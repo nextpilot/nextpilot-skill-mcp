@@ -16,3 +16,14 @@ dist/
 # 平台目录
 .vercel
 .edgeone
+
+# 校准用真实飞行日志（含 GPS 轨迹，勿入库；用小样本/合成日志做 CI）
+engine/tests/logs/*.ulg
+engine/tests/logs/*.bin
+
+# TS 增量构建
+*.tsbuildinfo
+
+# Python 字节码
+__pycache__/
+*.pyc

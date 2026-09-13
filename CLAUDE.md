@@ -273,6 +273,24 @@
 
 ---
 
+### 6.4 文件命名规范
+
+统一约定（新建文件务必遵循，命名不清时先查本节）：
+
+| 类型 | 规则 | 示例 |
+| --- | --- | --- |
+| React 组件 | PascalCase + `.tsx` | `LogAnalyzer.tsx`、`SkillCard.tsx` |
+| 库 / 类型 / 常量 | kebab-case + `.ts` | `chart-presets.ts`、`types.ts`、`constants.ts` |
+| Web Worker 入口 | kebab-case + `-worker.ts` | `ulog-worker.ts` |
+| Worker 内嵌脚本 / helper | kebab-case + `-script.ts` | `ulog-check-script.ts`、`ulog-data-script.ts` |
+| Next.js 路由 | `page.tsx` / `route.ts` / `layout.tsx`（目录即路由） | `app/analyze/page.tsx`、`app/api/explain/route.ts` |
+| Python 模块 | snake_case + `.py` | `run_checks_locally.py`（`engine/` 内包名 `nextpilot_engine`） |
+| 文档 | kebab-case + `.md` | `px4-ulog-rules.md` |
+
+> 注意：Worker 相关文件统一用连字符（`ulog-worker.ts`），不要用点号（❌ `ulog.worker.ts`）。
+
+---
+
 ## 7. 商业模式
 
 **核心原则**：社区内容（Skill）免费引流，确定性高价值服务（日志分析、规则库、API）收费。收费锚点是"确定性结论 + 规则库 + 数据积累"。

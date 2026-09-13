@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import {
   UploadCloud,
@@ -11,9 +11,30 @@ import {
   Lock,
   FileCheck2,
   ExternalLink,
+  LineChart,
+  ScrollText,
+  ClipboardCheck,
 } from "lucide-react";
-import type { AnalysisReport, Finding, Severity } from "@/lib/types";
-import type { WorkerStage } from "@/workers/ulog.worker";
+import type {
+  AnalysisReport,
+  Finding,
+  LogInfo,
+  Severity,
+  SeriesResponse,
+  TopicManifest,
+} from "@/lib/types";
+import type { WorkerStage } from "@/workers/ulog-worker";
+import type { SeriesRequest } from "@/lib/chart-presets";
+import { LogCharts } from "./LogCharts";
+import { LogEventsParams } from "./LogEventsParams";
+
+const VEHICLE_TYPE_LABELS: Record<string, string> = {
+  rotary_wing: "旋翼",
+  fixed_wing: "固定翼",
+  rover: "Rover",
+  airship: "飞艇",
+  unknown: "未知机型",
+};
 
 const STAGE_TEXT: Record<WorkerStage, string> = {
   "loading-runtime": "加载浏览器端 Pyodide 运行时",
@@ -22,15 +43,27 @@ const STAGE_TEXT: Record<WorkerStage, string> = {
   done: "完成",
 };
 
+type TabKey = "summary" | "charts" | "events";
+
 export function LogAnalyzer() {
   const workerRef = useRef<Worker | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pendingRef = useRef<Map<string, (data: unknown) => void>>(new Map());
+  const reqIdRef = useRef(0);
   const [stage, setStage] = useState<WorkerStage | "idle" | "explaining">(
     "idle",
   );
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<AnalysisReport | null>(null);
+  const [manifest, setManifest] = useState<TopicManifest | null>(null);
+  const [info, setInfo] = useState<LogInfo | null>(null);
   const [aiMarkdown, setAiMarkdown] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      workerRef.current?.terminate();
+    };
+  }, []);
 
   const explain = useCallback(
     async (fileName: string, findings: Finding[], stats: AnalysisReport["stats"]) => {
@@ -56,10 +89,28 @@ export function LogAnalyzer() {
     [],
   );
 
+  const requestSeries = useCallback((req: SeriesRequest): Promise<SeriesResponse> => {
+    const worker = workerRef.current;
+    if (!worker) return Promise.resolve({ error: "worker 未就绪" } as SeriesResponse);
+    const reqId = `s${reqIdRef.current++}`;
+    return new Promise((resolve) => {
+      pendingRef.current.set(reqId, (data) => resolve(data as SeriesResponse));
+      worker.postMessage({
+        type: "series",
+        reqId,
+        topic: req.topic,
+        instance: req.instance,
+        fields: req.fields,
+      });
+    });
+  }, []);
+
   const handleFile = useCallback(
     async (file: File) => {
       setError(null);
       setReport(null);
+      setManifest(null);
+      setInfo(null);
       setAiMarkdown(null);
 
       if (!file.name.toLowerCase().endsWith(".ulg")) {
@@ -67,33 +118,42 @@ export function LogAnalyzer() {
         return;
       }
 
-      const worker = new Worker(
-        new URL("../workers/ulog.worker.ts", import.meta.url),
-        { type: "module" },
-      );
-      workerRef.current = worker;
-
-      worker.onmessage = (e: MessageEvent) => {
-        const msg = e.data;
-        if (msg.type === "stage") {
-          setStage(msg.stage);
-        } else if (msg.type === "error") {
-          setError(msg.message);
-          setStage("idle");
-          worker.terminate();
-        } else if (msg.type === "done") {
-          const r = msg.report as AnalysisReport;
-          r.fileName = file.name;
-          r.fileSize = file.size;
-          r.analyzedAt = new Date().toISOString();
-          setReport(r);
-          worker.terminate();
-          void explain(file.name, r.findings, r.stats);
-        }
-      };
+      // 复用既有 worker（Pyodide 已加载），避免重复下载运行时
+      if (!workerRef.current) {
+        const worker = new Worker(
+          new URL("../workers/ulog-worker.ts", import.meta.url),
+          { type: "module" },
+        );
+        worker.onmessage = (e: MessageEvent) => {
+          const msg = e.data;
+          if (msg.type === "stage") {
+            setStage(msg.stage);
+          } else if (msg.type === "error") {
+            setError(msg.message);
+            setStage("idle");
+          } else if (msg.type === "done") {
+            const r = msg.report as AnalysisReport;
+            r.fileName = file.name;
+            r.fileSize = file.size;
+            r.analyzedAt = new Date().toISOString();
+            setReport(r);
+            setManifest(msg.manifest as TopicManifest);
+            setInfo(msg.info as LogInfo);
+            setStage("done");
+            void explain(file.name, r.findings, r.stats);
+          } else if (msg.type === "series") {
+            const resolve = pendingRef.current.get(msg.reqId);
+            if (resolve) {
+              pendingRef.current.delete(msg.reqId);
+              resolve(msg.data);
+            }
+          }
+        };
+        workerRef.current = worker;
+      }
 
       const bytes = new Uint8Array(await file.arrayBuffer());
-      worker.postMessage({ type: "analyze", file: bytes });
+      workerRef.current.postMessage({ type: "analyze", file: bytes });
     },
     [explain],
   );
@@ -105,9 +165,9 @@ export function LogAnalyzer() {
       {/* 隐私提示 */}
       <div className="mb-5 flex items-start gap-3 rounded-xl border border-primary/25 bg-primary/5 p-4 text-sm">
         <Lock className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-        <p className="leading-6 text-[#b9c9db]">
-          日志在<strong className="text-white">你的浏览器本地</strong>由
-          Pyodide + pyulog 解析，<strong className="text-white">原始 .ulg 文件不会上传</strong>
+        <p className="leading-6 text-muted">
+          日志在<strong className="text-text">你的浏览器本地</strong>由
+          Pyodide + pyulog 解析，<strong className="text-text">原始 .ulg 文件不会上传</strong>
           ；仅将结构化检查结果（findings）发送到服务器生成中文解释。
         </p>
       </div>
@@ -147,12 +207,20 @@ export function LogAnalyzer() {
       </div>
 
       {error && (
-        <div className="mt-4 rounded-xl border border-critical/40 bg-critical/10 p-4 text-sm text-red-200">
+        <div className="mt-4 rounded-xl border border-critical/40 bg-critical/10 p-4 text-sm text-critical">
           {error}
         </div>
       )}
 
-      {report && <ReportView report={report} aiMarkdown={aiMarkdown} />}
+      {report && manifest && info && (
+        <ReportView
+          report={report}
+          aiMarkdown={aiMarkdown}
+          manifest={manifest}
+          info={info}
+          requestSeries={requestSeries}
+        />
+      )}
     </div>
   );
 }
@@ -160,15 +228,28 @@ export function LogAnalyzer() {
 function ReportView({
   report,
   aiMarkdown,
+  manifest,
+  info,
+  requestSeries,
 }: {
   report: AnalysisReport;
   aiMarkdown: string | null;
+  manifest: TopicManifest;
+  info: LogInfo;
+  requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
 }) {
+  const [tab, setTab] = useState<TabKey>("summary");
   const counts = {
     critical: report.findings.filter((f) => f.severity === "critical").length,
     warning: report.findings.filter((f) => f.severity === "warning").length,
     info: report.findings.filter((f) => f.severity === "info").length,
   };
+
+  const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
+    { key: "summary", label: "检查结论", icon: <ClipboardCheck className="h-4 w-4" /> },
+    { key: "charts", label: "数据图表", icon: <LineChart className="h-4 w-4" /> },
+    { key: "events", label: "事件与参数", icon: <ScrollText className="h-4 w-4" /> },
+  ];
 
   return (
     <div className="mt-8">
@@ -179,8 +260,10 @@ function ReportView({
           <p className="font-medium">{report.fileName}</p>
           <p className="text-xs text-muted">
             {(report.fileSize / 1024 / 1024).toFixed(2)} MB
-            {report.durationSec ? ` · 时长 ${Math.round(report.durationSec)}s` : ""} ·{" "}
-            {report.parserVersion}
+            {report.durationSec ? ` · 时长 ${Math.round(report.durationSec)}s` : ""}
+            {report.vehicleType
+              ? ` · ${VEHICLE_TYPE_LABELS[report.vehicleType] ?? report.vehicleType}`
+              : ""} · {report.parserVersion}
           </p>
         </div>
         <div className="ml-auto flex gap-2 text-xs">
@@ -190,10 +273,49 @@ function ReportView({
         </div>
       </div>
 
+      {/* tabs */}
+      <div className="mt-6 flex gap-1 rounded-xl border border-border bg-surface p-1">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTab(t.key)}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm transition-colors ${
+              tab === t.key
+                ? "bg-surface-2 font-medium text-text"
+                : "text-muted hover:text-text"
+            }`}
+          >
+            {t.icon}
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-6">
+        {tab === "summary" && <SummaryTab report={report} aiMarkdown={aiMarkdown} />}
+        {tab === "charts" && (
+          <LogCharts manifest={manifest} phases={info.phases} requestSeries={requestSeries} />
+        )}
+        {tab === "events" && <LogEventsParams info={info} />}
+      </div>
+    </div>
+  );
+}
+
+function SummaryTab({
+  report,
+  aiMarkdown,
+}: {
+  report: AnalysisReport;
+  aiMarkdown: string | null;
+}) {
+  return (
+    <div>
       {/* findings 明细：确定性引擎结果 */}
-      <h2 className="mt-8 mb-3 text-lg font-semibold">检查明细（确定性引擎）</h2>
+      <h2 className="mb-3 text-lg font-semibold">检查明细（确定性引擎）</h2>
       {report.findings.length === 0 ? (
-        <p className="rounded-xl border border-ok/30 bg-ok/5 p-4 text-sm text-emerald-200">
+        <p className="rounded-xl border border-ok/30 bg-ok/5 p-4 text-sm text-ok">
           振动 / IMU 削波、EKF 创新检验、电源三项基础检查均未触发阈值。
         </p>
       ) : (
@@ -254,20 +376,20 @@ function FindingCard({ finding }: { finding: Finding }) {
         <h3 className="font-medium">{finding.title}</h3>
       </div>
       <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
-        <div className="rounded-lg bg-[#0a0e15] px-3 py-2">
+        <div className="rounded-lg bg-surface-2 px-3 py-2">
           <p className="text-[11px] text-muted">字段</p>
-          <p className="mt-0.5 break-all font-mono text-xs text-sky-300">
+          <p className="mt-0.5 break-all font-mono text-xs text-primary">
             {finding.evidence.field}
           </p>
         </div>
-        <div className="rounded-lg bg-[#0a0e15] px-3 py-2">
+        <div className="rounded-lg bg-surface-2 px-3 py-2">
           <p className="text-[11px] text-muted">实测值</p>
           <p className="mt-0.5 text-sm font-semibold">
             {String(finding.evidence.value)}
             {finding.evidence.unit ? ` ${finding.evidence.unit}` : ""}
           </p>
         </div>
-        <div className="rounded-lg bg-[#0a0e15] px-3 py-2">
+        <div className="rounded-lg bg-surface-2 px-3 py-2">
           <p className="text-[11px] text-muted">阈值</p>
           <p className="mt-0.5 text-sm">
             {finding.evidence.threshold !== undefined
@@ -277,7 +399,7 @@ function FindingCard({ finding }: { finding: Finding }) {
         </div>
       </div>
       {finding.suggestion && (
-        <p className="mt-3 text-sm text-[#c3d0e0]">{finding.suggestion}</p>
+        <p className="mt-3 text-sm text-muted">{finding.suggestion}</p>
       )}
       {finding.docUrl && (
         <a
