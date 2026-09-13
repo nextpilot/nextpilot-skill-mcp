@@ -1,0 +1,86 @@
+---
+title: 下载与使用
+titleEn: Download and use
+description: 找到合适的 Skill，把核心逻辑接入自己的客户端，再用一组示例输入做小范围验证。
+descriptionEn: Find a suitable Skill, wire its core logic into your client, and validate it with one small example.
+group: 交付
+groupEn: Ship
+order: 6
+---
+
+## 选择一个 Skill | Pick a Skill
+
+<Zh>
+
+从 Skill 库按分类或关键词找到合适内容，先阅读适用平台、依赖和安全说明。
+
+</Zh>
+
+<En>
+
+Find a suitable Skill by category or keyword, then read its platform, dependency, and safety
+notes first.
+
+</En>
+
+<Zh>
+
+平台维度比评分更值得先看：一份为 ArduPilot 写的检查规则，直接套到 PX4 上，
+结论的可靠程度取决于两边的字段语义是否真的对应。
+
+</Zh>
+
+<En>
+
+Read the platform before the rating. A check rule written for ArduPilot applied to PX4 is only as
+reliable as the field semantics actually line up.
+
+</En>
+
+## 导入工作流 | Import into your workflow
+
+<Zh>
+
+复制 Skill 的核心提示词，或按页面提供的格式导入到你的 AI 客户端，
+再用示例输入做一次小范围验证。
+
+</Zh>
+
+<En>
+
+Copy the core prompt, or use the provided import format in your AI client, then run a small
+validation with the example input.
+
+</En>
+
+<Zh>
+
+验证的意思是**先用示例再上真实数据**：示例输出了预期结果，才说明环境接对了；
+直接拿生产数据试，出了问题分不清是环境还是数据。
+
+</Zh>
+
+<En>
+
+Validate means **example first, real data second**. If the example produces the expected output,
+the environment is wired correctly; starting with production data leaves you unable to tell an
+environment problem from a data one.
+
+</En>
+
+## 分析一份日志 | Analyze a log
+
+<Zh>
+
+日志分析是平台内置服务，不需要导入 Skill。选择一份 PX4 `.ulg`，解析与规则检查都在浏览器本地完成，
+只有结构化的检查结论会发送到服务器生成中文解读。
+
+</Zh>
+
+<En>
+
+Log analysis is built in — there is no Skill to import. Pick a PX4 `.ulg`; parsing and rule checks
+run locally in your browser, and only the structured findings are sent to the server for the
+Chinese explanation.
+
+</En>

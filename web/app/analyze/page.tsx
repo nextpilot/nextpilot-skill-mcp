@@ -10,16 +10,16 @@ export const metadata: Metadata = {
 
 export default function AnalyzePage() {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
+    <div className="mx-auto max-w-7xl px-4 py-8">
       <h1 className="text-2xl font-bold"><LocalizedText zh="PX4 飞行日志分析" en="PX4 flight log analysis" /></h1>
-      <p className="mt-2 text-sm leading-6 text-muted">
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
         确定性引擎负责数值判断（解析 → 规则检查），DeepSeek
         只把检查结果翻译成中文，不参与任何数值判断。当前为冲刺 1 版本，包含
-        <strong className="text-muted"> 振动 / IMU 削波、EKF 创新检验、电源</strong>
+        <strong className="text-text"> 振动 / IMU 削波、EKF 创新检验、电源</strong>
         三项基础检查，阈值仍在真实日志校准中。
       </p>
 
-      <div className="mt-8">
+      <div className="mt-6">
         <LogAnalyzer />
       </div>
     </div>

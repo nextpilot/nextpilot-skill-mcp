@@ -105,7 +105,7 @@ export default async function SkillDetailPage({
             {skill.models.map((m) => (
               <span
                 key={m}
-                className="rounded-md bg-surface-2 px-2.5 py-1 text-xs text-[#c3d0e0]"
+                className="rounded-md bg-surface-2 px-2.5 py-1 text-xs text-text"
               >
                 {m}
               </span>

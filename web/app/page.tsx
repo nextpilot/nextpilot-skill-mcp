@@ -45,7 +45,7 @@ export default function HomePage() {
             </Link>
             <Link
               href="/skills"
-              className="flex items-center gap-2 rounded-lg border border-border bg-surface/70 px-5 py-3 text-sm text-text transition-colors hover:border-primary"
+              className="flex items-center gap-2 rounded-lg border border-border bg-surface px-5 py-3 text-sm text-text transition-colors hover:border-primary"
             >
               <LocalizedText zh="浏览 Skill 库" en="Browse skills" />
               <ArrowRight className="h-4 w-4" />
@@ -134,7 +134,7 @@ export default function HomePage() {
       </section>
 
       {/* 平台原则 */}
-      <section className="border-t border-border/80 bg-surface/40">
+      <section className="border-t border-border/80 bg-surface">
         <div className="mx-auto grid max-w-6xl gap-6 px-4 py-12 sm:grid-cols-3">
           <Principle
             icon={<ShieldCheck className="h-5 w-5" />}

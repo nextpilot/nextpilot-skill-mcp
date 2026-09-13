@@ -33,7 +33,7 @@ export function ThemeToggle() {
       aria-label={theme === "light" ? "切换到深色主题" : "切换到浅色主题"}
       title={theme === "light" ? "深色主题" : "浅色主题"}
     >
-      {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+      {theme === "light" ? <Moon className="h-[18px] w-[18px]" /> : <Sun className="h-[18px] w-[18px]" />}
     </button>
   );
 }

@@ -1,0 +1,58 @@
+---
+title: 提交到平台
+titleEn: Submit to the hub
+description: 把 Skill 变成一条可被检索、可被复现的条目——补齐字段，过一遍许可证与敏感数据。
+descriptionEn: Turn a Skill into a searchable, reproducible entry — complete the fields, then clear licensing and sensitive data.
+group: 交付
+groupEn: Ship
+order: 5
+---
+
+## 准备材料 | Prepare the material
+
+<Zh>
+
+补全名称、描述、分类、适用平台、依赖模型、输入输出示例、开源地址、许可证和实测效果。
+字段宁缺毋滥：写不满的条目比写错的条目更容易误导人。
+
+</Zh>
+
+<En>
+
+Complete the name, description, category, platforms, model dependencies, I/O examples, source URL,
+license, and measured results. Prefer omission over guesswork — an incomplete entry misleads less
+than a wrong one.
+
+</En>
+
+- <Zh><strong>名称 / 一句话描述</strong>——解决什么飞控场景的问题</Zh><En><strong>Name / one-liner</strong> — the flight-control problem it solves</En>
+- <Zh><strong>输入输出示例</strong>——至少一组真实输入与期望输出</Zh><En><strong>I/O examples</strong> — at least one real input and expected output</En>
+- <Zh><strong>适用平台</strong>——PX4 / ArduPilot / Betaflight / 仿真</Zh><En><strong>Platforms</strong> — PX4 / ArduPilot / Betaflight / simulation</En>
+- <Zh><strong>许可证与出处</strong>——MIT / Apache 等宽松许可优先</Zh><En><strong>License and source</strong> — permissive licenses preferred</En>
+- <Zh><strong>实测效果</strong>——跑过的案例和结果，不接受"应该可以"</Zh><En><strong>Measured results</strong> — cases actually run; "should work" is not a result</En>
+
+## 提交审核 | Submit for review
+
+<Zh>
+
+提交前检查原创性、许可证兼容性和敏感数据。涉及真实载具的能力必须默认只读，并明确仿真优先。
+
+</Zh>
+
+<En>
+
+Check originality, license compatibility, and sensitive data before submitting. Capabilities
+involving real aircraft must be read-only by default, with simulation preferred.
+
+</En>
+
+<Callout tone="primary" title="提交前检查" titleEn="Before you submit">
+
+- <Zh>名称和一句话描述清楚</Zh><En>Name and one-liner are clear</En>
+- <Zh>输入输出示例可复现</Zh><En>I/O examples reproduce</En>
+- <Zh>平台、模型和许可证已填写</Zh><En>Platforms, models, and license are filled in</En>
+- <Zh>不含密钥、GPS 或个人数据</Zh><En>No keys, GPS, or personal data</En>
+- <Zh>涉及致动时默认只读</Zh><En>Read-only by default where actuation is involved</En>
+- <Zh>已声明原创或注明出处</Zh><En>Original, or attributed to its source</En>
+
+</Callout>

@@ -1,14 +1,17 @@
 ---
-name: ArduPilot 日志诊断 MCP（工具链入口）
+name: ArduPilot 日志诊断 MCP
 description: furkanisikay 开源的 ArduPilot .bin 诊断 MCP Server，16 项检查、每条发现附阈值来源与官方文档链接，40 个真实炸机日志验证
-category: toolchain
 platforms: ["ArduPilot"]
 models: ["GPT-4o-mini", "Claude", "DeepSeek"]
-tags: ["MCP", "bin", "日志分析", "ArduPilot", "开源", "MIT"]
+tools: ["analyze_log", "list_checks", "explain_finding"]
+transport: stdio
+readOnly: true
+tags: ["bin", "日志分析", "ArduPilot", "开源", "MIT"]
 rating: 4.8
 downloads: 1340
 featured: true
 license: "MIT"
+sourceUrl: "https://github.com/furkanisikay/ardupilot-mcp"
 updatedAt: "2026-09-10"
 ---
 

@@ -1,10 +1,12 @@
 ---
 name: MSFS 模拟飞行 MCP 控制
 description: 通过 MCP Server 让 LLM 直接读取微软模拟飞行仪表、操纵舵面、执行起降程序，用于训练飞行语言智能体与自动化测试
-category: toolchain
 platforms: ["仿真", "MSFS"]
 models: ["Claude", "GPT-4o", "DeepSeek-V3"]
-tags: ["MCP", "MSFS", "模拟飞行", "仿真"]
+tools: ["get_instruments", "set_controls", "run_checklist"]
+transport: stdio
+readOnly: false
+tags: ["MSFS", "模拟飞行", "仿真", "致动"]
 rating: 4.2
 downloads: 540
 featured: true

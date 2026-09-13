@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="NextPilot Skill MCP">
+  <title>NextPilot Skill MCP</title>
+  <!--
+    favicon 的形状预算：浏览器标签页只给 16px。试过并否掉的几版——
+    外环 + 扫描线 → 16px 下读成 ⊘（禁止符号）；四分之一扇形 → 读成饼图；
+    双弧 → 读成 Wi-Fi；四旋翼（四个桨盘）→ 读成骰子五点。都是撞上了已有的通用符号。
+
+    最终取雷达屏的两道距离环 + 中心点：既是本平台的「探测 / 判读」语义，
+    又是 16px 下不会误读的形状，环间距按 16px 反推（环间空隙 ≈ 1.5px）。
+    与站内 Radar 图标同一意象，但不复用其路径——lucide 那版有八个元素，缩到 16px 必糊。
+
+    用实心色块而非透明底：标签栏有深有浅，透明底的绿描边在深色标签栏上会消失。
+  -->
+  <rect width="64" height="64" rx="14" fill="#1b7f5a"/>
+  <g fill="none" stroke="#ffffff" stroke-width="5">
+    <circle cx="32" cy="32" r="22"/>
+    <circle cx="32" cy="32" r="11.5"/>
+  </g>
+  <circle cx="32" cy="32" r="3.5" fill="#ffffff"/>
+</svg>

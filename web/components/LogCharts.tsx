@@ -97,31 +97,33 @@ export function LogCharts({
 
   if (phases.length === 0) {
     return (
-      <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted">
+      <p className="text-sm text-muted">
         该日志未记录飞行模式（vehicle_status.nav_state），无法绘制阶段背景。
       </p>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <PhaseStrip phases={phases} />
       {presets.length === 0 ? (
-        <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted">
+        <p className="text-sm text-muted">
           该日志未记录可绘制的图表话题（振动 / IMU / 姿态 / EKF / 电源 / GPS）。
         </p>
       ) : (
-        presets.map(({ preset, panels }) => (
-          <PresetCard
-            key={preset.id}
-            id={preset.id}
-            title={preset.title}
-            description={preset.description}
-            panels={panels!}
-            phases={phases}
-            requestSeries={requestSeries}
-          />
-        ))
+        <div className="divide-y divide-border/50">
+          {presets.map(({ preset, panels }) => (
+            <PresetCard
+              key={preset.id}
+              id={preset.id}
+              title={preset.title}
+              description={preset.description}
+              panels={panels!}
+              phases={phases}
+              requestSeries={requestSeries}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -132,9 +134,9 @@ function PhaseStrip({ phases }: { phases: FlightPhase[] }) {
   const legend = new Map<string, string>();
   for (const p of phases) legend.set(p.mode, modeColor(p.mode));
   return (
-    <div className="rounded-2xl border border-border bg-surface p-4">
-      <p className="mb-2 text-xs text-muted">飞行阶段（相对日志开始）</p>
-      <div className="flex h-5 w-full overflow-hidden rounded-md">
+    <div>
+      <p className="mb-2 text-xs text-muted">飞行阶段（相对日志开始，浅色段为未解锁）</p>
+      <div className="flex h-4 w-full overflow-hidden rounded">
         {phases.map((p, i) => (
           <div
             key={i}
@@ -142,7 +144,7 @@ function PhaseStrip({ phases }: { phases: FlightPhase[] }) {
             style={{
               width: `${((p.endSec - p.startSec) / total) * 100}%`,
               background: modeColor(p.mode),
-              opacity: p.armed ? 0.95 : 0.45,
+              opacity: p.armed ? 0.95 : 0.4,
             }}
           />
         ))}
@@ -176,21 +178,21 @@ function PresetCard({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-2xl border border-border bg-surface">
+    <div>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 p-4 text-left"
+        className="flex w-full items-center gap-2 py-3 text-left"
       >
         <LineChart className="h-4 w-4 shrink-0 text-primary" />
         <span className="font-medium">{title}</span>
+        <span className="hidden text-xs text-muted sm:inline">{description}</span>
         <ChevronDown
-          className={`ml-auto h-4 w-4 text-muted transition-transform ${open ? "rotate-180" : ""}`}
+          className={`ml-auto h-4 w-4 shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
       {open && (
-        <div className="space-y-4 border-t border-border p-4">
-          <p className="text-xs text-muted">{description}</p>
+        <div className="space-y-5 pb-5">
           {panels.map((panel) => (
             <PanelChart
               key={panel.title}
@@ -322,8 +324,8 @@ function PanelChart({
   }, [panel, phases, requestSeries, groupKey]);
 
   return (
-    <div className="rounded-xl border border-border bg-surface-2/60 p-3">
-      <p className="mb-2 text-sm font-medium">{panel.title}</p>
+    <div>
+      <p className="mb-1 text-sm font-medium text-muted">{panel.title}</p>
       {state === "loading" && (
         <div className="flex h-40 items-center justify-center gap-2 text-sm text-muted">
           <Loader2 className="h-4 w-4 animate-spin" /> 正在抽取数据…
@@ -345,8 +347,13 @@ function buildLayout(
   dark: boolean,
 ): Record<string, unknown> {
   const text = dark ? "#e6eee8" : "#172019";
-  const muted = dark ? "#93a397" : "#68736a";
+  const muted = dark ? "#93a397" : "#5c665e";
   const grid = dark ? "rgba(230,238,232,0.08)" : "rgba(23,32,25,0.08)";
+  const axisLine = dark ? "#2f3d34" : "#ced4c6";
+  // 图表落在白色画布（surface）内，故绘图区取面板内的「凹陷块」surface-2
+  // （浅 #eef1ee / 深 #232e27，与画布 1.14:1），再用 mirror 轴框住四边。
+  // 这两个值是 globals.css 里 --app-surface-2 的拷贝，改配色时一并改。
+  const plotBg = dark ? "#232e27" : "#eef1ee";
   const shapes: unknown[] = [];
   // 阶段背景带：用低透明度中性色，模式颜色由顶部 PhaseStrip 承载
   for (const p of phases) {
@@ -365,7 +372,7 @@ function buildLayout(
   }
   return {
     paper_bgcolor: "rgba(0,0,0,0)",
-    plot_bgcolor: "rgba(0,0,0,0)",
+    plot_bgcolor: plotBg,
     font: { color: text, size: 11, family: "PingFang SC, Microsoft YaHei, sans-serif" },
     margin: { l: 48, r: 12, t: 8, b: 40 },
     xaxis: {
@@ -373,12 +380,20 @@ function buildLayout(
       gridcolor: grid,
       zeroline: false,
       tickfont: { color: muted },
+      showline: true,
+      mirror: true,
+      linecolor: axisLine,
+      linewidth: 1,
     },
     yaxis: {
       title: { text: panel.yLabel, font: { color: muted, size: 10 } },
       gridcolor: grid,
       zeroline: false,
       tickfont: { color: muted },
+      showline: true,
+      mirror: true,
+      linecolor: axisLine,
+      linewidth: 1,
     },
     showlegend: true,
     legend: { font: { color: muted, size: 10 }, orientation: "h", x: 0, y: 1.02 },

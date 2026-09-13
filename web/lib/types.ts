@@ -18,8 +18,33 @@ export interface SkillMeta {
   updatedAt: string;
 }
 
-/** findings 检查结果（日志分析三层架构的层间契约，见 CLAUDE.md 4.2） */
-export type Severity = "critical" | "warning" | "info";
+/**
+ * MCP Server 元数据。
+ * 与 Skill 并列而非其子类：Skill 是模型读到的提示词与约定，MCP Server 是客户端
+ * 能真正调用的工具集，两者的字段、评估方式和安全要求都不同。
+ */
+export interface McpServerMeta {
+  slug: string;
+  name: string;
+  description: string;
+  /** 允许自由取值：MCP 面向的不只是飞控固件，还有仿真器与工具 */
+  platforms: string[];
+  models: string[];
+  /** 暴露给客户端的工具名 */
+  tools: string[];
+  transport: string;
+  /** 默认是否只读。false 表示具备致动能力，详情页须显著标注（见 CLAUDE.md 第 5 节） */
+  readOnly: boolean;
+  tags: string[];
+  rating: number;
+  downloads: number;
+  featured?: boolean;
+  sourceUrl?: string;
+  license?: string;
+  updatedAt: string;
+}
+
+/** findings 检查结果（日志分析三层架构的层间契约，见 CLAUDE.md 4.2） */export type Severity = "critical" | "warning" | "info";
 
 export interface Finding {
   id: string;
