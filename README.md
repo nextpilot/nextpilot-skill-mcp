@@ -4,9 +4,26 @@
 
 > 当前进度：冲刺 1（见 CLAUDE.md 第 8 节）。Skill Hub 静态站 + PX4 `.ulg` 端侧解析（3 条基础规则）+ DeepSeek 解释层。
 
+## 目录结构
+
+```text
+.
+├── CLAUDE.md        # 项目说明（定位、架构、路线图、决策依据）
+├── README.md
+└── web/             # Next.js 前端 + Pages Functions（本冲刺的全部代码）
+    ├── app/         # 页面与 /api/explain 边缘函数
+    ├── components/
+    ├── content/skills/   # Skill 卡片源文件（MDX）
+    ├── lib/
+    └── workers/     # Pyodide Worker 与 Python 规则检查脚本
+```
+
+后续阶段将在根目录增加 `engine/`（浏览器 / 服务端共用的 Python 检查引擎）等子项目。
+
 ## 快速开始
 
 ```bash
+cd web
 pnpm install
 cp .env.example .env.local   # 填入 DEEPSEEK_API_KEY
 pnpm dev
@@ -28,11 +45,11 @@ pnpm dev
   → 中文 Markdown 报告
 ```
 
-- **第一层 解析引擎**：Pyodide（WASM Python）+ pyulog，见 `workers/ulog.worker.ts`
-- **第二层 规则检查**：`workers/ulog-check-script.ts` 中的 Python 规则（振动/IMU 削波、EKF 创新检验、电芯电压），阈值待真实日志校准
-- **第三层 LLM 解释**：`app/api/explain/route.ts`，只接收 findings，system prompt 禁止编造数值
+- **第一层 解析引擎**：Pyodide（WASM Python）+ pyulog，见 `web/workers/ulog.worker.ts`
+- **第二层 规则检查**：`web/workers/ulog-check-script.ts` 中的 Python 规则（振动/IMU 削波、EKF 创新检验、电芯电压），阈值待真实日志校准
+- **第三层 LLM 解释**：`web/app/api/explain/route.ts`，只接收 findings，system prompt 禁止编造数值
 
-新增 Skill：在 `content/skills/` 添加一个 `.mdx` 文件并补全 frontmatter（字段规范见 CLAUDE.md 3.1）。
+新增 Skill：在 `web/content/skills/` 添加一个 `.mdx` 文件并补全 frontmatter（字段规范见 CLAUDE.md 3.1）。
 
 ## 待验证（冲刺 1 风险项）
 

@@ -216,7 +216,7 @@
 
 面向国内用户选型：
 
-- **前端 / 全栈**：Next.js + TypeScript + Tailwind CSS + shadcn/ui
+- **前端 / 全栈**：Next.js + TypeScript + Tailwind CSS + shadcn/ui，**代码位于 `web/` 子目录**（monorepo 预留：未来浏览器 / 服务端共用的 Python 检查引擎放根目录 `engine/`）
 - **登录认证**：Auth.js（NextAuth）。**冲刺 2 仅支持 GitHub + 邮箱验证码 / Magic Link（零资质，个人开发者可直接上线）**；**微信扫码、手机号验证码待注册企业主体后再接入**（微信开放平台网站应用需企业资质 + 300 元认证，短信签名 / 模板需企业资质审核）
 - **数据存储（EdgeOne 内置两层）**：
   - **EdgeOne KV**：小尺寸键值、读多写少，存元数据与索引——用户、配额计数、评论、报告元数据。**冲刺 1 不用**（Skill 是 MDX 静态文件，报告存 localStorage）；**冲刺 2 起随登录配额启用**，配额计数用唯一键 + 前缀列举避免竞态；注意最终一致，写后不立即回读。
