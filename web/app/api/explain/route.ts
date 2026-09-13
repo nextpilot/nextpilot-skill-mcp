@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Finding } from "@/lib/types";
 
-export const runtime = "edge";
+// Next.js 16 起 edge runtime 已废弃（默认 nodejs）；EdgeOne Pages 的 SSR/函数同样跑在 Node.js 运行时
 // 长报告允许较长生成时间；若边缘平台超时更短，以平台限制为准（CLAUDE.md 9 风险项）
 export const maxDuration = 60;
 
