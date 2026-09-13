@@ -18,7 +18,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const skill = getSkillBySlug(slug);
   if (!skill) return {};
-  return { title: `${skill.name} · NextPilot UAV AI`, description: skill.description };
+  return { title: `${skill.name} · NextPilot Skill MCP`, description: skill.description };
 }
 
 export default async function SkillDetailPage({

@@ -1,58 +1,135 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0b0f17;
-  --color-surface: #111827;
-  --color-surface-2: #1a2333;
-  --color-border: #1f2a3d;
-  --color-text: #e5edf7;
-  --color-muted: #8aa0b8;
-  --color-primary: #38bdf8;
-  --color-primary-strong: #0ea5e9;
+  --color-bg: var(--app-bg);
+  --color-surface: var(--app-surface);
+  --color-surface-2: var(--app-surface-2);
+  --color-border: var(--app-border);
+  --color-text: var(--app-text);
+  --color-muted: var(--app-muted);
+  --color-primary: var(--app-primary);
+  --color-primary-strong: var(--app-primary-strong);
   --color-critical: #f87171;
   --color-warning: #fbbf24;
   --color-ok: #34d399;
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, "PingFang SC",
-    "Microsoft YaHei", sans-serif;
+  --font-sans: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+:root {
+  --app-bg: #f5f6f2;
+  --app-surface: #ffffff;
+  --app-surface-2: #eef0eb;
+  --app-border: #d9ddd5;
+  --app-text: #172019;
+  --app-muted: #68736a;
+  --app-primary: #1b7f5a;
+  --app-primary-strong: #126244;
+  --app-grid: rgba(23, 32, 25, 0.055);
+  --app-glow: rgba(27, 127, 90, 0.13);
+}
+
+html[data-theme="dark"] {
+  --app-bg: #0b0f0d;
+  --app-surface: #121915;
+  --app-surface-2: #1b241e;
+  --app-border: #2b3830;
+  --app-text: #e6eee8;
+  --app-muted: #93a397;
+  --app-primary: #69d39d;
+  --app-primary-strong: #3aaf76;
+  --app-grid: rgba(230, 238, 232, 0.055);
+  --app-glow: rgba(105, 211, 157, 0.12);
 }
 
 html {
   scroll-behavior: smooth;
+  background: var(--color-bg);
 }
 
 body {
-  background: var(--color-bg);
+  background-color: var(--color-bg);
+  background-image: linear-gradient(var(--app-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--app-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.site-header {
+  background: color-mix(in srgb, var(--color-bg) 88%, transparent);
+}
+
+.theme-toggle {
+  display: inline-flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-muted);
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.theme-toggle:hover,
+.icon-link:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.language-toggle {
+  display: inline-flex;
+  height: 2rem;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0 0.55rem;
+  color: var(--color-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.language-toggle:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.icon-link {
+  display: inline-flex;
+  color: var(--color-muted);
+  transition: color 160ms ease;
 }
 
 .prose-skill h2 {
-  @apply mt-8 mb-3 text-lg font-semibold text-white;
+  @apply mt-8 mb-3 text-lg font-semibold text-text;
 }
 .prose-skill h3 {
-  @apply mt-6 mb-2 text-base font-semibold text-white;
+  @apply mt-6 mb-2 text-base font-semibold text-text;
 }
 .prose-skill p {
-  @apply my-3 leading-7 text-[#c3d0e0];
+  @apply my-3 leading-7 text-muted;
 }
 .prose-skill ul {
-  @apply my-3 list-disc space-y-1.5 pl-5 text-[#c3d0e0];
+  @apply my-3 list-disc space-y-1.5 pl-5 text-muted;
 }
 .prose-skill ol {
-  @apply my-3 list-decimal space-y-1.5 pl-5 text-[#c3d0e0];
+  @apply my-3 list-decimal space-y-1.5 pl-5 text-muted;
 }
 .prose-skill code {
-  @apply rounded bg-[#0a0e15] px-1.5 py-0.5 text-[13px] text-sky-300;
+  @apply rounded bg-surface-2 px-1.5 py-0.5 text-[13px] text-primary;
 }
 .prose-skill pre {
-  @apply my-4 overflow-x-auto rounded-xl border border-[#1f2a3d] bg-[#0a0e15] p-4;
+  @apply my-4 overflow-x-auto rounded-xl border border-border bg-surface-2 p-4;
 }
 .prose-skill pre code {
-  @apply bg-transparent p-0 text-[13px] leading-6 text-sky-200;
+  @apply bg-transparent p-0 text-[13px] leading-6 text-text;
 }
 .prose-skill strong {
-  @apply font-semibold text-white;
+  @apply font-semibold text-text;
 }
 .prose-skill a {
-  @apply text-sky-400 underline-offset-2 hover:underline;
+  @apply text-primary underline-offset-2 hover:underline;
 }

@@ -2,6 +2,8 @@
 
 飞控 × AI 的 Skill / MCP 交流分享平台。按「感知 → 决策 → 控制 → 工具链」组织飞控 AI Skill，并内置确定性日志分析服务：**浏览器端解析日志、规则引擎做数值判断、LLM 只做中文解释**。
 
+本项目采用 [BSD-3-Clause](LICENSE) 许可证。
+
 > 当前进度：冲刺 1（见 CLAUDE.md 第 8 节）。Skill Hub 静态站 + PX4 `.ulg` 端侧解析（3 条基础规则）+ DeepSeek 解释层。
 
 ## 目录结构
@@ -9,8 +11,13 @@
 ```text
 .
 ├── CLAUDE.md        # 项目说明（定位、架构、路线图、决策依据）
+├── LICENSE          # BSD-3-Clause 许可证
 ├── README.md
-└── web/             # Next.js 前端 + Pages Functions（本冲刺的全部代码）
+├── docs/            # 架构、运维和规则文档
+├── engine/          # 浏览器 / 服务端共用的 Python 日志引擎（预留）
+├── mcp-server/      # 平台 MCP Server（阶段二预留）
+├── scripts/         # 构建、校准和发布脚本（预留）
+└── web/             # Next.js 前端 + Pages Functions（当前冲刺代码）
     ├── app/         # 页面与 /api/explain 边缘函数
     ├── components/
     ├── content/skills/   # Skill 卡片源文件（MDX）
@@ -18,7 +25,7 @@
     └── workers/     # Pyodide Worker 与 Python 规则检查脚本
 ```
 
-后续阶段将在根目录增加 `engine/`（浏览器 / 服务端共用的 Python 检查引擎）等子项目。
+`engine/`、`mcp-server/` 和 `scripts/` 当前仅保留目录边界与说明，按路线图逐步实现。
 
 ## 快速开始
 
@@ -29,9 +36,10 @@ cp .env.example .env.local   # 填入 DEEPSEEK_API_KEY
 pnpm dev
 ```
 
-打开 http://localhost:3000 ：
+打开 <http://localhost:3000> ：
 
 - `/` 首页与精选 Skill
+- `/guide` Skill / MCP 帮助文档与提交使用指南
 - `/skills` Skill 库（构建期读取 `content/skills/*.mdx`，Fuse.js 客户端搜索）
 - `/analyze` PX4 日志分析（Pyodide + pyulog 在 Web Worker 中本地解析）
 

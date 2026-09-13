@@ -1,4 +1,4 @@
-# NextPilot UAV AI —— 飞控 AI Skill / MCP 平台
+# NextPilot Skill MCP —— 飞控 AI Skill / MCP 平台
 
 ## 1. 项目定位
 
@@ -23,7 +23,7 @@
 
 ```text
 ┌──────────────────────────────────────────────────────────┐
-│                    NextPilot UAV AI 平台                  │
+│                  NextPilot Skill MCP 平台                 │
 ├───────────────┬──────────────────────┬───────────────────┤
 │  Skill Hub    │  日志分析服务（内置）  │  平台 MCP Server  │
 │  社区 / 免费  │  确定性引擎 + LLM 解释 │  对外能力分发      │
