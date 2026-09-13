@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LanguageProvider } from "@/components/LanguageProvider";
+import { SessionProvider } from "@/components/SessionProvider";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
 import "./globals.css";
 
@@ -18,9 +19,11 @@ export default function RootLayout({
     <html lang="zh-CN" data-theme="light">
       <body className="min-h-screen font-sans">
         <LanguageProvider>
-          <SiteHeader />
-          <main className="pb-20">{children}</main>
-          <SiteFooter />
+          <SessionProvider>
+            <SiteHeader />
+            <main className="pb-20">{children}</main>
+            <SiteFooter />
+          </SessionProvider>
         </LanguageProvider>
       </body>
     </html>

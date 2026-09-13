@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Languages, Radar } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { UserMenu } from "@/components/UserMenu";
 import { useLanguage } from "@/components/LanguageProvider";
 
 // GitHub 官方标志路径（simple-icons，CC0）。不要手改：八爪鱼剪影的负空间在 18–20px
@@ -57,13 +58,15 @@ export function SiteHeader() {
             <span>{nextLanguage === "en" ? "EN" : "中"}</span>
           </button>
           <ThemeToggle />
+          <span className="mx-1 h-5 w-px bg-border" aria-hidden />
+          <UserMenu />
           <a
-            href="https://github.com"
+            href="https://gitee.com/nextpilot/nextpilot-skill-mcp"
             target="_blank"
             rel="noreferrer"
             className="icon-link ml-0.5"
-            aria-label="GitHub"
-            title="GitHub"
+            aria-label="源代码仓库"
+            title="Gitee 仓库"
           >
             <GithubIcon className="h-5 w-5" />
           </a>
