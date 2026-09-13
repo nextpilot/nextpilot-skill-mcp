@@ -1,0 +1,177 @@
+# PX4 飞控故障知识库（冲刺 2 冷启动版，10 条高频故障）
+#
+# 用途：端侧确定性引擎先输出异常标签（阈值规则命中），再按
+#   trigger_tags / flight_phase / exclude_tags 匹配本文件，
+#   只把匹配成功的条目注入 LLM 上下文（见 docs/rules/knowledge-authoring.md）。
+# LLM 禁止使用匹配条目以外的故障模式推断根因。
+#
+# 字段：
+#   fault_id            稳定编号，勿复用勿改义
+#   fault_tag           主故障标签（与阈值规则 tag 对齐）
+#   trigger_tags        命中所需的异常标签集合（当前语义：任一命中）
+#   flight_phase        适用飞行阶段；all = 不限（阶段由引擎按 mode/armed 推断）
+#   exclude_tags        出现这些标签时本条失效（碰撞/强风/温度等边界）
+#   possible_root_cause 根因列表，已按排查优先级排序（LLM 不得重排）
+#   troubleshooting_steps 排查步骤（由简到繁）
+#   risk_level          高 / 中高 / 中 / 低
+#   note                禁忌与边界说明（LLM 必须遵守）
+
+fault_knowledge_base:
+  - fault_id: F001
+    fault_tag: high_vibration
+    trigger_tags: ["high_vibration"]
+    flight_phase: ["takeoff", "hover"]
+    exclude_tags: ["collision_detected"]
+    possible_root_cause:
+      - 螺旋桨破损、变形、动平衡失衡
+      - 电机轴承磨损、电机转轴松动
+      - 机臂、机架紧固螺丝未按力矩锁紧
+      - 减震球老化失效
+    troubleshooting_steps:
+      - 目视检查全部螺旋桨有无缺口、磕碰、变形
+      - 手动转动每一台电机，感受转动是否卡顿、异响
+      - 复核机架、机臂、电机座紧固件力矩
+      - 检查IMU减震组件，确认减震球无开裂硬化
+    risk_level: 中高
+    note: 日志存在碰撞标记时，本条失效，优先排查撞击损伤
+
+  - fault_id: F002
+    fault_tag: gps_jump
+    trigger_tags: ["gps_jump", "gps_eph_high"]
+    flight_phase: ["all"]
+    exclude_tags: []
+    possible_root_cause:
+      - GPS天线安装位置受电源/电机电磁干扰
+      - 周围高楼、山体、金属遮挡卫星信号
+      - GPS天线馈线虚接、馈线破损
+      - 卫星数量不足，多路径效应
+    troubleshooting_steps:
+      - 检查GPS天线安装远离动力电源、电调、电源线
+      - 复现测试，开阔场地对比测试定位精度
+      - 检查天线接头是否拧紧，馈线有无挤压破损
+      - 调整GPS模块参数，增大多路径抑制
+    risk_level: 高
+    note: 室内环境GPS跳变属于正常现象，不判定故障
+
+  - fault_id: F003
+    fault_tag: vtol_convert_attitude_over
+    trigger_tags: ["vtol_convert_attitude_over"]
+    flight_phase: ["vtol_transition"]
+    exclude_tags: ["wind_strong"]
+    possible_root_cause:
+      - VTOL转换时间、油门过渡参数不合理
+      - 旋翼推力与固定翼升力匹配失调
+      - 气动重心偏移，配平未调好
+    troubleshooting_steps:
+      - 复盘转换阶段油门曲线，调整转换时序参数
+      - 检查整机重心，确认在设计范围内
+      - 降低转换阶段横滚/俯仰PID增益
+    risk_level: 高
+    note: 强风环境下姿态超限，优先判定环境扰动，不要直接修改参数
+
+  - fault_id: F004
+    fault_tag: battery_voltage_drop
+    trigger_tags: ["battery_voltage_drop"]
+    flight_phase: ["takeoff", "hover", "maneuver"]
+    exclude_tags: []
+    possible_root_cause:
+      - 电池电芯老化、内阻增大
+      - 电源插头、接线端子虚接接触不良
+      - 动力线缆线径不足，大电流压降过大
+      - 飞行负载超过动力系统设计能力
+    troubleshooting_steps:
+      - 地面静态大电流测试电池电压压降
+      - 检查插头、接线端子有无发热、氧化松动
+      - 复核整机起飞重量，确认不超过最大起飞重量
+    risk_level: 高
+    note: 大机动动作瞬时压降属于正常，持续压降才判定故障
+
+  - fault_id: F005
+    fault_tag: imu_bias_drift
+    trigger_tags: ["imu_bias_drift"]
+    flight_phase: ["hover", "cruise"]
+    exclude_tags: ["temperature_change_large"]
+    possible_root_cause:
+      - IMU温度漂移，温度补偿参数不足
+      - IMU安装松动，存在微小机械位移
+      - IMU硬件本身性能劣化
+    troubleshooting_steps:
+      - 检查IMU模块安装是否紧固无间隙
+      - 检查温度曲线，区分温度带来的漂移
+      - 重新执行陀螺仪加速度计标定
+    risk_level: 中
+    note: 温度剧烈变化场景漂移属于物理现象，优先排除温度因素
+
+  - fault_id: F006
+    fault_tag: attitude_overshoot
+    trigger_tags: ["attitude_overshoot"]
+    flight_phase: ["maneuver", "hover"]
+    exclude_tags: ["wind_strong"]
+    possible_root_cause:
+      - 姿态环PID增益过高，系统阻尼不足
+      - 机架共振，激励控制环震荡
+    troubleshooting_steps:
+      - 适当降低姿态环P增益，优先调阻尼D项
+      - 排查整机共振点，避开控制带宽
+    risk_level: 中
+    note: 大风环境下超调优先归为环境扰动，禁止直接大幅度下调PID
+
+  - fault_id: F007
+    fault_tag: rc_lost
+    trigger_tags: ["rc_lost"]
+    flight_phase: ["all"]
+    exclude_tags: []
+    possible_root_cause:
+      - 遥控器距离过远，信号衰减
+      - 接收机天线摆放不合理，被机身遮挡
+      - 接收机供电不稳
+      - 同频段电磁干扰
+    troubleshooting_steps:
+      - 检查接收机天线摆放，避免金属遮挡
+      - 地面做拉距测试，确认遥控链路余量
+      - 检查接收机供电电压是否稳定
+    risk_level: 高
+    note: 必须确认返航逻辑配置正确
+
+  - fault_id: F008
+    fault_tag: motor_output_unbalance
+    trigger_tags: ["motor_output_unbalance"]
+    flight_phase: ["hover"]
+    exclude_tags: ["collision_detected"]
+    possible_root_cause:
+      - 单台电机效率衰减，动力不一致
+      - 螺旋桨型号不一致、桨尺寸不匹配
+      - 机架变形，阻力不对称
+    troubleshooting_steps:
+      - 检查所有螺旋桨型号、正反桨是否正确
+      - 单机地面测试电机转速一致性
+      - 检查机架有无形变、机臂弯曲
+    risk_level: 中高
+
+  - fault_id: F009
+    fault_tag: low_airspeed
+    trigger_tags: ["low_airspeed"]
+    flight_phase: ["fw_cruise"]
+    exclude_tags: []
+    possible_root_cause:
+      - 空速管堵塞、积水
+      - 空速校准未完成
+      - 总压/静压管路漏气
+    troubleshooting_steps:
+      - 检查空速管有无异物堵塞
+      - 检查管路接头，确认无漏气
+      - 重新执行空速校准
+    risk_level: 高
+    note: VTOL固定翼阶段空速失效极易引发失速
+
+  - fault_id: F010
+    fault_tag: wind_disturb
+    trigger_tags: ["wind_strong"]
+    flight_phase: ["all"]
+    exclude_tags: []
+    possible_root_cause:
+      - 外部大风环境扰动，非机载故障
+    troubleshooting_steps:
+      - 记录本场气象数据，大风条件建议缩减任务或停飞
+    risk_level: 低
+    note: 本条目为环境因素，不做硬件/参数故障判定

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import {
   UploadCloud,
@@ -15,6 +16,8 @@ import {
   ScrollText,
   ClipboardCheck,
   ListFilter,
+  Sparkles,
+  LogIn,
 } from "lucide-react";
 import type {
   AnalysisReport,
@@ -27,6 +30,8 @@ import type {
 import type { WorkerStage } from "@/workers/ulog-worker";
 import type { SeriesRequest } from "@/lib/chart-presets";
 import {
+  clearReports,
+  deleteReport,
   listReports,
   newReportId,
   saveReport,
@@ -34,7 +39,7 @@ import {
 } from "@/lib/report-history";
 import { LogCharts } from "./LogCharts";
 import { LogMessages, LogParams, SystemInfoPanel } from "./LogEventsParams";
-import { HistoryList } from "./HistoryList";
+import { HistoryList, type HistoryItem } from "./HistoryList";
 
 const VEHICLE_TYPE_LABELS: Record<string, string> = {
   rotary_wing: "旋翼",
@@ -68,13 +73,67 @@ export function LogAnalyzer() {
   const [info, setInfo] = useState<LogInfo | null>(null);
   const [aiMarkdown, setAiMarkdown] = useState<string | null>(null);
   const [history, setHistory] = useState<SavedReport[]>([]);
+  const [quota, setQuota] = useState<{ used: number; limit: number } | null>(null);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [cloudItems, setCloudItems] = useState<HistoryItem[]>([]);
+
+  const refreshCloud = useCallback(async () => {
+    try {
+      const resp = await fetch("/api/reports", { cache: "no-store" });
+      if (!resp.ok) {
+        setCloudItems([]);
+        return;
+      }
+      const data = await resp.json();
+      setCloudItems(
+        (data.reports ?? []).map(
+          (r: Record<string, unknown>): HistoryItem => ({
+            id: String(r.id),
+            fileName: String(r.fileName ?? ""),
+            fileSize: Number(r.fileSize ?? 0),
+            durationSec: Number(r.durationSec ?? 0) || undefined,
+            platform: String(r.platform ?? "px4"),
+            vehicleType: (r.vehicleType as string) ?? undefined,
+            parserVersion: String(r.parserVersion ?? ""),
+            findings: [],
+            findingCount: Number(r.findingCount ?? 0),
+            stats: {},
+            aiMarkdown: null,
+            analyzedAt: String(r.analyzedAt),
+            source: "cloud",
+          }),
+        ),
+      );
+    } catch {
+      setCloudItems([]);
+    }
+  }, []);
+
+  const refreshMe = useCallback(async () => {
+    try {
+      const resp = await fetch("/api/me", { cache: "no-store" });
+      if (resp.ok) {
+        const data = await resp.json();
+        setLoggedIn(true);
+        setQuota(data.quota ?? null);
+        await refreshCloud();
+      } else {
+        setLoggedIn(false);
+        setQuota(null);
+        setCloudItems([]);
+      }
+    } catch {
+      // 边缘函数未部署 / 网络异常时不阻断本地分析
+    }
+  }, [refreshCloud]);
 
   useEffect(() => {
     setHistory(listReports());
+    void refreshMe();
     return () => {
       workerRef.current?.terminate();
     };
-  }, []);
+  }, [refreshMe]);
 
   const persist = useCallback(
     (r: AnalysisReport, id: string, ai: string | null) => {
@@ -100,27 +159,47 @@ export function LogAnalyzer() {
     async (r: AnalysisReport, id: string) => {
       setStage("explaining");
       let markdown: string | null = null;
+      let ok = false;
       try {
         const resp = await fetch("/api/explain", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fileName: r.fileName, findings: r.findings, stats: r.stats }),
+          body: JSON.stringify({
+            reportId: id,
+            fileName: r.fileName,
+            fileSize: r.fileSize,
+            durationSec: r.durationSec,
+            platform: r.platform,
+            parserVersion: r.parserVersion,
+            findings: r.findings,
+            stats: r.stats,
+          }),
         });
         const data = await resp.json();
-        if (!resp.ok) {
+        if (resp.status === 401) {
+          markdown = `> 请先[登录](/login?callbackUrl=${encodeURIComponent("/analyze")})后生成 AI 中文报告（每月免费 5 次）。端侧检查结论不受影响。`;
+        } else if (resp.status === 429) {
+          markdown = `> ${data.error ?? "本月免费额度已用完"}。额度每月 1 日重置。`;
+        } else if (!resp.ok) {
           markdown = `> AI 解释暂不可用：${data.error ?? resp.statusText}`;
         } else {
           markdown = data.markdown;
+          ok = true;
+          if (data.quota) setQuota({ used: data.quota.used, limit: data.quota.limit });
         }
       } catch (err) {
         markdown = `> AI 解释请求失败：${(err as Error).message}`;
       } finally {
         setAiMarkdown(markdown);
         setStage("done");
-        if (markdown !== null) persist(r, id, markdown);
+        // 只在真正拿到报告时更新本地存档（错误提示不入库）
+        if (markdown !== null && ok) {
+          persist(r, id, markdown);
+          void refreshCloud();
+        }
       }
     },
-    [persist],
+    [persist, refreshCloud],
   );
 
   const requestSeries = useCallback((req: SeriesRequest): Promise<SeriesResponse> => {
@@ -177,7 +256,7 @@ export function LogAnalyzer() {
             setInfo(msg.info as LogInfo);
             setStage("done");
             persist(r, reportIdRef.current, null);
-            void explain(r, reportIdRef.current);
+            // 冲刺 2：AI 报告需登录且消耗配额，改为用户手动点击生成，不再解析完自动调用
           } else if (msg.type === "series") {
             const resolve = pendingRef.current.get(msg.reqId);
             if (resolve) {
@@ -200,6 +279,7 @@ export function LogAnalyzer() {
     setManifest(null);
     setInfo(null);
     setAiMarkdown(saved.aiMarkdown);
+    reportIdRef.current = saved.id;
     setReport({
       fileName: saved.fileName,
       fileSize: saved.fileSize,
@@ -212,6 +292,49 @@ export function LogAnalyzer() {
       analyzedAt: saved.analyzedAt,
     });
     setStage("done");
+  }, []);
+
+  // 本地 localStorage 与云端 KV 历史合并（同一份报告以本地为准；云端 id 已去连字符）
+  const mergedHistory = useMemo<HistoryItem[]>(() => {
+    const local: HistoryItem[] = history.map((r) => ({ ...r, source: "local" }));
+    const localIds = new Set(history.map((r) => r.id.replace(/[^a-zA-Z0-9_]/g, "")));
+    const cloud = cloudItems.filter((c) => !localIds.has(c.id));
+    return [...local, ...cloud].sort((a, b) => b.analyzedAt.localeCompare(a.analyzedAt));
+  }, [history, cloudItems]);
+
+  const viewHistoryItem = useCallback(
+    async (item: HistoryItem) => {
+      if (item.source === "cloud") {
+        try {
+          const resp = await fetch(`/api/reports/${item.id}`);
+          if (!resp.ok) return;
+          const data = await resp.json();
+          if (data.report) viewSaved(data.report as SavedReport);
+        } catch {
+          // 网络异常时静默
+        }
+        return;
+      }
+      viewSaved(item);
+    },
+    [viewSaved],
+  );
+
+  const deleteHistoryItem = useCallback(
+    (item: HistoryItem) => {
+      if (item.source === "cloud") {
+        void fetch(`/api/reports/${item.id}`, { method: "DELETE" }).then(() => void refreshCloud());
+      } else {
+        deleteReport(item.id);
+        setHistory(listReports());
+      }
+    },
+    [refreshCloud],
+  );
+
+  const clearLocal = useCallback(() => {
+    clearReports();
+    setHistory([]);
   }, []);
 
   const busy = stage !== "idle" && stage !== "done";
@@ -263,10 +386,23 @@ export function LogAnalyzer() {
             />
           </div>
 
+          {loggedIn && quota && (
+            <p className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-muted">
+              本月 AI 报告额度：
+              <span className={quota.used >= quota.limit ? "font-semibold text-critical" : "font-semibold text-text"}>
+                {" "}
+                {Math.max(quota.limit - quota.used, 0)} / {quota.limit} 次剩余
+              </span>
+              （每月 1 日重置）
+            </p>
+          )}
+
           <HistoryList
-            items={history}
-            onView={viewSaved}
-            onChange={() => setHistory(listReports())}
+            items={mergedHistory}
+            localCount={history.length}
+            onView={(item) => void viewHistoryItem(item)}
+            onDelete={deleteHistoryItem}
+            onClearLocal={clearLocal}
           />
         </aside>
 
@@ -285,6 +421,10 @@ export function LogAnalyzer() {
               manifest={manifest}
               info={info}
               requestSeries={requestSeries}
+              explaining={stage === "explaining"}
+              loggedIn={loggedIn}
+              quota={quota}
+              onGenerateAi={() => void explain(report, reportIdRef.current)}
             />
           ) : (
             !error && (
@@ -310,12 +450,20 @@ function ReportView({
   manifest,
   info,
   requestSeries,
+  explaining,
+  loggedIn,
+  quota,
+  onGenerateAi,
 }: {
   report: AnalysisReport;
   aiMarkdown: string | null;
   manifest: TopicManifest | null;
   info: LogInfo | null;
   requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
+  explaining: boolean;
+  loggedIn: boolean;
+  quota: { used: number; limit: number } | null;
+  onGenerateAi: () => void;
 }) {
   const [tab, setTab] = useState<TabKey>("summary");
   const counts = {
@@ -390,7 +538,16 @@ function ReportView({
       </div>
 
       <div className="mt-5">
-        {activeTab === "summary" && <SummaryTab report={report} aiMarkdown={aiMarkdown} />}
+        {activeTab === "summary" && (
+          <SummaryTab
+            report={report}
+            aiMarkdown={aiMarkdown}
+            explaining={explaining}
+            loggedIn={loggedIn}
+            quota={quota}
+            onGenerateAi={onGenerateAi}
+          />
+        )}
         {activeTab === "charts" && manifest && info && (
           <LogCharts manifest={manifest} phases={info.phases} requestSeries={requestSeries} />
         )}
@@ -404,9 +561,17 @@ function ReportView({
 function SummaryTab({
   report,
   aiMarkdown,
+  explaining,
+  loggedIn,
+  quota,
+  onGenerateAi,
 }: {
   report: AnalysisReport;
   aiMarkdown: string | null;
+  explaining: boolean;
+  loggedIn: boolean;
+  quota: { used: number; limit: number } | null;
+  onGenerateAi: () => void;
 }) {
   return (
     <div>
@@ -425,17 +590,43 @@ function SummaryTab({
         </div>
       )}
 
-      {/* AI 解释层 */}
+      {/* AI 解释层：登录后手动生成，消耗月度免费配额 */}
       <h2 className="mt-8 mb-2 text-base font-semibold">AI 中文解读</h2>
       {aiMarkdown ? (
         <article className="prose-skill">
-          <ReactMarkdown>{aiMarkdown}</ReactMarkdown>
+          <ReactMarkdown
+            components={{
+              a: ({ children, href }) => (
+                <Link href={href ?? "#"}>{children}</Link>
+              ),
+            }}
+          >
+            {aiMarkdown}
+          </ReactMarkdown>
         </article>
-      ) : (
+      ) : explaining ? (
         <p className="flex items-center gap-2 text-sm text-muted">
           <Loader2 className="h-4 w-4 animate-spin" />
           DeepSeek 正在生成中文报告…
         </p>
+      ) : (
+        <div className="rounded-xl border border-dashed border-border bg-surface-2 p-5">
+          <button
+            type="button"
+            onClick={onGenerateAi}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          >
+            {loggedIn ? <Sparkles className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
+            {loggedIn ? "生成 AI 中文报告" : "登录后生成 AI 中文报告"}
+          </button>
+          <p className="mt-2 text-xs text-muted">
+            {loggedIn
+              ? `由 DeepSeek 基于上述结构化检查结果生成，每月免费 ${quota?.limit ?? 5} 次${
+                  quota ? `，本月已用 ${quota.used} 次` : ""
+                }`
+              : "每月免费 5 次，端侧检查结论无需登录即可查看"}
+          </p>
+        </div>
       )}
     </div>
   );

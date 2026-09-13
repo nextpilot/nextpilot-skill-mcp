@@ -1,13 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, Trash2, History, ShieldAlert, AlertTriangle, Info } from "lucide-react";
-import {
-  clearReports,
-  deleteReport,
-  listReports,
-  type SavedReport,
-} from "@/lib/report-history";
+import { Eye, Trash2, History, ShieldAlert, AlertTriangle, Info, Cloud, HardDrive } from "lucide-react";
+import type { SavedReport } from "@/lib/report-history";
 
 const VEHICLE_TYPE_LABELS: Record<string, string> = {
   rotary_wing: "旋翼",
@@ -15,6 +10,12 @@ const VEHICLE_TYPE_LABELS: Record<string, string> = {
   rover: "Rover",
   airship: "飞艇",
   unknown: "未知机型",
+};
+
+export type HistoryItem = SavedReport & {
+  source: "local" | "cloud";
+  /** 云端列表只有元数据，明细数量用这个字段 */
+  findingCount?: number;
 };
 
 function fmtTime(iso: string): string {
@@ -33,25 +34,18 @@ function fmtDuration(sec?: number): string {
 
 export function HistoryList({
   items,
+  localCount,
   onView,
-  onChange,
+  onDelete,
+  onClearLocal,
 }: {
-  items: SavedReport[];
-  onView: (r: SavedReport) => void;
-  onChange: () => void;
+  items: HistoryItem[];
+  localCount: number;
+  onView: (r: HistoryItem) => void;
+  onDelete: (r: HistoryItem) => void;
+  onClearLocal: () => void;
 }) {
   const [confirmingClear, setConfirmingClear] = useState(false);
-
-  function handleDelete(id: string) {
-    deleteReport(id);
-    onChange();
-  }
-
-  function handleClear() {
-    clearReports();
-    setConfirmingClear(false);
-    onChange();
-  }
 
   return (
     <div>
@@ -60,49 +54,58 @@ export function HistoryList({
         <span className="text-sm font-semibold">历史分析</span>
         <span className="text-xs text-muted">（{items.length}）</span>
         <div className="ml-auto">
-          {confirmingClear ? (
-            <span className="flex items-center gap-1.5 text-xs">
+          {localCount > 0 &&
+            (confirmingClear ? (
+              <span className="flex items-center gap-1.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClearLocal();
+                    setConfirmingClear(false);
+                  }}
+                  className="rounded-md bg-critical/15 px-2 py-1 text-critical hover:bg-critical/25"
+                >
+                  确认清空本机
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingClear(false)}
+                  className="rounded-md px-2 py-1 text-muted hover:bg-surface-2"
+                >
+                  取消
+                </button>
+              </span>
+            ) : (
               <button
                 type="button"
-                onClick={handleClear}
-                className="rounded-md bg-critical/15 px-2 py-1 text-critical hover:bg-critical/25"
+                onClick={() => setConfirmingClear(true)}
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted hover:bg-surface-2 hover:text-text"
               >
-                确认清空
+                <Trash2 className="h-3.5 w-3.5" /> 清空本机
               </button>
-              <button
-                type="button"
-                onClick={() => setConfirmingClear(false)}
-                className="rounded-md px-2 py-1 text-muted hover:bg-surface-2"
-              >
-                取消
-              </button>
-            </span>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setConfirmingClear(true)}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted hover:bg-surface-2 hover:text-text"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> 清空
-            </button>
-          )}
+            ))}
         </div>
       </div>
 
       {items.length === 0 ? (
         <p className="px-4 py-6 text-center text-xs leading-5 text-muted">
-          暂无历史分析。解析日志后，报告会自动保存在本机浏览器。
+          暂无历史分析。解析日志后报告会保存在本机浏览器；登录后生成的 AI 报告会同步到云端，保留 7 天。
         </p>
       ) : (
         <ul className="max-h-[560px] divide-y divide-border/30 overflow-y-auto">
           {items.map((r) => {
-            const c = {
-              critical: r.findings.filter((f) => f.severity === "critical").length,
-              warning: r.findings.filter((f) => f.severity === "warning").length,
-              info: r.findings.filter((f) => f.severity === "info").length,
-            };
+            const total =
+              typeof r.findingCount === "number" ? r.findingCount : r.findings.length;
+            const hasSeverityCounts = typeof r.findingCount !== "number";
+            const c = hasSeverityCounts
+              ? {
+                  critical: r.findings.filter((f) => f.severity === "critical").length,
+                  warning: r.findings.filter((f) => f.severity === "warning").length,
+                  info: r.findings.filter((f) => f.severity === "info").length,
+                }
+              : null;
             return (
-              <li key={r.id} className="py-2.5">
+              <li key={`${r.source}-${r.id}`} className="py-2.5">
                 <div className="flex items-center gap-2 text-xs text-muted">
                   <span className="font-mono">{fmtTime(r.analyzedAt)}</span>
                   {r.vehicleType && (
@@ -111,16 +114,29 @@ export function HistoryList({
                     </span>
                   )}
                   <span>{fmtDuration(r.durationSec)}</span>
+                  <span
+                    className="ml-auto flex items-center gap-0.5"
+                    title={r.source === "cloud" ? "云端（跨设备可见）" : "仅本机"}
+                  >
+                    {r.source === "cloud" ? (
+                      <Cloud className="h-3 w-3 text-primary" />
+                    ) : (
+                      <HardDrive className="h-3 w-3" />
+                    )}
+                  </span>
                 </div>
                 <p className="mt-1 truncate text-sm text-text" title={r.fileName}>
                   {r.fileName}
                 </p>
                 <div className="mt-1.5 flex items-center gap-2">
-                  <span className="flex items-center gap-1.5 text-xs">
-                    <Count icon={<ShieldAlert className="h-3 w-3" />} n={c.critical} tone="critical" />
-                    <Count icon={<AlertTriangle className="h-3 w-3" />} n={c.warning} tone="warning" />
-                    <Count icon={<Info className="h-3 w-3" />} n={c.info} tone="info" />
-                  </span>
+                  {c && (
+                    <span className="flex items-center gap-1.5 text-xs">
+                      <Count icon={<ShieldAlert className="h-3 w-3" />} n={c.critical} tone="critical" />
+                      <Count icon={<AlertTriangle className="h-3 w-3" />} n={c.warning} tone="warning" />
+                      <Count icon={<Info className="h-3 w-3" />} n={c.info} tone="info" />
+                    </span>
+                  )}
+                  {!c && <span className="text-xs text-muted">{total} 条检查结果</span>}
                   <span className="ml-auto flex items-center">
                     <button
                       type="button"
@@ -131,7 +147,7 @@ export function HistoryList({
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDelete(r.id)}
+                      onClick={() => onDelete(r)}
                       className="inline-flex items-center rounded-md px-1.5 py-1 text-xs text-muted hover:bg-surface-2 hover:text-critical"
                       aria-label="删除"
                     >
