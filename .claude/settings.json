@@ -10,7 +10,13 @@
       "Bash(grep -oE '\"[a-z][a-z0-9_]{3,}\"')",
       "Bash(awk '/fault_id:/{id=$2} /name:|title:|^    [a-z_]+:/{if \\(id && !seen[id]++\\) print id\": \"$0}' engine/src/nextpilot_engine/rules/px4-fault-kb.yaml)",
       "Bash(node scripts/shot-report.mjs \"D:/nextpilot/nextpilot-skill-mcp/engine/tests/logs/ce302d3b-06bc-43ab-9c2a-027d29fcefd3.ulg\" /tmp/report-v2.png light 1440 1200)",
-      "Bash(node scripts/shot-report.mjs \"D:/nextpilot/nextpilot-skill-mcp/engine/tests/logs/ce302d3b-06bc-43ab-9c2a-027d29fcefd3.ulg\" /tmp/report-v3.png light 1440 1500)"
+      "Bash(node scripts/shot-report.mjs \"D:/nextpilot/nextpilot-skill-mcp/engine/tests/logs/ce302d3b-06bc-43ab-9c2a-027d29fcefd3.ulg\" /tmp/report-v3.png light 1440 1500)",
+      "Bash(node scripts/shot-report.mjs \"D:/nextpilot/nextpilot-skill-mcp/engine/tests/logs/ce302d3b-06bc-43ab-9c2a-027d29fcefd3.ulg\" /tmp/report-mobile.png light 390 900)",
+      "Bash(node scripts/shot-report.mjs \"D:/nextpilot/nextpilot-skill-mcp/engine/tests/logs/ce302d3b-06bc-43ab-9c2a-027d29fcefd3.ulg\" /tmp/report-mobile2.png light 390 780)",
+      "Bash(python -c ' *)",
+      "Bash(node scripts/shot.mjs \"http://localhost:3000/skills\" /tmp/m-skills.png light 390 800 0)",
+      "Bash(node scripts/shot.mjs \"http://localhost:3000/guide/basics\" /tmp/m-guide.png light 390 800 0)",
+      "Bash(node scripts/shot.mjs \"http://localhost:3000/skills\" /tmp/m-skills2.png light 390 620 0)"
     ]
   }
 }

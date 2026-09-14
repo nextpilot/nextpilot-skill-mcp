@@ -689,15 +689,17 @@ function ReportView({
         </p>
       )}
 
-      {/* tabs：下划线式 */}
+      {/* tabs：下划线式。窄屏只留图标——四个中文标签在 390px 下会各自折行 */}
       <div className="flex gap-1 border-b border-border">
         {tabs.map((t) => (
           <button
             key={t.key}
             type="button"
             disabled={t.disabled}
+            aria-label={t.label}
+            title={t.label}
             onClick={() => setTab(t.key)}
-            className={`-mb-px flex items-center justify-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors ${
+            className={`-mb-px flex items-center justify-center gap-1.5 border-b-2 px-3 py-2 text-sm whitespace-nowrap transition-colors sm:px-3 ${
               activeTab === t.key
                 ? "border-primary font-medium text-text"
                 : t.disabled
@@ -706,7 +708,7 @@ function ReportView({
             }`}
           >
             {t.icon}
-            {t.label}
+            <span className="hidden sm:inline">{t.label}</span>
           </button>
         ))}
       </div>

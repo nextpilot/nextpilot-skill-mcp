@@ -71,8 +71,8 @@ export function SkillExplorer({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t(
-            "我想做 X，例如：识别画面里的人、室内无 GPS 飞行、分析炸机日志…",
-            "I want to: detect people, fly indoors without GPS, analyze a crash log…",
+            "搜索 Skill，或描述你想做的事",
+            "Search skills, or describe your task",
           )}
           className="input pl-10"
         />
@@ -89,7 +89,8 @@ export function SkillExplorer({
               : { perception: "Perception", decision: "Decision", control: "Control", toolchain: "Toolchain" }[c.key]}
           </FilterChip>
         ))}
-        <span className="ml-auto flex items-center gap-1 text-xs text-muted">
+        {/* 窄屏分类会折行，排序另起一行右对齐，避免看起来像是分类的一部分 */}
+        <span className="flex w-full items-center justify-end gap-1 text-xs text-muted sm:ml-auto sm:w-auto">
           {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
             <button
               key={k}
@@ -119,8 +120,8 @@ export function SkillExplorer({
 
       <p className="mt-6 text-xs text-muted">
         {t(
-          "当前为关键词搜索（Fuse.js），语义搜索将在冲刺 1 内上线（本地 BGE 向量匹配）",
-          "Keyword search powered by Fuse.js. Local BGE semantic search is coming in Sprint 1.",
+          "当前为关键词搜索（Fuse.js）。语义搜索（本地 BGE 向量匹配，无需上传查询内容）在计划中。",
+          "Keyword search (Fuse.js) for now. Local BGE semantic search — no query ever leaves the browser — is planned.",
         )}
       </p>
     </div>
