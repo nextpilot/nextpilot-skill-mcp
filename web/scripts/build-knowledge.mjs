@@ -1,7 +1,7 @@
 /**
- * 知识构建：把 knowledge/ulog/ 下工程师维护的经验文件，生成运行时所需的产物。
+ * 知识构建：把 knowledge/px4/ 下工程师维护的经验文件，生成运行时所需的产物。
  *
- * 单一数据源全部在仓库根 knowledge/ulog/：
+ * 单一数据源全部在仓库根 knowledge/px4/：
  *   px4/ulog_checks.py        第一层 pyulog 解析 + 第二层规则/guard（Pyodide 执行）
  *   px4/ulog_data.py          报告页数据层 helpers（图表/事件/参数）
  *   px4/px4-fault-kb.yaml     第三层故障知识库（工程师只编辑这个）
@@ -22,12 +22,12 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
-const KN = resolve(webRoot, "../knowledge/ulog");
+const KN = resolve(webRoot, "../knowledge/px4");
 
-const PY_CHECKS = resolve(KN, "px4/ulog_checks.py");
-const PY_DATA = resolve(KN, "px4/ulog_data.py");
-const YAML_PATH = resolve(KN, "px4/px4-fault-kb.yaml");
-const TOML_PATH = resolve(KN, "px4/px4-thresholds.toml");
+const PY_CHECKS = resolve(KN, "ulog_checks.py");
+const PY_DATA = resolve(KN, "ulog_data.py");
+const YAML_PATH = resolve(KN, "px4-fault-kb.yaml");
+const TOML_PATH = resolve(KN, "px4-thresholds.toml");
 const PROMPT_PATH = resolve(KN, "llm/gjb841-system-prompt.md");
 const EMPTY_PATH = resolve(KN, "llm/report-empty.md");
 
@@ -165,7 +165,7 @@ function toRawTemplate(text) {
   return text.replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
 }
 
-const banner = `// ⚠️ 自动生成，请勿手改。源文件在 knowledge/ulog/，改完跑 \`pnpm build:kb\`（dev/build 自动执行）。\n`;
+const banner = `// ⚠️ 自动生成，请勿手改。源文件在 knowledge/px4/，改完跑 \`pnpm build:kb\`（dev/build 自动执行）。\n`;
 
 // 1) 故障库 JSON
 const kb = parseFaultKb(read(YAML_PATH));
@@ -230,7 +230,7 @@ const outLib = resolve(webRoot, "lib/knowledge");
 mkdirSync(outLib, { recursive: true });
 writeFileSync(
   resolve(outLib, "prompts.generated.js"),
-  "// ⚠️ 自动生成，源：knowledge/ulog/llm/。请勿手改。\n" +
+  "// ⚠️ 自动生成，源：knowledge/px4/llm/。请勿手改。\n" +
     "export const GJB841_SYSTEM_PROMPT = " +
     JSON.stringify(prompt) +
     ";\n" +
@@ -243,7 +243,7 @@ writeFileSync(
 // 4b) 阈值 ESM（供将来服务端 / MCP 复用同一份数值）
 writeFileSync(
   resolve(outLib, "thresholds.generated.js"),
-  "// ⚠️ 自动生成，源：knowledge/ulog/px4/px4-thresholds.toml。请勿手改。\n" +
+  "// ⚠️ 自动生成，源：knowledge/px4/px4-thresholds.toml。请勿手改。\n" +
     "export const PX4_THRESHOLDS = " +
     thresholdsJson +
     ";\n",

@@ -15,7 +15,7 @@ FAULT_KB = __FAULT_KB__
 
 # ---------------- 阈值（唯一数值来源：px4-thresholds.toml，构建期内联为 JSON）----
 # 本地用 python 跑（run_checks_locally.py）时由注入的 JSON 字面量提供；
-# Pyodide 端同样内联。改阈值只编辑 knowledge/ulog/px4/px4-thresholds.toml。
+# Pyodide 端同样内联。改阈值只编辑 knowledge/px4/px4-thresholds.toml。
 TH = json.loads(r'''__THRESHOLDS__''')
 
 VIBE_WARN, VIBE_CRIT = TH["vibration"]["vibe_warn"], TH["vibration"]["vibe_crit"]

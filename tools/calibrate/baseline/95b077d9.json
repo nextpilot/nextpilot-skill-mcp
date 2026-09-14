@@ -1,0 +1,83 @@
+{
+  "log": "95b077d9-d719-45ea-bf91-5926170cbc52.ulg",
+  "slug": "95b077d9",
+  "engine": "knowledge/px4/ulog_checks.py + ulog_data.py",
+  "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
+  "result": {
+    "platform": "PX4",
+    "vehicleType": "rover",
+    "parserVersion": "pyulog/pyodide-0.3.0",
+    "durationSec": 73.2,
+    "stats": {
+      "durationSec": 73.2,
+      "vehicleType": "rover",
+      "firmware": "1.17.0",
+      "firmwareProfile": "px4-1.15+",
+      "hardware": "PX4_FMU_V6X",
+      "armedDurationSec": 42.5,
+      "phases": [
+        "fw_cruise",
+        "hover",
+        "maneuver"
+      ],
+      "imuAccelVibrationMean": 3.73,
+      "imuAccelVibrationP95": 5.857,
+      "imuAccelVibrationMax": 6.558,
+      "cpuLoadMax": 0.375,
+      "gpsEphP95M": 0.0,
+      "gpsEphMaxM": 0.0,
+      "gpsSatellitesMin": 15,
+      "navStateChanges": 3,
+      "gyroBiasMaxRadS": 0.001,
+      "gyroBiasDriftRadS": 0.0007,
+      "gyroBiasSource": "estimator_sensor_bias.gyro_bias[]",
+      "imuTempRangeC": 0.2,
+      "dropoutTotalMs": 0
+    },
+    "tags": [],
+    "guardTags": [
+      "insufficient_data",
+      "topic_missing:battery_status"
+    ],
+    "phases": [
+      "fw_cruise",
+      "hover",
+      "maneuver"
+    ],
+    "checksRun": [
+      "vibration",
+      "ekf_innovations",
+      "ekf_faults",
+      "cpu_load",
+      "gps_health",
+      "failsafe",
+      "mode_thrash",
+      "imu_bias",
+      "logged_messages"
+    ],
+    "checksSkipped": [
+      {
+        "check": "battery",
+        "reason": "battery_status not in log"
+      },
+      {
+        "check": "motor_balance",
+        "reason": "active motor channels < 4 (非多旋翼或未记录全部电机)"
+      },
+      {
+        "check": "attitude_tracking",
+        "reason": "vehicle_attitude(_setpoint) 或 armed 段缺失"
+      },
+      {
+        "check": "vtol_transition",
+        "reason": "vtol_vehicle_status not in log"
+      },
+      {
+        "check": "wind_estimate",
+        "reason": "estimator_wind / wind_estimate not in log"
+      }
+    ],
+    "matchedFaults": [],
+    "findings": []
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "log": "sample_log_small.ulg",
+  "slug": "sample_log_small",
+  "engine": "knowledge/px4/ulog_checks.py + ulog_data.py",
+  "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
+  "result": {
+    "platform": "PX4",
+    "vehicleType": "rotary_wing",
+    "parserVersion": "pyulog/pyodide-0.3.0",
+    "durationSec": 7.4,
+    "stats": {
+      "durationSec": 7.4,
+      "vehicleType": "rotary_wing",
+      "firmware": "1.11.2",
+      "firmwareProfile": "px4-legacy",
+      "hardware": "CUBEPILOT_CUBEORANGE",
+      "armedDurationSec": 5.6,
+      "phases": [
+        "maneuver"
+      ],
+      "imuAccelVibrationMean": 0.001,
+      "imuAccelVibrationP95": 0.001,
+      "imuAccelVibrationMax": 0.001,
+      "batteryVoltageMin": 23.34,
+      "batteryCellVoltageMin": 3.898,
+      "batteryRemainingMin": 0.74,
+      "cpuLoadMax": 0.355,
+      "gpsEphP95M": 0.0,
+      "gpsEphMaxM": 0.0,
+      "gpsSatellitesMin": 14,
+      "gpsJumpCount": 0,
+      "navStateChanges": 0,
+      "gyroBiasMaxRadS": 0.0008,
+      "gyroBiasDriftRadS": 0.0002,
+      "gyroBiasSource": "estimator_status.states[10..12]",
+      "attitudeErrDegP99": 1.1,
+      "attitudeOscHz": 1.54,
+      "vtolTransitionSamples": 0,
+      "windSpeedP95M": 0.0,
+      "dropoutTotalMs": 30
+    },
+    "tags": [],
+    "guardTags": [
+      "insufficient_data"
+    ],
+    "phases": [
+      "maneuver"
+    ],
+    "checksRun": [
+      "vibration",
+      "ekf_innovations",
+      "ekf_faults",
+      "battery",
+      "cpu_load",
+      "gps_health",
+      "failsafe",
+      "mode_thrash",
+      "imu_bias",
+      "attitude_tracking",
+      "vtol_transition",
+      "wind_estimate",
+      "logged_messages"
+    ],
+    "checksSkipped": [
+      {
+        "check": "motor_balance",
+        "reason": "actuator_motors not in log"
+      }
+    ],
+    "matchedFaults": [],
+    "findings": []
+  }
+}

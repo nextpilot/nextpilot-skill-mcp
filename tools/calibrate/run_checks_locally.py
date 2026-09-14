@@ -1,10 +1,10 @@
-"""本地校准/验证用：直接跑 knowledge/ulog/px4 下的 Python 源，在真实 .ulg 上验证。
+"""本地校准/验证用：直接跑 knowledge/px4 下的 Python 源，在真实 .ulg 上验证。
 
 用法：
   python tools/calibrate/run_checks_locally.py <file.ulg> [more.ulg ...]
   python tools/calibrate/run_checks_locally.py --probe-data <file.ulg> ...
 
-经验的唯一事实源在 knowledge/ulog/：阈值 TOML、故障库 YAML、检查逻辑 Python。
+经验的唯一事实源在 knowledge/px4/：阈值 TOML、故障库 YAML、检查逻辑 Python。
 本脚本用 tomllib（Python 3.11+）读阈值、解析故障库 YAML 的产物 JSON，
 不依赖 Node 构建，因此改完 knowledge 即可在此回归。
 """
@@ -21,7 +21,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-KN_PX4 = REPO_ROOT / "knowledge" / "ulog" / "px4"
+KN_PX4 = REPO_ROOT / "knowledge" / "px4"
 PY_CHECKS = KN_PX4 / "ulog_checks.py"
 PY_DATA = KN_PX4 / "ulog_data.py"
 THRESHOLDS_TOML = KN_PX4 / "px4-thresholds.toml"

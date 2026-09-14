@@ -294,14 +294,14 @@
 | Web Worker 入口 | kebab-case + `-worker.ts` | `ulog-worker.ts` |
 | Worker 内嵌脚本 / helper | kebab-case + `-script.ts` | 现由 `build-knowledge.mjs` **生成**，不手改 |
 | Next.js 路由 | `page.tsx` / `route.ts` / `layout.tsx`（目录即路由） | `app/analyze/page.tsx`、`app/api/explain/route.ts` |
-| Python 模块 | snake_case + `.py` | `knowledge/ulog/px4/ulog_checks.py` |
+| Python 模块 | snake_case + `.py` | `knowledge/px4/ulog_checks.py` |
 | 知识 / 经验文件 | 见 `knowledge/README.md`；阈值 `*.toml`、故障库 `*.yaml` | `px4-thresholds.toml`、`px4-fault-kb.yaml` |
 | 文档 | kebab-case + `.md` | `px4-ulog-rules.md` |
 
 > 注意：Worker 相关文件统一用连字符（`ulog-worker.ts`），不要用点号（❌ `ulog.worker.ts`）。
 >
 > **日志分析的人工经验（阈值 / 故障树 / 检查逻辑 / LLM 范式）单一事实源在仓库根
-> `knowledge/ulog/`**，web 与未来 MCP Server 都只消费其派生产物（`web/workers/*`、
+> `knowledge/px4/`**，web 与未来 MCP Server 都只消费其派生产物（`web/workers/*`、
 > `web/lib/knowledge/*.generated.js`）。改经验只改 `knowledge/`，然后
 > `cd web && pnpm build:kb`。
 
