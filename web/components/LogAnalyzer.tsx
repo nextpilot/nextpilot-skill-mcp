@@ -41,6 +41,7 @@ import {
 import { getDeviceId } from "@/lib/device-id";
 import { takePendingLog } from "@/lib/pending-log";
 import { fallbackLogKey, hashLogBytes } from "@/lib/log-hash";
+import { cacheUsage, cachedLogHashes, getCachedLog, putCachedLog } from "@/lib/log-cache";
 import { LogCharts } from "./LogCharts";
 import { LogMessages, LogParams, SystemInfoPanel } from "./LogEventsParams";
 import { HistoryList, type HistoryItem } from "./HistoryList";
@@ -124,7 +125,24 @@ export function LogAnalyzer() {
   const [cloudItems, setCloudItems] = useState<HistoryItem[]>([]);
   /** 命中历史结果（同一份日志重复上传）时的提示，不重复解析也不重复计费 */
   const [dedupeNotice, setDedupeNotice] = useState<string | null>(null);
+  /** 命中历史后字节仍在手上（弹"解析完整数据"入口，补回图表/参数） */
+  const [pendingBytes, setPendingBytes] = useState<{
+    name: string;
+    size: number;
+    hash: string;
+    bytes: Uint8Array;
+  } | null>(null);
+  /** 本机缓存了原始日志的指纹集合（决定历史条目是否显示"恢复完整数据"） */
+  const [cachedHashes, setCachedHashes] = useState<Set<string>>(new Set());
+  const [cacheInfo, setCacheInfo] = useState<{ entries: number; bytes: number }>({
+    entries: 0,
+    bytes: 0,
+  });
   const pendingHashRef = useRef<string>("");
+  /** 本次解析要沿用的 AI 报告（重新解析不得把它覆盖成 null） */
+  const pendingAiRef = useRef<string | null>(null);
+  /** 本次解析的原始字节，解析成功后写入本机缓存 */
+  const pendingBytesRef = useRef<Uint8Array | null>(null);
 
   /** 丢弃当前 worker 与其挂起的请求（加载失败 / 上传异常 / 卸载时调用）。
    *  置空 ref 后下一次上传会重新创建 worker，用户不必刷新页面。 */
@@ -192,6 +210,9 @@ export function LogAnalyzer() {
   useEffect(() => {
     setHistory(listReports());
     void refreshMe();
+    // 本机日志缓存的指纹与占用：决定历史条目上是否给"恢复完整数据"入口
+    void cachedLogHashes().then(setCachedHashes);
+    void cacheUsage().then(setCacheInfo);
     return () => {
       resetWorker();
     };
@@ -364,6 +385,100 @@ export function LogAnalyzer() {
     [fetchCloudList],
   );
 
+  /** 解析成功后把原始日志留在本机（只是本机缓存，仍不上传）；历史回看恢复图表要用 */
+  const cacheCurrentLog = useCallback(async () => {
+    const bytes = pendingBytesRef.current;
+    const hash = pendingHashRef.current;
+    if (!bytes || !hash) return;
+    if (await putCachedLog(hash, pendingFileRef.current.name, bytes)) {
+      setCachedHashes(await cachedLogHashes());
+      setCacheInfo(await cacheUsage());
+    }
+  }, []);
+
+  /** 建立 worker（含加载失败的兜底），并复用已加载的 Pyodide 运行时 */
+  const ensureWorker = useCallback((): Worker | null => {
+    if (workerRef.current) return workerRef.current;
+    const worker = new Worker(new URL("../workers/ulog-worker.ts", import.meta.url), {
+      type: "module",
+    });
+    // worker 脚本本身加载失败（离线 / CDN 被拦 / 构建产物损坏）时页面只会一直转圈，
+    // 必须显式接住，否则用户拿不到任何反馈
+    worker.onerror = (e) => {
+      resetWorker();
+      setError(
+        `本地解析引擎加载失败：${e.message || "无法加载 Worker 脚本"}。` +
+          `若是网络原因（Pyodide 从 CDN 加载），请检查网络后重试。`,
+      );
+      setStage("idle");
+    };
+    worker.onmessageerror = () => {
+      resetWorker();
+      setError("本地解析引擎消息解析失败，请刷新页面重试。");
+      setStage("idle");
+    };
+    worker.onmessage = (e: MessageEvent) => {
+      const msg = e.data;
+      if (msg.type === "stage") {
+        setStage(msg.stage);
+      } else if (msg.type === "error") {
+        setError(msg.message);
+        setStage("idle");
+      } else if (msg.type === "done") {
+        const r = msg.report as AnalysisReport;
+        r.fileName = pendingFileRef.current.name;
+        r.fileSize = pendingFileRef.current.size;
+        r.analyzedAt = new Date().toISOString();
+        r.logHash = pendingHashRef.current;
+        setReport(r);
+        setManifest(msg.manifest as TopicManifest);
+        setInfo(msg.info as LogInfo);
+        setStage("done");
+        // 历史回看只存了结论与 AI 报告，图表/参数来自这次解析。保留上一轮生成的
+        // AI 报告，否则重新解析会把已经付费/花过额度的解读覆盖成 null。
+        setAiMarkdown(pendingAiRef.current);
+        persist(r, reportIdRef.current, pendingAiRef.current, pendingHashRef.current);
+        // 本机留一份原始日志，历史条目才能一键恢复完整视图
+        void cacheCurrentLog();
+        // 冲刺 2：AI 报告需登录且消耗配额，改为用户手动点击生成，不再解析完自动调用
+      } else if (msg.type === "series") {
+        const resolve = pendingRef.current.get(msg.reqId);
+        if (resolve) {
+          pendingRef.current.delete(msg.reqId);
+          resolve(msg.data);
+        }
+      }
+    };
+    workerRef.current = worker;
+    return worker;
+  }, [cacheCurrentLog, persist, resetWorker]);
+
+  /**
+   * 解析原始日志字节——上传与"恢复完整数据"共用同一条路径，避免两处各写一份。
+   * reportId 由调用方给：新上传用新 id，恢复时沿用历史条目 id 以便原地更新存档。
+   */
+  const parseBytes = useCallback(
+    (
+      bytes: Uint8Array,
+      meta: { name: string; size: number; hash: string; reportId: string; priorAi: string | null },
+    ) => {
+      const worker = ensureWorker();
+      if (!worker) return;
+      // worker 的回调闭包只创建一次、会捕获首次的 file，故用 ref 传递本次信息
+      pendingFileRef.current = { name: meta.name, size: meta.size };
+      pendingHashRef.current = meta.hash;
+      pendingAiRef.current = meta.priorAi;
+      pendingBytesRef.current = bytes;
+      reportIdRef.current = meta.reportId;
+      setAiMarkdown(meta.priorAi);
+      setPendingBytes(null);
+      // worker 首次启动到发出第一条 stage 消息之间有间隔，先给即时反馈
+      setStage("loading-runtime");
+      worker.postMessage({ type: "analyze", file: bytes });
+    },
+    [ensureWorker],
+  );
+
   const handleFile = useCallback(
     async (file: File) => {
       setError(null);
@@ -395,72 +510,21 @@ export function LogAnalyzer() {
           // 本机历史自带完整结论；云端列表只有元数据，需再取一次详情
           if (existing.source === "cloud") await viewHistoryItem(existing);
           else viewSaved(existing);
+          // 结论可以复用，但历史存档没有图表/参数；字节就在手上，给一个"补全"入口
+          setPendingBytes({ name: file.name, size: file.size, hash, bytes });
           setDedupeNotice(
-            `这份日志此前已分析过（内容一致），已直接载入历史结论，未重复解析。` +
-              (existing.aiMarkdown ? "" : "如需 AI 中文解读，可在下方手动生成（消耗额度）。"),
+            "这份日志此前已分析过（内容一致），已直接载入历史结论，未重复解析。",
           );
           return;
         }
 
-        reportIdRef.current = newReportId();
-        // worker 只创建一次、回调闭包会捕获首次的 file，这里用 ref 记录本次文件信息
-        pendingFileRef.current = { name: file.name, size: file.size };
-        pendingHashRef.current = hash;
-
-        // 复用既有 worker（Pyodide 已加载），避免重复下载运行时
-        if (!workerRef.current) {
-          const worker = new Worker(
-            new URL("../workers/ulog-worker.ts", import.meta.url),
-            { type: "module" },
-          );
-          // worker 脚本本身加载失败（离线 / CDN 被拦 / 构建产物损坏）时页面只会一直转圈，
-          // 必须显式接住，否则用户拿不到任何反馈
-          worker.onerror = (e) => {
-            resetWorker();
-            setError(
-              `本地解析引擎加载失败：${e.message || "无法加载 Worker 脚本"}。` +
-                `若是网络原因（Pyodide 从 CDN 加载），请检查网络后重试。`,
-            );
-            setStage("idle");
-          };
-          worker.onmessageerror = () => {
-            resetWorker();
-            setError("本地解析引擎消息解析失败，请刷新页面重试。");
-            setStage("idle");
-          };
-          worker.onmessage = (e: MessageEvent) => {
-            const msg = e.data;
-            if (msg.type === "stage") {
-              setStage(msg.stage);
-            } else if (msg.type === "error") {
-              setError(msg.message);
-              setStage("idle");
-            } else if (msg.type === "done") {
-              const r = msg.report as AnalysisReport;
-              r.fileName = pendingFileRef.current.name;
-              r.fileSize = pendingFileRef.current.size;
-              r.analyzedAt = new Date().toISOString();
-              r.logHash = pendingHashRef.current;
-              setReport(r);
-              setManifest(msg.manifest as TopicManifest);
-              setInfo(msg.info as LogInfo);
-              setStage("done");
-              persist(r, reportIdRef.current, null, pendingHashRef.current);
-              // 冲刺 2：AI 报告需登录且消耗配额，改为用户手动点击生成，不再解析完自动调用
-            } else if (msg.type === "series") {
-              const resolve = pendingRef.current.get(msg.reqId);
-              if (resolve) {
-                pendingRef.current.delete(msg.reqId);
-                resolve(msg.data);
-              }
-            }
-          };
-          workerRef.current = worker;
-        }
-
-        // worker 首次启动到发出第一条 stage 消息之间有间隔，先给即时反馈
-        setStage("loading-runtime");
-        workerRef.current.postMessage({ type: "analyze", file: bytes });
+        parseBytes(bytes, {
+          name: file.name,
+          size: file.size,
+          hash,
+          reportId: newReportId(),
+          priorAi: null,
+        });
       } catch (err) {
         resetWorker();
         setStage("idle");
@@ -469,7 +533,39 @@ export function LogAnalyzer() {
         );
       }
     },
-    [findExistingByHash, persist, resetWorker, viewHistoryItem, viewSaved],
+    [findExistingByHash, parseBytes, resetWorker, viewHistoryItem, viewSaved],
+  );
+
+  /** 用本机缓存的原始日志重解析，恢复图表/事件/参数 */
+  const restoreFullData = useCallback(
+    async (item: HistoryItem) => {
+      const hash = item.logHash;
+      if (!hash) {
+        setError("这条历史记录没有日志指纹，无法定位缓存文件，请重新选择该日志。");
+        return;
+      }
+      const cached = await getCachedLog(hash);
+      if (!cached) {
+        setError(
+          "本机没有这份日志的缓存（可能已被容量淘汰，或报告来自其他设备）。" +
+            "重新选择该 .ulg 文件即可恢复图表与参数。",
+        );
+        return;
+      }
+      setError(null);
+      setDedupeNotice(null);
+      setManifest(null);
+      setInfo(null);
+      parseBytes(cached.bytes, {
+        name: cached.name || item.fileName,
+        size: cached.bytes.byteLength,
+        hash,
+        // 沿用历史条目 id：原地更新那份存档，而不是又添一条重复记录
+        reportId: item.id,
+        priorAi: item.aiMarkdown,
+      });
+    },
+    [parseBytes],
   );
 
   // 首页上传卡把文件暂存在 IndexedDB，这里取出后立即分析（读完即删）
@@ -571,7 +667,10 @@ export function LogAnalyzer() {
           <HistoryList
             items={mergedHistory}
             localCount={history.length}
+            cachedHashes={cachedHashes}
+            cacheInfo={cacheInfo}
             onView={(item) => void viewHistoryItem(item)}
+            onRestore={(item) => void restoreFullData(item)}
             onDelete={deleteHistoryItem}
             onClearLocal={clearLocal}
           />
@@ -586,9 +685,33 @@ export function LogAnalyzer() {
           )}
 
           {dedupeNotice && (
-            <div className="mb-4 flex items-start gap-2 rounded-lg border border-border bg-surface-2 p-3.5 text-sm text-muted">
-              <History className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              <span>{dedupeNotice}</span>
+            <div className="mb-4 rounded-lg border border-border bg-surface-2 p-3.5 text-sm text-muted">
+              <div className="flex items-start gap-2">
+                <History className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <span>{dedupeNotice}</span>
+              </div>
+              {/* 历史存档没有图表/参数；字节就在手上，直接给一键补全 */}
+              {pendingBytes && (
+                <div className="mt-2.5 flex flex-wrap items-center gap-2 pl-6">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      parseBytes(pendingBytes.bytes, {
+                        name: pendingBytes.name,
+                        size: pendingBytes.size,
+                        hash: pendingBytes.hash,
+                        reportId: reportIdRef.current || newReportId(),
+                        priorAi: aiMarkdown,
+                      })
+                    }
+                    className="btn-ghost px-3 py-1.5 text-xs"
+                  >
+                    <LineChart className="h-3.5 w-3.5" />
+                    解析完整数据（含图表与参数）
+                  </button>
+                  <span className="text-xs text-faint">约十余秒，不消耗额度</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -602,6 +725,7 @@ export function LogAnalyzer() {
               explaining={stage === "explaining"}
               loggedIn={loggedIn}
               quota={quota}
+              logCached={Boolean(report.logHash && cachedHashes.has(report.logHash))}
               onGenerateAi={() => void explain(report, reportIdRef.current)}
             />
           ) : (
@@ -631,6 +755,7 @@ function ReportView({
   explaining,
   loggedIn,
   quota,
+  logCached,
   onGenerateAi,
 }: {
   report: AnalysisReport;
@@ -640,6 +765,8 @@ function ReportView({
   requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
   explaining: boolean;
   loggedIn: boolean;
+  /** 本机是否缓存了这份原始日志（决定历史回看提示怎么给） */
+  logCached: boolean;
   quota: { used: number; limit: number; anonymous?: boolean; loginLimit?: number } | null;
   onGenerateAi: () => void;
 }) {
@@ -723,7 +850,17 @@ function ReportView({
         </section>
       ) : (
         <p className="mb-5 rounded-lg bg-surface-2 p-4 text-xs leading-5 text-muted">
-          历史回看仅保留检查结论与 AI 解读；系统信息、图表、事件与参数需重新解析原始日志（选择同一份 .ulg）。
+          历史回看只存档了检查结论与 AI 解读（原始日志从不上传）。系统信息、图表、事件与参数
+          需要重新解析原始日志——
+          {logCached ? (
+            <>
+              这份日志本机有缓存，点左侧历史条目上的
+              <strong className="font-medium text-text">「完整数据」</strong>
+              即可恢复，也可重新选择该 .ulg 文件。
+            </>
+          ) : (
+            <>本机没有它的缓存（已被容量淘汰或来自其他设备），重新选择该 .ulg 文件即可恢复。</>
+          )}
         </p>
       )}
 

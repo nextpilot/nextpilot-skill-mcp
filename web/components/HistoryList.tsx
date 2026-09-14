@@ -1,7 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, Trash2, History, ShieldAlert, AlertTriangle, Info, Cloud, HardDrive } from "lucide-react";
+import {
+  Eye,
+  Trash2,
+  History,
+  ShieldAlert,
+  AlertTriangle,
+  Info,
+  Cloud,
+  HardDrive,
+  LineChart,
+} from "lucide-react";
 import type { SavedReport } from "@/lib/report-history";
 
 const VEHICLE_TYPE_LABELS: Record<string, string> = {
@@ -35,17 +45,26 @@ function fmtDuration(sec?: number): string {
 export function HistoryList({
   items,
   localCount,
+  cachedHashes,
+  cacheInfo,
   onView,
+  onRestore,
   onDelete,
   onClearLocal,
 }: {
   items: HistoryItem[];
   localCount: number;
+  /** 本机缓存了原始日志的指纹：命中的历史条目可以一键恢复图表/参数 */
+  cachedHashes: Set<string>;
+  cacheInfo: { entries: number; bytes: number };
   onView: (r: HistoryItem) => void;
+  onRestore: (r: HistoryItem) => void;
   onDelete: (r: HistoryItem) => void;
   onClearLocal: () => void;
 }) {
   const [confirmingClear, setConfirmingClear] = useState(false);
+
+  const fmtMB = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MB`;
 
   return (
     <div>
@@ -145,6 +164,16 @@ export function HistoryList({
                     >
                       <Eye className="h-3.5 w-3.5" /> 查看
                     </button>
+                    {r.logHash && cachedHashes.has(r.logHash) && (
+                      <button
+                        type="button"
+                        onClick={() => onRestore(r)}
+                        title="用本机缓存的原始日志重解析，恢复图表、事件与参数"
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-text hover:bg-surface-2"
+                      >
+                        <LineChart className="h-3.5 w-3.5" /> 完整数据
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => onDelete(r)}
@@ -159,6 +188,14 @@ export function HistoryList({
             );
           })}
         </ul>
+      )}
+
+      {/* 如实告知本机占用：缓存了才可能"完整数据"，用户有权知道自己存了什么 */}
+      {cacheInfo.entries > 0 && (
+        <p className="mt-3 border-t border-border pt-2.5 text-[11px] leading-5 text-faint">
+          本机缓存了 {cacheInfo.entries} 份原始日志（{fmtMB(cacheInfo.bytes)}，上限 10 份 / 300MB，
+          超出按最久未用淘汰）。这些文件只存在这台设备，从不上传。
+        </p>
       )}
     </div>
   );
