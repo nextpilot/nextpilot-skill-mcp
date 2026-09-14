@@ -1,13 +1,43 @@
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
-import type { SkillMeta } from "./types";
+import type { ChangelogEntry, SkillMeta } from "./types";
 
 const SKILLS_DIR = path.join(process.cwd(), "content", "skills");
 
 export interface Skill extends SkillMeta {
   /** MDX 正文（System Prompt、示例、参考资料） */
   body: string;
+}
+
+/**
+ * 版本历史：优先用 frontmatter 的 changelog（作者维护，可写多条）；
+ * 未维护时按 version + updatedAt 兜底生成一条首版记录，保证 Tab 不空。
+ */
+function parseChangelog(
+  raw: unknown,
+  version: unknown,
+  updatedAt: unknown,
+): ChangelogEntry[] | undefined {
+  if (Array.isArray(raw)) {
+    const entries = raw
+      .map((e) => {
+        if (!e || typeof e !== "object") return null;
+        const o = e as Record<string, unknown>;
+        const notes = Array.isArray(o.notes) ? o.notes.map((n) => String(n)) : [];
+        return {
+          version: String(o.version ?? ""),
+          date: String(o.date ?? ""),
+          notes,
+        };
+      })
+      .filter((e): e is ChangelogEntry => Boolean(e && e.version));
+    if (entries.length > 0) return entries;
+  }
+  if (version) {
+    return [{ version: String(version), date: String(updatedAt ?? ""), notes: ["首次收录"] }];
+  }
+  return undefined;
 }
 
 function parseSkillFile(fileName: string): Skill {
@@ -30,7 +60,9 @@ function parseSkillFile(fileName: string): Skill {
     sourceUrl: data.sourceUrl ? String(data.sourceUrl) : undefined,
     paperUrl: data.paperUrl ? String(data.paperUrl) : undefined,
     license: data.license ? String(data.license) : undefined,
+    icon: data.icon ? String(data.icon) : undefined,
     version: data.version ? String(data.version) : undefined,
+    changelog: parseChangelog(data.changelog, data.version, data.updatedAt),
     updatedAt: String(data.updatedAt ?? ""),
     body: content.trim(),
   };

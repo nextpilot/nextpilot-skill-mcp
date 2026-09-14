@@ -13,5 +13,13 @@ export const CATEGORY_LABEL: Record<CategoryKey, string> = Object.fromEntries(
   CATEGORIES.map((c) => [c.key, c.label]),
 ) as Record<CategoryKey, string>;
 
+/** 分类默认图标（Skill 未在 frontmatter 指定 icon 时回退） */
+export const CATEGORY_GLYPH: Record<CategoryKey, string> = {
+  perception: "👁️",
+  decision: "🧭",
+  control: "🎛️",
+  toolchain: "🧰",
+};
+
 export const PLATFORMS = ["PX4", "ArduPilot", "Betaflight", "仿真", "通用"] as const;
 export type Platform = (typeof PLATFORMS)[number];

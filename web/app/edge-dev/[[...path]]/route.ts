@@ -24,6 +24,8 @@ const handlers: Record<string, () => Promise<Record<string, unknown>>> = {
   "api/reports": () => import("@/functions/api/reports.js"),
   "api/reports/[id]": () => import("@/functions/api/reports/[id].js"),
   "api/rating": () => import("@/functions/api/rating.js"),
+  "api/comments": () => import("@/functions/api/comments.js"),
+  "api/favorite": () => import("@/functions/api/favorite.js"),
   "api/download/track": () => import("@/functions/api/download/track.js"),
   "internal/otp/set": () => import("@/functions/internal/otp/set.js"),
   "internal/otp/consume": () => import("@/functions/internal/otp/consume.js"),

@@ -1,4 +1,5 @@
 ---
+icon: "🎯"
 name: 航拍图像目标检测
 description: 在无人机航拍画面中识别人员、车辆、塔架等目标，输出类别、位置与置信度，用于搜救和电力巡检
 category: perception
@@ -8,7 +9,21 @@ tags: ["目标检测", "搜救", "巡检", "CV"]
 rating: 4.7
 downloads: 1280
 featured: true
-version: "1.0.0"
+version: "1.2.0"
+changelog:
+  - version: "1.2.0"
+    date: "2026-09-01"
+    notes:
+      - 补充跨帧去重逻辑，避免同一目标重复告警
+      - 增加巡检场景的置信度阈值建议（≥0.7）
+  - version: "1.1.0"
+    date: "2026-07-18"
+    notes:
+      - 增加 RT-DETR 备选方案与推理耗时对比
+  - version: "1.0.0"
+    date: "2026-06-02"
+    notes:
+      - 首次收录
 updatedAt: "2026-09-01"
 ---
 

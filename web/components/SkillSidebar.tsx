@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, Copy, Download, Sparkles, Star } from "lucide-react";
+import { Bookmark, BookmarkCheck, Check, Copy, Download, Sparkles, Star } from "lucide-react";
 import {
+  getFavorite,
   getRating,
   submitRating,
+  toggleFavorite,
   trackDownload,
+  type FavoriteStats,
   type Kind,
   type RatingStats,
 } from "@/lib/community-stats";
@@ -42,6 +45,7 @@ export function SkillSidebar({
   related: { slug: string; name: string; description: string }[];
 }) {
   const [stats, setStats] = useState<RatingStats>({ avg: 0, count: 0, mine: 0 });
+  const [fav, setFav] = useState<FavoriteStats>({ count: 0, favorited: false });
   const [copied, setCopied] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
   const [sending, setSending] = useState(false);
@@ -49,7 +53,13 @@ export function SkillSidebar({
 
   useEffect(() => {
     void getRating(kind, slug).then((s) => s && setStats(s));
+    void getFavorite(kind, slug).then((f) => f && setFav(f));
   }, [kind, slug]);
+
+  async function onToggleFavorite() {
+    const next = await toggleFavorite(kind, slug);
+    if (next) setFav(next);
+  }
 
   // 线上评分与种子值按权重融合，避免 1 条新评把种子分完全覆盖
   const shownRating =
@@ -116,6 +126,25 @@ export function SkillSidebar({
           {downloaded ? <Check className="h-4 w-4 text-ok" /> : <Download className="h-4 w-4" />}
           {downloaded ? "已下载" : `下载 ${slug}.md`}
         </button>
+
+        <button
+          type="button"
+          onClick={() => void onToggleFavorite()}
+          aria-pressed={fav.favorited}
+          className={`mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm transition-colors ${
+            fav.favorited
+              ? "border-primary/50 bg-primary/10 text-primary"
+              : "border-border text-muted hover:border-primary/50 hover:text-text"
+          }`}
+        >
+          {fav.favorited ? (
+            <BookmarkCheck className="h-4 w-4" />
+          ) : (
+            <Bookmark className="h-4 w-4" />
+          )}
+          {fav.favorited ? "已收藏" : "收藏"}
+          {fav.count > 0 && <span className="text-xs">· {fav.count}</span>}
+        </button>
       </section>
 
       {/* 统计：评分（可点）/ 获取次数 / 名称 */}
@@ -149,6 +178,10 @@ export function SkillSidebar({
           <div className="flex justify-between">
             <dt>获取次数</dt>
             <dd className="font-medium text-text">{baseDownloads + delta}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt>收藏</dt>
+            <dd className="font-medium text-text">{fav.count}</dd>
           </div>
           <div className="flex justify-between">
             <dt>评分人数</dt>

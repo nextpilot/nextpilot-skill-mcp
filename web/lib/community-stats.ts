@@ -21,6 +21,37 @@ export interface RatingStats {
   mine: number;
 }
 
+export interface FavoriteStats {
+  count: number;
+  favorited: boolean;
+}
+
+export async function getFavorite(kind: Kind, slug: string): Promise<FavoriteStats | null> {
+  try {
+    const resp = await fetch(`/api/favorite?kind=${kind}&slug=${encodeURIComponent(slug)}`, {
+      headers: { "x-device-id": getDeviceId() },
+    });
+    if (!resp.ok) return null;
+    return (await resp.json()) as FavoriteStats;
+  } catch {
+    return null;
+  }
+}
+
+export async function toggleFavorite(kind: Kind, slug: string): Promise<FavoriteStats | null> {
+  try {
+    const resp = await fetch("/api/favorite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-device-id": getDeviceId() },
+      body: JSON.stringify({ kind, slug, deviceId: getDeviceId() }),
+    });
+    if (!resp.ok) return null;
+    return (await resp.json()) as FavoriteStats;
+  } catch {
+    return null;
+  }
+}
+
 const cache: Record<string, { ts: number; data: LeaderboardEntry[] }> = {};
 const CACHE_MS = 60_000;
 

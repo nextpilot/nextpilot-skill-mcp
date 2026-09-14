@@ -1,13 +1,15 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ExternalLink, FileText } from "lucide-react";
+import { ExternalLink, FileText, Star } from "lucide-react";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { getAllSkills, getSkillBySlug } from "@/lib/skills";
-import { CATEGORY_LABEL } from "@/lib/constants";
+import { CATEGORY_GLYPH, CATEGORY_LABEL } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
 import { SkillSidebar, type SidebarMetaRow } from "@/components/SkillSidebar";
 import { SkillContentTabs } from "@/components/SkillContentTabs";
+import { SkillComments } from "@/components/SkillComments";
+import { ChangelogList } from "@/components/ChangelogList";
 import { CopyChip } from "@/components/CopyChip";
 
 export function generateStaticParams() {
@@ -97,39 +99,63 @@ export default async function SkillDetailPage({
       {/* 两栏：左栏 = 标题 + 内容（纵向堆叠），右栏 = 粘性侧栏（对应 SkillHub 的 390px 侧栏） */}
       <div className="lg:grid lg:gap-x-[50px] lg:[grid-template-columns:minmax(0,1fr)_390px]">
         <div className="min-w-0">
-          {/* 标题区 */}
+          {/* 标题区：图标瓦片 + 标题 + slug + 徽章（对齐 SkillHub 头部） */}
           <header className="mb-8">
-            <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
-              <span className="rounded-md bg-primary/10 px-2 py-0.5 font-medium text-primary">
-                {CATEGORY_LABEL[skill.category]}
+            <div className="mb-4 flex items-start gap-4">
+              <span
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] border border-border bg-surface text-2xl"
+                aria-hidden
+              >
+                {skill.icon ?? CATEGORY_GLYPH[skill.category]}
               </span>
+              <div className="min-w-0">
+                <h1 className="text-2xl font-bold md:text-[26px]">{skill.name}</h1>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="truncate font-mono text-[13px] text-muted">{skill.slug}</span>
+                  <CopyChip value={skill.slug} title="点击复制 slug" iconOnly />
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                  <span className="inline-flex items-center gap-1 font-medium text-text">
+                    <Star className="h-3.5 w-3.5 fill-warning text-warning" />
+                    {skill.rating.toFixed(1)}
+                  </span>
+                  {skill.version && <span>v{skill.version}</span>}
+                  <span>更新于 {formatDate(skill.updatedAt)}</span>
+                  <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-primary">
+                    {CATEGORY_LABEL[skill.category]}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <p className="leading-7 text-muted">{skill.description}</p>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
               {skill.platforms.map((p) => (
                 <span key={p} className="rounded-md border border-border px-2 py-0.5 text-muted">
                   {p}
                 </span>
               ))}
-              {skill.version && (
-                <span className="rounded-md border border-border px-2 py-0.5 text-muted">
-                  v{skill.version}
+              {skill.tags.map((t) => (
+                <span key={t} className="text-muted">
+                  #{t}
                 </span>
-              )}
-              <span className="text-muted">更新于 {formatDate(skill.updatedAt)}</span>
-              <CopyChip value={skill.slug} title="点击复制 slug" className="ml-auto" />
+              ))}
             </div>
-
-            <h1 className="text-2xl font-bold md:text-3xl">{skill.name}</h1>
-            <p className="mt-2 font-mono text-[13px] text-muted">{skill.slug}</p>
-            <p className="mt-4 leading-7 text-muted">{skill.description}</p>
           </header>
 
-          {/* 内容区：Tab 切换正文 / Markdown 原文 */}
+          {/* 内容区：概述 / 评论 / 版本历史 */}
           <SkillContentTabs
-            contentHtml={
+            overview={
               <article className="prose-skill">
                 <MDXRemote source={skill.body} />
               </article>
             }
-            markdown={copyText}
+            comments={<SkillComments kind="skill" slug={skill.slug} />}
+            changelog={
+              <ChangelogList entries={skill.changelog ?? []} currentVersion={skill.version} />
+            }
+            changelogCount={skill.changelog?.length ?? 0}
           />
         </div>
 

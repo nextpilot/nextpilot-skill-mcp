@@ -15,9 +15,19 @@ export interface SkillMeta {
   sourceUrl?: string;
   paperUrl?: string;
   license?: string;
+  /** 图标（emoji，如 "🛰️"；缺省时按分类回退到内置图标瓦片） */
+  icon?: string;
   /** 版本号（可选，随内容更新递增；借鉴 SkillHub 的版本展示） */
   version?: string;
+  /** 版本历史（可选，作者在 frontmatter 维护；缺省时按 version+updatedAt 兜底生成一条） */
+  changelog?: ChangelogEntry[];
   updatedAt: string;
+}
+
+export interface ChangelogEntry {
+  version: string;
+  date: string;
+  notes: string[];
 }
 
 /**

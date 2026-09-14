@@ -7,7 +7,6 @@ import type { SkillMeta } from "@/lib/types";
 import { CATEGORIES, type CategoryKey } from "@/lib/constants";
 import { useLanguage } from "./LanguageProvider";
 import { SkillCard } from "./SkillCard";
-import { Leaderboard } from "./Leaderboard";
 import { applyDeltas, useLeaderboard } from "@/lib/community-stats";
 
 type SortKey = "hot" | "rating" | "newest";
@@ -65,74 +64,65 @@ export function SkillExplorer({
   }, [query, category, sort, fuse, enriched]);
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
-      <div>
-        <div className="relative mb-4">
-          <Search className="absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-muted" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t(
-              "我想做 X，例如：识别画面里的人、室内无 GPS 飞行、分析炸机日志…",
-              "I want to: detect people, fly indoors without GPS, analyze a crash log…",
-            )}
-            className="w-full rounded-xl border border-border bg-surface py-3 pr-4 pl-10 text-sm outline-none transition-colors placeholder:text-muted/70 focus:border-primary/60"
-          />
-        </div>
-
-        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-          <FilterChip active={category === "all"} onClick={() => setCategory("all")}>
-            {t("全部", "All")}
-          </FilterChip>
-          {CATEGORIES.map((c) => (
-            <FilterChip key={c.key} active={category === c.key} onClick={() => setCategory(c.key)}>
-              {language === "zh"
-                ? c.label
-                : { perception: "Perception", decision: "Decision", control: "Control", toolchain: "Toolchain" }[c.key]}
-            </FilterChip>
-          ))}
-          <span className="ml-auto flex items-center gap-1 text-xs text-muted">
-            {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setSort(k)}
-                className={`rounded-full px-2.5 py-1 transition-colors ${
-                  sort === k ? "bg-primary/10 text-primary" : "hover:text-text"
-                }`}
-              >
-                {SORT_LABELS[k]}
-              </button>
-            ))}
-          </span>
-        </div>
-
-        {result.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted">
-            {t("没有匹配的 Skill，换个关键词试试", "No matching skills. Try another search.")}
-          </p>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {result.map((skill) => (
-              <SkillCard key={skill.slug} skill={skill} />
-            ))}
-          </div>
-        )}
-
-        <p className="mt-6 text-xs text-muted">
-          {t(
-            "当前为关键词搜索（Fuse.js），语义搜索将在冲刺 1 内上线（本地 BGE 向量匹配）",
-            "Keyword search powered by Fuse.js. Local BGE semantic search is coming in Sprint 1.",
+    <div>
+      <div className="relative mb-4">
+        <Search className="absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-muted" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t(
+            "我想做 X，例如：识别画面里的人、室内无 GPS 飞行、分析炸机日志…",
+            "I want to: detect people, fly indoors without GPS, analyze a crash log…",
           )}
-        </p>
+          className="w-full rounded-xl border border-border bg-surface py-3 pr-4 pl-10 text-sm outline-none transition-colors placeholder:text-muted/70 focus:border-primary/60"
+        />
       </div>
 
-      <aside className="self-start lg:sticky lg:top-20">
-        <Leaderboard
-          kind="skill"
-          base={skills.map((s) => ({ slug: s.slug, name: s.name, downloads: s.downloads }))}
-        />
-      </aside>
+      <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+        <FilterChip active={category === "all"} onClick={() => setCategory("all")}>
+          {t("全部", "All")}
+        </FilterChip>
+        {CATEGORIES.map((c) => (
+          <FilterChip key={c.key} active={category === c.key} onClick={() => setCategory(c.key)}>
+            {language === "zh"
+              ? c.label
+              : { perception: "Perception", decision: "Decision", control: "Control", toolchain: "Toolchain" }[c.key]}
+          </FilterChip>
+        ))}
+        <span className="ml-auto flex items-center gap-1 text-xs text-muted">
+          {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setSort(k)}
+              className={`rounded-full px-2.5 py-1 transition-colors ${
+                sort === k ? "bg-primary/10 text-primary" : "hover:text-text"
+              }`}
+            >
+              {SORT_LABELS[k]}
+            </button>
+          ))}
+        </span>
+      </div>
+
+      {result.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted">
+          {t("没有匹配的 Skill，换个关键词试试", "No matching skills. Try another search.")}
+        </p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {result.map((skill) => (
+            <SkillCard key={skill.slug} skill={skill} />
+          ))}
+        </div>
+      )}
+
+      <p className="mt-6 text-xs text-muted">
+        {t(
+          "当前为关键词搜索（Fuse.js），语义搜索将在冲刺 1 内上线（本地 BGE 向量匹配）",
+          "Keyword search powered by Fuse.js. Local BGE semantic search is coming in Sprint 1.",
+        )}
+      </p>
     </div>
   );
 }
