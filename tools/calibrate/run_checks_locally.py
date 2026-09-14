@@ -4,7 +4,7 @@
   python tools/calibrate/run_checks_locally.py <file.ulg> [more.ulg ...]
   python tools/calibrate/run_checks_locally.py --probe-data <file.ulg> ...
 
-经验的唯一事实源在 knowledge/px4/：阈值 TOML、故障库 YAML、检查逻辑 Python。
+经验的唯一事实源在 knowledge/px4/：阈值 TOML、故障库 YAML、经验规则 rules/*.yaml、检查逻辑 Python。
 本脚本用 tomllib（Python 3.11+）读阈值、解析故障库 YAML 的产物 JSON，
 不依赖 Node 构建，因此改完 knowledge 即可在此回归。
 """
@@ -22,10 +22,35 @@ if hasattr(sys.stdout, "reconfigure"):
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 KN_PX4 = REPO_ROOT / "knowledge" / "px4"
+OPERATORS_PY = KN_PX4 / "operators.py"
 PY_CHECKS = KN_PX4 / "ulog_checks.py"
+RULES_DIR = KN_PX4 / "rules"
 PY_DATA = KN_PX4 / "ulog_data.py"
 THRESHOLDS_TOML = KN_PX4 / "px4-thresholds.toml"
 FAULT_KB_JSON = REPO_ROOT / "web" / "workers" / "fault-kb.generated.json"
+
+
+def _load_rules() -> list:
+    """rules/*.yaml → 列表；与构建脚本同一份源（本地回归不依赖 Node）。"""
+    try:
+        import yaml
+    except ImportError:
+        raise RuntimeError("需要 PyYAML 读 rules/*.yaml：pip install pyyaml")
+
+    # PyYAML 默认把 2026-09-15 解析成 datetime.date，而构建脚本用的 JS yaml 库保持字符串；
+    # 两个加载器必须一致，否则本地与线上注入的规则 JSON 不同。这里去掉 timestamp 解析器。
+    class _Loader(yaml.SafeLoader):
+        pass
+
+    _Loader.yaml_implicit_resolvers = {
+        ch: [(tag, regexp) for tag, regexp in pairs if tag != "tag:yaml.org,2002:timestamp"]
+        for ch, pairs in yaml.SafeLoader.yaml_implicit_resolvers.items()
+    }
+
+    rules = []
+    for f in sorted(RULES_DIR.glob("*.yaml")):
+        rules.append(yaml.load(f.read_text(encoding="utf-8"), Loader=_Loader))
+    return rules
 
 
 def _load_checks() -> str:
@@ -37,13 +62,21 @@ def _load_checks() -> str:
     if tomllib is None:
         raise RuntimeError("需要 Python 3.11+（标准库 tomllib）来读 px4-thresholds.toml")
     thresholds = tomllib.loads(THRESHOLDS_TOML.read_text(encoding="utf-8"))
-    # Python 源里是 json.loads(r'''__THRESHOLDS__''')；注入 JSON 字面量
+    # Python 源里是 json.loads(r'''__X__''')；注入 JSON 字面量
     body = body.replace("__THRESHOLDS__", json.dumps(thresholds, ensure_ascii=False))
+    body = body.replace("__RULES__", json.dumps(_load_rules(), ensure_ascii=False))
     return body
 
 
 def build_namespace(path: Path) -> dict:
-    script = _load_checks() + "\n" + PY_DATA.read_text(encoding="utf-8")
+    # 顺序与线上一致：operators（算子注册表）→ ulog_checks（框架用算子）→ ulog_data
+    script = (
+        OPERATORS_PY.read_text(encoding="utf-8")
+        + "\n"
+        + _load_checks()
+        + "\n"
+        + PY_DATA.read_text(encoding="utf-8")
+    )
     namespace: dict = {"ulog_bytes": path.read_bytes()}
     exec(compile(script, str(PY_CHECKS), "exec"), namespace)
     return namespace

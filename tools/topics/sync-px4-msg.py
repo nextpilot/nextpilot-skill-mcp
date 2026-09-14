@@ -215,7 +215,7 @@ def parse_msg(stem: str, text: str) -> dict:
             else:
                 spec["kind"] = "enum"
 
-    return {"topic": _to_snake(stem), "msg": f"{stem}.msg", "fields": fields}
+    return {"topic": _to_snake(stem), "file": f"{stem}.msg", "fields": fields}
 
 
 def _order_values(values: dict) -> dict:
@@ -244,7 +244,7 @@ def render_meta_json(tag: str, topics: dict[str, dict], params: dict | None) -> 
             if isinstance(f.get("values"), dict):
                 f["values"] = _order_values(f["values"])
             fields[fname] = f
-        out = {"msg": spec.get("msg")}
+        out = {"file": spec.get("file")}
         out["fields"] = fields
         return out
 

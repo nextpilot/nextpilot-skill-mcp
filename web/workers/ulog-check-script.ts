@@ -3,8 +3,10 @@ import faultKbJson from "./fault-kb.generated.json";
 
 const thresholds = {"guard":{"min_flight_sec":60,"dropout_ms":1000},"vibration":{"vibe_warn":4.905,"vibe_crit":9.81,"stddev_warn":0.5,"stddev_crit":1,"clip_warn":100,"clip_crit":1000},"ekf":{"reject_ratio_warn":0.01,"reject_ratio_crit":0.05,"reject_min_count":3,"peak_warn":0.5,"peak_crit":1},"power":{"cell_warn":3.7,"cell_crit":3.55,"sag_volts":0.3,"sag_skip_takeoff_sec":5,"remaining_warn":0.2,"remaining_crit":0.1},"cpu":{"load_warn":0.9,"load_crit":0.95},"gps":{"eph_warn":5,"eph_crit":10,"sats_warn":8,"sats_crit":6,"jump_speed_mps":50,"jump_min_count":3},"mode":{"thrash_changes":12},"motor":{"spread_warn":0.08,"spread_crit":0.15},"gyro_bias":{"abs_warn":0.02,"abs_crit":0.05,"drift_warn":0.02,"drift_crit":0.05,"temp_range_warn":15,"temp_range_crit":25},"attitude":{"err_warn_rotary":15,"err_crit_rotary":30,"err_warn_fixedwing":25,"err_crit_fixedwing":40,"osc_hz":4,"sample_rate_hz":50,"min_seg_samples":50},"airspeed":{"invalid_ratio_warn":0.1,"invalid_ratio_crit":0.5},"vtol":{"transition_tilt_deg":8},"wind":{"speed_warn":8,"speed_crit":12},"messages":{"critical_max_level":3,"warn_level":4,"max_examples":5,"message_clip_len":200}};
 
+const rules = [{"id":"px4-cpu-load","name":"CPU 负载","version":"1.0.0","category":"system","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["cpuload"]},"skip_reason":"cpuload not in log","compute":[{"out":"cpu_max","from":"cpuload.load","op":"max"}],"triggers":[{"expr":"cpu_max >= 0.95","severity":"critical","threshold":0.95,"value":"cpu_max","round":3,"field":"cpuload.load(max)","title":"CPU 负载峰值 {cpu_max:.0%} 超阈值","suggestion":"CPU 长期接近满载会导致控制环丢步；检查高耗率模块与日志流配置。"},{"expr":"cpu_max >= 0.90","severity":"warning","threshold":0.9,"value":"cpu_max","round":3,"field":"cpuload.load(max)","title":"CPU 负载峰值 {cpu_max:.0%} 偏高","suggestion":"关注 CPU 余量，必要时降低消息发布率。"}],"emit":{"check":"cpu_load","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html","stats":{"cpuLoadMax":{"var":"cpu_max","round":3}}}}];
+
 export const PY_ULG_CHECKS = String.raw`
-import json, io
+import json, io, ast
 import numpy as np
 from pyulog import ULog
 
@@ -22,6 +24,9 @@ FAULT_KB = __FAULT_KB__
 # 本地用 python 跑（run_checks_locally.py）时由注入的 JSON 字面量提供；
 # Pyodide 端同样内联。改阈值只编辑 knowledge/px4/px4-thresholds.toml。
 TH = json.loads(r'''__THRESHOLDS__''')
+
+# 经验规则（rules/*.yaml 编译而来；见 knowledge/px4/rule-schema-design.md）
+RULES = json.loads(r'''__RULES__''')
 
 VIBE_WARN, VIBE_CRIT = TH["vibration"]["vibe_warn"], TH["vibration"]["vibe_crit"]
 VIBE_STDDEV_WARN, VIBE_STDDEV_CRIT = TH["vibration"]["stddev_warn"], TH["vibration"]["stddev_crit"]
@@ -517,28 +522,115 @@ if bat_list:
 else:
     skipped("battery", "battery_status not in log")
 
-# ---------------- 规则 4：CPU 负载（robotto）----------------
-cpu_list = find_all(ulog, "cpuload")
-if cpu_list:
-    ran("cpu_load")
-    cpu_max = 0.0
-    for d in cpu_list:
-        load = getf(d, "load")
-        if load is not None and len(load) > 0:
-            cpu_max = max(cpu_max, float(np.max(np.asarray(load, dtype=float))))
-    stats["cpuLoadMax"] = round(cpu_max, 3)
-    if cpu_max >= CPU_CRIT:
-        add("critical", "px4-cpu-load", None,
-            "CPU 负载峰值 %.0f%% 超阈值" % (cpu_max * 100),
-            "cpuload.load(max)", round(cpu_max, 3), CPU_CRIT, None, PX4_DOC_LOG,
-            "CPU 长期接近满载会导致控制环丢步；检查高耗率模块与日志流配置。")
-    elif cpu_max >= CPU_WARN:
-        add("warning", "px4-cpu-load", None,
-            "CPU 负载峰值 %.0f%% 偏高" % (cpu_max * 100),
-            "cpuload.load(max)", round(cpu_max, 3), CPU_WARN, None, PX4_DOC_LOG,
-            "关注 CPU 余量，必要时降低消息发布率。")
-else:
-    skipped("cpu_load", "cpuload not in log")
+# ---------------- 经验规则框架（rules/*.yaml 驱动）----------------
+# 位置说明：本段位于原「规则 4：CPU 负载」处。迁移期的顺序约束——规则按 RULES 顺序
+# 在此执行，而 finding.id（F01、F02…）按发射顺序生成，所以**必须按与原检查相同的次序
+# 迁移**（vibration → ekf → power → cpu → gps → failsafe …），否则 id 会与冻结基线错位。
+_ALLOWED_NODES = (
+    ast.Expression, ast.BoolOp, ast.And, ast.Or, ast.UnaryOp, ast.Not, ast.USub,
+    ast.Compare, ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.Eq, ast.NotEq, ast.In, ast.NotIn,
+    ast.BinOp, ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Mod,
+    ast.Name, ast.Load, ast.Constant, ast.List, ast.Tuple, ast.Set,
+)
+
+
+def _eval_expr(expr, env):
+    """受限表达式求值：先按白名单遍历 AST，再在空 __builtins__ 下求值。
+
+    绝不 eval 用户可控代码：不允许属性访问、下标、函数调用、推导式等。
+    """
+    tree = ast.parse(expr, mode="eval")
+    for node in ast.walk(tree):
+        if not isinstance(node, _ALLOWED_NODES):
+            raise ValueError("表达式含不允许的语法 %s：%s" % (type(node).__name__, expr))
+    return eval(compile(tree, "<rule>", "eval"), {"__builtins__": {}}, env)
+
+
+def _read_field_ref(ref):
+    """'topic.field' → 该字段在各实例上的值（多实例拼接）；topic/字段缺失返回 None。"""
+    topic, _, field = ref.partition(".")
+    ds = find_all(ulog, topic)
+    if not ds:
+        return None
+    vals = []
+    for d in ds:
+        v = getf(d, field)
+        if v is not None and len(v):
+            vals.append(np.asarray(v, dtype=float))
+    if not vals:
+        return None
+    return np.concatenate(vals) if len(vals) > 1 else vals[0]
+
+
+def _rule_env():
+    """日志级内置变量：经验里可直接引用，无需在 compute 里声明。"""
+    return {
+        "firmware": FW_LABEL,
+        "fw_major": FW["major"], "fw_minor": FW["minor"], "fw_profile": FW_PROFILE,
+        "airframe": vehicle_type,
+        "is_rotary_wing": vehicle_type == "rotary_wing",
+        "is_fixed_wing": vehicle_type == "fixed_wing",
+        "is_vtol": "vtol" in vehicle_type,
+        "is_rover": vehicle_type == "rover",
+        "duration_s": duration_s if duration_s is not None else 0,
+        "armed_s": armed_duration_s,
+        "phases": phases_present,
+        "tags": set(tags),
+        "guard_tags": set(guard_tags),
+    }
+
+
+for _rule in RULES:
+    _rid = _rule["id"]
+    _check = _rule["emit"]["check"]
+    _need = (_rule.get("requires") or {}).get("any_of") or []
+    if _need and not all(find_all(ulog, t) for t in _need):
+        skipped(_check, _rule.get("skip_reason") or ("缺少依赖 topic：%s" % ", ".join(_need)))
+        continue
+    _env = _rule_env()
+    _ok = True
+    for _node in _rule["compute"]:
+        # 归一化：单输入可用短写法 from:（字符串或列表），单输出可直接写 out: 名字
+        _ins = _node.get("in")
+        if _ins is None:
+            _ins = _node["from"] if isinstance(_node["from"], list) else [_node["from"]]
+        _outs = _node["out"] if isinstance(_node["out"], list) else [_node["out"]]
+        _args = []
+        for _ref in _ins:
+            _args.append(_env[_ref] if _ref in _env else _read_field_ref(_ref))
+        if any(_a is None for _a in _args):
+            _ok = False
+            break
+        _res = OPERATORS[_node["op"]](*_args, **_node)
+        if _res is None:
+            _ok = False
+            break
+        if not isinstance(_res, tuple):
+            _res = (_res,)
+        for _name, _v in zip(_outs, _res):
+            _env[_name] = _v
+    if not _ok:
+        skipped(_check, _rule.get("skip_reason") or "数据不足，未做判定")
+        continue
+    ran(_check)
+
+    _emit = _rule["emit"]
+    for _key, _spec in (_emit.get("stats") or {}).items():
+        _v = _env.get(_spec["var"])
+        if _v is None:
+            continue
+        stats[_key] = round(float(_v), int(_spec["round"])) if "round" in _spec else _v
+
+    for _trig in _rule["triggers"]:
+        if _eval_expr(_trig["expr"], _env):
+            _val = _env.get(_trig["value"]) if _trig.get("value") else None
+            if _val is not None and _trig.get("round") is not None:
+                _val = round(float(_val), int(_trig["round"]))
+            add(_trig["severity"], _rid, _trig.get("tag"),
+                _trig["title"].format_map(_env), _trig["field"], _val,
+                _trig.get("threshold"), _trig.get("unit"),
+                _emit.get("doc"), _trig.get("suggestion"))
+            break
 
 # ---------------- 规则 5：GPS 健康（F002）----------------
 gps_list = find_all(ulog, "vehicle_gps_position")
@@ -1100,4 +1192,5 @@ __result = json.dumps({
 }, ensure_ascii=False)
 `
   .replace("__FAULT_KB__", JSON.stringify(faultKbJson.entries))
-  .replace("__THRESHOLDS__", JSON.stringify(thresholds));
+  .replace("__THRESHOLDS__", JSON.stringify(thresholds))
+  .replace("__RULES__", JSON.stringify(rules));

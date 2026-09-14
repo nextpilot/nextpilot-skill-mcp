@@ -19,6 +19,8 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readdirSync } from "node:fs";
+import { parse as parseYaml } from "yaml";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
@@ -28,6 +30,8 @@ const PY_CHECKS = resolve(KN, "ulog_checks.py");
 const PY_DATA = resolve(KN, "ulog_data.py");
 const YAML_PATH = resolve(KN, "px4-fault-kb.yaml");
 const TOML_PATH = resolve(KN, "px4-thresholds.toml");
+const RULES_DIR = resolve(KN, "rules");
+const OPERATORS_PY = resolve(KN, "operators.py");
 const PROMPT_PATH = resolve(KN, "llm/gjb841-system-prompt.md");
 const EMPTY_PATH = resolve(KN, "llm/report-empty.md");
 
@@ -165,6 +169,100 @@ function toRawTemplate(text) {
   return text.replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
 }
 
+/** 日志级内置变量：经验里可直接引用，无需在 compute 声明（与 ulog_checks.py 的 _rule_env 对齐） */
+const BUILTIN_VARS = new Set([
+  "firmware", "fw_major", "fw_minor", "fw_profile",
+  "airframe", "is_rotary_wing", "is_fixed_wing", "is_vtol", "is_rover",
+  "duration_s", "armed_s", "phases", "tags", "guard_tags",
+]);
+
+/** 从 operators.py 解析算子签名（本文件由我们维护，格式固定；解析不到即构建失败） */
+function parseOperatorSignatures(py) {
+  const sigs = {};
+  const re = /@operator\(\s*"([a-z_]+)"([^)]*)\)/g;
+  let m;
+  while ((m = re.exec(py))) {
+    const name = m[1];
+    const rest = m[2] || "";
+    const num = (key) => {
+      const mm = rest.match(new RegExp(key + "\\s*=\\s*(\\d+)"));
+      return mm ? Number(mm[1]) : 1;
+    };
+    const names = rest.match(/out_names\s*=\s*\[([^\]]*)\]/);
+    sigs[name] = {
+      in_arity: num("in_arity"),
+      out_arity: num("out_arity"),
+      out_names: names ? names[1].split(",").map((x) => x.trim().replace(/["']/g, "")).filter(Boolean) : [],
+    };
+  }
+  return sigs;
+}
+
+/** 校验并加载 rules/*.yaml；任何不完整都构建失败（杜绝"空洞经验"） */
+function loadRules(dir, signatures) {
+  const files = readdirSync(dir).filter((f) => f.endsWith(".yaml")).sort();
+  if (files.length === 0) throw new Error("rules/ 下没有规则文件");
+  const rules = [];
+  const seen = new Set();
+  for (const file of files) {
+    const raw = parseYaml(readFileSync(resolve(dir, file), "utf8"));
+    const where = `rules/${file}`;
+    // 必填项：即使不限也必须显式写 any（隐式豁免正是空洞条目的入口）
+    for (const key of ["id", "name", "firmware", "airframe", "compute", "triggers", "emit"]) {
+      if (raw[key] === undefined || raw[key] === null || raw[key] === "") {
+        throw new Error(`${where}: 缺少必填字段 ${key}`);
+      }
+    }
+    if (seen.has(raw.id)) throw new Error(`${where}: 规则 id 重复 ${raw.id}`);
+    seen.add(raw.id);
+
+    const declared = new Set();
+    if (!Array.isArray(raw.compute) || raw.compute.length === 0) {
+      throw new Error(`${where}: compute 必须是非空数组`);
+    }
+    for (const node of raw.compute) {
+      const sig = signatures[node.op];
+      if (!sig) throw new Error(`${where}: 未注册的算子 op=${node.op}`);
+      const ins = node.in ?? (node.from !== undefined ? [].concat(node.from) : null);
+      const outs = [].concat(node.out ?? []);
+      if (!ins || ins.length !== sig.in_arity) {
+        throw new Error(`${where}: 算子 ${node.op} 需要 ${sig.in_arity} 个输入，实际 ${ins ? ins.length : 0}`);
+      }
+      if (outs.length !== sig.out_arity) {
+        throw new Error(`${where}: 算子 ${node.op} 需要 ${sig.out_arity} 个输出，实际 ${outs.length}`);
+      }
+      for (const o of outs) declared.add(o);
+    }
+    if (!Array.isArray(raw.triggers) || raw.triggers.length === 0) {
+      throw new Error(`${where}: triggers 必须是非空数组`);
+    }
+    for (const t of raw.triggers) {
+      if (typeof t.expr !== "string") throw new Error(`${where}: trigger 缺 expr（须为字符串，注意加引号）`);
+      if (!["critical", "warning", "info"].includes(t.severity)) {
+        throw new Error(`${where}: trigger severity 非法：${t.severity}`);
+      }
+      if (typeof t.title !== "string") throw new Error(`${where}: trigger 缺 title`);
+      if (typeof t.field !== "string") throw new Error(`${where}: trigger 缺 field（evidence.field）`);
+      // 表达式里的标识符必须已声明（内置变量或 compute 输出）
+      for (const name of t.expr.match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
+        if (["and", "or", "not", "True", "False"].includes(name)) continue;
+        if (!declared.has(name) && !BUILTIN_VARS.has(name)) {
+          throw new Error(`${where}: 表达式引用了未声明的名字 ${name}（expr: ${t.expr}）`);
+        }
+      }
+      // 标题里的占位符同理
+      for (const m of t.title.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)(:[^}]*)?\}/g)) {
+        if (!declared.has(m[1]) && !BUILTIN_VARS.has(m[1])) {
+          throw new Error(`${where}: 标题引用了未声明的名字 ${m[1]}`);
+        }
+      }
+    }
+    if (!raw.emit.check) throw new Error(`${where}: emit.check 必填（ran/skipped 用）`);
+    rules.push(raw);
+  }
+  return rules;
+}
+
 const banner = `// ⚠️ 自动生成，请勿手改。源文件在 knowledge/px4/，改完跑 \`pnpm build:kb\`（dev/build 自动执行）。\n`;
 
 // 1) 故障库 JSON
@@ -190,6 +288,12 @@ writeFileSync(
 );
 
 // 2) 检查脚本 .ts：内联 KB 与阈值，替换两个占位符
+const operatorsPy = read(OPERATORS_PY);
+const signatures = parseOperatorSignatures(operatorsPy);
+if (Object.keys(signatures).length === 0) throw new Error("operators.py 里没解析到任何算子签名");
+const rules = loadRules(RULES_DIR, signatures);
+if (rules.some((r) => !r.compute)) throw new Error("规则缺少 compute");
+
 const checkPy = read(PY_CHECKS);
 if (!checkPy.includes("__FAULT_KB__")) {
   throw new Error("ulog_checks.py 必须保留 __FAULT_KB__ 占位符");
@@ -197,6 +301,11 @@ if (!checkPy.includes("__FAULT_KB__")) {
 if (!checkPy.includes("__THRESHOLDS__")) {
   throw new Error("ulog_checks.py 必须保留 __THRESHOLDS__ 占位符");
 }
+if (!checkPy.includes("__RULES__")) {
+  throw new Error("ulog_checks.py 必须保留 __RULES__ 占位符");
+}
+// 算子定义必须在框架之前执行（框架用它按名字调用）
+const pyWithOperators = operatorsPy + "\n" + checkPy;
 writeFileSync(
   resolve(outWorkers, "ulog-check-script.ts"),
   banner +
@@ -204,11 +313,15 @@ writeFileSync(
     "const thresholds = " +
     thresholdsJson +
     ";\n\n" +
+    "const rules = " +
+    JSON.stringify(rules) +
+    ";\n\n" +
     "export const PY_ULG_CHECKS = String.raw`" +
     toRawTemplate(checkPy) +
     "`\n" +
     '  .replace("__FAULT_KB__", JSON.stringify(faultKbJson.entries))\n' +
-    '  .replace("__THRESHOLDS__", JSON.stringify(thresholds));\n',
+    '  .replace("__THRESHOLDS__", JSON.stringify(thresholds))\n' +
+    '  .replace("__RULES__", JSON.stringify(rules));\n',
   "utf8",
 );
 
@@ -251,6 +364,7 @@ writeFileSync(
 );
 
 console.log(
-  `knowledge built: ${kb.length} fault entries; ` +
+  `knowledge built: ${kb.length} fault entries, ${rules.length} rules, ` +
+    `${Object.keys(signatures).length} operators; ` +
     "ulog-check-script.ts, ulog-data-script.ts, prompts.generated.js, thresholds.generated.js",
 );

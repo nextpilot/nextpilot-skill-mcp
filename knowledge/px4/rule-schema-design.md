@@ -677,7 +677,7 @@ units:                       # 单位修正（上游注释缺失或不准时）
 | `# 水平位置误差 (m)` 尾部/行内注释 | `fields.eph.note` + 从注释里的 `(m)` 提取 `unit` |
 | `# [0] X  [1] Y  [2] Z` 数组槽位注释 | `fields.<name>.slots: {0: X, 1: Y, 2: Z}` |
 | `*_flags` / `fault_flags` 类字段 + 位常量 | `fields.<name>.bits: {0: ..., 1: ...}` |
-| 引用了另一个 msg（如 `VehicleStatus vehicle_status`） | `type: <msg 名>`，并在文件里保留 `msg:` 上游路径 |
+| 引用了另一个 msg（如 `VehicleStatus vehicle_status`） | `type: <msg 名>`，并在文件里保留 `file:` 上游路径 |
 | 文件名 `VehicleStatus.msg` | 输出 `topics/vehicle_status.yaml`（PX4 主题为 snake_case） |
 
 **生成物 vs 人工补充**（与现有"生成物不手改"约定一致）：

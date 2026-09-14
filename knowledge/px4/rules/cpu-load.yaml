@@ -1,0 +1,54 @@
+# 一条经验 = 一个自包含单元：身份 / 适用范围 / 计算 / 触发 / 输出
+# 结构说明见 ../rule-schema-design.md；改动后跑 tools/calibrate/compare-baseline.py 验等价
+
+id: px4-cpu-load
+name: CPU 负载
+version: 1.0.0
+category: system
+status: stable
+author: {name: NextPilot 内置}
+license: CC-BY-4.0
+changelog:
+  - {version: 1.0.0, date: 2026-09-15, note: 从 ulog_checks.py 迁出，逻辑与阈值不变}
+
+# ── 适用范围（三个轴，不限也必须显式写 any）──
+firmware: any
+airframe: any
+
+# ── 数据依赖：缺 topic 则 skipped，不误报 ──
+requires:
+  any_of: [cpuload]
+skip_reason: cpuload not in log
+
+# ── 计算：算子节点数据流（输出命名进环境，供表达式引用）──
+compute:
+  # 多实例（cpuload 通常只有一个）默认合并后统计，与迁移前 max over instances 等价
+  - out: cpu_max
+    from: cpuload.load
+    op: max
+
+# ── 触发：自上而下，命中第一条 ──
+triggers:
+  - expr: "cpu_max >= 0.95"
+    severity: critical
+    threshold: 0.95          # 写进 evidence.threshold（显式声明，不从表达式猜）
+    value: cpu_max
+    round: 3
+    field: "cpuload.load(max)"
+    title: "CPU 负载峰值 {cpu_max:.0%} 超阈值"
+    suggestion: "CPU 长期接近满载会导致控制环丢步；检查高耗率模块与日志流配置。"
+  - expr: "cpu_max >= 0.90"
+    severity: warning
+    threshold: 0.90
+    value: cpu_max
+    round: 3
+    field: "cpuload.load(max)"
+    title: "CPU 负载峰值 {cpu_max:.0%} 偏高"
+    suggestion: "关注 CPU 余量，必要时降低消息发布率。"
+
+# ── 输出：溯源与副作用 ──
+emit:
+  check: cpu_load                                   # checksRun / checksSkipped 里的名字
+  doc: https://docs.px4.io/main/en/log/flight_log_analysis.html
+  stats:
+    cpuLoadMax: {var: cpu_max, round: 3}             # 写入 stats 的键

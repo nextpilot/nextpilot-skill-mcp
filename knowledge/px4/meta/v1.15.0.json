@@ -4,7 +4,7 @@
  "topicCount": 213,
  "topics": {
   "action_request": {
-   "msg": "ActionRequest.msg",
+   "file": "ActionRequest.msg",
    "fields": {
     "action": {
      "type": "uint8",
@@ -43,7 +43,7 @@
    }
   },
   "actuator_armed": {
-   "msg": "ActuatorArmed.msg",
+   "file": "ActuatorArmed.msg",
    "fields": {
     "armed": {
      "type": "bool",
@@ -81,7 +81,7 @@
    }
   },
   "actuator_controls_status": {
-   "msg": "ActuatorControlsStatus.msg",
+   "file": "ActuatorControlsStatus.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -90,7 +90,7 @@
    }
   },
   "actuator_motors": {
-   "msg": "ActuatorMotors.msg",
+   "file": "ActuatorMotors.msg",
    "fields": {
     "reversible_flags": {
      "type": "uint16",
@@ -107,7 +107,7 @@
    }
   },
   "actuator_outputs": {
-   "msg": "ActuatorOutputs.msg",
+   "file": "ActuatorOutputs.msg",
    "fields": {
     "noutputs": {
      "type": "uint32",
@@ -120,7 +120,7 @@
    }
   },
   "actuator_servos": {
-   "msg": "ActuatorServos.msg",
+   "file": "ActuatorServos.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -133,7 +133,7 @@
    }
   },
   "actuator_servos_trim": {
-   "msg": "ActuatorServosTrim.msg",
+   "file": "ActuatorServosTrim.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -142,7 +142,7 @@
    }
   },
   "actuator_test": {
-   "msg": "ActuatorTest.msg",
+   "file": "ActuatorTest.msg",
    "fields": {
     "action": {
      "type": "uint8",
@@ -177,7 +177,7 @@
    }
   },
   "adc_report": {
-   "msg": "AdcReport.msg",
+   "file": "AdcReport.msg",
    "fields": {
     "device_id": {
      "type": "uint32",
@@ -198,7 +198,7 @@
    }
   },
   "airspeed": {
-   "msg": "Airspeed.msg",
+   "file": "Airspeed.msg",
    "fields": {
     "air_temperature_celsius": {
      "type": "float32",
@@ -227,7 +227,7 @@
    }
   },
   "airspeed_validated": {
-   "msg": "AirspeedValidated.msg",
+   "file": "AirspeedValidated.msg",
    "fields": {
     "airspeed_sensor_measurement_valid": {
      "type": "bool",
@@ -264,7 +264,7 @@
    }
   },
   "airspeed_wind": {
-   "msg": "AirspeedWind.msg",
+   "file": "AirspeedWind.msg",
    "fields": {
     "beta_innov": {
      "type": "float32",
@@ -335,7 +335,7 @@
    }
   },
   "arming_check_reply": {
-   "msg": "ArmingCheckReply.msg",
+   "file": "ArmingCheckReply.msg",
    "fields": {
     "can_arm_and_run": {
      "type": "bool",
@@ -405,7 +405,7 @@
    }
   },
   "arming_check_request": {
-   "msg": "ArmingCheckRequest.msg",
+   "file": "ArmingCheckRequest.msg",
    "fields": {
     "request_id": {
      "type": "uint8"
@@ -417,7 +417,7 @@
    }
   },
   "autotune_attitude_control_status": {
-   "msg": "AutotuneAttitudeControlStatus.msg",
+   "file": "AutotuneAttitudeControlStatus.msg",
    "fields": {
     "att_p": {
      "type": "float32"
@@ -477,7 +477,7 @@
    }
   },
   "battery_status": {
-   "msg": "BatteryStatus.msg",
+   "file": "BatteryStatus.msg",
    "fields": {
     "available_energy": {
      "type": "float32",
@@ -640,7 +640,7 @@
    }
   },
   "buffer128": {
-   "msg": "Buffer128.msg",
+   "file": "Buffer128.msg",
    "fields": {
     "len": {
      "type": "uint8",
@@ -653,7 +653,7 @@
    }
   },
   "button_event": {
-   "msg": "ButtonEvent.msg",
+   "file": "ButtonEvent.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -666,7 +666,7 @@
    }
   },
   "camera_capture": {
-   "msg": "CameraCapture.msg",
+   "file": "CameraCapture.msg",
    "fields": {
     "alt": {
      "type": "float32",
@@ -707,7 +707,7 @@
    }
   },
   "camera_status": {
-   "msg": "CameraStatus.msg",
+   "file": "CameraStatus.msg",
    "fields": {
     "active_comp_id": {
      "type": "uint8",
@@ -724,7 +724,7 @@
    }
   },
   "camera_trigger": {
-   "msg": "CameraTrigger.msg",
+   "file": "CameraTrigger.msg",
    "fields": {
     "feedback": {
      "type": "bool",
@@ -745,7 +745,7 @@
    }
   },
   "can_interface_status": {
-   "msg": "CanInterfaceStatus.msg",
+   "file": "CanInterfaceStatus.msg",
    "fields": {
     "frames_rx": {
      "type": "uint64"
@@ -766,7 +766,7 @@
    }
   },
   "cellular_status": {
-   "msg": "CellularStatus.msg",
+   "file": "CellularStatus.msg",
    "fields": {
     "failure_reason": {
      "type": "uint8",
@@ -803,7 +803,7 @@
    }
   },
   "collision_constraints": {
-   "msg": "CollisionConstraints.msg",
+   "file": "CollisionConstraints.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -812,7 +812,7 @@
    }
   },
   "collision_report": {
-   "msg": "CollisionReport.msg",
+   "file": "CollisionReport.msg",
    "fields": {
     "action": {
      "type": "uint8"
@@ -842,7 +842,7 @@
    }
   },
   "config_overrides": {
-   "msg": "ConfigOverrides.msg",
+   "file": "ConfigOverrides.msg",
    "fields": {
     "defer_failsafes": {
      "type": "bool",
@@ -877,7 +877,7 @@
    }
   },
   "control_allocator_status": {
-   "msg": "ControlAllocatorStatus.msg",
+   "file": "ControlAllocatorStatus.msg",
    "fields": {
     "handled_motor_failure_mask": {
      "type": "uint16",
@@ -899,7 +899,7 @@
    }
   },
   "cpuload": {
-   "msg": "Cpuload.msg",
+   "file": "Cpuload.msg",
    "fields": {
     "load": {
      "type": "float32",
@@ -916,7 +916,7 @@
    }
   },
   "dataman_request": {
-   "msg": "DatamanRequest.msg",
+   "file": "DatamanRequest.msg",
    "fields": {
     "client_id": {
      "type": "uint8"
@@ -942,7 +942,7 @@
    }
   },
   "dataman_response": {
-   "msg": "DatamanResponse.msg",
+   "file": "DatamanResponse.msg",
    "fields": {
     "client_id": {
      "type": "uint8"
@@ -977,7 +977,7 @@
    }
   },
   "debug_array": {
-   "msg": "DebugArray.msg",
+   "file": "DebugArray.msg",
    "fields": {
     "id": {
      "type": "uint16",
@@ -990,7 +990,7 @@
    }
   },
   "debug_key_value": {
-   "msg": "DebugKeyValue.msg",
+   "file": "DebugKeyValue.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -1003,7 +1003,7 @@
    }
   },
   "debug_value": {
-   "msg": "DebugValue.msg",
+   "file": "DebugValue.msg",
    "fields": {
     "ind": {
      "type": "int8",
@@ -1020,7 +1020,7 @@
    }
   },
   "debug_vect": {
-   "msg": "DebugVect.msg",
+   "file": "DebugVect.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -1041,7 +1041,7 @@
    }
   },
   "differential_drive_setpoint": {
-   "msg": "DifferentialDriveSetpoint.msg",
+   "file": "DifferentialDriveSetpoint.msg",
    "fields": {
     "closed_loop_speed_control": {
      "type": "bool",
@@ -1066,7 +1066,7 @@
    }
   },
   "differential_pressure": {
-   "msg": "DifferentialPressure.msg",
+   "file": "DifferentialPressure.msg",
    "fields": {
     "device_id": {
      "type": "uint32",
@@ -1096,7 +1096,7 @@
    }
   },
   "distance_sensor": {
-   "msg": "DistanceSensor.msg",
+   "file": "DistanceSensor.msg",
    "fields": {
     "current_distance": {
      "type": "float32",
@@ -1150,7 +1150,7 @@
    }
   },
   "ekf2_timestamps": {
-   "msg": "Ekf2Timestamps.msg",
+   "file": "Ekf2Timestamps.msg",
    "fields": {
     "airspeed_timestamp_rel": {
      "type": "int16"
@@ -1177,7 +1177,7 @@
    }
   },
   "esc_report": {
-   "msg": "EscReport.msg",
+   "file": "EscReport.msg",
    "fields": {
     "actuator_function": {
      "type": "uint8",
@@ -1234,7 +1234,7 @@
    }
   },
   "esc_status": {
-   "msg": "EscStatus.msg",
+   "file": "EscStatus.msg",
    "fields": {
     "counter": {
      "type": "uint16",
@@ -1265,7 +1265,7 @@
    }
   },
   "estimator_aid_source1d": {
-   "msg": "EstimatorAidSource1d.msg",
+   "file": "EstimatorAidSource1d.msg",
    "fields": {
     "device_id": {
      "type": "uint32"
@@ -1310,7 +1310,7 @@
    }
   },
   "estimator_aid_source2d": {
-   "msg": "EstimatorAidSource2d.msg",
+   "file": "EstimatorAidSource2d.msg",
    "fields": {
     "device_id": {
      "type": "uint32"
@@ -1340,7 +1340,7 @@
    }
   },
   "estimator_aid_source3d": {
-   "msg": "EstimatorAidSource3d.msg",
+   "file": "EstimatorAidSource3d.msg",
    "fields": {
     "device_id": {
      "type": "uint32"
@@ -1370,7 +1370,7 @@
    }
   },
   "estimator_bias": {
-   "msg": "EstimatorBias.msg",
+   "file": "EstimatorBias.msg",
    "fields": {
     "bias": {
      "type": "float32",
@@ -1411,7 +1411,7 @@
    }
   },
   "estimator_bias3d": {
-   "msg": "EstimatorBias3d.msg",
+   "file": "EstimatorBias3d.msg",
    "fields": {
     "device_id": {
      "type": "uint32",
@@ -1428,7 +1428,7 @@
    }
   },
   "estimator_event_flags": {
-   "msg": "EstimatorEventFlags.msg",
+   "file": "EstimatorEventFlags.msg",
    "fields": {
     "bad_yaw_using_gps_course": {
      "type": "bool",
@@ -1565,7 +1565,7 @@
    }
   },
   "estimator_gps_status": {
-   "msg": "EstimatorGpsStatus.msg",
+   "file": "EstimatorGpsStatus.msg",
    "fields": {
     "check_fail_gps_fix": {
      "type": "bool",
@@ -1637,7 +1637,7 @@
    }
   },
   "estimator_innovations": {
-   "msg": "EstimatorInnovations.msg",
+   "file": "EstimatorInnovations.msg",
    "fields": {
     "airspeed": {
      "type": "float32",
@@ -1694,7 +1694,7 @@
    }
   },
   "estimator_selector_status": {
-   "msg": "EstimatorSelectorStatus.msg",
+   "file": "EstimatorSelectorStatus.msg",
    "fields": {
     "accel_device_id": {
      "type": "uint32"
@@ -1733,7 +1733,7 @@
    }
   },
   "estimator_sensor_bias": {
-   "msg": "EstimatorSensorBias.msg",
+   "file": "EstimatorSensorBias.msg",
    "fields": {
     "accel_bias_limit": {
      "type": "float32",
@@ -1794,7 +1794,7 @@
    }
   },
   "estimator_states": {
-   "msg": "EstimatorStates.msg",
+   "file": "EstimatorStates.msg",
    "fields": {
     "n_states": {
      "type": "uint8",
@@ -1811,7 +1811,7 @@
    }
   },
   "estimator_status": {
-   "msg": "EstimatorStatus.msg",
+   "file": "EstimatorStatus.msg",
    "fields": {
     "accel_device_id": {
      "type": "uint32"
@@ -1977,7 +1977,7 @@
    }
   },
   "estimator_status_flags": {
-   "msg": "EstimatorStatusFlags.msg",
+   "file": "EstimatorStatusFlags.msg",
    "fields": {
     "control_status_changes": {
      "type": "uint32",
@@ -2247,7 +2247,7 @@
    }
   },
   "event": {
-   "msg": "Event.msg",
+   "file": "Event.msg",
    "fields": {
     "event_sequence": {
      "type": "uint16",
@@ -2268,7 +2268,7 @@
    }
   },
   "failsafe_flags": {
-   "msg": "FailsafeFlags.msg",
+   "file": "FailsafeFlags.msg",
    "fields": {
     "angular_velocity_invalid": {
      "type": "bool",
@@ -2423,7 +2423,7 @@
    }
   },
   "failure_detector_status": {
-   "msg": "FailureDetectorStatus.msg",
+   "file": "FailureDetectorStatus.msg",
    "fields": {
     "fd_alt": {
      "type": "bool"
@@ -2465,7 +2465,7 @@
    }
   },
   "figure_eight_status": {
-   "msg": "FigureEightStatus.msg",
+   "file": "FigureEightStatus.msg",
    "fields": {
     "frame": {
      "type": "uint8",
@@ -2502,7 +2502,7 @@
    }
   },
   "flight_phase_estimation": {
-   "msg": "FlightPhaseEstimation.msg",
+   "file": "FlightPhaseEstimation.msg",
    "fields": {
     "flight_phase": {
      "type": "uint8",
@@ -2522,7 +2522,7 @@
    }
   },
   "follow_target": {
-   "msg": "FollowTarget.msg",
+   "file": "FollowTarget.msg",
    "fields": {
     "alt": {
      "type": "float32",
@@ -2559,7 +2559,7 @@
    }
   },
   "follow_target_estimator": {
-   "msg": "FollowTargetEstimator.msg",
+   "file": "FollowTargetEstimator.msg",
    "fields": {
     "alt_est": {
      "type": "float32",
@@ -2599,7 +2599,7 @@
    }
   },
   "follow_target_status": {
-   "msg": "FollowTargetStatus.msg",
+   "file": "FollowTargetStatus.msg",
    "fields": {
     "angular_rate_setpoint": {
      "type": "float32",
@@ -2634,7 +2634,7 @@
    }
   },
   "generator_status": {
-   "msg": "GeneratorStatus.msg",
+   "file": "GeneratorStatus.msg",
    "fields": {
     "bat_current_setpoint": {
      "type": "float32",
@@ -2687,7 +2687,7 @@
    }
   },
   "geofence_result": {
-   "msg": "GeofenceResult.msg",
+   "file": "GeofenceResult.msg",
    "fields": {
     "geofence_action": {
      "type": "uint8",
@@ -2712,7 +2712,7 @@
    }
   },
   "geofence_status": {
-   "msg": "GeofenceStatus.msg",
+   "file": "GeofenceStatus.msg",
    "fields": {
     "geofence_id": {
      "type": "uint32",
@@ -2729,7 +2729,7 @@
    }
   },
   "gimbal_controls": {
-   "msg": "GimbalControls.msg",
+   "file": "GimbalControls.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -2742,7 +2742,7 @@
    }
   },
   "gimbal_device_attitude_status": {
-   "msg": "GimbalDeviceAttitudeStatus.msg",
+   "file": "GimbalDeviceAttitudeStatus.msg",
    "fields": {
     "angular_velocity_x": {
      "type": "float32"
@@ -2783,7 +2783,7 @@
    }
   },
   "gimbal_device_information": {
-   "msg": "GimbalDeviceInformation.msg",
+   "file": "GimbalDeviceInformation.msg",
    "fields": {
     "cap_flags": {
      "type": "uint16"
@@ -2834,7 +2834,7 @@
    }
   },
   "gimbal_device_set_attitude": {
-   "msg": "GimbalDeviceSetAttitude.msg",
+   "file": "GimbalDeviceSetAttitude.msg",
    "fields": {
     "angular_velocity_x": {
      "type": "float32"
@@ -2861,7 +2861,7 @@
    }
   },
   "gimbal_manager_information": {
-   "msg": "GimbalManagerInformation.msg",
+   "file": "GimbalManagerInformation.msg",
    "fields": {
     "cap_flags": {
      "type": "uint32"
@@ -2900,7 +2900,7 @@
    }
   },
   "gimbal_manager_set_attitude": {
-   "msg": "GimbalManagerSetAttitude.msg",
+   "file": "GimbalManagerSetAttitude.msg",
    "fields": {
     "angular_velocity_x": {
      "type": "float32"
@@ -2936,7 +2936,7 @@
    }
   },
   "gimbal_manager_set_manual_control": {
-   "msg": "GimbalManagerSetManualControl.msg",
+   "file": "GimbalManagerSetManualControl.msg",
    "fields": {
     "flags": {
      "type": "uint32"
@@ -2979,7 +2979,7 @@
    }
   },
   "gimbal_manager_status": {
-   "msg": "GimbalManagerStatus.msg",
+   "file": "GimbalManagerStatus.msg",
    "fields": {
     "flags": {
      "type": "uint32"
@@ -3006,7 +3006,7 @@
    }
   },
   "goto_setpoint": {
-   "msg": "GotoSetpoint.msg",
+   "file": "GotoSetpoint.msg",
    "fields": {
     "flag_control_heading": {
      "type": "bool",
@@ -3048,7 +3048,7 @@
    }
   },
   "gpio_config": {
-   "msg": "GpioConfig.msg",
+   "file": "GpioConfig.msg",
    "fields": {
     "config": {
      "type": "uint32"
@@ -3072,7 +3072,7 @@
    }
   },
   "gpio_in": {
-   "msg": "GpioIn.msg",
+   "file": "GpioIn.msg",
    "fields": {
     "device_id": {
      "type": "uint32",
@@ -3089,7 +3089,7 @@
    }
   },
   "gpio_out": {
-   "msg": "GpioOut.msg",
+   "file": "GpioOut.msg",
    "fields": {
     "device_id": {
      "type": "uint32",
@@ -3110,7 +3110,7 @@
    }
   },
   "gpio_request": {
-   "msg": "GpioRequest.msg",
+   "file": "GpioRequest.msg",
    "fields": {
     "device_id": {
      "type": "uint32",
@@ -3123,7 +3123,7 @@
    }
   },
   "gps_dump": {
-   "msg": "GpsDump.msg",
+   "file": "GpsDump.msg",
    "fields": {
     "instance": {
      "type": "uint8",
@@ -3140,7 +3140,7 @@
    }
   },
   "gps_inject_data": {
-   "msg": "GpsInjectData.msg",
+   "file": "GpsInjectData.msg",
    "fields": {
     "device_id": {
      "type": "uint32",
@@ -3161,7 +3161,7 @@
    }
   },
   "gripper": {
-   "msg": "Gripper.msg",
+   "file": "Gripper.msg",
    "fields": {
     "command": {
      "type": "int8",
@@ -3179,7 +3179,7 @@
    }
   },
   "health_report": {
-   "msg": "HealthReport.msg",
+   "file": "HealthReport.msg",
    "fields": {
     "arming_check_error_flags": {
      "type": "uint64"
@@ -3212,7 +3212,7 @@
    }
   },
   "heater_status": {
-   "msg": "HeaterStatus.msg",
+   "file": "HeaterStatus.msg",
    "fields": {
     "controller_period_usec": {
      "type": "uint32"
@@ -3259,7 +3259,7 @@
    }
   },
   "home_position": {
-   "msg": "HomePosition.msg",
+   "file": "HomePosition.msg",
    "fields": {
     "alt": {
      "type": "float32",
@@ -3317,7 +3317,7 @@
    }
   },
   "hover_thrust_estimate": {
-   "msg": "HoverThrustEstimate.msg",
+   "file": "HoverThrustEstimate.msg",
    "fields": {
     "accel_innov": {
      "type": "float32",
@@ -3357,7 +3357,7 @@
    }
   },
   "input_rc": {
-   "msg": "InputRc.msg",
+   "file": "InputRc.msg",
    "fields": {
     "channel_count": {
      "type": "uint8",
@@ -3414,7 +3414,7 @@
    }
   },
   "internal_combustion_engine_status": {
-   "msg": "InternalCombustionEngineStatus.msg",
+   "file": "InternalCombustionEngineStatus.msg",
    "fields": {
     "atmospheric_pressure_kpa": {
      "type": "float32",
@@ -3516,7 +3516,7 @@
    }
   },
   "iridiumsbd_status": {
-   "msg": "IridiumsbdStatus.msg",
+   "file": "IridiumsbdStatus.msg",
    "fields": {
     "failed_sbd_sessions": {
      "type": "uint16",
@@ -3581,7 +3581,7 @@
    }
   },
   "irlock_report": {
-   "msg": "IrlockReport.msg",
+   "file": "IrlockReport.msg",
    "fields": {
     "pos_x": {
      "type": "float32",
@@ -3609,7 +3609,7 @@
    }
   },
   "landing_gear": {
-   "msg": "LandingGear.msg",
+   "file": "LandingGear.msg",
    "fields": {
     "landing_gear": {
      "type": "int8"
@@ -3621,7 +3621,7 @@
    }
   },
   "landing_gear_wheel": {
-   "msg": "LandingGearWheel.msg",
+   "file": "LandingGearWheel.msg",
    "fields": {
     "normalized_wheel_setpoint": {
      "type": "float32",
@@ -3634,7 +3634,7 @@
    }
   },
   "landing_target_innovations": {
-   "msg": "LandingTargetInnovations.msg",
+   "file": "LandingTargetInnovations.msg",
    "fields": {
     "innov_cov_x": {
      "type": "float32"
@@ -3655,7 +3655,7 @@
    }
   },
   "landing_target_pose": {
-   "msg": "LandingTargetPose.msg",
+   "file": "LandingTargetPose.msg",
    "fields": {
     "abs_pos_valid": {
      "type": "bool",
@@ -3728,7 +3728,7 @@
    }
   },
   "launch_detection_status": {
-   "msg": "LaunchDetectionStatus.msg",
+   "file": "LaunchDetectionStatus.msg",
    "fields": {
     "launch_detection_state": {
      "type": "uint8"
@@ -3740,7 +3740,7 @@
    }
   },
   "led_control": {
-   "msg": "LedControl.msg",
+   "file": "LedControl.msg",
    "fields": {
     "color": {
      "type": "uint8",
@@ -3793,7 +3793,7 @@
    }
   },
   "log_message": {
-   "msg": "LogMessage.msg",
+   "file": "LogMessage.msg",
    "fields": {
     "severity": {
      "type": "uint8",
@@ -3806,7 +3806,7 @@
    }
   },
   "logger_status": {
-   "msg": "LoggerStatus.msg",
+   "file": "LoggerStatus.msg",
    "fields": {
     "backend": {
      "type": "uint8",
@@ -3854,7 +3854,7 @@
    }
   },
   "mag_worker_data": {
-   "msg": "MagWorkerData.msg",
+   "file": "MagWorkerData.msg",
    "fields": {
     "calibration_interval_perside_us": {
      "type": "uint64"
@@ -3876,7 +3876,7 @@
    }
   },
   "magnetometer_bias_estimate": {
-   "msg": "MagnetometerBiasEstimate.msg",
+   "file": "MagnetometerBiasEstimate.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -3885,7 +3885,7 @@
    }
   },
   "manual_control_setpoint": {
-   "msg": "ManualControlSetpoint.msg",
+   "file": "ManualControlSetpoint.msg",
    "fields": {
     "aux1": {
      "type": "float32"
@@ -3949,7 +3949,7 @@
    }
   },
   "manual_control_switches": {
-   "msg": "ManualControlSwitches.msg",
+   "file": "ManualControlSwitches.msg",
    "fields": {
     "arm_switch": {
      "type": "uint8",
@@ -4021,7 +4021,7 @@
    }
   },
   "mavlink_log": {
-   "msg": "MavlinkLog.msg",
+   "file": "MavlinkLog.msg",
    "fields": {
     "severity": {
      "type": "uint8",
@@ -4034,7 +4034,7 @@
    }
   },
   "mavlink_tunnel": {
-   "msg": "MavlinkTunnel.msg",
+   "file": "MavlinkTunnel.msg",
    "fields": {
     "payload_length": {
      "type": "uint8",
@@ -4059,7 +4059,7 @@
    }
   },
   "message_format_request": {
-   "msg": "MessageFormatRequest.msg",
+   "file": "MessageFormatRequest.msg",
    "fields": {
     "protocol_version": {
      "type": "uint16",
@@ -4072,7 +4072,7 @@
    }
   },
   "message_format_response": {
-   "msg": "MessageFormatResponse.msg",
+   "file": "MessageFormatResponse.msg",
    "fields": {
     "message_hash": {
      "type": "uint32",
@@ -4092,7 +4092,7 @@
    }
   },
   "mission": {
-   "msg": "Mission.msg",
+   "file": "Mission.msg",
    "fields": {
     "count": {
      "type": "uint16",
@@ -4141,7 +4141,7 @@
    }
   },
   "mission_result": {
-   "msg": "MissionResult.msg",
+   "file": "MissionResult.msg",
    "fields": {
     "execution_mode": {
      "type": "uint8",
@@ -4208,7 +4208,7 @@
    }
   },
   "mode_completed": {
-   "msg": "ModeCompleted.msg",
+   "file": "ModeCompleted.msg",
    "fields": {
     "nav_state": {
      "type": "uint8",
@@ -4231,7 +4231,7 @@
    }
   },
   "mount_orientation": {
-   "msg": "MountOrientation.msg",
+   "file": "MountOrientation.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -4240,7 +4240,7 @@
    }
   },
   "navigator_mission_item": {
-   "msg": "NavigatorMissionItem.msg",
+   "file": "NavigatorMissionItem.msg",
    "fields": {
     "acceptance_radius": {
      "type": "float32",
@@ -4316,7 +4316,7 @@
    }
   },
   "normalized_unsigned_setpoint": {
-   "msg": "NormalizedUnsignedSetpoint.msg",
+   "file": "NormalizedUnsignedSetpoint.msg",
    "fields": {
     "normalized_setpoint": {
      "type": "float32",
@@ -4329,7 +4329,7 @@
    }
   },
   "npfg_status": {
-   "msg": "NpfgStatus.msg",
+   "file": "NpfgStatus.msg",
    "fields": {
     "adapted_period": {
      "type": "float32",
@@ -4399,7 +4399,7 @@
    }
   },
   "obstacle_distance": {
-   "msg": "ObstacleDistance.msg",
+   "file": "ObstacleDistance.msg",
    "fields": {
     "angle_offset": {
      "type": "float32",
@@ -4432,7 +4432,7 @@
    }
   },
   "offboard_control_mode": {
-   "msg": "OffboardControlMode.msg",
+   "file": "OffboardControlMode.msg",
    "fields": {
     "acceleration": {
      "type": "bool"
@@ -4462,7 +4462,7 @@
    }
   },
   "onboard_computer_status": {
-   "msg": "OnboardComputerStatus.msg",
+   "file": "OnboardComputerStatus.msg",
    "fields": {
     "ram_total": {
      "type": "uint32",
@@ -4492,7 +4492,7 @@
    }
   },
   "orb_test": {
-   "msg": "OrbTest.msg",
+   "file": "OrbTest.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -4504,7 +4504,7 @@
    }
   },
   "orb_test_large": {
-   "msg": "OrbTestLarge.msg",
+   "file": "OrbTestLarge.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -4516,7 +4516,7 @@
    }
   },
   "orb_test_medium": {
-   "msg": "OrbTestMedium.msg",
+   "file": "OrbTestMedium.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -4528,7 +4528,7 @@
    }
   },
   "orbit_status": {
-   "msg": "OrbitStatus.msg",
+   "file": "OrbitStatus.msg",
    "fields": {
     "frame": {
      "type": "uint8",
@@ -4560,7 +4560,7 @@
    }
   },
   "parameter_reset_request": {
-   "msg": "ParameterResetRequest.msg",
+   "file": "ParameterResetRequest.msg",
    "fields": {
     "parameter_index": {
      "type": "uint16"
@@ -4576,7 +4576,7 @@
    }
   },
   "parameter_set_used_request": {
-   "msg": "ParameterSetUsedRequest.msg",
+   "file": "ParameterSetUsedRequest.msg",
    "fields": {
     "parameter_index": {
      "type": "uint16"
@@ -4588,7 +4588,7 @@
    }
   },
   "parameter_set_value_request": {
-   "msg": "ParameterSetValueRequest.msg",
+   "file": "ParameterSetValueRequest.msg",
    "fields": {
     "float_value": {
      "type": "float32",
@@ -4608,7 +4608,7 @@
    }
   },
   "parameter_set_value_response": {
-   "msg": "ParameterSetValueResponse.msg",
+   "file": "ParameterSetValueResponse.msg",
    "fields": {
     "parameter_index": {
      "type": "uint16"
@@ -4623,7 +4623,7 @@
    }
   },
   "parameter_update": {
-   "msg": "ParameterUpdate.msg",
+   "file": "ParameterUpdate.msg",
    "fields": {
     "active": {
      "type": "uint16"
@@ -4657,7 +4657,7 @@
    }
   },
   "ping": {
-   "msg": "Ping.msg",
+   "file": "Ping.msg",
    "fields": {
     "component_id": {
      "type": "uint8",
@@ -4691,7 +4691,7 @@
    }
   },
   "position_controller_landing_status": {
-   "msg": "PositionControllerLandingStatus.msg",
+   "file": "PositionControllerLandingStatus.msg",
    "fields": {
     "abort_status": {
      "type": "uint8"
@@ -4711,7 +4711,7 @@
    }
   },
   "position_controller_status": {
-   "msg": "PositionControllerStatus.msg",
+   "file": "PositionControllerStatus.msg",
    "fields": {
     "acceptance_radius": {
      "type": "float32",
@@ -4761,7 +4761,7 @@
    }
   },
   "position_setpoint": {
-   "msg": "PositionSetpoint.msg",
+   "file": "PositionSetpoint.msg",
    "fields": {
     "acceptance_radius": {
      "type": "float32",
@@ -4844,7 +4844,7 @@
    }
   },
   "position_setpoint_triplet": {
-   "msg": "PositionSetpointTriplet.msg",
+   "file": "PositionSetpointTriplet.msg",
    "fields": {
     "current": {
      "type": "PositionSetpoint"
@@ -4862,7 +4862,7 @@
    }
   },
   "power_button_state": {
-   "msg": "PowerButtonState.msg",
+   "file": "PowerButtonState.msg",
    "fields": {
     "event": {
      "type": "uint8",
@@ -4875,7 +4875,7 @@
    }
   },
   "power_monitor": {
-   "msg": "PowerMonitor.msg",
+   "file": "PowerMonitor.msg",
    "fields": {
     "al": {
      "type": "int16"
@@ -4920,7 +4920,7 @@
    }
   },
   "pps_capture": {
-   "msg": "PpsCapture.msg",
+   "file": "PpsCapture.msg",
    "fields": {
     "pps_rate_exceeded_counter": {
      "type": "uint8",
@@ -4937,7 +4937,7 @@
    }
   },
   "pwm_input": {
-   "msg": "PwmInput.msg",
+   "file": "PwmInput.msg",
    "fields": {
     "error_count": {
      "type": "uint64",
@@ -4959,7 +4959,7 @@
    }
   },
   "px4io_status": {
-   "msg": "Px4ioStatus.msg",
+   "file": "Px4ioStatus.msg",
    "fields": {
     "alarm_pwm_error": {
      "type": "bool"
@@ -5049,7 +5049,7 @@
    }
   },
   "qshell_req": {
-   "msg": "QshellReq.msg",
+   "file": "QshellReq.msg",
    "fields": {
     "request_sequence": {
      "type": "uint32"
@@ -5064,7 +5064,7 @@
    }
   },
   "qshell_retval": {
-   "msg": "QshellRetval.msg",
+   "file": "QshellRetval.msg",
    "fields": {
     "return_sequence": {
      "type": "uint32"
@@ -5079,7 +5079,7 @@
    }
   },
   "radio_status": {
-   "msg": "RadioStatus.msg",
+   "file": "RadioStatus.msg",
    "fields": {
     "fix": {
      "type": "uint16",
@@ -5116,7 +5116,7 @@
    }
   },
   "rate_ctrl_status": {
-   "msg": "RateCtrlStatus.msg",
+   "file": "RateCtrlStatus.msg",
    "fields": {
     "pitchspeed_integ": {
      "type": "float32"
@@ -5138,7 +5138,7 @@
    }
   },
   "rc_channels": {
-   "msg": "RcChannels.msg",
+   "file": "RcChannels.msg",
    "fields": {
     "channel_count": {
      "type": "uint8",
@@ -5167,7 +5167,7 @@
    }
   },
   "rc_parameter_map": {
-   "msg": "RcParameterMap.msg",
+   "file": "RcParameterMap.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -5176,7 +5176,7 @@
    }
   },
   "register_ext_component_reply": {
-   "msg": "RegisterExtComponentReply.msg",
+   "file": "RegisterExtComponentReply.msg",
    "fields": {
     "arming_check_id": {
      "type": "int8",
@@ -5210,7 +5210,7 @@
    }
   },
   "register_ext_component_request": {
-   "msg": "RegisterExtComponentRequest.msg",
+   "file": "RegisterExtComponentRequest.msg",
    "fields": {
     "activate_mode_immediately": {
      "type": "bool",
@@ -5252,7 +5252,7 @@
    }
   },
   "rpm": {
-   "msg": "Rpm.msg",
+   "file": "Rpm.msg",
    "fields": {
     "estimated_accurancy_rpm": {
      "type": "float32",
@@ -5269,7 +5269,7 @@
    }
   },
   "rtl_status": {
-   "msg": "RtlStatus.msg",
+   "file": "RtlStatus.msg",
    "fields": {
     "has_vtol_approach": {
      "type": "bool",
@@ -5298,7 +5298,7 @@
    }
   },
   "rtl_time_estimate": {
-   "msg": "RtlTimeEstimate.msg",
+   "file": "RtlTimeEstimate.msg",
    "fields": {
     "safe_time_estimate": {
      "type": "float32",
@@ -5319,7 +5319,7 @@
    }
   },
   "satellite_info": {
-   "msg": "SatelliteInfo.msg",
+   "file": "SatelliteInfo.msg",
    "fields": {
     "count": {
      "type": "uint8",
@@ -5332,7 +5332,7 @@
    }
   },
   "sensor_accel": {
-   "msg": "SensorAccel.msg",
+   "file": "SensorAccel.msg",
    "fields": {
     "device_id": {
      "type": "uint32",
@@ -5372,7 +5372,7 @@
    }
   },
   "sensor_accel_fifo": {
-   "msg": "SensorAccelFifo.msg",
+   "file": "SensorAccelFifo.msg",
    "fields": {
     "device_id": {
      "type": "uint32",
@@ -5401,7 +5401,7 @@
    }
   },
   "sensor_airflow": {
-   "msg": "SensorAirflow.msg",
+   "file": "SensorAirflow.msg",
    "fields": {
     "device_id": {
      "type": "uint32",
@@ -5426,7 +5426,7 @@
    }
   },
   "sensor_baro": {
-   "msg": "SensorBaro.msg",
+   "file": "SensorBaro.msg",
    "fields": {
     "device_id": {
      "type": "uint32",
@@ -5454,7 +5454,7 @@
    }
   },
   "sensor_combined": {
-   "msg": "SensorCombined.msg",
+   "file": "SensorCombined.msg",
    "fields": {
     "accel_calibration_count": {
      "type": "uint8",
@@ -5491,7 +5491,7 @@
    }
   },
   "sensor_correction": {
-   "msg": "SensorCorrection.msg",
+   "file": "SensorCorrection.msg",
    "fields": {
     "baro_offset_0": {
      "type": "float32",
@@ -5516,7 +5516,7 @@
    }
   },
   "sensor_gnss_relative": {
-   "msg": "SensorGnssRelative.msg",
+   "file": "SensorGnssRelative.msg",
    "fields": {
     "accuracy_length": {
      "type": "float32",
@@ -5599,7 +5599,7 @@
    }
   },
   "sensor_gps": {
-   "msg": "SensorGps.msg",
+   "file": "SensorGps.msg",
    "fields": {
     "altitude_ellipsoid_m": {
      "type": "float64",
@@ -5784,7 +5784,7 @@
    }
   },
   "sensor_gyro": {
-   "msg": "SensorGyro.msg",
+   "file": "SensorGyro.msg",
    "fields": {
     "device_id": {
      "type": "uint32",
@@ -5824,7 +5824,7 @@
    }
   },
   "sensor_gyro_fft": {
-   "msg": "SensorGyroFft.msg",
+   "file": "SensorGyroFft.msg",
    "fields": {
     "device_id": {
      "type": "uint32",
@@ -5847,7 +5847,7 @@
    }
   },
   "sensor_gyro_fifo": {
-   "msg": "SensorGyroFifo.msg",
+   "file": "SensorGyroFifo.msg",
    "fields": {
     "device_id": {
      "type": "uint32",
@@ -5876,7 +5876,7 @@
    }
   },
   "sensor_hygrometer": {
-   "msg": "SensorHygrometer.msg",
+   "file": "SensorHygrometer.msg",
    "fields": {
     "device_id": {
      "type": "uint32",
@@ -5902,7 +5902,7 @@
    }
   },
   "sensor_mag": {
-   "msg": "SensorMag.msg",
+   "file": "SensorMag.msg",
    "fields": {
     "device_id": {
      "type": "uint32",
@@ -5938,7 +5938,7 @@
    }
   },
   "sensor_optical_flow": {
-   "msg": "SensorOpticalFlow.msg",
+   "file": "SensorOpticalFlow.msg",
    "fields": {
     "delta_angle_available": {
      "type": "bool"
@@ -5998,7 +5998,7 @@
    }
   },
   "sensor_preflight_mag": {
-   "msg": "SensorPreflightMag.msg",
+   "file": "SensorPreflightMag.msg",
    "fields": {
     "mag_inconsistency_angle": {
      "type": "float32",
@@ -6011,7 +6011,7 @@
    }
   },
   "sensor_selection": {
-   "msg": "SensorSelection.msg",
+   "file": "SensorSelection.msg",
    "fields": {
     "accel_device_id": {
      "type": "uint32",
@@ -6028,7 +6028,7 @@
    }
   },
   "sensor_uwb": {
-   "msg": "SensorUwb.msg",
+   "file": "SensorUwb.msg",
    "fields": {
     "aoa_azimuth_dev": {
      "type": "float32",
@@ -6122,7 +6122,7 @@
    }
   },
   "sensors_status": {
-   "msg": "SensorsStatus.msg",
+   "file": "SensorsStatus.msg",
    "fields": {
     "device_id_primary": {
      "type": "uint32",
@@ -6135,7 +6135,7 @@
    }
   },
   "sensors_status_imu": {
-   "msg": "SensorsStatusImu.msg",
+   "file": "SensorsStatusImu.msg",
    "fields": {
     "accel_device_id_primary": {
      "type": "uint32",
@@ -6152,7 +6152,7 @@
    }
   },
   "system_power": {
-   "msg": "SystemPower.msg",
+   "file": "SystemPower.msg",
    "fields": {
     "brick_valid": {
      "type": "uint8",
@@ -6210,7 +6210,7 @@
    }
   },
   "takeoff_status": {
-   "msg": "TakeoffStatus.msg",
+   "file": "TakeoffStatus.msg",
    "fields": {
     "takeoff_state": {
      "type": "uint8",
@@ -6235,7 +6235,7 @@
    }
   },
   "task_stack_info": {
-   "msg": "TaskStackInfo.msg",
+   "file": "TaskStackInfo.msg",
    "fields": {
     "stack_free": {
      "type": "uint16"
@@ -6247,7 +6247,7 @@
    }
   },
   "tecs_status": {
-   "msg": "TecsStatus.msg",
+   "file": "TecsStatus.msg",
    "fields": {
     "altitude_reference": {
      "type": "float32",
@@ -6344,7 +6344,7 @@
    }
   },
   "telemetry_status": {
-   "msg": "TelemetryStatus.msg",
+   "file": "TelemetryStatus.msg",
    "fields": {
     "avoidance_system_healthy": {
      "type": "bool"
@@ -6501,7 +6501,7 @@
    }
   },
   "tiltrotor_extra_controls": {
-   "msg": "TiltrotorExtraControls.msg",
+   "file": "TiltrotorExtraControls.msg",
    "fields": {
     "collective_thrust_normalized_setpoint": {
      "type": "float32",
@@ -6518,7 +6518,7 @@
    }
   },
   "timesync_status": {
-   "msg": "TimesyncStatus.msg",
+   "file": "TimesyncStatus.msg",
    "fields": {
     "estimated_offset": {
      "type": "int64",
@@ -6557,7 +6557,7 @@
    }
   },
   "trajectory_bezier": {
-   "msg": "TrajectoryBezier.msg",
+   "file": "TrajectoryBezier.msg",
    "fields": {
     "delta": {
      "type": "float32",
@@ -6576,7 +6576,7 @@
    }
   },
   "trajectory_setpoint": {
-   "msg": "TrajectorySetpoint.msg",
+   "file": "TrajectorySetpoint.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -6593,7 +6593,7 @@
    }
   },
   "trajectory_waypoint": {
-   "msg": "TrajectoryWaypoint.msg",
+   "file": "TrajectoryWaypoint.msg",
    "fields": {
     "point_valid": {
      "type": "bool"
@@ -6614,7 +6614,7 @@
    }
   },
   "transponder_report": {
-   "msg": "TransponderReport.msg",
+   "file": "TransponderReport.msg",
    "fields": {
     "altitude": {
      "type": "float32",
@@ -6671,7 +6671,7 @@
    }
   },
   "tune_control": {
-   "msg": "TuneControl.msg",
+   "file": "TuneControl.msg",
    "fields": {
     "duration": {
      "type": "uint32",
@@ -6733,7 +6733,7 @@
    }
   },
   "uavcan_parameter_request": {
-   "msg": "UavcanParameterRequest.msg",
+   "file": "UavcanParameterRequest.msg",
    "fields": {
     "int_value": {
      "type": "int64",
@@ -6782,7 +6782,7 @@
    }
   },
   "uavcan_parameter_value": {
-   "msg": "UavcanParameterValue.msg",
+   "file": "UavcanParameterValue.msg",
    "fields": {
     "int_value": {
      "type": "int64",
@@ -6815,7 +6815,7 @@
    }
   },
   "ulog_stream": {
-   "msg": "UlogStream.msg",
+   "file": "UlogStream.msg",
    "fields": {
     "first_message_offset": {
      "type": "uint8",
@@ -6844,7 +6844,7 @@
    }
   },
   "ulog_stream_ack": {
-   "msg": "UlogStreamAck.msg",
+   "file": "UlogStreamAck.msg",
    "fields": {
     "msg_sequence": {
      "type": "uint16"
@@ -6856,7 +6856,7 @@
    }
   },
   "unregister_ext_component": {
-   "msg": "UnregisterExtComponent.msg",
+   "file": "UnregisterExtComponent.msg",
    "fields": {
     "arming_check_id": {
      "type": "int8",
@@ -6880,7 +6880,7 @@
    }
   },
   "vehicle_acceleration": {
-   "msg": "VehicleAcceleration.msg",
+   "file": "VehicleAcceleration.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -6893,7 +6893,7 @@
    }
   },
   "vehicle_air_data": {
-   "msg": "VehicleAirData.msg",
+   "file": "VehicleAirData.msg",
    "fields": {
     "baro_alt_meter": {
      "type": "float32",
@@ -6934,7 +6934,7 @@
    }
   },
   "vehicle_angular_acceleration_setpoint": {
-   "msg": "VehicleAngularAccelerationSetpoint.msg",
+   "file": "VehicleAngularAccelerationSetpoint.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -6947,7 +6947,7 @@
    }
   },
   "vehicle_angular_velocity": {
-   "msg": "VehicleAngularVelocity.msg",
+   "file": "VehicleAngularVelocity.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -6960,7 +6960,7 @@
    }
   },
   "vehicle_attitude": {
-   "msg": "VehicleAttitude.msg",
+   "file": "VehicleAttitude.msg",
    "fields": {
     "quat_reset_counter": {
      "type": "uint8",
@@ -6977,7 +6977,7 @@
    }
   },
   "vehicle_attitude_setpoint": {
-   "msg": "VehicleAttitudeSetpoint.msg",
+   "file": "VehicleAttitudeSetpoint.msg",
    "fields": {
     "fw_control_yaw_wheel": {
      "type": "bool",
@@ -7016,7 +7016,7 @@
    }
   },
   "vehicle_command": {
-   "msg": "VehicleCommand.msg",
+   "file": "VehicleCommand.msg",
    "fields": {
     "command": {
      "type": "uint32",
@@ -7081,7 +7081,7 @@
    }
   },
   "vehicle_command_ack": {
-   "msg": "VehicleCommandAck.msg",
+   "file": "VehicleCommandAck.msg",
    "fields": {
     "command": {
      "type": "uint32",
@@ -7117,7 +7117,7 @@
    }
   },
   "vehicle_constraints": {
-   "msg": "VehicleConstraints.msg",
+   "file": "VehicleConstraints.msg",
    "fields": {
     "speed_down": {
      "type": "float32",
@@ -7139,7 +7139,7 @@
    }
   },
   "vehicle_control_mode": {
-   "msg": "VehicleControlMode.msg",
+   "file": "VehicleControlMode.msg",
    "fields": {
     "flag_armed": {
      "type": "bool",
@@ -7207,7 +7207,7 @@
    }
   },
   "vehicle_global_position": {
-   "msg": "VehicleGlobalPosition.msg",
+   "file": "VehicleGlobalPosition.msg",
    "fields": {
     "alt": {
      "type": "float32",
@@ -7275,7 +7275,7 @@
    }
   },
   "vehicle_imu": {
-   "msg": "VehicleImu.msg",
+   "file": "VehicleImu.msg",
    "fields": {
     "accel_calibration_count": {
      "type": "uint8",
@@ -7320,7 +7320,7 @@
    }
   },
   "vehicle_imu_status": {
-   "msg": "VehicleImuStatus.msg",
+   "file": "VehicleImuStatus.msg",
    "fields": {
     "accel_device_id": {
      "type": "uint32",
@@ -7380,7 +7380,7 @@
    }
   },
   "vehicle_land_detected": {
-   "msg": "VehicleLandDetected.msg",
+   "file": "VehicleLandDetected.msg",
    "fields": {
     "at_rest": {
      "type": "bool"
@@ -7433,7 +7433,7 @@
    }
   },
   "vehicle_local_position": {
-   "msg": "VehicleLocalPosition.msg",
+   "file": "VehicleLocalPosition.msg",
    "fields": {
     "ax": {
      "type": "float32",
@@ -7653,7 +7653,7 @@
    }
   },
   "vehicle_local_position_setpoint": {
-   "msg": "VehicleLocalPositionSetpoint.msg",
+   "file": "VehicleLocalPositionSetpoint.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -7694,7 +7694,7 @@
    }
   },
   "vehicle_magnetometer": {
-   "msg": "VehicleMagnetometer.msg",
+   "file": "VehicleMagnetometer.msg",
    "fields": {
     "calibration_count": {
      "type": "uint8",
@@ -7715,7 +7715,7 @@
    }
   },
   "vehicle_odometry": {
-   "msg": "VehicleOdometry.msg",
+   "file": "VehicleOdometry.msg",
    "fields": {
     "pose_frame": {
      "type": "uint8",
@@ -7755,7 +7755,7 @@
    }
   },
   "vehicle_optical_flow": {
-   "msg": "VehicleOpticalFlow.msg",
+   "file": "VehicleOpticalFlow.msg",
    "fields": {
     "device_id": {
      "type": "uint32",
@@ -7797,7 +7797,7 @@
    }
   },
   "vehicle_optical_flow_vel": {
-   "msg": "VehicleOpticalFlowVel.msg",
+   "file": "VehicleOpticalFlowVel.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -7810,7 +7810,7 @@
    }
   },
   "vehicle_rates_setpoint": {
-   "msg": "VehicleRatesSetpoint.msg",
+   "file": "VehicleRatesSetpoint.msg",
    "fields": {
     "pitch": {
      "type": "float32",
@@ -7836,7 +7836,7 @@
    }
   },
   "vehicle_roi": {
-   "msg": "VehicleRoi.msg",
+   "file": "VehicleRoi.msg",
    "fields": {
     "alt": {
      "type": "float32",
@@ -7874,7 +7874,7 @@
    }
   },
   "vehicle_status": {
-   "msg": "VehicleStatus.msg",
+   "file": "VehicleStatus.msg",
    "fields": {
     "armed_time": {
      "type": "uint64",
@@ -8094,7 +8094,7 @@
    }
   },
   "vehicle_thrust_setpoint": {
-   "msg": "VehicleThrustSetpoint.msg",
+   "file": "VehicleThrustSetpoint.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -8107,7 +8107,7 @@
    }
   },
   "vehicle_torque_setpoint": {
-   "msg": "VehicleTorqueSetpoint.msg",
+   "file": "VehicleTorqueSetpoint.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -8120,7 +8120,7 @@
    }
   },
   "vehicle_trajectory_bezier": {
-   "msg": "VehicleTrajectoryBezier.msg",
+   "file": "VehicleTrajectoryBezier.msg",
    "fields": {
     "bezier_order": {
      "type": "uint8"
@@ -8132,7 +8132,7 @@
    }
   },
   "vehicle_trajectory_waypoint": {
-   "msg": "VehicleTrajectoryWaypoint.msg",
+   "file": "VehicleTrajectoryWaypoint.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -8145,7 +8145,7 @@
    }
   },
   "velocity_limits": {
-   "msg": "VelocityLimits.msg",
+   "file": "VelocityLimits.msg",
    "fields": {
     "horizontal_velocity": {
      "type": "float32",
@@ -8166,7 +8166,7 @@
    }
   },
   "vtol_vehicle_status": {
-   "msg": "VtolVehicleStatus.msg",
+   "file": "VtolVehicleStatus.msg",
    "fields": {
     "fixed_wing_system_failure": {
      "type": "bool",
@@ -8192,7 +8192,7 @@
    }
   },
   "wheel_encoders": {
-   "msg": "WheelEncoders.msg",
+   "file": "WheelEncoders.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",
@@ -8201,7 +8201,7 @@
    }
   },
   "wind": {
-   "msg": "Wind.msg",
+   "file": "Wind.msg",
    "fields": {
     "beta_innov": {
      "type": "float32",
@@ -8248,7 +8248,7 @@
    }
   },
   "yaw_estimator_status": {
-   "msg": "YawEstimatorStatus.msg",
+   "file": "YawEstimatorStatus.msg",
    "fields": {
     "timestamp": {
      "type": "uint64",

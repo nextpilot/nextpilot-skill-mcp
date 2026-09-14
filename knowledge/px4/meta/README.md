@@ -6,7 +6,7 @@
 {
   "tag": "main",
   "topicCount": 288,
-  "topics": { "vehicle_status": { "msg": "VehicleStatus.msg", "fields": { ... } }, ... },
+  "topics": { "vehicle_status": { "file": "VehicleStatus.msg", "fields": { ... } }, ... },
   "paramCount": 2656,
   "parameters": { "MPC_XY_CRUISE": { "type": "float", "default": 5.0, "min": 3.0, ... }, ... }
 }
