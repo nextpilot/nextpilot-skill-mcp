@@ -22,6 +22,7 @@ export function SkillSidebar({
   baseDownloads,
   copyText,
   installHint,
+  installTitle = "把提示词发给你的 AI，即可使用该 Skill",
   related,
 }: {
   kind: Kind;
@@ -30,6 +31,8 @@ export function SkillSidebar({
   baseDownloads: number;
   copyText: string;
   installHint: string;
+  /** 安装卡标题（MCP 用「该 MCP Server」） */
+  installTitle?: string;
   related: { slug: string; name: string; description: string; icon?: string }[];
 }) {
   const [fav, setFav] = useState<FavoriteStats>({ count: 0, favorited: false });
@@ -80,7 +83,7 @@ export function SkillSidebar({
     <div className="flex w-full flex-col lg:w-[390px]">
       {/* 安装卡：说明 + 主 CTA（对应 SkillHub 的“将提示词发送给你的 AI 安装该 skills”） */}
       <section className="rounded-xl border border-border bg-surface p-5">
-        <h3 className="text-[15px] font-semibold">把提示词发给你的 AI，即可使用该 Skill</h3>
+        <h3 className="text-[15px] font-semibold">{installTitle}</h3>
         <p className="mt-2 text-xs leading-5 text-muted">{installHint}</p>
 
         <button

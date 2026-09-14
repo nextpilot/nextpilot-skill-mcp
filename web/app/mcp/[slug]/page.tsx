@@ -169,6 +169,7 @@ export default async function McpDetailPage({
             baseDownloads={server.downloads}
             copyText={copyText}
             installHint="复制下方内容，粘贴到 Claude / Cursor 等支持 MCP 的客户端的配置中即可接入；致动类工具默认关闭，需要时显式开启。"
+            installTitle="把配置发给你的 AI 客户端，即可接入该 MCP Server"
             related={related}
           />
         </aside>
