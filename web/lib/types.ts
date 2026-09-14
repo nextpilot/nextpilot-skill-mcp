@@ -9,6 +9,8 @@ export interface SkillMeta {
   platforms: Platform[];
   models: string[];
   tags: string[];
+  /** 适用范围：可用的 AI 客户端 / 运行环境（如 Claude、ChatGPT、Cursor、Claude Code） */
+  clients?: string[];
   rating: number;
   downloads: number;
   featured?: boolean;

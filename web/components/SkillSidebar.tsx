@@ -14,14 +14,9 @@ import {
   type RatingStats,
 } from "@/lib/community-stats";
 
-export interface SidebarMetaRow {
-  label: string;
-  value: React.ReactNode;
-}
-
 /**
  * 详情页右栏（390px 粘性），版式参照腾讯 SkillHub：
- * 安装卡 → 安装方式 → 统计 → 元信息 → 相关推荐。
+ * 安装卡（复制/下载/收藏）→ 统计与评分 → 相关推荐；元信息在左栏分组表内。
  */
 export function SkillSidebar({
   kind,
@@ -31,7 +26,6 @@ export function SkillSidebar({
   baseDownloads,
   copyText,
   installHint,
-  meta,
   related,
 }: {
   kind: Kind;
@@ -41,7 +35,6 @@ export function SkillSidebar({
   baseDownloads: number;
   copyText: string;
   installHint: string;
-  meta: SidebarMetaRow[];
   related: { slug: string; name: string; description: string }[];
 }) {
   const [stats, setStats] = useState<RatingStats>({ avg: 0, count: 0, mine: 0 });
@@ -190,18 +183,6 @@ export function SkillSidebar({
         </dl>
       </section>
 
-      {/* 元信息列表 */}
-      <section className="mt-4 rounded-xl border border-border bg-surface p-5">
-        <h3 className="mb-3 text-sm font-semibold">元信息</h3>
-        <dl className="space-y-2 text-xs">
-          {meta.map((row) => (
-            <div key={row.label} className="flex items-start justify-between gap-4">
-              <dt className="shrink-0 text-muted">{row.label}</dt>
-              <dd className="text-right text-text">{row.value}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
 
       {/* 相关推荐 */}
       {related.length > 0 && (

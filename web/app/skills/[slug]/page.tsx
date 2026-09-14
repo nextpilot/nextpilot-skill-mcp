@@ -1,12 +1,11 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ExternalLink, FileText, Star } from "lucide-react";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { getAllSkills, getSkillBySlug } from "@/lib/skills";
-import { CATEGORY_GLYPH, CATEGORY_LABEL } from "@/lib/constants";
-import { formatDate } from "@/lib/format";
-import { SkillSidebar, type SidebarMetaRow } from "@/components/SkillSidebar";
+import { CATEGORY_GLYPH } from "@/lib/constants";
+import { CommunityStatLine, SkillMetaGroups } from "@/components/SkillHeaderMeta";
+import { SkillSidebar } from "@/components/SkillSidebar";
 import { SkillContentTabs } from "@/components/SkillContentTabs";
 import { SkillComments } from "@/components/SkillComments";
 import { ChangelogList } from "@/components/ChangelogList";
@@ -45,46 +44,6 @@ export default async function SkillDetailPage({
     .slice(0, 4)
     .map((s) => ({ slug: s.slug, name: s.name, description: s.description }));
 
-  const meta: SidebarMetaRow[] = [
-    { label: "分类", value: CATEGORY_LABEL[skill.category] },
-    { label: "适用平台", value: skill.platforms.join(" / ") || "—" },
-    { label: "依赖模型", value: skill.models.join("、") || "—" },
-    { label: "版本", value: skill.version ? `v${skill.version}` : "—" },
-    { label: "更新时间", value: formatDate(skill.updatedAt) },
-    { label: "许可证", value: skill.license ?? "—" },
-    {
-      label: "来源",
-      value:
-        skill.sourceUrl || skill.paperUrl ? (
-          <span className="flex flex-col items-end gap-1">
-            {skill.sourceUrl && (
-              <a
-                href={skill.sourceUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-primary hover:underline"
-              >
-                <ExternalLink className="h-3 w-3" />
-                开源仓库
-              </a>
-            )}
-            {skill.paperUrl && (
-              <a
-                href={skill.paperUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-primary hover:underline"
-              >
-                <FileText className="h-3 w-3" />
-                相关论文
-              </a>
-            )}
-          </span>
-        ) : (
-          "—"
-        ),
-    },
-  ];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -99,9 +58,9 @@ export default async function SkillDetailPage({
       {/* 两栏：左栏 = 标题 + 内容（纵向堆叠），右栏 = 粘性侧栏（对应 SkillHub 的 390px 侧栏） */}
       <div className="lg:grid lg:gap-x-[50px] lg:[grid-template-columns:minmax(0,1fr)_390px]">
         <div className="min-w-0">
-          {/* 标题区：图标瓦片 + 标题 + slug + 徽章（对齐 SkillHub 头部） */}
+          {/* 标题区：图标 + 标题 + slug，其后按组展示头部信息（见 SkillHeaderMeta） */}
           <header className="mb-8">
-            <div className="mb-4 flex items-start gap-4">
+            <div className="flex items-start gap-4">
               <span
                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] border border-border bg-surface text-2xl"
                 aria-hidden
@@ -114,34 +73,31 @@ export default async function SkillDetailPage({
                   <span className="truncate font-mono text-[13px] text-muted">{skill.slug}</span>
                   <CopyChip value={skill.slug} title="点击复制 slug" iconOnly />
                 </div>
-                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-                  <span className="inline-flex items-center gap-1 font-medium text-text">
-                    <Star className="h-3.5 w-3.5 fill-warning text-warning" />
-                    {skill.rating.toFixed(1)}
-                  </span>
-                  {skill.version && <span>v{skill.version}</span>}
-                  <span>更新于 {formatDate(skill.updatedAt)}</span>
-                  <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-primary">
-                    {CATEGORY_LABEL[skill.category]}
-                  </span>
-                </div>
+                {/* 社区信息紧跟标题：下载 / 评分 / 收藏 / 版本 / 更新时间 */}
+                <CommunityStatLine
+                  kind="skill"
+                  slug={skill.slug}
+                  baseRating={skill.rating}
+                  baseDownloads={skill.downloads}
+                  version={skill.version}
+                  updatedAt={skill.updatedAt}
+                />
               </div>
             </div>
 
-            <p className="leading-7 text-muted">{skill.description}</p>
+            <p className="mt-4 leading-7 text-muted">{skill.description}</p>
 
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-              {skill.platforms.map((p) => (
-                <span key={p} className="rounded-md border border-border px-2 py-0.5 text-muted">
-                  {p}
-                </span>
-              ))}
-              {skill.tags.map((t) => (
-                <span key={t} className="text-muted">
-                  #{t}
-                </span>
-              ))}
-            </div>
+            <SkillMetaGroups
+              category={skill.category}
+              tags={skill.tags}
+              platforms={skill.platforms}
+              clients={skill.clients}
+              models={skill.models}
+              featured={skill.featured}
+              sourceUrl={skill.sourceUrl}
+              paperUrl={skill.paperUrl}
+              license={skill.license}
+            />
           </header>
 
           {/* 内容区：概述 / 评论 / 版本历史 */}
@@ -169,7 +125,6 @@ export default async function SkillDetailPage({
             baseDownloads={skill.downloads}
             copyText={copyText}
             installHint="复制下方全部内容，粘贴到 Claude / ChatGPT / Cursor 等对话里，或作为 System Prompt 使用；原始 .ulg 等数据始终留在你自己的设备上。"
-            meta={meta}
             related={related}
           />
         </aside>

@@ -54,6 +54,7 @@ function parseSkillFile(fileName: string): Skill {
     platforms: (data.platforms ?? []) as SkillMeta["platforms"],
     models: (data.models ?? []) as string[],
     tags: (data.tags ?? []) as string[],
+    clients: (data.clients ?? []) as string[],
     rating: Number(data.rating ?? 0),
     downloads: Number(data.downloads ?? 0),
     featured: Boolean(data.featured),
