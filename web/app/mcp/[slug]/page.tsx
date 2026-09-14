@@ -1,12 +1,15 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, Eye, Terminal, Zap } from "lucide-react";
 import { MDXRemote } from "next-mdx-remote/rsc";
+import { Eye, Zap } from "lucide-react";
 import { getAllMcpServers, getMcpServerBySlug } from "@/lib/mcp";
-import { LocalizedText } from "@/components/LocalizedText";
-import { SkillActionsBar } from "@/components/SkillActionsBar";
-import { formatDate } from "@/lib/format";
+import { CommunityStatLine, SkillMetaGroups } from "@/components/SkillHeaderMeta";
+import { SkillSidebar } from "@/components/SkillSidebar";
+import { SkillContentTabs } from "@/components/SkillContentTabs";
+import { SkillComments } from "@/components/SkillComments";
+import { ChangelogList } from "@/components/ChangelogList";
+import { CopyChip } from "@/components/CopyChip";
 
 export function generateStaticParams() {
   return getAllMcpServers().map((s) => ({ slug: s.slug }));
@@ -32,127 +35,144 @@ export default async function McpDetailPage({
   const server = getMcpServerBySlug(slug);
   if (!server) notFound();
 
-  // "复制安装配置"给出可直接粘贴到 MCP 客户端配置里的片段
+  // 复制给 AI 客户端的完整配置说明
   const copyText = `# ${server.name}\n\n${server.description}\n\n## 工具\n${server.tools
     .map((t) => `- ${t}`)
-    .join("\n")}\n\n## 传输方式\n${server.transport}${
-    server.readOnly ? "\n\n默认只读，不含致动能力。" : "\n\n含致动能力，默认需显式开启。"
+    .join("\n")}\n\n## 传输方式\n${server.transport}\n\n${
+    server.readOnly ? "默认只读，不含致动能力。" : "含致动能力，默认需显式开启。"
   }\n\n${server.body}`;
 
+  // 同类推荐：MCP 数量少，取其余全部
+  const related = getAllMcpServers()
+    .filter((s) => s.slug !== server.slug)
+    .slice(0, 4)
+    .map((s) => ({ slug: s.slug, name: s.name, description: s.description, icon: s.icon }));
+
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
-      <Link
-        href="/mcp"
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted hover:text-text"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        <LocalizedText zh="返回 MCP Server 目录" en="Back to MCP servers" />
-      </Link>
+    <div className="mx-auto max-w-6xl px-4 py-10">
+      <nav className="mb-8 flex items-center gap-2 text-sm" aria-label="breadcrumb">
+        <Link href="/mcp" className="text-muted transition-colors hover:text-text">
+          MCP Server /
+        </Link>
+        <span className="font-semibold">{server.slug}</span>
+      </nav>
 
-      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-        <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 font-medium text-primary">
-          <Terminal className="h-3 w-3" />
-          MCP Server
-        </span>
-        <span className="rounded-md border border-border px-2 py-0.5 font-mono text-muted">
-          {server.transport}
-        </span>
-        {server.readOnly ? (
-          <span className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-muted">
-            <Eye className="h-3 w-3" />
-            <LocalizedText zh="默认只读" en="Read-only" />
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1 rounded-md border border-warning/40 bg-warning/10 px-2 py-0.5 text-warning">
-            <Zap className="h-3 w-3" />
-            <LocalizedText zh="含致动能力" en="Can actuate" />
-          </span>
-        )}
-        {server.platforms.map((p) => (
-          <span key={p} className="rounded-md border border-border px-2 py-0.5 text-muted">
-            {p}
-          </span>
-        ))}
-        {server.license && (
-          <span className="rounded-md border border-border px-2 py-0.5 text-muted">
-            {server.license}
-          </span>
-        )}
-      </div>
-
-      <h1 className="text-3xl font-bold text-text">{server.name}</h1>
-      <p className="mt-3 leading-7 text-muted">{server.description}</p>
-
-      <SkillActionsBar
-        kind="mcp"
-        slug={server.slug}
-        baseRating={server.rating}
-        baseDownloads={server.downloads}
-        copyText={copyText}
-        copyLabel="复制安装配置"
-      />
-
-      <p className="mt-3 text-xs text-muted">
-        <LocalizedText zh="更新于" en="Updated" /> {formatDate(server.updatedAt)}
-      </p>
-
-      {server.sourceUrl && (
-        <div className="mt-5">
-          <a
-            href={server.sourceUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm hover:border-primary/50"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            <LocalizedText zh="开源仓库" en="Source repository" />
-          </a>
-        </div>
-      )}
-
-      {/* 工具清单是 MCP 条目的核心信息：调用方要先知道能调什么、会不会写数据 */}
-      <section className="mt-6 rounded-xl border border-border bg-surface p-4">
-        <p className="mb-3 text-xs text-muted">
-          <LocalizedText zh="暴露的工具" en="Exposed tools" />
-        </p>
-        <ul className="flex flex-wrap gap-2">
-          {server.tools.map((tool) => (
-            <li key={tool}>
-              <code className="rounded-md bg-surface-2 px-2.5 py-1 font-mono text-xs text-text">
-                {tool}
-              </code>
-            </li>
-          ))}
-        </ul>
-        {!server.readOnly && (
-          <p className="mt-3 flex items-start gap-2 border-t border-border pt-3 text-xs leading-5 text-warning">
-            <Zap className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <LocalizedText
-              zh="该 Server 具备写入或控制能力：启用前请确认已在仿真环境验证，并显式开启致动参数。"
-              en="This server can write or control. Validate in simulation first and enable actuation explicitly."
-            />
-          </p>
-        )}
-      </section>
-
-      {server.models.length > 0 && (
-        <div className="mt-4 rounded-xl border border-border bg-surface p-4">
-          <p className="mb-2 text-xs text-muted">
-            <LocalizedText zh="验证过的客户端 / 模型" en="Tested clients / models" />
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {server.models.map((m) => (
-              <span key={m} className="rounded-md bg-surface-2 px-2.5 py-1 text-xs text-text">
-                {m}
+      <div className="lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">
+        <div className="min-w-0 rounded-2xl bg-surface p-5 sm:p-6">
+          <header className="mb-8">
+            <div className="flex items-start gap-4">
+              <span
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] border border-border bg-surface text-2xl"
+                aria-hidden
+              >
+                {server.icon ?? "🔌"}
               </span>
-            ))}
-          </div>
-        </div>
-      )}
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl font-bold md:text-[26px]">{server.name}</h1>
+                  {server.readOnly ? (
+                    <span className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs text-muted">
+                      <Eye className="h-3 w-3" />
+                      默认只读
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-md border border-warning/40 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
+                      <Zap className="h-3 w-3" />
+                      含致动能力
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="truncate font-mono text-[13px] text-muted">{server.slug}</span>
+                  <CopyChip value={server.slug} title="点击复制 slug" iconOnly />
+                </div>
+                <CommunityStatLine
+                  kind="mcp"
+                  slug={server.slug}
+                  baseRating={server.rating}
+                  baseDownloads={server.downloads}
+                  version={server.version}
+                  updatedAt={server.updatedAt}
+                />
+              </div>
+            </div>
 
-      <article className="prose-skill mt-8">
-        <MDXRemote source={server.body} />
-      </article>
+            <p className="mt-4 leading-7 text-muted">{server.description}</p>
+
+            {server.tags.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
+                {server.tags.map((t) => (
+                  <span key={t} className="rounded bg-surface-2 px-1.5 py-0.5 text-muted">
+                    #{t}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <SkillMetaGroups
+              platforms={server.platforms}
+              clients={server.clients}
+              models={server.models}
+              featured={server.featured}
+              sourceUrl={server.sourceUrl}
+              license={server.license}
+              extraRows={[
+                {
+                  label: "暴露工具",
+                  value: (
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      {server.tools.map((t) => (
+                        <code
+                          key={t}
+                          className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[11px]"
+                        >
+                          {t}
+                        </code>
+                      ))}
+                    </span>
+                  ),
+                },
+                { label: "传输方式", value: <span className="font-mono">{server.transport}</span> },
+                {
+                  label: "致动能力",
+                  value: (
+                    <span className={server.readOnly ? "text-muted" : "text-warning"}>
+                      {server.readOnly
+                        ? "无（默认只读，不写数据）"
+                        : "有（需显式开启，仿真环境优先）"}
+                    </span>
+                  ),
+                },
+              ]}
+            />
+          </header>
+
+          <SkillContentTabs
+            overview={
+              <article className="prose-skill">
+                <MDXRemote source={server.body} />
+              </article>
+            }
+            comments={<SkillComments kind="mcp" slug={server.slug} />}
+            changelog={
+              <ChangelogList entries={server.changelog ?? []} currentVersion={server.version} />
+            }
+            changelogCount={server.changelog?.length ?? 0}
+          />
+        </div>
+
+        <aside className="mb-10 lg:mb-0 lg:self-start">
+          <SkillSidebar
+            kind="mcp"
+            slug={server.slug}
+            name={server.name}
+            baseDownloads={server.downloads}
+            copyText={copyText}
+            installHint="复制下方内容，粘贴到 Claude / Cursor 等支持 MCP 的客户端的配置中即可接入；致动类工具默认关闭，需要时显式开启。"
+            related={related}
+          />
+        </aside>
+      </div>
     </div>
   );
 }

@@ -30,7 +30,7 @@ export function SkillSidebar({
   baseDownloads: number;
   copyText: string;
   installHint: string;
-  related: { slug: string; name: string; description: string }[];
+  related: { slug: string; name: string; description: string; icon?: string }[];
 }) {
   const [fav, setFav] = useState<FavoriteStats>({ count: 0, favorited: false });
   const [copied, setCopied] = useState(false);
@@ -126,14 +126,26 @@ export function SkillSidebar({
       {related.length > 0 && (
         <section className="mt-4 rounded-xl border border-border bg-surface p-5">
           <h3 className="mb-3 text-sm font-semibold">相关推荐</h3>
-          <ul className="space-y-3">
+          <ul className="divide-y divide-border/60">
             {related.map((r) => (
-              <li key={r.slug}>
-                <Link href={`/skills/${r.slug}`} className="group block">
-                  <p className="text-sm group-hover:text-primary">{r.name}</p>
-                  <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-muted">
-                    {r.description}
-                  </p>
+              <li key={r.slug} className="py-2.5 first:pt-0 last:pb-0">
+                <Link href={`/skills/${r.slug}`} className="group flex items-start gap-2.5">
+                  {r.icon && (
+                    <span
+                      className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface-2 text-sm"
+                      aria-hidden
+                    >
+                      {r.icon}
+                    </span>
+                  )}
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium text-text group-hover:text-primary">
+                      {r.name}
+                    </span>
+                    <span className="mt-1 line-clamp-2 block text-xs leading-5 text-muted">
+                      {r.description}
+                    </span>
+                  </span>
                 </Link>
               </li>
             ))}

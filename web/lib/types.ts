@@ -47,6 +47,12 @@ export interface McpServerMeta {
   /** 暴露给客户端的工具名 */
   tools: string[];
   transport: string;
+  /** 图标（emoji） */
+  icon?: string;
+  /** 适用范围：可用的 AI 客户端（Claude / Cursor 等） */
+  clients?: string[];
+  version?: string;
+  changelog?: ChangelogEntry[];
   /** 默认是否只读。false 表示具备致动能力，详情页须显著标注（见 CLAUDE.md 第 5 节） */
   readOnly: boolean;
   tags: string[];

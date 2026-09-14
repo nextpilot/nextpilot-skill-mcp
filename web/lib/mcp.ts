@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
 import type { McpServerMeta } from "./types";
+import { parseChangelog } from "./changelog";
 
 const MCP_DIR = path.join(process.cwd(), "content", "mcp");
 
@@ -24,6 +25,10 @@ function parseMcpFile(fileName: string): McpServer {
     models: (data.models ?? []) as string[],
     tools: (data.tools ?? []) as string[],
     transport: String(data.transport ?? "stdio"),
+    icon: data.icon ? String(data.icon) : undefined,
+    clients: (data.clients ?? []) as string[],
+    version: data.version ? String(data.version) : undefined,
+    changelog: parseChangelog(data.changelog, data.version, data.updatedAt),
     // 缺省视为只读：安全属性上，字段写漏了应当往保守一侧倒
     readOnly: data.readOnly === undefined ? true : Boolean(data.readOnly),
     tags: (data.tags ?? []) as string[],

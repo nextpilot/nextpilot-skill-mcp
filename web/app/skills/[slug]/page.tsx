@@ -42,7 +42,7 @@ export default async function SkillDetailPage({
   const related = getAllSkills()
     .filter((s) => s.slug !== skill.slug && s.category === skill.category)
     .slice(0, 4)
-    .map((s) => ({ slug: s.slug, name: s.name, description: s.description }));
+    .map((s) => ({ slug: s.slug, name: s.name, description: s.description, icon: s.icon }));
 
 
   return (

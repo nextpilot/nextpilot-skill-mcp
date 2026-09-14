@@ -115,6 +115,7 @@ export function SkillMetaGroups({
   platforms,
   clients,
   models,
+  extraRows,
   featured,
   sourceUrl,
   paperUrl,
@@ -123,6 +124,8 @@ export function SkillMetaGroups({
   platforms: string[];
   clients?: string[];
   models: string[];
+  /** 额外分组行（MCP 用：工具 / 传输方式 / 致动能力） */
+  extraRows?: { label: string; value: React.ReactNode }[];
   featured?: boolean;
   sourceUrl?: string;
   paperUrl?: string;
@@ -206,6 +209,12 @@ export function SkillMetaGroups({
           </span>
         </Row>
       )}
+
+      {extraRows?.map((r) => (
+        <Row key={r.label} label={r.label}>
+          {r.value}
+        </Row>
+      ))}
 
       <Row label="维护作者">
         <span className="text-muted">{sourceUrl ? "开源社区" : "平台收录"}</span>

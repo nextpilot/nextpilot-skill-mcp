@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { Star, Download, Eye, Zap } from "lucide-react";
 import type { McpServerMeta } from "@/lib/types";
@@ -6,8 +8,16 @@ import { LocalizedText } from "@/components/LocalizedText";
 /**
  * MCP Server 卡片。与 SkillCard 的关键差别：这里首先回答「它能碰什么」——
  * 工具数与只读 / 致动标记，比评分更该先看到。
+ * 下载数由父级传入（已叠加 KV 实时增量）。
  */
-export function McpCard({ server }: { server: McpServerMeta }) {
+export function McpCard({
+  server,
+  downloads,
+}: {
+  server: McpServerMeta;
+  downloads?: number;
+}) {
+  const shown = downloads ?? server.downloads;
   return (
     <Link
       href={`/mcp/${server.slug}`}
@@ -35,7 +45,10 @@ export function McpCard({ server }: { server: McpServerMeta }) {
         ))}
       </div>
 
-      <h3 className="mb-1.5 font-semibold text-text group-hover:text-primary">{server.name}</h3>
+      <h3 className="mb-1.5 flex items-center gap-2 font-semibold text-text group-hover:text-primary">
+        {server.icon && <span aria-hidden>{server.icon}</span>}
+        {server.name}
+      </h3>
       <p className="line-clamp-3 flex-1 text-sm leading-6 text-muted">{server.description}</p>
 
       <div className="mt-4 flex flex-wrap gap-1.5">
@@ -58,7 +71,7 @@ export function McpCard({ server }: { server: McpServerMeta }) {
           </span>
           <span className="flex items-center gap-1">
             <Download className="h-3.5 w-3.5" />
-            {server.downloads}
+            {shown}
           </span>
         </div>
       </div>

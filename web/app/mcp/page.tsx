@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { Plug, ShieldCheck } from "lucide-react";
 import { getMcpIndex } from "@/lib/mcp";
-import { McpCard } from "@/components/McpCard";
+import { McpGrid } from "@/components/McpGrid";
 import { LocalizedText } from "@/components/LocalizedText";
-import { Leaderboard } from "@/components/Leaderboard";
 
 export const metadata: Metadata = {
   title: "MCP Server · NextPilot Skill MCP",
@@ -46,23 +45,7 @@ export default function McpPage() {
           <LocalizedText zh="暂无收录。" en="Nothing listed yet." />
         </p>
       ) : (
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
-          <div className="grid gap-5 sm:grid-cols-2">
-            {servers.map((server) => (
-              <McpCard key={server.slug} server={server} />
-            ))}
-          </div>
-          <aside className="self-start lg:sticky lg:top-20">
-            <Leaderboard
-              kind="mcp"
-              base={servers.map((s) => ({
-                slug: s.slug,
-                name: s.name,
-                downloads: s.downloads,
-              }))}
-            />
-          </aside>
-        </div>
+        <McpGrid servers={servers} />
       )}
     </div>
   );
