@@ -218,6 +218,16 @@ def parse_msg(stem: str, text: str) -> dict:
     return {"topic": _to_snake(stem), "msg": f"{stem}.msg", "fields": fields}
 
 
+def _order_values(values: dict) -> dict:
+    """枚举/位掩码的键按数值排序（否则字符串序会变成 0,1,10,11,…,2,20）。"""
+    def key(k: str):
+        try:
+            return (0, int(k))
+        except (TypeError, ValueError):
+            return (1, 0, str(k))
+    return {k: values[k] for k in sorted(values, key=key)}
+
+
 def render_meta_json(tag: str, topics: dict[str, dict], params: dict | None) -> str:
     """一个 tag 的全部元数据 → 一个 JSON 文件：topics（字段字典）+ parameters（参数字典）。
 
@@ -225,23 +235,42 @@ def render_meta_json(tag: str, topics: dict[str, dict], params: dict | None) -> 
     同属一个 tag 就该是一份文件；分开成两个目录只会让"取某个版本的全部元数据"
     变成两处查找。
     """
+    # 不用 json.dumps(sort_keys=True)：那会把枚举键按字符串排（0,1,10,11,…,2）。
+    # 这里显式构造顺序：topic 名字母序、字段名字母序、枚举值数值序 —— 输出确定且可读。
+    def fix_fields(spec: dict) -> dict:
+        fields = {}
+        for fname in sorted(spec.get("fields", {})):
+            f = dict(spec["fields"][fname])
+            if isinstance(f.get("values"), dict):
+                f["values"] = _order_values(f["values"])
+            fields[fname] = f
+        out = {"msg": spec.get("msg")}
+        out["fields"] = fields
+        return out
+
     doc: dict = {
         "_note": "生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 PX4 上游同步。",
         "tag": tag,
         "topicCount": len(topics),
-        "topics": {name: spec for name, spec in sorted(topics.items())},
+        "topics": {name: fix_fields(topics[name]) for name in sorted(topics)},
     }
     if params is None:
+        doc["paramCount"] = 0
         doc["parameters"] = None
         doc["parametersNote"] = (
             "该 tag 无参数元数据：PX4 只在分支构建（main/master）发布 parameters.json，"
             "release tag 下没有；日志里的实际参数值来自 .ulg 的 initial_parameters。"
         )
-        doc["paramCount"] = 0
     else:
-        doc["paramCount"] = len(params)
-        doc["parameters"] = params
-    return json.dumps(doc, ensure_ascii=False, indent=1, sort_keys=True) + "\n"
+        ordered = {}
+        for pname in sorted(params):
+            spec = params[pname]
+            if isinstance(spec.get("values"), dict):
+                spec = dict(spec, values=_order_values(spec["values"]))
+            ordered[pname] = spec
+        doc["paramCount"] = len(ordered)
+        doc["parameters"] = ordered
+    return json.dumps(doc, ensure_ascii=False, indent=1) + "\n"
 
 
 def normalize_params(payload: dict) -> dict[str, dict]:
