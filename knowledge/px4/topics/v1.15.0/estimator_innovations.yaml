@@ -1,0 +1,43 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 EstimatorInnovations.msg 生成
+topic: estimator_innovations
+msg: EstimatorInnovations.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  timestamp_sample:
+    type: uint64
+    unit: us
+  gps_vvel:
+    type: float32
+    note: vertical GPS velocity innovation (m/sec) and innovation variance ((m/sec)**2)
+  gps_vpos:
+    type: float32
+    note: vertical GPS position innovation (m) and innovation variance (m**2)
+  ev_vvel:
+    type: float32
+    note: vertical external vision velocity innovation (m/sec) and innovation variance ((m/sec)**2)
+  ev_vpos:
+    type: float32
+    note: vertical external vision position innovation (m) and innovation variance (m**2)
+  rng_vpos:
+    type: float32
+    note: range sensor height innovation (m) and innovation variance (m**2)
+  baro_vpos:
+    type: float32
+    note: barometer height innovation (m) and innovation variance (m**2)
+  heading:
+    type: float32
+    note: heading innovation (rad) and innovation variance (rad**2)
+  airspeed:
+    type: float32
+    note: airspeed innovation (m/sec) and innovation variance ((m/sec)**2)
+  beta:
+    type: float32
+    note: synthetic sideslip innovation (rad) and innovation variance (rad**2)
+  hagl:
+    type: float32
+    note: height of ground innovation (m) and innovation variance (m**2)
+  hagl_rate:
+    type: float32
+    note: height of ground rate innovation (m/s) and innovation variance ((m/s)**2)

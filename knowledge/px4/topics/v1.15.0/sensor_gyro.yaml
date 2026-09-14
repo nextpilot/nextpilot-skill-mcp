@@ -1,0 +1,30 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 SensorGyro.msg 生成
+topic: sensor_gyro
+msg: SensorGyro.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  timestamp_sample:
+    type: uint64
+    unit: us
+  device_id:
+    type: uint32
+    note: unique device ID for the sensor that does not change between power cycles
+  x:
+    type: float32
+    note: angular velocity in the FRD board frame X-axis in rad/s
+  y:
+    type: float32
+    note: angular velocity in the FRD board frame Y-axis in rad/s
+  z:
+    type: float32
+    note: angular velocity in the FRD board frame Z-axis in rad/s
+  temperature:
+    type: float32
+    note: temperature in degrees Celsius
+  error_count:
+    type: uint32
+  samples:
+    type: uint8
+    note: number of raw samples that went into this message

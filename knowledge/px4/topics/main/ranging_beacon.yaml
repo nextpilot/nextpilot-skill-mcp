@@ -1,0 +1,47 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 RangingBeacon.msg 生成
+topic: ranging_beacon
+msg: RangingBeacon.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  timestamp_sample:
+    type: uint64
+    unit: us
+  beacon_id:
+    type: uint8
+  range:
+    type: float32
+    note: "[m] Range measurement"
+  lat:
+    type: float64
+    note: "[deg] Latitude"
+  lon:
+    type: float64
+    note: "[deg] Longitude"
+  alt:
+    type: float32
+    note: "[m] Beacon altitude (frame defined in alt_type)"
+  alt_type:
+    type: uint8
+    note: "[@enum ALT_TYPE] Altitude frame for alt field"
+    values:
+      0: WGS84
+      1: MSL
+    kind: enum
+  hacc:
+    type: float32
+    note: "[m] Groundbeacon horizontal accuracy"
+  vacc:
+    type: float32
+    note: "[m] Groundbeacon vertical accuracy"
+  sequence_nr:
+    type: uint8
+  status:
+    type: uint8
+  carrier_freq:
+    type: uint16
+    note: "[MHz] Carrier frequency"
+  range_accuracy:
+    type: float32
+    note: "[m] Range accuracy estimate"

@@ -1,0 +1,15 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 LandingTargetInnovations.msg 生成
+topic: landing_target_innovations
+msg: LandingTargetInnovations.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  innov_x:
+    type: float32
+  innov_y:
+    type: float32
+  innov_cov_x:
+    type: float32
+  innov_cov_y:
+    type: float32

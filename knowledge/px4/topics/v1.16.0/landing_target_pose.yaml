@@ -1,0 +1,55 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 LandingTargetPose.msg 生成
+topic: landing_target_pose
+msg: LandingTargetPose.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  is_static:
+    type: bool
+    note: Flag indicating whether the landing target is static or moving with respect to the ground
+  rel_pos_valid:
+    type: bool
+    note: Flag showing whether relative position is valid
+  rel_vel_valid:
+    type: bool
+    note: Flag showing whether relative velocity is valid
+  x_rel:
+    type: float32
+    note: X/north position of target, relative to vehicle (navigation frame) [meters]
+  y_rel:
+    type: float32
+    note: Y/east position of target, relative to vehicle (navigation frame) [meters]
+  z_rel:
+    type: float32
+    note: Z/down position of target, relative to vehicle (navigation frame) [meters]
+  vx_rel:
+    type: float32
+    note: X/north velocity  of target, relative to vehicle (navigation frame) [meters/second]
+  vy_rel:
+    type: float32
+    note: Y/east velocity of target, relative to vehicle (navigation frame) [meters/second]
+  cov_x_rel:
+    type: float32
+    note: X/north position variance [meters^2]
+  cov_y_rel:
+    type: float32
+    note: Y/east position variance [meters^2]
+  cov_vx_rel:
+    type: float32
+    note: X/north velocity variance [(meters/second)^2]
+  cov_vy_rel:
+    type: float32
+    note: Y/east velocity variance [(meters/second)^2]
+  abs_pos_valid:
+    type: bool
+    note: Flag showing whether absolute position is valid
+  x_abs:
+    type: float32
+    note: X/north position of target, relative to origin (navigation frame) [meters]
+  y_abs:
+    type: float32
+    note: Y/east position of target, relative to origin (navigation frame) [meters]
+  z_abs:
+    type: float32
+    note: Z/down position of target, relative to origin (navigation frame) [meters]

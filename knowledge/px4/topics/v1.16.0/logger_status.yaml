@@ -1,0 +1,38 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 LoggerStatus.msg 生成
+topic: logger_status
+msg: LoggerStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  type:
+    type: uint8
+  backend:
+    type: uint8
+    values:
+      1: FILE
+      2: MAVLINK
+      3: ALL
+    kind: enum
+  is_logging:
+    type: bool
+  total_written_kb:
+    type: float32
+    note: total written to log in kiloBytes
+  write_rate_kb_s:
+    type: float32
+    note: write rate in kiloBytes/s
+  dropouts:
+    type: uint32
+    note: number of failed buffer writes due to buffer overflow
+  message_gaps:
+    type: uint32
+    note: messages misssed
+  buffer_used_bytes:
+    type: uint32
+    note: current buffer fill in Bytes
+  buffer_size_bytes:
+    type: uint32
+    note: total buffer size in Bytes
+  num_messages:
+    type: uint8

@@ -1,0 +1,32 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 PowerMonitor.msg 生成
+topic: power_monitor
+msg: PowerMonitor.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  voltage_v:
+    type: float32
+    note: Voltage in volts, 0 if unknown
+  current_a:
+    type: float32
+    note: Current in amperes, -1 if unknown
+  power_w:
+    type: float32
+    note: power in watts, -1 if unknown
+  rconf:
+    type: int16
+  rsv:
+    type: int16
+  rbv:
+    type: int16
+  rp:
+    type: int16
+  rc:
+    type: int16
+  rcal:
+    type: int16
+  me:
+    type: int16
+  al:
+    type: int16

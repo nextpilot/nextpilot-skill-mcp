@@ -1,0 +1,16 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 EscEepromRead.msg 生成
+topic: esc_eeprom_read
+msg: EscEepromRead.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  firmware:
+    type: uint8
+    note: "[-] ESC firmware type (see ESC_FIRMWARE enum in MAVLink)"
+  index:
+    type: uint8
+    note: "[-] Index of the ESC (0 = ESC1, 1 = ESC2, etc.)"
+  length:
+    type: uint16
+    note: "[-] Length of valid data"

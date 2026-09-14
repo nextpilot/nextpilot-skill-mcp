@@ -1,0 +1,35 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 EstimatorFusionControl.msg 生成
+topic: estimator_fusion_control
+msg: EstimatorFusionControl.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  of_intended:
+    type: bool
+  ev_intended:
+    type: bool
+  baro_intended:
+    type: bool
+  rng_intended:
+    type: bool
+  mag_intended:
+    type: bool
+  aspd_intended:
+    type: bool
+  rngbcn_intended:
+    type: bool
+  of_active:
+    type: bool
+  ev_active:
+    type: bool
+  baro_active:
+    type: bool
+  rng_active:
+    type: bool
+  mag_active:
+    type: bool
+  aspd_active:
+    type: bool
+  rngbcn_active:
+    type: bool

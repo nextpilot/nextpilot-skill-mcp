@@ -1,0 +1,13 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 SensorsStatusImu.msg 生成
+topic: sensors_status_imu
+msg: SensorsStatusImu.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  accel_device_id_primary:
+    type: uint32
+    note: current primary accel device id for reference
+  gyro_device_id_primary:
+    type: uint32
+    note: current primary gyro device id for reference

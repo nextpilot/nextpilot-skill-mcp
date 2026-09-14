@@ -1,0 +1,59 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 ManualControlSwitches.msg 生成
+topic: manual_control_switches
+msg: ManualControlSwitches.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  timestamp_sample:
+    type: uint64
+    unit: us
+  mode_slot:
+    type: uint8
+    note: the slot a specific model selector is in
+    values:
+      0: NONE
+      1: "1"
+      2: "2"
+      3: "3"
+      4: "4"
+      5: "5"
+      6: NUM
+    kind: enum
+  arm_switch:
+    type: uint8
+    note: "arm/disarm switch: _DISARMED_, ARMED"
+  return_switch:
+    type: uint8
+    note: "return to launch 2 position switch (mandatory): _NORMAL_, RTL"
+  loiter_switch:
+    type: uint8
+    note: "loiter 2 position switch (optional): _MISSION_, LOITER"
+  offboard_switch:
+    type: uint8
+    note: "offboard 2 position switch (optional): _NORMAL_, OFFBOARD"
+  kill_switch:
+    type: uint8
+    note: "throttle kill: _NORMAL_, KILL"
+  gear_switch:
+    type: uint8
+    note: "landing gear switch: _DOWN_, UP"
+  transition_switch:
+    type: uint8
+    note: "VTOL transition switch: _HOVER, FORWARD_FLIGHT"
+  photo_switch:
+    type: uint8
+    note: Photo trigger switch
+  video_switch:
+    type: uint8
+    note: Photo trigger switch
+  payload_power_switch:
+    type: uint8
+    note: Payload power switch
+  engage_main_motor_switch:
+    type: uint8
+    unit: for helicopters
+    note: Engage the main motor (for helicopters)
+  switch_changes:
+    type: uint32
+    note: number of switch changes

@@ -1,0 +1,12 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 Rpm.msg 生成
+topic: rpm
+msg: Rpm.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  rpm_estimate:
+    type: float32
+    note: filtered revolutions per minute
+  rpm_raw:
+    type: float32

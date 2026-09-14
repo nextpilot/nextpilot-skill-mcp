@@ -1,0 +1,10 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 Buffer128.msg 生成
+topic: buffer128
+msg: Buffer128.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  len:
+    type: uint8
+    note: length of data

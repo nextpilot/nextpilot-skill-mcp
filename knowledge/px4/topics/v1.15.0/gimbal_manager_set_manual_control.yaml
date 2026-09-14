@@ -1,0 +1,31 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 GimbalManagerSetManualControl.msg 生成
+topic: gimbal_manager_set_manual_control
+msg: GimbalManagerSetManualControl.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  origin_sysid:
+    type: uint8
+  origin_compid:
+    type: uint8
+  target_system:
+    type: uint8
+  target_component:
+    type: uint8
+  flags:
+    type: uint32
+  gimbal_device_id:
+    type: uint8
+  pitch:
+    type: float32
+    note: unitless -1..1, can be NAN
+  yaw:
+    type: float32
+    note: unitless -1..1, can be NAN
+  pitch_rate:
+    type: float32
+    note: unitless -1..1, can be NAN
+  yaw_rate:
+    type: float32
+    note: unitless -1..1, can be NAN

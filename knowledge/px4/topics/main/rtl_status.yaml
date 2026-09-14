@@ -1,0 +1,22 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 RtlStatus.msg 生成
+topic: rtl_status
+msg: RtlStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  safe_points_id:
+    type: uint32
+    note: unique ID of active set of safe_point_items
+  is_evaluation_pending:
+    type: bool
+    note: flag if the RTL point needs reevaluation (e.g. new safe points available, but need loading).
+  has_vtol_approach:
+    type: bool
+    note: flag if approaches are defined for current RTL_TYPE parameter setting
+  rtl_type:
+    type: uint8
+    note: Type of RTL chosen
+  safe_point_index:
+    type: uint8
+    note: index of the chosen safe point, UINT8_MAX if no rally point was chosen

@@ -1,0 +1,13 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 RoverSpeedSetpoint.msg 生成
+topic: rover_speed_setpoint
+msg: RoverSpeedSetpoint.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  speed_body_x:
+    type: float32
+    note: "[m/s] [@range -inf (Backwards), inf (Forwards)] [@frame Body] Speed setpoint in body x direction"
+  speed_body_y:
+    type: float32
+    note: "[m/s] [@range -inf (Left), inf (Right)] [@frame Body] [@invalid NaN If not mecanum] Mecanum only: Speed setpoint in body y direction"

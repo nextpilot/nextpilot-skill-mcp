@@ -1,0 +1,49 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 VehicleCommand.msg 生成
+topic: vehicle_command
+msg: VehicleCommand.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  param1:
+    type: float32
+    note: Parameter 1, as defined by MAVLink uint16 VEHICLE_CMD enum.
+  param2:
+    type: float32
+    note: Parameter 2, as defined by MAVLink uint16 VEHICLE_CMD enum.
+  param3:
+    type: float32
+    note: Parameter 3, as defined by MAVLink uint16 VEHICLE_CMD enum.
+  param4:
+    type: float32
+    note: Parameter 4, as defined by MAVLink uint16 VEHICLE_CMD enum.
+  param5:
+    type: float64
+    note: Parameter 5, as defined by MAVLink uint16 VEHICLE_CMD enum.
+  param6:
+    type: float64
+    note: Parameter 6, as defined by MAVLink uint16 VEHICLE_CMD enum.
+  param7:
+    type: float32
+    note: Parameter 7, as defined by MAVLink uint16 VEHICLE_CMD enum.
+  command:
+    type: uint32
+    note: Command ID
+  target_system:
+    type: uint8
+    note: System which should execute the command
+  target_component:
+    type: uint8
+    note: Component which should execute the command, 0 for all components
+  source_system:
+    type: uint8
+    note: System sending the command
+  source_component:
+    type: uint16
+    note: Component / mode executor sending the command
+  confirmation:
+    type: uint8
+    unit: e.g. for kill command
+    note: "0: First transmission of this command. 1-255: Confirmation transmissions (e.g. for kill command)"
+  from_external:
+    type: bool

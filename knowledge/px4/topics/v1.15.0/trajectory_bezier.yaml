@@ -1,0 +1,15 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 TrajectoryBezier.msg 生成
+topic: trajectory_bezier
+msg: TrajectoryBezier.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  yaw:
+    type: float32
+    unit: rad
+    note: yaw angle (rad)
+  delta:
+    type: float32
+    unit: seconds
+    note: time it should take to get to this waypoint, if this is the final waypoint (seconds)

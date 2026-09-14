@@ -1,0 +1,52 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 TuneControl.msg 生成
+topic: tune_control
+msg: TuneControl.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  tune_id:
+    type: uint8
+    note: "tune_id corresponding to TuneID::* from the tune_defaults.h in the tunes library"
+    values:
+      0: STOP
+      1: STARTUP
+      2: ERROR
+      3: POSITIVE
+      4: NEUTRAL
+      5: NEGATIVE
+      6: WARNING
+      7: SLOW
+      8: FAST
+      9: WARNING
+      10: FAILURE
+      11: RELEASE
+      12: BEEP
+      13: SET
+      14: INIT
+      15: ERROR
+      16: PX4IO
+      17: OK
+      18: ERR
+      19: "OFF"
+    kind: enum
+  tune_override:
+    type: bool
+    note: if true the tune which is playing will be stopped and the new started
+  frequency:
+    type: uint16
+    note: in Hz
+  duration:
+    type: uint32
+    note: in us
+  silence:
+    type: uint32
+    note: in us
+  volume:
+    type: uint8
+    note: value between 0-100 if supported by backend
+    values:
+      0: MIN
+      20: DEFAULT
+      100: MAX
+    kind: enum

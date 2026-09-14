@@ -1,0 +1,31 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 VehicleOdometry.msg 生成
+topic: vehicle_odometry
+msg: VehicleOdometry.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  timestamp_sample:
+    type: uint64
+    unit: us
+  pose_frame:
+    type: uint8
+    note: Position and orientation frame of reference
+    values:
+      0: UNKNOWN
+      1: NED
+      2: FRD
+    kind: enum
+  velocity_frame:
+    type: uint8
+    note: Reference frame of the velocity data
+    values:
+      0: UNKNOWN
+      1: NED
+      2: FRD
+      3: FRD
+    kind: enum
+  reset_counter:
+    type: uint8
+  quality:
+    type: int8

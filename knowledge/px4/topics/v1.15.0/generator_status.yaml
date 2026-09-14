@@ -1,0 +1,40 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 GeneratorStatus.msg 生成
+topic: generator_status
+msg: GeneratorStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  status:
+    type: uint64
+    note: Status flags
+  battery_current:
+    type: float32
+    note: "[A] Current into/out of battery. Positive for out. Negative for in. NaN: field not provided."
+  load_current:
+    type: float32
+    note: "[A] Current going to the UAV. If battery current not available this is the DC current from the generator. Positive for out. Negative for in. NaN: field not provided"
+  power_generated:
+    type: float32
+    note: "[W] The power being generated. NaN: field not provided"
+  bus_voltage:
+    type: float32
+    note: "[V] Voltage of the bus seen at the generator, or battery bus if battery bus is controlled by generator and at a different voltage to main bus."
+  bat_current_setpoint:
+    type: float32
+    note: "[A] The target battery current. Positive for out. Negative for in. NaN: field not provided"
+  runtime:
+    type: uint32
+    note: "[s] Seconds this generator has run since it was rebooted. UINT32_MAX: field not provided."
+  time_until_maintenance:
+    type: int32
+    note: "[s] Seconds until this generator requires maintenance.  A negative value indicates maintenance is past-due. INT32_MAX: field not provided."
+  generator_speed:
+    type: uint16
+    note: "[rpm] Speed of electrical generator or alternator. UINT16_MAX: field not provided."
+  rectifier_temperature:
+    type: int16
+    note: "[degC] The temperature of the rectifier or power converter. INT16_MAX: field not provided."
+  generator_temperature:
+    type: int16
+    note: "[degC] The temperature of the mechanical motor, fuel cell core or generator. INT16_MAX: field not provided."

@@ -1,0 +1,28 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 RadioStatus.msg 生成
+topic: radio_status
+msg: RadioStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  rssi:
+    type: uint8
+    note: local signal strength
+  remote_rssi:
+    type: uint8
+    note: remote signal strength
+  txbuf:
+    type: uint8
+    note: how full the tx buffer is as a percentage
+  noise:
+    type: uint8
+    note: background noise level
+  remote_noise:
+    type: uint8
+    note: remote background noise level
+  rxerrors:
+    type: uint16
+    note: receive errors
+  fix:
+    type: uint16
+    note: count of error corrected packets

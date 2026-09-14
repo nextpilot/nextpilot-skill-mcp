@@ -1,0 +1,15 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 ParameterSetValueRequest.msg 生成
+topic: parameter_set_value_request
+msg: ParameterSetValueRequest.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  parameter_index:
+    type: uint16
+  int_value:
+    type: int32
+    note: Optional value for an integer parameter
+  float_value:
+    type: float32
+    note: Optional value for a float parameter

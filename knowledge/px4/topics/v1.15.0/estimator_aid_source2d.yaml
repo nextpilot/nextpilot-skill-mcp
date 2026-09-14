@@ -1,0 +1,22 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 EstimatorAidSource2d.msg 生成
+topic: estimator_aid_source2d
+msg: EstimatorAidSource2d.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  timestamp_sample:
+    type: uint64
+    unit: us
+  estimator_instance:
+    type: uint8
+  device_id:
+    type: uint32
+  time_last_fuse:
+    type: uint64
+  innovation_rejected:
+    type: bool
+    note: true if the observation has been rejected
+  fused:
+    type: bool
+    note: true if the sample was successfully fused

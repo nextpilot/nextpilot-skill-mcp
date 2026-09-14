@@ -1,0 +1,10 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 LogMessage.msg 生成
+topic: log_message
+msg: LogMessage.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  severity:
+    type: uint8
+    note: log level (same as in the linux kernel, starting with 0)

@@ -1,0 +1,20 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 TakeoffStatus.msg 生成
+topic: takeoff_status
+msg: TakeoffStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  takeoff_state:
+    type: uint8
+    values:
+      0: UNINITIALIZED
+      1: DISARMED
+      2: SPOOLUP
+      3: TAKEOFF
+      4: RAMPUP
+      5: FLIGHT
+    kind: enum
+  tilt_limit:
+    type: float32
+    note: limited tilt feasibility during takeoff, contains maximum tilt otherwise

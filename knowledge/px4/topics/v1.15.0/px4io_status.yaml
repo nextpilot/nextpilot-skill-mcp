@@ -1,0 +1,62 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 Px4ioStatus.msg 生成
+topic: px4io_status
+msg: Px4ioStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  free_memory_bytes:
+    type: uint16
+  voltage_v:
+    type: float32
+    note: Servo rail voltage in volts
+  rssi_v:
+    type: float32
+    note: RSSI pin voltage in volts
+  status_arm_sync:
+    type: bool
+  status_failsafe:
+    type: bool
+  status_fmu_initialized:
+    type: bool
+  status_fmu_ok:
+    type: bool
+  status_init_ok:
+    type: bool
+  status_outputs_armed:
+    type: bool
+  status_raw_pwm:
+    type: bool
+  status_rc_ok:
+    type: bool
+  status_rc_dsm:
+    type: bool
+  status_rc_ppm:
+    type: bool
+  status_rc_sbus:
+    type: bool
+  status_rc_st24:
+    type: bool
+  status_rc_sumd:
+    type: bool
+  status_safety_button_event:
+    type: bool
+    note: px4io safety button was pressed for longer than 1 second
+  alarm_pwm_error:
+    type: bool
+  alarm_rc_lost:
+    type: bool
+  arming_failsafe_custom:
+    type: bool
+  arming_fmu_armed:
+    type: bool
+  arming_fmu_prearmed:
+    type: bool
+  arming_force_failsafe:
+    type: bool
+  arming_io_arm_ok:
+    type: bool
+  arming_lockdown:
+    type: bool
+  arming_termination_failsafe:
+    type: bool

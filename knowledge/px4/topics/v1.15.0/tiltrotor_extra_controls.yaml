@@ -1,0 +1,13 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 TiltrotorExtraControls.msg 生成
+topic: tiltrotor_extra_controls
+msg: TiltrotorExtraControls.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  collective_tilt_normalized_setpoint:
+    type: float32
+    note: "Collective tilt angle of motors of tiltrotor, 0: vertical, 1: horizontal [0, 1]"
+  collective_thrust_normalized_setpoint:
+    type: float32
+    note: Collective thrust setpoint [0, 1]

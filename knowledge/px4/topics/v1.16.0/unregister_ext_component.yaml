@@ -1,0 +1,19 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 UnregisterExtComponent.msg 生成
+topic: unregister_ext_component
+msg: UnregisterExtComponent.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  arming_check_id:
+    type: int8
+    unit: "-1 if not registered"
+    note: arming check registration ID (-1 if not registered)
+  mode_id:
+    type: int8
+    unit: "-1 if not registered"
+    note: assigned mode ID (-1 if not registered)
+  mode_executor_id:
+    type: int8
+    unit: "-1 if not registered"
+    note: assigned mode executor ID (-1 if not registered)

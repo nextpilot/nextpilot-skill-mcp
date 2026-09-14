@@ -1,0 +1,35 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 DeviceInformation.msg 生成
+topic: device_information
+msg: DeviceInformation.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  device_type:
+    type: uint8
+    note: "[@enum DEVICE_TYPE] Type of the device. Matches MAVLink DEVICE_TYPE enum"
+    values:
+      0: GENERIC
+      1: AIRSPEED
+      2: ESC
+      3: SERVO
+      4: GPS
+      5: MAGNETOMETER
+      6: PARACHUTE
+      7: RANGEFINDER
+      8: WINCH
+      9: BAROMETER
+      10: FLOW
+      11: ACCELEROMETER
+      12: GYROSCOPE
+      13: PRESSURE
+      14: BATTERY
+      15: HYGROMETER
+      16: AVOIDANCE
+      17: COMPUTE
+      18: LIDAR
+      19: CAMERA
+    kind: enum
+  device_id:
+    type: uint32
+    note: "[-] [@invalid 0 if not available] Unique device ID for the sensor. Does not change between power cycles."

@@ -1,0 +1,54 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 NavigatorMissionItem.msg 生成
+topic: navigator_mission_item
+msg: NavigatorMissionItem.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  sequence_current:
+    type: uint16
+    note: Sequence of the current mission item
+  nav_cmd:
+    type: uint16
+  latitude:
+    type: float32
+  longitude:
+    type: float32
+  time_inside:
+    type: float32
+    note: time that the MAV should stay inside the radius before advancing in seconds
+  acceptance_radius:
+    type: float32
+    note: default radius in which the mission is accepted as reached in meters
+  loiter_radius:
+    type: float32
+    note: loiter radius in meters, 0 for a VTOL to hover, negative for counter-clockwise
+  yaw:
+    type: float32
+    note: in radians NED -PI..+PI, NAN means don't change yaw
+  altitude:
+    type: float32
+    unit: AMSL
+    note: altitude in meters (AMSL)
+  frame:
+    type: uint8
+    note: mission frame
+  origin:
+    type: uint8
+    unit: onboard or mavlink
+    note: mission item origin (onboard or mavlink)
+  loiter_exit_xtrack:
+    type: bool
+    note: "exit xtrack location: 0 for center of loiter wp, 1 for exit location"
+  force_heading:
+    type: bool
+    note: heading needs to be reached
+  altitude_is_relative:
+    type: bool
+    note: true if altitude is relative from start point
+  autocontinue:
+    type: bool
+    note: true if next waypoint should follow after this one
+  vtol_back_transition:
+    type: bool
+    note: part of the vtol back transition sequence

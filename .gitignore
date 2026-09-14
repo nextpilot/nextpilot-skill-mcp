@@ -27,3 +27,5 @@ engine/tests/logs/*.bin
 # Python 字节码
 __pycache__/
 *.pyc
+
+.cache

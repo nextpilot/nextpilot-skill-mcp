@@ -1,0 +1,23 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 InternalCombustionEngineControl.msg 生成
+topic: internal_combustion_engine_control
+msg: InternalCombustionEngineControl.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  ignition_on:
+    type: bool
+    unit: Spark Plug
+    note: activate/deactivate ignition (Spark Plug)
+  throttle_control:
+    type: float32
+    note: "[0,1] - Motor should idle with 0. Includes slew rate if enabled."
+  choke_control:
+    type: float32
+    note: "[0,1] - 1 fully closes the air inlet."
+  starter_engine_control:
+    type: float32
+    note: "[0,1] - control value for electric starter motor."
+  user_request:
+    type: uint8
+    note: user intent for the ICE being on/off

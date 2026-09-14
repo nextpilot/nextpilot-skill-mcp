@@ -1,0 +1,16 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 GpsInjectData.msg 生成
+topic: gps_inject_data
+msg: GpsInjectData.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  device_id:
+    type: uint32
+    note: unique device ID for the sensor that does not change between power cycles
+  len:
+    type: uint16
+    note: length of data
+  flags:
+    type: uint8
+    note: "LSB: 1=fragmented"

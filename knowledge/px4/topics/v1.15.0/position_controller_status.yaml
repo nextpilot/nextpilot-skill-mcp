@@ -1,0 +1,38 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 PositionControllerStatus.msg 生成
+topic: position_controller_status
+msg: PositionControllerStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  nav_roll:
+    type: float32
+    note: Roll setpoint [rad]
+  nav_pitch:
+    type: float32
+    note: Pitch setpoint [rad]
+  nav_bearing:
+    type: float32
+    note: Bearing angle[rad]
+  target_bearing:
+    type: float32
+    note: Bearing angle from aircraft to current target [rad]
+  xtrack_error:
+    type: float32
+    note: Signed track error [m]
+  wp_dist:
+    type: float32
+    note: Distance to active (next) waypoint [m]
+  acceptance_radius:
+    type: float32
+    note: Current horizontal acceptance radius [m]
+  yaw_acceptance:
+    type: float32
+    note: Yaw acceptance error[rad]
+  altitude_acceptance:
+    type: float32
+    note: Current vertical acceptance error [m]
+  type:
+    type: uint8
+    unit: see PositionSetpoint.msg
+    note: Current (applied) position setpoint type (see PositionSetpoint.msg)

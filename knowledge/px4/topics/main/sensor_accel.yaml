@@ -1,0 +1,33 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 SensorAccel.msg 生成
+topic: sensor_accel
+msg: SensorAccel.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  timestamp_sample:
+    type: uint64
+    unit: us
+  device_id:
+    type: uint32
+    note: unique device ID for the sensor that does not change between power cycles
+  is_external:
+    type: bool
+    note: true if the sensor is not mounted on the flight controller board itself
+  x:
+    type: float32
+    note: acceleration in the FRD board frame X-axis in m/s^2
+  y:
+    type: float32
+    note: acceleration in the FRD board frame Y-axis in m/s^2
+  z:
+    type: float32
+    note: acceleration in the FRD board frame Z-axis in m/s^2
+  temperature:
+    type: float32
+    note: temperature in degrees Celsius
+  error_count:
+    type: uint32
+  samples:
+    type: uint8
+    note: number of raw samples that went into this message

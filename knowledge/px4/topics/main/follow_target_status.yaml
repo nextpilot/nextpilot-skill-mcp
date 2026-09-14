@@ -1,0 +1,27 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 FollowTargetStatus.msg 生成
+topic: follow_target_status
+msg: FollowTargetStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  tracked_target_course:
+    type: float32
+    unit: North is course zero
+    note: "[rad] Tracked target course in NED local frame (North is course zero)"
+  follow_angle:
+    type: float32
+    note: "[rad] Current follow angle setting"
+  orbit_angle_setpoint:
+    type: float32
+    note: "[rad] Current orbit angle setpoint from the smooth trajectory generator"
+  angular_rate_setpoint:
+    type: float32
+    note: "[rad/s] Angular rate commanded from Jerk-limited Orbit Angle trajectory for Orbit Angle"
+  in_emergency_ascent:
+    type: bool
+    unit: when distance to ground is below safety altitude
+    note: "[bool] True when doing emergency ascent (when distance to ground is below safety altitude)"
+  gimbal_pitch:
+    type: float32
+    note: "[rad] Gimbal pitch commanded to track target in the center of the frame"

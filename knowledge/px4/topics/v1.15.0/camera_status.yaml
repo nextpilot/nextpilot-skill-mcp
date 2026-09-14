@@ -1,0 +1,13 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 CameraStatus.msg 生成
+topic: camera_status
+msg: CameraStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  active_sys_id:
+    type: uint8
+    note: mavlink system id of the currently active camera
+  active_comp_id:
+    type: uint8
+    note: mavlink component id of currently active camera

@@ -1,0 +1,10 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 FixedWingTakeoffStatus.msg 生成
+topic: fixed_wing_takeoff_status
+msg: FixedWingTakeoffStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  climbout_completed:
+    type: bool
+    note: Whether the takeoff climbout is finished (altitude, or time if FW_TKO_CLMB_T is set)

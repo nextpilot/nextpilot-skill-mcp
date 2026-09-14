@@ -1,0 +1,49 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 DistanceSensor.msg 生成
+topic: distance_sensor
+msg: DistanceSensor.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  device_id:
+    type: uint32
+    note: unique device ID for the sensor that does not change between power cycles
+  min_distance:
+    type: float32
+    unit: in m
+    note: Minimum distance the sensor can measure (in m)
+  max_distance:
+    type: float32
+    unit: in m
+    note: Maximum distance the sensor can measure (in m)
+  current_distance:
+    type: float32
+    unit: in m
+    note: Current distance reading (in m)
+  variance:
+    type: float32
+    note: Measurement variance (in m^2), 0 for unknown / invalid readings
+  signal_quality:
+    type: int8
+    note: Signal quality in percent (0...100%), where 0 = invalid signal, 100 = perfect signal, and -1 = unknown signal quality.
+  type:
+    type: uint8
+    note: Type from MAV_DISTANCE_SENSOR enum
+  h_fov:
+    type: float32
+    unit: rad
+    note: Sensor horizontal field of view (rad)
+  v_fov:
+    type: float32
+    unit: rad
+    note: Sensor vertical field of view (rad)
+  orientation:
+    type: uint8
+    note: Direction the sensor faces from MAV_SENSOR_ORIENTATION enum
+  mode:
+    type: uint8
+    values:
+      0: UNKNOWN
+      1: ENABLED
+      2: DISABLED
+    kind: enum

@@ -1,0 +1,21 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 IrlockReport.msg 生成
+topic: irlock_report
+msg: IrlockReport.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  signature:
+    type: uint16
+  pos_x:
+    type: float32
+    note: tan(theta), where theta is the angle between the target and the camera center of projection in camera x-axis
+  pos_y:
+    type: float32
+    note: tan(theta), where theta is the angle between the target and the camera center of projection in camera y-axis
+  size_x:
+    type: float32
+    note: /** size of target along camera x-axis in units of tan(theta) **/
+  size_y:
+    type: float32
+    note: /** size of target along camera y-axis in units of tan(theta) **/

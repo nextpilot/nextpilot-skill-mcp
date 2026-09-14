@@ -1,0 +1,44 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 HomePositionV0.msg 生成
+topic: home_position_v0
+msg: HomePositionV0.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  lat:
+    type: float64
+    note: Latitude in degrees
+  lon:
+    type: float64
+    note: Longitude in degrees
+  alt:
+    type: float32
+    unit: AMSL
+    note: Altitude in meters (AMSL)
+  x:
+    type: float32
+    note: X coordinate in meters
+  y:
+    type: float32
+    note: Y coordinate in meters
+  z:
+    type: float32
+    note: Z coordinate in meters
+  yaw:
+    type: float32
+    note: Yaw angle in radians
+  valid_alt:
+    type: bool
+    note: true when the altitude has been set
+  valid_hpos:
+    type: bool
+    note: true when the latitude and longitude have been set
+  valid_lpos:
+    type: bool
+    note: true when the local position (xyz) has been set
+  manual_home:
+    type: bool
+    note: true when home position was set manually
+  update_count:
+    type: uint32
+    note: update counter of the home position

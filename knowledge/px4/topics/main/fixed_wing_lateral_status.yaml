@@ -1,0 +1,13 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 FixedWingLateralStatus.msg 生成
+topic: fixed_wing_lateral_status
+msg: FixedWingLateralStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  lateral_acceleration_setpoint:
+    type: float32
+    note: "[m/s^2] [FRD] resultant lateral acceleration setpoint"
+  can_run_factor:
+    type: float32
+    note: "[norm] [@range 0, 1] estimate of certainty of the correct functionality of the npfg roll setpoint"

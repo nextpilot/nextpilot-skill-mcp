@@ -1,0 +1,28 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 DetectAndAvoidMostUrgent.msg 生成
+topic: detect_and_avoid_most_urgent
+msg: DetectAndAvoidMostUrgent.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  unique_id:
+    type: uint64
+    note: "[-] Encoded identifier of the current most urgent traffic aircraft, selected in priority order: ICAO address, ADS-B callsign, then reduced UAS ID tail bytes"
+  unique_id_encoding:
+    type: uint8
+    note: "[-] Namespace used to decode `unique_id`"
+    values:
+      0: ICAO
+      1: CALLSIGN
+      2: ID
+    kind: enum
+  has_action:
+    type: bool
+    note: "[-] True if the configured DAA response for this most urgent conflict is stronger than Warn only"
+  conflict_level:
+    type: uint8
+    note: "[-] Conflict level of the current most urgent active conflict"
+  aircraft_dist:
+    type: float32
+    unit: 9999 when empty
+    note: "[m] Approximate 3D range to the most urgent traffic aircraft (9999 when empty)"

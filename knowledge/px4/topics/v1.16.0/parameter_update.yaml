@@ -1,0 +1,24 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 ParameterUpdate.msg 生成
+topic: parameter_update
+msg: ParameterUpdate.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  instance:
+    type: uint32
+    note: Instance count - constantly incrementing
+  get_count:
+    type: uint32
+  set_count:
+    type: uint32
+  find_count:
+    type: uint32
+  export_count:
+    type: uint32
+  active:
+    type: uint16
+  changed:
+    type: uint16
+  custom_default:
+    type: uint16

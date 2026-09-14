@@ -1,0 +1,26 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 EscStatus.msg 生成
+topic: esc_status
+msg: EscStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  counter:
+    type: uint16
+    note: "[-] Incremented by the writing thread everytime new data is stored"
+  esc_count:
+    type: uint8
+    note: "[-] Number of connected ESCs"
+  esc_connectiontype:
+    type: uint8
+    note: "[@enum ESC_CONNECTION_TYPE] How ESCs connected to the system"
+  esc_online_flags:
+    type: uint16
+    unit: in motor order
+    note: Bitmask indicating which ESC is online/offline (in motor order)
+    kind: bitmask
+  esc_armed_flags:
+    type: uint16
+    unit: in motor order
+    note: "[-] Bitmask indicating which ESC is armed (in motor order)"
+    kind: bitmask

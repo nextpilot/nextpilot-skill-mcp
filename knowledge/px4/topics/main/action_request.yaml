@@ -1,0 +1,33 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 ActionRequest.msg 生成
+topic: action_request
+msg: ActionRequest.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  action:
+    type: uint8
+    note: "[@enum ACTION] Requested action"
+    values:
+      0: DISARM
+      1: ARM
+      2: ARMING
+      3: UNKILL
+      4: KILL
+      5: MODE
+      6: MULTICOPTER
+      7: FIXEDWING
+      8: TERMINATION
+    kind: enum
+  source:
+    type: uint8
+    note: "[@enum SOURCE] Request trigger type, such as a switch, button or gesture"
+    values:
+      0: GESTURE
+      1: SWITCH
+      2: BUTTON
+      3: SLOT
+    kind: enum
+  mode:
+    type: uint8
+    note: "Requested mode. Only applies when `action` is `ACTION_SWITCH_MODE`. Values for this field are defined by the `vehicle_status_s::NAVIGATION_STATE_*` enumeration."

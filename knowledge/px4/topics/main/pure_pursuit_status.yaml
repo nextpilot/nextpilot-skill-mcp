@@ -1,0 +1,22 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 PurePursuitStatus.msg 生成
+topic: pure_pursuit_status
+msg: PurePursuitStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  lookahead_distance:
+    type: float32
+    note: "[m] [@range 0, inf] Lookahead distance of pure the pursuit controller"
+  target_bearing:
+    type: float32
+    note: "[rad] [@range -pi, pi] [@frame NED] Target bearing calculated by the pure pursuit controller"
+  crosstrack_error:
+    type: float32
+    note: "[m] [@range -inf (Left of the path), inf (Right of the path)] Shortest distance from the vehicle to the path"
+  distance_to_waypoint:
+    type: float32
+    note: "[m] [@range -inf, inf]Distance from the vehicle to the current waypoint"
+  bearing_to_waypoint:
+    type: float32
+    note: "[rad] [@range -pi, pi] [@frame NED]Bearing towards current waypoint"

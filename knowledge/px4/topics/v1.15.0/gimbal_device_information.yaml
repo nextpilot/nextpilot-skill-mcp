@@ -1,0 +1,37 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 GimbalDeviceInformation.msg 生成
+topic: gimbal_device_information
+msg: GimbalDeviceInformation.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  firmware_version:
+    type: uint32
+  hardware_version:
+    type: uint32
+  uid:
+    type: uint64
+  cap_flags:
+    type: uint16
+  custom_cap_flags:
+    type: uint16
+  roll_min:
+    type: float32
+    note: "[rad]"
+  roll_max:
+    type: float32
+    note: "[rad]"
+  pitch_min:
+    type: float32
+    note: "[rad]"
+  pitch_max:
+    type: float32
+    note: "[rad]"
+  yaw_min:
+    type: float32
+    note: "[rad]"
+  yaw_max:
+    type: float32
+    note: "[rad]"
+  gimbal_device_compid:
+    type: uint8

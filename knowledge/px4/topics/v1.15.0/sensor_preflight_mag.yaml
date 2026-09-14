@@ -1,0 +1,10 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 SensorPreflightMag.msg 生成
+topic: sensor_preflight_mag
+msg: SensorPreflightMag.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  mag_inconsistency_angle:
+    type: float32
+    note: maximum angle between magnetometer instance field vectors in radians.

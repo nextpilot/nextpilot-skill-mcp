@@ -1,0 +1,23 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 ControlAllocatorStatus.msg 生成
+topic: control_allocator_status
+msg: ControlAllocatorStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  torque_setpoint_achieved:
+    type: bool
+    note: Boolean indicating whether the 3D torque setpoint was correctly allocated to actuators. 0 if not achieved, 1 if achieved.
+  thrust_setpoint_achieved:
+    type: bool
+    note: Boolean indicating whether the 3D thrust setpoint was correctly allocated to actuators. 0 if not achieved, 1 if achieved.
+  handled_motor_failure_mask:
+    type: uint16
+    note: Bitmask of failed motors that were removed from the allocation / effectiveness matrix. Not necessarily identical to the report from FailureDetector
+    kind: bitmask
+  motor_stop_mask:
+    type: uint16
+    note: Bitmaks of motors stopped by failure injection
+  actuator_group_preflight_check_active:
+    type: bool
+    note: True while an actuator group preflight check (VEHICLE_CMD_ACTUATOR_GROUP_TEST) is overriding the torque/thrust setpoint or collective-tilt

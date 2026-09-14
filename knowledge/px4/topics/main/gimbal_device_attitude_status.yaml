@@ -1,0 +1,38 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 GimbalDeviceAttitudeStatus.msg 生成
+topic: gimbal_device_attitude_status
+msg: GimbalDeviceAttitudeStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  target_system:
+    type: uint8
+  target_component:
+    type: uint8
+  device_flags:
+    type: uint16
+    values:
+      1: RETRACT
+      2: NEUTRAL
+      4: LOCK
+      8: LOCK
+      16: LOCK
+      32: FRAME
+      64: FRAME
+    kind: bitmask
+  angular_velocity_x:
+    type: float32
+  angular_velocity_y:
+    type: float32
+  angular_velocity_z:
+    type: float32
+  failure_flags:
+    type: uint32
+  delta_yaw:
+    type: float32
+  delta_yaw_velocity:
+    type: float32
+  gimbal_device_id:
+    type: uint8
+  received_from_mavlink:
+    type: bool

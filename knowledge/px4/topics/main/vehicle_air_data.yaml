@@ -1,0 +1,31 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 VehicleAirData.msg 生成
+topic: vehicle_air_data
+msg: VehicleAirData.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  timestamp_sample:
+    type: uint64
+    unit: us
+  baro_device_id:
+    type: uint32
+    note: Unique device ID for the selected barometer
+  baro_alt_meter:
+    type: float32
+    note: "[m] [@frame MSL] Altitude above MSL calculated from temperature compensated baro sensor data using an ISA corrected for sea level pressure SENS_BARO_QNH"
+  baro_pressure_pa:
+    type: float32
+    note: "[Pa] Absolute pressure"
+  ambient_temperature:
+    type: float32
+    note: "[degC] Ambient temperature"
+  temperature_source:
+    type: uint8
+    note: "Source of temperature data: 0: Default Temperature (15°C), 1: External Baro, 2: Airspeed"
+  rho:
+    type: float32
+    note: "[kg/m^3] Air density"
+  calibration_count:
+    type: uint8
+    note: Calibration changed counter. Monotonically increases whenever calibration changes.

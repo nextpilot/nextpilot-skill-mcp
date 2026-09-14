@@ -1,0 +1,72 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 SensorUwb.msg 生成
+topic: sensor_uwb
+msg: SensorUwb.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  sessionid:
+    type: uint32
+    note: UWB SessionID
+  time_offset:
+    type: uint32
+    note: Time between Ranging Rounds in ms
+  counter:
+    type: uint32
+    note: Number of Ranges since last Start of Ranging
+  mac:
+    type: uint16
+    unit: controller
+    note: MAC adress of Initiator (controller)
+  mac_dest:
+    type: uint16
+    unit: Controlee
+    note: MAC adress of Responder (Controlee)
+  status:
+    type: uint16
+    note: status feedback #
+  nlos:
+    type: uint8
+    note: None line of site condition y/n
+  distance:
+    type: float32
+    note: distance in m to the UWB receiver
+  aoa_azimuth_dev:
+    type: float32
+    note: Angle of arrival of first incomming RX msg
+  aoa_elevation_dev:
+    type: float32
+    note: Angle of arrival of first incomming RX msg
+  aoa_azimuth_resp:
+    type: float32
+    note: Angle of arrival of first incomming RX msg at the responder
+  aoa_elevation_resp:
+    type: float32
+    note: Angle of arrival of first incomming RX msg at the responder
+  aoa_azimuth_fom:
+    type: uint8
+    note: AOA Azimuth FOM
+  aoa_elevation_fom:
+    type: uint8
+    note: AOA Elevation FOM
+  aoa_dest_azimuth_fom:
+    type: uint8
+    note: AOA Azimuth FOM
+  aoa_dest_elevation_fom:
+    type: uint8
+    note: AOA Elevation FOM
+  orientation:
+    type: uint8
+    note: Direction the sensor faces from MAV_SENSOR_ORIENTATION enum
+  offset_x:
+    type: float32
+    unit: NED drone frame
+    note: UWB initiator offset in X axis (NED drone frame)
+  offset_y:
+    type: float32
+    unit: NED drone frame
+    note: UWB initiator offset in Y axis (NED drone frame)
+  offset_z:
+    type: float32
+    unit: NED drone frame
+    note: UWB initiator offset in Z axis (NED drone frame)

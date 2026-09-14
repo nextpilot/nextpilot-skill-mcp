@@ -1,0 +1,22 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 FixedWingLongitudinalSetpoint.msg 生成
+topic: fixed_wing_longitudinal_setpoint
+msg: FixedWingLongitudinalSetpoint.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  altitude:
+    type: float32
+    note: "[m] Altitude setpoint AMSL, not controlled directly if NAN or if height_rate is finite"
+  height_rate:
+    type: float32
+    note: "[m/s] [@frame ENU] Scalar height rate setpoint. NAN if not controlled directly"
+  equivalent_airspeed:
+    type: float32
+    note: "[m/s] [@range 0, inf] Scalar equivalent airspeed setpoint. NAN if system default should be used"
+  pitch_direct:
+    type: float32
+    note: "[rad] [@range -pi, pi] [@frame FRD] NAN if not controlled, overrides total energy controller"
+  throttle_direct:
+    type: float32
+    note: "[norm] [@range 0,1] NAN if not controlled, overrides total energy controller"

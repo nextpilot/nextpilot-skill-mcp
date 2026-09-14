@@ -1,0 +1,15 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 CanInterfaceStatus.msg 生成
+topic: can_interface_status
+msg: CanInterfaceStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  interface:
+    type: uint8
+  io_errors:
+    type: uint64
+  frames_tx:
+    type: uint64
+  frames_rx:
+    type: uint64

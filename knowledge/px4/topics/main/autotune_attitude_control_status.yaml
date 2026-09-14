@@ -1,0 +1,63 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 AutotuneAttitudeControlStatus.msg 生成
+topic: autotune_attitude_control_status
+msg: AutotuneAttitudeControlStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  fitness:
+    type: float32
+    note: "[-] Fitness of the parameter estimate"
+  innov:
+    type: float32
+    unit: residual error between model and measured output
+    note: "[rad/s] Innovation (residual error between model and measured output)"
+  dt_model:
+    type: float32
+    note: "[s] Model sample time used for identification"
+  kc:
+    type: float32
+    unit: ideal form
+    note: "[-] Proportional rate-loop gain (ideal form)"
+  ki:
+    type: float32
+    unit: ideal form
+    note: "[-] Integral rate-loop gain (ideal form)"
+  kd:
+    type: float32
+    unit: ideal form
+    note: "[-] Derivative rate-loop gain (ideal form)"
+  kff:
+    type: float32
+    note: "[-] Feedforward rate-loop gain"
+  att_p:
+    type: float32
+    note: "[-] Proportional attitude gain"
+  u_filt:
+    type: float32
+    note: "[-] Filtered input signal (normalized torque setpoint) used in system identification."
+  y_filt:
+    type: float32
+    note: "[rad/s] Filtered output signal (angular velocity) used in system identification."
+  state:
+    type: uint8
+    note: "[@enum STATE] Current state of the autotune procedure."
+    values:
+      0: IDLE
+      1: INIT
+      2: DETECTION
+      3: ROLL
+      4: PAUSE
+      5: DETECTION
+      6: PITCH
+      7: PAUSE
+      8: DETECTION
+      9: YAW
+      10: PAUSE
+      11: VERIFICATION
+      12: APPLY
+      13: TEST
+      14: COMPLETE
+      15: FAIL
+      16: DISARM
+    kind: enum

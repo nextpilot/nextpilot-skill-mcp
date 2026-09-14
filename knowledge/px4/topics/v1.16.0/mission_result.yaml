@@ -1,0 +1,51 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 MissionResult.msg 生成
+topic: mission_result
+msg: MissionResult.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  mission_id:
+    type: uint32
+    note: Id for the mission for which the result was generated
+  geofence_id:
+    type: uint32
+    unit: used for mission feasibility
+    note: Id for the corresponding geofence for which the result was generated (used for mission feasibility)
+  home_position_counter:
+    type: uint32
+    unit: used for mission feasibility
+    note: Counter of the home position for which the result was generated (used for mission feasibility)
+  seq_reached:
+    type: int32
+    note: Sequence of the mission item which has been reached, default -1
+  seq_current:
+    type: uint16
+    note: Sequence of the current mission item
+  seq_total:
+    type: uint16
+    note: Total number of mission items
+  valid:
+    type: bool
+    note: true if mission is valid
+  warning:
+    type: bool
+    note: true if mission is valid, but has potentially problematic items leading to safety warnings
+  finished:
+    type: bool
+    note: true if mission has been completed
+  failure:
+    type: bool
+    note: true if the mission cannot continue or be completed for some reason
+  item_do_jump_changed:
+    type: bool
+    note: true if the number of do jumps remaining has changed
+  item_changed_index:
+    type: uint16
+    note: indicate which item has changed
+  item_do_jump_remaining:
+    type: uint16
+    note: set to the number of do jumps remaining for that item
+  execution_mode:
+    type: uint8
+    note: indicates the mode in which the mission is executed

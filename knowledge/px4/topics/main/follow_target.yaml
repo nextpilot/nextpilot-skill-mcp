@@ -1,0 +1,28 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 FollowTarget.msg 生成
+topic: follow_target
+msg: FollowTarget.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  lat:
+    type: float64
+    note: target position (deg * 1e7)
+  lon:
+    type: float64
+    note: target position (deg * 1e7)
+  alt:
+    type: float32
+    note: target position
+  vy:
+    type: float32
+    note: target vel in y
+  vx:
+    type: float32
+    note: target vel in x
+  vz:
+    type: float32
+    note: target vel in z
+  est_cap:
+    type: uint8
+    note: target reporting capabilities

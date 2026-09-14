@@ -1,0 +1,11 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 QshellReq.msg 生成
+topic: qshell_req
+msg: QshellReq.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  strlen:
+    type: uint32
+  request_sequence:
+    type: uint32

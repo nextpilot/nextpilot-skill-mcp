@@ -1,0 +1,19 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 DifferentialDriveSetpoint.msg 生成
+topic: differential_drive_setpoint
+msg: DifferentialDriveSetpoint.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  speed:
+    type: float32
+    note: "[m/s] collective roll-off speed in body x-axis"
+  closed_loop_speed_control:
+    type: bool
+    note: true if speed is controlled using estimator feedback, false if direct feed-forward
+  yaw_rate:
+    type: float32
+    note: "[rad/s] yaw rate"
+  closed_loop_yaw_rate_control:
+    type: bool
+    note: true if yaw rate is controlled using gyroscope feedback, false if direct feed-forward

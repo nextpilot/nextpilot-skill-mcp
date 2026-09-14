@@ -1,0 +1,13 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 SensorSelection.msg 生成
+topic: sensor_selection
+msg: SensorSelection.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  accel_device_id:
+    type: uint32
+    note: unique device ID for the selected accelerometers
+  gyro_device_id:
+    type: uint32
+    note: unique device ID for the selected rate gyros

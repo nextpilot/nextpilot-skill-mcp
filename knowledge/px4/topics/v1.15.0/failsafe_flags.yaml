@@ -1,0 +1,115 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 FailsafeFlags.msg 生成
+topic: failsafe_flags
+msg: FailsafeFlags.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  mode_req_angular_velocity:
+    type: uint32
+  mode_req_attitude:
+    type: uint32
+  mode_req_local_alt:
+    type: uint32
+  mode_req_local_position:
+    type: uint32
+  mode_req_local_position_relaxed:
+    type: uint32
+  mode_req_global_position:
+    type: uint32
+  mode_req_mission:
+    type: uint32
+  mode_req_offboard_signal:
+    type: uint32
+  mode_req_home_position:
+    type: uint32
+  mode_req_wind_and_flight_time_compliance:
+    type: uint32
+    note: if set, mode cannot be entered if wind or flight time limit exceeded
+  mode_req_prevent_arming:
+    type: uint32
+    note: if set, cannot arm while in this mode
+  mode_req_manual_control:
+    type: uint32
+  mode_req_other:
+    type: uint32
+    unit: for external modes
+    note: other requirements, not covered above (for external modes)
+  angular_velocity_invalid:
+    type: bool
+    note: Angular velocity invalid
+  attitude_invalid:
+    type: bool
+    note: Attitude invalid
+  local_altitude_invalid:
+    type: bool
+    note: Local altitude invalid
+  local_position_invalid:
+    type: bool
+    note: Local position estimate invalid
+  local_position_invalid_relaxed:
+    type: bool
+    unit: e.g. flying with optical flow
+    note: Local position with reduced accuracy requirements invalid (e.g. flying with optical flow)
+  local_velocity_invalid:
+    type: bool
+    note: Local velocity estimate invalid
+  global_position_invalid:
+    type: bool
+    note: Global position estimate invalid
+  auto_mission_missing:
+    type: bool
+    note: No mission available
+  offboard_control_signal_lost:
+    type: bool
+    note: Offboard signal lost
+  home_position_invalid:
+    type: bool
+    note: No home position available
+  manual_control_signal_lost:
+    type: bool
+    note: Manual control (RC) signal lost
+  gcs_connection_lost:
+    type: bool
+    note: GCS connection lost
+  battery_warning:
+    type: uint8
+    note: Battery warning level
+  battery_low_remaining_time:
+    type: bool
+    note: Low battery based on remaining flight time
+  battery_unhealthy:
+    type: bool
+    note: Battery unhealthy
+  geofence_breached:
+    type: bool
+    unit: one or multiple
+    note: Geofence breached (one or multiple)
+  mission_failure:
+    type: bool
+    note: Mission failure
+  vtol_fixed_wing_system_failure:
+    type: bool
+    unit: after quad-chute
+    note: vehicle in fixed-wing system failure failsafe mode (after quad-chute)
+  wind_limit_exceeded:
+    type: bool
+    note: Wind limit exceeded
+  flight_time_limit_exceeded:
+    type: bool
+    note: Maximum flight time exceeded
+  local_position_accuracy_low:
+    type: bool
+    note: Local position estimate has dropped below threshold, but is currently still declared valid
+  fd_critical_failure:
+    type: bool
+    note: Critical failure (attitude/altitude limit exceeded, or external ATS)
+  fd_esc_arming_failure:
+    type: bool
+    note: ESC failed to arm
+  fd_imbalanced_prop:
+    type: bool
+    note: Imbalanced propeller detected
+  fd_motor_failure:
+    type: bool
+    note: Motor failure

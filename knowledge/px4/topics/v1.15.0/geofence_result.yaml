@@ -1,0 +1,19 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 GeofenceResult.msg 生成
+topic: geofence_result
+msg: GeofenceResult.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  geofence_max_dist_triggered:
+    type: bool
+    note: true the check for max distance from Home is triggered
+  geofence_max_alt_triggered:
+    type: bool
+    note: true the check for max altitude above Home is triggered
+  geofence_custom_fence_triggered:
+    type: bool
+    note: true the check for custom inclusion/exclusion geofence(s) is triggered
+  geofence_action:
+    type: uint8
+    note: action to take when the geofence is breached

@@ -1,0 +1,10 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 LateralControlConfiguration.msg 生成
+topic: lateral_control_configuration
+msg: LateralControlConfiguration.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  lateral_accel_max:
+    type: float32
+    note: "[m/s^2] Currently maps to a maximum roll angle, accel_max = tan(roll_max) * GRAVITY"

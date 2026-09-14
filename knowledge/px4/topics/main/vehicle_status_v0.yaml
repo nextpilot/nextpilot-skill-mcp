@@ -1,0 +1,173 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 VehicleStatusV0.msg 生成
+topic: vehicle_status_v0
+msg: VehicleStatusV0.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  armed_time:
+    type: uint64
+    unit: microseconds
+    note: Arming timestamp (microseconds)
+  takeoff_time:
+    type: uint64
+    unit: microseconds
+    note: Takeoff timestamp (microseconds)
+  arming_state:
+    type: uint8
+    values:
+      1: DISARMED
+      2: ARMED
+    kind: enum
+  latest_arming_reason:
+    type: uint8
+  latest_disarming_reason:
+    type: uint8
+  nav_state_timestamp:
+    type: uint64
+    note: time when current nav_state activated
+  nav_state_user_intention:
+    type: uint8
+    note: Mode that the user selected (might be different from nav_state in a failsafe situation)
+  nav_state:
+    type: uint8
+    note: Currently active mode
+    values:
+      0: MANUAL
+      1: ALTCTL
+      2: POSCTL
+      3: MISSION
+      4: LOITER
+      5: RTL
+      6: SLOW
+      7: FREE5
+      8: FREE4
+      9: FREE3
+      10: ACRO
+      11: FREE2
+      12: DESCEND
+      13: TERMINATION
+      14: OFFBOARD
+      15: STAB
+      16: FREE1
+      17: TAKEOFF
+      18: LAND
+      19: TARGET
+      20: PRECLAND
+      21: ORBIT
+      22: TAKEOFF
+      23: EXTERNAL1
+      24: EXTERNAL2
+      25: EXTERNAL3
+      26: EXTERNAL4
+      27: EXTERNAL5
+      28: EXTERNAL6
+      29: EXTERNAL7
+      30: EXTERNAL8
+      31: MAX
+    kind: enum
+  executor_in_charge:
+    type: uint8
+    note: Current mode executor in charge (0=Autopilot)
+  valid_nav_states_mask:
+    type: uint32
+    note: Bitmask for all valid nav_state values
+    kind: bitmask
+  can_set_nav_states_mask:
+    type: uint32
+    note: Bitmask for all modes that a user can select
+    kind: bitmask
+  failure_detector_status:
+    type: uint16
+  hil_state:
+    type: uint8
+    values:
+      0: "OFF"
+      1: "ON"
+    kind: enum
+  vehicle_type:
+    type: uint8
+    values:
+      0: UNKNOWN
+      1: WING
+      2: WING
+      3: ROVER
+      4: AIRSHIP
+    kind: enum
+  failsafe:
+    type: bool
+    note: "true if system is in failsafe state (e.g.:RTL, Hover, Terminate, ...)"
+  failsafe_and_user_took_over:
+    type: bool
+    note: true if system is in failsafe state but the user took over control
+  failsafe_defer_state:
+    type: uint8
+    note: one of FAILSAFE_DEFER_STATE_*
+    values:
+      0: DISABLED
+      1: ENABLED
+      2: FAILSAFE
+    kind: enum
+  gcs_connection_lost:
+    type: bool
+    note: datalink to GCS lost
+  gcs_connection_lost_counter:
+    type: uint8
+    note: counts unique GCS connection lost events
+  high_latency_data_link_lost:
+    type: bool
+    note: Set to true if the high latency data link (eg. RockBlock Iridium 9603 telemetry module) is lost
+  is_vtol:
+    type: bool
+    note: True if the system is VTOL capable
+  is_vtol_tailsitter:
+    type: bool
+    note: True if the system performs a 90° pitch down rotation during transition from MC to FW
+  in_transition_mode:
+    type: bool
+    note: True if VTOL is doing a transition
+  in_transition_to_fw:
+    type: bool
+    note: True if VTOL is doing a transition from MC to FW
+  system_type:
+    type: uint8
+    note: system type, contains mavlink MAV_TYPE
+  system_id:
+    type: uint8
+    note: system id, contains MAVLink's system ID field
+  component_id:
+    type: uint8
+    note: subsystem / component id, contains MAVLink's component ID field
+  safety_button_available:
+    type: bool
+    note: Set to true if a safety button is connected
+  safety_off:
+    type: bool
+    note: Set to true if safety is off
+  power_input_valid:
+    type: bool
+    note: set if input power is valid
+  usb_connected:
+    type: bool
+    note: set to true (never cleared) once telemetry received from usb link
+  open_drone_id_system_present:
+    type: bool
+  open_drone_id_system_healthy:
+    type: bool
+  parachute_system_present:
+    type: bool
+  parachute_system_healthy:
+    type: bool
+  avoidance_system_required:
+    type: bool
+    note: Set to true if avoidance system is enabled via COM_OBS_AVOID parameter
+  avoidance_system_valid:
+    type: bool
+    note: Status of the obstacle avoidance system
+  rc_calibration_in_progress:
+    type: bool
+  calibration_enabled:
+    type: bool
+  pre_flight_checks_pass:
+    type: bool
+    note: true if all checks necessary to arm pass

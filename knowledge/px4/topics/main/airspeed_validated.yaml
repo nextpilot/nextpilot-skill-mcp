@@ -1,0 +1,37 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 AirspeedValidated.msg 生成
+topic: airspeed_validated
+msg: AirspeedValidated.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  indicated_airspeed_m_s:
+    type: float32
+    unit: IAS
+    note: "[m/s] [@invalid NaN] Indicated airspeed (IAS)"
+  calibrated_airspeed_m_s:
+    type: float32
+    unit: CAS
+    note: "[m/s] [@invalid NaN] Calibrated airspeed (CAS)"
+  true_airspeed_m_s:
+    type: float32
+    unit: TAS
+    note: "[m/s] [@invalid NaN] True airspeed (TAS)"
+  airspeed_source:
+    type: int8
+    note: "[@enum SOURCE] Source of currently published airspeed values"
+  calibrated_ground_minus_wind_m_s:
+    type: float32
+    note: "[m/s] [@invalid NaN] CAS calculated from groundspeed - windspeed, where windspeed is estimated based on a zero-sideslip assumption"
+  calibraded_airspeed_synth_m_s:
+    type: float32
+    note: "[m/s] [@invalid NaN] Synthetic airspeed"
+  airspeed_derivative_filtered:
+    type: float32
+    note: "[m/s^2] Filtered indicated airspeed derivative"
+  throttle_filtered:
+    type: float32
+    note: "[-] Filtered fixed-wing throttle"
+  pitch_filtered:
+    type: float32
+    note: "[rad] Filtered pitch"

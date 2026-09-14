@@ -1,0 +1,10 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 FailureInjection.msg 生成
+topic: failure_injection
+msg: FailureInjection.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  count:
+    type: uint8
+    note: number of valid entries in the arrays below

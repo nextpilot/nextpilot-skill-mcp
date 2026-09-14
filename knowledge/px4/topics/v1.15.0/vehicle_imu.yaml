@@ -1,0 +1,34 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 VehicleImu.msg 生成
+topic: vehicle_imu
+msg: VehicleImu.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  timestamp_sample:
+    type: uint64
+    unit: us
+  accel_device_id:
+    type: uint32
+    note: Accelerometer unique device ID for the sensor that does not change between power cycles
+  gyro_device_id:
+    type: uint32
+    note: Gyroscope unique device ID for the sensor that does not change between power cycles
+  delta_angle_dt:
+    type: uint16
+    note: integration period in microseconds
+  delta_velocity_dt:
+    type: uint16
+    note: integration period in microseconds
+  delta_angle_clipping:
+    type: uint8
+    note: bitfield indicating if there was any gyro clipping (per axis) during the integration time frame
+  delta_velocity_clipping:
+    type: uint8
+    note: bitfield indicating if there was any accelerometer clipping (per axis) during the integration time frame
+  accel_calibration_count:
+    type: uint8
+    note: Calibration changed counter. Monotonically increases whenever accelermeter calibration changes.
+  gyro_calibration_count:
+    type: uint8
+    note: Calibration changed counter. Monotonically increases whenever rate gyro calibration changes.

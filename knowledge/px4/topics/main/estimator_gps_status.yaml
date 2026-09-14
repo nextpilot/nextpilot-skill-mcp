@@ -1,0 +1,58 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 EstimatorGpsStatus.msg 生成
+topic: estimator_gps_status
+msg: EstimatorGpsStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  timestamp_sample:
+    type: uint64
+    unit: us
+  checks_passed:
+    type: bool
+  check_fail_gps_fix:
+    type: bool
+    unit: no 3D solution
+    note: "0 : insufficient fix type (no 3D solution)"
+  check_fail_min_sat_count:
+    type: bool
+    note: "1 : minimum required sat count fail"
+  check_fail_max_pdop:
+    type: bool
+    note: "2 : maximum allowed PDOP fail"
+  check_fail_max_horz_err:
+    type: bool
+    note: "3 : maximum allowed horizontal position error fail"
+  check_fail_max_vert_err:
+    type: bool
+    note: "4 : maximum allowed vertical position error fail"
+  check_fail_max_spd_err:
+    type: bool
+    note: "5 : maximum allowed speed error fail"
+  check_fail_max_horz_drift:
+    type: bool
+    note: "6 : maximum allowed horizontal position drift fail - requires stationary vehicle"
+  check_fail_max_vert_drift:
+    type: bool
+    note: "7 : maximum allowed vertical position drift fail - requires stationary vehicle"
+  check_fail_max_horz_spd_err:
+    type: bool
+    note: "8 : maximum allowed horizontal speed fail - requires stationary vehicle"
+  check_fail_max_vert_spd_err:
+    type: bool
+    note: "9 : maximum allowed vertical velocity discrepancy fail"
+  check_fail_spoofed_gps:
+    type: bool
+    note: "10 : GPS signal is spoofed"
+  position_drift_rate_horizontal_m_s:
+    type: float32
+    unit: m/s
+    note: Horizontal position rate magnitude (m/s)
+  position_drift_rate_vertical_m_s:
+    type: float32
+    unit: m/s
+    note: Vertical position rate magnitude (m/s)
+  filtered_horizontal_speed_m_s:
+    type: float32
+    unit: m/s
+    note: Filtered horizontal velocity magnitude (m/s)

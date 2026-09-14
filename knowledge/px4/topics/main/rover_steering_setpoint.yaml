@@ -1,0 +1,10 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 RoverSteeringSetpoint.msg 生成
+topic: rover_steering_setpoint
+msg: RoverSteeringSetpoint.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  normalized_steering_setpoint:
+    type: float32
+    note: "[-] [@range -1 (Left), 1 (Right)] [@frame Body] Ackermann: Normalized steering angle, Differential/Mecanum: Normalized speed difference between the left and right wheels"

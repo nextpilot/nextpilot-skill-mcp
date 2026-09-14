@@ -1,0 +1,29 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 RegisterExtComponentReply.msg 生成
+topic: register_ext_component_reply
+msg: RegisterExtComponentReply.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  request_id:
+    type: uint64
+    note: ID from the request
+  px4_ros2_api_version:
+    type: uint16
+  success:
+    type: bool
+  arming_check_id:
+    type: int8
+    unit: "-1 if invalid"
+    note: arming check registration ID (-1 if invalid)
+  mode_id:
+    type: int8
+    unit: "-1 if invalid"
+    note: assigned mode ID (-1 if invalid)
+  mode_executor_id:
+    type: int8
+    unit: "-1 if invalid"
+    note: assigned mode executor ID (-1 if invalid)
+  not_user_selectable:
+    type: bool
+    note: mode cannot be selected by the user

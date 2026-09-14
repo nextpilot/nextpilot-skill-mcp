@@ -1,0 +1,16 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 DebugVect.msg 生成
+topic: debug_vect
+msg: DebugVect.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  x:
+    type: float32
+    note: x value
+  y:
+    type: float32
+    note: y value
+  z:
+    type: float32
+    note: z value

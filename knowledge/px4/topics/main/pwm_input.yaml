@@ -1,0 +1,19 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 PwmInput.msg 生成
+topic: pwm_input
+msg: PwmInput.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  error_count:
+    type: uint64
+    unit: AUX5 or MAIN5
+    note: Timer overcapture error flag (AUX5 or MAIN5)
+  pulse_width:
+    type: uint32
+    unit: microseconds
+    note: Pulse width, timer counts (microseconds)
+  period:
+    type: uint32
+    unit: microseconds
+    note: Period, timer counts (microseconds)

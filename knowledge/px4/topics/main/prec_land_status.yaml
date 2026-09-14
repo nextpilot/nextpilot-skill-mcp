@@ -1,0 +1,10 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 PrecLandStatus.msg 生成
+topic: prec_land_status
+msg: PrecLandStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  state:
+    type: uint8
+    note: "[@enum PREC_LAND_STATE] Current precision-landing state"

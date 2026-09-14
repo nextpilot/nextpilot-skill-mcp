@@ -1,0 +1,79 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 CellularStatus.msg 生成
+topic: cellular_status
+msg: CellularStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  status:
+    type: uint8
+    note: "[@enum STATUS_FLAG] Status"
+    values:
+      0: UNKNOWN
+      1: FAILED
+      2: INITIALIZING
+      3: LOCKED
+      4: DISABLED
+      5: DISABLING
+      6: ENABLING
+      7: ENABLED
+      8: SEARCHING
+      9: REGISTERED
+      10: DISCONNECTING
+      11: CONNECTING
+      12: CONNECTED
+    kind: enum
+  failure_reason:
+    type: uint8
+    note: "[@enum FAILURE_REASON] Failure reason"
+    values:
+      0: NONE
+      1: UNKNOWN
+      2: MISSING
+      3: ERROR
+    kind: enum
+  type:
+    type: uint8
+    note: "[@enum CELLULAR_NETWORK_RADIO_TYPE] Cellular network radio type"
+  quality:
+    type: uint8
+    note: "[%] [@invalid UINT8_MAX] Cellular network signal quality in percent. May be used for RSSI"
+  mcc:
+    type: uint16
+    note: "[@invalid UINT16_MAX] Mobile country code"
+  mnc:
+    type: uint16
+    note: "[@invalid UINT16_MAX] Mobile network code"
+  lac:
+    type: uint16
+    note: "[@invalid 0] Location area code"
+  id:
+    type: uint8
+    note: "[-] Cellular instance number. Indexed from 1. A value of 0 indicates the sender does not support reporting of multiple modems"
+  link_tx_rate:
+    type: uint32
+    note: "[KiB/s] [@invalid 0] Download rate"
+  link_rx_rate:
+    type: uint32
+    note: "[KiB/s] [@invalid 0] Upload rate"
+  band_number:
+    type: uint8
+    note: "[-] [@invalid 0] LTE frequency band number"
+  band_frequency:
+    type: float32
+    note: "[MHz] [@invalid 0] LTE radio frequency"
+  channel_number:
+    type: uint32
+    note: "[@invalid 0] Channel Number (CN), Absolute radio-frequency (ARFCN) / E-UTRA (EARFCN) / UTRA (UARFCN) / New radio (NR_CH)"
+  rx_level:
+    type: float32
+    note: "[dBm] [@invalid 0] Receiver signal level. On 3G is Received Signal Code Power (RSCP). On LTE Reference Signal Received Power (RSRP). On 5G is New Radio Reference Signal Received Power (NR_RSRP)"
+  tx_level:
+    type: float32
+    note: "[dBm] [@invalid 0] Transmitter signal absolute level"
+  rx_quality:
+    type: float32
+    note: "[dBm] [@invalid 0] Received signal quality. On 3G is Receiver Quality (RxQual). On LTE is Reference Signal Received Quality (RSRQ). On 5G is New Radio Reference Signal Received Quality (NR_RSRQ)"
+  sinr:
+    type: float32
+    note: "[dB] [@invalid 0] Signal to Interference plus Noise Ratio"

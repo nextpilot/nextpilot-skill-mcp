@@ -1,0 +1,7 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 ActuatorServosTrim.msg 生成
+topic: actuator_servos_trim
+msg: ActuatorServosTrim.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us

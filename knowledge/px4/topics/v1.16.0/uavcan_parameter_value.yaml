@@ -1,0 +1,25 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 UavcanParameterValue.msg 生成
+topic: uavcan_parameter_value
+msg: UavcanParameterValue.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  node_id:
+    type: uint8
+    note: UAVCAN node ID mapped from MAVLink component ID
+  param_index:
+    type: int16
+    note: parameter index, if known
+  param_count:
+    type: uint16
+    note: number of parameters exposed by the node
+  param_type:
+    type: uint8
+    note: MAVLink parameter type
+  int_value:
+    type: int64
+    note: current value if param_type is int-like
+  real_value:
+    type: float32
+    note: current value if param_type is float-like

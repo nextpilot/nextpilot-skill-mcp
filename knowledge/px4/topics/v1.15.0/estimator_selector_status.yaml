@@ -1,0 +1,27 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 EstimatorSelectorStatus.msg 生成
+topic: estimator_selector_status
+msg: EstimatorSelectorStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  primary_instance:
+    type: uint8
+  instances_available:
+    type: uint8
+  instance_changed_count:
+    type: uint32
+  last_instance_change:
+    type: uint64
+  accel_device_id:
+    type: uint32
+  baro_device_id:
+    type: uint32
+  gyro_device_id:
+    type: uint32
+  mag_device_id:
+    type: uint32
+  gyro_fault_detected:
+    type: bool
+  accel_fault_detected:
+    type: bool

@@ -1,0 +1,29 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 VehicleCommandAck.msg 生成
+topic: vehicle_command_ack
+msg: VehicleCommandAck.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  command:
+    type: uint32
+    note: "[-] Command that is being acknowledged"
+  result:
+    type: uint8
+    note: "[@enum VEHICLE_CMD_RESULT] Command result"
+  result_param1:
+    type: uint8
+    unit: "%"
+    note: "[-] Can be set with the reason why the command was denied, or the progress percentage when result is MAV_RESULT_IN_PROGRESS (%)"
+  result_param2:
+    type: int32
+    note: "[enum ARM_AUTH_DENIED_REASON] Additional parameter of the result, example: which parameter of MAV_CMD_NAV_WAYPOINT caused it to be denied, or what ARM_AUTH_DENIED_REASON"
+  target_system:
+    type: uint8
+    note: "[-] Target system"
+  target_component:
+    type: uint16
+    note: Target component / mode executor
+  from_external:
+    type: bool
+    note: Indicates if the command came from an external source

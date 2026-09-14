@@ -1,0 +1,21 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 CollisionReport.msg 生成
+topic: collision_report
+msg: CollisionReport.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  src:
+    type: uint8
+  id:
+    type: uint32
+  action:
+    type: uint8
+  threat_level:
+    type: uint8
+  time_to_minimum_delta:
+    type: float32
+  altitude_minimum_delta:
+    type: float32
+  horizontal_minimum_delta:
+    type: float32

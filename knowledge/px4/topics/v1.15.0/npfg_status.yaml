@@ -1,0 +1,53 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 NpfgStatus.msg 生成
+topic: npfg_status
+msg: NpfgStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  wind_est_valid:
+    type: uint8
+    unit: also indicates if wind est usage is disabled despite being valid
+    note: (boolean) true = wind estimate is valid and/or being used by controller (also indicates if wind est usage is disabled despite being valid)
+  lat_accel:
+    type: float32
+    note: resultant lateral acceleration reference [m/s^2]
+  lat_accel_ff:
+    type: float32
+    note: lateral acceleration demand only for maintaining curvature [m/s^2]
+  bearing_feas:
+    type: float32
+    note: bearing feasibility [0,1]
+  bearing_feas_on_track:
+    type: float32
+    note: on-track bearing feasibility [0,1]
+  signed_track_error:
+    type: float32
+    note: signed track error [m]
+  track_error_bound:
+    type: float32
+    note: track error bound [m]
+  airspeed_ref:
+    type: float32
+    note: (true) airspeed reference [m/s]
+  bearing:
+    type: float32
+    note: bearing angle [rad]
+  heading_ref:
+    type: float32
+    note: heading angle reference [rad]
+  min_ground_speed_ref:
+    type: float32
+    note: minimum forward ground speed reference [m/s]
+  adapted_period:
+    type: float32
+    note: adapted period (if auto-tuning enabled) [s]
+  p_gain:
+    type: float32
+    note: controller proportional gain [rad/s]
+  time_const:
+    type: float32
+    note: controller time constant [s]
+  can_run_factor:
+    type: float32
+    note: estimate of certainty of the correct functionality of the npfg roll setpoint in [0, 1]

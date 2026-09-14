@@ -1,0 +1,16 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 FlightPhaseEstimation.msg 生成
+topic: flight_phase_estimation
+msg: FlightPhaseEstimation.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  flight_phase:
+    type: uint8
+    note: Estimate of current flight phase
+    values:
+      0: UNKNOWN
+      1: LEVEL
+      2: DESCEND
+      3: CLIMB
+    kind: enum

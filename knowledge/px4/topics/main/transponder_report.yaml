@@ -1,0 +1,44 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 TransponderReport.msg 生成
+topic: transponder_report
+msg: TransponderReport.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  icao_address:
+    type: uint32
+    note: "[-] ICAO address"
+  lat:
+    type: float64
+    note: "[deg] Latitude, validity flag: PX4_ADSB_FLAGS_VALID_COORDS"
+  lon:
+    type: float64
+    note: "[deg] Longitude, validity flag: PX4_ADSB_FLAGS_VALID_COORDS"
+  altitude_type:
+    type: uint8
+    note: Type from ADSB_ALTITUDE_TYPE enum
+  altitude:
+    type: float32
+    note: "[m] Altitude (ASL), validity flag: PX4_ADSB_FLAGS_VALID_ALTITUDE"
+  heading:
+    type: float32
+    note: "[rad] Course over ground, 0 to 2pi, 0 is north, validity flag: PX4_ADSB_FLAGS_VALID_HEADING"
+  hor_velocity:
+    type: float32
+    note: "[m/s] Horizontal velocity, validity flag: PX4_ADSB_FLAGS_VALID_VELOCITY"
+  ver_velocity:
+    type: float32
+    note: "[m/s] Vertical velocity, positive is up, validity flag: PX4_ADSB_FLAGS_VALID_VELOCITY"
+  emitter_type:
+    type: uint8
+    note: "[@enum ADSB_EMITTER_TYPE] Type matching MAVLink's ADSB_EMITTER_TYPE enum"
+  tslc:
+    type: uint8
+    note: "[s] Time since last communication"
+  flags:
+    type: uint16
+    note: "[@enum PX4_ADSB_FLAGS] Flags matching MAVLink's ADSB_FLAGS bitmask"
+    kind: bitmask
+  squawk:
+    type: uint16
+    note: "[-] Squawk code, validity flag: PX4_ADSB_FLAGS_VALID_SQUAWK"

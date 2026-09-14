@@ -1,0 +1,10 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 DistanceSensorModeChangeRequest.msg 生成
+topic: distance_sensor_mode_change_request
+msg: DistanceSensorModeChangeRequest.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  request_on_off:
+    type: uint8
+    note: request to disable/enable the distance sensor

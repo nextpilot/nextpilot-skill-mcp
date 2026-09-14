@@ -1,0 +1,126 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 EstimatorStatus.msg 生成
+topic: estimator_status
+msg: EstimatorStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  timestamp_sample:
+    type: uint64
+    unit: us
+  gps_check_fail_flags:
+    type: uint16
+    note: Bitmask to indicate status of GPS checks - see definition below
+    kind: bitmask
+    values:
+      0: FIX
+      1: COUNT
+      2: PDOP
+      3: ERR
+      4: ERR
+      5: ERR
+      6: DRIFT
+      7: DRIFT
+      8: ERR
+      9: ERR
+      10: SPOOFED
+  control_mode_flags:
+    type: uint64
+    note: Bitmask to indicate EKF logic state
+    kind: bitmask
+  filter_fault_flags:
+    type: uint32
+    note: Bitmask to indicate EKF internal faults
+    kind: bitmask
+  pos_horiz_accuracy:
+    type: float32
+    unit: m
+    note: 1-Sigma estimated horizontal position accuracy relative to the estimators origin (m)
+  pos_vert_accuracy:
+    type: float32
+    unit: m
+    note: 1-Sigma estimated vertical position accuracy relative to the estimators origin (m)
+  hdg_test_ratio:
+    type: float32
+    note: low-pass filtered ratio of the largest heading innovation component to the innovation test limit
+  vel_test_ratio:
+    type: float32
+    note: low-pass filtered ratio of the largest velocity innovation component to the innovation test limit
+  pos_test_ratio:
+    type: float32
+    note: low-pass filtered ratio of the largest horizontal position innovation component to the innovation test limit
+  hgt_test_ratio:
+    type: float32
+    note: low-pass filtered ratio of the vertical position innovation to the innovation test limit
+  tas_test_ratio:
+    type: float32
+    note: low-pass filtered ratio of the true airspeed innovation to the innovation test limit
+  hagl_test_ratio:
+    type: float32
+    note: low-pass filtered ratio of the height above ground innovation to the innovation test limit
+  beta_test_ratio:
+    type: float32
+    note: low-pass filtered ratio of the synthetic sideslip innovation to the innovation test limit
+  solution_status_flags:
+    type: uint16
+    note: Bitmask indicating which filter kinematic state outputs are valid for flight control use.
+    kind: bitmask
+  reset_count_vel_ne:
+    type: uint8
+    unit: allow to wrap if count exceeds 255
+    note: number of horizontal position reset events (allow to wrap if count exceeds 255)
+  reset_count_vel_d:
+    type: uint8
+    unit: allow to wrap if count exceeds 255
+    note: number of vertical velocity reset events (allow to wrap if count exceeds 255)
+  reset_count_pos_ne:
+    type: uint8
+    unit: allow to wrap if count exceeds 255
+    note: number of horizontal position reset events (allow to wrap if count exceeds 255)
+  reset_count_pod_d:
+    type: uint8
+    unit: allow to wrap if count exceeds 255
+    note: number of vertical position reset events (allow to wrap if count exceeds 255)
+  reset_count_quat:
+    type: uint8
+    unit: allow to wrap if count exceeds 255
+    note: number of quaternion reset events (allow to wrap if count exceeds 255)
+  time_slip:
+    type: float32
+    note: cumulative amount of time in seconds that the EKF inertial calculation has slipped relative to system time
+  pre_flt_fail_innov_heading:
+    type: bool
+  pre_flt_fail_innov_height:
+    type: bool
+  pre_flt_fail_innov_pos_horiz:
+    type: bool
+  pre_flt_fail_innov_vel_horiz:
+    type: bool
+  pre_flt_fail_innov_vel_vert:
+    type: bool
+  pre_flt_fail_mag_field_disturbed:
+    type: bool
+  accel_device_id:
+    type: uint32
+  gyro_device_id:
+    type: uint32
+  baro_device_id:
+    type: uint32
+  mag_device_id:
+    type: uint32
+  health_flags:
+    type: uint8
+    note: Bitmask to indicate sensor health states (vel, pos, hgt)
+    kind: bitmask
+  timeout_flags:
+    type: uint8
+    note: Bitmask to indicate timeout flags (vel, pos, hgt)
+    kind: bitmask
+  mag_inclination_deg:
+    type: float32
+  mag_inclination_ref_deg:
+    type: float32
+  mag_strength_gs:
+    type: float32
+  mag_strength_ref_gs:
+    type: float32

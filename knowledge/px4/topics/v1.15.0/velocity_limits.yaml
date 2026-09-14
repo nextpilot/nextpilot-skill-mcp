@@ -1,0 +1,16 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 VelocityLimits.msg 生成
+topic: velocity_limits
+msg: VelocityLimits.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  horizontal_velocity:
+    type: float32
+    note: "[m/s]"
+  vertical_velocity:
+    type: float32
+    note: "[m/s]"
+  yaw_rate:
+    type: float32
+    note: "[rad/s]"

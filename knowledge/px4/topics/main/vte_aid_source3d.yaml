@@ -1,0 +1,20 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 VteAidSource3d.msg 生成
+topic: vte_aid_source3d
+msg: VteAidSource3d.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  timestamp_sample:
+    type: uint64
+    unit: us
+  time_last_predict:
+    type: uint64
+    note: "[us] Timestamp of last filter prediction"
+  time_since_meas_ms:
+    type: float32
+    note: "[ms] (now - timestamp_sample)"
+  history_steps:
+    type: uint8
+    unit: 0 if current or failed
+    note: "[-] Number of steps replayed in OOSM (0 if current or failed)"

@@ -1,0 +1,19 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 FixedWingRunwayControl.msg 生成
+topic: fixed_wing_runway_control
+msg: FixedWingRunwayControl.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  runway_takeoff_state:
+    type: uint8
+    note: Current state of runway takeoff state machine
+  wheel_steering_enabled:
+    type: bool
+    note: Flag that enables the wheel steering.
+  wheel_steering_yaw_setpoint:
+    type: float32
+    note: "[rad] [@range -pi, pi] For the wheel controller to track. NAN means hold the heading captured when steering engaged."
+  wheel_steering_nudging_rate:
+    type: float32
+    note: "[norm] [@range -1, 1] [FRD] Manual wheel nudging, added to controller output. NAN is interpreted as 0."

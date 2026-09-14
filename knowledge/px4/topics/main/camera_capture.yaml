@@ -1,0 +1,35 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 CameraCapture.msg 生成
+topic: camera_capture
+msg: CameraCapture.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  timestamp_utc:
+    type: uint64
+    note: Capture time in UTC / GPS time
+  seq:
+    type: uint32
+    note: Image sequence number
+  lat:
+    type: float64
+    unit: WGS84
+    note: Latitude in degrees (WGS84)
+  lon:
+    type: float64
+    unit: WGS84
+    note: Longitude in degrees (WGS84)
+  alt:
+    type: float32
+    unit: AMSL
+    note: Altitude (AMSL)
+  ground_distance:
+    type: float32
+    unit: meters
+    note: Altitude above ground (meters)
+  result:
+    type: int8
+    note: 1 for success, 0 for failure, -1 if camera does not provide feedback
+  report:
+    type: bool
+    note: Report this capture to the ground station (CAMERA_IMAGE_CAPTURED); it is always logged regardless

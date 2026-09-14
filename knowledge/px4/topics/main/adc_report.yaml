@@ -1,0 +1,16 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 AdcReport.msg 生成
+topic: adc_report
+msg: AdcReport.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  device_id:
+    type: uint32
+    note: "[-] unique device ID for the sensor that does not change between power cycles"
+  resolution:
+    type: uint32
+    note: "[-] ADC channel resolution"
+  v_ref:
+    type: float32
+    note: "[V] ADC channel voltage reference, use to calculate LSB voltage(lsb=scale/resolution)"

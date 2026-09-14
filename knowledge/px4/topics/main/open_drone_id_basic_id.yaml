@@ -1,0 +1,14 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 OpenDroneIdBasicId.msg 生成
+topic: open_drone_id_basic_id
+msg: OpenDroneIdBasicId.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  id_type:
+    type: uint8
+    note: "MAV_ODID_ID_TYPE: indicates the format for the uas_id field"
+  ua_type:
+    type: uint8
+    unit: Unmanned Aircraft
+    note: "MAV_ODID_UA_TYPE: indicates the type of UA (Unmanned Aircraft)"

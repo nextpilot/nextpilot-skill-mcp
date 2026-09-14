@@ -1,0 +1,9 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 OpenDroneIdOperatorId.msg 生成
+topic: open_drone_id_operator_id
+msg: OpenDroneIdOperatorId.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  operator_id_type:
+    type: uint8

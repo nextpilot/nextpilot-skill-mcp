@@ -1,0 +1,116 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 TelemetryStatus.msg 生成
+topic: telemetry_status
+msg: TelemetryStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  type:
+    type: uint8
+    note: type of the radio hardware (LINK_TYPE_*)
+  mode:
+    type: uint8
+  flow_control:
+    type: bool
+  forwarding:
+    type: bool
+  mavlink_v2:
+    type: bool
+  ftp:
+    type: bool
+  streams:
+    type: uint8
+  data_rate:
+    type: float32
+    unit: Bytes/s
+    note: configured maximum data rate (Bytes/s)
+  rate_multiplier:
+    type: float32
+  tx_rate_avg:
+    type: float32
+    unit: Bytes/s
+    note: transmit rate average (Bytes/s)
+  tx_error_rate_avg:
+    type: float32
+    unit: Bytes/s
+    note: transmit error rate average (Bytes/s)
+  tx_message_count:
+    type: uint32
+    note: total message sent count
+  tx_buffer_overruns:
+    type: uint32
+    note: number of TX buffer overruns
+  rx_rate_avg:
+    type: float32
+    unit: Bytes/s
+    note: transmit rate average (Bytes/s)
+  rx_message_count:
+    type: uint32
+    note: count of total messages received
+  rx_message_lost_count:
+    type: uint32
+  rx_buffer_overruns:
+    type: uint32
+    note: number of RX buffer overruns
+  rx_parse_errors:
+    type: uint32
+    note: number of parse errors
+  rx_packet_drop_count:
+    type: uint32
+    note: number of packet drops
+  rx_message_lost_rate:
+    type: float32
+  heartbeat_type_antenna_tracker:
+    type: bool
+    note: MAV_TYPE_ANTENNA_TRACKER
+  heartbeat_type_gcs:
+    type: bool
+    note: MAV_TYPE_GCS
+  heartbeat_type_onboard_controller:
+    type: bool
+    note: MAV_TYPE_ONBOARD_CONTROLLER
+  heartbeat_type_gimbal:
+    type: bool
+    note: MAV_TYPE_GIMBAL
+  heartbeat_type_adsb:
+    type: bool
+    note: MAV_TYPE_ADSB
+  heartbeat_type_camera:
+    type: bool
+    note: MAV_TYPE_CAMERA
+  heartbeat_type_parachute:
+    type: bool
+    note: MAV_TYPE_PARACHUTE
+  heartbeat_type_open_drone_id:
+    type: bool
+    note: MAV_TYPE_ODID
+  heartbeat_component_telemetry_radio:
+    type: bool
+    note: MAV_COMP_ID_TELEMETRY_RADIO
+  heartbeat_component_log:
+    type: bool
+    note: MAV_COMP_ID_LOG
+  heartbeat_component_osd:
+    type: bool
+    note: MAV_COMP_ID_OSD
+  heartbeat_component_obstacle_avoidance:
+    type: bool
+    note: MAV_COMP_ID_OBSTACLE_AVOIDANCE
+  heartbeat_component_vio:
+    type: bool
+    note: MAV_COMP_ID_VISUAL_INERTIAL_ODOMETRY
+  heartbeat_component_pairing_manager:
+    type: bool
+    note: MAV_COMP_ID_PAIRING_MANAGER
+  heartbeat_component_udp_bridge:
+    type: bool
+    note: MAV_COMP_ID_UDP_BRIDGE
+  heartbeat_component_uart_bridge:
+    type: bool
+    note: MAV_COMP_ID_UART_BRIDGE
+  avoidance_system_healthy:
+    type: bool
+  open_drone_id_system_healthy:
+    type: bool
+  parachute_system_healthy:
+    type: bool

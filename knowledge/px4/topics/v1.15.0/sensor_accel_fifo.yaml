@@ -1,0 +1,22 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 SensorAccelFifo.msg 生成
+topic: sensor_accel_fifo
+msg: SensorAccelFifo.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  timestamp_sample:
+    type: uint64
+    unit: us
+  device_id:
+    type: uint32
+    note: unique device ID for the sensor that does not change between power cycles
+  dt:
+    type: float32
+    unit: microseconds
+    note: delta time between samples (microseconds)
+  scale:
+    type: float32
+  samples:
+    type: uint8
+    note: number of valid samples

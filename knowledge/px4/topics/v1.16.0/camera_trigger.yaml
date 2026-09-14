@@ -1,0 +1,16 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 CameraTrigger.msg 生成
+topic: camera_trigger
+msg: CameraTrigger.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  timestamp_utc:
+    type: uint64
+    note: UTC timestamp
+  seq:
+    type: uint32
+    note: Image sequence number
+  feedback:
+    type: bool
+    note: Trigger feedback from camera

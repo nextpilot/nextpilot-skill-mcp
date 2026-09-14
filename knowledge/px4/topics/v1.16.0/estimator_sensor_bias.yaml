@@ -1,0 +1,46 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 EstimatorSensorBias.msg 生成
+topic: estimator_sensor_bias
+msg: EstimatorSensorBias.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  timestamp_sample:
+    type: uint64
+    unit: us
+  gyro_device_id:
+    type: uint32
+    note: unique device ID for the sensor that does not change between power cycles
+  gyro_bias_limit:
+    type: float32
+    unit: rad/s
+    note: magnitude of maximum gyroscope in-run bias in body frame (rad/s)
+  gyro_bias_valid:
+    type: bool
+  gyro_bias_stable:
+    type: bool
+    note: true when the gyro bias estimate is stable enough to use for calibration
+  accel_device_id:
+    type: uint32
+    note: unique device ID for the sensor that does not change between power cycles
+  accel_bias_limit:
+    type: float32
+    unit: m/s^2
+    note: magnitude of maximum accelerometer in-run bias in body frame (m/s^2)
+  accel_bias_valid:
+    type: bool
+  accel_bias_stable:
+    type: bool
+    note: true when the accel bias estimate is stable enough to use for calibration
+  mag_device_id:
+    type: uint32
+    note: unique device ID for the sensor that does not change between power cycles
+  mag_bias_limit:
+    type: float32
+    unit: Gauss
+    note: magnitude of maximum magnetometer in-run bias in body frame (Gauss)
+  mag_bias_valid:
+    type: bool
+  mag_bias_stable:
+    type: bool
+    note: true when the mag bias estimate is stable enough to use for calibration

@@ -1,0 +1,10 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 ActuatorOutputs.msg 生成
+topic: actuator_outputs
+msg: ActuatorOutputs.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  noutputs:
+    type: uint32
+    note: valid outputs

@@ -1,0 +1,45 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 AuxGlobalPosition.msg 生成
+topic: aux_global_position
+msg: AuxGlobalPosition.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  timestamp_sample:
+    type: uint64
+    unit: us
+  id:
+    type: uint8
+    note: "[-] Unique identifier for the AGP source"
+  source:
+    type: uint8
+    note: "[@enum SOURCE] Source type of the position data (based on mavlink::GLOBAL_POSITION_SRC)"
+    values:
+      0: UNKNOWN
+      1: GNSS
+      2: VISION
+      3: PSEUDOLITES
+      4: TERRAIN
+      5: MAGNETIC
+      6: ESTIMATOR
+      7: LEO
+    kind: enum
+  lat:
+    type: float64
+    note: "[deg] Latitude in WGS84"
+  lon:
+    type: float64
+    note: "[deg] Longitude in WGS84"
+  alt:
+    type: float32
+    unit: AMSL
+    note: "[m] [@invalid NaN] Altitude above mean sea level (AMSL)"
+  eph:
+    type: float32
+    note: "[m] [@invalid NaN] Std dev of horizontal position, lower bounded by NOISE param"
+  epv:
+    type: float32
+    note: "[m] [@invalid NaN] Std dev of vertical position, lower bounded by NOISE param"
+  lat_lon_reset_counter:
+    type: uint8
+    note: "[-] Counter for reset events on horizontal position coordinates"

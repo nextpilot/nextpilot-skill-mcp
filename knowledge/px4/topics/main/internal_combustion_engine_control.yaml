@@ -1,0 +1,23 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 InternalCombustionEngineControl.msg 生成
+topic: internal_combustion_engine_control
+msg: InternalCombustionEngineControl.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  ignition_on:
+    type: bool
+    unit: spark plug
+    note: activate/deactivate ignition (spark plug)
+  throttle_control:
+    type: float32
+    note: setpoint for throttle actuator, with slew rate if enabled, idles with 0 [norm] [@range 0,1] [@uncontrolled NAN to stop motor]
+  choke_control:
+    type: float32
+    note: "setpoint for choke actuator, 1: fully closed [norm] [@range 0,1]"
+  starter_engine_control:
+    type: float32
+    note: setpoint for (electric) starter motor [norm] [@range 0,1]
+  user_request:
+    type: uint8
+    note: user intent for the ICE being on/off

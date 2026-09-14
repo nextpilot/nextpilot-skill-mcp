@@ -1,0 +1,28 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 SensorCombined.msg 生成
+topic: sensor_combined
+msg: SensorCombined.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  gyro_integral_dt:
+    type: uint32
+    note: gyro measurement sampling period in microseconds
+  accelerometer_timestamp_relative:
+    type: int32
+    note: timestamp + accelerometer_timestamp_relative = Accelerometer timestamp
+  accelerometer_integral_dt:
+    type: uint32
+    note: accelerometer measurement sampling period in microseconds
+  accelerometer_clipping:
+    type: uint8
+    note: bitfield indicating if there was any accelerometer clipping (per axis) during the integration time frame
+  gyro_clipping:
+    type: uint8
+    note: bitfield indicating if there was any gyro clipping (per axis) during the integration time frame
+  accel_calibration_count:
+    type: uint8
+    note: Calibration changed counter. Monotonically increases whenever accelermeter calibration changes.
+  gyro_calibration_count:
+    type: uint8
+    note: Calibration changed counter. Monotonically increases whenever rate gyro calibration changes.

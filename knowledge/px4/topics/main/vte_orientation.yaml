@@ -1,0 +1,22 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 VteOrientation.msg 生成
+topic: vte_orientation
+msg: VteOrientation.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  orientation_valid:
+    type: bool
+    note: "[-] Relative orientation estimate valid"
+  yaw:
+    type: float32
+    note: "[rad] [@frame NED] Target yaw angle"
+  cov_yaw:
+    type: float32
+    note: "[rad^2] Variance of yaw"
+  yaw_rate:
+    type: float32
+    note: "[rad/s] [@frame NED] Target yaw rate"
+  cov_yaw_rate:
+    type: float32
+    note: "[(rad/s)^2] Variance of yaw_rate"

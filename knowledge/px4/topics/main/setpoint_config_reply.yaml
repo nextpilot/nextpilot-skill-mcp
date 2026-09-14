@@ -1,0 +1,30 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 SetpointConfigReply.msg 生成
+topic: setpoint_config_reply
+msg: SetpointConfigReply.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  type:
+    type: uint16
+    note: "See SetpointConfig::TYPE_*"
+  source_id:
+    type: uint8
+    note: nav_state of the mode that sent the SetpointConfig
+  result:
+    type: uint8
+    note: "[@enum RESULT]"
+    values:
+      0: SUCCESS
+      1: OTHER
+      2: UNSUPPORTED
+      3: TYPE
+    kind: enum
+  mode_req_angular_velocity:
+    type: bool
+  mode_req_attitude:
+    type: bool
+  mode_req_local_alt:
+    type: bool
+  mode_req_local_position:
+    type: bool

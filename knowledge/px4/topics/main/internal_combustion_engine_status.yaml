@@ -1,0 +1,92 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 InternalCombustionEngineStatus.msg 生成
+topic: internal_combustion_engine_status
+msg: InternalCombustionEngineStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  state:
+    type: uint8
+    note: "[@enum STATE] Engine state"
+    values:
+      0: STOPPED
+      1: STARTING
+      2: RUNNING
+      3: FAULT
+    kind: enum
+  substate:
+    type: uint8
+    note: "[@enum SUBSTATE] Engine substate"
+    values:
+      0: RUN
+      1: IDLE
+      2: REST
+    kind: enum
+  flags:
+    type: uint32
+    note: "[@enum FLAG] Engine status flags bitmap"
+  engine_load_percent:
+    type: uint8
+    note: "[%] [@range 0, 127] Engine load estimate"
+  engine_speed_rpm:
+    type: uint32
+    note: "[rpm] [@range 0, inf] Engine speed"
+  spark_dwell_time_ms:
+    type: float32
+    note: "[ms] [@range 0, inf] Spark dwell time"
+  atmospheric_pressure_kpa:
+    type: float32
+    note: "[kPa] [@range 0, inf] Atmospheric (barometric) pressure"
+  intake_manifold_pressure_kpa:
+    type: float32
+    note: "[kPa] [@range 0, inf] Engine intake manifold pressure"
+  intake_manifold_temperature:
+    type: float32
+    note: "[K] [@range 0, inf] Engine intake manifold temperature"
+  coolant_temperature:
+    type: float32
+    note: "[K] [@range 0, inf] Engine coolant temperature"
+  oil_pressure:
+    type: float32
+    note: "[kPa] [@range 0, inf] Oil pressure"
+  oil_temperature:
+    type: float32
+    note: "[K] [@range 0, inf] Oil temperature"
+  fuel_pressure:
+    type: float32
+    note: "[kPa] [@range 0, inf] Fuel pressure"
+  fuel_consumption_rate_cm3pm:
+    type: float32
+    note: "[cm^3/min] [@range 0, inf] Instant fuel consumption estimate"
+  estimated_consumed_fuel_volume_cm3:
+    type: float32
+    note: "[cm^3] [@range 0, inf] Estimate of the consumed fuel since the start of the engine"
+  throttle_position_percent:
+    type: uint8
+    note: "[%] [@range 0, 100] Throttle position"
+  ecu_index:
+    type: uint8
+    note: "[-] [@range 0, 255] The index of the publishing ECU"
+  spark_plug_usage:
+    type: uint8
+    note: "[@enum SPARK_PLUG] Spark plug activity report"
+  ignition_timing_deg:
+    type: float32
+    note: "[deg] [@range -inf, inf] Cylinder ignition timing, angular degrees of the crankshaft"
+  injection_time_ms:
+    type: float32
+    note: "[ms] [@range 0, inf] Fuel injection time"
+  cylinder_head_temperature:
+    type: float32
+    unit: CHT
+    note: "[K] [@range 0, inf] Cylinder head temperature (CHT)"
+  exhaust_gas_temperature:
+    type: float32
+    unit: EGT
+    note: "[K] [@range 0, inf] Exhaust gas temperature (EGT)"
+  lambda_coefficient:
+    type: float32
+    note: "[-] [@range 0, inf] Estimated lambda coefficient, dimensionless ratio"
+  pid_idle_rpm_integral:
+    type: float32
+    note: "[-] [@range -1, 1] Integral of the PID for the closed loop idle RPM controller"

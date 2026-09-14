@@ -1,0 +1,70 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 ArmingCheckReply.msg 生成
+topic: arming_check_reply
+msg: ArmingCheckReply.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  request_id:
+    type: uint8
+    note: "[-] Id of ArmingCheckRequest for which this is a response"
+  registration_id:
+    type: uint8
+    note: "[-] Id of external component emitting this response"
+  health_component_index:
+    type: uint8
+    note: "[@enum HEALTH_COMPONENT_INDEX]"
+    values:
+      0: NONE
+    kind: enum
+  health_component_is_present:
+    type: bool
+    note: Unused. Intended for use with health events interface (health_component_t in events.json)
+  health_component_warning:
+    type: bool
+    note: Unused. Intended for use with health events interface (health_component_t in events.json)
+  health_component_error:
+    type: bool
+    note: Unused. Intended for use with health events interface (health_component_t in events.json)
+  can_arm_and_run:
+    type: bool
+    note: True if the component can arm. For navigation mode components, true if the component can arm in the mode or switch to the mode when already armed
+  num_events:
+    type: uint8
+    note: Number of queued failure messages (Event) in the events field
+  mode_req_angular_velocity:
+    type: bool
+    unit: e.g. from gyroscope
+    note: Requires angular velocity estimate (e.g. from gyroscope)
+  mode_req_attitude:
+    type: bool
+    note: Requires an attitude estimate
+  mode_req_local_alt:
+    type: bool
+    note: Requires a local altitude estimate
+  mode_req_local_position:
+    type: bool
+    note: Requires a local position estimate
+  mode_req_local_position_relaxed:
+    type: bool
+    note: Requires a more relaxed global position estimate
+  mode_req_global_position:
+    type: bool
+    note: Requires a global position estimate
+  mode_req_global_position_relaxed:
+    type: bool
+    note: Requires a relaxed global position estimate
+  mode_req_mission:
+    type: bool
+    note: Requires an uploaded mission
+  mode_req_home_position:
+    type: bool
+    unit: such as RTL/Return mode
+    note: Requires a home position (such as RTL/Return mode)
+  mode_req_prevent_arming:
+    type: bool
+    unit: such as in Land mode
+    note: Prevent arming (such as in Land mode)
+  mode_req_manual_control:
+    type: bool
+    note: Requires a manual controller

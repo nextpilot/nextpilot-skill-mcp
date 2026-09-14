@@ -1,0 +1,45 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 VehicleImuStatus.msg 生成
+topic: vehicle_imu_status
+msg: VehicleImuStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  accel_device_id:
+    type: uint32
+    note: unique device ID for the sensor that does not change between power cycles
+  gyro_device_id:
+    type: uint32
+    note: unique device ID for the sensor that does not change between power cycles
+  accel_error_count:
+    type: uint32
+  gyro_error_count:
+    type: uint32
+  accel_rate_hz:
+    type: float32
+  gyro_rate_hz:
+    type: float32
+  accel_raw_rate_hz:
+    type: float32
+    unit: Hz
+    note: full raw sensor sample rate (Hz)
+  gyro_raw_rate_hz:
+    type: float32
+    unit: Hz
+    note: full raw sensor sample rate (Hz)
+  accel_vibration_metric:
+    type: float32
+    unit: m/s/s
+    note: high frequency vibration level in the accelerometer data (m/s/s)
+  gyro_vibration_metric:
+    type: float32
+    unit: rad/s
+    note: high frequency vibration level in the gyro data (rad/s)
+  delta_angle_coning_metric:
+    type: float32
+    unit: rad^2
+    note: average IMU delta angle coning correction (rad^2)
+  temperature_accel:
+    type: float32
+  temperature_gyro:
+    type: float32

@@ -1,0 +1,18 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 GpioConfig.msg 生成
+topic: gpio_config
+msg: GpioConfig.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  device_id:
+    type: uint32
+    note: Device id
+  mask:
+    type: uint32
+    note: Pin mask
+  state:
+    type: uint32
+    note: Initial pin output state
+  config:
+    type: uint32

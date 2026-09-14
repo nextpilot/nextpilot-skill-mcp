@@ -1,0 +1,21 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 VtolVehicleStatus.msg 生成
+topic: vtol_vehicle_status
+msg: VtolVehicleStatus.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  vehicle_vtol_state:
+    type: uint8
+    note: current state of the vtol, see VEHICLE_VTOL_STATE
+    values:
+      0: UNDEFINED
+      1: FW
+      2: MC
+      3: MC
+      4: FW
+    kind: enum
+  fixed_wing_system_failure:
+    type: bool
+    unit: after quad-chute
+    note: vehicle in fixed-wing system failure failsafe mode (after quad-chute)

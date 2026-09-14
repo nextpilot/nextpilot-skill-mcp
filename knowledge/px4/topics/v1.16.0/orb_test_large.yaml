@@ -1,0 +1,9 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 OrbTestLarge.msg 生成
+topic: orb_test_large
+msg: OrbTestLarge.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  val:
+    type: int32

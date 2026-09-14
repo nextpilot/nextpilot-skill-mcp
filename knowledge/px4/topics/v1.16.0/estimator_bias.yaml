@@ -1,0 +1,32 @@
+# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 EstimatorBias.msg 生成
+topic: estimator_bias
+msg: EstimatorBias.msg
+fields:
+  timestamp:
+    type: uint64
+    unit: us
+  timestamp_sample:
+    type: uint64
+    unit: us
+  device_id:
+    type: uint32
+    note: unique device ID for the sensor that does not change between power cycles
+  bias:
+    type: float32
+    unit: m
+    note: estimated barometric altitude bias (m)
+  bias_var:
+    type: float32
+    unit: m^2
+    note: estimated barometric altitude bias variance (m^2)
+  innov:
+    type: float32
+    unit: m
+    note: innovation of the last measurement fusion (m)
+  innov_var:
+    type: float32
+    unit: m^2
+    note: innovation variance of the last measurement fusion (m^2)
+  innov_test_ratio:
+    type: float32
+    note: normalized innovation squared test ratio
