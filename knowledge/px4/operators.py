@@ -51,6 +51,19 @@ def op_min(values, **kw):
     return float(a.min()) if a.size else None
 
 
+@operator("min_ge", doc="有限且 >= ge 的最小值（排除无效值，如 remaining=-1 表示未知）")
+def op_min_ge(values, ge=None, **kw):
+    a = _finite(values)
+    if ge is not None:
+        a = a[a >= float(ge)]
+    return float(a.min()) if a.size else None
+
+
+@operator("scale", in_arity=1, out_arity=1, doc="标量乘以系数（如比例 → 百分比）")
+def op_scale(x, factor=1.0, **kw):
+    return float(x) * float(factor) if x is not None else None
+
+
 @operator("mean", doc="均值（忽略 NaN）")
 def op_mean(values, **kw):
     a = _finite(values)

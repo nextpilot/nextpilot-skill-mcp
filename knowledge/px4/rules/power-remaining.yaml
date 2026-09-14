@@ -1,0 +1,55 @@
+# 电池剩余电量（robotto）：armed 全程最低值，-1 表示未知需过滤
+
+id: px4-power-remaining
+slot: battery
+order: 3                 # battery slot 内的次序：cell-voltage=1, sag=2, remaining=3
+name: 电池剩余电量
+version: 1.0.0
+category: power
+status: stable
+author: {name: NextPilot 内置}
+license: CC-BY-4.0
+changelog:
+  - {version: 1.0.0, date: "2026-09-15", note: 从 ulog_checks.py 迁出，逻辑与阈值不变}
+
+firmware: any
+airframe: any
+
+requires:
+  any_of: [battery_status]
+skip_reason: battery_status not in log
+
+compute:
+  - out: rem
+    from: battery_status.remaining
+    op: min_ge
+    ge: 0                    # remaining ∈ [0,1]，-1 = 未知，过滤掉
+  - out: rem_pct
+    in: [rem]
+    op: scale
+    factor: 100
+
+triggers:
+  - expr: "rem <= 0.10"
+    severity: critical
+    threshold: 0.10
+    value: rem
+    round: 3
+    field: "battery_status.remaining(min)"
+    title: "电池剩余电量极低（{rem_pct:.0f}%）"
+    suggestion: "剩余电量低于 10%，应立即返航；检查电量估算与电池健康。"
+  - expr: "rem <= 0.20"
+    severity: warning
+    threshold: 0.20
+    value: rem
+    round: 3
+    field: "battery_status.remaining(min)"
+    title: "电池剩余电量偏低（{rem_pct:.0f}%）"
+    suggestion: "剩余电量低于 20%，注意返航裕度。"
+
+emit:
+  check: battery
+  tag: battery_voltage_drop
+  doc: https://docs.px4.io/main/en/config/battery.html
+  stats:
+    batteryRemainingMin: {var: rem, round: 3}

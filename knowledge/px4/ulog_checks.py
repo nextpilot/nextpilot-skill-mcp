@@ -21,6 +21,24 @@ TH = json.loads(r'''__THRESHOLDS__''')
 # 经验规则（rules/*.yaml 编译而来；见 knowledge/px4/rule-schema-design.md）
 RULES = json.loads(r'''__RULES__''')
 
+# 执行位置必须与原过程式检查一致（finding.id 按发射顺序生成）。同一 slot 内多条规则
+# 按 order 字段排序（缺省 100000，再按 id 兜底）。迁移期未声明的 slot 排到最后。
+_SLOT_ORDER = [
+    "vibration", "ekf_innovations", "ekf_faults", "battery", "cpu",
+    "gps_health", "failsafe", "mode_thrash", "motor_balance", "imu_bias",
+    "attitude_tracking", "airspeed", "vtol_transition", "wind_estimate",
+    "logged_messages",
+]
+
+
+def _rule_pos(rule):
+    slot = rule.get("slot")
+    idx = _SLOT_ORDER.index(slot) if slot in _SLOT_ORDER else len(_SLOT_ORDER)
+    return (idx, rule.get("order", 100000), rule.get("id", ""))
+
+
+RULES.sort(key=_rule_pos)
+
 VIBE_WARN, VIBE_CRIT = TH["vibration"]["vibe_warn"], TH["vibration"]["vibe_crit"]
 VIBE_STDDEV_WARN, VIBE_STDDEV_CRIT = TH["vibration"]["stddev_warn"], TH["vibration"]["stddev_crit"]
 CLIP_WARN, CLIP_CRIT = TH["vibration"]["clip_warn"], TH["vibration"]["clip_crit"]
@@ -82,7 +100,9 @@ def add(severity, rule_id, tag, title, field, value, threshold=None, unit=None,
         add_tag(te)
 
 def skipped(check, reason):
-    checks_skipped.append({"check": check, "reason": reason})
+    item = {"check": check, "reason": reason}
+    if item not in checks_skipped:
+        checks_skipped.append(item)
 
 def ran(check):
     if check not in checks_run:
@@ -255,6 +275,131 @@ def in_armed(ts_us):
         if ts_us >= s and (e is None or ts_us <= e):
             return True
     return False
+
+# ---------------- 经验规则框架（rules/*.yaml 驱动）----------------
+# 位置说明：本段位于原「规则 4：CPU 负载」处。迁移期的顺序约束——规则按 RULES 顺序
+# 在此执行，而 finding.id（F01、F02…）按发射顺序生成，所以**必须按与原检查相同的次序
+# 迁移**（vibration → ekf → power → cpu → gps → failsafe …），否则 id 会与冻结基线错位。
+_ALLOWED_NODES = (
+    ast.Expression, ast.BoolOp, ast.And, ast.Or, ast.UnaryOp, ast.Not, ast.USub,
+    ast.Compare, ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.Eq, ast.NotEq, ast.In, ast.NotIn,
+    ast.BinOp, ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Mod,
+    ast.Name, ast.Load, ast.Constant, ast.List, ast.Tuple, ast.Set,
+)
+
+
+def _eval_expr(expr, env):
+    """受限表达式求值：先按白名单遍历 AST，再在空 __builtins__ 下求值。
+
+    绝不 eval 用户可控代码：不允许属性访问、下标、函数调用、推导式等。
+    """
+    tree = ast.parse(expr, mode="eval")
+    for node in ast.walk(tree):
+        if not isinstance(node, _ALLOWED_NODES):
+            raise ValueError("表达式含不允许的语法 %s：%s" % (type(node).__name__, expr))
+    return eval(compile(tree, "<rule>", "eval"), {"__builtins__": {}}, env)
+
+
+def _read_field_ref(ref):
+    """'topic.field' → 该字段在各实例上的值（多实例拼接）；topic/字段缺失返回 None。"""
+    topic, _, field = ref.partition(".")
+    ds = find_all(ulog, topic)
+    if not ds:
+        return None
+    vals = []
+    for d in ds:
+        v = getf(d, field)
+        if v is not None and len(v):
+            vals.append(np.asarray(v, dtype=float))
+    if not vals:
+        return None
+    return np.concatenate(vals) if len(vals) > 1 else vals[0]
+
+
+def _rule_env():
+    """日志级内置变量：经验里可直接引用，无需在 compute 里声明。"""
+    return {
+        "firmware": FW_LABEL,
+        "fw_major": FW["major"], "fw_minor": FW["minor"], "fw_profile": FW_PROFILE,
+        "airframe": vehicle_type,
+        "is_rotary_wing": vehicle_type == "rotary_wing",
+        "is_fixed_wing": vehicle_type == "fixed_wing",
+        "is_vtol": "vtol" in vehicle_type,
+        "is_rover": vehicle_type == "rover",
+        "duration_s": duration_s if duration_s is not None else 0,
+        "armed_s": armed_duration_s,
+        "phases": phases_present,
+        "tags": set(tags),
+        "guard_tags": set(guard_tags),
+    }
+
+
+def _run_rules(slot):
+    """执行声明了该 slot 的经验规则。
+
+    finding 的 id 是按发射顺序（F01、F02…）生成的，所以每条规则的 slot **必须与
+    它所替换的原过程式检查的位置一致**（vibration → ekf → power → cpu → gps →
+    failsafe → mode_thrash …）；同一 slot 内按 rules/*.yaml 的文件名顺序执行。
+    """
+    for _rule in RULES:
+        if _rule.get("slot") != slot:
+            continue
+        _rid = _rule["id"]
+        _checks = _rule["emit"]["check"]
+        _checks = _checks if isinstance(_checks, list) else [_checks]
+        _need = (_rule.get("requires") or {}).get("any_of") or []
+        _missing = bool(_need) and not all(find_all(ulog, t) for t in _need)
+        if _missing:
+            for _check in _checks:
+                skipped(_check, _rule.get("skip_reason") or ("缺少依赖 topic：%s" % ", ".join(_need)))
+            continue
+        _env = _rule_env()
+        _ok = True
+        for _node in _rule["compute"]:
+            # 归一化：单输入可用短写法 from:（字符串或列表），单输出可直接写 out: 名字
+            _ins = _node.get("in")
+            if _ins is None:
+                _ins = _node["from"] if isinstance(_node["from"], list) else [_node["from"]]
+            _outs = _node["out"] if isinstance(_node["out"], list) else [_node["out"]]
+            _args = []
+            for _ref in _ins:
+                _args.append(_env[_ref] if _ref in _env else _read_field_ref(_ref))
+            if any(_a is None for _a in _args):
+                _ok = False
+                break
+            _res = OPERATORS[_node["op"]](*_args, **_node)
+            if _res is None:
+                _ok = False
+                break
+            if not isinstance(_res, tuple):
+                _res = (_res,)
+            for _name, _v in zip(_outs, _res):
+                _env[_name] = _v
+        if not _ok:
+            for _check in _checks:
+                skipped(_check, _rule.get("skip_reason") or "数据不足，未做判定")
+            continue
+        for _check in _checks:
+            ran(_check)
+
+        _emit = _rule["emit"]
+        for _key, _spec in (_emit.get("stats") or {}).items():
+            _v = _env.get(_spec["var"])
+            if _v is None:
+                continue
+            stats[_key] = round(float(_v), int(_spec["round"])) if "round" in _spec else _v
+
+        for _trig in _rule["triggers"]:
+            if _eval_expr(_trig["expr"], _env):
+                _val = _env.get(_trig["value"]) if _trig.get("value") else None
+                if _val is not None and _trig.get("round") is not None:
+                    _val = round(float(_val), int(_trig["round"]))
+                add(_trig["severity"], _rid, _trig.get("tag", _emit.get("tag")),
+                    _trig["title"].format_map(_env), _trig["field"], _val,
+                    _trig.get("threshold"), _trig.get("unit"),
+                    _emit.get("doc"), _trig.get("suggestion"))
+                break
+
 
 # ---------------- 规则 1：振动 / IMU 削波 ----------------
 imu_list = find_all(ulog, "vehicle_imu_status")
@@ -494,153 +639,16 @@ if bat_list:
         except Exception:
             pass
 
-    # 剩余电量（robotto 经验）
-    rem = getf(b0, "remaining")
-    if rem is not None and len(rem) > 0:
-        rarr = np.asarray(rem, dtype=float)
-        valid = rarr[(rarr >= 0) & np.isfinite(rarr)]   # -1 = 未知
-        if len(valid) > 0:
-            rmin = float(np.min(valid))
-            stats["batteryRemainingMin"] = round(rmin, 3)
-            if rmin <= REMAIN_CRIT:
-                add("critical", "px4-power-remaining", "battery_voltage_drop",
-                    "电池剩余电量极低（%.0f%%）" % (rmin * 100),
-                    "battery_status.remaining(min)", round(rmin, 3), REMAIN_CRIT, None,
-                    PX4_DOC_BATTERY, "剩余电量低于 10%，应立即返航；检查电量估算与电池健康。")
-            elif rmin <= REMAIN_WARN:
-                add("warning", "px4-power-remaining", "battery_voltage_drop",
-                    "电池剩余电量偏低（%.0f%%）" % (rmin * 100),
-                    "battery_status.remaining(min)", round(rmin, 3), REMAIN_WARN, None,
-                    PX4_DOC_BATTERY, "剩余电量低于 20%，注意返航裕度。")
+    # 剩余电量（px4-power-remaining 已迁至 rules/，由末尾 _run_rules("battery") 执行）
 else:
     skipped("battery", "battery_status not in log")
 
-# ---------------- 经验规则框架（rules/*.yaml 驱动）----------------
-# 位置说明：本段位于原「规则 4：CPU 负载」处。迁移期的顺序约束——规则按 RULES 顺序
-# 在此执行，而 finding.id（F01、F02…）按发射顺序生成，所以**必须按与原检查相同的次序
-# 迁移**（vibration → ekf → power → cpu → gps → failsafe …），否则 id 会与冻结基线错位。
-_ALLOWED_NODES = (
-    ast.Expression, ast.BoolOp, ast.And, ast.Or, ast.UnaryOp, ast.Not, ast.USub,
-    ast.Compare, ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.Eq, ast.NotEq, ast.In, ast.NotIn,
-    ast.BinOp, ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Mod,
-    ast.Name, ast.Load, ast.Constant, ast.List, ast.Tuple, ast.Set,
-)
+# battery slot：cell-voltage/sag 仍是过程式（在上面），remaining 已是规则
+_run_rules("battery")
 
-
-def _eval_expr(expr, env):
-    """受限表达式求值：先按白名单遍历 AST，再在空 __builtins__ 下求值。
-
-    绝不 eval 用户可控代码：不允许属性访问、下标、函数调用、推导式等。
-    """
-    tree = ast.parse(expr, mode="eval")
-    for node in ast.walk(tree):
-        if not isinstance(node, _ALLOWED_NODES):
-            raise ValueError("表达式含不允许的语法 %s：%s" % (type(node).__name__, expr))
-    return eval(compile(tree, "<rule>", "eval"), {"__builtins__": {}}, env)
-
-
-def _read_field_ref(ref):
-    """'topic.field' → 该字段在各实例上的值（多实例拼接）；topic/字段缺失返回 None。"""
-    topic, _, field = ref.partition(".")
-    ds = find_all(ulog, topic)
-    if not ds:
-        return None
-    vals = []
-    for d in ds:
-        v = getf(d, field)
-        if v is not None and len(v):
-            vals.append(np.asarray(v, dtype=float))
-    if not vals:
-        return None
-    return np.concatenate(vals) if len(vals) > 1 else vals[0]
-
-
-def _rule_env():
-    """日志级内置变量：经验里可直接引用，无需在 compute 里声明。"""
-    return {
-        "firmware": FW_LABEL,
-        "fw_major": FW["major"], "fw_minor": FW["minor"], "fw_profile": FW_PROFILE,
-        "airframe": vehicle_type,
-        "is_rotary_wing": vehicle_type == "rotary_wing",
-        "is_fixed_wing": vehicle_type == "fixed_wing",
-        "is_vtol": "vtol" in vehicle_type,
-        "is_rover": vehicle_type == "rover",
-        "duration_s": duration_s if duration_s is not None else 0,
-        "armed_s": armed_duration_s,
-        "phases": phases_present,
-        "tags": set(tags),
-        "guard_tags": set(guard_tags),
-    }
-
-
-def _run_rules(slot):
-    """执行声明了该 slot 的经验规则。
-
-    finding 的 id 是按发射顺序（F01、F02…）生成的，所以每条规则的 slot **必须与
-    它所替换的原过程式检查的位置一致**（vibration → ekf → power → cpu → gps →
-    failsafe → mode_thrash …）；同一 slot 内按 rules/*.yaml 的文件名顺序执行。
-    """
-    for _rule in RULES:
-        if _rule.get("slot") != slot:
-            continue
-        _rid = _rule["id"]
-        _checks = _rule["emit"]["check"]
-        _checks = _checks if isinstance(_checks, list) else [_checks]
-        _need = (_rule.get("requires") or {}).get("any_of") or []
-        _missing = bool(_need) and not all(find_all(ulog, t) for t in _need)
-        if _missing:
-            for _check in _checks:
-                skipped(_check, _rule.get("skip_reason") or ("缺少依赖 topic：%s" % ", ".join(_need)))
-            continue
-        _env = _rule_env()
-        _ok = True
-        for _node in _rule["compute"]:
-            # 归一化：单输入可用短写法 from:（字符串或列表），单输出可直接写 out: 名字
-            _ins = _node.get("in")
-            if _ins is None:
-                _ins = _node["from"] if isinstance(_node["from"], list) else [_node["from"]]
-            _outs = _node["out"] if isinstance(_node["out"], list) else [_node["out"]]
-            _args = []
-            for _ref in _ins:
-                _args.append(_env[_ref] if _ref in _env else _read_field_ref(_ref))
-            if any(_a is None for _a in _args):
-                _ok = False
-                break
-            _res = OPERATORS[_node["op"]](*_args, **_node)
-            if _res is None:
-                _ok = False
-                break
-            if not isinstance(_res, tuple):
-                _res = (_res,)
-            for _name, _v in zip(_outs, _res):
-                _env[_name] = _v
-        if not _ok:
-            for _check in _checks:
-                skipped(_check, _rule.get("skip_reason") or "数据不足，未做判定")
-            continue
-        for _check in _checks:
-            ran(_check)
-
-        _emit = _rule["emit"]
-        for _key, _spec in (_emit.get("stats") or {}).items():
-            _v = _env.get(_spec["var"])
-            if _v is None:
-                continue
-            stats[_key] = round(float(_v), int(_spec["round"])) if "round" in _spec else _v
-
-        for _trig in _rule["triggers"]:
-            if _eval_expr(_trig["expr"], _env):
-                _val = _env.get(_trig["value"]) if _trig.get("value") else None
-                if _val is not None and _trig.get("round") is not None:
-                    _val = round(float(_val), int(_trig["round"]))
-                add(_trig["severity"], _rid, _trig.get("tag"),
-                    _trig["title"].format_map(_env), _trig["field"], _val,
-                    _trig.get("threshold"), _trig.get("unit"),
-                    _emit.get("doc"), _trig.get("suggestion"))
-                break
-
-
+# cpu slot（px4-cpu-load 已迁至 rules/；原过程式 CPU 段已删除）
 _run_rules("cpu")
+
 
 # ---------------- 规则 5：GPS 健康（F002）----------------
 gps_list = find_all(ulog, "vehicle_gps_position")
