@@ -1,9 +1,0 @@
-# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 ParameterSetUsedRequest.msg 生成
-topic: parameter_set_used_request
-msg: ParameterSetUsedRequest.msg
-fields:
-  timestamp:
-    type: uint64
-    unit: us
-  parameter_index:
-    type: uint16

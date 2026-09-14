@@ -1,7 +1,0 @@
-# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 NfsUp.msg 生成
-topic: nfs_up
-msg: NfsUp.msg
-fields:
-  timestamp:
-    type: uint64
-    unit: us

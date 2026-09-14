@@ -1,9 +1,0 @@
-# 生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 TaskStackInfo.msg 生成
-topic: task_stack_info
-msg: TaskStackInfo.msg
-fields:
-  timestamp:
-    type: uint64
-    unit: us
-  stack_free:
-    type: uint16
