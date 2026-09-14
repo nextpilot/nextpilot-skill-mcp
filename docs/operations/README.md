@@ -22,6 +22,7 @@
 
 - 会话：next-auth JWT 策略（JWE，A256CBC-HS512，密钥 HKDF(AUTH_SECRET, cookie名)）。边缘函数用 `jose` 以同一 `AUTH_SECRET` 验签（`functions/_lib/auth.js`）。
 - KV：`NEXTPILOT_KV` 绑定，**只在边缘函数可用**。key 仅允许字母/数字/下划线，无 TTL（过期写进 value 惰性清理）。
+- **平台坑（实测）**：`kv.list()` 在**没有任何匹配 key 时，返回体里没有 `keys` 字段**（`{"cursor":"","complete":true}`），直接 `for...of result.keys` 会抛错导致 545。统一走 `_lib/kv.js` 的 `listAll()`（已对 `keys ?? []` 加守卫），不要在业务里直接调 `kv.list`。
 
 ## 2. 本地开发
 
@@ -62,10 +63,26 @@ openssl rand -hex 24      # AUTH_INTERNAL_SECRET
 
 ### GitHub OAuth App
 
-github.com → Settings → Developer settings → OAuth Apps → New OAuth App：
+**创建步骤**（个人开发者即可，无需企业资质，免费）：
 
-- Callback URL：`https://skill.nextpilot.org/api/auth/callback/github`
-- 本地调试另建一个：`http://localhost:端口/api/auth/callback/github`
+1. 打开 <https://github.com/settings/developers> → **OAuth Apps** → **New OAuth App**（个人设置路径：右上头像 → Settings → 最下面 Developer settings）。
+2. 填写：
+   - **Application name**：`NextPilot Skill MCP`（任意）
+   - **Homepage URL**：`https://skill.nextpilot.org`
+   - **Application description**：可留空
+   - **Authorization callback URL**：`https://skill.nextpilot.org/api/auth/callback/github`
+3. 点 **Register application**，进入应用详情页 → **Generate a new client secret**，复制 Client ID 和 Client secret。
+4. 回到 EdgeOne 控制台 → 项目 → 环境变量，加两条：
+   - `AUTH_GITHUB_ID` = Client ID
+   - `AUTH_GITHUB_SECRET` = Client secret（只显示一次，丢了重新生成即可）
+5. **重新部署**，登录页的 GitHub 按钮即可用（代码里只有配了这两个变量才会注册 provider，没配时按钮隐藏，不会 500）。
+
+注意：
+
+- 回调地址必须**精确到 `/api/auth/callback/github`**，域名写错（http/https、末尾斜杠）会报 `redirect_uri mismatch`。
+- **本地调试另建一个 OAuth App**：`http://localhost:3000` / `http://localhost:3000/api/auth/callback/github`（端口按实际），写进本地 `web/.env`，不要和生产混用。
+- 个人 OAuth App 默认每小时 5000 次授权请求，初期完全够用。
+- 回调地址变更（如以后切备案域名/国内节点）回这里改，不用重新发版。
 
 ## 4. EdgeOne KV 开通与绑定
 
