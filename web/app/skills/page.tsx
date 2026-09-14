@@ -33,9 +33,9 @@ export default async function SkillsPage({
       <div className="mb-4">
         <Breadcrumbs items={[{ label: "Skill 库" }]} />
       </div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold"><LocalizedText zh="飞控 AI Skill 库" en="Flight AI skill library" /></h1>
-        <p className="mt-1.5 text-sm text-muted">
+      <div className="mb-7">
+        <h1 className="text-[26px] font-semibold tracking-[-0.02em]"><LocalizedText zh="飞控 AI Skill 库" en="Flight AI skill library" /></h1>
+        <p className="mt-2 text-sm text-muted">
           {getSkillIndex().length} <LocalizedText zh="个 Skill，覆盖感知、决策、控制与工具链。MCP Server 单独收录，见导航栏。" en="skills across perception, decisions, control and toolchains. MCP servers are listed separately." />
         </p>
       </div>

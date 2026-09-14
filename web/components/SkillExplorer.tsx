@@ -74,7 +74,7 @@ export function SkillExplorer({
             "我想做 X，例如：识别画面里的人、室内无 GPS 飞行、分析炸机日志…",
             "I want to: detect people, fly indoors without GPS, analyze a crash log…",
           )}
-          className="w-full rounded-xl border border-border bg-surface py-3 pr-4 pl-10 text-sm outline-none transition-colors placeholder:text-muted/70 focus:border-primary/60"
+          className="input pl-10"
         />
       </div>
 
@@ -95,8 +95,8 @@ export function SkillExplorer({
               key={k}
               type="button"
               onClick={() => setSort(k)}
-              className={`rounded-full px-2.5 py-1 transition-colors ${
-                sort === k ? "bg-primary/10 text-primary" : "hover:text-text"
+              className={`rounded-md px-2.5 py-1 transition-colors ${
+                sort === k ? "bg-surface-2 font-medium text-text" : "hover:text-text"
               }`}
             >
               {SORT_LABELS[k]}
@@ -140,10 +140,10 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full border px-3.5 py-1.5 transition-colors ${
+      className={`chip px-3 py-1.5 transition-colors ${
         active
-          ? "border-primary bg-primary/10 text-primary"
-          : "border-border text-muted hover:border-primary/40 hover:text-text"
+          ? "chip-brand border-transparent"
+          : "hover:border-border-strong hover:text-text"
       }`}
     >
       {children}

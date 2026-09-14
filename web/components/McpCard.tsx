@@ -21,25 +21,25 @@ export function McpCard({
   return (
     <Link
       href={`/mcp/${server.slug}`}
-      className="group flex h-full flex-col rounded-xl border border-border bg-surface p-5 transition-all hover:-translate-y-1 hover:border-primary/60"
+      className="card group flex h-full flex-col p-5 transition-colors hover:border-border-strong"
     >
       <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-        <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 font-medium text-primary">
+        <span className="chip chip-brand">
           {server.tools.length} <LocalizedText zh="个工具" en="tools" />
         </span>
         {server.readOnly ? (
-          <span className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-muted">
+          <span className="chip">
             <Eye className="h-3 w-3" />
             <LocalizedText zh="默认只读" en="Read-only" />
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 rounded-md border border-warning/40 bg-warning/10 px-2 py-0.5 text-warning">
+          <span className="chip border-warning/40 text-warning">
             <Zap className="h-3 w-3" />
             <LocalizedText zh="含致动能力" en="Can actuate" />
           </span>
         )}
         {server.platforms.slice(0, 1).map((p) => (
-          <span key={p} className="rounded-md border border-border px-2 py-0.5 text-muted">
+          <span key={p} className="chip">
             {p}
           </span>
         ))}

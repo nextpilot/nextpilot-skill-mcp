@@ -37,6 +37,7 @@ import {
   type SavedReport,
 } from "@/lib/report-history";
 import { getDeviceId } from "@/lib/device-id";
+import { takePendingLog } from "@/lib/pending-log";
 import { LogCharts } from "./LogCharts";
 import { LogMessages, LogParams, SystemInfoPanel } from "./LogEventsParams";
 import { HistoryList, type HistoryItem } from "./HistoryList";
@@ -320,6 +321,19 @@ export function LogAnalyzer() {
     },
     [explain, persist],
   );
+
+  // 首页上传卡把文件暂存在 IndexedDB，这里取出后立即分析（读完即删）
+  const consumedPendingRef = useRef(false);
+  useEffect(() => {
+    if (consumedPendingRef.current) return;
+    consumedPendingRef.current = true;
+    void (async () => {
+      const file = await takePendingLog();
+      if (file) void handleFile(file);
+    })();
+    // handleFile 在依赖里保持最新即可，不需要每次重建消费者
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const viewSaved = useCallback((saved: SavedReport) => {
     setError(null);

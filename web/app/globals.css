@@ -20,41 +20,51 @@
 }
 
 /*
- * 表面色阶（务必保持可分辨）：
- *   bg（页面底） → surface（浮起的面板 / 图表绘图区） → surface-2（面板内的凹陷块）
- * 浅色下 bg↔surface ≈ 1.19:1、surface↔surface-2 ≈ 1.14:1；
- * 深色下 ≈ 1.19:1 / 1.16:1。低于 1.1:1 就等于没有分层。
- *
- * 色相必须与品牌绿一致：品牌 #1b7f5a 是青绿（B > R）。底色若用黄绿（B < R），
- * 同框会出现两个方向的绿，页面发脏。
+ * 设计系统 v2：极简白底 · 工程风（色值对齐 VitePress 默认主题）
+ *   - bg 纯白；bg-alt/soft 用 #f6f6f7 作凹陷块，不靠彩色底做层级
+ *   - 文字用同一灰（60,60,67）分三档透明度，而不是多个不同灰
+ *   - 分隔线 12% 透明度、边框 20%，极轻；不用彩色描边
+ *   - 品牌绿只出现在链接 / 选中 / 状态；主操作按钮用深色实底
+ * 表面层级：bg（页面）→ surface（卡片/弹层）→ surface-2（凹陷块/代码底）
  */
 :root {
-  --app-bg: #e9ecea;
+  --app-bg: #ffffff;
   --app-surface: #ffffff;
-  --app-surface-2: #eef1ee;
-  --app-border: #d5d9d6;
-  --app-text: #172019;
-  --app-muted: #5c665e;
-  --app-primary: #1b7f5a;
-  --app-primary-strong: #126244;
-  /* 状态色须在浅底上达到 4.5:1，故浅色主题用深一档的色值 */
-  --app-critical: #c8352b;
-  --app-warning: #a35a06;
-  --app-ok: #0b7a52;
+  --app-surface-2: #f6f6f7;
+  --app-border: rgba(60, 60, 67, 0.16);
+  --app-border-strong: rgba(60, 60, 67, 0.3);
+  --app-text: rgba(60, 60, 67, 1);
+  --app-muted: rgba(60, 60, 67, 0.72);
+  --app-faint: rgba(60, 60, 67, 0.48);
+  --app-primary: #18794e;
+  --app-primary-strong: #0f5c3a;
+  --app-primary-soft: rgba(16, 185, 129, 0.14);
+  --app-accent: #1f2328;
+  --app-accent-hover: #333a42;
+  --app-critical: #b8272c;
+  --app-warning: #915930;
+  --app-ok: #18794e;
+  --shadow-card: 0 1px 2px rgba(60, 60, 67, 0.06);
 }
 
 html[data-theme="dark"] {
-  --app-bg: #070a08;
-  --app-surface: #18221c;
-  --app-surface-2: #232e27;
-  --app-border: #2f3d34;
-  --app-text: #e6eee8;
-  --app-muted: #93a397;
-  --app-primary: #69d39d;
-  --app-primary-strong: #3aaf76;
-  --app-critical: #f87171;
-  --app-warning: #fbbf24;
-  --app-ok: #34d399;
+  --app-bg: #1b1b1f;
+  --app-surface: #202127;
+  --app-surface-2: #161618;
+  --app-border: rgba(84, 84, 84, 0.55);
+  --app-border-strong: rgba(120, 120, 128, 0.7);
+  --app-text: rgba(255, 255, 255, 0.87);
+  --app-muted: rgba(235, 235, 245, 0.66);
+  --app-faint: rgba(235, 235, 245, 0.42);
+  --app-primary: #3dd68c;
+  --app-primary-strong: #30a46c;
+  --app-primary-soft: rgba(16, 185, 129, 0.18);
+  --app-accent: #f2f5f8;
+  --app-accent-hover: #ffffff;
+  --app-critical: #f66f6f;
+  --app-warning: #e0a45c;
+  --app-ok: #3dd68c;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 html {
