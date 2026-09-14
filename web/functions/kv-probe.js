@@ -4,6 +4,7 @@
 import { getKv } from "./_lib/kv.js";
 
 const COUNTER_KEY = "kvprobe_count";
+const SHAPE_KEY = "kvprobe_shape";
 
 function getBinding(env) {
   return getKv(env);
@@ -27,6 +28,22 @@ export async function onRequestGet({ env }) {
     result.kv = { before, after };
   } catch (err) {
     result.kv = { error: String(err && err.message ? err.message : err) };
+  }
+
+  // KV 接口自查：list / get({type:"json"}) 的实际形状。
+  // 平台若与官方文档有出入，这里能直接看出（/api/me 的配额计数依赖 list）。
+  try {
+    await kv.put(SHAPE_KEY, JSON.stringify({ t: "probe" }));
+    const plain = await kv.get(SHAPE_KEY);
+    const asJson = await kv.get(SHAPE_KEY, { type: "json" });
+    const listed = await kv.list({ prefix: "kvprobe_", limit: 10 });
+    result.kvApi = {
+      getReturns: typeof plain === "string" ? "string" : typeof plain,
+      getJsonType: asJson === null ? "null" : typeof asJson,
+      listKeys: JSON.stringify(listed).slice(0, 600),
+    };
+  } catch (err) {
+    result.kvApi = { error: String(err && err.message ? err.message : err) };
   }
 
   try {

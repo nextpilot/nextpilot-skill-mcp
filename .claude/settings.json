@@ -20,7 +20,11 @@
       "Bash(node scripts/shot.mjs \"http://localhost:3000/guide/basics\" /tmp/guide-v2.png light 1440 700 0)",
       "Bash(node scripts/shot.mjs \"http://localhost:3000/skills\" /tmp/skills-bc.png light 1440 600 0)",
       "Bash(node scripts/shot.mjs \"http://localhost:3000/skills/px4-ulog-analyzer\" /tmp/detail-bc.png light 1440 620 0)",
-      "Bash(node scripts/shot.mjs \"http://localhost:3000/guide/basics\" /tmp/guide-m.png light 390 460 0)"
+      "Bash(node scripts/shot.mjs \"http://localhost:3000/guide/basics\" /tmp/guide-m.png light 390 460 0)",
+      "Bash(curl -s -m 30 https://skill.nextpilot.org/kv-probe)",
+      "Bash(curl -s -m 30 -H \"x-device-id: probe_dev_$\\(date +%s\\)\" https://skill.nextpilot.org/api/me)",
+      "Bash(curl -s -m 30 -o /dev/null -w \"%{http_code}\\\\n\" https://skill.nextpilot.org/api/reports)",
+      "Bash(curl -s -m 30 -o /dev/null -w \"%{http_code}\\\\n\" -X POST https://skill.nextpilot.org/internal/otp/set)"
     ]
   }
 }
