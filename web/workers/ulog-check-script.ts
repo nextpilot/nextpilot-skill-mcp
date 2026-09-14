@@ -600,6 +600,361 @@ if vs is not None:
 else:
     skipped("mode_thrash", "vehicle_status not in log")
 
+# ---------------- 规则 9：电机输出不平衡（F008）----------------
+# 只在 armed 且悬停/定点段判定；要求 ≥4 个活跃通道，否则跳过（单通道日志无从比较）。
+MOTOR_SPREAD_WARN, MOTOR_SPREAD_CRIT = 0.08, 0.15
+mot = find_all(ulog, "actuator_motors")
+if mot and armed_intervals:
+    d = mot[0]
+    mts = getf(d, "timestamp")
+    cols = []
+    for i in range(12):
+        c = getf(d, "control[%d]" % i)
+        if c is not None and len(c):
+            cols.append((i, np.asarray(c, dtype=float)))
+    # armed 段内、悬停/定点阶段（nav_state 在 HOVERISH 集合内）的样本才比较
+    if mts is not None and len(cols) >= 4:
+        mts = np.asarray(mts, dtype=np.int64)
+        mask = np.zeros(len(mts), dtype=bool)
+        for s, e in armed_intervals:
+            lo = int(np.searchsorted(mts, s))
+            hi = len(mts) if e is None else int(np.searchsorted(mts, e))
+            mask[lo:hi] = True
+        hover_mask = mask.copy()
+        nav = getf(vs, "nav_state") if vs is not None else None
+        if nav is not None:
+            vts_vs = np.asarray(getf(vs, "timestamp"), dtype=np.int64)
+            nav_arr = np.asarray(nav)
+            # 采样到电机时间轴上，取悬停/定点状态
+            idx = np.clip(np.searchsorted(vts_vs, mts), 0, len(nav_arr) - 1)
+            state_at = nav_arr[idx]
+            hover_mask &= np.isin(state_at, list(NAV_HOVERISH))
+        seg = hover_mask if np.count_nonzero(hover_mask) > 20 else mask
+        means = []
+        for i, c in cols:
+            v = c[seg] if len(c) == len(mts) else c[:np.count_nonzero(seg)]
+            v = v[np.isfinite(v)]
+            if v.size and float(np.mean(v)) > 0.01:   # 未接/未用通道均值≈0，排除
+                means.append((i, float(np.mean(v))))
+        if len(means) >= 4:
+            ran("motor_balance")
+            vals = [m for _, m in means]
+            spread = max(vals) - min(vals)
+            stats["motorControlSpread"] = round(spread, 3)
+            stats["motorCountActive"] = len(means)
+            busiest = max(means, key=lambda x: x[1])
+            idlest = min(means, key=lambda x: x[1])
+            if spread >= MOTOR_SPREAD_CRIT:
+                add("critical", "px4-motor-unbalance", "motor_output_unbalance",
+                    "电机输出不平衡（悬停段通道 %d 与 %d 差 %.3f）" % (busiest[0], idlest[0], spread),
+                    "actuator_motors.control[](悬停段均值极差)", round(spread, 3),
+                    MOTOR_SPREAD_WARN, None, PX4_DOC_LOG,
+                    "结合故障库 F008：检查桨叶型号/正反桨是否一致、单电机效率、机架形变。")
+            elif spread >= MOTOR_SPREAD_WARN:
+                add("warning", "px4-motor-unbalance", "motor_output_unbalance",
+                    "电机输出差异偏大（通道 %d 与 %d 差 %.3f）" % (busiest[0], idlest[0], spread),
+                    "actuator_motors.control[](悬停段均值极差)", round(spread, 3),
+                    MOTOR_SPREAD_WARN, None, PX4_DOC_LOG,
+                    "结合故障库 F008 排查动力一致性；偶发差异可先观察。")
+        else:
+            skipped("motor_balance", "active motor channels < 4 (非多旋翼或未记录全部电机)")
+    else:
+        skipped("motor_balance", "actuator_motors 通道不足或无 armed 段")
+else:
+    skipped("motor_balance", "actuator_motors not in log")
+
+# ---------------- 规则 10：IMU 角速度零偏漂移（F005）----------------
+# 跨固件版本取源（PX4 1.15+ 拆分 topic）：
+#   新：estimator_sensor_bias.gyro_bias[]（直读零偏）
+#   旧：estimator_status.states[10..12] / 新：estimator_states.states[10..12]（EKF 状态里的零偏）
+GYRO_BIAS_ABS_WARN, GYRO_BIAS_ABS_CRIT = 0.02, 0.05   # rad/s（约 1.1°/s / 2.9°/s）
+GYRO_BIAS_DRIFT_WARN, GYRO_BIAS_DRIFT_CRIT = 0.02, 0.05
+TEMP_RANGE_WARN, TEMP_RANGE_CRIT = 15.0, 25.0          # °C
+
+def _imu_bias_series():
+    """返回 (来源说明, [(轴名, 数组), ...])，按固件版本优先取直读零偏。"""
+    sb = find_all(ulog, "estimator_sensor_bias")
+    if sb:
+        d = sb[0]
+        series = [(n, getf(d, "gyro_bias[%d]" % i), getf(d, "timestamp")) for i, n in
+                  enumerate(("X", "Y", "Z"))]
+        if any(x[1] is not None and len(x[1]) for x in series):
+            return "estimator_sensor_bias.gyro_bias[]", series
+    for topic in ("estimator_status", "estimator_states"):
+        ds = find_all(ulog, topic)
+        if not ds:
+            continue
+        d = ds[0]
+        series = [(n, getf(d, "states[%d]" % (10 + i)), getf(d, "timestamp")) for i, n in
+                  enumerate(("X", "Y", "Z"))]
+        if any(x[1] is not None and len(x[1]) for x in series):
+            return "%s.states[10..12]" % topic, series
+    return None, None
+
+if armed_intervals:
+    bias_source, bias_series = _imu_bias_series()
+    if bias_source and bias_series:
+        ran("imu_bias")
+        bts = bias_series[0][2]
+        if bts is not None and len(bts):
+            bts = np.asarray(bts, dtype=np.int64)
+            amask = np.zeros(len(bts), dtype=bool)
+            for s_, e_ in armed_intervals:
+                lo = int(np.searchsorted(bts, s_))
+                hi = len(bts) if e_ is None else int(np.searchsorted(bts, e_))
+                amask[lo:hi] = True
+            worst_abs, worst_abs_axis = 0.0, None
+            worst_drift, worst_drift_axis = 0.0, None
+            for axis, b, _t in bias_series:
+                if b is None or not len(b):
+                    continue
+                v = np.asarray(b, dtype=float)[amask] if len(b) == len(bts) else np.asarray(b, dtype=float)
+                v = v[np.isfinite(v)]
+                if v.size < 10:
+                    continue
+                if float(np.max(np.abs(v))) > worst_abs:
+                    worst_abs, worst_abs_axis = float(np.max(np.abs(v))), axis
+                if float(np.max(v) - np.min(v)) > worst_drift:
+                    worst_drift, worst_drift_axis = float(np.max(v) - np.min(v)), axis
+            if worst_abs_axis:
+                stats["gyroBiasMaxRadS"] = round(worst_abs, 4)
+                stats["gyroBiasDriftRadS"] = round(worst_drift, 4)
+                stats["gyroBiasSource"] = bias_source
+                # 温度跨度：判定漂移是否可由温度解释
+                temp_range = None
+                for topic, field in (("vehicle_imu_status", "temperature_gyro"),
+                                      ("vehicle_air_data", "ambient_temperature")):
+                    ds = find_all(ulog, topic)
+                    if not ds:
+                        continue
+                    tv = getf(ds[0], field)
+                    if tv is None or not len(tv):
+                        continue
+                    t = np.asarray(tv, dtype=float); t = t[np.isfinite(t)]
+                    if t.size > 1:
+                        rng = float(np.max(t) - np.min(t))
+                        temp_range = rng if temp_range is None else max(temp_range, rng)
+                if temp_range is not None:
+                    stats["imuTempRangeC"] = round(temp_range, 1)
+                    if temp_range >= TEMP_RANGE_CRIT:
+                        guard_tags.append("temperature_change_large")
+                sev = None
+                if worst_abs >= GYRO_BIAS_ABS_CRIT or worst_drift >= GYRO_BIAS_DRIFT_CRIT:
+                    sev = "critical"
+                elif worst_abs >= GYRO_BIAS_ABS_WARN or worst_drift >= GYRO_BIAS_DRIFT_WARN:
+                    sev = "warning"
+                if sev:
+                    add(sev, "px4-imu-bias-drift", "imu_bias_drift",
+                        "陀螺零偏异常（轴 %s：绝对值 %.4f rad/s，漂移 %.4f rad/s）" % (
+                            worst_abs_axis, worst_abs, worst_drift),
+                        bias_source, round(max(worst_abs, worst_drift), 4),
+                        GYRO_BIAS_ABS_WARN, "rad/s", PX4_DOC_EKF,
+                        "结合故障库 F005：检查 IMU 安装紧固、执行陀螺/加计标定；"
+                        "若温度跨度大，优先按温度漂移解释。")
+    else:
+        skipped("imu_bias", "无陀螺零偏数据（无 estimator_sensor_bias / estimator_status.states）")
+else:
+    skipped("imu_bias", "无 armed 段，不做零偏判定")
+
+# ---------------- 规则 11：姿态跟踪超调 / 振荡（F006）----------------
+# 只统计 armed 且非悬停的机动段，避免把悬停微调当作超调。
+# 跟踪误差阈值按机型区分：固定翼在手动/机动段天然误差更大，用更宽门限
+ATT_ERR_WARN, ATT_ERR_CRIT = 15.0, 30.0          # 旋翼类 p99（度）
+ATT_ERR_WARN_FW, ATT_ERR_CRIT_FW = 25.0, 40.0    # 固定翼 p99（度）
+ATT_OSC_WARN = 4.0                            # 误差符号翻转频率 Hz（振荡判据）
+att = find_all(ulog, "vehicle_attitude")
+att_sp = find_all(ulog, "vehicle_attitude_setpoint")
+if att and att_sp and armed_intervals:
+    d, dsp = att[0], att_sp[0]
+    ts = getf(d, "timestamp")
+    q = [getf(d, "q[%d]" % i) for i in range(4)]
+    sp_ts = getf(dsp, "timestamp")
+    # 姿态指令：旧固件 roll_body/pitch_body；新固件只有 q_d 四元数
+    roll_sp = getf(dsp, "roll_body")
+    pitch_sp = getf(dsp, "pitch_body")
+    qd = [getf(dsp, "q_d[%d]" % i) for i in range(4)]
+    use_quat_sp = roll_sp is None and all(x is not None and len(x) for x in qd)
+    if ts is not None and all(x is not None and len(x) for x in q) and sp_ts is not None and (
+            roll_sp is not None or use_quat_sp):
+        ts = np.asarray(ts, dtype=np.int64)
+        # 采样长度取姿态与该版本可用的姿态指令来源中的最小值
+        sp_lens = [len(x) for x in qd] if use_quat_sp else [
+            len(roll_sp)] + ([len(pitch_sp)] if pitch_sp is not None else [])
+        n = min([len(x) for x in q] + sp_lens)
+        q0, q1, q2, q3 = (np.asarray(x, dtype=float)[:n] for x in q)
+        roll = np.arctan2(2 * (q0 * q1 + q2 * q3), 1 - 2 * (q1 ** 2 + q2 ** 2))
+        pitch = np.arcsin(np.clip(2 * (q0 * q2 - q3 * q1), -1, 1))
+        # 将 setpoint 插值到姿态时间轴
+        sp_ts = np.asarray(sp_ts, dtype=np.int64)
+        if use_quat_sp:
+            ns = min(len(x) for x in qd)
+            d0, d1, d2, d3 = (np.asarray(x, dtype=float)[:ns] for x in qd)
+            r_sp_raw = np.arctan2(2 * (d0 * d1 + d2 * d3), 1 - 2 * (d1 ** 2 + d2 ** 2))
+            p_sp_raw = np.arcsin(np.clip(2 * (d0 * d2 - d3 * d1), -1, 1))
+        else:
+            r_sp_raw = np.asarray(roll_sp, dtype=float)
+            p_sp_raw = (np.asarray(pitch_sp, dtype=float) if pitch_sp is not None
+                        else np.zeros(len(r_sp_raw)))
+        r_sp = np.interp(ts[:n], sp_ts[:len(r_sp_raw)], r_sp_raw)
+        p_sp = np.interp(ts[:n], sp_ts[:len(p_sp_raw)], p_sp_raw)
+        err = np.degrees(np.maximum(np.abs(roll - r_sp), np.abs(pitch - p_sp)))
+        # 机动段掩码：armed 且姿态指令角速度/角度变化明显（用 setpoint 角速度近似）
+        amask = np.zeros(n, dtype=bool)
+        for s, e in armed_intervals:
+            lo = int(np.searchsorted(ts, s))
+            hi = n if e is None else int(np.searchsorted(ts, e))
+            amask[lo:hi] = True
+        # 排除近悬停：指令角接近 0 的样本不计
+        active = amask & (np.degrees(np.abs(r_sp)) + np.degrees(np.abs(p_sp)) > 10.0)
+        seg = err[active] if np.count_nonzero(active) > 50 else err[amask]
+        if seg.size > 50:
+            ran("attitude_tracking")
+            p99 = float(np.percentile(seg, 99))
+            stats["attitudeErrDegP99"] = round(p99, 1)
+            # 振荡：误差过零频率
+            sign = np.sign(seg - np.median(seg))
+            flips = int(np.count_nonzero(np.diff(sign[sign != 0]) != 0))
+            dur = float(seg.size) / 50.0     # 姿态约 50Hz 记录
+            osc_hz = flips / 2.0 / max(dur, 1e-3)
+            stats["attitudeOscHz"] = round(osc_hz, 2)
+            err_warn, err_crit = ((ATT_ERR_WARN_FW, ATT_ERR_CRIT_FW)
+                                  if vehicle_type == "fixed_wing"
+                                  else (ATT_ERR_WARN, ATT_ERR_CRIT))
+            if p99 >= err_crit:
+                add("critical", "px4-attitude-overshoot", "attitude_overshoot",
+                    "姿态跟踪误差过大（p99 %.1f°）" % p99,
+                    "vehicle_attitude vs vehicle_attitude_setpoint（机动段）", round(p99, 1),
+                    err_warn, "°", PX4_DOC_LOG,
+                    "结合故障库 F006：检查姿态环增益、机架共振；避免直接大幅降 PID。")
+            elif p99 >= err_warn:
+                add("warning", "px4-attitude-overshoot", "attitude_overshoot",
+                    "姿态跟踪误差偏大（p99 %.1f°）" % p99,
+                    "vehicle_attitude vs vehicle_attitude_setpoint（机动段）", round(p99, 1),
+                    err_warn, "°", PX4_DOC_LOG,
+                    "结合故障库 F006 排查；大风环境下优先归因环境扰动。")
+            if osc_hz >= ATT_OSC_WARN and p99 >= err_warn:
+                add("warning", "px4-attitude-oscillation", "attitude_overshoot",
+                    "姿态误差高频振荡（约 %.1f Hz）" % osc_hz,
+                    "姿态跟踪误差符号翻转频率", round(osc_hz, 2), ATT_OSC_WARN, "Hz",
+                    PX4_DOC_LOG, "振荡多与控制增益/机架共振相关，禁用大幅调参，先做频响检查。")
+    else:
+        skipped("attitude_tracking", "姿态或姿态指令字段缺失")
+else:
+    skipped("attitude_tracking", "vehicle_attitude(_setpoint) 或 armed 段缺失")
+
+# ---------------- 规则 12：空速健康（F009，固定翼/垂直起降巡航）----------------
+if att_sp and (vehicle_type in ("fixed_wing",)):
+    ran("airspeed")
+    av = find_all(ulog, "airspeed_validated")
+    fw_armed = False
+    if nav is not None:
+        nav_arr2 = np.asarray(nav)
+        vts2 = np.asarray(getf(vs, "timestamp"), dtype=np.int64)
+        m2 = np.zeros(len(nav_arr2), dtype=bool)
+        for s, e in armed_intervals:
+            lo = int(np.searchsorted(vts2, s))
+            hi = len(vts2) if e is None else int(np.searchsorted(vts2, e))
+            m2[lo:hi] = True
+        fw_armed = bool(np.any(np.isin(nav_arr2[m2], list(NAV_FW_CRUISE))))
+    if av and fw_armed:
+        d = av[0]
+        valid = getf(d, "airspeed_sensor_measurement_valid")
+        tas = getf(d, "true_airspeed_m_s")
+        if valid is not None and len(valid):
+            va = np.asarray(valid, dtype=float)
+            invalid_frac = float(np.count_nonzero(va == 0)) / max(len(va), 1)
+            stats["airspeedInvalidRatio"] = round(invalid_frac, 3)
+            if invalid_frac >= 0.5:
+                add("critical", "px4-airspeed-invalid", "low_airspeed",
+                    "空速传感器在固定翼段大部分时间无效（%.0f%% 样本）" % (invalid_frac * 100),
+                    "airspeed_validated.airspeed_sensor_measurement_valid", round(invalid_frac, 3),
+                    0.5, None, PX4_DOC_LOG,
+                    "结合故障库 F009：空速失效极易引发失速，检查空速管堵塞/积水、管路漏气与校准。")
+            elif invalid_frac >= 0.1:
+                add("warning", "px4-airspeed-invalid", "low_airspeed",
+                    "空速传感器间歇无效（%.0f%% 样本）" % (invalid_frac * 100),
+                    "airspeed_validated.airspeed_sensor_measurement_valid", round(invalid_frac, 3),
+                    0.1, None, PX4_DOC_LOG, "结合故障库 F009 检查空速管与管路密封。")
+        if tas is not None and len(tas):
+            t = np.asarray(tas, dtype=float); t = t[np.isfinite(t)]
+            if t.size:
+                stats["airspeedMinM"] = round(float(np.min(t)), 1)
+    else:
+        skipped("airspeed", "无固定翼巡航段或未记录 airspeed_validated")
+elif vehicle_type == "unknown":
+    skipped("airspeed", "机型未知，无法判定固定翼巡航段")
+
+# ---------------- 规则 13：VTOL 转换姿态越限（F003）----------------
+VTOL_ATT_LIMIT = 8.0     # 度：转换阶段姿态越限（工程师经验值）
+if vs is not None and armed_intervals:
+    vtsv = find_all(ulog, "vtol_vehicle_status")
+    if vtsv:
+        ran("vtol_transition")
+        d = vtsv[0]
+        tr = getf(d, "vtol_in_trans_mode")
+        tts = getf(d, "timestamp")
+        in_trans = False
+        if tr is not None and len(tr):
+            tr_arr = np.asarray(tr, dtype=float)
+            in_trans = bool(np.count_nonzero(tr_arr) > 0)
+            stats["vtolTransitionSamples"] = int(np.count_nonzero(tr_arr))
+        if in_trans and att:
+            datt = att[0]
+            ats = getf(datt, "timestamp")
+            qq = [getf(datt, "q[%d]" % i) for i in range(4)]
+            if tts is not None and ats is not None and all(x is not None and len(x) for x in qq):
+                # 姿态时间轴上的转换掩码（向前填充转换状态）
+                a_ts = np.asarray(ats, dtype=np.int64)
+                tr_ts = np.asarray(tts, dtype=np.int64)
+                idx = np.clip(np.searchsorted(tr_ts, a_ts), 0, len(tr_arr) - 1)
+                trans_mask = tr_arr[idx] > 0
+                if np.count_nonzero(trans_mask) > 5:
+                    n2 = min(len(x) for x in qq)
+                    q0, q1, q2, q3 = (np.asarray(x, dtype=float)[:n2] for x in qq)
+                    roll = np.degrees(np.arctan2(2 * (q0 * q1 + q2 * q3), 1 - 2 * (q1 ** 2 + q2 ** 2)))
+                    pitch = np.degrees(np.arcsin(np.clip(2 * (q0 * q2 - q3 * q1), -1, 1)))
+                    tm = trans_mask[:n2]
+                    max_tilt = float(np.max(np.maximum(np.abs(roll[tm]), np.abs(pitch[tm]))))
+                    stats["vtolTransitionMaxTiltDeg"] = round(max_tilt, 1)
+                    if max_tilt > VTOL_ATT_LIMIT:
+                        add("warning", "px4-vtol-transition-attitude", "vtol_convert_attitude_over",
+                            "VTOL 转换阶段姿态越限（最大 %.1f°，限值 %.0f°）" % (max_tilt, VTOL_ATT_LIMIT),
+                            "vehicle_attitude（vtol_in_trans_mode 段）", round(max_tilt, 1),
+                            VTOL_ATT_LIMIT, "°", PX4_DOC_LOG,
+                            "结合故障库 F003：复盘转换时序与推力匹配，强风环境优先归因环境扰动。")
+    else:
+        skipped("vtol_transition", "vtol_vehicle_status not in log")
+
+# ---------------- 规则 14：风扰估计（F010，作为 guard 影响其他结论）----------------
+WIND_WARN, WIND_CRIT = 8.0, 12.0     # m/s
+we = find_all(ulog, "estimator_wind") or find_all(ulog, "wind_estimate")
+if we:
+    ran("wind_estimate")
+    d = we[0]
+    wn = getf(d, "windspeed_north")
+    ww = getf(d, "windspeed_east")
+    if wn is not None and ww is not None and len(wn):
+        w = np.sqrt(np.asarray(wn, dtype=float) ** 2 + np.asarray(ww, dtype=float) ** 2)
+        w = w[np.isfinite(w)]
+        if w.size:
+            w_p95 = float(np.percentile(w, 95))
+            stats["windSpeedP95M"] = round(w_p95, 1)
+            if w_p95 >= WIND_CRIT:
+                guard_tags.append("wind_strong")
+                add("warning", "px4-wind-strong", "wind_disturb",
+                    "估计风速较大（p95 %.1f m/s）" % w_p95,
+                    "estimator_wind.windspeed_north/east", round(w_p95, 1), WIND_WARN, "m/s",
+                    PX4_DOC_LOG,
+                    "结合故障库 F010：强风属环境扰动，姿态超调/转换越限优先归因风，不要直接改 PID。")
+            elif w_p95 >= WIND_WARN:
+                guard_tags.append("wind_strong")
+                add("info", "px4-wind-moderate", "wind_disturb",
+                    "估计风速偏大（p95 %.1f m/s）" % w_p95,
+                    "estimator_wind.windspeed_north/east", round(w_p95, 1), WIND_WARN, "m/s",
+                    PX4_DOC_LOG, "解释姿态类异常时需考虑风扰因素。")
+else:
+    skipped("wind_estimate", "estimator_wind / wind_estimate not in log")
+
 # ---------------- 规则 8：日志消息聚合（robotto：ERR+ 冒烟的枪）----------------
 severe_msgs, warning_msgs = [], []
 for m in getattr(ulog, "logged_messages", []):
