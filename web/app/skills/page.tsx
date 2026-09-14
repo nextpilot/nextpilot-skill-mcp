@@ -29,7 +29,7 @@ export default async function SkillsPage({
       : undefined;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10">
+    <div className="mx-auto max-w-6xl px-4 pt-4 pb-10 sm:pt-5">
       <div className="mb-4">
         <Breadcrumbs items={[{ label: "Skill 库" }]} />
       </div>

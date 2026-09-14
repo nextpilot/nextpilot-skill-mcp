@@ -16,7 +16,11 @@
       "Bash(python -c ' *)",
       "Bash(node scripts/shot.mjs \"http://localhost:3000/skills\" /tmp/m-skills.png light 390 800 0)",
       "Bash(node scripts/shot.mjs \"http://localhost:3000/guide/basics\" /tmp/m-guide.png light 390 800 0)",
-      "Bash(node scripts/shot.mjs \"http://localhost:3000/skills\" /tmp/m-skills2.png light 390 620 0)"
+      "Bash(node scripts/shot.mjs \"http://localhost:3000/skills\" /tmp/m-skills2.png light 390 620 0)",
+      "Bash(node scripts/shot.mjs \"http://localhost:3000/guide/basics\" /tmp/guide-v2.png light 1440 700 0)",
+      "Bash(node scripts/shot.mjs \"http://localhost:3000/skills\" /tmp/skills-bc.png light 1440 600 0)",
+      "Bash(node scripts/shot.mjs \"http://localhost:3000/skills/px4-ulog-analyzer\" /tmp/detail-bc.png light 1440 620 0)",
+      "Bash(node scripts/shot.mjs \"http://localhost:3000/guide/basics\" /tmp/guide-m.png light 390 460 0)"
     ]
   }
 }

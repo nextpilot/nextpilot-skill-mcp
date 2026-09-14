@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function AnalyzePage() {
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
+    <div className="mx-auto max-w-7xl px-4 pt-4 pb-10 sm:pt-5">
       <Breadcrumbs items={[{ label: "日志分析" }]} />
       <h1 className="text-[24px] font-semibold tracking-[-0.02em]">
         <LocalizedText zh="PX4 飞行日志分析" en="PX4 flight log analysis" />

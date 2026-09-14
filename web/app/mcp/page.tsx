@@ -14,7 +14,7 @@ export default function McpPage() {
   const servers = getMcpIndex();
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10">
+    <div className="mx-auto max-w-6xl px-4 pt-4 pb-10 sm:pt-5">
       <Breadcrumbs items={[{ label: "MCP Server" }]} />
       <header className="mb-8">
         <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">

@@ -7,7 +7,7 @@ export interface Crumb {
 }
 
 /**
- * 全站统一面包屑：浅灰背景胶囊容器，含“首页”入口。
+ * 全站统一面包屑：整宽浅灰底条（占满所在容器宽度），含「首页」入口。
  * 最后一项为当前页（深色、不可点）。
  */
 export function Breadcrumbs({ items, showHome = true }: { items: Crumb[]; showHome?: boolean }) {
@@ -17,7 +17,7 @@ export function Breadcrumbs({ items, showHome = true }: { items: Crumb[]; showHo
   return (
     <nav
       aria-label="breadcrumb"
-      className="mb-6 inline-flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-[13px] text-muted"
+      className="mb-6 flex w-full flex-wrap items-center gap-1 rounded-md border border-border bg-surface-2 px-3 py-2 text-[13px] text-muted"
     >
       {all.map((item, i) => {
         const last = i === all.length - 1;
