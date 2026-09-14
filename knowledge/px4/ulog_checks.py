@@ -301,19 +301,39 @@ def _eval_expr(expr, env):
 
 
 def _read_field_ref(ref):
-    """'topic.field' → 该字段在各实例上的值（多实例拼接）；topic/字段缺失返回 None。"""
+    """'topic.field' → 该字段在各实例上的值（多实例拼接）；topic/字段缺失返回 None。
+
+    数组字段（如 float32[14] voltage_cell_v）pyulog 按 'field[i]' 暴露，
+    直接 getf(field) 拿不到，这里尝试下标 0..31，返回**每元素一列的列表**；
+    缺的元素位置为 None。
+    """
     topic, _, field = ref.partition(".")
     ds = find_all(ulog, topic)
     if not ds:
         return None
-    vals = []
-    for d in ds:
-        v = getf(d, field)
-        if v is not None and len(v):
-            vals.append(np.asarray(v, dtype=float))
-    if not vals:
+
+    def gather(get_one):
+        vals = []
+        for d in ds:
+            v = get_one(d)
+            if v is not None and len(v):
+                vals.append(np.asarray(v, dtype=float))
+        if not vals:
+            return None
+        return np.concatenate(vals) if len(vals) > 1 else vals[0]
+
+    direct = gather(lambda d: getf(d, field))
+    if direct is not None:
+        return direct
+    col0 = gather(lambda d: getf(d, f"{field}[0]"))
+    if col0 is None:
         return None
-    return np.concatenate(vals) if len(vals) > 1 else vals[0]
+    columns = []
+    for i in range(32):
+        columns.append(gather(lambda d, i=i: getf(d, f"{field}[{i}]")))
+    while columns and columns[-1] is None:
+        columns.pop()
+    return columns
 
 
 def _rule_env():
