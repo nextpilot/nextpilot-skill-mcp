@@ -4,7 +4,9 @@
 
 本项目采用 [BSD-3-Clause](LICENSE) 许可证。
 
-> 当前进度：冲刺 1（见 CLAUDE.md 第 8 节）。Skill Hub 静态站 + PX4 `.ulg` 端侧解析（3 条基础规则）+ DeepSeek 解释层。
+> 当前进度：冲刺 2（见 CLAUDE.md 第 8 节）。Skill Hub + GitHub/邮箱登录 + EdgeOne KV 已上线；
+> PX4 `.ulg` 端侧解析已扩到 **15 个检查组 + 10 条故障知识库**，输出 GJB-841 中文报告；
+> 阈值仍在用真实日志校准（误报率尚未达 <10% 目标）。
 
 ## 目录结构
 
@@ -13,19 +15,24 @@
 ├── CLAUDE.md        # 项目说明（定位、架构、路线图、决策依据）
 ├── LICENSE          # BSD-3-Clause 许可证
 ├── README.md
-├── docs/            # 架构、运维和规则文档
-├── engine/          # 浏览器 / 服务端共用的 Python 日志引擎（预留）
+├── docs/            # 架构、运维文档
+├── engine/          # 服务端 Python 引擎包（阶段二预留，当前无运行时代码）
+├── knowledge/       # ★ 日志分析的唯一知识源：阈值 TOML / 故障库 YAML / 检查 Python / LLM 提示词
 ├── mcp-server/      # 平台 MCP Server（阶段二预留）
-├── scripts/         # 构建、校准和发布脚本（预留）
+├── tools/           # 手动运行的开发工具：规则校准、浏览器链路自检、截图、图标
 └── web/             # Next.js 前端 + Pages Functions（当前冲刺代码）
-    ├── app/         # 页面与 /api/explain 边缘函数
+    ├── app/         # 页面与 /api/auth 路由
     ├── components/
     ├── content/skills/   # Skill 卡片源文件（MDX）
+    ├── functions/   # EdgeOne 边缘函数（KV、配额、DeepSeek 转发）
     ├── lib/
-    └── workers/     # Pyodide Worker 与 Python 规则检查脚本
+    ├── scripts/     # 构建期脚本（build-knowledge.mjs，由 pnpm dev/build 前置调用）
+    └── workers/     # Pyodide Worker 与**生成**的 Python 规则脚本（勿手改）
 ```
 
-`engine/`、`mcp-server/` 和 `scripts/` 当前仅保留目录边界与说明，按路线图逐步实现。
+`engine/` 与 `mcp-server/` 当前仅保留目录边界与说明，按路线图在阶段二实现。
+日志分析的规则、阈值与提示词**只维护在 `knowledge/`**，改完跑 `cd web && pnpm build:kb`
+重新生成运行时产物；详见 [knowledge/README.md](knowledge/README.md)。
 
 ## 快速开始
 

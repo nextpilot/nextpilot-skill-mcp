@@ -36,7 +36,7 @@ pnpm build:kb          # 从 knowledge/ 重新生成 web/ 下运行时产物
 # dev / build 脚本会自动先跑 build:kb，一般不用手动
 
 # 等价回归（不依赖 Node，直接跑 knowledge 里的 Python 源）
-python scripts/calibrate/run_checks_locally.py engine/tests/logs/*.ulg
+python tools/calibrate/run_checks_locally.py engine/tests/logs/*.ulg
 ```
 
 生成产物（提交进仓库，EdgeOne 直接 `next build` 也有得用）：

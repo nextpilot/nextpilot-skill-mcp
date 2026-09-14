@@ -126,12 +126,6 @@ export function LogAnalyzer() {
   const [dedupeNotice, setDedupeNotice] = useState<string | null>(null);
   const pendingHashRef = useRef<string>("");
 
-  const resetWorker = useCallback(() => {
-    workerRef.current?.terminate();
-    workerRef.current = null;
-    pendingRef.current.clear();
-  }, []);
-
   /** 云端报告列表（元数据）；返回而不写 state，便于上传时即时查重 */
   const fetchCloudList = useCallback(async (): Promise<HistoryItem[]> => {
     try {
@@ -191,7 +185,7 @@ export function LogAnalyzer() {
     setHistory(listReports());
     void refreshMe();
     return () => {
-      resetWorker();
+      workerRef.current?.terminate();
     };
   }, [refreshMe, resetWorker]);
 

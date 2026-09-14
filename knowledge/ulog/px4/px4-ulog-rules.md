@@ -2,7 +2,7 @@
 
 > 规则实现：[ulog_checks.py](ulog_checks.py)（源，Pyodide 与本地校准跑同一份）；
 > 阈值：`px4-thresholds.toml`；故障树：`px4-fault-kb.yaml`。
-> 本地回归入口：[scripts/calibrate/run_checks_locally.py](../../../scripts/calibrate/run_checks_locally.py)
+> 本地回归入口：[tools/calibrate/run_checks_locally.py](../../../tools/calibrate/run_checks_locally.py)
 >
 > 铁律（CLAUDE.md 4.1）：所有数值判断只发生在确定性引擎；LLM 只翻译，不更改数值。
 > 当前 **15 个检查组 / 39 个告警发射点 / 10 条故障库**；冲刺 2 目标：10-20 个真实日志校准，误报率 < 10%。标注"暂定"的阈值需在该阶段复核。
@@ -172,5 +172,5 @@ fork 底座是 robotto-xyz/ai-drone-toolkit 的 `diagnose_flight`（`robotto_dro
 
 图表分类色取自 dataviz 参考调色板（已对站点浅/深表面通过校验），状态色沿用站点
 `critical/warning/ok` token；单 Y 轴约束，多量纲拆面板。本地回归入口
-`scripts/calibrate/run_checks_locally.py --probe-data` 校验 manifest / info / series
+`tools/calibrate/run_checks_locally.py --probe-data` 校验 manifest / info / series
 的结构、JSON 合法性（NaN→null）与降采样点数。
