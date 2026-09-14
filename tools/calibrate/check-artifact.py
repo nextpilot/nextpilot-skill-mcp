@@ -56,7 +56,33 @@ def main() -> int:
         return 1
 
     rules = extract_json_const(src, "rules")
-    print(f"生成产物体检通过：合法 Python，{len(final.splitlines())} 行，含 {len(rules)} 条经验规则")
+    print(f"产物语法检查通过：{len(final.splitlines())} 行，含 {len(rules)} 条经验规则")
+
+    # 仅语法检查不够：NameError / KeyError 这类只有**真执行**才暴露
+    # （曾漏掉"operators.py 没被内联"导致 Pyodide 里 OPERATORS 未定义）。
+    data_ts = (REPO_ROOT / "web" / "workers" / "ulog-data-script.ts").read_text(encoding="utf-8")
+    m2 = re.search(r"String\.raw`(.*)`;", data_ts, re.S)
+    if not m2:
+        raise SystemExit("数据层产物里找不到 String.raw 模板")
+    logs = sorted((REPO_ROOT / "engine" / "tests" / "logs").glob("*.ulg"), key=lambda p: p.stat().st_size)
+    if not logs:
+        print("（没有回归日志，跳过执行检查）")
+        return 0
+    log = logs[0]
+    ns: dict = {"ulog_bytes": log.read_bytes()}
+    try:
+        exec(compile(final + "\n" + m2.group(1), "<artifact>", "exec"), ns)
+        result = json.loads(ns["__result"])
+    except Exception as e:  # noqa: BLE001
+        print(f"产物执行失败（{log.name}）：{type(e).__name__}: {e}")
+        import traceback
+
+        traceback.print_exc(limit=3)
+        return 1
+    print(
+        f"产物执行检查通过：{log.name} → findings={len(result.get('findings', []))}, "
+        f"checksRun={len(result.get('checksRun', []))}, tags={result.get('tags')}"
+    )
     return 0
 
 

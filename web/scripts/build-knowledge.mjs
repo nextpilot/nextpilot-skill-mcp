@@ -317,7 +317,7 @@ writeFileSync(
     JSON.stringify(rules) +
     ";\n\n" +
     "export const PY_ULG_CHECKS = String.raw`" +
-    toRawTemplate(checkPy) +
+    toRawTemplate(pyWithOperators) +
     "`\n" +
     '  .replace("__FAULT_KB__", JSON.stringify(faultKbJson.entries))\n' +
     '  .replace("__THRESHOLDS__", JSON.stringify(thresholds))\n' +
