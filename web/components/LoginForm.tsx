@@ -116,7 +116,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
       <div className="mb-6 flex flex-col items-center gap-2 text-center">
         <Radar className="h-8 w-8 text-primary" />
         <h1 className="text-2xl font-semibold">登录 NextPilot</h1>
-        <p className="text-sm text-muted">登录后每月可免费生成 5 次 AI 日志报告</p>
+        <p className="text-sm text-muted">登录后每日可生成 10 次 AI 日志报告，历史同步云端保留 7 天</p>
       </div>
 
       {githubEnabled && (

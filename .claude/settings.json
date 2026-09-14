@@ -29,7 +29,11 @@
       "Bash(curl -s -i -m 30 https://skill.nextpilot.org/api/me)",
       "Bash(curl -s -i -m 30 https://skill.nextpilot.org/api/reports)",
       "Bash(curl -s -m 30 https://skill.nextpilot.org/api/auth/providers)",
-      "Bash(curl -s -i -m 30 \"https://skill.nextpilot.org/api/auth/signin/github?callbackUrl=https%3A%2F%2Fskill.nextpilot.org%2Fanalyze\")"
+      "Bash(curl -s -i -m 30 \"https://skill.nextpilot.org/api/auth/signin/github?callbackUrl=https%3A%2F%2Fskill.nextpilot.org%2Fanalyze\")",
+      "Bash(curl -s -m 20 -c /tmp/cj https://skill.nextpilot.org/api/auth/csrf)",
+      "Bash(curl -s -m 20 https://skill.nextpilot.org/api/auth/session)",
+      "Bash(curl -s -m 20 https://skill.nextpilot.org/api/auth/providers)",
+      "Bash(node scripts/shot.mjs \"https://skill.nextpilot.org/login\" /tmp/login-prod.png light 1100 900 0)"
     ]
   }
 }
