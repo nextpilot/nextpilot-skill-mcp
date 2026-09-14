@@ -45,7 +45,7 @@ export default function HomePage() {
     <div>
       {/* Hero：白底、紧排标题、无装饰光斑；强调色只出现在链接与小标记上 */}
       <section className="border-b border-border">
-        <div className="mx-auto grid max-w-6xl gap-12 px-4 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16 lg:py-20">
+        <div className="page-shell grid gap-12 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16 lg:py-20">
           <div>
             <p className="mb-5 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
               <LocalizedText zh="飞控 AI 技术交流 · Skill / MCP 平台" en="Flight AI community · Skill / MCP platform" />
@@ -89,7 +89,7 @@ export default function HomePage() {
 
       {/* 分类 */}
       <section className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-4 py-14">
+        <div className="page-shell py-14">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
               <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">
@@ -153,7 +153,7 @@ export default function HomePage() {
 
       {/* 精选 Skill */}
       <section className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-4 py-14">
+        <div className="page-shell py-14">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
               <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">
@@ -181,7 +181,7 @@ export default function HomePage() {
 
       {/* 日志分析覆盖：平台自营的确定性检查（数值判断的唯一来源） */}
       <section className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-4 py-14">
+        <div className="page-shell py-14">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
               <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">
@@ -262,7 +262,7 @@ export default function HomePage() {
 
       {/* 平台原则 */}
       <section>
-        <div className="mx-auto max-w-6xl px-4 py-14">
+        <div className="page-shell py-14">
           <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">
             Principles
           </p>

@@ -27,7 +27,9 @@
       "Bash(curl -s -m 30 -o /dev/null -w \"%{http_code}\\\\n\" -X POST https://skill.nextpilot.org/internal/otp/set)",
       "Bash(curl -s -i -m 30 -H \"x-device-id: probedev999\" https://skill.nextpilot.org/api/me)",
       "Bash(curl -s -i -m 30 https://skill.nextpilot.org/api/me)",
-      "Bash(curl -s -i -m 30 https://skill.nextpilot.org/api/reports)"
+      "Bash(curl -s -i -m 30 https://skill.nextpilot.org/api/reports)",
+      "Bash(curl -s -m 30 https://skill.nextpilot.org/api/auth/providers)",
+      "Bash(curl -s -i -m 30 \"https://skill.nextpilot.org/api/auth/signin/github?callbackUrl=https%3A%2F%2Fskill.nextpilot.org%2Fanalyze\")"
     ]
   }
 }

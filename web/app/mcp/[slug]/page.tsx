@@ -49,7 +49,7 @@ export default async function McpDetailPage({
     .map((s) => ({ slug: s.slug, name: s.name, description: s.description, icon: s.icon }));
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pt-4 pb-10 sm:pt-5">
+    <div className="page-shell pt-4 pb-10 sm:pt-5">
       <Breadcrumbs items={[{ label: "MCP Server", href: "/mcp" }, { label: server.slug }]} />
 
       <div className="flex flex-col gap-4 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">

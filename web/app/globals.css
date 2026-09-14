@@ -223,6 +223,12 @@ body {
     outline: none;
     transition: border-color 140ms ease, box-shadow 140ms ease;
   }
+
+  /* 全站统一内容容器：顶栏、首页、各列表/详情/指南/分析页共用同一个宽度，
+     避免各顶级栏目宽度不一致（6xl，与 SiteHeader 对齐）。 */
+  .page-shell {
+    @apply mx-auto w-full max-w-6xl px-4;
+  }
   .input::placeholder { color: var(--app-faint); }
   .input:focus {
     border-color: var(--app-text);

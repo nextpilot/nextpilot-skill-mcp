@@ -19,7 +19,7 @@ export default async function LoginPage({
       : "/analyze";
 
   return (
-    <div className="mx-auto flex max-w-6xl justify-center px-4 py-16">
+    <div className="page-shell flex justify-center py-16">
       <Suspense>
         <LoginForm callbackUrl={callbackUrl} />
       </Suspense>
