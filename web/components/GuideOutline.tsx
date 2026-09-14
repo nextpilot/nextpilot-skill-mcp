@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, List as ListIcon } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import type { GuideHeading } from "@/lib/guide";
 
@@ -68,7 +68,10 @@ export function GuideOutline({ headings }: { headings: GuideHeading[] }) {
       <aside className="hidden w-56 shrink-0 xl:block">
         <nav className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pb-10">
           <p className="mb-3 text-xs font-semibold tracking-wider text-muted">
-            {language === "zh" ? "本页目录" : "On this page"}
+            <span className="inline-flex min-w-0 items-center gap-2 truncate">
+          <ListIcon className="h-4 w-4 shrink-0 text-primary" />
+          <span className="truncate">{language === "zh" ? "本页目录" : "On this page"}</span>
+        </span>
           </p>
           {list}
         </nav>
@@ -83,9 +86,12 @@ export function GuideOutlineMobile({ headings }: { headings: GuideHeading[] }) {
   const { language } = useLanguage();
   if (headings.length === 0) return null;
   return (
-    <details className="group mb-6 rounded-xl border border-border bg-surface xl:hidden">
+    <details className="group min-w-0 flex-1 rounded-xl border border-border bg-surface xl:hidden">
       <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-2.5 text-sm font-medium">
-        {language === "zh" ? "本页目录" : "On this page"}
+        <span className="inline-flex min-w-0 items-center gap-2 truncate">
+          <ListIcon className="h-4 w-4 shrink-0 text-primary" />
+          <span className="truncate">{language === "zh" ? "本页目录" : "On this page"}</span>
+        </span>
         <ChevronDown className="h-4 w-4 text-muted transition-transform group-open:rotate-180" />
       </summary>
       <div className="max-h-[60vh] overflow-y-auto border-t border-border px-4 py-3">

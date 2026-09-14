@@ -3,6 +3,8 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { LocalizedText } from "@/components/LocalizedText";
 import { GuideMdx } from "@/components/GuideMdx";
 import { GuideOutline, GuideOutlineMobile } from "@/components/GuideOutline";
+import { GuideDocsSelect } from "@/components/GuideSidebar";
+import { getGuideNav } from "@/lib/guide";
 import { getGuideNeighbors, type GuideDoc } from "@/lib/guide";
 
 /**
@@ -16,9 +18,6 @@ export function GuideArticle({ doc }: { doc: GuideDoc }) {
     <div className="flex min-w-0 gap-10">
       <article className="min-w-0 max-w-3xl flex-1">
         <header className="mb-8 border-b border-border pb-6">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-            <LocalizedText zh={doc.group} en={doc.groupEn} />
-          </p>
           <h1 className="text-3xl font-semibold tracking-tight text-text sm:text-4xl">
             <LocalizedText zh={doc.title} en={doc.titleEn} />
           </h1>
@@ -27,7 +26,10 @@ export function GuideArticle({ doc }: { doc: GuideDoc }) {
           </p>
         </header>
 
-        <GuideOutlineMobile headings={doc.headings} />
+        <div className="mb-5 flex gap-2 lg:hidden">
+          <GuideDocsSelect groups={getGuideNav()} />
+          <GuideOutlineMobile headings={doc.headings} />
+        </div>
 
         <div className="prose-guide">
           <GuideMdx source={doc.body} />

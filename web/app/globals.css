@@ -12,6 +12,10 @@
   --color-critical: var(--app-critical);
   --color-warning: var(--app-warning);
   --color-ok: var(--app-ok);
+  --color-accent: var(--app-accent);
+  --color-faint: var(--app-faint);
+  --color-border-strong: var(--app-border-strong);
+  --color-primary-soft: var(--app-primary-soft);
   --font-sans: "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
@@ -72,6 +76,7 @@ body {
  */
 .site-header {
   background: var(--color-surface);
+  border-bottom-color: var(--app-border);
 }
 
 .theme-toggle {
@@ -129,6 +134,88 @@ body {
 .icon-link:focus-visible {
   /* 栏体本身是 surface，hover 必须再深一档 */
   background: var(--color-surface-2);
+}
+
+
+/* ============ 工程风组件原语（全站统一） ============ */
+
+/* 主按钮：深色实底 */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+  background: var(--app-accent);
+  color: #fff;
+  padding: 0.55rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background-color 140ms ease, transform 100ms ease;
+}
+html[data-theme="dark"] .btn-primary { color: #0a0d10; }
+.btn-primary:hover { background: var(--app-accent-hover); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 次按钮：描边 */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-surface);
+  color: var(--app-text);
+  padding: 0.55rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+.btn-ghost:hover { border-color: var(--app-text); }
+
+/* 卡片：白底 + 1px 细线 + 极轻阴影，不再用厚边框 + 大圆角堆叠 */
+.card {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-card);
+}
+
+/* 标签：灰底方角小圆，品牌色标签走 primary-soft */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--app-muted);
+}
+.chip-brand {
+  border-color: transparent;
+  background: var(--app-primary-soft);
+  color: var(--app-primary);
+}
+
+/* 输入框 */
+.input {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-surface);
+  color: var(--app-text);
+  padding: 0.6rem 0.8rem;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.input::placeholder { color: var(--app-faint); }
+.input:focus {
+  border-color: var(--app-text);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-text) 10%, transparent);
 }
 
 .prose-skill h2 {

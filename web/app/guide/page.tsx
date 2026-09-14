@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { GuideArticle } from "@/components/GuideArticle";
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { getGuideDoc } from "@/lib/guide";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -15,10 +14,5 @@ export default function GuideIndexPage() {
   const doc = getGuideDoc("");
   if (!doc) notFound();
 
-  return (
-    <>
-      <Breadcrumbs items={[{ label: "使用指南" }]} />
-      <GuideArticle doc={doc} />
-    </>
-  );
+  return <GuideArticle doc={doc} />;
 }
