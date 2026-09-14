@@ -126,6 +126,14 @@ export function LogAnalyzer() {
   const [dedupeNotice, setDedupeNotice] = useState<string | null>(null);
   const pendingHashRef = useRef<string>("");
 
+  /** 丢弃当前 worker 与其挂起的请求（加载失败 / 上传异常 / 卸载时调用）。
+   *  置空 ref 后下一次上传会重新创建 worker，用户不必刷新页面。 */
+  const resetWorker = useCallback(() => {
+    workerRef.current?.terminate();
+    workerRef.current = null;
+    pendingRef.current.clear();
+  }, []);
+
   /** 云端报告列表（元数据）；返回而不写 state，便于上传时即时查重 */
   const fetchCloudList = useCallback(async (): Promise<HistoryItem[]> => {
     try {
@@ -185,7 +193,7 @@ export function LogAnalyzer() {
     setHistory(listReports());
     void refreshMe();
     return () => {
-      workerRef.current?.terminate();
+      resetWorker();
     };
   }, [refreshMe, resetWorker]);
 
