@@ -52,19 +52,19 @@ export default async function SkillDetailPage({
 
       {/* 两栏：左栏 = 标题 + 内容（纵向堆叠），右栏 = 粘性侧栏（对应 SkillHub 的 390px 侧栏） */}
       <div className="flex flex-col gap-4 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">
-        <div className="min-w-0 rounded-2xl bg-surface p-5 sm:p-6">
+        <div className="card min-w-0 p-5 sm:p-6">
           {/* 标题区：图标 + 标题 + slug，其后按组展示头部信息（见 SkillHeaderMeta） */}
           <header className="mb-8">
             <div className="flex items-start gap-4">
               <span
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] border border-border bg-surface text-2xl"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border text-xl"
                 aria-hidden
               >
                 {skill.icon ?? CATEGORY_GLYPH[skill.category]}
               </span>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-bold md:text-[26px]">{skill.name}</h1>
+                  <h1 className="text-[24px] font-semibold tracking-[-0.02em]">{skill.name}</h1>
                   <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                     {CATEGORY_LABEL[skill.category]}
                   </span>

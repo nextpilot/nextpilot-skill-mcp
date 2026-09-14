@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node scripts/shot.mjs \"http://localhost:3000/skills\" /tmp/v2-skills.png light 1280 820 0)",
+      "Bash(node scripts/shot.mjs \"http://localhost:3000/skills\" /tmp/v2-skills2.png light 1000 420 0)"
+    ]
+  }
+}

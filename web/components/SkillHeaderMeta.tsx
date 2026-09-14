@@ -150,7 +150,7 @@ export function SkillMetaGroups({
   }[];
 
   return (
-    <dl className="mt-5 space-y-2.5 border-t border-border pt-4 text-xs">
+    <dl className="mt-5 space-y-2.5 border-t border-border pt-4 text-[13px]">
 
       {badges.length > 0 && (
         <Row label="徽章">

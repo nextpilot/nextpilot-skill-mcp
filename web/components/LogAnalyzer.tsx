@@ -408,7 +408,7 @@ export function LogAnalyzer() {
     <div>
       <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
         {/* 左栏画布：上传 + 历史 */}
-        <aside className="min-w-0 space-y-5 self-start rounded-2xl bg-surface p-5">
+        <aside className="card min-w-0 space-y-5 self-start p-5">
           <p className="flex items-start gap-2 text-xs leading-5 text-muted">
             <Lock className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
             <span>
@@ -426,7 +426,7 @@ export function LogAnalyzer() {
               const f = e.dataTransfer.files?.[0];
               if (f) void handleFile(f);
             }}
-            className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-surface-2 px-4 py-9 text-center transition-colors hover:border-primary/60"
+            className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border-strong px-4 py-9 text-center transition-colors hover:border-text"
           >
             {busy ? (
               <Loader2 className="mb-3 h-8 w-8 animate-spin text-primary" />
@@ -478,9 +478,9 @@ export function LogAnalyzer() {
         </aside>
 
         {/* 右栏画布：分析结果 */}
-        <section className="min-w-0 self-start rounded-2xl bg-surface p-5 sm:p-6">
+        <section className="card min-w-0 self-start p-5 sm:p-6">
           {error && (
-            <div className="rounded-xl border border-critical/40 bg-critical/10 p-4 text-sm text-critical">
+            <div className="rounded-lg border border-critical/40 bg-critical/[0.06] p-4 text-sm text-critical">
               {error}
             </div>
           )}
@@ -601,12 +601,12 @@ function ReportView({
 
       {/* 系统信息常驻在 tab 上方，切换 tab 不消失 */}
       {info ? (
-        <section className="mb-5 rounded-xl bg-surface-2 p-4">
+        <section className="mb-5 rounded-lg bg-surface-2 p-4">
           <h3 className="mb-2 text-sm font-semibold">系统信息</h3>
           <SystemInfoPanel info={info} />
         </section>
       ) : (
-        <p className="mb-5 rounded-xl bg-surface-2 p-4 text-xs leading-5 text-muted">
+        <p className="mb-5 rounded-lg bg-surface-2 p-4 text-xs leading-5 text-muted">
           历史回看仅保留检查结论与 AI 解读；系统信息、图表、事件与参数需重新解析原始日志（选择同一份 .ulg）。
         </p>
       )}
@@ -691,7 +691,7 @@ function SummaryTab({
         <div className="mt-6 space-y-3">
           <h2 className="text-base font-semibold">匹配故障模式（{report.matchedFaults.length}）</h2>
           {report.matchedFaults.map((mf) => (
-            <div key={mf.faultId} className="rounded-xl border border-border bg-surface-2 p-4 text-sm">
+            <div key={mf.faultId} className="rounded-lg border border-border bg-surface-2 p-4 text-sm">
               <div className="flex items-center gap-2">
                 <span className="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-xs text-primary">
                   {mf.faultId}
@@ -742,7 +742,7 @@ function SummaryTab({
           DeepSeek 正在生成中文报告…
         </p>
       ) : (
-        <div className="rounded-xl border border-dashed border-border bg-surface-2 p-5">
+        <div className="rounded-lg border border-dashed border-border-strong p-5">
           <button
             type="button"
             onClick={onGenerateAi}

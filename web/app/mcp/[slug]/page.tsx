@@ -53,18 +53,18 @@ export default async function McpDetailPage({
       <Breadcrumbs items={[{ label: "MCP Server", href: "/mcp" }, { label: server.slug }]} />
 
       <div className="flex flex-col gap-4 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">
-        <div className="min-w-0 rounded-2xl bg-surface p-5 sm:p-6">
+        <div className="card min-w-0 p-5 sm:p-6">
           <header className="mb-8">
             <div className="flex items-start gap-4">
               <span
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] border border-border bg-surface text-2xl"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-border text-xl"
                 aria-hidden
               >
                 {server.icon ?? "🔌"}
               </span>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-bold md:text-[26px]">{server.name}</h1>
+                  <h1 className="text-[24px] font-semibold tracking-[-0.02em]">{server.name}</h1>
                   {server.readOnly ? (
                     <span className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs text-muted">
                       <Eye className="h-3 w-3" />

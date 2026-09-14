@@ -82,7 +82,7 @@ export function SkillSidebar({
   return (
     <div className="flex w-full flex-col lg:w-[390px]">
       {/* 安装卡：说明 + 主 CTA（对应 SkillHub 的“将提示词发送给你的 AI 安装该 skills”） */}
-      <section className="rounded-xl border border-border bg-surface p-5">
+      <section className="card p-5">
         <h3 className="text-[15px] font-semibold">{installTitle}</h3>
         <p className="mt-2 text-xs leading-5 text-muted">{installHint}</p>
 
@@ -97,7 +97,7 @@ export function SkillSidebar({
         <button
           type="button"
           onClick={download}
-          className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm text-muted transition-colors hover:border-primary/50 hover:text-text"
+          className="btn-ghost mt-2 w-full py-2.5 text-muted"
         >
           {downloaded ? <Check className="h-4 w-4 text-ok" /> : <Download className="h-4 w-4" />}
           {downloaded ? "已下载" : `下载 ${slug}.md`}
@@ -127,7 +127,7 @@ export function SkillSidebar({
 
       {/* 相关推荐 */}
       {related.length > 0 && (
-        <section className="mt-4 rounded-xl border border-border bg-surface p-5">
+        <section className="card mt-4 p-5">
           <h3 className="mb-3 text-sm font-semibold">相关推荐</h3>
           <ul className="divide-y divide-border/60">
             {related.map((r) => (

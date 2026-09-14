@@ -124,7 +124,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
           <button
             type="button"
             onClick={loginGithub}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 py-2.5 text-sm font-medium transition-colors hover:bg-surface-2"
+            className="btn-ghost w-full py-2.5"
           >
             <GithubIcon className="h-5 w-5" />
             使用 GitHub 登录
@@ -145,7 +145,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="邮箱地址"
           autoComplete="email"
-          className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm outline-none focus:border-primary"
+          className="input"
         />
         <div className="flex gap-2">
           <input
@@ -156,13 +156,13 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
             placeholder="6 位验证码"
             autoComplete="one-time-code"
-            className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm outline-none focus:border-primary"
+            className="input"
           />
           <button
             type="button"
             onClick={requestCode}
             disabled={sending || countdown > 0}
-            className="shrink-0 rounded-lg border border-border bg-surface px-3 py-2.5 text-sm font-medium transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn-ghost shrink-0 py-2.5"
           >
             {countdown > 0 ? `${countdown}s` : sending ? "发送中…" : "获取验证码"}
           </button>
@@ -174,7 +174,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
         <button
           type="submit"
           disabled={submitting}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="btn-primary w-full py-2.5"
         >
           <Mail className="h-4 w-4" />
           {submitting ? "登录中…" : "登录 / 注册"}

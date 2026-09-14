@@ -90,7 +90,7 @@ export function SkillComments({ kind, slug }: { kind: Kind; slug: string }) {
     <div>
       {/* 发布框：未登录时引导登录（保留回跳目标） */}
       {session?.user ? (
-        <form onSubmit={submit} className="rounded-xl border border-border bg-surface p-4">
+        <form onSubmit={submit} className="card p-4">
           {replyTo && (
             <p className="mb-2 flex items-center gap-1.5 text-xs text-muted">
               <CornerDownRight className="h-3.5 w-3.5" />
@@ -110,7 +110,7 @@ export function SkillComments({ kind, slug }: { kind: Kind; slug: string }) {
             rows={3}
             maxLength={1000}
             placeholder="分享你的实测效果、踩坑经验或改进建议…"
-            className="w-full resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary"
+            className="input resize-y"
           />
           <div className="mt-2 flex items-center justify-between">
             <span className="text-xs text-muted">{content.length}/1000</span>
@@ -126,7 +126,7 @@ export function SkillComments({ kind, slug }: { kind: Kind; slug: string }) {
           {error && <p className="mt-2 text-xs text-critical">{error}</p>}
         </form>
       ) : (
-        <p className="rounded-xl border border-dashed border-border bg-surface p-4 text-sm text-muted">
+        <p className="rounded-lg border border-dashed border-border-strong p-4 text-sm text-muted">
           <a
             href={`/login?callbackUrl=${encodeURIComponent(`/skills/${slug}`)}`}
             className="text-primary hover:underline"
