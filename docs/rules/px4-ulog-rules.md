@@ -66,11 +66,41 @@
 | pyulog `sample.ulg` | rotary_wing | 182s | 无 | 旧格式兼容 |
 | pyulog `sample_log_small.ulg` | rotary_wing | 7s | 无 | 旧格式兼容（含 2016 年风格字段） |
 
+## 冲刺 2 升级：四层架构 + 8 条规则 + 故障库匹配
+
+实现见 [ulog-check-script.ts](../../web/workers/ulog-check-script.ts)，方法论见
+[knowledge-authoring.md](knowledge-authoring.md)。引擎输出新增 `tags / guardTags /
+phases / matchedFaults / checksRun / checksSkipped`。
+
+| 规则 | ruleId | 标签 / 阈值 |
+| --- | --- | --- |
+| 振动 / 削波（原有 3 项） | `px4-vibration` `px4-imu-clipping` | tag `high_vibration`（仅 warning/critical，info 不打） |
+| EKF 创新检验 + 硬故障位 | `px4-ekf-innovation` `px4-ekf-fault` | tag `ekf_innovation_failure`；`filter_fault_flags` 只有 bit0-5（位置/速度/高度/偏航核心融合）报 critical，bit10（视觉拒绝）未用 VIO 时仅 info |
+| 电源（单芯电压 + 余量 + 飞行中持续压降） | `px4-power-cell-voltage` `px4-power-remaining` `px4-power-sag` | tag `battery_voltage_drop`；压降用 armed 段剔除起飞冲击 5s、尾段 20% 中位数 |
+| CPU 负载 | `px4-cpu-load` | `cpuload.load` p95/max 90%/95% |
+| GPS 健康 | `px4-gps-eph` `px4-gps-sats` `px4-gps-jump` | tag `gps_eph_high`/`gps_jump`；eph p95 5/10m、卫星 ≤6/8、lat/lon 差分速度 >50m/s 跳点 |
+| Failsafe / 失联边沿 | `px4-failsafe-*` | 只报置位沿，且必须落在 armed 区间（借鉴 robotto）；tag `rc_lost`/`failsafe` |
+| 模式抖动 | `px4-mode-thrash` | nav_state 变化 >12 次 |
+| 日志消息聚合 | `px4-log-errors` `px4-log-warnings` | `logged_messages` level≤3 聚合为 critical，附最多 5 条带时间戳原文 |
+
+飞行阶段（`phases`）：只从 **armed 段**的 nav_state 推断（takeoff/hover/maneuver/
+fw_cruise/landing/vtol_transition）；未解锁的地面操作不产生阶段、不参与故障库匹配。
+
+数据质量 guard：`insufficient_data`（armed <60s）、`restart_detected`（topic 时间戳回退）、
+`topic_missing:{name}`、`log_dropouts_high`（丢包 >1s）。命中 `insufficient_data` 时
+短路故障库匹配，只描述现象不出根因。
+
+故障库匹配：`px4-fault-kb.yaml` 按 trigger_tags ∩ tags + flight_phase + exclude_tags
+确定性检索，只把命中条目（possibleRootCause/troubleshootingSteps/note）注入 LLM；
+LLM 的 GJB-841 报告根因不得超出命中条目。
+
 ## 待办
 
-- [ ] 扩到 10-20 个日志（多旋翼为主，覆盖固定翼 / rover），校准削波、test ratio、电芯电压阈值。
-- [ ] 浏览器端实测 Pyodide 加载 / 解析耗时与内存（CLAUDE.md 冲刺 2 验收项）。
-- [ ] 规则补齐到 16 项（冲刺 3）。
+- [ ] 扩到 10-20 个日志（多旋翼为主，覆盖固定翼 / rover），校准削波、test ratio、电芯电压、eph、压降阈值。
+- [ ] 浏览器端实测 Pyodide 加载 / 解析耗时与内存。
+- [ ] 规则继续向 16 项补齐：电机输出不平衡（actuator_motors）、IMU bias 漂移、空速管、VTOL 转换姿态、碰撞检测、风扰等（标签已在故障库 F003/F005/F006/F008/F009/F010 预留）。
+- [ ] LLM 输出后置校验：故障编号白名单，引用未注入故障模式时重生成。
+- [ ] ArduPilot `.bin`（pymavlink + ardupilot-mcp 检查套件）。
 
 ## 报告页数据层（对标 Flight Review A/B/C）
 

@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 
 /**
  * Node 侧 SSR 调用同源 /internal/* 边缘函数的薄客户端。
- * KV 只能在边缘运行时访问，Node 侧（NextAuth、发信路由）通过 INTERNAL_SECRET 中转。
+ * KV 只能在边缘运行时访问，Node 侧（NextAuth、发信路由）通过 AUTH_INTERNAL_SECRET 中转。
  */
 
 const INTERNAL_PATHS = {
@@ -14,7 +14,7 @@ const INTERNAL_PATHS = {
 
 /** 从当前请求的转发头推导公网源站（EdgeOne 注入 x-forwarded-*） */
 async function publicOrigin(): Promise<string> {
-  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, "");
+  if (process.env.SITE_URL) return process.env.SITE_URL.replace(/\/$/, "");
   const h = await headers();
   const proto = h.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
   const host =
@@ -35,11 +35,11 @@ export class InternalApiError extends Error {
 async function callInternal(
   path: string,
   body: Record<string, unknown>,
-  init?: { ip?: string },
+  init?: { ip?: string; },
 ): Promise<Record<string, unknown>> {
   const origin = await publicOrigin();
-  const secret = process.env.INTERNAL_SECRET;
-  if (!secret) throw new InternalApiError("INTERNAL_SECRET 未配置", 500);
+  const secret = process.env.AUTH_INTERNAL_SECRET;
+  if (!secret) throw new InternalApiError("AUTH_INTERNAL_SECRET 未配置", 500);
 
   const resp = await fetch(`${origin}${path}`, {
     method: "POST",
@@ -74,14 +74,14 @@ export interface InternalUser {
 
 export async function requestEmailOtp(email: string, ip?: string) {
   return callInternal(INTERNAL_PATHS.otpSet, { email }, { ip }) as Promise<
-    | { ok: true; code: string }
-    | { ok: false; reason: string; retryAfter?: number }
+    | { ok: true; code: string; }
+    | { ok: false; reason: string; retryAfter?: number; }
   >;
 }
 
 export async function consumeEmailOtp(email: string, code: string) {
   return callInternal(INTERNAL_PATHS.otpConsume, { email, code }) as Promise<
-    { ok: true } | { ok: false; reason: string }
+    { ok: true; } | { ok: false; reason: string; }
   >;
 }
 

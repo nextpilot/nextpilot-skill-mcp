@@ -1,7 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import { Star, Download } from "lucide-react";
 import type { SkillMeta } from "@/lib/types";
 import { CATEGORY_LABEL } from "@/lib/constants";
+import { formatDate } from "@/lib/format";
 
 export function SkillCard({ skill }: { skill: SkillMeta }) {
   return (
@@ -14,10 +17,7 @@ export function SkillCard({ skill }: { skill: SkillMeta }) {
           {CATEGORY_LABEL[skill.category]}
         </span>
         {skill.platforms.slice(0, 2).map((p) => (
-          <span
-            key={p}
-            className="rounded-md border border-border px-2 py-0.5 text-muted"
-          >
+          <span key={p} className="rounded-md border border-border px-2 py-0.5 text-muted">
             {p}
           </span>
         ))}
@@ -33,7 +33,7 @@ export function SkillCard({ skill }: { skill: SkillMeta }) {
       <div className="mt-4 flex items-center justify-between text-xs text-muted">
         <div className="flex flex-wrap gap-1.5">
           {skill.tags.slice(0, 3).map((t) => (
-              <span key={t} className="text-[11px] text-muted">
+            <span key={t} className="text-[11px] text-muted">
               #{t}
             </span>
           ))}
@@ -49,6 +49,10 @@ export function SkillCard({ skill }: { skill: SkillMeta }) {
           </span>
         </div>
       </div>
+
+      <p className="mt-2 text-right text-[11px] text-muted/70">
+        更新于 {formatDate(skill.updatedAt)}
+      </p>
     </Link>
   );
 }

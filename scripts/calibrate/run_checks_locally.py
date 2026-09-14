@@ -18,14 +18,22 @@ if hasattr(sys.stdout, "reconfigure"):
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TS_CHECKS = REPO_ROOT / "web" / "workers" / "ulog-check-script.ts"
 TS_DATA = REPO_ROOT / "web" / "workers" / "ulog-data-script.ts"
+FAULT_KB_JSON = REPO_ROOT / "web" / "workers" / "fault-kb.generated.json"
 
 
 def _load_template(path: Path) -> str:
     text = path.read_text(encoding="utf-8")
-    m = re.search(r"String\.raw`(.*)`\s*;?\s*$", text, re.S)
+    # 兼容 `...` 与 `...`.replace(...) 两种结尾
+    m = re.search(r"String\.raw`(.*)`\s*(?:\.replace.*)?;\s*$", text, re.S)
     if not m:
         raise RuntimeError(f"未能在 {path} 中找到 String.raw`...` 模板")
-    return m.group(1)
+    body = m.group(1)
+    if "__FAULT_KB__" in body:
+        import json as _json
+        entries = _json.loads(FAULT_KB_JSON.read_text(encoding="utf-8"))["entries"]
+        # 注入 Python 字面量（repr 保证 True/False/None 语义正确）
+        body = body.replace("__FAULT_KB__", repr(entries))
+    return body
 
 
 def build_namespace(path: Path) -> dict:

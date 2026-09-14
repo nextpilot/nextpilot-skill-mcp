@@ -6,36 +6,48 @@ import {
   getKv,
   listAll,
   usagePrefix,
+  anonUsagePrefix,
   reportPrefix,
   sanitizeId,
-  monthStamp,
-  FREE_MONTHLY_QUOTA,
+  sanitizeDeviceId,
+  sha256Hex,
+  dateStamp,
+  FREE_DAILY_QUOTA,
+  ANONYMOUS_DAILY_QUOTA,
+  ANONYMOUS_IP_DAILY_CAP,
   REPORT_TTL_MS,
+  clientIp,
 } from "../_lib/kv.js";
 import { getSessionUser } from "../_lib/auth.js";
 import { jsonResponse, readJson } from "../_lib/http.js";
 
 const DEEPSEEK_ENDPOINT = "https://api.deepseek.com/chat/completions";
 
-const SYSTEM_PROMPT = `你是资深 PX4 飞控日志分析专家。你的唯一职责是把结构化检查结果（findings）"翻译"成给飞手看的中文报告。
+// 工程师思考范式（docs/rules/knowledge-authoring.md 第 3 节）：LLM 只做 GJB-841 组装
+const SYSTEM_PROMPT = `你是资深飞控测试工程师，依据结构化检查结果输出 GJB-841 故障归零报告。严格遵守思考范式：
+1. 先区分现象：哪些是硬件问题，哪些是参数配置问题，哪些是环境扰动（风、GPS 干扰）。
+2. 排查顺序由简到繁：硬件机械检查 → 安装装配 → 传感器状态 → 飞控参数 → 算法逻辑。
+3. 同时出现多个异常时，识别主故障与次生故障，不要把次生现象当成根因。
+4. VTOL 机型必须区分故障发生在：多旋翼模式 / 转换过渡阶段 / 固定翼巡航阶段。
+5. 证据不足时禁止编造根因；证据不足输出：【现有数据不足以确定根因，建议复现试验，同步增加机载记录】。
+6. 输出格式遵循 GJB-841 故障归零规范，每条问题按四段：故障现象描述 → 数据依据 → 初步原因分析 → 排查与验证建议。
+7. 禁止输出会带来炸机风险的参数修改建议；给出参数建议时必须标注安全边界。
+8. 所有结论只能基于【日志统计摘要】和【匹配的故障知识库】，禁止使用未提供的故障模式；根因顺序必须沿用知识库给出的排查顺序。
 
-铁律：
-1. 只能引用 findings 中给出的字段、数值、阈值，禁止编造任何数字、字段名或结论；
-2. 没有检查到的项目明确说"本次未检查/未发现异常"，不要推测；
-3. 按严重度（critical > warning > info）组织内容，先给 2-3 句总体结论，再逐条解释：现象、可能原因、建议动作；
-   飞行统计中的 vehicleType 标明机型（rotary_wing 旋翼类 / fixed_wing 固定翼 / rover 地面车等），原因分析与建议必须贴合该机型（如 rover 不存在桨叶/飞行动力学问题）；
-4. 每条解释末尾附上 findings 中的官方文档链接（如有）；
-5. 结尾固定加一行："本报告为辅助判读，不替代人工排查。"
-6. 使用 Markdown 输出，语言简洁专业，不要输出与本次日志无关的内容。`;
+其他铁律：
+- 只能引用 findings 中的字段、数值、阈值，禁止编造数字或字段名。
+- 未检查的项目明确说"本次未检查/未发现异常"，不要推测。
+- 每个排查建议末尾附上知识库 note 中的禁忌与 findings 中的官方文档链接。
+- guardTags 含 insufficient_data 时，先声明数据不足、只描述现象、不做 PID/根因深度诊断。
+- 使用简洁专业的中文 Markdown，结尾固定加一行："本报告为辅助判读，不替代人工排查。"`;
 
 const EMPTY_FINDINGS_MARKDOWN =
   "## 分析结论\n\n本次检查的三项基础规则（振动 / IMU 削波、EKF 创新检验、电源）**均未发现异常**。\n\n本报告为辅助判读，不替代人工排查。";
 
 export async function onRequestPost({ request, env, waitUntil }) {
+  // 冲刺 2：日志分析对所有用户免费。登录 10 次/天，匿名设备 3 次/天（KV 只用于防滥用）。
+  // 会员体系/无限额度是冲刺 3。
   const session = await getSessionUser(request, env);
-  if (!session) {
-    return jsonResponse({ error: "请先登录后再生成 AI 报告" }, 401);
-  }
 
   const body = await readJson(request);
   if (!body || typeof body !== "object") {
@@ -54,14 +66,54 @@ export async function onRequestPost({ request, env, waitUntil }) {
   }
 
   const kv = getKv(env);
-  const month = monthStamp();
-  let usedBefore = 0;
-  if (kv) {
-    usedBefore = (await listAll(kv, usagePrefix(session.uid, month))).length;
+  const day = dateStamp();
+
+  // 配额判定（按日重置）：登录按 uid，匿名按设备 ID（+ IP 日上限防清 Cookie 绕过）
+  let identity;
+  if (session) {
+    identity = { kind: "user", key: session.uid, limit: FREE_DAILY_QUOTA };
+  } else {
+    const deviceRaw = sanitizeDeviceId(body.deviceId);
+    const ipHash = await sha256Hex(clientIp(request));
+    identity = {
+      kind: "anonymous",
+      key: deviceRaw || ipHash,
+      ipHash,
+      limit: ANONYMOUS_DAILY_QUOTA,
+    };
   }
-  if (usedBefore >= FREE_MONTHLY_QUOTA) {
+
+  let usedBefore = 0;
+  let ipUsedToday = 0;
+  if (kv) {
+    if (session) {
+      usedBefore = (await listAll(kv, usagePrefix(session.uid, day))).length;
+    } else {
+      usedBefore = (await listAll(kv, anonUsagePrefix(identity.key, day))).length;
+      ipUsedToday = (await listAll(kv, `anip_${identity.ipHash}_${day}_`)).length;
+    }
+  }
+
+  if (usedBefore >= identity.limit) {
     return jsonResponse(
-      { error: "本月免费分析额度（5 次）已用完", quota: { month, used: usedBefore, limit: FREE_MONTHLY_QUOTA } },
+      {
+        error: session
+          ? `今日免费分析额度（${identity.limit} 次）已用完，每日重置，会员版即将上线`
+          : `匿名免费试用为每日 ${identity.limit} 次，登录可获得 ${FREE_DAILY_QUOTA} 次/天`,
+        quota: {
+          day,
+          used: usedBefore,
+          limit: identity.limit,
+          anonymous: !session,
+          loginLimit: FREE_DAILY_QUOTA,
+        },
+      },
+      429,
+    );
+  }
+  if (!session && ipUsedToday >= ANONYMOUS_IP_DAILY_CAP) {
+    return jsonResponse(
+      { error: "今日匿名分析次数过多，请明天再试或登录使用" },
       429,
     );
   }
@@ -71,18 +123,36 @@ export async function onRequestPost({ request, env, waitUntil }) {
     id: f.id,
     severity: f.severity,
     ruleId: f.ruleId,
+    tag: f.tag ?? null,
     title: f.title,
     evidence: f.evidence,
     docUrl: f.docUrl ?? null,
     suggestion: f.suggestion ?? null,
   }));
 
-  const userContent = `日志文件：${body.fileName ?? "unknown"}
-飞行统计：${JSON.stringify(body.stats ?? {})}
-检查结果 findings：
+  // 第四层报文契约：统计摘要（含标签/阶段/guard）+ 仅命中的故障库条目
+  const summary = {
+    durationSec: body.stats?.durationSec ?? null,
+    armedDurationSec: body.stats?.armedDurationSec ?? null,
+    vehicleType: body.stats?.vehicleType ?? null,
+    phases: body.phases ?? [],
+    tags: body.tags ?? [],
+    guardTags: body.guardTags ?? [],
+    checksRun: body.checksRun ?? [],
+    checksSkipped: body.checksSkipped ?? [],
+    keyStats: body.stats ?? {},
+  };
+
+  const userContent = `【日志统计摘要（来自代码预处理）】
+${JSON.stringify(summary, null, 2)}
+
+【检查结果 findings】
 ${JSON.stringify(safe, null, 2)}
 
-请按系统提示生成中文 Markdown 报告。`;
+【本次匹配的故障知识库片段（检索得到，不是全量库；根因必须从中选取）】
+${JSON.stringify(body.matchedFaults ?? [], null, 2)}
+
+请按系统提示的 GJB-841 四段式输出中文 Markdown 报告。不允许引入未提供的故障模式，证据不足直接说明。`;
 
   let markdown;
   try {
@@ -110,33 +180,53 @@ ${JSON.stringify(safe, null, 2)}
     return jsonResponse({ error: "调用 LLM 失败", detail: String(err?.message ?? err) }, 502);
   }
 
-  // 调用成功后才计数 + 存报告；reportId 由客户端生成（与 localStorage 同一份）
-  const quota = { month, used: usedBefore + 1, limit: FREE_MONTHLY_QUOTA };
+  // 调用成功后才计数；只有登录用户存云端报告，匿名只存客户端 localStorage
+  const quota = {
+    day,
+    used: usedBefore + 1,
+    limit: identity.limit,
+    anonymous: !session,
+    loginLimit: FREE_DAILY_QUOTA,
+  };
   if (kv) {
-    const reportId = sanitizeId(body.reportId || crypto.randomUUID());
     const now = Date.now();
-    const usageKey = `${usagePrefix(session.uid, month)}${reportId}`;
-    const reportKey = `${reportPrefix(session.uid)}${reportId}`;
-    const report = {
-      id: reportId,
-      fileName: String(body.fileName ?? "unknown").slice(0, 300),
-      fileSize: Number(body.fileSize ?? 0) || 0,
-      durationSec: Number(body.durationSec ?? 0) || undefined,
-      platform: String(body.platform ?? "px4"),
-      vehicleType: body.stats?.vehicleType ? String(body.stats.vehicleType) : undefined,
-      parserVersion: String(body.parserVersion ?? ""),
-      findings: safe,
-      stats: body.stats && typeof body.stats === "object" ? body.stats : {},
-      aiMarkdown: markdown,
-      analyzedAt: new Date(now).toISOString(),
-      expiresAt: now + REPORT_TTL_MS,
-    };
-    waitUntil?.(
-      Promise.allSettled([
-        kv.put(usageKey, String(now)),
-        kv.put(reportKey, JSON.stringify(report)),
-      ]),
-    );
+    const eventId = sanitizeId(body.reportId || crypto.randomUUID());
+    if (session) {
+      const usageKey = `${usagePrefix(session.uid, day)}${eventId}`;
+      const reportKey = `${reportPrefix(session.uid)}${eventId}`;
+      const report = {
+        id: eventId,
+        fileName: String(body.fileName ?? "unknown").slice(0, 300),
+        fileSize: Number(body.fileSize ?? 0) || 0,
+        durationSec: Number(body.durationSec ?? 0) || undefined,
+        platform: String(body.platform ?? "px4"),
+        vehicleType: body.stats?.vehicleType ? String(body.stats.vehicleType) : undefined,
+        parserVersion: String(body.parserVersion ?? ""),
+        findings: safe,
+        stats: body.stats && typeof body.stats === "object" ? body.stats : {},
+        tags: Array.isArray(body.tags) ? body.tags : [],
+        guardTags: Array.isArray(body.guardTags) ? body.guardTags : [],
+        phases: Array.isArray(body.phases) ? body.phases : [],
+        matchedFaults: Array.isArray(body.matchedFaults) ? body.matchedFaults : [],
+        aiMarkdown: markdown,
+        analyzedAt: new Date(now).toISOString(),
+        expiresAt: now + REPORT_TTL_MS,
+      };
+      waitUntil?.(
+        Promise.allSettled([
+          kv.put(usageKey, String(now)),
+          kv.put(reportKey, JSON.stringify(report)),
+        ]),
+      );
+    } else {
+      // 匿名：设备当日唯一事件 + IP 日计数
+      waitUntil?.(
+        Promise.allSettled([
+          kv.put(`${anonUsagePrefix(identity.key, day)}${eventId}`, String(now)),
+          kv.put(`anip_${identity.ipHash}_${dateStamp()}_${eventId}`, String(now)),
+        ]),
+      );
+    }
   }
 
   return jsonResponse({ markdown, reportId: body.reportId, quota });

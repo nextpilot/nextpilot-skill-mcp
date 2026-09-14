@@ -2,7 +2,9 @@
 // KV 平台约束（官方文档）：key 仅允许字母/数字/下划线、长度 ≤512B；value ≤25MB；
 // 最终一致（60s 全球同步）；put 无 TTL，过期时间写进 value 惰性清理。
 
-export const FREE_MONTHLY_QUOTA = 5;
+export const FREE_DAILY_QUOTA = 10; // 登录用户每日（冲刺 3 会员体系再分层）
+export const ANONYMOUS_DAILY_QUOTA = 3; // 匿名设备每日
+export const ANONYMOUS_IP_DAILY_CAP = 30; // 按 IP 的防滥用日上限（NAT 场景宽松）
 export const REPORT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 免费版保留 7 天
 
 /** @returns {any} */
@@ -48,8 +50,16 @@ export async function listAll(kv, prefix) {
   return keys;
 }
 
-export const usagePrefix = (uid, month = monthStamp()) => `use_${uid}_${month}_`;
+// 日配额唯一键：登录 use_{uid}_{day}_{event}，匿名 anuse_{device}_{day}_{event}
+export const usagePrefix = (uid, day = dateStamp()) => `use_${uid}_${day}_`;
+export const anonUsagePrefix = (deviceHash, day = dateStamp()) =>
+  `anuse_${deviceHash}_${day}_`;
 export const reportPrefix = (uid) => `rpt_${uid}_`;
+
+/** 设备 ID 清洗为 KV key 安全片段（localStorage 随机 hex，这里再兜一层） */
+export function sanitizeDeviceId(id) {
+  return String(id ?? "").replace(/[^A-Za-z0-9_]/g, "").slice(0, 64);
+}
 
 export function clientIp(request) {
   return (

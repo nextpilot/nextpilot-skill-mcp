@@ -4,8 +4,9 @@
   "private": true,
   "license": "BSD-3-Clause",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/build-fault-kb.mjs && next dev",
+    "build:kb": "node scripts/build-fault-kb.mjs",
+    "build": "node scripts/build-fault-kb.mjs && next build",
     "start": "next start",
     "lint": "next lint"
   },

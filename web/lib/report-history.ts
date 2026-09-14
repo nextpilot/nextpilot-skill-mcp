@@ -1,4 +1,4 @@
-import type { Finding } from "./types";
+import type { Finding, MatchedFault } from "./types";
 
 /**
  * 报告历史（冲刺 1：浏览器 localStorage，零服务器）。
@@ -19,6 +19,10 @@ export interface SavedReport {
   parserVersion: string;
   findings: Finding[];
   stats: Record<string, number | string>;
+  tags?: string[];
+  guardTags?: string[];
+  phases?: string[];
+  matchedFaults?: MatchedFault[];
   aiMarkdown: string | null;
   analyzedAt: string;
 }

@@ -30,6 +30,7 @@ function parseSkillFile(fileName: string): Skill {
     sourceUrl: data.sourceUrl ? String(data.sourceUrl) : undefined,
     paperUrl: data.paperUrl ? String(data.paperUrl) : undefined,
     license: data.license ? String(data.license) : undefined,
+    version: data.version ? String(data.version) : undefined,
     updatedAt: String(data.updatedAt ?? ""),
     body: content.trim(),
   };

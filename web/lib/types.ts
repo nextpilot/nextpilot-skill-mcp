@@ -15,6 +15,8 @@ export interface SkillMeta {
   sourceUrl?: string;
   paperUrl?: string;
   license?: string;
+  /** 版本号（可选，随内容更新递增；借鉴 SkillHub 的版本展示） */
+  version?: string;
   updatedAt: string;
 }
 
@@ -50,6 +52,8 @@ export interface Finding {
   id: string;
   severity: Severity;
   ruleId: string;
+  /** 确定性引擎异常标签（喂给故障知识库匹配）；info 级可能为 null */
+  tag?: string | null;
   title: string;
   /** 触发依据：字段名、实际值、阈值，LLM 不得更改这些数值 */
   evidence: {
@@ -57,9 +61,21 @@ export interface Finding {
     value: number | string;
     threshold?: number | string;
     unit?: string;
+    samples?: { tSec?: number; message?: string }[];
   };
   docUrl?: string;
   suggestion?: string;
+}
+
+/** 第三层确定性匹配到的故障知识库条目（见 px4-fault-kb.yaml） */
+export interface MatchedFault {
+  faultId: string;
+  faultTag: string;
+  riskLevel: string;
+  possibleRootCause: string[];
+  troubleshootingSteps: string[];
+  note?: string;
+  matchedPhases: string[];
 }
 
 export interface AnalysisReport {
@@ -72,6 +88,16 @@ export interface AnalysisReport {
   parserVersion: string;
   findings: Finding[];
   stats: Record<string, number | string>;
+  /** 第二层异常标签 */
+  tags?: string[];
+  /** 数据质量 / 边界 guard 标签（insufficient_data 等） */
+  guardTags?: string[];
+  /** armed 段飞行阶段 */
+  phases?: string[];
+  checksRun?: string[];
+  checksSkipped?: { check: string; reason: string }[];
+  /** 第三层故障知识库命中条目 */
+  matchedFaults?: MatchedFault[];
   analyzedAt: string;
 }
 

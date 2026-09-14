@@ -9,7 +9,7 @@
   ├─ Next.js SSR（Node 运行时，ssr-node）
   │    /login                      登录页
   │    /api/auth/*                 next-auth v5：GitHub OAuth、邮箱验证码（Credentials）
-  │    /api/auth/otp/request       生成验证码 + QQ SMTP 发信，经 INTERNAL_SECRET 调内部边缘函数
+  │    /api/auth/otp/request       生成验证码 + QQ SMTP 发信，经 AUTH_INTERNAL_SECRET 调内部边缘函数
   │
   └─ Edge Functions（V8 边缘运行时，web/functions/，可访问 KV）
        /api/me                     会话 + 本月配额
@@ -48,15 +48,15 @@ edgeone pages dev         # 本地同时跑 Next、functions、KV 模拟
 
 ```bash
 openssl rand -base64 32   # AUTH_SECRET
-openssl rand -hex 24      # INTERNAL_SECRET
+openssl rand -hex 24      # AUTH_INTERNAL_SECRET
 ```
 
 | 变量 | 说明 |
 | --- | --- |
 | `AUTH_SECRET` | 会话 JWE 密钥，Node 与边缘函数共享，改了全员掉线 |
 | `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET` | GitHub OAuth App |
-| `INTERNAL_SECRET` | SSR ↔ `/functions/internal/*` 共享密钥 |
-| `APP_URL` | 公网源站，Node 侧同源调内部函数用，如 `https://skill.nextpilot.org` |
+| `AUTH_INTERNAL_SECRET` | SSR ↔ `/functions/internal/*` 共享密钥 |
+| `SITE_URL` | 公网源站，Node 侧同源调内部函数用，如 `https://skill.nextpilot.org` |
 | `SMTP_*` | QQ/163 SMTP，`SMTP_PASS` 填**邮箱授权码**（QQ 邮箱 → 设置 → 账户 → 开启 SMTP） |
 | `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL` | 边缘函数 `/api/explain` 读取 |
 
@@ -100,6 +100,6 @@ KV key 规则（代码见 `functions/_lib/kv.js`）：
 | `/api/explain` 返回 503 | 边缘函数未配 `DEEPSEEK_API_KEY` |
 | 登录后仍 401 | 检查生产是否 HTTPS（cookie 名 `__Secure-` 前缀）；边缘函数与 SSR 的 `AUTH_SECRET` 是否一致 |
 | 验证码发不出 | `SMTP_*` 是否配置；QQ 授权码是否正确；Node 函数出网 465 是否可用 |
-| `/internal/*` 403 | `INTERNAL_SECRET` 未配或不一致 |
+| `/internal/*` 403 | `AUTH_INTERNAL_SECRET` 未配或不一致 |
 | KV 报 binding missing | 命名空间绑定变量名必须是 `NEXTPILOT_KV`，绑定后需重新部署 |
 | 配额数不准 | KV 最终一致，60s 内可能滞后；唯一键设计保证不会重复计数 |

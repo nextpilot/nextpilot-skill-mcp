@@ -9,13 +9,22 @@
 import { NextRequest } from "next/server";
 import { installDevKv } from "@/lib/dev/dev-kv";
 
+// 边缘函数处理器签名（与 EdgeOne Pages Functions 的 onRequest* 对齐）
+type EdgeHandler = (ctx: {
+  request: NextRequest;
+  env: Record<string, string | undefined>;
+  params: Record<string, string>;
+  waitUntil?: (p: Promise<unknown>) => void;
+}) => Response | Promise<Response>;
+
 // 显式映射（不用运行时文件系统查找，保证 Turbopack 可静态分析）
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const handlers: Record<string, () => Promise<any>> = {
+const handlers: Record<string, () => Promise<Record<string, unknown>>> = {
   "api/me": () => import("@/functions/api/me.js"),
   "api/explain": () => import("@/functions/api/explain.js"),
   "api/reports": () => import("@/functions/api/reports.js"),
   "api/reports/[id]": () => import("@/functions/api/reports/[id].js"),
+  "api/rating": () => import("@/functions/api/rating.js"),
+  "api/download/track": () => import("@/functions/api/download/track.js"),
   "internal/otp/set": () => import("@/functions/internal/otp/set.js"),
   "internal/otp/consume": () => import("@/functions/internal/otp/consume.js"),
   "internal/users/upsert": () => import("@/functions/internal/users/upsert.js"),
@@ -52,7 +61,7 @@ async function invoke(req: NextRequest, path: string[]): Promise<Response> {
   const fn = module[fnName] ?? module.onRequest;
   if (typeof fn !== "function") return new Response("method not allowed", { status: 405 });
 
-  return fn({
+  return (fn as EdgeHandler)({
     request: req,
     env,
     params,

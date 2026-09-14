@@ -20,7 +20,7 @@ fault_knowledge_base:
   - fault_id: F001
     fault_tag: high_vibration
     trigger_tags: ["high_vibration"]
-    flight_phase: ["takeoff", "hover"]
+    flight_phase: ["takeoff", "hover", "maneuver", "fw_cruise", "cruise"]
     exclude_tags: ["collision_detected"]
     possible_root_cause:
       - 螺旋桨破损、变形、动平衡失衡

@@ -1,4 +1,4 @@
-// POST /internal/otp/set  仅供 Node 侧 SSR 调用（INTERNAL_SECRET）。
+// POST /internal/otp/set  仅供 Node 侧 SSR 调用（AUTH_INTERNAL_SECRET）。
 // 生成 6 位验证码（哈希后存 KV），执行发码频控；明文 code 只经内网返回给 Node 侧发送邮件。
 import { getKv, sha256Hex, dateStamp, clientIp } from "../../_lib/kv.js";
 import { jsonResponse, readJson, assertInternal, isValidEmail } from "../../_lib/http.js";

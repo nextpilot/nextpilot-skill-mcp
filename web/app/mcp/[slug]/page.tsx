@@ -5,6 +5,8 @@ import { ArrowLeft, ExternalLink, Eye, Terminal, Zap } from "lucide-react";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { getAllMcpServers, getMcpServerBySlug } from "@/lib/mcp";
 import { LocalizedText } from "@/components/LocalizedText";
+import { SkillActionsBar } from "@/components/SkillActionsBar";
+import { formatDate } from "@/lib/format";
 
 export function generateStaticParams() {
   return getAllMcpServers().map((s) => ({ slug: s.slug }));
@@ -29,6 +31,13 @@ export default async function McpDetailPage({
   const { slug } = await params;
   const server = getMcpServerBySlug(slug);
   if (!server) notFound();
+
+  // "复制安装配置"给出可直接粘贴到 MCP 客户端配置里的片段
+  const copyText = `# ${server.name}\n\n${server.description}\n\n## 工具\n${server.tools
+    .map((t) => `- ${t}`)
+    .join("\n")}\n\n## 传输方式\n${server.transport}${
+    server.readOnly ? "\n\n默认只读，不含致动能力。" : "\n\n含致动能力，默认需显式开启。"
+  }\n\n${server.body}`;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -74,13 +83,18 @@ export default async function McpDetailPage({
       <h1 className="text-3xl font-bold text-text">{server.name}</h1>
       <p className="mt-3 leading-7 text-muted">{server.description}</p>
 
-      <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-muted">
-        <span>
-          ★ {server.rating.toFixed(1)}
-        </span>
-        <span>{server.downloads} <LocalizedText zh="次获取" en="fetches" /></span>
-        <span><LocalizedText zh="更新于" en="Updated" /> {server.updatedAt}</span>
-      </div>
+      <SkillActionsBar
+        kind="mcp"
+        slug={server.slug}
+        baseRating={server.rating}
+        baseDownloads={server.downloads}
+        copyText={copyText}
+        copyLabel="复制安装配置"
+      />
+
+      <p className="mt-3 text-xs text-muted">
+        <LocalizedText zh="更新于" en="Updated" /> {formatDate(server.updatedAt)}
+      </p>
 
       {server.sourceUrl && (
         <div className="mt-5">

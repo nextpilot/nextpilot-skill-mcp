@@ -17,7 +17,6 @@ import {
   ClipboardCheck,
   ListFilter,
   Sparkles,
-  LogIn,
 } from "lucide-react";
 import type {
   AnalysisReport,
@@ -37,6 +36,7 @@ import {
   saveReport,
   type SavedReport,
 } from "@/lib/report-history";
+import { getDeviceId } from "@/lib/device-id";
 import { LogCharts } from "./LogCharts";
 import { LogMessages, LogParams, SystemInfoPanel } from "./LogEventsParams";
 import { HistoryList, type HistoryItem } from "./HistoryList";
@@ -47,6 +47,22 @@ const VEHICLE_TYPE_LABELS: Record<string, string> = {
   rover: "Rover",
   airship: "飞艇",
   unknown: "未知机型",
+};
+
+const PHASE_LABELS: Record<string, string> = {
+  takeoff: "起飞",
+  hover: "悬停/定点",
+  maneuver: "机动",
+  fw_cruise: "固定翼巡航",
+  vtol_transition: "VTOL 转换",
+  landing: "降落",
+  cruise: "巡航",
+};
+
+const GUARD_LABELS: Record<string, string> = {
+  insufficient_data: "样本不足(<60s)，不出深度结论",
+  restart_detected: "日志中途重启",
+  log_dropouts_high: "日志丢包>1s",
 };
 
 const STAGE_TEXT: Record<WorkerStage, string> = {
@@ -73,7 +89,12 @@ export function LogAnalyzer() {
   const [info, setInfo] = useState<LogInfo | null>(null);
   const [aiMarkdown, setAiMarkdown] = useState<string | null>(null);
   const [history, setHistory] = useState<SavedReport[]>([]);
-  const [quota, setQuota] = useState<{ used: number; limit: number } | null>(null);
+  const [quota, setQuota] = useState<{
+    used: number;
+    limit: number;
+    anonymous?: boolean;
+    loginLimit?: number;
+  } | null>(null);
   const [loggedIn, setLoggedIn] = useState(false);
   const [cloudItems, setCloudItems] = useState<HistoryItem[]>([]);
 
@@ -111,12 +132,16 @@ export function LogAnalyzer() {
 
   const refreshMe = useCallback(async () => {
     try {
-      const resp = await fetch("/api/me", { cache: "no-store" });
+      const resp = await fetch("/api/me", {
+        cache: "no-store",
+        headers: { "x-device-id": getDeviceId() },
+      });
       if (resp.ok) {
         const data = await resp.json();
-        setLoggedIn(true);
+        setLoggedIn(Boolean(data.user));
         setQuota(data.quota ?? null);
-        await refreshCloud();
+        if (data.user) await refreshCloud();
+        else setCloudItems([]);
       } else {
         setLoggedIn(false);
         setQuota(null);
@@ -147,6 +172,10 @@ export function LogAnalyzer() {
         parserVersion: r.parserVersion,
         findings: r.findings,
         stats: r.stats,
+        tags: r.tags,
+        guardTags: r.guardTags,
+        phases: r.phases,
+        matchedFaults: r.matchedFaults,
         aiMarkdown: ai,
         analyzedAt: r.analyzedAt,
       });
@@ -163,9 +192,13 @@ export function LogAnalyzer() {
       try {
         const resp = await fetch("/api/explain", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-device-id": getDeviceId(),
+          },
           body: JSON.stringify({
             reportId: id,
+            deviceId: getDeviceId(),
             fileName: r.fileName,
             fileSize: r.fileSize,
             durationSec: r.durationSec,
@@ -173,19 +206,29 @@ export function LogAnalyzer() {
             parserVersion: r.parserVersion,
             findings: r.findings,
             stats: r.stats,
+            tags: r.tags ?? [],
+            guardTags: r.guardTags ?? [],
+            phases: r.phases ?? [],
+            checksRun: r.checksRun ?? [],
+            checksSkipped: r.checksSkipped ?? [],
+            matchedFaults: r.matchedFaults ?? [],
           }),
         });
         const data = await resp.json();
-        if (resp.status === 401) {
-          markdown = `> 请先[登录](/login?callbackUrl=${encodeURIComponent("/analyze")})后生成 AI 中文报告（每月免费 5 次）。端侧检查结论不受影响。`;
-        } else if (resp.status === 429) {
-          markdown = `> ${data.error ?? "本月免费额度已用完"}。额度每月 1 日重置。`;
+        if (resp.status === 429) {
+          markdown = `> ${data.error ?? "今日免费额度已用完"}。额度每日 0 点（UTC）重置。`;
         } else if (!resp.ok) {
           markdown = `> AI 解释暂不可用：${data.error ?? resp.statusText}`;
         } else {
           markdown = data.markdown;
           ok = true;
-          if (data.quota) setQuota({ used: data.quota.used, limit: data.quota.limit });
+          if (data.quota) {
+            setQuota({
+              used: data.quota.used,
+              limit: data.quota.limit,
+              anonymous: data.quota.anonymous,
+            });
+          }
         }
       } catch (err) {
         markdown = `> AI 解释请求失败：${(err as Error).message}`;
@@ -289,6 +332,10 @@ export function LogAnalyzer() {
       parserVersion: saved.parserVersion,
       findings: saved.findings,
       stats: saved.stats,
+      tags: saved.tags,
+      guardTags: saved.guardTags,
+      phases: saved.phases,
+      matchedFaults: saved.matchedFaults,
       analyzedAt: saved.analyzedAt,
     });
     setStage("done");
@@ -386,14 +433,20 @@ export function LogAnalyzer() {
             />
           </div>
 
-          {loggedIn && quota && (
+          {quota && (
             <p className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-muted">
-              本月 AI 报告额度：
-              <span className={quota.used >= quota.limit ? "font-semibold text-critical" : "font-semibold text-text"}>
+              {quota.anonymous ? "匿名免费试用（每日）" : "今日 AI 报告额度"}：
+              <span
+                className={
+                  quota.used >= quota.limit
+                    ? "font-semibold text-critical"
+                    : "font-semibold text-text"
+                }
+              >
                 {" "}
                 {Math.max(quota.limit - quota.used, 0)} / {quota.limit} 次剩余
               </span>
-              （每月 1 日重置）
+              {quota.anonymous ? "，登录后 10 次/天并同步云端历史" : "（每日 0 点重置）"}
             </p>
           )}
 
@@ -462,7 +515,7 @@ function ReportView({
   requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
   explaining: boolean;
   loggedIn: boolean;
-  quota: { used: number; limit: number } | null;
+  quota: { used: number; limit: number; anonymous?: boolean; loginLimit?: number } | null;
   onGenerateAi: () => void;
 }) {
   const [tab, setTab] = useState<TabKey>("summary");
@@ -502,6 +555,31 @@ function ReportView({
           <CountPill icon={<Info className="h-3.5 w-3.5" />} n={counts.info} label="提示" tone="info" />
         </div>
       </div>
+
+      {/* 飞行上下文：阶段 / 数据质量 guard（第二层输出） */}
+      {(report.phases?.length || report.guardTags?.length || report.tags?.length) && (
+        <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
+          {report.phases?.map((p) => (
+            <span key={p} className="rounded-full bg-primary/10 px-2.5 py-1 text-primary">
+              {PHASE_LABELS[p] ?? p}
+            </span>
+          ))}
+          {report.tags?.map((t) => (
+            <span key={t} className="rounded-full bg-warning/15 px-2.5 py-1 text-warning">
+              {t}
+            </span>
+          ))}
+          {report.guardTags?.map((g) => (
+            <span
+              key={g}
+              className="rounded-full bg-critical/15 px-2.5 py-1 text-critical"
+              title="数据质量/边界标签：影响结论可信度"
+            >
+              ⚠ {GUARD_LABELS[g] ?? g}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* 系统信息常驻在 tab 上方，切换 tab 不消失 */}
       {info ? (
@@ -570,7 +648,7 @@ function SummaryTab({
   aiMarkdown: string | null;
   explaining: boolean;
   loggedIn: boolean;
-  quota: { used: number; limit: number } | null;
+  quota: { used: number; limit: number; anonymous?: boolean; loginLimit?: number } | null;
   onGenerateAi: () => void;
 }) {
   return (
@@ -590,8 +668,44 @@ function SummaryTab({
         </div>
       )}
 
-      {/* AI 解释层：登录后手动生成，消耗月度免费配额 */}
-      <h2 className="mt-8 mb-2 text-base font-semibold">AI 中文解读</h2>
+      {/* 第三层：确定性匹配到的故障知识库条目（LLM 根因只允许出自这里） */}
+      {report.matchedFaults && report.matchedFaults.length > 0 && (
+        <div className="mt-6 space-y-3">
+          <h2 className="text-base font-semibold">匹配故障模式（{report.matchedFaults.length}）</h2>
+          {report.matchedFaults.map((mf) => (
+            <div key={mf.faultId} className="rounded-xl border border-border bg-surface-2 p-4 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-xs text-primary">
+                  {mf.faultId}
+                </span>
+                <span className="text-xs text-muted">风险等级：{mf.riskLevel}</span>
+                {mf.note && <span className="text-xs text-warning">禁忌：{mf.note}</span>}
+              </div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted">可能根因（按排查优先级）</p>
+                  <ol className="list-decimal space-y-0.5 pl-4 text-xs leading-5">
+                    {mf.possibleRootCause.map((c) => (
+                      <li key={c}>{c}</li>
+                    ))}
+                  </ol>
+                </div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted">排查步骤（由简到繁）</p>
+                  <ol className="list-decimal space-y-0.5 pl-4 text-xs leading-5">
+                    {mf.troubleshootingSteps.map((s) => (
+                      <li key={s}>{s}</li>
+                    ))}
+                  </ol>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* AI 解释层：手动生成，消耗每日免费配额 */}
+      <h2 className="mt-8 mb-2 text-base font-semibold">AI 中文解读（GJB-841 归零报告）</h2>
       {aiMarkdown ? (
         <article className="prose-skill">
           <ReactMarkdown
@@ -616,15 +730,15 @@ function SummaryTab({
             onClick={onGenerateAi}
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
           >
-            {loggedIn ? <Sparkles className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
-            {loggedIn ? "生成 AI 中文报告" : "登录后生成 AI 中文报告"}
+            <Sparkles className="h-4 w-4" />
+            生成 AI 中文报告
           </button>
           <p className="mt-2 text-xs text-muted">
             {loggedIn
-              ? `由 DeepSeek 基于上述结构化检查结果生成，每月免费 ${quota?.limit ?? 5} 次${
-                  quota ? `，本月已用 ${quota.used} 次` : ""
+              ? `由 DeepSeek 基于上述结构化检查结果生成，今日免费 ${quota?.limit ?? 10} 次${
+                  quota ? `，剩余 ${Math.max(quota.limit - quota.used, 0)} 次` : ""
                 }`
-              : "每月免费 5 次，端侧检查结论无需登录即可查看"}
+              : `匿名可免费试用 ${quota?.limit ?? 3} 次/天，登录后 ${quota?.loginLimit ?? 10} 次/天并同步云端历史`}
           </p>
         </div>
       )}
