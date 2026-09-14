@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { LogAnalyzer } from "@/components/LogAnalyzer";
 import { LocalizedText } from "@/components/LocalizedText";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export const metadata: Metadata = {
   title: "PX4 日志分析 · NextPilot Skill MCP",

@@ -3,6 +3,7 @@ import { getSkillIndex } from "@/lib/skills";
 import type { CategoryKey } from "@/lib/constants";
 import { SkillExplorer } from "@/components/SkillExplorer";
 import { LocalizedText } from "@/components/LocalizedText";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export const metadata: Metadata = {
   title: "Skill 库 · NextPilot Skill MCP",
@@ -29,6 +30,9 @@ export default async function SkillsPage({
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
+      <div className="mb-4">
+        <Breadcrumbs items={[{ label: "Skill 库" }]} />
+      </div>
       <div className="mb-8">
         <h1 className="text-2xl font-bold"><LocalizedText zh="飞控 AI Skill 库" en="Flight AI skill library" /></h1>
         <p className="mt-1.5 text-sm text-muted">

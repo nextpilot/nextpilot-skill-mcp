@@ -3,6 +3,7 @@ import { Plug, ShieldCheck } from "lucide-react";
 import { getMcpIndex } from "@/lib/mcp";
 import { McpGrid } from "@/components/McpGrid";
 import { LocalizedText } from "@/components/LocalizedText";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export const metadata: Metadata = {
   title: "MCP Server · NextPilot Skill MCP",
@@ -14,6 +15,7 @@ export default function McpPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
+      <Breadcrumbs items={[{ label: "MCP Server" }]} />
       <header className="mb-8">
         <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
           <Plug className="h-4 w-4" />

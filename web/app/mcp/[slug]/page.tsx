@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { MDXRemote } from "next-mdx-remote/rsc";
-import { Eye, Zap } from "lucide-react";
+import { Eye, Sparkles, Zap } from "lucide-react";
 import { getAllMcpServers, getMcpServerBySlug } from "@/lib/mcp";
 import { CommunityStatLine, SkillMetaGroups } from "@/components/SkillHeaderMeta";
 import { SkillSidebar } from "@/components/SkillSidebar";
@@ -10,6 +9,7 @@ import { SkillContentTabs } from "@/components/SkillContentTabs";
 import { SkillComments } from "@/components/SkillComments";
 import { ChangelogList } from "@/components/ChangelogList";
 import { CopyChip } from "@/components/CopyChip";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export function generateStaticParams() {
   return getAllMcpServers().map((s) => ({ slug: s.slug }));
@@ -50,14 +50,9 @@ export default async function McpDetailPage({
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
-      <nav className="mb-8 flex items-center gap-2 text-sm" aria-label="breadcrumb">
-        <Link href="/mcp" className="text-muted transition-colors hover:text-text">
-          MCP Server /
-        </Link>
-        <span className="font-semibold">{server.slug}</span>
-      </nav>
+      <Breadcrumbs items={[{ label: "MCP Server", href: "/mcp" }, { label: server.slug }]} />
 
-      <div className="flex flex-col gap-3 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">
+      <div className="flex flex-col gap-4 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">
         <div className="min-w-0 rounded-2xl bg-surface p-5 sm:p-6">
           <header className="mb-8">
             <div className="flex items-start gap-4">
@@ -79,6 +74,12 @@ export default async function McpDetailPage({
                     <span className="inline-flex items-center gap-1 rounded-md border border-warning/40 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
                       <Zap className="h-3 w-3" />
                       含致动能力
+                    </span>
+                  )}
+                  {server.featured && (
+                    <span className="inline-flex items-center gap-1 rounded-md border border-warning/40 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
+                      <Sparkles className="h-3 w-3" />
+                      推荐
                     </span>
                   )}
                 </div>
@@ -113,7 +114,6 @@ export default async function McpDetailPage({
               platforms={server.platforms}
               clients={server.clients}
               models={server.models}
-              featured={server.featured}
               sourceUrl={server.sourceUrl}
               license={server.license}
               extraRows={[

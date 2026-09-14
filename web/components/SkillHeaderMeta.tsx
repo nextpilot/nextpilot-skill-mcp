@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bookmark, Code2, Download, FileText, ShieldCheck, Sparkles, Star } from "lucide-react";
+import { Bookmark, CalendarDays, Code2, Download, FileText, ShieldCheck, Sparkles, Star, Tag } from "lucide-react";
 import { formatDate } from "@/lib/format";
 import {
   getFavorite,
@@ -102,8 +102,16 @@ export function CommunityStatLine({
         <Bookmark className="h-3.5 w-3.5" />
         {fav.count} 收藏
       </span>
-      {version && <span>v{version}</span>}
-      <span>更新于 {formatDate(updatedAt)}</span>
+      {version && (
+        <span className="inline-flex items-center gap-1">
+          <Tag className="h-3 w-3" />
+          v{version}
+        </span>
+      )}
+      <span className="inline-flex items-center gap-1">
+        <CalendarDays className="h-3 w-3" />
+        {formatDate(updatedAt)}
+      </span>
     </div>
   );
 }
@@ -116,7 +124,6 @@ export function SkillMetaGroups({
   clients,
   models,
   extraRows,
-  featured,
   sourceUrl,
   paperUrl,
   license,
@@ -126,14 +133,12 @@ export function SkillMetaGroups({
   models: string[];
   /** 额外分组行（MCP 用：工具 / 传输方式 / 致动能力） */
   extraRows?: { label: string; value: React.ReactNode }[];
-  featured?: boolean;
   sourceUrl?: string;
   paperUrl?: string;
   license?: string;
 }) {
-  // 徽章即入口：开源/论文徽章直接链接到对应出处（不再单列“来源”行）
+  // 推荐徽章在标题旁展示（见页面头部），这里只列属性标记；跳转由“来源”行承担
   const badges = [
-    featured && { key: "featured", icon: <Sparkles className="h-3 w-3" />, label: "推荐", tone: "warning" as const },
     sourceUrl && { key: "oss", icon: <Code2 className="h-3 w-3" />, label: "开源", tone: "muted" as const },
     paperUrl && { key: "paper", icon: <FileText className="h-3 w-3" />, label: "有论文", tone: "muted" as const },
     license && { key: "license", icon: <ShieldCheck className="h-3 w-3" />, label: license, tone: "muted" as const },
@@ -142,7 +147,6 @@ export function SkillMetaGroups({
     icon: React.ReactNode;
     label: string;
     tone: "warning" | "muted";
-    href?: string;
   }[];
 
   return (
@@ -157,12 +161,7 @@ export function SkillMetaGroups({
                   ? "border-warning/40 bg-warning/10 text-warning"
                   : "border-border text-muted hover:border-primary/50 hover:text-text"
               }`;
-              return b.href ? (
-                <a key={b.key} href={b.href} target="_blank" rel="noreferrer" className={cls}>
-                  {b.icon}
-                  {b.label}
-                </a>
-              ) : (
+              return (
                 <span key={b.key} className={cls}>
                   {b.icon}
                   {b.label}

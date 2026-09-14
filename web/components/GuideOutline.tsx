@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import type { GuideHeading } from "@/lib/guide";
 
@@ -39,32 +40,71 @@ export function GuideOutline({ headings }: { headings: GuideHeading[] }) {
 
   if (headings.length === 0) return null;
 
+  const list = (
+    <ul className="border-l border-border">
+      {headings.map((h) => (
+        <li key={h.id}>
+          <a
+            href={`#${encodeURIComponent(h.id)}`}
+            aria-current={active === h.id ? "true" : undefined}
+            className={`-ml-px block border-l-2 py-1 text-sm leading-5 transition-colors ${
+              h.level === 3 ? "pl-6" : "pl-3"
+            } ${
+              active === h.id
+                ? "border-primary font-medium text-primary"
+                : "border-transparent text-muted hover:border-border hover:text-text"
+            }`}
+          >
+            {language === "zh" ? h.zh : h.en}
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+
   return (
-    <aside className="hidden w-56 shrink-0 xl:block">
-      <nav className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pb-10">
-        <p className="mb-3 text-xs font-semibold tracking-wider text-muted">
-          {language === "zh" ? "本页目录" : "On this page"}
-        </p>
+    <>
+      {/* 桌面端：右侧粘性目录 */}
+      <aside className="hidden w-56 shrink-0 xl:block">
+        <nav className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pb-10">
+          <p className="mb-3 text-xs font-semibold tracking-wider text-muted">
+            {language === "zh" ? "本页目录" : "On this page"}
+          </p>
+          {list}
+        </nav>
+      </aside>
+
+    </>
+  );
+}
+
+/** 手机端折叠目录：在文章标题下方渲染（桌面端隐藏） */
+export function GuideOutlineMobile({ headings }: { headings: GuideHeading[] }) {
+  const { language } = useLanguage();
+  if (headings.length === 0) return null;
+  return (
+    <details className="group mb-6 rounded-xl border border-border bg-surface xl:hidden">
+      <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-2.5 text-sm font-medium">
+        {language === "zh" ? "本页目录" : "On this page"}
+        <ChevronDown className="h-4 w-4 text-muted transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="max-h-[60vh] overflow-y-auto border-t border-border px-4 py-3">
         <ul className="border-l border-border">
           {headings.map((h) => (
             <li key={h.id}>
               <a
                 href={`#${encodeURIComponent(h.id)}`}
-                aria-current={active === h.id ? "true" : undefined}
                 className={`-ml-px block border-l-2 py-1 text-sm leading-5 transition-colors ${
                   h.level === 3 ? "pl-6" : "pl-3"
-                } ${
-                  active === h.id
-                    ? "border-primary font-medium text-primary"
-                    : "border-transparent text-muted hover:border-border hover:text-text"
-                }`}
+                } border-transparent text-muted hover:border-border hover:text-text`}
               >
                 {language === "zh" ? h.zh : h.en}
               </a>
             </li>
           ))}
         </ul>
-      </nav>
-    </aside>
+      </div>
+    </details>
   );
 }
+

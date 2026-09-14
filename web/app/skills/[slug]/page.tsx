@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { MDXRemote } from "next-mdx-remote/rsc";
+import { Sparkles } from "lucide-react";
 import { getAllSkills, getSkillBySlug } from "@/lib/skills";
 import { CATEGORY_GLYPH, CATEGORY_LABEL } from "@/lib/constants";
 import { CommunityStatLine, SkillMetaGroups } from "@/components/SkillHeaderMeta";
@@ -10,6 +10,7 @@ import { SkillContentTabs } from "@/components/SkillContentTabs";
 import { SkillComments } from "@/components/SkillComments";
 import { ChangelogList } from "@/components/ChangelogList";
 import { CopyChip } from "@/components/CopyChip";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export function generateStaticParams() {
   return getAllSkills().map((s) => ({ slug: s.slug }));
@@ -47,16 +48,10 @@ export default async function SkillDetailPage({
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
-      {/* 面包屑（对应 SkillHub 顶部 技能 / slug） */}
-      <nav className="mb-8 flex items-center gap-2 text-sm" aria-label="breadcrumb">
-        <Link href="/skills" className="text-muted transition-colors hover:text-text">
-          Skill 库 /
-        </Link>
-        <span className="font-semibold">{skill.slug}</span>
-      </nav>
+      <Breadcrumbs items={[{ label: "Skill 库", href: "/skills" }, { label: skill.slug }]} />
 
       {/* 两栏：左栏 = 标题 + 内容（纵向堆叠），右栏 = 粘性侧栏（对应 SkillHub 的 390px 侧栏） */}
-      <div className="flex flex-col gap-3 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">
+      <div className="flex flex-col gap-4 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">
         <div className="min-w-0 rounded-2xl bg-surface p-5 sm:p-6">
           {/* 标题区：图标 + 标题 + slug，其后按组展示头部信息（见 SkillHeaderMeta） */}
           <header className="mb-8">
@@ -73,6 +68,12 @@ export default async function SkillDetailPage({
                   <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                     {CATEGORY_LABEL[skill.category]}
                   </span>
+                  {skill.featured && (
+                    <span className="inline-flex items-center gap-1 rounded-md border border-warning/40 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
+                      <Sparkles className="h-3 w-3" />
+                      推荐
+                    </span>
+                  )}
                 </div>
                 <div className="mt-1 flex items-center gap-2">
                   <span className="truncate font-mono text-[13px] text-muted">{skill.slug}</span>
@@ -107,7 +108,6 @@ export default async function SkillDetailPage({
               platforms={skill.platforms}
               clients={skill.clients}
               models={skill.models}
-              featured={skill.featured}
               sourceUrl={skill.sourceUrl}
               paperUrl={skill.paperUrl}
               license={skill.license}

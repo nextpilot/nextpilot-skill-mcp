@@ -61,8 +61,8 @@ export function SiteHeader() {
               {l.label}
             </Link>
           ))}
-          {/* 文字导航与工具控件分组，避免七个等权控件挤成一行 */}
-          <span className="mx-2 h-5 w-px bg-border" aria-hidden />
+          {/* 分隔：浏览入口 | 显示设置 | 账号与源码，三组互不混淆 */}
+          <span className="mx-3 h-5 w-px bg-border" aria-hidden />
           <button
             type="button"
             onClick={() => setLanguage(nextLanguage)}
@@ -74,7 +74,7 @@ export function SiteHeader() {
             <span>{nextLanguage === "en" ? "EN" : "中"}</span>
           </button>
           <ThemeToggle />
-          <span className="mx-1 h-5 w-px bg-border" aria-hidden />
+          <span className="mx-3 h-5 w-px bg-border" aria-hidden />
           <UserMenu />
           <a
             href="https://gitee.com/nextpilot/nextpilot-skill-mcp"
@@ -88,9 +88,8 @@ export function SiteHeader() {
           </a>
         </nav>
 
-        {/* 移动端：仅保留主题、登录与菜单入口 */}
+        {/* 移动端：只留登录与菜单入口（主题/语言/源码都收进展开面板） */}
         <div className="flex shrink-0 items-center gap-1 md:hidden">
-          <ThemeToggle />
           <UserMenu />
           <button
             type="button"
@@ -128,6 +127,10 @@ export function SiteHeader() {
                 </li>
               );
             })}
+            <li className="flex items-center justify-between py-3 text-sm text-muted">
+              <span>{t("外观", "Appearance")}</span>
+              <ThemeToggle />
+            </li>
             <li className="flex items-center justify-between py-3 text-sm text-muted">
               <span>{t("语言", "Language")}</span>
               <button

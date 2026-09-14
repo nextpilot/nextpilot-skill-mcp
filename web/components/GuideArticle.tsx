@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { LocalizedText } from "@/components/LocalizedText";
 import { GuideMdx } from "@/components/GuideMdx";
-import { GuideOutline } from "@/components/GuideOutline";
+import { GuideOutline, GuideOutlineMobile } from "@/components/GuideOutline";
 import { getGuideNeighbors, type GuideDoc } from "@/lib/guide";
 
 /**
@@ -26,6 +26,8 @@ export function GuideArticle({ doc }: { doc: GuideDoc }) {
             <LocalizedText zh={doc.description} en={doc.descriptionEn} />
           </p>
         </header>
+
+        <GuideOutlineMobile headings={doc.headings} />
 
         <div className="prose-guide">
           <GuideMdx source={doc.body} />
