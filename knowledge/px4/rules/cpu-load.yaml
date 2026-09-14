@@ -2,6 +2,9 @@
 # 结构说明见 ../rule-schema-design.md；改动后跑 tools/calibrate/compare-baseline.py 验等价
 
 id: px4-cpu-load
+# slot：决定这条规则在引擎里的执行位置。finding.id（F01、F02…）按发射顺序生成，
+# 所以 slot 必须与它所替换的原过程式检查位置一致（见 ../rule-schema-design.md）。
+slot: cpu
 name: CPU 负载
 version: 1.0.0
 category: system

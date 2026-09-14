@@ -208,7 +208,7 @@ function loadRules(dir, signatures) {
     const raw = parseYaml(readFileSync(resolve(dir, file), "utf8"));
     const where = `rules/${file}`;
     // 必填项：即使不限也必须显式写 any（隐式豁免正是空洞条目的入口）
-    for (const key of ["id", "name", "firmware", "airframe", "compute", "triggers", "emit"]) {
+    for (const key of ["id", "slot", "name", "firmware", "airframe", "compute", "triggers", "emit"]) {
       if (raw[key] === undefined || raw[key] === null || raw[key] === "") {
         throw new Error(`${where}: 缺少必填字段 ${key}`);
       }

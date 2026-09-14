@@ -3,7 +3,7 @@ import faultKbJson from "./fault-kb.generated.json";
 
 const thresholds = {"guard":{"min_flight_sec":60,"dropout_ms":1000},"vibration":{"vibe_warn":4.905,"vibe_crit":9.81,"stddev_warn":0.5,"stddev_crit":1,"clip_warn":100,"clip_crit":1000},"ekf":{"reject_ratio_warn":0.01,"reject_ratio_crit":0.05,"reject_min_count":3,"peak_warn":0.5,"peak_crit":1},"power":{"cell_warn":3.7,"cell_crit":3.55,"sag_volts":0.3,"sag_skip_takeoff_sec":5,"remaining_warn":0.2,"remaining_crit":0.1},"cpu":{"load_warn":0.9,"load_crit":0.95},"gps":{"eph_warn":5,"eph_crit":10,"sats_warn":8,"sats_crit":6,"jump_speed_mps":50,"jump_min_count":3},"mode":{"thrash_changes":12},"motor":{"spread_warn":0.08,"spread_crit":0.15},"gyro_bias":{"abs_warn":0.02,"abs_crit":0.05,"drift_warn":0.02,"drift_crit":0.05,"temp_range_warn":15,"temp_range_crit":25},"attitude":{"err_warn_rotary":15,"err_crit_rotary":30,"err_warn_fixedwing":25,"err_crit_fixedwing":40,"osc_hz":4,"sample_rate_hz":50,"min_seg_samples":50},"airspeed":{"invalid_ratio_warn":0.1,"invalid_ratio_crit":0.5},"vtol":{"transition_tilt_deg":8},"wind":{"speed_warn":8,"speed_crit":12},"messages":{"critical_max_level":3,"warn_level":4,"max_examples":5,"message_clip_len":200}};
 
-const rules = [{"id":"px4-cpu-load","name":"CPU 负载","version":"1.0.0","category":"system","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["cpuload"]},"skip_reason":"cpuload not in log","compute":[{"out":"cpu_max","from":"cpuload.load","op":"max"}],"triggers":[{"expr":"cpu_max >= 0.95","severity":"critical","threshold":0.95,"value":"cpu_max","round":3,"field":"cpuload.load(max)","title":"CPU 负载峰值 {cpu_max:.0%} 超阈值","suggestion":"CPU 长期接近满载会导致控制环丢步；检查高耗率模块与日志流配置。"},{"expr":"cpu_max >= 0.90","severity":"warning","threshold":0.9,"value":"cpu_max","round":3,"field":"cpuload.load(max)","title":"CPU 负载峰值 {cpu_max:.0%} 偏高","suggestion":"关注 CPU 余量，必要时降低消息发布率。"}],"emit":{"check":"cpu_load","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html","stats":{"cpuLoadMax":{"var":"cpu_max","round":3}}}}];
+const rules = [{"id":"px4-cpu-load","slot":"cpu","name":"CPU 负载","version":"1.0.0","category":"system","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["cpuload"]},"skip_reason":"cpuload not in log","compute":[{"out":"cpu_max","from":"cpuload.load","op":"max"}],"triggers":[{"expr":"cpu_max >= 0.95","severity":"critical","threshold":0.95,"value":"cpu_max","round":3,"field":"cpuload.load(max)","title":"CPU 负载峰值 {cpu_max:.0%} 超阈值","suggestion":"CPU 长期接近满载会导致控制环丢步；检查高耗率模块与日志流配置。"},{"expr":"cpu_max >= 0.90","severity":"warning","threshold":0.9,"value":"cpu_max","round":3,"field":"cpuload.load(max)","title":"CPU 负载峰值 {cpu_max:.0%} 偏高","suggestion":"关注 CPU 余量，必要时降低消息发布率。"}],"emit":{"check":"cpu_load","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html","stats":{"cpuLoadMax":{"var":"cpu_max","round":3}}}}];
 
 export const PY_ULG_CHECKS = String.raw`"""预定函数（算子）注册表 —— 经验文件里的 \`op:\` 只能引用这里注册的算子。
 
@@ -638,57 +638,74 @@ def _rule_env():
     }
 
 
-for _rule in RULES:
-    _rid = _rule["id"]
-    _check = _rule["emit"]["check"]
-    _need = (_rule.get("requires") or {}).get("any_of") or []
-    if _need and not all(find_all(ulog, t) for t in _need):
-        skipped(_check, _rule.get("skip_reason") or ("缺少依赖 topic：%s" % ", ".join(_need)))
-        continue
-    _env = _rule_env()
-    _ok = True
-    for _node in _rule["compute"]:
-        # 归一化：单输入可用短写法 from:（字符串或列表），单输出可直接写 out: 名字
-        _ins = _node.get("in")
-        if _ins is None:
-            _ins = _node["from"] if isinstance(_node["from"], list) else [_node["from"]]
-        _outs = _node["out"] if isinstance(_node["out"], list) else [_node["out"]]
-        _args = []
-        for _ref in _ins:
-            _args.append(_env[_ref] if _ref in _env else _read_field_ref(_ref))
-        if any(_a is None for _a in _args):
-            _ok = False
-            break
-        _res = OPERATORS[_node["op"]](*_args, **_node)
-        if _res is None:
-            _ok = False
-            break
-        if not isinstance(_res, tuple):
-            _res = (_res,)
-        for _name, _v in zip(_outs, _res):
-            _env[_name] = _v
-    if not _ok:
-        skipped(_check, _rule.get("skip_reason") or "数据不足，未做判定")
-        continue
-    ran(_check)
+def _run_rules(slot):
+    """执行声明了该 slot 的经验规则。
 
-    _emit = _rule["emit"]
-    for _key, _spec in (_emit.get("stats") or {}).items():
-        _v = _env.get(_spec["var"])
-        if _v is None:
+    finding 的 id 是按发射顺序（F01、F02…）生成的，所以每条规则的 slot **必须与
+    它所替换的原过程式检查的位置一致**（vibration → ekf → power → cpu → gps →
+    failsafe → mode_thrash …）；同一 slot 内按 rules/*.yaml 的文件名顺序执行。
+    """
+    for _rule in RULES:
+        if _rule.get("slot") != slot:
             continue
-        stats[_key] = round(float(_v), int(_spec["round"])) if "round" in _spec else _v
+        _rid = _rule["id"]
+        _checks = _rule["emit"]["check"]
+        _checks = _checks if isinstance(_checks, list) else [_checks]
+        _need = (_rule.get("requires") or {}).get("any_of") or []
+        _missing = bool(_need) and not all(find_all(ulog, t) for t in _need)
+        if _missing:
+            for _check in _checks:
+                skipped(_check, _rule.get("skip_reason") or ("缺少依赖 topic：%s" % ", ".join(_need)))
+            continue
+        _env = _rule_env()
+        _ok = True
+        for _node in _rule["compute"]:
+            # 归一化：单输入可用短写法 from:（字符串或列表），单输出可直接写 out: 名字
+            _ins = _node.get("in")
+            if _ins is None:
+                _ins = _node["from"] if isinstance(_node["from"], list) else [_node["from"]]
+            _outs = _node["out"] if isinstance(_node["out"], list) else [_node["out"]]
+            _args = []
+            for _ref in _ins:
+                _args.append(_env[_ref] if _ref in _env else _read_field_ref(_ref))
+            if any(_a is None for _a in _args):
+                _ok = False
+                break
+            _res = OPERATORS[_node["op"]](*_args, **_node)
+            if _res is None:
+                _ok = False
+                break
+            if not isinstance(_res, tuple):
+                _res = (_res,)
+            for _name, _v in zip(_outs, _res):
+                _env[_name] = _v
+        if not _ok:
+            for _check in _checks:
+                skipped(_check, _rule.get("skip_reason") or "数据不足，未做判定")
+            continue
+        for _check in _checks:
+            ran(_check)
 
-    for _trig in _rule["triggers"]:
-        if _eval_expr(_trig["expr"], _env):
-            _val = _env.get(_trig["value"]) if _trig.get("value") else None
-            if _val is not None and _trig.get("round") is not None:
-                _val = round(float(_val), int(_trig["round"]))
-            add(_trig["severity"], _rid, _trig.get("tag"),
-                _trig["title"].format_map(_env), _trig["field"], _val,
-                _trig.get("threshold"), _trig.get("unit"),
-                _emit.get("doc"), _trig.get("suggestion"))
-            break
+        _emit = _rule["emit"]
+        for _key, _spec in (_emit.get("stats") or {}).items():
+            _v = _env.get(_spec["var"])
+            if _v is None:
+                continue
+            stats[_key] = round(float(_v), int(_spec["round"])) if "round" in _spec else _v
+
+        for _trig in _rule["triggers"]:
+            if _eval_expr(_trig["expr"], _env):
+                _val = _env.get(_trig["value"]) if _trig.get("value") else None
+                if _val is not None and _trig.get("round") is not None:
+                    _val = round(float(_val), int(_trig["round"]))
+                add(_trig["severity"], _rid, _trig.get("tag"),
+                    _trig["title"].format_map(_env), _trig["field"], _val,
+                    _trig.get("threshold"), _trig.get("unit"),
+                    _emit.get("doc"), _trig.get("suggestion"))
+                break
+
+
+_run_rules("cpu")
 
 # ---------------- 规则 5：GPS 健康（F002）----------------
 gps_list = find_all(ulog, "vehicle_gps_position")

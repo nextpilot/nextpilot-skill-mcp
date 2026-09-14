@@ -113,14 +113,19 @@ export function HistoryList({
       ) : (
         <ul className="max-h-[560px] divide-y divide-border/30 overflow-y-auto">
           {items.map((r) => {
+            // 双保险：cloud item 用 findingCount，local item 用 findings 数组；
+            // 两者都缺失时（极旧的本地记录）按 0 处理，不渲染崩页面
+            const findings = Array.isArray(r.findings) ? r.findings : [];
             const total =
-              typeof r.findingCount === "number" ? r.findingCount : r.findings.length;
+              typeof r.findingCount === "number"
+                ? r.findingCount
+                : findings.length;
             const hasSeverityCounts = typeof r.findingCount !== "number";
             const c = hasSeverityCounts
               ? {
-                  critical: r.findings.filter((f) => f.severity === "critical").length,
-                  warning: r.findings.filter((f) => f.severity === "warning").length,
-                  info: r.findings.filter((f) => f.severity === "info").length,
+                  critical: findings.filter((f) => f.severity === "critical").length,
+                  warning: findings.filter((f) => f.severity === "warning").length,
+                  info: findings.filter((f) => f.severity === "info").length,
                 }
               : null;
             return (
