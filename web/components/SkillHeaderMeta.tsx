@@ -131,20 +131,8 @@ export function SkillMetaGroups({
   // 徽章即入口：开源/论文徽章直接链接到对应出处（不再单列“来源”行）
   const badges = [
     featured && { key: "featured", icon: <Sparkles className="h-3 w-3" />, label: "推荐", tone: "warning" as const },
-    sourceUrl && {
-      key: "oss",
-      icon: <Code2 className="h-3 w-3" />,
-      label: "开源仓库",
-      tone: "muted" as const,
-      href: sourceUrl,
-    },
-    paperUrl && {
-      key: "paper",
-      icon: <FileText className="h-3 w-3" />,
-      label: "相关论文",
-      tone: "muted" as const,
-      href: paperUrl,
-    },
+    sourceUrl && { key: "oss", icon: <Code2 className="h-3 w-3" />, label: "开源", tone: "muted" as const },
+    paperUrl && { key: "paper", icon: <FileText className="h-3 w-3" />, label: "有论文", tone: "muted" as const },
     license && { key: "license", icon: <ShieldCheck className="h-3 w-3" />, label: license, tone: "muted" as const },
   ].filter(Boolean) as {
     key: string;
@@ -221,6 +209,37 @@ export function SkillMetaGroups({
 
       <Row label="维护作者">
         <span className="text-muted">{sourceUrl ? "开源社区" : "平台收录"}</span>
+      </Row>
+
+      <Row label="来源">
+        {sourceUrl || paperUrl ? (
+          <span className="flex flex-wrap items-center gap-3">
+            {sourceUrl && (
+              <a
+                href={sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                <Code2 className="h-3 w-3" />
+                开源仓库
+              </a>
+            )}
+            {paperUrl && (
+              <a
+                href={paperUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                <FileText className="h-3 w-3" />
+                相关论文
+              </a>
+            )}
+          </span>
+        ) : (
+          <span className="text-muted">平台收录（无外部来源）</span>
+        )}
       </Row>
 
     </dl>
