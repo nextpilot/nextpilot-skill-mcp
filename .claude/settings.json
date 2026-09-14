@@ -33,7 +33,19 @@
       "Bash(curl -s -m 20 -c /tmp/cj https://skill.nextpilot.org/api/auth/csrf)",
       "Bash(curl -s -m 20 https://skill.nextpilot.org/api/auth/session)",
       "Bash(curl -s -m 20 https://skill.nextpilot.org/api/auth/providers)",
-      "Bash(node scripts/shot.mjs \"https://skill.nextpilot.org/login\" /tmp/login-prod.png light 1100 900 0)"
+      "Bash(node scripts/shot.mjs \"https://skill.nextpilot.org/login\" /tmp/login-prod.png light 1100 900 0)",
+      "Bash(awk '{print $5, $9}')",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(curl -sL -m 40 \"https://raw.githubusercontent.com/robotto-xyz/ai-drone-toolkit/main/tools/px4-ulog-mcp/README.md\" -o px4-readme.md)",
+      "Bash(wc -c)",
+      "Bash(grep -nE \"^#{1,3} |check|threshold|diagnose|analyze\" px4-readme.md)",
+      "Bash(curl -sL -m 40 \"https://api.github.com/repos/robotto-xyz/ai-drone-toolkit/git/trees/main?recursive=1\" -o tree.json)",
+      "Bash(curl -sL -m 60 \"https://raw.githubusercontent.com/robotto-xyz/ai-drone-toolkit/main/packages/robotto-drone-core/src/robotto_drone_core/ulog_tools.py\" -o ulog_tools.py)",
+      "Bash(wc -l)",
+      "Bash(awk 'NR>=523 && NR<=770 && /_finding\\\\\\(/{getline; print NR\": \"$0}' ulog_tools.py)",
+      "Bash(python scripts/calibrate/run_checks_locally.py engine/tests/logs/ce302d3b-06bc-43ab-9c2a-027d29fcefd3.ulg)",
+      "Bash(python -c \"import ast;ast.parse\\(open\\('knowledge/ulog/px4/ulog_checks.py',encoding='utf-8'\\).read\\(\\)\\);print\\('AST OK'\\)\")"
     ]
   }
 }

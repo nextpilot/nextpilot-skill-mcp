@@ -1,45 +1,51 @@
-"""本地校准/验证用：抽取 web/workers 下两个 Python 模板并在真实 .ulg 上运行。
+"""本地校准/验证用：直接跑 knowledge/ulog/px4 下的 Python 源，在真实 .ulg 上验证。
 
 用法：
   python scripts/calibrate/run_checks_locally.py <file.ulg> [more.ulg ...]
   python scripts/calibrate/run_checks_locally.py --probe-data <file.ulg> ...
 
-冲刺 2 用 10-20 个真实日志校准阈值（CLAUDE.md 4.3/8）时，这个脚本就是回归入口；
-engine/ 真包抽出后改为直接 import nextpilot_engine。
+经验的唯一事实源在 knowledge/ulog/：阈值 TOML、故障库 YAML、检查逻辑 Python。
+本脚本用 tomllib（Python 3.11+）读阈值、解析故障库 YAML 的产物 JSON，
+不依赖 Node 构建，因此改完 knowledge 即可在此回归。
 """
 import json
-import re
 import sys
 from pathlib import Path
+
+try:
+    import tomllib  # Python 3.11+
+except ModuleNotFoundError:  # pragma: no cover
+    tomllib = None
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-TS_CHECKS = REPO_ROOT / "web" / "workers" / "ulog-check-script.ts"
-TS_DATA = REPO_ROOT / "web" / "workers" / "ulog-data-script.ts"
+KN_PX4 = REPO_ROOT / "knowledge" / "ulog" / "px4"
+PY_CHECKS = KN_PX4 / "ulog_checks.py"
+PY_DATA = KN_PX4 / "ulog_data.py"
+THRESHOLDS_TOML = KN_PX4 / "px4-thresholds.toml"
 FAULT_KB_JSON = REPO_ROOT / "web" / "workers" / "fault-kb.generated.json"
 
 
-def _load_template(path: Path) -> str:
-    text = path.read_text(encoding="utf-8")
-    # 兼容 `...` 与 `...`.replace(...) 两种结尾
-    m = re.search(r"String\.raw`(.*)`\s*(?:\.replace.*)?;\s*$", text, re.S)
-    if not m:
-        raise RuntimeError(f"未能在 {path} 中找到 String.raw`...` 模板")
-    body = m.group(1)
-    if "__FAULT_KB__" in body:
-        import json as _json
-        entries = _json.loads(FAULT_KB_JSON.read_text(encoding="utf-8"))["entries"]
-        # 注入 Python 字面量（repr 保证 True/False/None 语义正确）
-        body = body.replace("__FAULT_KB__", repr(entries))
+def _load_checks() -> str:
+    body = PY_CHECKS.read_text(encoding="utf-8")
+
+    entries = json.loads(FAULT_KB_JSON.read_text(encoding="utf-8"))["entries"]
+    body = body.replace("__FAULT_KB__", repr(entries))
+
+    if tomllib is None:
+        raise RuntimeError("需要 Python 3.11+（标准库 tomllib）来读 px4-thresholds.toml")
+    thresholds = tomllib.loads(THRESHOLDS_TOML.read_text(encoding="utf-8"))
+    # Python 源里是 json.loads(r'''__THRESHOLDS__''')；注入 JSON 字面量
+    body = body.replace("__THRESHOLDS__", json.dumps(thresholds, ensure_ascii=False))
     return body
 
 
 def build_namespace(path: Path) -> dict:
-    script = _load_template(TS_CHECKS) + _load_template(TS_DATA)
+    script = _load_checks() + "\n" + PY_DATA.read_text(encoding="utf-8")
     namespace: dict = {"ulog_bytes": path.read_bytes()}
-    exec(compile(script, str(TS_CHECKS), "exec"), namespace)
+    exec(compile(script, str(PY_CHECKS), "exec"), namespace)
     return namespace
 
 

@@ -126,6 +126,12 @@ export function LogAnalyzer() {
   const [dedupeNotice, setDedupeNotice] = useState<string | null>(null);
   const pendingHashRef = useRef<string>("");
 
+  const resetWorker = useCallback(() => {
+    workerRef.current?.terminate();
+    workerRef.current = null;
+    pendingRef.current.clear();
+  }, []);
+
   /** 云端报告列表（元数据）；返回而不写 state，便于上传时即时查重 */
   const fetchCloudList = useCallback(async (): Promise<HistoryItem[]> => {
     try {
@@ -185,9 +191,9 @@ export function LogAnalyzer() {
     setHistory(listReports());
     void refreshMe();
     return () => {
-      workerRef.current?.terminate();
+      resetWorker();
     };
-  }, [refreshMe]);
+  }, [refreshMe, resetWorker]);
 
   const persist = useCallback(
     (r: AnalysisReport, id: string, ai: string | null, hash?: string) => {
@@ -370,68 +376,98 @@ export function LogAnalyzer() {
         return;
       }
 
-      const bytes = new Uint8Array(await file.arrayBuffer());
-
-      // 同一份日志（内容哈希一致）不重复解析：直接载入历史结论
-      const hash =
-        (await hashLogBytes(bytes)) ||
-        fallbackLogKey(file.name, file.size, file.lastModified);
-      const existing = await findExistingByHash(hash);
-      if (existing) {
-        // 本机历史自带完整结论；云端列表只有元数据，需再取一次详情
-        if (existing.source === "cloud") await viewHistoryItem(existing);
-        else viewSaved(existing);
-        setDedupeNotice(
-          `这份日志此前已分析过（内容一致），已直接载入历史结论，未重复解析。` +
-            (existing.aiMarkdown ? "" : "如需 AI 中文解读，可在下方手动生成（消耗额度）。"),
-        );
+      if (file.size === 0) {
+        setError("日志文件为空，请选择有效的 PX4 .ulg 文件。");
         return;
       }
 
-      reportIdRef.current = newReportId();
-      // worker 只创建一次、回调闭包会捕获首次的 file，这里用 ref 记录本次文件信息
-      pendingFileRef.current = { name: file.name, size: file.size };
-      pendingHashRef.current = hash;
+      try {
+        const bytes = new Uint8Array(await file.arrayBuffer());
 
-      // 复用既有 worker（Pyodide 已加载），避免重复下载运行时
-      if (!workerRef.current) {
-        const worker = new Worker(
-          new URL("../workers/ulog-worker.ts", import.meta.url),
-          { type: "module" },
-        );
-        worker.onmessage = (e: MessageEvent) => {
-          const msg = e.data;
-          if (msg.type === "stage") {
-            setStage(msg.stage);
-          } else if (msg.type === "error") {
-            setError(msg.message);
+        // 同一份日志（内容哈希一致）不重复解析：直接载入历史结论
+        const hash =
+          (await hashLogBytes(bytes)) ||
+          fallbackLogKey(file.name, file.size, file.lastModified);
+        const existing = await findExistingByHash(hash);
+        if (existing) {
+          // 本机历史自带完整结论；云端列表只有元数据，需再取一次详情
+          if (existing.source === "cloud") await viewHistoryItem(existing);
+          else viewSaved(existing);
+          setDedupeNotice(
+            `这份日志此前已分析过（内容一致），已直接载入历史结论，未重复解析。` +
+              (existing.aiMarkdown ? "" : "如需 AI 中文解读，可在下方手动生成（消耗额度）。"),
+          );
+          return;
+        }
+
+        reportIdRef.current = newReportId();
+        // worker 只创建一次、回调闭包会捕获首次的 file，这里用 ref 记录本次文件信息
+        pendingFileRef.current = { name: file.name, size: file.size };
+        pendingHashRef.current = hash;
+
+        // 复用既有 worker（Pyodide 已加载），避免重复下载运行时
+        if (!workerRef.current) {
+          const worker = new Worker(
+            new URL("../workers/ulog-worker.ts", import.meta.url),
+            { type: "module" },
+          );
+          // worker 脚本本身加载失败（离线 / CDN 被拦 / 构建产物损坏）时页面只会一直转圈，
+          // 必须显式接住，否则用户拿不到任何反馈
+          worker.onerror = (e) => {
+            resetWorker();
+            setError(
+              `本地解析引擎加载失败：${e.message || "无法加载 Worker 脚本"}。` +
+                `若是网络原因（Pyodide 从 CDN 加载），请检查网络后重试。`,
+            );
             setStage("idle");
-          } else if (msg.type === "done") {
-            const r = msg.report as AnalysisReport;
-            r.fileName = pendingFileRef.current.name;
-            r.fileSize = pendingFileRef.current.size;
-            r.analyzedAt = new Date().toISOString();
-            r.logHash = pendingHashRef.current;
-            setReport(r);
-            setManifest(msg.manifest as TopicManifest);
-            setInfo(msg.info as LogInfo);
-            setStage("done");
-            persist(r, reportIdRef.current, null, pendingHashRef.current);
-            // 冲刺 2：AI 报告需登录且消耗配额，改为用户手动点击生成，不再解析完自动调用
-          } else if (msg.type === "series") {
-            const resolve = pendingRef.current.get(msg.reqId);
-            if (resolve) {
-              pendingRef.current.delete(msg.reqId);
-              resolve(msg.data);
+          };
+          worker.onmessageerror = () => {
+            resetWorker();
+            setError("本地解析引擎消息解析失败，请刷新页面重试。");
+            setStage("idle");
+          };
+          worker.onmessage = (e: MessageEvent) => {
+            const msg = e.data;
+            if (msg.type === "stage") {
+              setStage(msg.stage);
+            } else if (msg.type === "error") {
+              setError(msg.message);
+              setStage("idle");
+            } else if (msg.type === "done") {
+              const r = msg.report as AnalysisReport;
+              r.fileName = pendingFileRef.current.name;
+              r.fileSize = pendingFileRef.current.size;
+              r.analyzedAt = new Date().toISOString();
+              r.logHash = pendingHashRef.current;
+              setReport(r);
+              setManifest(msg.manifest as TopicManifest);
+              setInfo(msg.info as LogInfo);
+              setStage("done");
+              persist(r, reportIdRef.current, null, pendingHashRef.current);
+              // 冲刺 2：AI 报告需登录且消耗配额，改为用户手动点击生成，不再解析完自动调用
+            } else if (msg.type === "series") {
+              const resolve = pendingRef.current.get(msg.reqId);
+              if (resolve) {
+                pendingRef.current.delete(msg.reqId);
+                resolve(msg.data);
+              }
             }
-          }
-        };
-        workerRef.current = worker;
-      }
+          };
+          workerRef.current = worker;
+        }
 
-      workerRef.current.postMessage({ type: "analyze", file: bytes });
+        // worker 首次启动到发出第一条 stage 消息之间有间隔，先给即时反馈
+        setStage("loading-runtime");
+        workerRef.current.postMessage({ type: "analyze", file: bytes });
+      } catch (err) {
+        resetWorker();
+        setStage("idle");
+        setError(
+          `日志上传失败：${err instanceof Error ? err.message : String(err)}。请确认文件未损坏后重试。`,
+        );
+      }
     },
-    [findExistingByHash, persist, viewHistoryItem, viewSaved],
+    [findExistingByHash, persist, resetWorker, viewHistoryItem, viewSaved],
   );
 
   // 首页上传卡把文件暂存在 IndexedDB，这里取出后立即分析（读完即删）

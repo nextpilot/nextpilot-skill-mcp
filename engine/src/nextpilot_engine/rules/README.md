@@ -1,3 +1,5 @@
-# 检查规则
+# 检查规则（预留位）
 
-放置只做数值判断的确定性规则。LLM 不参与此层的判断。
+阶段二的规则执行层：从仓库根 `knowledge/ulog/px4/` 加载阈值 TOML 与故障库 YAML，
+执行同一份 Python 检查脚本。**规则本体不放在这里**，见
+[`knowledge/ulog/`](../../../knowledge/ulog/)。

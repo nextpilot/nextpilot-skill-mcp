@@ -1,7 +1,7 @@
 # 规则知识库编写规范（工程师经验 → Agent 方法论）
 
 > 状态：规范定稿于冲刺 2；故障知识库首版 10 条见
-> [engine/src/nextpilot_engine/rules/px4-fault-kb.yaml](../../engine/src/nextpilot_engine/rules/px4-fault-kb.yaml)。
+> [px4/px4-fault-kb.yaml](px4/px4-fault-kb.yaml)。
 > 引擎按本规范接入是冲刺 3 的工作（见文末"落地差距"）。
 
 ## 0. 核心原则
@@ -151,7 +151,7 @@ prompt 无工程师思考范式，引擎也不产出标签/阶段/故障树匹�
 
 1. **引擎产出标签**：[web/workers/ulog-check-script.ts](../../web/workers/ulog-check-script.ts) 每条规则补稳定 `tag`；
    新增飞行阶段推断（参考 robotto armed/nav_state 边沿法）；新增 5 个 guard 标签。
-2. **故障树匹配器（Python，随引擎打包）**：加载 [px4-fault-kb.yaml](../../engine/src/nextpilot_engine/rules/px4-fault-kb.yaml)，
+2. **故障树匹配器（Python，随引擎打包）**：加载 [px4-fault-kb.yaml](px4/px4-fault-kb.yaml)，
    按 2.2 节规则输出命中条目，挂到结果 JSON。Pyodide 内可用极简 YAML 解析（条目结构固定）或构建期转 JSON 打包。
 3. **报文改造**：边缘函数 explain 按第 5 节契约组装，System Prompt 换成第 3 节 8 条 + 四段式。
 4. **输出后置校验**：finding/故障编号白名单校验，违规重生成或降级为纯条目翻译。

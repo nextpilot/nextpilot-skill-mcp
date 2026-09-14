@@ -1,9 +1,4 @@
-// ⚠️ 自动生成，请勿手改。源文件在 knowledge/ulog/，改完跑 `pnpm build:kb`（dev/build 自动执行）。
-import faultKbJson from "./fault-kb.generated.json";
 
-const thresholds = {"guard":{"min_flight_sec":60,"dropout_ms":1000},"vibration":{"vibe_warn":4.905,"vibe_crit":9.81,"stddev_warn":0.5,"stddev_crit":1,"clip_warn":100,"clip_crit":1000},"ekf":{"reject_ratio_warn":0.01,"reject_ratio_crit":0.05,"reject_min_count":3,"peak_warn":0.5,"peak_crit":1},"power":{"cell_warn":3.7,"cell_crit":3.55,"sag_volts":0.3,"sag_skip_takeoff_sec":5,"remaining_warn":0.2,"remaining_crit":0.1},"cpu":{"load_warn":0.9,"load_crit":0.95},"gps":{"eph_warn":5,"eph_crit":10,"sats_warn":8,"sats_crit":6,"jump_speed_mps":50,"jump_min_count":3},"mode":{"thrash_changes":12},"motor":{"spread_warn":0.08,"spread_crit":0.15},"gyro_bias":{"abs_warn":0.02,"abs_crit":0.05,"drift_warn":0.02,"drift_crit":0.05,"temp_range_warn":15,"temp_range_crit":25},"attitude":{"err_warn_rotary":15,"err_crit_rotary":30,"err_warn_fixedwing":25,"err_crit_fixedwing":40,"osc_hz":4,"sample_rate_hz":50,"min_seg_samples":50},"airspeed":{"invalid_ratio_warn":0.1,"invalid_ratio_crit":0.5},"vtol":{"transition_tilt_deg":8},"wind":{"speed_warn":8,"speed_crit":12},"messages":{"critical_max_level":3,"warn_level":4,"max_examples":5,"message_clip_len":200}};
-
-export const PY_ULG_CHECKS = String.raw`
 import json, io
 import numpy as np
 from pyulog import ULog
@@ -1098,6 +1093,3 @@ __result = json.dumps({
     "matchedFaults": matched_faults,
     "findings": findings,
 }, ensure_ascii=False)
-`
-  .replace("__FAULT_KB__", JSON.stringify(faultKbJson.entries))
-  .replace("__THRESHOLDS__", JSON.stringify(thresholds));

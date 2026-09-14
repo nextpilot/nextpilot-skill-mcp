@@ -1,5 +1,4 @@
-// ⚠️ 自动生成，请勿手改。源文件在 knowledge/ulog/，改完跑 `pnpm build:kb`（dev/build 自动执行）。
-export const PY_ULG_DATA_HELPERS = String.raw`
+
 # ============ 通用工具 ============
 def _np_find(topic, instance):
     for d in ulog.data_list:
@@ -194,4 +193,3 @@ def np_log_info():
         "changedParams": changed,
         "phases": _phases(),
     }, ensure_ascii=False)
-`;

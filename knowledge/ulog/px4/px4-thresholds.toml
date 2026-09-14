@@ -1,0 +1,112 @@
+# PX4 .ulg 检查阈值（确定性引擎的唯一数值来源）
+#
+# 这是工程师日常最常编辑的文件：改阈值只改这里，不要改 ulog_checks.py。
+# 每个键都尽量带来源标记：
+#   [来源] 官方/Flight Review/robotto 有依据；
+#   [暂定] 经验初值，待 10-20 个真实日志校准（见 px4-ulog-rules.md 校准记录）。
+# 改完在 web/ 下跑 `pnpm build:kb` 重新生成运行时产物（dev/build 会自动执行）。
+
+# 数据质量 guard ----------------------------------------------------------
+[guard]
+# armed 总时长短于该秒数时只描述现象、不出深度根因（短路故障库匹配）
+min_flight_sec = 60                 # [暂定]
+# 全日志丢包累计超过该毫秒数，打 log_dropouts_high
+dropout_ms = 1000                   # [暂定]
+
+# R1 振动 / IMU 削波 ------------------------------------------------------
+[vibration]
+# accel_vibration_metric（等效加速度），Flight Review Vibration 色带 0.5g/1g
+vibe_warn = 4.905                   # [来源] Flight Review，m/s^2
+vibe_crit = 9.81                    # [来源]
+# 旧固件 stddev_accel RSS 回退
+stddev_warn = 0.5                   # [暂定] m/s^2
+stddev_crit = 1.0                   # [暂定]
+# accel_clipping[] 全日志累计削波次数（单调累计计数，取末值-首值）
+clip_warn = 100                     # [暂定] 次，1~99 报 info
+clip_crit = 1000                    # [暂定]
+
+# R2 EKF 创新检验 ---------------------------------------------------------
+[ekf]
+# test_ratio 被拒样本（ratio>=1）占比；另要求被拒样本数 >= reject_min_count 去毛刺
+reject_ratio_warn = 0.01            # [暂定] 1%
+reject_ratio_crit = 0.05            # [暂定] 5%
+reject_min_count = 3                # [暂定]
+# 瞬时峰值 test ratio（robotto 0.5/1.0，作为占比之外的补充判据）
+peak_warn = 0.5                     # [来源] robotto
+peak_crit = 1.0                     # [来源] ratio>=1 即该路观测被 EKF 拒绝
+
+# R3 电源 ----------------------------------------------------------------
+[power]
+cell_warn = 3.70                    # [暂定] 单电芯最低电压 V
+cell_crit = 3.55                    # [暂定]
+# 飞行中持续压降：armed 后跳过起飞冲击的秒数，比较尾段中位与头段中位
+sag_volts = 0.30                    # [暂定] V
+sag_skip_takeoff_sec = 5            # [暂定]
+remaining_warn = 0.20               # [来源] robotto，battery_status.remaining
+remaining_crit = 0.10               # [来源]
+
+# R4 CPU 负载 ------------------------------------------------------------
+[cpu]
+load_warn = 0.90                    # [来源] robotto，cpuload.load 峰值
+load_crit = 0.95                    # [来源]
+
+# R5 GPS 健康 ------------------------------------------------------------
+[gps]
+eph_warn = 5.0                      # [暂定] eph p95，m
+eph_crit = 10.0                     # [暂定]
+sats_warn = 8                       # [暂定] 卫星数
+sats_crit = 6                       # [暂定]
+# 相邻定位差分速度超过该值视为跳点，累计 >= jump_min_count 次告警
+jump_speed_mps = 50.0               # [暂定]
+jump_min_count = 3                  # [暂定]
+
+# R7 模式抖动 ------------------------------------------------------------
+[mode]
+thrash_changes = 12                 # [来源] robotto，nav_state 切换次数
+
+# R9 电机输出不平衡（armed 悬停段，>=4 通道才评估）-----------------------
+[motor]
+spread_warn = 0.08                  # [暂定] 通道均值离散度
+spread_crit = 0.15                  # [暂定]
+
+# R10 陀螺零偏漂移 --------------------------------------------------------
+[gyro_bias]
+abs_warn = 0.02                     # [暂定] rad/s（约 1.1°/s）
+abs_crit = 0.05                     # [暂定]（约 2.9°/s）
+drift_warn = 0.02                   # [暂定] armed 段内漂移量 rad/s
+drift_crit = 0.05                   # [暂定]
+temp_range_warn = 15.0              # [暂定] 温度变化 °C，作 guard 背景
+temp_range_crit = 25.0              # [暂定]
+
+# R11 姿态跟踪 / 振荡（机动段误差 p99，度）--------------------------------
+[attitude]
+err_warn_rotary = 15.0              # [暂定] 旋翼类
+err_crit_rotary = 30.0              # [暂定]
+err_warn_fixedwing = 25.0           # [暂定] 固定翼更宽松
+err_crit_fixedwing = 40.0           # [暂定]
+# 误差过零频率 >= 该值且 p99 同时超 warn，判振荡
+osc_hz = 4.0                        # [暂定] Hz
+sample_rate_hz = 50.0               # [来源] vehicle_attitude 约 50Hz，用于频率换算
+min_seg_samples = 50                # 样本数不足不出该结论
+
+# R12 空速（固定翼巡航段，airspeed_sensor_measurement_valid 无效占比）-----
+[airspeed]
+invalid_ratio_warn = 0.10           # [暂定]
+invalid_ratio_crit = 0.50           # [暂定]
+
+# R13 VTOL 转换姿态 -------------------------------------------------------
+[vtol]
+transition_tilt_deg = 8.0           # [暂定] 转换段最大倾角
+
+# R14 风扰（estimator_wind 风速 p95，同时打 wind_strong guard）------------
+[wind]
+speed_warn = 8.0                    # [暂定] m/s
+speed_crit = 12.0                   # [暂定]
+
+# 日志消息 ---------------------------------------------------------------
+[messages]
+# syslog level：<=3（ERR 及更严重）聚合为 critical，=4（warning）单列
+critical_max_level = 3
+warn_level = 4
+max_examples = 5                     # finding 中附带的原文条数
+message_clip_len = 200              # 单条消息截断长度
