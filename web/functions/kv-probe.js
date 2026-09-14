@@ -1,7 +1,7 @@
 // 冲刺 2 阶段 0 Spike：验证 KV 绑定读写 + 边缘函数外网 fetch（DeepSeek 连通性）。
 // 控制台需先开通 KV、创建 namespace（nextpilot_skill_mcp）并绑定到本项目，变量名 NEXTPILOT_KV。
 // 访问 GET /kv-probe 每次计数 +1，并探测 DeepSeek API 的可达性（无 key 时对方返回 401 也算通）。
-import { getKv } from "./_lib/kv.js";
+import { getKv, listAll } from "./_lib/kv.js";
 
 const COUNTER_KEY = "kvprobe_count";
 const SHAPE_KEY = "kvprobe_shape";
@@ -44,6 +44,13 @@ export async function onRequestGet({ env }) {
     };
   } catch (err) {
     result.kvApi = { error: String(err && err.message ? err.message : err) };
+  }
+
+  // 复现配额计数实际走的调用：listAll 的翻页参数
+  try {
+    result.listAll = { count: (await listAll(kv, "kvprobe_")).length };
+  } catch (err) {
+    result.listAll = { error: String(err && err.message ? err.message : err) };
   }
 
   try {

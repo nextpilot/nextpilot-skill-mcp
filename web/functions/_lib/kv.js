@@ -57,8 +57,11 @@ export async function listAll(kv, prefix) {
   const keys = [];
   let cursor;
   do {
-    const result = await kv.list({ prefix, limit: 256, cursor });
-    for (const k of result.keys) keys.push(k.key);
+    // 只在真正翻页时才带上 cursor：部分平台的 list 实现不接受显式的 undefined
+    const options = { prefix, limit: 256 };
+    if (cursor) options.cursor = cursor;
+    const result = await kv.list(options);
+    for (const k of result.keys) keys.push(k.key ?? k.name);
     cursor = result.complete ? null : result.cursor;
   } while (cursor);
   return keys;

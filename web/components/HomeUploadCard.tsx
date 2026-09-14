@@ -31,15 +31,10 @@ export function HomeUploadCard() {
 
   return (
     <div className="card p-5 sm:p-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-faint">
-            {t("上传日志", "Upload log")}
-          </p>
-          <h2 className="mt-2.5 text-lg font-semibold">
-            {t("分析一份飞控日志", "Analyze a flight log")}
-          </h2>
-        </div>
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="text-lg font-semibold">
+          {t("上传日志，分析一份飞控日志", "Upload a log and analyze it")}
+        </h2>
         <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted">
           <FileCheck2 className="h-4 w-4" />
         </span>
