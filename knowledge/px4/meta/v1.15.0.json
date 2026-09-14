@@ -1,22 +1,11 @@
 {
- "_note": "生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 PX4 上游 msg 同步。",
- "tag": "v1.16.0",
- "topicCount": 227,
+ "_note": "生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 PX4 上游同步。",
+ "paramCount": 0,
+ "parameters": null,
+ "parametersNote": "该 tag 无参数元数据：PX4 只在分支构建（main/master）发布 parameters.json，release tag 下没有；日志里的实际参数值来自 .ulg 的 initial_parameters。",
+ "tag": "v1.15.0",
+ "topicCount": 213,
  "topics": {
-  "ackermann_velocity_setpoint": {
-   "fields": {
-    "backwards": {
-     "note": "Flag for backwards driving",
-     "type": "bool"
-    },
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    }
-   },
-   "msg": "AckermannVelocitySetpoint.msg",
-   "topic": "ackermann_velocity_setpoint"
-  },
   "action_request": {
    "fields": {
     "action": {
@@ -222,6 +211,10 @@
   },
   "airspeed": {
    "fields": {
+    "air_temperature_celsius": {
+     "note": "air temperature in degrees Celsius, -1000 if unknown",
+     "type": "float32"
+    },
     "confidence": {
      "note": "confidence value from 0 to 1 for this sensor",
      "type": "float32"
@@ -248,10 +241,6 @@
   },
   "airspeed_validated": {
    "fields": {
-    "airspeed_derivative_filtered": {
-     "note": "filtered indicated airspeed derivative [m/s/s]",
-     "type": "float32"
-    },
     "airspeed_sensor_measurement_valid": {
      "note": "True if data from at least one airspeed sensor is declared valid.",
      "type": "bool"
@@ -268,17 +257,9 @@
      "note": "indicated airspeed in m/s (IAS), set to NAN if invalid",
      "type": "float32"
     },
-    "pitch_filtered": {
-     "note": "filtered pitch [rad]",
-     "type": "float32"
-    },
     "selected_airspeed_index": {
      "note": "1-3: airspeed sensor index, 0: groundspeed-windspeed, -1: airspeed invalid",
      "type": "int8"
-    },
-    "throttle_filtered": {
-     "note": "filtered fixed-wing throttle [-]",
-     "type": "float32"
     },
     "timestamp": {
      "type": "uint64",
@@ -382,7 +363,8 @@
      "note": "HEALTH_COMPONENT_INDEX_*",
      "type": "uint8",
      "values": {
-      "0": "NONE"
+      "0": "NONE",
+      "19": "AVOIDANCE"
      }
     },
     "health_component_is_present": {
@@ -514,8 +496,20 @@
   },
   "battery_status": {
    "fields": {
+    "available_energy": {
+     "note": "The predicted charge or energy remaining in the battery",
+     "type": "float32"
+    },
+    "average_power": {
+     "note": "The average power of the current discharge",
+     "type": "float32"
+    },
     "average_time_to_empty": {
      "note": "predicted remaining battery capacity based on the average rate of discharge in min",
+     "type": "uint16"
+    },
+    "average_time_to_full": {
+     "note": "The predicted remaining time until the battery reaches full charge, in minutes",
      "type": "uint16"
     },
     "capacity": {
@@ -538,16 +532,25 @@
      "note": "Battery current average in amperes (for FW average in level flight), -1 if unknown",
      "type": "float32"
     },
+    "current_filtered_a": {
+     "note": "Battery current in amperes, filtered, 0 if unknown",
+     "type": "float32"
+    },
+    "custom_faults": {
+     "kind": "bitmask",
+     "note": "Bitmask indicating smart battery internal manufacturer faults, those are not user actionable.",
+     "type": "uint32"
+    },
     "cycle_count": {
      "note": "number of discharge cycles the battery has experienced",
      "type": "uint16"
     },
-    "discharged_mah": {
-     "note": "Discharged amount in mAh, -1 if unknown",
+    "design_capacity": {
+     "note": "The design capacity of the battery",
      "type": "float32"
     },
-    "estimation_covariance_norm": {
-     "note": "Norm of the covariance matrix",
+    "discharged_mah": {
+     "note": "Discharged amount in mAh, -1 if unknown",
      "type": "float32"
     },
     "faults": {
@@ -566,10 +569,6 @@
     "interface_error": {
      "note": "interface error counter",
      "type": "uint16"
-    },
-    "internal_resistance_estimate": {
-     "note": "[Ohm] Internal resistance per cell estimate",
-     "type": "float32"
     },
     "is_powering_off": {
      "note": "Power off event imminent indication, false if unknown",
@@ -591,25 +590,17 @@
      "note": "max error, expected margin of error in % in the state-of-charge calculation with a range of 1 to 100%",
      "type": "uint16"
     },
+    "mode": {
+     "note": "Battery mode. Note, the normal operation mode",
+     "type": "uint8"
+    },
     "nominal_voltage": {
      "note": "Nominal voltage of the battery pack",
-     "type": "float32"
-    },
-    "ocv_estimate": {
-     "note": "[V] Open circuit voltage estimate",
-     "type": "float32"
-    },
-    "ocv_estimate_filtered": {
-     "note": "[V] Filtered open circuit voltage estimate",
      "type": "float32"
     },
     "over_discharge_count": {
      "note": "Number of battery overdischarge",
      "type": "uint16"
-    },
-    "prediction_error": {
-     "note": "[V] Prediction error",
-     "type": "float32"
     },
     "priority": {
      "note": "Zero based priority is the connection on the Power Controller V1..Vn AKA BrickN-1",
@@ -632,21 +623,15 @@
      "type": "uint16"
     },
     "source": {
-     "kind": "enum",
      "note": "Battery source",
-     "type": "uint8",
-     "values": {
-      "0": "MODULE",
-      "1": "EXTERNAL",
-      "2": "ESCS"
-     }
+     "type": "uint8"
     },
     "state_of_health": {
      "note": "state of health. FullChargeCapacity/DesignCapacity, 0-100%.",
      "type": "uint16"
     },
     "temperature": {
-     "note": "Temperature of the battery in degrees Celcius, NaN if unknown",
+     "note": "temperature of the battery. NaN if unknown",
      "type": "float32"
     },
     "time_remaining_s": {
@@ -657,12 +642,8 @@
      "type": "uint64",
      "unit": "us"
     },
-    "volt_based_soc_estimate": {
-     "note": "[0, 1] Normalized volt based state of charge estimate",
-     "type": "float32"
-    },
-    "voltage_prediction": {
-     "note": "[V] Predicted voltage",
+    "voltage_filtered_v": {
+     "note": "Battery voltage in volts, filtered, 0 if unknown",
      "type": "float32"
     },
     "voltage_v": {
@@ -670,20 +651,26 @@
      "type": "float32"
     },
     "warning": {
-     "kind": "enum",
      "note": "Current battery warning",
-     "type": "uint8",
-     "values": {
-      "0": "NONE",
-      "1": "LOW",
-      "2": "CRITICAL",
-      "3": "EMERGENCY",
-      "4": "FAILED"
-     }
+     "type": "uint8"
     }
    },
    "msg": "BatteryStatus.msg",
    "topic": "battery_status"
+  },
+  "buffer128": {
+   "fields": {
+    "len": {
+     "note": "length of data",
+     "type": "uint8"
+    },
+    "timestamp": {
+     "type": "uint64",
+     "unit": "us"
+    }
+   },
+   "msg": "Buffer128.msg",
+   "topic": "buffer128"
   },
   "button_event": {
    "fields": {
@@ -850,6 +837,37 @@
    },
    "msg": "CollisionConstraints.msg",
    "topic": "collision_constraints"
+  },
+  "collision_report": {
+   "fields": {
+    "action": {
+     "type": "uint8"
+    },
+    "altitude_minimum_delta": {
+     "type": "float32"
+    },
+    "horizontal_minimum_delta": {
+     "type": "float32"
+    },
+    "id": {
+     "type": "uint32"
+    },
+    "src": {
+     "type": "uint8"
+    },
+    "threat_level": {
+     "type": "uint8"
+    },
+    "time_to_minimum_delta": {
+     "type": "float32"
+    },
+    "timestamp": {
+     "type": "uint64",
+     "unit": "us"
+    }
+   },
+   "msg": "CollisionReport.msg",
+   "topic": "collision_report"
   },
   "config_overrides": {
    "fields": {
@@ -1059,6 +1077,32 @@
    "msg": "DebugVect.msg",
    "topic": "debug_vect"
   },
+  "differential_drive_setpoint": {
+   "fields": {
+    "closed_loop_speed_control": {
+     "note": "true if speed is controlled using estimator feedback, false if direct feed-forward",
+     "type": "bool"
+    },
+    "closed_loop_yaw_rate_control": {
+     "note": "true if yaw rate is controlled using gyroscope feedback, false if direct feed-forward",
+     "type": "bool"
+    },
+    "speed": {
+     "note": "[m/s] collective roll-off speed in body x-axis",
+     "type": "float32"
+    },
+    "timestamp": {
+     "type": "uint64",
+     "unit": "us"
+    },
+    "yaw_rate": {
+     "note": "[rad/s] yaw rate",
+     "type": "float32"
+    }
+   },
+   "msg": "DifferentialDriveSetpoint.msg",
+   "topic": "differential_drive_setpoint"
+  },
   "differential_pressure": {
    "fields": {
     "device_id": {
@@ -1090,25 +1134,6 @@
    "msg": "DifferentialPressure.msg",
    "topic": "differential_pressure"
   },
-  "differential_velocity_setpoint": {
-   "fields": {
-    "bearing": {
-     "note": "[rad] [-pi,pi] from North.",
-     "type": "float32"
-    },
-    "speed": {
-     "note": "[m/s] [-inf, inf] Speed setpoint (Backwards driving if negative)",
-     "type": "float32",
-     "unit": "Backwards driving if negative"
-    },
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    }
-   },
-   "msg": "DifferentialVelocitySetpoint.msg",
-   "topic": "differential_velocity_setpoint"
-  },
   "distance_sensor": {
    "fields": {
     "current_distance": {
@@ -1134,15 +1159,6 @@
      "note": "Minimum distance the sensor can measure (in m)",
      "type": "float32",
      "unit": "in m"
-    },
-    "mode": {
-     "kind": "enum",
-     "type": "uint8",
-     "values": {
-      "0": "UNKNOWN",
-      "1": "ENABLED",
-      "2": "DISABLED"
-     }
     },
     "orientation": {
      "note": "Direction the sensor faces from MAV_SENSOR_ORIENTATION enum",
@@ -1173,26 +1189,9 @@
    "msg": "DistanceSensor.msg",
    "topic": "distance_sensor"
   },
-  "distance_sensor_mode_change_request": {
-   "fields": {
-    "request_on_off": {
-     "note": "request to disable/enable the distance sensor",
-     "type": "uint8"
-    },
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    }
-   },
-   "msg": "DistanceSensorModeChangeRequest.msg",
-   "topic": "distance_sensor_mode_change_request"
-  },
   "ekf2_timestamps": {
    "fields": {
     "airspeed_timestamp_rel": {
-     "type": "int16"
-    },
-    "airspeed_validated_timestamp_rel": {
      "type": "int16"
     },
     "distance_sensor_timestamp_rel": {
@@ -1323,9 +1322,6 @@
     "innovation": {
      "type": "float32"
     },
-    "innovation_filtered": {
-     "type": "float32"
-    },
     "innovation_rejected": {
      "note": "true if the observation has been rejected",
      "type": "bool"
@@ -1340,11 +1336,6 @@
      "type": "float32"
     },
     "test_ratio": {
-     "note": "normalized innovation squared",
-     "type": "float32"
-    },
-    "test_ratio_filtered": {
-     "note": "signed filtered test ratio",
      "type": "float32"
     },
     "time_last_fuse": {
@@ -1486,13 +1477,49 @@
   },
   "estimator_event_flags": {
    "fields": {
+    "bad_yaw_using_gps_course": {
+     "note": "7 - true when the filter has detected an invalid yaw estimate and has reset the yaw angle to the GPS ground course",
+     "type": "bool"
+    },
+    "emergency_yaw_reset_gps_yaw_stopped": {
+     "note": "11 - true when the filter has detected bad GNSS yaw data, has reset the yaw to anothter source of data and has stopped further use of the GNSS yaw data",
+     "type": "bool"
+    },
+    "emergency_yaw_reset_mag_stopped": {
+     "note": "10 - true when the filter has detected bad magnetometer data, has reset the yaw to anothter source of data and has stopped further use of the magnetometer data",
+     "type": "bool"
+    },
     "gps_checks_passed": {
      "note": "0 - true when gps quality checks are passing passed",
+     "type": "bool"
+    },
+    "gps_data_stopped": {
+     "note": "2 - true when the gps data has stopped for a significant time period",
+     "type": "bool"
+    },
+    "gps_data_stopped_using_alternate": {
+     "note": "3 - true when the gps data has stopped for a significant time period but the filter is able to use other sources of data to maintain navigation",
+     "type": "bool"
+    },
+    "gps_fusion_timout": {
+     "note": "1 - true when the gps data has not been used to correct the state estimates for a significant time period",
+     "type": "bool"
+    },
+    "gps_quality_poor": {
+     "note": "0 - true when the gps is failing quality checks",
+     "type": "bool"
+    },
+    "height_sensor_timeout": {
+     "note": "4 - true when the height sensor has not been used to correct the state estimates for a significant time period",
      "type": "bool"
     },
     "information_event_changes": {
      "note": "number of information event changes",
      "type": "uint32"
+    },
+    "invalid_accel_bias_cov_reset": {
+     "note": "6 - true when the filter has detected bad acceerometer bias state esitmstes and has reset the corresponding covariance matrix elements",
+     "type": "bool"
     },
     "reset_hgt_to_baro": {
      "note": "13 - true when the vertical position state is reset to the baro measurement",
@@ -1554,6 +1581,14 @@
      "note": "11 - true when the filter starts using vision system yaw  measurements to correct the state estimates",
      "type": "bool"
     },
+    "stopping_mag_use": {
+     "note": "8 - true when the filter has detected bad magnetometer data and is stopping further use of the magnetometer data",
+     "type": "bool"
+    },
+    "stopping_navigation": {
+     "note": "5 - true when the filter has insufficient data to estimate velocity and position and is falling back to an attitude, height and height rate mode of operation",
+     "type": "bool"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -1561,6 +1596,14 @@
     "timestamp_sample": {
      "type": "uint64",
      "unit": "us"
+    },
+    "vision_data_stopped": {
+     "note": "9 - true when the vision system data has stopped for a significant time period",
+     "type": "bool"
+    },
+    "warning_event_changes": {
+     "note": "number of warning event changes",
+     "type": "uint32"
     },
     "yaw_aligned_to_imu_gps": {
      "note": "12 - true when the filter resets the yaw to an estimate derived from IMU and GPS data",
@@ -1611,10 +1654,6 @@
     },
     "check_fail_min_sat_count": {
      "note": "1 : minimum required sat count fail",
-     "type": "bool"
-    },
-    "check_fail_spoofed_gps": {
-     "note": "10 : GPS signal is spoofed",
      "type": "bool"
     },
     "checks_passed": {
@@ -1834,7 +1873,7 @@
      "type": "uint32"
     },
     "beta_test_ratio": {
-     "note": "low-pass filtered ratio of the synthetic sideslip innovation to the innovation test limit",
+     "note": "ratio of the synthetic sideslip innovation to the innovation test limit",
      "type": "float32"
     },
     "control_mode_flags": {
@@ -1854,7 +1893,6 @@
      "values": {
       "0": "FIX",
       "1": "COUNT",
-      "10": "SPOOFED",
       "2": "PDOP",
       "3": "ERR",
       "4": "ERR",
@@ -1869,11 +1907,7 @@
      "type": "uint32"
     },
     "hagl_test_ratio": {
-     "note": "low-pass filtered ratio of the height above ground innovation to the innovation test limit",
-     "type": "float32"
-    },
-    "hdg_test_ratio": {
-     "note": "low-pass filtered ratio of the largest heading innovation component to the innovation test limit",
+     "note": "ratio of the height above ground innovation to the innovation test limit",
      "type": "float32"
     },
     "health_flags": {
@@ -1882,8 +1916,13 @@
      "type": "uint8"
     },
     "hgt_test_ratio": {
-     "note": "low-pass filtered ratio of the vertical position innovation to the innovation test limit",
+     "note": "ratio of the vertical position innovation to the innovation test limit",
      "type": "float32"
+    },
+    "innovation_check_flags": {
+     "kind": "bitmask",
+     "note": "Bitmask to indicate pass/fail status of innovation consistency checks",
+     "type": "uint16"
     },
     "mag_device_id": {
      "type": "uint32"
@@ -1900,13 +1939,17 @@
     "mag_strength_ref_gs": {
      "type": "float32"
     },
+    "mag_test_ratio": {
+     "note": "ratio of the largest magnetometer innovation component to the innovation test limit",
+     "type": "float32"
+    },
     "pos_horiz_accuracy": {
      "note": "1-Sigma estimated horizontal position accuracy relative to the estimators origin (m)",
      "type": "float32",
      "unit": "m"
     },
     "pos_test_ratio": {
-     "note": "low-pass filtered ratio of the largest horizontal position innovation component to the innovation test limit",
+     "note": "ratio of the largest horizontal position innovation component to the innovation test limit",
      "type": "float32"
     },
     "pos_vert_accuracy": {
@@ -1918,9 +1961,6 @@
      "type": "bool"
     },
     "pre_flt_fail_innov_height": {
-     "type": "bool"
-    },
-    "pre_flt_fail_innov_pos_horiz": {
      "type": "bool"
     },
     "pre_flt_fail_innov_vel_horiz": {
@@ -1963,7 +2003,7 @@
      "type": "uint16"
     },
     "tas_test_ratio": {
-     "note": "low-pass filtered ratio of the true airspeed innovation to the innovation test limit",
+     "note": "ratio of the true airspeed innovation to the innovation test limit",
      "type": "float32"
     },
     "time_slip": {
@@ -1984,7 +2024,7 @@
      "unit": "us"
     },
     "vel_test_ratio": {
-     "note": "low-pass filtered ratio of the largest velocity innovation component to the innovation test limit",
+     "note": "ratio of the largest velocity innovation component to the innovation test limit",
      "type": "float32"
     }
    },
@@ -2001,16 +2041,8 @@
      "note": "38 - true if auxiliary global position measurement fusion is intended",
      "type": "bool"
     },
-    "cs_baro_fault": {
-     "note": "43 - true when the current baro has been declared faulty and is no longer being used",
-     "type": "bool"
-    },
     "cs_baro_hgt": {
-     "note": "9 - true when baro data is being fused",
-     "type": "bool"
-    },
-    "cs_constant_pos": {
-     "note": "42 - true if the vehicle is at a constant position",
+     "note": "9 - true when baro height is being fused as a primary height reference",
      "type": "bool"
     },
     "cs_ev_hgt": {
@@ -2057,24 +2089,20 @@
      "note": "20 - true when protection from ground effect induced static pressure rise is active",
      "type": "bool"
     },
-    "cs_gnss_pos": {
-     "note": "2 - true if GNSS position measurement fusion is intended",
-     "type": "bool"
-    },
-    "cs_gnss_vel": {
-     "note": "44 - true if GNSS velocity measurement fusion is intended",
-     "type": "bool"
-    },
-    "cs_gnss_yaw": {
-     "note": "22 - true when yaw (not ground course) data fusion from a GPS receiver is intended",
-     "type": "bool"
-    },
-    "cs_gnss_yaw_fault": {
-     "note": "27 - true when the GNSS heading has been declared faulty and is no longer being used",
+    "cs_gps": {
+     "note": "2 - true if GPS measurement fusion is intended",
      "type": "bool"
     },
     "cs_gps_hgt": {
-     "note": "11 - true when GPS altitude is being fused",
+     "note": "11 - true when GPS height is being fused as a primary height reference",
+     "type": "bool"
+    },
+    "cs_gps_yaw": {
+     "note": "22 - true when yaw (not ground course) data fusion from a GPS receiver is intended",
+     "type": "bool"
+    },
+    "cs_gps_yaw_fault": {
+     "note": "27 - true when the GNSS heading has been declared faulty and is no longer being used",
      "type": "bool"
     },
     "cs_gravity_vector": {
@@ -2125,16 +2153,12 @@
      "note": "3 - true if optical flow measurements fusion is intended",
      "type": "bool"
     },
-    "cs_opt_flow_terrain": {
-     "note": "40 - true if we are fusing flow data for terrain",
-     "type": "bool"
-    },
     "cs_rng_fault": {
      "note": "28 - true when the range finder has been declared faulty and is no longer being used",
      "type": "bool"
     },
     "cs_rng_hgt": {
-     "note": "10 - true when range finder data is being fused for height aiding",
+     "note": "10 - true when range finder height is being fused as a primary height reference",
      "type": "bool"
     },
     "cs_rng_kin_consistent": {
@@ -2145,20 +2169,12 @@
      "note": "21 - true when rng data wasn't ready for more than 10s and new rng values haven't changed enough",
      "type": "bool"
     },
-    "cs_rng_terrain": {
-     "note": "39 - true if we are fusing range finder data for terrain",
-     "type": "bool"
-    },
     "cs_synthetic_mag_z": {
      "note": "25 - true when we are using a synthesized measurement for the magnetometer Z component",
      "type": "bool"
     },
     "cs_tilt_align": {
      "note": "0 - true if the filter tilt alignment is complete",
-     "type": "bool"
-    },
-    "cs_valid_fake_pos": {
-     "note": "41 - true if a valid constant position is being fused",
      "type": "bool"
     },
     "cs_vehicle_at_rest": {
@@ -2180,6 +2196,10 @@
     "fault_status_changes": {
      "note": "number of filter fault status (fs) changes",
      "type": "uint32"
+    },
+    "fs_bad_acc_bias": {
+     "note": "9 - true if bad delta velocity bias estimates have been detected",
+     "type": "bool"
     },
     "fs_bad_acc_clipping": {
      "note": "11 - true if delta velocity data contains clipping (asymmetric railing)",
@@ -2327,9 +2347,8 @@
      "type": "bool"
     },
     "battery_warning": {
-     "note": "Battery warning level (see BatteryStatus.msg)",
-     "type": "uint8",
-     "unit": "see BatteryStatus.msg"
+     "note": "Battery warning level",
+     "type": "uint8"
     },
     "fd_critical_failure": {
      "note": "Critical failure (attitude/altitude limit exceeded, or external ATS)",
@@ -2439,10 +2458,6 @@
     "mode_req_wind_and_flight_time_compliance": {
      "note": "if set, mode cannot be entered if wind or flight time limit exceeded",
      "type": "uint32"
-    },
-    "navigator_failure": {
-     "note": "Navigator failed to execute a mode",
-     "type": "bool"
     },
     "offboard_control_signal_lost": {
      "note": "Offboard signal lost",
@@ -2682,48 +2697,6 @@
    "msg": "FollowTargetStatus.msg",
    "topic": "follow_target_status"
   },
-  "fuel_tank_status": {
-   "fields": {
-    "consumed_fuel": {
-     "note": "consumed fuel, NaN if not measured. Should not be inferred from the max fuel capacity",
-     "type": "float32"
-    },
-    "fuel_consumption_rate": {
-     "note": "fuel consumption rate, NaN if not measured",
-     "type": "float32"
-    },
-    "fuel_tank_id": {
-     "note": "identifier for the fuel tank. Must match ID of other messages for same fuel system. 0 by default when only a single tank exists",
-     "type": "uint8"
-    },
-    "fuel_type": {
-     "note": "type of fuel based on MAV_FUEL_TYPE enum. Set to MAV_FUEL_TYPE_UNKNOWN if unknown or it does not fit the provided types",
-     "type": "uint32"
-    },
-    "maximum_fuel_capacity": {
-     "note": "maximum fuel capacity. Must always be provided, either from the driver or a parameter",
-     "type": "float32"
-    },
-    "percent_remaining": {
-     "note": "percentage of remaining fuel, UINT8_MAX if not provided",
-     "type": "uint8"
-    },
-    "remaining_fuel": {
-     "note": "remaining fuel, NaN if not measured. Should not be inferred from the max fuel capacity",
-     "type": "float32"
-    },
-    "temperature": {
-     "note": "fuel temperature in Kelvin, NaN if not measured",
-     "type": "float32"
-    },
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    }
-   },
-   "msg": "FuelTankStatus.msg",
-   "topic": "fuel_tank_status"
-  },
   "generator_status": {
    "fields": {
     "bat_current_setpoint": {
@@ -2847,12 +2820,6 @@
     "angular_velocity_z": {
      "type": "float32"
     },
-    "delta_yaw": {
-     "type": "float32"
-    },
-    "delta_yaw_velocity": {
-     "type": "float32"
-    },
     "device_flags": {
      "kind": "bitmask",
      "type": "uint16",
@@ -2866,9 +2833,6 @@
     },
     "failure_flags": {
      "type": "uint32"
-    },
-    "gimbal_device_id": {
-     "type": "uint8"
     },
     "received_from_mavlink": {
      "type": "bool"
@@ -2898,7 +2862,7 @@
     "firmware_version": {
      "type": "uint32"
     },
-    "gimbal_device_id": {
+    "gimbal_device_compid": {
      "type": "uint8"
     },
     "hardware_version": {
@@ -3537,37 +3501,6 @@
    "msg": "InputRc.msg",
    "topic": "input_rc"
   },
-  "internal_combustion_engine_control": {
-   "fields": {
-    "choke_control": {
-     "note": "[0,1] - 1 fully closes the air inlet.",
-     "type": "float32"
-    },
-    "ignition_on": {
-     "note": "activate/deactivate ignition (Spark Plug)",
-     "type": "bool",
-     "unit": "Spark Plug"
-    },
-    "starter_engine_control": {
-     "note": "[0,1] - control value for electric starter motor.",
-     "type": "float32"
-    },
-    "throttle_control": {
-     "note": "[0,1] - Motor should idle with 0. Includes slew rate if enabled.",
-     "type": "float32"
-    },
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    },
-    "user_request": {
-     "note": "user intent for the ICE being on/off",
-     "type": "uint8"
-    }
-   },
-   "msg": "InternalCombustionEngineControl.msg",
-   "topic": "internal_combustion_engine_control"
-  },
   "internal_combustion_engine_status": {
    "fields": {
     "atmospheric_pressure_kpa": {
@@ -3677,8 +3610,8 @@
      "note": "number of failed sbd sessions",
      "type": "uint16"
     },
-    "last_at_ok_timestamp": {
-     "note": "timestamp of the last \"OK\" received after the \"AT\" command",
+    "last_heartbeat": {
+     "note": "timestamp of the last successful sbd session",
      "type": "uint64"
     },
     "num_tx_buf_reset": {
@@ -3993,9 +3926,6 @@
      "note": "number of failed buffer writes due to buffer overflow",
      "type": "uint32"
     },
-    "is_logging": {
-     "type": "bool"
-    },
     "message_gaps": {
      "note": "messages misssed",
      "type": "uint32"
@@ -4159,10 +4089,6 @@
     },
     "offboard_switch": {
      "note": "offboard 2 position switch (optional): _NORMAL_, OFFBOARD",
-     "type": "uint8"
-    },
-    "payload_power_switch": {
-     "note": "Payload power switch",
      "type": "uint8"
     },
     "photo_switch": {
@@ -4451,6 +4377,10 @@
      "note": "mission frame",
      "type": "uint8"
     },
+    "instance_count": {
+     "note": "Instance count of this mission. Increments monotonically whenever the mission is modified",
+     "type": "uint32"
+    },
     "latitude": {
      "type": "float32"
     },
@@ -4496,30 +4426,6 @@
    },
    "msg": "NavigatorMissionItem.msg",
    "topic": "navigator_mission_item"
-  },
-  "navigator_status": {
-   "fields": {
-    "failure": {
-     "kind": "enum",
-     "note": "Navigator failure enum",
-     "type": "uint8",
-     "values": {
-      "0": "NONE",
-      "1": "HAGL"
-     }
-    },
-    "nav_state": {
-     "note": "Source mode (values in VehicleStatus)",
-     "type": "uint8",
-     "unit": "values in VehicleStatus"
-    },
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    }
-   },
-   "msg": "NavigatorStatus.msg",
-   "topic": "navigator_status"
   },
   "normalized_unsigned_setpoint": {
    "fields": {
@@ -4609,7 +4515,7 @@
   "obstacle_distance": {
    "fields": {
     "angle_offset": {
-     "note": "Relative angle offset of the 0-index element in the distances array. Value of 0 corresponds to forward. Positive is clockwise direction, negative is counter-clockwise.",
+     "note": "Relative angle offset of the 0-index element in the distances array. Value of 0 corresponds to forward. Positive values are offsets to the right.",
      "type": "float32"
     },
     "frame": {
@@ -4701,88 +4607,6 @@
    },
    "msg": "OnboardComputerStatus.msg",
    "topic": "onboard_computer_status"
-  },
-  "open_drone_id_arm_status": {
-   "fields": {
-    "status": {
-     "type": "uint8"
-    },
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    }
-   },
-   "msg": "OpenDroneIdArmStatus.msg",
-   "topic": "open_drone_id_arm_status"
-  },
-  "open_drone_id_operator_id": {
-   "fields": {
-    "operator_id_type": {
-     "type": "uint8"
-    },
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    }
-   },
-   "msg": "OpenDroneIdOperatorId.msg",
-   "topic": "open_drone_id_operator_id"
-  },
-  "open_drone_id_self_id": {
-   "fields": {
-    "description_type": {
-     "type": "uint8"
-    },
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    }
-   },
-   "msg": "OpenDroneIdSelfId.msg",
-   "topic": "open_drone_id_self_id"
-  },
-  "open_drone_id_system": {
-   "fields": {
-    "area_ceiling": {
-     "type": "float32"
-    },
-    "area_count": {
-     "type": "uint16"
-    },
-    "area_floor": {
-     "type": "float32"
-    },
-    "area_radius": {
-     "type": "uint16"
-    },
-    "category_eu": {
-     "type": "uint8"
-    },
-    "class_eu": {
-     "type": "uint8"
-    },
-    "classification_type": {
-     "type": "uint8"
-    },
-    "operator_altitude_geo": {
-     "type": "float32"
-    },
-    "operator_latitude": {
-     "type": "int32"
-    },
-    "operator_location_type": {
-     "type": "uint8"
-    },
-    "operator_longitude": {
-     "type": "int32"
-    },
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    }
-   },
-   "msg": "OpenDroneIdSystem.msg",
-   "topic": "open_drone_id_system"
   },
   "orb_test": {
    "fields": {
@@ -5020,6 +4844,10 @@
      "note": "Current horizontal acceptance radius [m]",
      "type": "float32"
     },
+    "altitude_acceptance": {
+     "note": "Current vertical acceptance error [m]",
+     "type": "float32"
+    },
     "nav_bearing": {
      "note": "Bearing angle[rad]",
      "type": "float32"
@@ -5052,6 +4880,10 @@
     "xtrack_error": {
      "note": "Signed track error [m]",
      "type": "float32"
+    },
+    "yaw_acceptance": {
+     "note": "Yaw acceptance error[rad]",
+     "type": "float32"
     }
    },
    "msg": "PositionControllerStatus.msg",
@@ -5060,18 +4892,12 @@
   "position_setpoint": {
    "fields": {
     "acceptance_radius": {
-     "note": "horizontal acceptance_radius (meters)",
-     "type": "float32",
-     "unit": "meters"
+     "note": "navigation acceptance_radius if we're doing waypoint navigation",
+     "type": "float32"
     },
     "alt": {
      "note": "altitude AMSL, in m",
      "type": "float32"
-    },
-    "alt_acceptance_radius": {
-     "note": "vertical acceptance radius, only used for fixed wing guidance, NAN = let guidance choose (meters)",
-     "type": "float32",
-     "unit": "meters"
     },
     "cruising_speed": {
      "note": "the generally desired cruising speed (not a hard constraint)",
@@ -5244,36 +5070,6 @@
    "msg": "PpsCapture.msg",
    "topic": "pps_capture"
   },
-  "pure_pursuit_status": {
-   "fields": {
-    "bearing_to_waypoint": {
-     "note": "[rad] Bearing towards current waypoint",
-     "type": "float32"
-    },
-    "crosstrack_error": {
-     "note": "[m] Shortest distance from the vehicle to the path (Positiv: Vehicle is on the right hand side with respect to the oriented path vector, Negativ: Left of the path)",
-     "type": "float32"
-    },
-    "distance_to_waypoint": {
-     "note": "[m] Distance from the vehicle to the current waypoint",
-     "type": "float32"
-    },
-    "lookahead_distance": {
-     "note": "[m] Lookahead distance of pure the pursuit controller",
-     "type": "float32"
-    },
-    "target_bearing": {
-     "note": "[rad] Target bearing calculated by the pure pursuit controller",
-     "type": "float32"
-    },
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    }
-   },
-   "msg": "PurePursuitStatus.msg",
-   "topic": "pure_pursuit_status"
-  },
   "pwm_input": {
    "fields": {
     "error_count": {
@@ -5282,14 +5078,12 @@
      "unit": "AUX5 or MAIN5"
     },
     "period": {
-     "note": "Period, timer counts (microseconds)",
-     "type": "uint32",
-     "unit": "microseconds"
+     "note": "Period, timer counts",
+     "type": "uint32"
     },
     "pulse_width": {
-     "note": "Pulse width, timer counts (microseconds)",
-     "type": "uint32",
-     "unit": "microseconds"
+     "note": "Pulse width, timer counts",
+     "type": "uint32"
     },
     "timestamp": {
      "type": "uint64",
@@ -5601,182 +5395,14 @@
    "msg": "RegisterExtComponentRequest.msg",
    "topic": "register_ext_component_request"
   },
-  "rover_attitude_setpoint": {
-   "fields": {
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    },
-    "yaw_setpoint": {
-     "note": "[rad] Expressed in NED frame",
-     "type": "float32"
-    }
-   },
-   "msg": "RoverAttitudeSetpoint.msg",
-   "topic": "rover_attitude_setpoint"
-  },
-  "rover_attitude_status": {
-   "fields": {
-    "adjusted_yaw_setpoint": {
-     "note": "[rad/s] Yaw setpoint that is being tracked (Applied slew rates)",
-     "type": "float32",
-     "unit": "Applied slew rates"
-    },
-    "measured_yaw": {
-     "note": "[rad/s] Measured yaw rate",
-     "type": "float32"
-    },
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    }
-   },
-   "msg": "RoverAttitudeStatus.msg",
-   "topic": "rover_attitude_status"
-  },
-  "rover_position_setpoint": {
-   "fields": {
-    "cruising_speed": {
-     "note": "(Optional) Specify rover speed (Defaults to maximum speed)",
-     "type": "float32",
-     "unit": "Defaults to maximum speed"
-    },
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    },
-    "yaw": {
-     "note": "[rad] [-pi,pi] from North. Optional, NAN if not set. Mecanum only.",
-     "type": "float32"
-    }
-   },
-   "msg": "RoverPositionSetpoint.msg",
-   "topic": "rover_position_setpoint"
-  },
-  "rover_rate_setpoint": {
-   "fields": {
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    },
-    "yaw_rate_setpoint": {
-     "note": "[rad/s] Expressed in NED frame",
-     "type": "float32"
-    }
-   },
-   "msg": "RoverRateSetpoint.msg",
-   "topic": "rover_rate_setpoint"
-  },
-  "rover_rate_status": {
-   "fields": {
-    "adjusted_yaw_rate_setpoint": {
-     "note": "[rad/s] Yaw rate setpoint that is being tracked (Applied slew rates)",
-     "type": "float32",
-     "unit": "Applied slew rates"
-    },
-    "measured_yaw_rate": {
-     "note": "[rad/s] Measured yaw rate",
-     "type": "float32"
-    },
-    "pid_yaw_rate_integral": {
-     "note": "Integral of the PID for the closed loop yaw rate controller",
-     "type": "float32"
-    },
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    }
-   },
-   "msg": "RoverRateStatus.msg",
-   "topic": "rover_rate_status"
-  },
-  "rover_steering_setpoint": {
-   "fields": {
-    "normalized_speed_diff": {
-     "note": "[-1, 1] Normalized speed difference between the left and right wheels of the rover (Differential/Mecanum only, Positiv = Turn right, Negativ: Turn left)",
-     "type": "float32"
-    },
-    "normalized_steering_angle": {
-     "note": "[-1, 1] Normalized steering angle (Ackermann only, Positiv: Steer right, Negativ: Steer left)",
-     "type": "float32"
-    },
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    }
-   },
-   "msg": "RoverSteeringSetpoint.msg",
-   "topic": "rover_steering_setpoint"
-  },
-  "rover_throttle_setpoint": {
-   "fields": {
-    "throttle_body_x": {
-     "note": "throttle setpoint along body X axis [-1, 1] (Positiv = forwards, Negativ = backwards)",
-     "type": "float32"
-    },
-    "throttle_body_y": {
-     "note": "throttle setpoint along body Y axis [-1, 1] (Mecanum only, Positiv = right, Negativ = left)",
-     "type": "float32"
-    },
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    }
-   },
-   "msg": "RoverThrottleSetpoint.msg",
-   "topic": "rover_throttle_setpoint"
-  },
-  "rover_velocity_status": {
-   "fields": {
-    "adjusted_speed_body_x_setpoint": {
-     "note": "[m/s] Post slew rate speed setpoint in body x direction. Positiv: forwards, Negativ: backwards",
-     "type": "float32"
-    },
-    "adjusted_speed_body_y_setpoint": {
-     "note": "[m/s] Post slew rate speed setpoint in body y direction. Positiv: right, Negativ: left (Only for mecanum rovers)",
-     "type": "float32",
-     "unit": "Only for mecanum rovers"
-    },
-    "measured_speed_body_x": {
-     "note": "[m/s] Measured speed in body x direction. Positiv: forwards, Negativ: backwards",
-     "type": "float32"
-    },
-    "measured_speed_body_y": {
-     "note": "[m/s] Measured speed in body y direction. Positiv: right, Negativ: left",
-     "type": "float32"
-    },
-    "pid_throttle_body_x_integral": {
-     "note": "Integral of the PID for the closed loop controller of the speed in body x direction",
-     "type": "float32"
-    },
-    "pid_throttle_body_y_integral": {
-     "note": "Integral of the PID for the closed loop controller of the speed in body y direction",
-     "type": "float32"
-    },
-    "speed_body_x_setpoint": {
-     "note": "[m/s] Speed setpoint in body x direction. Positiv: forwards, Negativ: backwards",
-     "type": "float32"
-    },
-    "speed_body_y_setpoint": {
-     "note": "[m/s] Speed setpoint in body y direction. Positiv: right, Negativ: left (Only for mecanum rovers)",
-     "type": "float32",
-     "unit": "Only for mecanum rovers"
-    },
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    }
-   },
-   "msg": "RoverVelocityStatus.msg",
-   "topic": "rover_velocity_status"
-  },
   "rpm": {
    "fields": {
-    "rpm_estimate": {
-     "note": "filtered revolutions per minute",
+    "estimated_accurancy_rpm": {
+     "note": "estimated accuracy in Revolution per minute",
      "type": "float32"
     },
-    "rpm_raw": {
+    "indicated_frequency_rpm": {
+     "note": "indicated rotor Frequency in Revolution per minute",
      "type": "float32"
     },
     "timestamp": {
@@ -5931,7 +5557,7 @@
      "type": "uint32"
     },
     "direction": {
-     "note": "the direction being reported by the wind / airflow sensor",
+     "note": "the direction bein report by the wind / airflow sensor",
      "type": "float32"
     },
     "speed": {
@@ -6719,10 +6345,6 @@
      "note": "high power peripheral overcurrent when 1",
      "type": "uint8"
     },
-    "payload_v_valid": {
-     "note": "payload rail voltage is valid",
-     "type": "uint8"
-    },
     "periph_5v_oc": {
      "note": "peripheral overcurrent when 1",
      "type": "uint8"
@@ -6749,10 +6371,6 @@
     },
     "voltage5v_v": {
      "note": "peripheral 5V rail voltage",
-     "type": "float32"
-    },
-    "voltage_payload_v": {
-     "note": "payload rail voltage",
      "type": "float32"
     }
    },
@@ -6808,16 +6426,8 @@
      "note": "Altitude setpoint AMSL [m]",
      "type": "float32"
     },
-    "altitude_time_constant": {
-     "note": "Time constant of the altitude tracker [s]",
-     "type": "float32"
-    },
     "equivalent_airspeed_sp": {
      "note": "Equivalent airspeed setpoint [m/s]",
-     "type": "float32"
-    },
-    "fast_descend_ratio": {
-     "note": "value indicating if fast descend mode is enabled with ramp up and ramp down [0-1]",
      "type": "float32"
     },
     "height_rate": {
@@ -6906,6 +6516,9 @@
   },
   "telemetry_status": {
    "fields": {
+    "avoidance_system_healthy": {
+     "type": "bool"
+    },
     "data_rate": {
      "note": "configured maximum data rate (Bytes/s)",
      "type": "float32",
@@ -6922,6 +6535,10 @@
     },
     "heartbeat_component_log": {
      "note": "MAV_COMP_ID_LOG",
+     "type": "bool"
+    },
+    "heartbeat_component_obstacle_avoidance": {
+     "note": "MAV_COMP_ID_OBSTACLE_AVOIDANCE",
      "type": "bool"
     },
     "heartbeat_component_osd": {
@@ -7113,6 +6730,26 @@
    "msg": "TimesyncStatus.msg",
    "topic": "timesync_status"
   },
+  "trajectory_bezier": {
+   "fields": {
+    "delta": {
+     "note": "time it should take to get to this waypoint, if this is the final waypoint (seconds)",
+     "type": "float32",
+     "unit": "seconds"
+    },
+    "timestamp": {
+     "type": "uint64",
+     "unit": "us"
+    },
+    "yaw": {
+     "note": "yaw angle (rad)",
+     "type": "float32",
+     "unit": "rad"
+    }
+   },
+   "msg": "TrajectoryBezier.msg",
+   "topic": "trajectory_bezier"
+  },
   "trajectory_setpoint": {
    "fields": {
     "timestamp": {
@@ -7131,15 +6768,27 @@
    "msg": "TrajectorySetpoint.msg",
    "topic": "trajectory_setpoint"
   },
-  "trajectory_setpoint6dof": {
+  "trajectory_waypoint": {
    "fields": {
+    "point_valid": {
+     "type": "bool"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
+    },
+    "type": {
+     "type": "uint8"
+    },
+    "yaw": {
+     "type": "float32"
+    },
+    "yaw_speed": {
+     "type": "float32"
     }
    },
-   "msg": "TrajectorySetpoint6dof.msg",
-   "topic": "trajectory_setpoint6dof"
+   "msg": "TrajectoryWaypoint.msg",
+   "topic": "trajectory_waypoint"
   },
   "transponder_report": {
    "fields": {
@@ -7430,10 +7079,6 @@
   },
   "vehicle_air_data": {
    "fields": {
-    "ambient_temperature": {
-     "note": "Abient temperature in degrees Celsius",
-     "type": "float32"
-    },
     "baro_alt_meter": {
      "note": "Altitude above MSL calculated from temperature compensated baro sensor data using an ISA corrected for sea level pressure SENS_BARO_QNH.",
      "type": "float32"
@@ -7446,17 +7091,21 @@
      "note": "Absolute pressure in Pascals",
      "type": "float32"
     },
+    "baro_temp_celcius": {
+     "note": "Temperature in degrees Celsius",
+     "type": "float32"
+    },
     "calibration_count": {
      "note": "Calibration changed counter. Monotonically increases whenever calibration changes.",
      "type": "uint8"
     },
+    "eas2tas": {
+     "note": "equivalent airspeed to true airspeed conversion factor",
+     "type": "float32"
+    },
     "rho": {
      "note": "air density",
      "type": "float32"
-    },
-    "temperature_source": {
-     "note": "Source of temperature data: 0: Default Temperature (15°C), 1: External Baro, 2: Airspeed",
-     "type": "uint8"
     },
     "timestamp": {
      "type": "uint64",
@@ -7523,14 +7172,29 @@
      "type": "bool",
      "unit": "used for auto takeoff on runway"
     },
+    "pitch_body": {
+     "note": "body angle in NED frame (can be NaN for FW)",
+     "type": "float32",
+     "unit": "can be NaN for FW"
+    },
     "reset_integral": {
      "note": "Reset roll/pitch/yaw integrals (navigation logic change)",
      "type": "bool",
      "unit": "navigation logic change"
     },
+    "roll_body": {
+     "note": "body angle in NED frame (can be NaN for FW)",
+     "type": "float32",
+     "unit": "can be NaN for FW"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
+    },
+    "yaw_body": {
+     "note": "body angle in NED frame (can be NaN for FW)",
+     "type": "float32",
+     "unit": "can be NaN for FW"
     },
     "yaw_sp_move_rate": {
      "note": "rad/s (commanded by user)",
@@ -7752,19 +7416,12 @@
      "note": "Counter for reset events on altitude",
      "type": "uint8"
     },
-    "alt_valid": {
-     "type": "bool"
-    },
     "dead_reckoning": {
      "note": "True if this position is estimated through dead-reckoning",
      "type": "bool"
     },
     "delta_alt": {
      "note": "Reset delta for altitude",
-     "type": "float32"
-    },
-    "delta_terrain": {
-     "note": "Reset delta for terrain",
      "type": "float32"
     },
     "eph": {
@@ -7786,9 +7443,6 @@
      "note": "Counter for reset events on horizontal position coordinates",
      "type": "uint8"
     },
-    "lat_lon_valid": {
-     "type": "bool"
-    },
     "lon": {
      "note": "Longitude, (degrees)",
      "type": "float64",
@@ -7802,10 +7456,6 @@
     "terrain_alt_valid": {
      "note": "Terrain altitude estimate is valid",
      "type": "bool"
-    },
-    "terrain_reset_counter": {
-     "note": "Counter for reset events on terrain",
-     "type": "uint8"
     },
     "timestamp": {
      "type": "uint64",
@@ -7835,7 +7485,7 @@
     },
     "delta_angle_dt": {
      "note": "integration period in microseconds",
-     "type": "uint32"
+     "type": "uint16"
     },
     "delta_velocity_clipping": {
      "note": "bitfield indicating if there was any accelerometer clipping (per axis) during the integration time frame",
@@ -7843,7 +7493,7 @@
     },
     "delta_velocity_dt": {
      "note": "integration period in microseconds",
-     "type": "uint32"
+     "type": "uint16"
     },
     "gyro_calibration_count": {
      "note": "Calibration changed counter. Monotonically increases whenever rate gyro calibration changes.",
@@ -8001,10 +7651,6 @@
      "note": "True if this position is estimated through dead-reckoning",
      "type": "bool"
     },
-    "delta_dist_bottom": {
-     "note": "Amount of vertical shift of dist bottom estimate in latest reset [m]",
-     "type": "float32"
-    },
     "delta_heading": {
      "note": "Heading delta caused by latest heading reset [rad]",
      "type": "float32"
@@ -8028,10 +7674,6 @@
       "2": "FLOW"
      }
     },
-    "dist_bottom_reset_counter": {
-     "note": "Index of latest dist bottom estimate reset",
-     "type": "uint8"
-    },
     "dist_bottom_sensor_bitfield": {
      "note": "bitfield indicating what type of sensor is used to estimate dist_bottom",
      "type": "uint8"
@@ -8039,11 +7681,6 @@
     "dist_bottom_valid": {
      "note": "true if distance to bottom surface is valid",
      "type": "bool"
-    },
-    "dist_bottom_var": {
-     "note": "terrain estimate variance (m^2)",
-     "type": "float32",
-     "unit": "m^2"
     },
     "eph": {
      "note": "Standard deviation of horizontal position error, (metres)",
@@ -8065,18 +7702,13 @@
      "type": "float32",
      "unit": "metres/sec"
     },
-    "hagl_max_xy": {
-     "note": "maximum height above ground level for xy-control (meters)",
-     "type": "float32",
-     "unit": "meters"
-    },
-    "hagl_max_z": {
-     "note": "maximum height above ground level for z-control (meters)",
+    "hagl_max": {
+     "note": "maximum height above ground level - set to 0 when limiting not required (meters)",
      "type": "float32",
      "unit": "meters"
     },
     "hagl_min": {
-     "note": "minimum height above ground level (meters)",
+     "note": "minimum height above ground level - set to 0 when limiting not required (meters)",
      "type": "float32",
      "unit": "meters"
     },
@@ -8144,7 +7776,7 @@
      "unit": "metres/sec"
     },
     "vxy_max": {
-     "note": "maximum horizontal speed (meters/sec)",
+     "note": "maximum horizontal speed - set to 0 when limiting not required (meters/sec)",
      "type": "float32",
      "unit": "meters/sec"
     },
@@ -8163,7 +7795,7 @@
      "unit": "metres/sec"
     },
     "vz_max": {
-     "note": "maximum vertical speed (meters/sec)",
+     "note": "maximum vertical speed - set to 0 when limiting not required (meters/sec)",
      "type": "float32",
      "unit": "meters/sec"
     },
@@ -8462,217 +8094,6 @@
       "2": "ARMED"
      }
     },
-    "calibration_enabled": {
-     "type": "bool"
-    },
-    "can_set_nav_states_mask": {
-     "kind": "bitmask",
-     "note": "Bitmask for all modes that a user can select",
-     "type": "uint32"
-    },
-    "component_id": {
-     "note": "subsystem / component id, contains MAVLink's component ID field",
-     "type": "uint8"
-    },
-    "executor_in_charge": {
-     "note": "Current mode executor in charge (0=Autopilot)",
-     "type": "uint8"
-    },
-    "failsafe": {
-     "note": "true if system is in failsafe state (e.g.:RTL, Hover, Terminate, ...)",
-     "type": "bool"
-    },
-    "failsafe_and_user_took_over": {
-     "note": "true if system is in failsafe state but the user took over control",
-     "type": "bool"
-    },
-    "failsafe_defer_state": {
-     "kind": "enum",
-     "note": "one of FAILSAFE_DEFER_STATE_*",
-     "type": "uint8",
-     "values": {
-      "0": "DISABLED",
-      "1": "ENABLED",
-      "2": "FAILSAFE"
-     }
-    },
-    "failure_detector_status": {
-     "type": "uint16"
-    },
-    "gcs_connection_lost": {
-     "note": "datalink to GCS lost",
-     "type": "bool"
-    },
-    "gcs_connection_lost_counter": {
-     "note": "counts unique GCS connection lost events",
-     "type": "uint8"
-    },
-    "high_latency_data_link_lost": {
-     "note": "Set to true if the high latency data link (eg. RockBlock Iridium 9603 telemetry module) is lost",
-     "type": "bool"
-    },
-    "hil_state": {
-     "kind": "enum",
-     "type": "uint8",
-     "values": {
-      "0": "OFF",
-      "1": "ON"
-     }
-    },
-    "in_transition_mode": {
-     "note": "True if VTOL is doing a transition",
-     "type": "bool"
-    },
-    "in_transition_to_fw": {
-     "note": "True if VTOL is doing a transition from MC to FW",
-     "type": "bool"
-    },
-    "is_vtol": {
-     "note": "True if the system is VTOL capable",
-     "type": "bool"
-    },
-    "is_vtol_tailsitter": {
-     "note": "True if the system performs a 90° pitch down rotation during transition from MC to FW",
-     "type": "bool"
-    },
-    "latest_arming_reason": {
-     "type": "uint8"
-    },
-    "latest_disarming_reason": {
-     "type": "uint8"
-    },
-    "nav_state": {
-     "kind": "enum",
-     "note": "Currently active mode",
-     "type": "uint8",
-     "values": {
-      "0": "MANUAL",
-      "1": "ALTCTL",
-      "10": "ACRO",
-      "11": "FREE2",
-      "12": "DESCEND",
-      "13": "TERMINATION",
-      "14": "OFFBOARD",
-      "15": "STAB",
-      "16": "FREE1",
-      "17": "TAKEOFF",
-      "18": "LAND",
-      "19": "TARGET",
-      "2": "POSCTL",
-      "20": "PRECLAND",
-      "21": "ORBIT",
-      "22": "TAKEOFF",
-      "23": "EXTERNAL1",
-      "24": "EXTERNAL2",
-      "25": "EXTERNAL3",
-      "26": "EXTERNAL4",
-      "27": "EXTERNAL5",
-      "28": "EXTERNAL6",
-      "29": "EXTERNAL7",
-      "3": "MISSION",
-      "30": "EXTERNAL8",
-      "31": "MAX",
-      "4": "LOITER",
-      "5": "RTL",
-      "6": "SLOW",
-      "7": "FREE5",
-      "8": "FREE4",
-      "9": "FREE3"
-     }
-    },
-    "nav_state_timestamp": {
-     "note": "time when current nav_state activated",
-     "type": "uint64"
-    },
-    "nav_state_user_intention": {
-     "note": "Mode that the user selected (might be different from nav_state in a failsafe situation)",
-     "type": "uint8"
-    },
-    "open_drone_id_system_healthy": {
-     "type": "bool"
-    },
-    "open_drone_id_system_present": {
-     "type": "bool"
-    },
-    "parachute_system_healthy": {
-     "type": "bool"
-    },
-    "parachute_system_present": {
-     "type": "bool"
-    },
-    "power_input_valid": {
-     "note": "set if input power is valid",
-     "type": "bool"
-    },
-    "pre_flight_checks_pass": {
-     "note": "true if all checks necessary to arm pass",
-     "type": "bool"
-    },
-    "rc_calibration_in_progress": {
-     "type": "bool"
-    },
-    "safety_button_available": {
-     "note": "Set to true if a safety button is connected",
-     "type": "bool"
-    },
-    "safety_off": {
-     "note": "Set to true if safety is off",
-     "type": "bool"
-    },
-    "system_id": {
-     "note": "system id, contains MAVLink's system ID field",
-     "type": "uint8"
-    },
-    "system_type": {
-     "note": "system type, contains mavlink MAV_TYPE",
-     "type": "uint8"
-    },
-    "takeoff_time": {
-     "note": "Takeoff timestamp (microseconds)",
-     "type": "uint64",
-     "unit": "microseconds"
-    },
-    "timestamp": {
-     "type": "uint64",
-     "unit": "us"
-    },
-    "usb_connected": {
-     "note": "set to true (never cleared) once telemetry received from usb link",
-     "type": "bool"
-    },
-    "valid_nav_states_mask": {
-     "kind": "bitmask",
-     "note": "Bitmask for all valid nav_state values",
-     "type": "uint32"
-    },
-    "vehicle_type": {
-     "kind": "enum",
-     "type": "uint8",
-     "values": {
-      "1": "WING",
-      "2": "WING",
-      "3": "ROVER"
-     }
-    }
-   },
-   "msg": "VehicleStatus.msg",
-   "topic": "vehicle_status"
-  },
-  "vehicle_status_v0": {
-   "fields": {
-    "armed_time": {
-     "note": "Arming timestamp (microseconds)",
-     "type": "uint64",
-     "unit": "microseconds"
-    },
-    "arming_state": {
-     "kind": "enum",
-     "type": "uint8",
-     "values": {
-      "1": "DISARMED",
-      "2": "ARMED"
-     }
-    },
     "avoidance_system_required": {
      "note": "Set to true if avoidance system is enabled via COM_OBS_AVOID parameter",
      "type": "bool"
@@ -8876,8 +8297,8 @@
      }
     }
    },
-   "msg": "VehicleStatusV0.msg",
-   "topic": "vehicle_status_v0"
+   "msg": "VehicleStatus.msg",
+   "topic": "vehicle_status"
   },
   "vehicle_thrust_setpoint": {
    "fields": {
@@ -8906,6 +8327,33 @@
    },
    "msg": "VehicleTorqueSetpoint.msg",
    "topic": "vehicle_torque_setpoint"
+  },
+  "vehicle_trajectory_bezier": {
+   "fields": {
+    "bezier_order": {
+     "type": "uint8"
+    },
+    "timestamp": {
+     "type": "uint64",
+     "unit": "us"
+    }
+   },
+   "msg": "VehicleTrajectoryBezier.msg",
+   "topic": "vehicle_trajectory_bezier"
+  },
+  "vehicle_trajectory_waypoint": {
+   "fields": {
+    "timestamp": {
+     "type": "uint64",
+     "unit": "us"
+    },
+    "type": {
+     "note": "Type from MAV_TRAJECTORY_REPRESENTATION enum.",
+     "type": "uint8"
+    }
+   },
+   "msg": "VehicleTrajectoryWaypoint.msg",
+   "topic": "vehicle_trajectory_waypoint"
   },
   "velocity_limits": {
    "fields": {

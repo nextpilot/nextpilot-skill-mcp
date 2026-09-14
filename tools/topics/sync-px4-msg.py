@@ -29,8 +29,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CACHE_DIR = REPO_ROOT / ".cache" / "px4"
 OUT_ROOT = REPO_ROOT / "knowledge" / "px4"
-TOPICS_OUT = OUT_ROOT / "topics"   # topics/<tag>.json（一 tag 一文件）
-PARAMS_OUT = OUT_ROOT / "params"   # params/<tag>.json
+META_OUT = OUT_ROOT / "meta"       # meta/<tag>.json（一 tag 一份：topics + parameters）
 
 GITHUB_ARCHIVE = "https://github.com/PX4/PX4-Autopilot/archive/refs/{kind}/{ref}.tar.gz"
 DEFAULT_PARAMS_URL = (
@@ -219,19 +218,34 @@ def parse_msg(stem: str, text: str) -> dict:
     return {"topic": _to_snake(stem), "msg": f"{stem}.msg", "fields": fields}
 
 
-def render_topic_json(tag: str, topics: dict[str, dict]) -> str:
-    """一个 tag 的全部 topic → 一个 JSON 文件（排序键，便于跨 tag diff）。"""
-    payload = {
-        "_note": "生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 PX4 上游 msg 同步。",
+def render_meta_json(tag: str, topics: dict[str, dict], params: dict | None) -> str:
+    """一个 tag 的全部元数据 → 一个 JSON 文件：topics（字段字典）+ parameters（参数字典）。
+
+    合并成一份的理由：两者都是"该固件版本的字段/参数语义"，都只被机器读写，
+    同属一个 tag 就该是一份文件；分开成两个目录只会让"取某个版本的全部元数据"
+    变成两处查找。
+    """
+    doc: dict = {
+        "_note": "生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 PX4 上游同步。",
         "tag": tag,
         "topicCount": len(topics),
         "topics": {name: spec for name, spec in sorted(topics.items())},
     }
-    return json.dumps(payload, ensure_ascii=False, indent=1, sort_keys=True) + "\n"
+    if params is None:
+        doc["parameters"] = None
+        doc["parametersNote"] = (
+            "该 tag 无参数元数据：PX4 只在分支构建（main/master）发布 parameters.json，"
+            "release tag 下没有；日志里的实际参数值来自 .ulg 的 initial_parameters。"
+        )
+        doc["paramCount"] = 0
+    else:
+        doc["paramCount"] = len(params)
+        doc["parameters"] = params
+    return json.dumps(doc, ensure_ascii=False, indent=1, sort_keys=True) + "\n"
 
 
-def render_params_json(tag: str, payload: dict) -> str:
-    """一个 tag 的参数元数据 → 一个 JSON 文件。只保留有用字段以控体积。"""
+def normalize_params(payload: dict) -> dict[str, dict]:
+    """parameters.json → {参数名: 精简规范}（只保留有用字段以控体积）。"""
     out: dict[str, dict] = {}
     for item in payload.get("parameters", []):
         name = item.get("name")
@@ -258,13 +272,7 @@ def render_params_json(tag: str, payload: dict) -> str:
             if values:
                 spec["values"] = values
         out[name] = spec
-    doc = {
-        "_note": "生成物，勿手改。来自 PX4 parameters.json；构建期只注入被经验引用到的子集。",
-        "tag": tag,
-        "paramCount": len(out),
-        "parameters": out,
-    }
-    return json.dumps(doc, ensure_ascii=False, indent=1, sort_keys=True) + "\n"
+    return out
 
 
 # ─────────────────────────── 主流程 ───────────────────────────
@@ -272,49 +280,40 @@ def render_params_json(tag: str, payload: dict) -> str:
 def sync(tags: list[str], params_url: str, params_tag: str, check: bool, base_url: str | None) -> int:
     changed = False
 
-    # 1) msg → topics/<tag>/
+    # 参数元数据只对 params_tag 生效（PX4 只发布分支构建的 parameters.json）
+    params = normalize_params(fetch_params(params_url, params_tag))
+
     for tag in tags:
         msgs = fetch_msg_dir(tag, base_url)
         topics = {parse_msg(stem, text)["topic"]: parse_msg(stem, text) for stem, text in msgs.items()}
-        content = render_topic_json(tag, topics)
-        out_file = TOPICS_OUT / f"{tag}.json"
+        content = render_meta_json(tag, topics, params if tag == params_tag else None)
+        out_file = META_OUT / f"{tag}.json"
+        label = f"meta/{tag}.json"
         if check:
             if not out_file.exists() or out_file.read_text(encoding="utf-8") != content:
-                print(f"CHECK FAIL: topics/{tag}.json 与上游不一致，重跑同步")
+                print(f"CHECK FAIL: {label} 与上游不一致，重跑同步")
                 changed = True
             else:
-                print(f"OK topics/{tag}.json（{len(topics)} 个 topic）")
+                n_params = len(params) if tag == params_tag else 0
+                print(f"OK {label}（{len(topics)} 个 topic, {n_params} 个参数）")
         else:
             out_file.parent.mkdir(parents=True, exist_ok=True)
             out_file.write_text(content, encoding="utf-8")
-            # 清理早期"一 topic 一 YAML"的目录形态
-            legacy = TOPICS_OUT / tag
-            if legacy.is_dir():
-                for old in legacy.glob("*.yaml"):
-                    old.unlink()
-                try:
-                    legacy.rmdir()
-                except OSError:
-                    pass
-            print(f"TOPIC_WRITTEN {tag} {len(topics)}")
+            print(f"META_WRITTEN {tag} topics={len(topics)} params={len(params) if tag == params_tag else 0}")
 
-    # 2) 参数 → params/<tag>.yaml（flight_review 也只用一份 master 定义）
-    payload = fetch_params(params_url, params_tag)
-    content = render_params_json(params_tag, payload)
-    params_path = PARAMS_OUT / f"{params_tag}.json"
-    if check:
-        if not params_path.exists() or params_path.read_text(encoding="utf-8") != content:
-            print(f"CHECK FAIL: params/{params_tag}.json 与上游不一致，重跑同步")
-            changed = True
-        else:
-            print(f"OK params/{params_tag}.json（{len(payload.get('parameters', []))} 个参数）")
-    else:
-        params_path.parent.mkdir(parents=True, exist_ok=True)
-        params_path.write_text(content, encoding="utf-8")
-        legacy = PARAMS_OUT / f"{params_tag}.yaml"
-        if legacy.exists():
-            legacy.unlink()
-        print(f"PARAM_WRITTEN {params_tag} {len(payload.get('parameters', []))}")
+    if not check:
+        # 清理历史形态：topics/<tag>/*.yaml、topics/<tag>.json、params/<tag>.json、params/<tag>.yaml
+        for legacy_dir in (OUT_ROOT / "topics", OUT_ROOT / "params"):
+            if legacy_dir.is_dir():
+                for f in legacy_dir.iterdir():
+                    if f.is_file():
+                        f.unlink()
+                    elif f.is_dir():
+                        for sub in f.iterdir():
+                            sub.unlink()
+                        f.rmdir()
+                if not any(legacy_dir.iterdir()):
+                    legacy_dir.rmdir()
 
     return 1 if changed else 0
 

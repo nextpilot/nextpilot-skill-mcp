@@ -17,8 +17,7 @@ px4/
   llm/
     gjb841-system-prompt.md  第四层 GJB-841 思考范式
     report-empty.md          无 finding 时的固定结论文案
-  topics/              字段字典（生成物，按 tag 分目录，由 tools/topics/ 从 PX4 msg 同步）
-  params/              参数字典（生成物，按 tag 一文件，来自 parameters.json）
+  meta/                固件元数据（生成物，一 tag 一份 JSON：字段字典 + 参数字典）
 knowledge-authoring.md   工程师方法论（四类经验 → 四种载体）
 px4/rule-schema-design.md 规则格式重构的已批准设计（尚未实施）
 ```
@@ -32,7 +31,7 @@ px4/rule-schema-design.md 规则格式重构的已批准设计（尚未实施）
 | 加一条全新检查过程 | `px4/ulog_checks.py`（命中调 `add(...)`，缺数据调 `skipped(...)`） |
 | 改 AI 报告口径 / 思考范式 | `px4/llm/*.md` |
 | 看每条规则的字段、阈值、来历 | `px4/px4-ulog-rules.md` |
-| 同步字段 / 参数字典 | `python tools/topics/sync-px4-msg.py --tags ...`（生成物在 `px4/topics/`、`px4/params/`） |
+| 同步固件元数据 | `python tools/topics/sync-px4-msg.py --tags ...`（生成物在 `px4/meta/<tag>.json`） |
 
 ## 改完怎么生效 / 验证
 
@@ -61,7 +60,7 @@ python tools/calibrate/run_checks_locally.py engine/tests/logs/*.ulg
 - `compute` 数据流：算子节点支持**多输入/多输出与串联**（如四元数→欧拉角 4 进 3 出）
 - `triggers[].expr`：受限表达式触发（`p99_err >= 30 or (p99_err >= 15 and osc_hz >= 4)`），
   走 AST 白名单求值、不用 `eval`；`armed`/`nav_state`/`timestamp` 等内置变量可直接引用
-- 配套 `px4/topics/<tag>/`（字段字典）与 `px4/params/<tag>.yaml`（参数字典），
+- 配套 `px4/meta/<tag>.json`（字段字典 + 参数字典），
   由 `tools/topics/` 从 PX4 上游同步；另有 `operators.py`（预定函数，带 arity 签名校验）、
   硬性必填校验（杜绝"空洞经验"）
 - 单一格式：**全部 YAML**，删除 `px4-thresholds.toml` 与构建脚本的 TOML 解析器

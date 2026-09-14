@@ -28,7 +28,7 @@ load_crit = 0.95
 构建期（Node，web/scripts/build-knowledge.mjs）
   knowledge/px4/rules/*.yaml      ─┐
   knowledge/px4/guards/*.yaml     ─┤ 解析 + 校验（必填/算子白名单/表达式合法性）
-  knowledge/px4/topics/**、params/** 与 topic-overrides.yaml   ─┤
+  knowledge/px4/meta/** 与 topic-overrides.yaml   ─┤
   knowledge/px4/operators.py      ─┤
   knowledge/px4/ulog_checks.py    ─┘
         ↓ 生成的产物（提交进仓库）
@@ -65,7 +65,7 @@ from pyulog import ULog
 
 RULES      = json.loads(r'''__RULES__''')       # 由 rules/*.yaml 编译而来
 GUARDS     = json.loads(r'''__GUARDS__''')      # 由 guards/*.yaml 编译而来
-TOPICS     = json.loads(r'''__TOPICS__''')      # topics/<tag>/*、params/<tag>.yaml 与 topic-overrides.yaml 合并编译而来
+TOPICS     = json.loads(r'''__TOPICS__''')      # meta/<tag>.json 与 topic-overrides.yaml 合并编译而来
 FAULT_KB   = __FAULT_KB__                       # 由 px4-fault-kb.yaml 编译而来
 
 # ── 预定函数（operators.py 内联）──
@@ -416,7 +416,7 @@ triggers:
 下面是**合并后**的样子（`type`/`values` 由上游 `.msg` 生成，`groups` 来自人工的 `topic-overrides.yaml`）：
 
 ```yaml
-# topics/<tag>/vehicle_status.yaml（与 topic-overrides.yaml 的合并视图）
+# meta/<tag>.json 里 topics.vehicle_status（与 topic-overrides.yaml 的合并视图）
 topic: vehicle_status
 msg: VehicleStatus.msg            # 对应 PX4 原始定义，便于对照同步
 fields:
@@ -453,7 +453,7 @@ fields:
 ```
 
 ```yaml
-# topics/<tag>/vehicle_gps_position.yaml
+# meta/<tag>.json 里 topics.vehicle_gps_position
 fields:
   eph:
     type: scalar
@@ -467,7 +467,7 @@ fields:
 ```
 
 ```yaml
-# topics/<1.15 之前的 tag>/estimator_status.yaml   ← 只存在于 1.15 之前的 tag 目录
+# 1.15 之前的 tag 的 meta/<tag>.json 里才有 topics.estimator_status
 topic: estimator_status
 msg: EstimatorStatus.msg
 fields:
@@ -489,14 +489,14 @@ fields:
 ```
 
 ```yaml
-# topics/<1.15 及之后的 tag>/estimator_sensor_bias.yaml   ← 1.15 起零偏拆成独立 topic
+# 1.15 及之后的 tag 的 meta/<tag>.json 里才有 topics.estimator_sensor_bias（零偏拆成独立 topic）
 topic: estimator_sensor_bias
 fields:
   gyro_bias: {type: array, unit: rad/s, note: 可直读陀螺零偏}
 ```
 
 ```yaml
-# topics/<tag>/battery_status.yaml
+# meta/<tag>.json 里 topics.battery_status
 topic: battery_status
 fields:
   voltage_cell_v: {type: array, unit: V, note: 索引即电芯序号，0 表示未接}
@@ -557,7 +557,7 @@ fields:
 | --- | --- | --- |
 | `rules/*.yaml` | **怎么发现**：读哪些 `topic.field`、用什么算子、满足什么条件触发 | 检测 / 数据工程 |
 | `px4-fault-kb.yaml` | **发现之后意味着什么**：可能根因（按排查优先级）、排查步骤（由简到繁）、风险等级、禁忌 | 领域 / 故障分析 |
-| `topics/<tag>/*.yaml` + `params/<tag>.yaml` | 字段与参数字典：**一 tag 一份**，topic 由 uORB `.msg` 生成、params 由 `parameters.json` 生成 | 跟固件版本的人 |
+| `meta/<tag>.json` | 字段与参数字典：**一 tag 一份**，`topics` 由 uORB `.msg` 生成、`parameters` 由 `parameters.json` 生成 | 跟固件版本的人 |
 
 **去重动作**：规则里现在那些"结合故障库 F001 排查桨叶/电机"的文案要删掉，规则只留
 `emit.related_faults: [F001]`；根因与排查步骤只存在于故障库。规则侧仅保留与该阈值直接
@@ -586,7 +586,7 @@ fields:
 `tags/` 不应手写（字段随固件版本漂移，手写必然脱节），而是**从上游自动同步**：
 
 ```bash
-# 拉取指定 release tag 的 msg 与 parameters.json，生成/更新 topics/<tag>/ 与 params/<tag>.yaml
+# 拉取指定 release tag 的 msg 与 parameters.json，生成/更新 meta/<tag>.json
 python tools/topics/sync-px4-msg.py --tags v1.13.3,v1.14.4,v1.15.0,v1.16.0,main
 
 # CI / 本地校验：只比对不写入，若上游已变则非零退出
@@ -604,10 +604,8 @@ msg 也放同一维度，最简单）：
 
 knowledge/px4/               # 知识产物，入库
   tags.yaml                       # tag 顺序与版本映射
-  topics/v1.15.0/vehicle_status.yaml   # 字段字典：topics/<tag>/<topic>.yaml（生成物）
-  topics/v1.15.0/...                   # 约 200 个，跨 tag 共 1–3MB
-  params/v1.15.0.yaml                  # 参数字典：params/<tag>.yaml（生成物）
-  topics/v1.16.0/ ... params/v1.16.0.yaml ...
+  meta/v1.15.0.json                    # 该版本全部元数据：topics + parameters（生成物）
+  meta/v1.16.0.json ... meta/main.json # 三份合计约 1.5MB
   topic-overrides.yaml            # 跨 tag 的人工语义层（见下）
 ```
 
@@ -686,8 +684,7 @@ units:                       # 单位修正（上游注释缺失或不准时）
 
 | 文件 | 性质 | 内容 |
 | --- | --- | --- |
-| `knowledge/px4/topics/<tag>/*.yaml` | **生成物**（提交进仓库） | 该版本字段名/类型/单位/枚举/位/槽位（跨 tag 共有部分会重复，见工具一节） |
-| `knowledge/px4/params/<tag>.yaml` | **生成物**（提交进仓库） | 该版本参数元数据（名称/类型/默认值/范围/单位/机型/说明），供参数审计类经验引用 |
+| `knowledge/px4/meta/<tag>.json` | **生成物**（提交进仓库） | 该版本字段字典 + 参数字典（一份文件里两块）|
 | `knowledge/px4/topic-overrides.yaml` | **人工维护** | 上游没有的语义：`groups`（如 `hover_ish`、`critical_union`）、单位修正、`invalid` 标记（如 `remaining = -1`）、补充 `note` |
 | `.cache/px4/<tag>/` | 本地缓存，不入库 | 一个 tag 一个文件夹：`msg/` + `parameters.json` |
 
@@ -750,9 +747,9 @@ knowledge/px4/
   `tools/calibrate/baseline/*.json` 提交（findings 全字段 + tags/guards/phases/checks*）
 - **阶段 0.5 同步字段与参数字典**：`tools/topics/sync-px4-msg.py` 按 tag（v1.13.3 / v1.14.4 /
   v1.15.0 / v1.16.0 / main）各建一个文件夹，下载 `msg/` 与 `parameters.json`，生成
-  `topics/<tag>/*.yaml`（该版本字段定义）与 `params/<tag>.yaml`（参数元数据）；
+  `meta/<tag>.json`（该版本字段字典 + 参数字典）；
   人工补 `topic-overrides.yaml` 的 `aliases` / `groups` / `invalid`
-- **阶段 1**：`operators.py` + 框架改造 + 12 条标准型 + 全部 guard 迁移 + `topics/<tag>/` + `params/<tag>.yaml` +
+- **阶段 1**：`operators.py` + 框架改造 + 12 条标准型 + 全部 guard 迁移 + `meta/<tag>.json` +
   `build-knowledge.mjs` 必填/表达式校验 + **删掉已无用的 TOML 解析器**（统一 YAML 后只剩一个）；
   `compare-baseline.py` 验等价
 - **阶段 2**：补时序/掩码类 9 个函数，迁剩余 10 个告警点，`ulog_checks.py` 瘦到约 200 行
