@@ -52,6 +52,12 @@ export async function onRequestGet({ env }) {
   } catch (err) {
     result.listAll = { error: String(err && err.message ? err.message : err) };
   }
+  // 匿名配额的前缀在新设备上是空结果——dump 空结果时 list 的原始返回
+  try {
+    result.emptyList = await kv.list({ prefix: `anuse_nonexistent_${Date.now()}_`, limit: 256 });
+  } catch (err) {
+    result.emptyList = { error: String(err && err.message ? err.message : err) };
+  }
 
   try {
     const resp = await fetch("https://api.deepseek.com/models", {

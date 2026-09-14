@@ -61,7 +61,8 @@ export async function listAll(kv, prefix) {
     const options = { prefix, limit: 256 };
     if (cursor) options.cursor = cursor;
     const result = await kv.list(options);
-    for (const k of result.keys) keys.push(k.key ?? k.name);
+    // 空前缀匹配时部分平台返回 keys:null 而非 []，直接 for...of 会抛错
+    for (const k of result.keys ?? []) keys.push(k.key ?? k.name);
     cursor = result.complete ? null : result.cursor;
   } while (cursor);
   return keys;

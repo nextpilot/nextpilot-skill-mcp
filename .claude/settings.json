@@ -24,7 +24,10 @@
       "Bash(curl -s -m 30 https://skill.nextpilot.org/kv-probe)",
       "Bash(curl -s -m 30 -H \"x-device-id: probe_dev_$\\(date +%s\\)\" https://skill.nextpilot.org/api/me)",
       "Bash(curl -s -m 30 -o /dev/null -w \"%{http_code}\\\\n\" https://skill.nextpilot.org/api/reports)",
-      "Bash(curl -s -m 30 -o /dev/null -w \"%{http_code}\\\\n\" -X POST https://skill.nextpilot.org/internal/otp/set)"
+      "Bash(curl -s -m 30 -o /dev/null -w \"%{http_code}\\\\n\" -X POST https://skill.nextpilot.org/internal/otp/set)",
+      "Bash(curl -s -i -m 30 -H \"x-device-id: probedev999\" https://skill.nextpilot.org/api/me)",
+      "Bash(curl -s -i -m 30 https://skill.nextpilot.org/api/me)",
+      "Bash(curl -s -i -m 30 https://skill.nextpilot.org/api/reports)"
     ]
   }
 }
