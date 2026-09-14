@@ -26,7 +26,7 @@ export function Leaderboard({
   const path = kind === "skill" ? "/skills" : "/mcp";
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
+    <div className="card p-4">
       <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
         <Trophy className="h-4 w-4 text-warning" />
         热门榜

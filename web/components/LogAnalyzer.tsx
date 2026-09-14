@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   UploadCloud,
   Loader2,
@@ -12,6 +13,7 @@ import {
   Lock,
   FileCheck2,
   ExternalLink,
+  History,
   LineChart,
   ScrollText,
   ClipboardCheck,
@@ -38,6 +40,7 @@ import {
 } from "@/lib/report-history";
 import { getDeviceId } from "@/lib/device-id";
 import { takePendingLog } from "@/lib/pending-log";
+import { fallbackLogKey, hashLogBytes } from "@/lib/log-hash";
 import { LogCharts } from "./LogCharts";
 import { LogMessages, LogParams, SystemInfoPanel } from "./LogEventsParams";
 import { HistoryList, type HistoryItem } from "./HistoryList";
@@ -64,6 +67,25 @@ const GUARD_LABELS: Record<string, string> = {
   insufficient_data: "样本不足(<60s)，不出深度结论",
   restart_detected: "日志中途重启",
   log_dropouts_high: "日志丢包>1s",
+  temperature_change_large: "温度变化过大",
+  wind_strong: "强风扰动",
+};
+
+/** 异常标签（第二层 add_tag 输出）→ 中文；未收录的原样显示 */
+const TAG_LABELS: Record<string, string> = {
+  high_vibration: "振动超标",
+  imu_bias_drift: "陀螺零偏漂移",
+  ekf_innovation_failure: "EKF 创新检验失败",
+  gps_eph_high: "GPS 水平精度差",
+  gps_jump: "GPS 位置跳变",
+  battery_voltage_drop: "电压跌落",
+  attitude_overshoot: "姿态超调",
+  attitude_tracking: "姿态跟踪误差",
+  motor_output_unbalance: "电机输出不平衡",
+  low_airspeed: "空速偏低",
+  vtol_convert_attitude_over: "VTOL 转换姿态超限",
+  wind_disturb: "风扰动",
+  failsafe: "触发失效保护",
 };
 
 const STAGE_TEXT: Record<WorkerStage, string> = {
@@ -100,38 +122,42 @@ export function LogAnalyzer() {
   } | null>(null);
   const [loggedIn, setLoggedIn] = useState(false);
   const [cloudItems, setCloudItems] = useState<HistoryItem[]>([]);
+  /** 命中历史结果（同一份日志重复上传）时的提示，不重复解析也不重复计费 */
+  const [dedupeNotice, setDedupeNotice] = useState<string | null>(null);
+  const pendingHashRef = useRef<string>("");
 
-  const refreshCloud = useCallback(async () => {
+  /** 云端报告列表（元数据）；返回而不写 state，便于上传时即时查重 */
+  const fetchCloudList = useCallback(async (): Promise<HistoryItem[]> => {
     try {
       const resp = await fetch("/api/reports", { cache: "no-store" });
-      if (!resp.ok) {
-        setCloudItems([]);
-        return;
-      }
+      if (!resp.ok) return [];
       const data = await resp.json();
-      setCloudItems(
-        (data.reports ?? []).map(
-          (r: Record<string, unknown>): HistoryItem => ({
-            id: String(r.id),
-            fileName: String(r.fileName ?? ""),
-            fileSize: Number(r.fileSize ?? 0),
-            durationSec: Number(r.durationSec ?? 0) || undefined,
-            platform: String(r.platform ?? "px4"),
-            vehicleType: (r.vehicleType as string) ?? undefined,
-            parserVersion: String(r.parserVersion ?? ""),
-            findings: [],
-            findingCount: Number(r.findingCount ?? 0),
-            stats: {},
-            aiMarkdown: null,
-            analyzedAt: String(r.analyzedAt),
-            source: "cloud",
-          }),
-        ),
+      return (data.reports ?? []).map(
+        (r: Record<string, unknown>): HistoryItem => ({
+          id: String(r.id),
+          fileName: String(r.fileName ?? ""),
+          fileSize: Number(r.fileSize ?? 0),
+          durationSec: Number(r.durationSec ?? 0) || undefined,
+          platform: String(r.platform ?? "px4"),
+          vehicleType: (r.vehicleType as string) ?? undefined,
+          parserVersion: String(r.parserVersion ?? ""),
+          logHash: r.logHash ? String(r.logHash) : undefined,
+          findings: [],
+          findingCount: Number(r.findingCount ?? 0),
+          stats: {},
+          aiMarkdown: null,
+          analyzedAt: String(r.analyzedAt),
+          source: "cloud",
+        }),
       );
     } catch {
-      setCloudItems([]);
+      return [];
     }
   }, []);
+
+  const refreshCloud = useCallback(async () => {
+    setCloudItems(await fetchCloudList());
+  }, [fetchCloudList]);
 
   const refreshMe = useCallback(async () => {
     try {
@@ -164,7 +190,7 @@ export function LogAnalyzer() {
   }, [refreshMe]);
 
   const persist = useCallback(
-    (r: AnalysisReport, id: string, ai: string | null) => {
+    (r: AnalysisReport, id: string, ai: string | null, hash?: string) => {
       saveReport({
         id,
         fileName: r.fileName,
@@ -173,6 +199,7 @@ export function LogAnalyzer() {
         platform: r.platform,
         vehicleType: r.vehicleType,
         parserVersion: r.parserVersion,
+        logHash: hash ?? r.logHash,
         findings: r.findings,
         stats: r.stats,
         tags: r.tags,
@@ -207,6 +234,7 @@ export function LogAnalyzer() {
             durationSec: r.durationSec,
             platform: r.platform,
             parserVersion: r.parserVersion,
+            logHash: r.logHash ?? pendingHashRef.current,
             findings: r.findings,
             stats: r.stats,
             tags: r.tags ?? [],
@@ -264,83 +292,13 @@ export function LogAnalyzer() {
     });
   }, []);
 
-  const handleFile = useCallback(
-    async (file: File) => {
-      setError(null);
-      setReport(null);
-      setManifest(null);
-      setInfo(null);
-      setAiMarkdown(null);
-
-      if (!file.name.toLowerCase().endsWith(".ulg")) {
-        setError("冲刺 1 仅支持 PX4 .ulg 日志，ArduPilot .bin 将在冲刺 3 支持");
-        return;
-      }
-
-      reportIdRef.current = newReportId();
-      // worker 只创建一次、回调闭包会捕获首次的 file，这里用 ref 记录本次文件信息
-      pendingFileRef.current = { name: file.name, size: file.size };
-
-      // 复用既有 worker（Pyodide 已加载），避免重复下载运行时
-      if (!workerRef.current) {
-        const worker = new Worker(
-          new URL("../workers/ulog-worker.ts", import.meta.url),
-          { type: "module" },
-        );
-        worker.onmessage = (e: MessageEvent) => {
-          const msg = e.data;
-          if (msg.type === "stage") {
-            setStage(msg.stage);
-          } else if (msg.type === "error") {
-            setError(msg.message);
-            setStage("idle");
-          } else if (msg.type === "done") {
-            const r = msg.report as AnalysisReport;
-            r.fileName = pendingFileRef.current.name;
-            r.fileSize = pendingFileRef.current.size;
-            r.analyzedAt = new Date().toISOString();
-            setReport(r);
-            setManifest(msg.manifest as TopicManifest);
-            setInfo(msg.info as LogInfo);
-            setStage("done");
-            persist(r, reportIdRef.current, null);
-            // 冲刺 2：AI 报告需登录且消耗配额，改为用户手动点击生成，不再解析完自动调用
-          } else if (msg.type === "series") {
-            const resolve = pendingRef.current.get(msg.reqId);
-            if (resolve) {
-              pendingRef.current.delete(msg.reqId);
-              resolve(msg.data);
-            }
-          }
-        };
-        workerRef.current = worker;
-      }
-
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      workerRef.current.postMessage({ type: "analyze", file: bytes });
-    },
-    [explain, persist],
-  );
-
-  // 首页上传卡把文件暂存在 IndexedDB，这里取出后立即分析（读完即删）
-  const consumedPendingRef = useRef(false);
-  useEffect(() => {
-    if (consumedPendingRef.current) return;
-    consumedPendingRef.current = true;
-    void (async () => {
-      const file = await takePendingLog();
-      if (file) void handleFile(file);
-    })();
-    // handleFile 在依赖里保持最新即可，不需要每次重建消费者
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const viewSaved = useCallback((saved: SavedReport) => {
     setError(null);
     setManifest(null);
     setInfo(null);
     setAiMarkdown(saved.aiMarkdown);
     reportIdRef.current = saved.id;
+    pendingHashRef.current = saved.logHash ?? "";
     setReport({
       fileName: saved.fileName,
       fileSize: saved.fileSize,
@@ -348,6 +306,7 @@ export function LogAnalyzer() {
       platform: saved.platform as AnalysisReport["platform"],
       vehicleType: saved.vehicleType,
       parserVersion: saved.parserVersion,
+      logHash: saved.logHash,
       findings: saved.findings,
       stats: saved.stats,
       tags: saved.tags,
@@ -385,6 +344,109 @@ export function LogAnalyzer() {
     [viewSaved],
   );
 
+  /** 同一份日志的查重：先本机历史（含完整结论），再云端列表（跨设备） */
+  const findExistingByHash = useCallback(
+    async (hash: string): Promise<HistoryItem | null> => {
+      if (!hash) return null;
+      const local = listReports().find((r) => r.logHash === hash);
+      if (local) return { ...local, source: "local" };
+      const cloud = await fetchCloudList();
+      return cloud.find((c) => c.logHash === hash) ?? null;
+    },
+    [fetchCloudList],
+  );
+
+  const handleFile = useCallback(
+    async (file: File) => {
+      setError(null);
+      setReport(null);
+      setManifest(null);
+      setInfo(null);
+      setAiMarkdown(null);
+      setDedupeNotice(null);
+
+      if (!file.name.toLowerCase().endsWith(".ulg")) {
+        setError("冲刺 1 仅支持 PX4 .ulg 日志，ArduPilot .bin 将在冲刺 3 支持");
+        return;
+      }
+
+      const bytes = new Uint8Array(await file.arrayBuffer());
+
+      // 同一份日志（内容哈希一致）不重复解析：直接载入历史结论
+      const hash =
+        (await hashLogBytes(bytes)) ||
+        fallbackLogKey(file.name, file.size, file.lastModified);
+      const existing = await findExistingByHash(hash);
+      if (existing) {
+        // 本机历史自带完整结论；云端列表只有元数据，需再取一次详情
+        if (existing.source === "cloud") await viewHistoryItem(existing);
+        else viewSaved(existing);
+        setDedupeNotice(
+          `这份日志此前已分析过（内容一致），已直接载入历史结论，未重复解析。` +
+            (existing.aiMarkdown ? "" : "如需 AI 中文解读，可在下方手动生成（消耗额度）。"),
+        );
+        return;
+      }
+
+      reportIdRef.current = newReportId();
+      // worker 只创建一次、回调闭包会捕获首次的 file，这里用 ref 记录本次文件信息
+      pendingFileRef.current = { name: file.name, size: file.size };
+      pendingHashRef.current = hash;
+
+      // 复用既有 worker（Pyodide 已加载），避免重复下载运行时
+      if (!workerRef.current) {
+        const worker = new Worker(
+          new URL("../workers/ulog-worker.ts", import.meta.url),
+          { type: "module" },
+        );
+        worker.onmessage = (e: MessageEvent) => {
+          const msg = e.data;
+          if (msg.type === "stage") {
+            setStage(msg.stage);
+          } else if (msg.type === "error") {
+            setError(msg.message);
+            setStage("idle");
+          } else if (msg.type === "done") {
+            const r = msg.report as AnalysisReport;
+            r.fileName = pendingFileRef.current.name;
+            r.fileSize = pendingFileRef.current.size;
+            r.analyzedAt = new Date().toISOString();
+            r.logHash = pendingHashRef.current;
+            setReport(r);
+            setManifest(msg.manifest as TopicManifest);
+            setInfo(msg.info as LogInfo);
+            setStage("done");
+            persist(r, reportIdRef.current, null, pendingHashRef.current);
+            // 冲刺 2：AI 报告需登录且消耗配额，改为用户手动点击生成，不再解析完自动调用
+          } else if (msg.type === "series") {
+            const resolve = pendingRef.current.get(msg.reqId);
+            if (resolve) {
+              pendingRef.current.delete(msg.reqId);
+              resolve(msg.data);
+            }
+          }
+        };
+        workerRef.current = worker;
+      }
+
+      workerRef.current.postMessage({ type: "analyze", file: bytes });
+    },
+    [findExistingByHash, persist, viewHistoryItem, viewSaved],
+  );
+
+  // 首页上传卡把文件暂存在 IndexedDB，这里取出后立即分析（读完即删）
+  const consumedPendingRef = useRef(false);
+  useEffect(() => {
+    if (consumedPendingRef.current) return;
+    consumedPendingRef.current = true;
+    void (async () => {
+      const file = await takePendingLog();
+      if (file) void handleFile(file);
+    })();
+    // 消费者只在挂载时跑一次；handleFile 通过 ref 语义取最新闭包即可
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const deleteHistoryItem = useCallback(
     (item: HistoryItem) => {
       if (item.source === "cloud") {
@@ -407,8 +469,8 @@ export function LogAnalyzer() {
   return (
     <div>
       <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
-        {/* 左栏画布：上传 + 历史 */}
-        <aside className="card min-w-0 space-y-5 self-start p-5">
+        {/* 左栏画布：上传 + 历史。两栏等高（不设 self-start，随 grid 行高拉伸） */}
+        <aside className="card min-w-0 space-y-5 p-5">
           <p className="flex items-start gap-2 text-xs leading-5 text-muted">
             <Lock className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
             <span>
@@ -478,10 +540,17 @@ export function LogAnalyzer() {
         </aside>
 
         {/* 右栏画布：分析结果 */}
-        <section className="card min-w-0 self-start p-5 sm:p-6">
+        <section className="card flex min-w-0 flex-col p-5 sm:p-6">
           {error && (
             <div className="rounded-lg border border-critical/40 bg-critical/[0.06] p-4 text-sm text-critical">
               {error}
+            </div>
+          )}
+
+          {dedupeNotice && (
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-border bg-surface-2 p-3.5 text-sm text-muted">
+              <History className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <span>{dedupeNotice}</span>
             </div>
           )}
 
@@ -499,12 +568,12 @@ export function LogAnalyzer() {
             />
           ) : (
             !error && (
-              <div className="flex min-h-[360px] flex-col items-center justify-center gap-3 text-center">
+              <div className="flex min-h-[360px] flex-1 flex-col items-center justify-center gap-3 text-center">
                 <FileCheck2 className="h-10 w-10 text-muted/70" />
                 <p className="font-medium">上传日志后，这里显示分析结果</p>
                 <p className="max-w-sm text-xs leading-5 text-muted">
-                  左侧选择或拖入一份 PX4 .ulg 日志，将生成检查结论（振动 / EKF / 电源）、
-                  数据图表与 AI 中文解读。
+                  左侧选择或拖入一份 PX4 .ulg 日志，将生成 15 项确定性检查结论、
+                  故障知识库匹配、数据图表与 AI 中文解读。
                 </p>
               </div>
             )
@@ -574,28 +643,37 @@ function ReportView({
         </div>
       </div>
 
-      {/* 飞行上下文：阶段 / 数据质量 guard（第二层输出） */}
+      {/* 飞行上下文：阶段 / 异常标签 / 数据质量 guard（第二层输出）
+          三组语义不同，各占一行并带行首标签，挤在一排会读不出区别 */}
       {(report.phases?.length || report.guardTags?.length || report.tags?.length) && (
-        <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
-          {report.phases?.map((p) => (
-            <span key={p} className="rounded-full bg-primary/10 px-2.5 py-1 text-primary">
-              {PHASE_LABELS[p] ?? p}
-            </span>
-          ))}
-          {report.tags?.map((t) => (
-            <span key={t} className="rounded-full bg-warning/15 px-2.5 py-1 text-warning">
-              {t}
-            </span>
-          ))}
-          {report.guardTags?.map((g) => (
-            <span
-              key={g}
-              className="rounded-full bg-critical/15 px-2.5 py-1 text-critical"
-              title="数据质量/边界标签：影响结论可信度"
-            >
-              ⚠ {GUARD_LABELS[g] ?? g}
-            </span>
-          ))}
+        <div className="mt-5 mb-5 space-y-2.5">
+          {report.phases && report.phases.length > 0 && (
+            <TagRow label="飞行阶段">
+              {report.phases.map((p) => (
+                <span key={p} className="chip chip-brand">
+                  {PHASE_LABELS[p] ?? p}
+                </span>
+              ))}
+            </TagRow>
+          )}
+          {report.tags && report.tags.length > 0 && (
+            <TagRow label="异常标签">
+              {report.tags.map((t) => (
+                <span key={t} className="chip border-warning/40 text-warning">
+                  {TAG_LABELS[t] ?? t}
+                </span>
+              ))}
+            </TagRow>
+          )}
+          {report.guardTags && report.guardTags.length > 0 && (
+            <TagRow label="数据质量" hint="影响结论可信度">
+              {report.guardTags.map((g) => (
+                <span key={g} className="chip border-critical/40 text-critical">
+                  {GUARD_LABELS[g] ?? g}
+                </span>
+              ))}
+            </TagRow>
+          )}
         </div>
       )}
 
@@ -725,8 +803,9 @@ function SummaryTab({
       {/* AI 解释层：手动生成，消耗每日免费配额 */}
       <h2 className="mt-8 mb-2 text-base font-semibold">AI 中文解读（GJB-841 归零报告）</h2>
       {aiMarkdown ? (
-        <article className="prose-skill">
+        <article className="prose-guide">
           <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
             components={{
               a: ({ children, href }) => (
                 <Link href={href ?? "#"}>{children}</Link>
@@ -746,7 +825,7 @@ function SummaryTab({
           <button
             type="button"
             onClick={onGenerateAi}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+            className="btn-primary"
           >
             <Sparkles className="h-4 w-4" />
             生成 AI 中文报告
@@ -826,6 +905,26 @@ function FindingCard({ finding }: { finding: Finding }) {
           官方文档 <ExternalLink className="h-3 w-3" />
         </a>
       )}
+    </div>
+  );
+}
+
+/** 一行标签：行首固定宽度说明 + 标签流，避免多组标签挤成一片读不出区别 */
+function TagRow({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+      <span className="w-16 shrink-0 text-xs text-faint" title={hint}>
+        {label}
+      </span>
+      {children}
     </div>
   );
 }

@@ -104,6 +104,8 @@ export interface AnalysisReport {
   /** 机型：rotary_wing / fixed_wing / rover / airship / unknown（见 vehicle_status.vehicle_type） */
   vehicleType?: string;
   parserVersion: string;
+  /** 日志内容指纹（SHA-256 hex）：同一份日志重复上传时直接载入历史结果 */
+  logHash?: string;
   findings: Finding[];
   stats: Record<string, number | string>;
   /** 第二层异常标签 */

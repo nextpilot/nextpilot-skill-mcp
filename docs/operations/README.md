@@ -70,8 +70,12 @@ github.com → Settings → Developer settings → OAuth Apps → New OAuth App�
 ## 4. EdgeOne KV 开通与绑定
 
 1. 控制台 → KV 存储 → 申请开通（申请理由写实际用途：登录资料/验证码/配额计数/报告元数据）。
-2. 创建命名空间：`nextpilot_main`。
-3. 绑定到 Pages 项目，**变量名 `NEXTPILOT_KV`**（绑定，不是环境变量）。
+2. 创建命名空间：`nextpilot_skill_mcp`（**已开通**）。
+3. 绑定到 Pages 项目，**变量名 `NEXTPILOT_KV`**（绑定，不是环境变量）。绑定后需重新部署才生效。
+4. 部署后访问 `GET /kv-probe` 验证：返回的 `kv.after` 每次 +1 即绑定成功。
+
+> 命名空间名称本身不影响代码（代码只认绑定变量名 `NEXTPILOT_KV`）；控制台里绑定变量名若被固定成别的名字，
+> `getKv()` 会退化为「在 env 中查找具备 get/put/list 的对象」，仍能取到。
 
 KV key 规则（代码见 `functions/_lib/kv.js`）：
 
@@ -80,8 +84,9 @@ KV key 规则（代码见 `functions/_lib/kv.js`）：
 | `usr_{uid}` | 用户资料（对齐远期 profiles 表） |
 | `em_{emailHash}` / `gh_{githubId}` | 登录方式 → uid 索引 |
 | `otp_` / `otprl_` / `otpd_` / `otpi_` | 验证码、60s 重发窗、每日限额 |
-| `use_{uid}_{yyyyMM}_{reportId}` | 月度配额唯一键（前缀列举计数，免费 5/月） |
-| `rpt_{uid}_{reportId}` | 报告记录（7 天惰性过期） |
+| `use_{uid}_{yyyyMMDD}_{事件}` | 每日配额唯一键（前缀列举计数，登录 10/天、匿名 3/天） |
+| `anuse_{设备}_{yyyyMMDD}_{事件}` | 匿名设备日计数（另有 `anip_{ip}_{日}` 防刷） |
+| `rpt_{uid}_{reportId}` | 报告记录（7 天惰性过期，含 `logHash` 日志指纹） |
 
 注意：最终一致（60s 全球同步），写后不要立即回读；配额计数容忍短暂不一致。
 
@@ -101,5 +106,5 @@ KV key 规则（代码见 `functions/_lib/kv.js`）：
 | 登录后仍 401 | 检查生产是否 HTTPS（cookie 名 `__Secure-` 前缀）；边缘函数与 SSR 的 `AUTH_SECRET` 是否一致 |
 | 验证码发不出 | `SMTP_*` 是否配置；QQ 授权码是否正确；Node 函数出网 465 是否可用 |
 | `/internal/*` 403 | `AUTH_INTERNAL_SECRET` 未配或不一致 |
-| KV 报 binding missing | 命名空间绑定变量名必须是 `NEXTPILOT_KV`，绑定后需重新部署 |
+| KV 报 binding missing | KV 命名空间（`nextpilot_skill_mcp`）未绑定到 Pages 项目；绑定后需重新部署 |
 | 配额数不准 | KV 最终一致，60s 内可能滞后；唯一键设计保证不会重复计数 |

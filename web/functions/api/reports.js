@@ -31,6 +31,7 @@ export async function onRequestGet({ request, env, waitUntil }) {
       platform: rec.platform,
       vehicleType: rec.vehicleType,
       parserVersion: rec.parserVersion,
+      logHash: rec.logHash,
       findingCount: Array.isArray(rec.findings) ? rec.findings.length : 0,
       hasReport: Boolean(rec.aiMarkdown),
       analyzedAt: rec.analyzedAt,

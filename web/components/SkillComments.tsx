@@ -117,7 +117,7 @@ export function SkillComments({ kind, slug }: { kind: Kind; slug: string }) {
             <button
               type="submit"
               disabled={posting || !content.trim()}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="btn-primary"
             >
               {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               {replyTo ? "发表回复" : "发表评论"}

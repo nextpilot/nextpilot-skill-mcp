@@ -250,6 +250,8 @@ ${markdown}`;
         platform: String(body.platform ?? "px4"),
         vehicleType: body.stats?.vehicleType ? String(body.stats.vehicleType) : undefined,
         parserVersion: String(body.parserVersion ?? ""),
+        // 日志内容指纹：同一份日志重复上传时前端据此直接载入结论，不再解析
+        logHash: typeof body.logHash === "string" ? body.logHash.slice(0, 128) : undefined,
         findings: safe,
         stats: body.stats && typeof body.stats === "object" ? body.stats : {},
         tags: Array.isArray(body.tags) ? body.tags : [],

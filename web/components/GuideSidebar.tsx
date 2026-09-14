@@ -62,7 +62,7 @@ export function GuideDocsSelect({ groups }: { groups: GuideNavGroup[] }) {
   const current = groups.flatMap((g) => g.items).find((i) => i.href === pathname);
 
   return (
-    <details className="group min-w-0 flex-1 rounded-xl border border-border bg-surface lg:hidden">
+    <details className="card group min-w-0 flex-1 lg:hidden">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-2.5 text-sm font-medium">
         <span className="inline-flex min-w-0 items-center gap-2 truncate">
           <List className="h-4 w-4 shrink-0 text-primary" />

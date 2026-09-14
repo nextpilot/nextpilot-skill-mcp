@@ -36,7 +36,7 @@ export function HomeUploadCard() {
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-faint">
             {t("上传日志", "Upload log")}
           </p>
-          <h2 className="mt-1.5 text-lg font-semibold">
+          <h2 className="mt-2.5 text-lg font-semibold">
             {t("分析一份飞控日志", "Analyze a flight log")}
           </h2>
         </div>

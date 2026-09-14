@@ -101,7 +101,7 @@ export function SkillActionsBar({
       <button
         type="button"
         onClick={() => void copy()}
-        className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+        className="btn-primary ml-auto"
       >
         {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
         {copied ? "已复制" : copyLabel}

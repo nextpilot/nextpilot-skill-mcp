@@ -32,7 +32,7 @@ export default function McpPage() {
         </p>
       </header>
 
-      <div className="mb-8 flex items-start gap-2.5 rounded-xl border border-border bg-surface p-4 text-sm leading-6 text-muted">
+      <div className="card mb-8 flex items-start gap-2.5 p-4 text-sm leading-6 text-muted">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
         <p>
           <LocalizedText
@@ -43,7 +43,7 @@ export default function McpPage() {
       </div>
 
       {servers.length === 0 ? (
-        <p className="rounded-xl border border-border bg-surface p-10 text-center text-sm text-muted">
+        <p className="card p-10 text-center text-sm text-muted">
           <LocalizedText zh="暂无收录。" en="Nothing listed yet." />
         </p>
       ) : (

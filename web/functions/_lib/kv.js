@@ -10,7 +10,21 @@ export const REPORT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 免费版保留 7 天
 /** @returns {any} */
 export function getKv(env) {
   // 官方示例中绑定变量以全局方式注入，同时也可能挂在 env 上，两种都兼容
-  return globalThis.NEXTPILOT_KV ?? env?.NEXTPILOT_KV ?? null;
+  const direct = globalThis.NEXTPILOT_KV ?? env?.NEXTPILOT_KV;
+  if (direct) return direct;
+  // 兜底：控制台里绑定变量名若与约定不一致，就从 env 中找出具备 KV 接口的对象。
+  // 只认 get/put/list 齐备的对象，避免误命中外层普通对象。
+  for (const value of Object.values(env ?? {})) {
+    if (
+      value &&
+      typeof value.get === "function" &&
+      typeof value.put === "function" &&
+      typeof value.list === "function"
+    ) {
+      return value;
+    }
+  }
+  return null;
 }
 
 export async function sha256Hex(input) {

@@ -86,7 +86,7 @@ export function GuideOutlineMobile({ headings }: { headings: GuideHeading[] }) {
   const { language } = useLanguage();
   if (headings.length === 0) return null;
   return (
-    <details className="group min-w-0 flex-1 rounded-xl border border-border bg-surface xl:hidden">
+    <details className="card group min-w-0 flex-1 xl:hidden">
       <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-2.5 text-sm font-medium">
         <span className="inline-flex min-w-0 items-center gap-2 truncate">
           <ListIcon className="h-4 w-4 shrink-0 text-primary" />

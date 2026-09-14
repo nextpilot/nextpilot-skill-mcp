@@ -1,12 +1,12 @@
 // 冲刺 2 阶段 0 Spike：验证 KV 绑定读写 + 边缘函数外网 fetch（DeepSeek 连通性）。
-// 控制台需先开通 KV、创建 namespace（nextpilot_main）并绑定到本项目，变量名 NEXTPILOT_KV。
+// 控制台需先开通 KV、创建 namespace（nextpilot_skill_mcp）并绑定到本项目，变量名 NEXTPILOT_KV。
 // 访问 GET /kv-probe 每次计数 +1，并探测 DeepSeek API 的可达性（无 key 时对方返回 401 也算通）。
+import { getKv } from "./_lib/kv.js";
 
 const COUNTER_KEY = "kvprobe_count";
 
 function getBinding(env) {
-  // 官方示例中绑定变量以全局方式注入，同时也可能挂在 env 上，两种都兼容
-  return globalThis.NEXTPILOT_KV ?? env?.NEXTPILOT_KV ?? null;
+  return getKv(env);
 }
 
 export async function onRequestGet({ env }) {

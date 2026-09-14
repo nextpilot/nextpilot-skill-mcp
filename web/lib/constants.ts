@@ -1,10 +1,30 @@
 /** 平台 / 分类等领域常量，与 CLAUDE.md 3.3 内容框架保持一致 */
 
 export const CATEGORIES = [
-  { key: "perception", label: "感知", desc: "让飞控看得懂" },
-  { key: "decision", label: "决策与规划", desc: "让飞控想得清" },
-  { key: "control", label: "控制", desc: "让飞控飞得稳" },
-  { key: "toolchain", label: "系统与工具链", desc: "让飞控用得上" },
+  {
+    key: "perception",
+    label: "感知",
+    desc: "让飞控看得懂",
+    topics: ["目标检测", "语义分割", "VLM 场景理解"],
+  },
+  {
+    key: "decision",
+    label: "决策与规划",
+    desc: "让飞控想得清",
+    topics: ["任务规划", "自主导航", "路径规划"],
+  },
+  {
+    key: "control",
+    label: "控制",
+    desc: "让飞控飞得稳",
+    topics: ["语言引导飞行", "视觉伺服", "PID 调参"],
+  },
+  {
+    key: "toolchain",
+    label: "系统与工具链",
+    desc: "让飞控用得上",
+    topics: ["PX4 集成", "MAVLink", "机载部署"],
+  },
 ] as const;
 
 export type CategoryKey = (typeof CATEGORIES)[number]["key"];

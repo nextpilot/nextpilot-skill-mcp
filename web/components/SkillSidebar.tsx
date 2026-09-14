@@ -89,7 +89,7 @@ export function SkillSidebar({
         <button
           type="button"
           onClick={() => void copy()}
-          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          className="btn-primary mt-4 w-full py-2.5"
         >
           {copied ? <Check className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
           {copied ? "已复制，粘贴给 AI 即可" : "复制 Skill 内容"}
@@ -107,10 +107,8 @@ export function SkillSidebar({
           type="button"
           onClick={() => void onToggleFavorite()}
           aria-pressed={fav.favorited}
-          className={`mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm transition-colors ${
-            fav.favorited
-              ? "border-primary/50 bg-primary/10 text-primary"
-              : "border-border text-muted hover:border-primary/50 hover:text-text"
+          className={`btn-ghost mt-2 w-full py-2.5 ${
+            fav.favorited ? "border-primary/50 text-primary" : "text-muted"
           }`}
         >
           {fav.favorited ? (
