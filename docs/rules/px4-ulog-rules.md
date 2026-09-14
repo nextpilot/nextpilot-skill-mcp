@@ -94,6 +94,25 @@ fw_cruise/landing/vtol_transition）；未解锁的地面操作不产生阶段�
 确定性检索，只把命中条目（possibleRootCause/troubleshootingSteps/note）注入 LLM；
 LLM 的 GJB-841 报告根因不得超出命中条目。
 
+## 固件版本与字段矩阵（PX4 1.15 起有破坏性变更）
+
+引擎解析后先识别固件版本（`msg_info_dict.ver_sw_release`，打包格式
+`major<<24 | minor<<16 | patch<<8 | type`），输出 `stats.firmware` 与
+`stats.firmwareProfile`（`px4-1.15+` / `px4-legacy`），再按版本取字段；
+版本缺失时退化为字段存在性判定。
+
+| 数据 | 1.15+ | 旧固件 | 引擎处理 |
+| --- | --- | --- | --- |
+| 陀螺零偏 | `estimator_sensor_bias.gyro_bias[0..2]`（直读） | `estimator_status.states[10..12]` | 版本优先直读，回退 EKF 状态；`stats.gyroBiasSource` 记录实际来源 |
+| EKF 状态 | `estimator_states.states[]` | `estimator_status.states[]` | 按 profile 顺序尝试 |
+| 创新检验比例 | `estimator_innovation_test_ratios`（`gps_hvel/gps_hpos/baro_vpos/mag_field/heading/airspeed/beta/hagl`） | `estimator_status.*_test_ratio` + `innovation_check_flags` | 新 topic 命中即用，否则回退 |
+| 风估计 | `estimator_wind` | `wind_estimate`（字段同名） | 版本优先新 topic |
+| 姿态指令 | `vehicle_attitude_setpoint.q_d[0..3]`（四元数） | `roll_body` / `pitch_body` | 按版本选取，未知时按存在性 |
+| 振动 | `vehicle_imu_status.accel_vibration_metric`（1.14+） | `stddev_accel_*` | 存在性判定 |
+
+实测：1.16.0 / 1.17.0 走新 profile，1.11.2 与无版本号老日志走 legacy profile。
+机型、固件、硬件型号一并进入报告与 GJB-841 报文。
+
 ## 待办
 
 - [ ] 扩到 10-20 个日志（多旋翼为主，覆盖固定翼 / rover），校准削波、test ratio、电芯电压、eph、压降阈值。

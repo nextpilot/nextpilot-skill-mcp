@@ -109,6 +109,42 @@ def edge_indices(arr):
 buf = io.BytesIO(bytes(ulog_bytes))
 ulog = ULog(buf)
 
+# ---------------- 固件版本识别（PX4 1.15 起 topic 与字段名有破坏性变化）----------------
+# ver_sw_release 打包格式：major<<24 | minor<<16 | patch<<8 | type
+def detect_firmware(ulog):
+    info = getattr(ulog, "msg_info_dict", {}) or {}
+    rel = info.get("ver_sw_release")
+    fw = {"release": None, "major": None, "minor": None, "patch": None,
+          "git": str(info.get("ver_sw", ""))[:12], "hw": str(info.get("ver_hw", ""))}
+    if rel is not None:
+        try:
+            v = int(rel)
+            fw.update({"release": v, "major": (v >> 24) & 0xFF,
+                       "minor": (v >> 16) & 0xFF, "patch": (v >> 8) & 0xFF})
+        except Exception:
+            pass
+    return fw
+
+FW = detect_firmware(ulog)
+FW_MINOR = FW["minor"]
+FW_LABEL = ("%d.%d.%d" % (FW["major"], FW["minor"], FW["patch"])) if FW_MINOR is not None else "未知（旧固件或无版本号）"
+FW_PROFILE = "px4-1.15+" if (FW_MINOR is not None and FW_MINOR >= 15) else "px4-legacy"
+
+def pick_versioned(*candidates):
+    """按固件版本优先取字段来源；版本未知时退化为“字段存在性”判定。
+    candidates 形如 (最低 minor 版本或 None, 值)。"""
+    known = FW_MINOR is not None
+    ordered = sorted(candidates, key=lambda c: (c[0] is None, -(c[0] or 0)))
+    for mm, val in ordered:
+        if val is None:
+            continue
+        if mm is None or not known or FW_MINOR >= mm:
+            return val
+    for _mm, val in candidates:   # 定制固件容错
+        if val is not None:
+            return val
+    return None
+
 # ---------------- 总时长 / 时间基准 ----------------
 t_min, t_max = None, None
 for d in ulog.data_list:
@@ -135,6 +171,10 @@ if vs is not None:
         if rw is not None and len(rw) > 0:
             vehicle_type = "rotary_wing" if int(rw[-1]) else "fixed_wing"
 stats["vehicleType"] = vehicle_type
+stats["firmware"] = FW_LABEL
+stats["firmwareProfile"] = FW_PROFILE
+if FW["hw"]:
+    stats["hardware"] = FW["hw"]
 
 # ---------------- 飞行阶段识别（第二层，用于故障库 phase 匹配）----------------
 # nav_state 枚举（Flight Review config_tables / PX4 commander）
@@ -673,14 +713,15 @@ TEMP_RANGE_WARN, TEMP_RANGE_CRIT = 15.0, 25.0          # °C
 
 def _imu_bias_series():
     """返回 (来源说明, [(轴名, 数组), ...])，按固件版本优先取直读零偏。"""
-    sb = find_all(ulog, "estimator_sensor_bias")
+    sb = find_all(ulog, "estimator_sensor_bias") if FW_PROFILE == "px4-1.15+" else None
     if sb:
         d = sb[0]
         series = [(n, getf(d, "gyro_bias[%d]" % i), getf(d, "timestamp")) for i, n in
                   enumerate(("X", "Y", "Z"))]
         if any(x[1] is not None and len(x[1]) for x in series):
             return "estimator_sensor_bias.gyro_bias[]", series
-    for topic in ("estimator_status", "estimator_states"):
+    for topic in (("estimator_states", "estimator_status") if FW_PROFILE == "px4-1.15+"
+                  else ("estimator_status", "estimator_states")):
         ds = find_all(ulog, topic)
         if not ds:
             continue
@@ -773,7 +814,11 @@ if att and att_sp and armed_intervals:
     roll_sp = getf(dsp, "roll_body")
     pitch_sp = getf(dsp, "pitch_body")
     qd = [getf(dsp, "q_d[%d]" % i) for i in range(4)]
-    use_quat_sp = roll_sp is None and all(x is not None and len(x) for x in qd)
+    has_quat_sp = all(x is not None and len(x) for x in qd)
+    # 1.15+ 只记录四元数指令；旧固件记录 roll/pitch_body。版本未知时按字段存在性判定。
+    use_quat_sp = has_quat_sp if FW_MINOR is None else (FW_MINOR >= 15 and has_quat_sp)
+    if not use_quat_sp and roll_sp is None and has_quat_sp:
+        use_quat_sp = True   # 定制固件容错
     if ts is not None and all(x is not None and len(x) for x in q) and sp_ts is not None and (
             roll_sp is not None or use_quat_sp):
         ts = np.asarray(ts, dtype=np.int64)
@@ -927,7 +972,8 @@ if vs is not None and armed_intervals:
 
 # ---------------- 规则 14：风扰估计（F010，作为 guard 影响其他结论）----------------
 WIND_WARN, WIND_CRIT = 8.0, 12.0     # m/s
-we = find_all(ulog, "estimator_wind") or find_all(ulog, "wind_estimate")
+we = pick_versioned((15, find_all(ulog, "estimator_wind")),
+                    (None, find_all(ulog, "wind_estimate")))
 if we:
     ran("wind_estimate")
     d = we[0]

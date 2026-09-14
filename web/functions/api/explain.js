@@ -38,6 +38,8 @@ const SYSTEM_PROMPT = `你是资深飞控测试工程师，依据结构化检查
 - 只能引用 findings 中的字段、数值、阈值，禁止编造数字或字段名。
 - 未检查的项目明确说"本次未检查/未发现异常"，不要推测。
 - 每个排查建议末尾附上知识库 note 中的禁忌与 findings 中的官方文档链接。
+- 若 firmwareProfile 为 px4-legacy（1.15 之前或无版本号），涉及 EKF 状态/创新检验的结论要注明
+  "该固件字段体系与 1.15+ 不同"，不要用新固件字段名解释老日志。
 - guardTags 含 insufficient_data 时，先声明数据不足、只描述现象、不做 PID/根因深度诊断。
 - 使用简洁专业的中文 Markdown，结尾固定加一行："本报告为辅助判读，不替代人工排查。"`;
 
@@ -135,6 +137,9 @@ export async function onRequestPost({ request, env, waitUntil }) {
     durationSec: body.stats?.durationSec ?? null,
     armedDurationSec: body.stats?.armedDurationSec ?? null,
     vehicleType: body.stats?.vehicleType ?? null,
+    firmware: body.stats?.firmware ?? null,
+    firmwareProfile: body.stats?.firmwareProfile ?? null,
+    hardware: body.stats?.hardware ?? null,
     phases: body.phases ?? [],
     tags: body.tags ?? [],
     guardTags: body.guardTags ?? [],
