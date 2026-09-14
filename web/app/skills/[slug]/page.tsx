@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { getAllSkills, getSkillBySlug } from "@/lib/skills";
-import { CATEGORY_GLYPH } from "@/lib/constants";
+import { CATEGORY_GLYPH, CATEGORY_LABEL } from "@/lib/constants";
 import { CommunityStatLine, SkillMetaGroups } from "@/components/SkillHeaderMeta";
 import { SkillSidebar } from "@/components/SkillSidebar";
 import { SkillContentTabs } from "@/components/SkillContentTabs";
@@ -68,7 +68,12 @@ export default async function SkillDetailPage({
                 {skill.icon ?? CATEGORY_GLYPH[skill.category]}
               </span>
               <div className="min-w-0">
-                <h1 className="text-2xl font-bold md:text-[26px]">{skill.name}</h1>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl font-bold md:text-[26px]">{skill.name}</h1>
+                  <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                    {CATEGORY_LABEL[skill.category]}
+                  </span>
+                </div>
                 <div className="mt-1 flex items-center gap-2">
                   <span className="truncate font-mono text-[13px] text-muted">{skill.slug}</span>
                   <CopyChip value={skill.slug} title="点击复制 slug" iconOnly />
@@ -87,9 +92,18 @@ export default async function SkillDetailPage({
 
             <p className="mt-4 leading-7 text-muted">{skill.description}</p>
 
+            {/* 标签：紧贴描述下方，不放进分组表 */}
+            {skill.tags.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
+                {skill.tags.map((t) => (
+                  <span key={t} className="rounded bg-surface-2 px-1.5 py-0.5 text-muted">
+                    #{t}
+                  </span>
+                ))}
+              </div>
+            )}
+
             <SkillMetaGroups
-              category={skill.category}
-              tags={skill.tags}
               platforms={skill.platforms}
               clients={skill.clients}
               models={skill.models}
@@ -121,7 +135,6 @@ export default async function SkillDetailPage({
             kind="skill"
             slug={skill.slug}
             name={skill.name}
-            baseRating={skill.rating}
             baseDownloads={skill.downloads}
             copyText={copyText}
             installHint="复制下方全部内容，粘贴到 Claude / ChatGPT / Cursor 等对话里，或作为 System Prompt 使用；原始 .ulg 等数据始终留在你自己的设备上。"
