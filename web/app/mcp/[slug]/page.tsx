@@ -57,7 +57,7 @@ export default async function McpDetailPage({
         <span className="font-semibold">{server.slug}</span>
       </nav>
 
-      <div className="lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">
+      <div className="flex flex-col gap-3 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">
         <div className="min-w-0 rounded-2xl bg-surface p-5 sm:p-6">
           <header className="mb-8">
             <div className="flex items-start gap-4">
@@ -161,7 +161,7 @@ export default async function McpDetailPage({
           />
         </div>
 
-        <aside className="mb-10 lg:mb-0 lg:self-start">
+        <aside className="lg:self-start">
           <SkillSidebar
             kind="mcp"
             slug={server.slug}

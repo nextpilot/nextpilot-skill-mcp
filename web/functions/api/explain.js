@@ -62,8 +62,11 @@ export async function onRequestPost({ request, env, waitUntil }) {
     return jsonResponse({ markdown: EMPTY_FINDINGS_MARKDOWN, quotaFree: true });
   }
 
+  // 本地联调：显式开启 LLM_MOCK=1（或 key 填 mock）时，用模板报告替代真实调用，
+  // 让配额/限流/报告落盘等链路可在没有 API key 的情况下完整验证。
   const apiKey = env?.DEEPSEEK_API_KEY;
-  if (!apiKey) {
+  const mockMode = env?.LLM_MOCK === "1" || apiKey === "mock";
+  if (!apiKey && !mockMode) {
     return jsonResponse({ error: "LLM 解释层未配置 DEEPSEEK_API_KEY" }, 503);
   }
 
@@ -160,7 +163,41 @@ ${JSON.stringify(body.matchedFaults ?? [], null, 2)}
 请按系统提示的 GJB-841 四段式输出中文 Markdown 报告。不允许引入未提供的故障模式，证据不足直接说明。`;
 
   let markdown;
-  try {
+  if (!apiKey) {
+    // 模拟报告：结构与真实 GJB-841 输出一致，但明确标注为本地模拟
+    markdown = [
+      "## 故障现象描述",
+      `本次日志（${body.fileName ?? "unknown"}，机型 ${body.stats?.vehicleType ?? "未知"}，` +
+        `固件 ${body.stats?.firmware ?? "未知"}）确定性引擎共给出 ${findings.length} 条检查结果。`,
+      "",
+      "## 数据依据",
+      ...findings.slice(0, 5).map(
+        (f) =>
+          `- [${f.severity}] ${f.title}：${f.evidence?.field ?? ""} = ${f.evidence?.value ?? ""}` +
+          (f.evidence?.threshold != null ? `（阈值 ${f.evidence.threshold}）` : ""),
+      ),
+      "",
+      "## 初步原因分析",
+      ...((body.matchedFaults ?? []).length
+        ? body.matchedFaults.map(
+            (m) => `- ${m.faultId}（风险${m.riskLevel}）：${(m.possibleRootCause ?? [])[0] ?? ""}`,
+          )
+        : ["未命中故障知识库条目，不做根因推断。"]),
+      "",
+      "## 排查与验证建议",
+      ...((body.matchedFaults ?? []).flatMap((m) =>
+        (m.troubleshootingSteps ?? []).slice(0, 2).map((t) => `- ${t}`),
+      ).length
+        ? (body.matchedFaults ?? []).flatMap((m) =>
+            (m.troubleshootingSteps ?? []).slice(0, 2).map((t) => `- ${t}`),
+          )
+        : ["按 findings 中的字段逐项复核。"]),
+      "",
+      "> ⚠ 本报告由**本地模拟模式**（LLM_MOCK）生成，用于联调配额与链路，不是真实模型输出。",
+      "",
+      "本报告为辅助判读，不替代人工排查。",
+    ].join("\n");
+  } else try {
     const resp = await fetch(DEEPSEEK_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
@@ -184,6 +221,9 @@ ${JSON.stringify(body.matchedFaults ?? [], null, 2)}
   } catch (err) {
     return jsonResponse({ error: "调用 LLM 失败", detail: String(err?.message ?? err) }, 502);
   }
+  if (mockMode) markdown = `> ⚠ 本地模拟报告（LLM_MOCK）
+
+${markdown}`;
 
   // 调用成功后才计数；只有登录用户存云端报告，匿名只存客户端 localStorage
   const quota = {
@@ -195,12 +235,15 @@ ${JSON.stringify(body.matchedFaults ?? [], null, 2)}
   };
   if (kv) {
     const now = Date.now();
-    const eventId = sanitizeId(body.reportId || crypto.randomUUID());
+    const reportId = sanitizeId(body.reportId || crypto.randomUUID());
+    // 配额事件键必须每次调用唯一：同一份报告重复生成（历史里再点生成）也要计一次，
+    // 否则可以通过复用 reportId 绕过额度。报告记录仍按 reportId 覆盖。
+    const eventId = `${now}_${Math.random().toString(36).slice(2, 8)}`;
     if (session) {
       const usageKey = `${usagePrefix(session.uid, day)}${eventId}`;
-      const reportKey = `${reportPrefix(session.uid)}${eventId}`;
+      const reportKey = `${reportPrefix(session.uid)}${reportId}`;
       const report = {
-        id: eventId,
+        id: reportId,
         fileName: String(body.fileName ?? "unknown").slice(0, 300),
         fileSize: Number(body.fileSize ?? 0) || 0,
         durationSec: Number(body.durationSec ?? 0) || undefined,

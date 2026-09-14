@@ -56,7 +56,7 @@ export default async function SkillDetailPage({
       </nav>
 
       {/* 两栏：左栏 = 标题 + 内容（纵向堆叠），右栏 = 粘性侧栏（对应 SkillHub 的 390px 侧栏） */}
-      <div className="lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">
+      <div className="flex flex-col gap-3 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">
         <div className="min-w-0 rounded-2xl bg-surface p-5 sm:p-6">
           {/* 标题区：图标 + 标题 + slug，其后按组展示头部信息（见 SkillHeaderMeta） */}
           <header className="mb-8">
@@ -130,7 +130,7 @@ export default async function SkillDetailPage({
         </div>
 
         {/* 右栏 */}
-        <aside className="mb-10 lg:mb-0 lg:self-start">
+        <aside className="lg:self-start">
           <SkillSidebar
             kind="skill"
             slug={skill.slug}

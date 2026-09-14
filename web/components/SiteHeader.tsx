@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Languages, Radar } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Languages, Menu, Radar, X } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -19,6 +21,13 @@ function GithubIcon({ className }: { className?: string }) {
 export function SiteHeader() {
   const { language, setLanguage, t } = useLanguage();
   const nextLanguage = language === "zh" ? "en" : "zh";
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
+  // 路由变化后自动收起移动端菜单
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   // MCP Server 是与 Skill 并列的一类内容，不再作为 Skill 库的子分类跳转
   const links = [
@@ -30,12 +39,19 @@ export function SiteHeader() {
 
   return (
     <header className="site-header sticky top-0 z-40 border-b border-border">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4">
-        <Link href="/" className="flex shrink-0 items-center gap-2 text-[17px] font-semibold">
-          <Radar className="h-5 w-5 text-primary" />
-          <span>NextPilot <span className="text-primary">Skill MCP</span></span>
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4">
+        <Link
+          href="/"
+          className="flex min-w-0 shrink items-center gap-2 text-[15px] font-semibold sm:text-[17px]"
+        >
+          <Radar className="h-5 w-5 shrink-0 text-primary" />
+          <span className="truncate">
+            NextPilot <span className="text-primary">Skill MCP</span>
+          </span>
         </Link>
-        <nav className="flex items-center gap-0.5 text-base text-muted">
+
+        {/* 桌面端导航 */}
+        <nav className="hidden items-center gap-0.5 text-base text-muted md:flex">
           {links.map((l) => (
             <Link
               key={l.href}
@@ -71,7 +87,74 @@ export function SiteHeader() {
             <GithubIcon className="h-5 w-5" />
           </a>
         </nav>
+
+        {/* 移动端：仅保留主题、登录与菜单入口 */}
+        <div className="flex shrink-0 items-center gap-1 md:hidden">
+          <ThemeToggle />
+          <UserMenu />
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            aria-controls="mobile-nav"
+            aria-label={open ? "关闭菜单" : "打开菜单"}
+            className="icon-link"
+          >
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
+
+      {/* 移动端展开面板 */}
+      {open && (
+        <nav
+          id="mobile-nav"
+          className="border-t border-border bg-surface md:hidden"
+          aria-label="主导航"
+        >
+          <ul className="mx-auto max-w-6xl px-4 py-2">
+            {links.map((l) => {
+              const active = pathname === l.href || pathname.startsWith(`${l.href}/`);
+              return (
+                <li key={l.href} className="border-b border-border/60 last:border-0">
+                  <Link
+                    href={l.href}
+                    className={`block py-3 text-[15px] ${
+                      active ? "font-medium text-primary" : "text-text"
+                    }`}
+                  >
+                    {l.label}
+                  </Link>
+                </li>
+              );
+            })}
+            <li className="flex items-center justify-between py-3 text-sm text-muted">
+              <span>{t("语言", "Language")}</span>
+              <button
+                type="button"
+                onClick={() => setLanguage(nextLanguage)}
+                className="language-toggle"
+                aria-label={t("切换到英文", "Switch to Chinese")}
+              >
+                <Languages className="h-[18px] w-[18px]" />
+                <span>{nextLanguage === "en" ? "EN" : "中"}</span>
+              </button>
+            </li>
+            <li className="flex items-center justify-between py-3 text-sm text-muted">
+              <span>{t("源代码", "Source")}</span>
+              <a
+                href="https://gitee.com/nextpilot/nextpilot-skill-mcp"
+                target="_blank"
+                rel="noreferrer"
+                className="icon-link"
+                aria-label="源代码仓库"
+              >
+                <GithubIcon className="h-5 w-5" />
+              </a>
+            </li>
+          </ul>
+        </nav>
+      )}
     </header>
   );
 }

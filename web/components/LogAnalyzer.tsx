@@ -80,6 +80,8 @@ export function LogAnalyzer() {
   const pendingRef = useRef<Map<string, (data: unknown) => void>>(new Map());
   const reqIdRef = useRef(0);
   const reportIdRef = useRef<string>("");
+  // 当前待解析文件（worker 回调闭包会捕获首次 file，改用它取名字与大小）
+  const pendingFileRef = useRef<{ name: string; size: number }>({ name: "", size: 0 });
   const [stage, setStage] = useState<WorkerStage | "idle" | "explaining">(
     "idle",
   );
@@ -275,6 +277,8 @@ export function LogAnalyzer() {
       }
 
       reportIdRef.current = newReportId();
+      // worker 只创建一次、回调闭包会捕获首次的 file，这里用 ref 记录本次文件信息
+      pendingFileRef.current = { name: file.name, size: file.size };
 
       // 复用既有 worker（Pyodide 已加载），避免重复下载运行时
       if (!workerRef.current) {
@@ -291,8 +295,8 @@ export function LogAnalyzer() {
             setStage("idle");
           } else if (msg.type === "done") {
             const r = msg.report as AnalysisReport;
-            r.fileName = file.name;
-            r.fileSize = file.size;
+            r.fileName = pendingFileRef.current.name;
+            r.fileSize = pendingFileRef.current.size;
             r.analyzedAt = new Date().toISOString();
             setReport(r);
             setManifest(msg.manifest as TopicManifest);

@@ -125,7 +125,7 @@ export function HistoryList({
                     )}
                   </span>
                 </div>
-                <p className="mt-1 truncate text-sm text-text" title={r.fileName}>
+                <p className="mt-1 truncate text-sm font-medium text-text" title={r.fileName}>
                   {r.fileName}
                 </p>
                 <div className="mt-1.5 flex items-center gap-2">
