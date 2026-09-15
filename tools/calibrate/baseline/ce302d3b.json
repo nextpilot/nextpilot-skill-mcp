@@ -1,6 +1,7 @@
 {
   "log": "ce302d3b-06bc-43ab-9c2a-027d29fcefd3.ulg",
   "slug": "ce302d3b",
+  "source": "logs.px4.io 公开日志：GET https://logs.px4.io/download?log=ce302d3b-06bc-43ab-9c2a-027d29fcefd3（或 python tools/px4/download_px4_logs.py）",
   "engine": "knowledge/px4/ulog_checks.py + ulog_data.py",
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
@@ -21,6 +22,7 @@
         "landing",
         "maneuver"
       ],
+      "dropoutTotalMs": 40,
       "imuAccelVibrationMean": 1.052,
       "imuAccelVibrationP95": 1.655,
       "imuAccelVibrationMax": 8.661,
@@ -42,8 +44,7 @@
       "attitudeErrDegP99": 10.4,
       "attitudeOscHz": 1.62,
       "airspeedMinM": 2.0,
-      "windSpeedP95M": 2.3,
-      "dropoutTotalMs": 40
+      "windSpeedP95M": 2.3
     },
     "tags": [
       "ekf_innovation_failure",
@@ -201,6 +202,42 @@
         },
         "docUrl": "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html",
         "suggestion": "涉及：空速。关注 GPS 卫星数、磁罗盘干扰、振动与气压计异常。"
+      },
+      {
+        "id": "F10",
+        "severity": "warning",
+        "ruleId": "px4-log-warnings",
+        "tag": null,
+        "title": "日志中出现 18 条 WARNING 消息",
+        "evidence": {
+          "field": "ulog.logged_messages(log_level=4)",
+          "value": 18,
+          "threshold": 0,
+          "unit": "条",
+          "samples": [
+            {
+              "tSec": 24.56,
+              "message": "[health_and_arming_checks] Low battery"
+            },
+            {
+              "tSec": 25.62,
+              "message": "[failsafe] Failsafe activated"
+            },
+            {
+              "tSec": 159.95,
+              "message": "[health_and_arming_checks] Low battery"
+            },
+            {
+              "tSec": 162.22,
+              "message": "[health_and_arming_checks] Low battery"
+            },
+            {
+              "tSec": 162.22,
+              "message": "[health_and_arming_checks] Geofence: approaching or outside geofence"
+            }
+          ]
+        },
+        "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html"
       },
       {
         "id": "F01",

@@ -1,6 +1,7 @@
 {
   "log": "39f26cce-337a-4f83-a967-45352f6e1e82.ulg",
   "slug": "39f26cce",
+  "source": "logs.px4.io 公开日志：GET https://logs.px4.io/download?log=39f26cce-337a-4f83-a967-45352f6e1e82（或 python tools/px4/download_px4_logs.py）",
   "engine": "knowledge/px4/ulog_checks.py + ulog_data.py",
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
@@ -19,6 +20,7 @@
         "fw_cruise",
         "maneuver"
       ],
+      "dropoutTotalMs": 0,
       "imuAccelVibrationMean": 4.985,
       "imuAccelVibrationP95": 9.254,
       "imuAccelVibrationMax": 17.92,
@@ -36,8 +38,7 @@
       "attitudeErrDegP99": 27.5,
       "attitudeOscHz": 1.52,
       "airspeedInvalidRatio": 1.0,
-      "windSpeedP95M": 3.7,
-      "dropoutTotalMs": 0
+      "windSpeedP95M": 3.7
     },
     "tags": [
       "high_vibration",
@@ -155,6 +156,43 @@
         "suggestion": "结合故障库 F009：空速失效极易引发失速，检查空速管堵塞/积水、管路漏气与校准。"
       },
       {
+        "id": "F05",
+        "severity": "critical",
+        "ruleId": "px4-log-errors",
+        "tag": null,
+        "title": "日志中出现 8 条 ERROR 及以上消息",
+        "evidence": {
+          "field": "ulog.logged_messages(log_level<=3)",
+          "value": 8,
+          "threshold": 0,
+          "unit": "条",
+          "samples": [
+            {
+              "tSec": 158.59,
+              "message": "[commander] action_request lost, generation 15 -> 17"
+            },
+            {
+              "tSec": 159.29,
+              "message": "[commander] action_request lost, generation 17 -> 19"
+            },
+            {
+              "tSec": 160.96,
+              "message": "[commander] action_request lost, generation 19 -> 21"
+            },
+            {
+              "tSec": 161.23,
+              "message": "[commander] action_request lost, generation 21 -> 23"
+            },
+            {
+              "tSec": 172.34,
+              "message": "[commander] action_request lost, generation 23 -> 25"
+            }
+          ]
+        },
+        "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html",
+        "suggestion": "按时间顺序核对错误原文，这通常是定位根因最直接的证据。"
+      },
+      {
         "id": "F01",
         "severity": "warning",
         "ruleId": "px4-vibration",
@@ -198,6 +236,42 @@
         },
         "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html",
         "suggestion": "结合故障库 F006 排查；大风环境下优先归因环境扰动。"
+      },
+      {
+        "id": "F06",
+        "severity": "warning",
+        "ruleId": "px4-log-warnings",
+        "tag": null,
+        "title": "日志中出现 13 条 WARNING 消息",
+        "evidence": {
+          "field": "ulog.logged_messages(log_level=4)",
+          "value": 13,
+          "threshold": 0,
+          "unit": "条",
+          "samples": [
+            {
+              "tSec": 158.59,
+              "message": "[commander] Kill engaged"
+            },
+            {
+              "tSec": 158.62,
+              "message": "[health_and_arming_checks] Preflight Fail: Flight termination active"
+            },
+            {
+              "tSec": 160.96,
+              "message": "[commander] Kill engaged"
+            },
+            {
+              "tSec": 172.34,
+              "message": "[commander] Kill engaged"
+            },
+            {
+              "tSec": 172.35,
+              "message": "[health_and_arming_checks] Preflight Fail: Flight termination active"
+            }
+          ]
+        },
+        "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html"
       }
     ]
   }

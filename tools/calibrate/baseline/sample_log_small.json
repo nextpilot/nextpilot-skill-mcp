@@ -1,6 +1,7 @@
 {
   "log": "sample_log_small.ulg",
   "slug": "sample_log_small",
+  "source": "本仓库自带（engine/tests/logs/，未入库，需自备）",
   "engine": "knowledge/px4/ulog_checks.py + ulog_data.py",
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
@@ -18,6 +19,7 @@
       "phases": [
         "maneuver"
       ],
+      "dropoutTotalMs": 30,
       "imuAccelVibrationMean": 0.001,
       "imuAccelVibrationP95": 0.001,
       "imuAccelVibrationMax": 0.001,
@@ -36,8 +38,7 @@
       "attitudeErrDegP99": 1.1,
       "attitudeOscHz": 1.54,
       "vtolTransitionSamples": 0,
-      "windSpeedP95M": 0.0,
-      "dropoutTotalMs": 30
+      "windSpeedP95M": 0.0
     },
     "tags": [],
     "guardTags": [

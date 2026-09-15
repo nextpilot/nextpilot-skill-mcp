@@ -1,6 +1,7 @@
 {
   "log": "95b077d9-d719-45ea-bf91-5926170cbc52.ulg",
   "slug": "95b077d9",
+  "source": "logs.px4.io 公开日志：GET https://logs.px4.io/download?log=95b077d9-d719-45ea-bf91-5926170cbc52（或 python tools/px4/download_px4_logs.py）",
   "engine": "knowledge/px4/ulog_checks.py + ulog_data.py",
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
@@ -20,6 +21,7 @@
         "hover",
         "maneuver"
       ],
+      "dropoutTotalMs": 0,
       "imuAccelVibrationMean": 3.73,
       "imuAccelVibrationP95": 5.857,
       "imuAccelVibrationMax": 6.558,
@@ -31,8 +33,7 @@
       "gyroBiasMaxRadS": 0.001,
       "gyroBiasDriftRadS": 0.0007,
       "gyroBiasSource": "estimator_sensor_bias.gyro_bias[]",
-      "imuTempRangeC": 0.2,
-      "dropoutTotalMs": 0
+      "imuTempRangeC": 0.2
     },
     "tags": [],
     "guardTags": [

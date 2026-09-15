@@ -1,6 +1,7 @@
 {
   "log": "sample.ulg",
   "slug": "sample",
+  "source": "本仓库自带（engine/tests/logs/，未入库，需自备）",
   "engine": "knowledge/px4/ulog_checks.py + ulog_data.py",
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
@@ -16,9 +17,9 @@
       "hardware": "AUAV_X21",
       "armedDurationSec": 0.0,
       "phases": [],
+      "dropoutTotalMs": 119,
       "cpuLoadMax": 0.833,
-      "navStateChanges": 0,
-      "dropoutTotalMs": 119
+      "navStateChanges": 0
     },
     "tags": [],
     "guardTags": [
@@ -64,6 +65,40 @@
       }
     ],
     "matchedFaults": [],
-    "findings": []
+    "findings": [
+      {
+        "id": "F01",
+        "severity": "critical",
+        "ruleId": "px4-log-errors",
+        "tag": null,
+        "title": "日志中出现 4 条 ERROR 及以上消息",
+        "evidence": {
+          "field": "ulog.logged_messages(log_level<=3)",
+          "value": 4,
+          "threshold": 0,
+          "unit": "条",
+          "samples": [
+            {
+              "tSec": 45.72,
+              "message": "[sensors] no barometer found on /dev/baro0 (2)"
+            },
+            {
+              "tSec": 49.57,
+              "message": "[sensors] no barometer found on /dev/baro0 (2)"
+            },
+            {
+              "tSec": 59.12,
+              "message": "[sensors] no barometer found on /dev/baro0 (2)"
+            },
+            {
+              "tSec": 63.91,
+              "message": "[sensors] no barometer found on /dev/baro0 (2)"
+            }
+          ]
+        },
+        "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html",
+        "suggestion": "按时间顺序核对错误原文，这通常是定位根因最直接的证据。"
+      }
+    ]
   }
 }

@@ -34,11 +34,25 @@ def slug(path: Path) -> str:
     return stem.replace(".", "_")
 
 
+def source_of(path: Path) -> str:
+    """记录日志来源：.ulg 不入库（见 .gitignore），基线必须自带“怎么把它取回来”。
+
+    uuid 命名的日志来自 Flight Review（logs.px4.io）公开日志集。
+    """
+    stem = path.stem
+    first = stem.split("-")[0]
+    if len(first) == 8 and all(c in "0123456789abcdef" for c in first):
+        return ("logs.px4.io 公开日志：GET https://logs.px4.io/download?log=%s"
+                "（或 python tools/px4/download_px4_logs.py）" % stem)
+    return "本仓库自带（engine/tests/logs/，未入库，需自备）"
+
+
 def dump_one(path: Path) -> Path:
     result = runner.run_one(path)
     envelope = {
         "log": path.name,
         "slug": slug(path),
+        "source": source_of(path),
         "engine": "knowledge/px4/ulog_checks.py + ulog_data.py",
         "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
         "result": result,
