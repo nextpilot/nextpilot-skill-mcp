@@ -299,7 +299,9 @@ const outWorkers = resolve(webRoot, "workers");
 mkdirSync(outWorkers, { recursive: true });
 writeFileSync(
   resolve(outWorkers, "fault-kb.generated.json"),
-  JSON.stringify({ generatedAt: new Date().toISOString(), entries: kb }, null, 2) + "\n",
+  // 不写 generatedAt：时间戳会让产物每次构建都产生 diff（而它没有任何消费者），
+  // 产物应当可复现 —— 同样的 knowledge/ 输入必须得到逐字节相同的输出。
+  JSON.stringify({ entries: kb }, null, 2) + "\n",
   "utf8",
 );
 
