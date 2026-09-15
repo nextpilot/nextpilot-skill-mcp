@@ -64,7 +64,10 @@
       "Bash(rm -f ./rm-test.tmp.mjs)",
       "Read(//tmp/**)",
       "Bash(curl -s -o /dev/null -w \"existing dev server: %{http_code}\\\\n\" --max-time 3 http://localhost:3000/guide)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(grep -rn \"engine/tests/logs\\\\|engine[/\\\\\\\\\\\\\\\\]tests\" --include=*.py --include=*.md --include=*.mjs --include=*.ts --include=*.json --include=*.sh .)",
+      "Bash(mkdir -p tools/calibrate/logs)",
+      "Bash(mv engine/tests/logs/*.ulg tools/calibrate/logs/)"
     ]
   }
 }
