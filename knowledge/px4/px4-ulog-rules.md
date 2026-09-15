@@ -533,13 +533,13 @@
 - 文件：`rules/wind-estimate.yaml` ｜ 位置：slot `wind_estimate` #1
 - 适用：firmware any ｜ airframe any ｜ 依赖(任一) estimator_wind, wind_estimate
 - 取值：
-- `read` → **n_new**
+- `read` when_fw=>=1.15 → **n_new**
     输入：`estimator_wind.windspeed_north`
-- `read` → **e_new**
+- `read` when_fw=>=1.15 → **e_new**
     输入：`estimator_wind.windspeed_east`
-- `read` → **n_old**
+- `read` when_fw=<1.15 → **n_old**
     输入：`wind_estimate.windspeed_north`
-- `read` → **e_old**
+- `read` when_fw=<1.15 → **e_old**
     输入：`wind_estimate.windspeed_east`
 - `coalesce` → **wn**
     输入：`n_new`, `n_old`

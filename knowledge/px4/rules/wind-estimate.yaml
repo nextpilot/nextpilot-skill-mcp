@@ -23,10 +23,14 @@ requires:
 skip_reason: estimator_wind / wind_estimate not in log
 
 compute:
-  - {out: n_new, from: estimator_wind.windspeed_north, op: read, optional: true}
-  - {out: e_new, from: estimator_wind.windspeed_east, op: read, optional: true}
-  - {out: n_old, from: wind_estimate.windspeed_north, op: read, optional: true}
-  - {out: e_old, from: wind_estimate.windspeed_east, op: read, optional: true}
+  # 版本分流写在节点上：when_fw 不满足时该节点被跳过、输出 None，由下面的 coalesce 选另一支。
+  # 1.15+ 用估计器风（日志里的 topic 名是 estimator_wind；上游 msg 文件名叫 wind，
+  # 所以字典里查不到 estimator_wind 这个名字——这正是"字典名 ≠ 日志 topic 名"的例子）
+  - {out: n_new, from: estimator_wind.windspeed_north, op: read, when_fw: ">=1.15", optional: true}
+  - {out: e_new, from: estimator_wind.windspeed_east, op: read, when_fw: ">=1.15", optional: true}
+  # 1.15 之前是 wind_estimate（字段名相同）
+  - {out: n_old, from: wind_estimate.windspeed_north, op: read, when_fw: "<1.15", optional: true}
+  - {out: e_old, from: wind_estimate.windspeed_east, op: read, when_fw: "<1.15", optional: true}
   - {out: wn, in: [n_new, n_old], op: coalesce, optional: true}
   - {out: we, in: [e_new, e_old], op: coalesce, optional: true}
   - {out: w, in: [wn, we], op: hypot}          # 缺任一路即中止（与原 len(wn) 判定一致）

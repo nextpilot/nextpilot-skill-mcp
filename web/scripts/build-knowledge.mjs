@@ -208,6 +208,12 @@ function loadRules(dir, signatures) {
     for (const node of raw.compute || []) {
       const sig = signatures[node.op];
       if (!sig) throw new Error(`${where}: 未注册的算子 op=${node.op}`);
+      // when_fw：节点级版本条件（如 ">=1.15" / "<1.15" / ">=1.14,<1.15"）
+      if (node.when_fw !== undefined) {
+        const ok = typeof node.when_fw === "string"
+          && /^\s*(>=|<=|==|>|<)?\s*\d+(\.\d+)?\s*(,\s*(>=|<=|==|>|<)?\s*\d+(\.\d+)?\s*)*$/.test(node.when_fw);
+        if (!ok) throw new Error(`${where}: 算子 ${node.op} 的 when_fw 约束写法非法：${node.when_fw}`);
+      }
       const ins = node.in ?? (node.from !== undefined ? [].concat(node.from) : null);
       const outs = [].concat(node.out ?? []);
       if (!ins || ins.length !== sig.in_arity) {

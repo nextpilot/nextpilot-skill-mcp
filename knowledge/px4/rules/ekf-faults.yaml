@@ -20,6 +20,9 @@ airframe: any
 requires:
   any_of: [estimator_status]
 skip_reason: estimator_status not in log
+# nan_flags 是很早期的字段（1.11 起的日志与 1.15+ 字典里都没有），属已知遗留：
+# lint-rules.py 据此不再把它列为可疑引用
+known_legacy: [estimator_status.nan_flags]
 
 compute:
   # 跨实例合并：每个实例取该实例内的最大置位，再按位或

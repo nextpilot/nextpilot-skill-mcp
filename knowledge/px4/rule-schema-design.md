@@ -30,8 +30,41 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 - motor_balance：通道数不足（<4 列）与活跃通道不足（<4 个）共用同一条 skip 文案
 - airspeed：缺 `airspeed_validated` 与无固定翼巡航段共用同一条 skip 文案
 
+### 版本分支：规则级 `firmware` + 节点级 `when_fw`
+
+同一语义在不同固件里会换 topic / 字段名，所以两级版本条件都要有：
+
+| 层级 | 字段 | 作用 |
+| --- | --- | --- |
+| 规则 | `firmware: ">=1.15"` | 整条经验是否适用于该日志（不适用则既不 ran 也不产 finding） |
+| 节点 | `when_fw: ">=1.15"` | 单个 compute 节点是否执行；不满足就跳过、输出置 `None`，由后续 `coalesce` 选另一支 |
+
+写法示例（`rules/wind-estimate.yaml`，同一物理量的新旧 topic）：
+
+```yaml
+compute:
+  - {out: n_new, from: estimator_wind.windspeed_north, op: read, when_fw: ">=1.15", optional: true}
+  - {out: n_old, from: wind_estimate.windspeed_north, op: read, when_fw: "<1.15",  optional: true}
+  - {out: wn, in: [n_new, n_old], op: coalesce, optional: true}
+```
+
+这样"哪个固件用哪个字段"就写在经验文件里，人可读、机器可查；需要算子内部处理更复杂
+版本差异时（如陀螺零偏的双固件取源、姿态指令 q_d 与 roll/pitch_body 的选源），
+把 `fw_minor` 作为算子入参传进去即可（复合算子 `gyro_bias_series` / `att_tracking_stats`）。
+
+**字段校验（`tools/calibrate/lint-rules.py`）按这两级版本条件判定**：对每个引用，取
+「规则 `firmware` ∩ 节点 `when_fw`」圈定的版本范围，在该范围的**回归日志实测字段**与
+**上游字典**里找，分类为 命中 / 版本错配 / 已声明遗留（`aliases`、`known_legacy`）/ 可疑。
+自检过：把 `wind_estimate` 那支错标成 `>=1.15` 会精确报出"仅存在于 1.11"。
+
+一个必须记住的现实：**上游 `.msg` 文件名派生的字典名 ≠ 日志里的 topic 名**
+（字典 `wind` ↔ 日志 `estimator_wind`；字典 `sensor_gps` ↔ 日志里 `sensor_gps` 与
+遗留名 `vehicle_gps_position` 并存）。所以校验以**日志实测为准、字典为辅**；
+若真要按字典硬校验，得先补一份 topic/字段改名映射（设计里的 `topic-overrides.yaml`）。
+
 **怎么验证**：`python tools/calibrate/compare-baseline.py`（6 条日志逐字段比对）、
 `python tools/calibrate/check-artifact.py`（生成产物真实执行）、
+`python tools/calibrate/lint-rules.py`（字段引用 + 版本错配）、
 `python tools/calibrate/probe_rule.py <log.ulg> <rule_id>`（单条经验逐节点诊断）。
 
 ---

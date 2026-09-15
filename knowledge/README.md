@@ -68,6 +68,10 @@ LLM 只做翻译与组装。
 `compute` 数据流节点引用 `topic.field` 或前序输出；`triggers[].expr` 走 AST 白名单求值
 （不用 `eval`）；`emit` 声明 check / 故障标签 / 文档链接 / 统计量 / 条件性 guard 标签。
 
+**版本差异有两级条件**：规则级 `firmware`（整条经验是否适用）与节点级 `when_fw`
+（单个节点是否执行，不满足则输出 None、交给 `coalesce` 选另一版本的分支），
+例如 `estimator_wind`（1.15+）与 `wind_estimate`（更早）的取源分流。
+
 细节、内置变量清单、算子目录，以及**实施过程中与设计的差异**（多经验文件、
 复合算子、`instance` 取单实例、guard 槽位等）见
 **[px4/rule-schema-design.md](px4/rule-schema-design.md) 的「实施状态与落地差异」一节**。

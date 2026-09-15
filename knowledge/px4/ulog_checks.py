@@ -508,6 +508,14 @@ def _run_rules(slot):
             if _ins is None:
                 _ins = _node["from"] if isinstance(_node["from"], list) else [_node["from"]]
             _outs = _node["out"] if isinstance(_node["out"], list) else [_node["out"]]
+            # when_fw：节点级版本条件（如 when_fw: ">=1.15"）。不满足就跳过该节点、
+            # 输出置 None，交给后续 coalesce/choose 选另一版本的分支 —— 于是"同一字段
+            # 在不同固件里换了名字/topic"这件事在经验文件里是显式可读、可校验的。
+            _wf = _node.get("when_fw")
+            if _wf is not None and not _match_firmware(_wf):
+                for _name in _outs:
+                    _env[_name] = None
+                continue
             _args = []
             _per_inst = bool(_node.get("per_instance"))
             _node_aliases = _node.get("aliases") or {}
