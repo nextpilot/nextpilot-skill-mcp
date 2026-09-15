@@ -1,0 +1,181 @@
+{
+  "log": "efd2ee9d-e0ff-44ac-ba83-5ac464adf470.ulg",
+  "slug": "efd2ee9d",
+  "source": "logs.px4.io 公开日志：GET https://logs.px4.io/download?log=efd2ee9d-e0ff-44ac-ba83-5ac464adf470（或 python tools/px4/download_px4_logs.py）",
+  "engine": "knowledge/px4/ulog_checks.py + ulog_data.py",
+  "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
+  "result": {
+    "platform": "PX4",
+    "vehicleType": "rotary_wing",
+    "parserVersion": "pyulog/pyodide-0.3.0",
+    "durationSec": 213.0,
+    "stats": {
+      "durationSec": 213.0,
+      "vehicleType": "rotary_wing",
+      "firmware": "1.15.0",
+      "firmwareProfile": "px4-1.15+",
+      "hardware": "DAMIAO_DM_FC01",
+      "armedDurationSec": 74.5,
+      "phases": [
+        "hover"
+      ],
+      "dropoutTotalMs": 0,
+      "imuAccelVibrationMean": 2.806,
+      "imuAccelVibrationP95": 3.621,
+      "imuAccelVibrationMax": 3.728,
+      "batteryVoltageMin": 21.35,
+      "batteryCellCount": 6,
+      "batteryCellVoltageMin": 3.559,
+      "batteryRemainingMin": 0.039,
+      "cpuLoadMax": 0.789,
+      "navStateChanges": 2,
+      "motorControlSpread": 0.021,
+      "motorCountActive": 4,
+      "gyroBiasMaxRadS": 0.0051,
+      "gyroBiasDriftRadS": 0.0003,
+      "gyroBiasSource": "estimator_sensor_bias.gyro_bias[]",
+      "attitudeErrDegP99": 1.4,
+      "attitudeOscHz": 3.02
+    },
+    "tags": [
+      "battery_voltage_drop"
+    ],
+    "guardTags": [],
+    "phases": [
+      "hover"
+    ],
+    "checksRun": [
+      "vibration",
+      "ekf_innovations",
+      "ekf_faults",
+      "battery",
+      "cpu_load",
+      "failsafe",
+      "mode_thrash",
+      "motor_balance",
+      "imu_bias",
+      "attitude_tracking",
+      "logged_messages"
+    ],
+    "checksSkipped": [
+      {
+        "check": "gps_health",
+        "reason": "vehicle_gps_position not in log"
+      },
+      {
+        "check": "vtol_transition",
+        "reason": "vtol_vehicle_status not in log"
+      },
+      {
+        "check": "wind_estimate",
+        "reason": "estimator_wind / wind_estimate not in log"
+      }
+    ],
+    "matchedFaults": [
+      {
+        "faultId": "F004",
+        "faultTag": "battery_voltage_drop",
+        "riskLevel": "高",
+        "possibleRootCause": [
+          "电池电芯老化、内阻增大",
+          "电源插头、接线端子虚接接触不良",
+          "动力线缆线径不足，大电流压降过大",
+          "飞行负载超过动力系统设计能力"
+        ],
+        "troubleshootingSteps": [
+          "地面静态大电流测试电池电压压降",
+          "检查插头、接线端子有无发热、氧化松动",
+          "复核整机起飞重量，确认不超过最大起飞重量"
+        ],
+        "note": "大机动动作瞬时压降属于正常，持续压降才判定故障",
+        "matchedPhases": [
+          "hover"
+        ]
+      }
+    ],
+    "findings": [
+      {
+        "id": "F02",
+        "severity": "critical",
+        "ruleId": "px4-power-remaining",
+        "tag": "battery_voltage_drop",
+        "title": "电池剩余电量极低（4%）",
+        "evidence": {
+          "field": "battery_status.remaining(min)",
+          "value": 0.039,
+          "threshold": 0.1
+        },
+        "docUrl": "https://docs.px4.io/main/en/config/battery.html",
+        "suggestion": "剩余电量低于 10%，应立即返航；检查电量估算与电池健康。"
+      },
+      {
+        "id": "F03",
+        "severity": "critical",
+        "ruleId": "px4-log-errors",
+        "tag": null,
+        "title": "日志中出现 2 条 ERROR 及以上消息",
+        "evidence": {
+          "field": "ulog.logged_messages(log_level<=3)",
+          "value": 2,
+          "threshold": 0,
+          "unit": "条",
+          "samples": [
+            {
+              "tSec": 25.11,
+              "message": "[health_and_arming_checks] Low battery level"
+            },
+            {
+              "tSec": 54.13,
+              "message": "[health_and_arming_checks] Low battery level"
+            }
+          ]
+        },
+        "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html",
+        "suggestion": "按时间顺序核对错误原文，这通常是定位根因最直接的证据。"
+      },
+      {
+        "id": "F01",
+        "severity": "warning",
+        "ruleId": "px4-power-cell-voltage",
+        "tag": "battery_voltage_drop",
+        "title": "电芯电压偏低",
+        "evidence": {
+          "field": "battery_status.voltage_v(min)/cell_count",
+          "value": 3.559,
+          "threshold": 3.7,
+          "unit": "V/cell"
+        },
+        "docUrl": "https://docs.px4.io/main/en/config/battery.html",
+        "suggestion": "建议核对剩余容量估计与返航电压裕度。"
+      },
+      {
+        "id": "F04",
+        "severity": "warning",
+        "ruleId": "px4-log-warnings",
+        "tag": null,
+        "title": "日志中出现 3 条 WARNING 消息",
+        "evidence": {
+          "field": "ulog.logged_messages(log_level=4)",
+          "value": 3,
+          "threshold": 0,
+          "unit": "条",
+          "samples": [
+            {
+              "tSec": 25.12,
+              "message": "[failsafe] Failsafe activated"
+            },
+            {
+              "tSec": 54.14,
+              "message": "[failsafe] Failsafe activated"
+            },
+            {
+              "tSec": 57.7,
+              "message": "[failsafe] Failsafe activated"
+            }
+          ]
+        },
+        "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html"
+      }
+    ]
+  }
+}
