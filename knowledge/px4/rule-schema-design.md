@@ -1,5 +1,41 @@
 # 检查规则改为「一条经验一个配置文件」：一条经验的完整画像
 
+## 实施状态（2026-09-15：已实施）
+
+**已完成**：15 组过程式检查（`ulog_checks.py` 1095 行）→ **32 条自包含经验**（含 4 条数据质量
+guard），**73 个通用算子**；`px4-thresholds.toml` 已退场（阈值随各自经验内联）。引擎侧每个
+检查块只剩一行 `_run_rules("<slot>")`。6 条真实日志的冻结基线逐字段一致；生成产物真实执行
+通过；构建期护栏生效（算子名/入参数量、表达式与文案里的未声明名字、缺 `firmware`/`airframe`、
+guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
+
+经验索引（自动生成）：**[px4-ulog-rules.md](px4-ulog-rules.md)**；迁移过程中顺带修掉的 6 处
+真实缺陷见提交 `6a081d5` 的说明（最要紧的一条：日志消息级别判据按 ASCII 语义修正后，
+`Kill engaged / Flight termination active`、`no barometer found` 这类"冒烟的枪"才浮出来）。
+
+**与设计的落地差异**（都是有原因的选择，不是遗漏）：
+
+| 设计 | 实际做法 | 为什么 |
+| --- | --- | --- |
+| 一条经验一个 YAML | 一个 YAML 可装**多条**经验（顶层数组）；failsafe 的 6 条同构经验合并为一个文件 | 5 个布尔字段的失效保护经验只差字段/标签/文案，拆 6 个文件纯属噪音；一般情况仍一经验一文件 |
+| compute 用细粒度算子串起来 | 允许**复合算子**（多入多出），如 `att_tracking_stats`（对齐+掩码+统计）、`gyro_bias_series`（双固件取源）、`cell_voltage_min`（实测/回退/缺失三分支） | 30~40 个节点串成的链读不下去；把"取数→对齐→掩码→统计"这类固定套路收成一个算子后，姿态那条 30→4、陀螺零偏 41→6、全库平均 2.6 节点/条。算子仍**不认识具体字段**：字段名、阈值、文案都在 YAML |
+| `phase` 作为第三个适用轴 | 未启用 | 原实现里 phase 只参与故障库匹配，规则并未按阶段过滤；等真需要（例如只对大机动段判某条）再启用 |
+| `guards/*.yaml` 独立目录 | 放在 `rules/`，用 `slot: guards_early` / `guards` | 同一套 schema、同一套校验；分两级是因为 `insufficient_data` 必须是第一个 guard 标签 |
+| `min_samples`/`confidence`/`safety`/`thresholds_source`/`calibration`/`fixtures` | 暂未启用 | 本阶段验收标准是"等价迁移"；这些是校准期与规则市场期的字段 |
+| `meta/<tag>.json` 参与构建期字段校验 | **尚未接入（已知缺口）** | 现在字段名拼错不会构建失败，而是运行期取到 `None` → 该经验静默不生效（不崩，但也没有任何告警）。接入时要注意版本差异：`accel_clipping` 只存在于旧固件，不能按"必须存在于最新 tag"来判 |
+| 设计中未提及 `instance` | 新增 `instance: N` 取单个实例 | 原实现大量 `xxx_list[0]`；而默认的多实例拼接会改变语义——`estimator_sensor_bias` 每个 IMU 一个实例，拼接后样本 43→129，零偏统计直接算错 |
+
+**已知的次要行为差异**（都不在基线覆盖范围内，已在对应经验文件里注释标明）：
+
+- attitude：姿态/指令字段缺失时静默不适用（原实现会留一条 skip）
+- motor_balance：通道数不足（<4 列）与活跃通道不足（<4 个）共用同一条 skip 文案
+- airspeed：缺 `airspeed_validated` 与无固定翼巡航段共用同一条 skip 文案
+
+**怎么验证**：`python tools/calibrate/compare-baseline.py`（6 条日志逐字段比对）、
+`python tools/calibrate/check-artifact.py`（生成产物真实执行）、
+`python tools/calibrate/probe_rule.py <log.ulg> <rule_id>`（单条经验逐节点诊断）。
+
+---
+
 ## Context（为什么做）
 
 现状的反例正是 `px4-thresholds.toml`：
