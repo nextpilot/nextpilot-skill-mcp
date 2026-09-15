@@ -8,6 +8,7 @@ guard），**73 个通用算子**；`px4-thresholds.toml` 已退场（阈值随�
 通过；构建期护栏生效（算子名/入参数量、表达式与文案里的未声明名字、缺 `firmware`/`airframe`、
 guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 
+字段级权威参考（写经验时看这份）：**[rule-reference.md](rule-reference.md)**；
 经验索引（自动生成）：**[px4-ulog-rules.md](px4-ulog-rules.md)**；迁移过程中顺带修掉的 6 处
 真实缺陷见提交 `6a081d5` 的说明（最要紧的一条：日志消息级别判据按 ASCII 语义修正后，
 `Kill engaged / Flight termination active`、`no barometer found` 这类"冒烟的枪"才浮出来）。

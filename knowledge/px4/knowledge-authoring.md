@@ -37,22 +37,35 @@
 `insufficient_data`（时长 <60s）、`data_quality_warning:log_truncated`、`restart_detected`、
 `topic_missing:{name}`、`collision_detected`、`temperature_change_large`、`wind_strong`。
 
-## 1. 阈值类经验：规则 JSON
+## 1. 阈值类经验：经验 YAML（rules/*.yaml）
 
-数值判断全部在预处理代码里完成，输出稳定标签。Agent 看不到原始公式，只收标签：
+数值判断全部在确定性引擎里完成，输出稳定标签。Agent 看不到原始公式，只收标签：
 
-```json
-{
-  "rule_id": "imu_vibration_check",
-  "condition": "imu_rms > 0.08",
-  "tag": "high_vibration",
-  "risk": "medium_high"
-}
+```yaml
+# knowledge/px4/rules/<经验>.yaml —— 一条经验 = 一个自包含单元
+id: px4-cpu-load
+slot: cpu                            # 执行位置（决定 finding 编号）
+firmware: any                        # 适用范围：固件 / 机架（不限也要显式写 any）
+airframe: any
+requires: {any_of: [cpuload]}        # 数据依赖：缺 topic 就 skipped，不误报
+compute:                             # 取哪些字段、怎么处理
+  - {out: cpu_max, from: cpuload.load, op: max}
+triggers:                            # 什么条件下成立
+  - {expr: "cpu_max >= 0.95", severity: critical, threshold: 0.95,
+     value: cpu_max, round: 3, field: "cpuload.load(max)",
+     title: "CPU 负载峰值 {cpu_max:.0%} 超阈值"}
+emit:
+  check: cpu_load                    # 报告里 checksRun 的名字
+  tag: ...                           # 命中的异常标签（喂故障知识库）
+  doc: https://docs.px4.io/...        # 必须可溯源
+  stats: {cpuLoadMax: {var: cpu_max, round: 3}}
 ```
 
 - 禁止把"当 RMS 大于 0.08 就要注意振动"写进 prompt——大模型会记错、忽略数值。
-- 每条规则必须有官方来源或校准记录；阈值现状见 [px4-ulog-rules.md](px4-ulog-rules.md)。
+- 每条规则必须有官方来源或校准记录；阈值就写在这条经验自己里面。
 - 一条规则输出：`tag`、严重度、命中字段、实测值、阈值、官方文档链接（沿用现有 Finding 结构）。
+- **完整字段定义、内置变量、算子目录、常见坑**：[rule-reference.md](rule-reference.md)；
+  全部经验清单：[px4-ulog-rules.md](px4-ulog-rules.md)。
 
 ## 2. 故障树经验：故障知识库 YAML
 

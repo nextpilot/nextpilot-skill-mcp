@@ -16,6 +16,7 @@ px4/
                         受限表达式求值 / foreach 展开 / 发射 finding）；Pyodide 执行
   ulog_data.py          报告页数据层 helpers（图表 / 事件 / 参数）
   px4-fault-kb.yaml     故障树：标签 → 根因 / 排查步骤 / 禁忌 / 风险等级
+  rule-reference.md     经验 YAML 的完整参考（字段定义/内置变量/算子目录）
   px4-ulog-rules.md     32 条经验索引（从 rules/*.yaml 汇总，校准用）
   rule-schema-design.md 规则格式设计全文 + 实施状态与落地差异
   llm/
@@ -30,7 +31,7 @@ knowledge-authoring.md   工程师方法论（四类经验 → 四种载体）
 | 我要…… | 编辑 |
 | --- | --- |
 | 调一条阈值（如欠压、振动、GPS eph） | `px4/rules/<那条经验>.yaml` 里的 `threshold` 与 `triggers[].expr` |
-| 加一条全新检查 | 新建 `px4/rules/<名字>.yaml`（必填 `id/slot/name/firmware/airframe/compute/triggers/emit`，构建期强校验） |
+| 加一条全新检查 | 新建 `px4/rules/<名字>.yaml`（字段定义见 [px4/rule-reference.md](px4/rule-reference.md)；必填 `id/slot/name/firmware/airframe/compute/triggers/emit`，构建期强校验） |
 | 加一个可复用的计算步骤 | `px4/operators.py`（`@operator` 声明 in/out arity），再在经验的 `compute` 里引用 |
 | 加一条故障模式（根因 / 排查步骤） | `px4/px4-fault-kb.yaml`（trigger_tags 必须是引擎会产出的标签） |
 | 改 AI 报告口径 / 思考范式 | `px4/llm/*.md` |
@@ -72,6 +73,6 @@ LLM 只做翻译与组装。
 （单个节点是否执行，不满足则输出 None、交给 `coalesce` 选另一版本的分支），
 例如 `estimator_wind`（1.15+）与 `wind_estimate`（更早）的取源分流。
 
-细节、内置变量清单、算子目录，以及**实施过程中与设计的差异**（多经验文件、
-复合算子、`instance` 取单实例、guard 槽位等）见
-**[px4/rule-schema-design.md](px4/rule-schema-design.md) 的「实施状态与落地差异」一节**。
+字段级定义、内置变量、算子目录、常见坑看 **[px4/rule-reference.md](px4/rule-reference.md)**；
+设计与演进史（含**实施过程中与设计的差异**：多经验文件、复合算子、`instance` 取单实例、
+guard 槽位等）看 [px4/rule-schema-design.md](px4/rule-schema-design.md)。
