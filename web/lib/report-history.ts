@@ -16,6 +16,10 @@ export interface SavedReport {
   durationSec?: number;
   platform: string;
   vehicleType?: string;
+  /** 飞控软件版本（ver_sw 截断） */
+  verSw?: string;
+  /** 飞控硬件版本（ver_hw） */
+  verHw?: string;
   parserVersion: string;
   /** 日志内容指纹（SHA-256 hex）；同一份日志重复上传时据此命中已有结果 */
   logHash?: string;
@@ -40,6 +44,8 @@ function normalize(raw: Partial<SavedReport> | null | undefined): SavedReport {
     durationSec: typeof r.durationSec === "number" ? r.durationSec : undefined,
     platform: String(r.platform ?? "px4"),
     vehicleType: r.vehicleType ? String(r.vehicleType) : undefined,
+    verSw: r.verSw ? String(r.verSw) : undefined,
+    verHw: r.verHw ? String(r.verHw) : undefined,
     parserVersion: String(r.parserVersion ?? ""),
     logHash: r.logHash ? String(r.logHash) : undefined,
     findings: Array.isArray(r.findings) ? r.findings : [],
@@ -100,6 +106,6 @@ export function clearReports(): void {
 }
 
 export function newReportId(): string {
-  const c = globalThis.crypto as { randomUUID?: () => string } | undefined;
+  const c = globalThis.crypto as { randomUUID?: () => string; } | undefined;
   return c?.randomUUID?.() ?? `r${Date.now()}`;
 }

@@ -79,7 +79,7 @@ export interface Finding {
     value: number | string;
     threshold?: number | string;
     unit?: string;
-    samples?: { tSec?: number; message?: string }[];
+    samples?: { tSec?: number; message?: string; }[];
   };
   docUrl?: string;
   suggestion?: string;
@@ -103,6 +103,10 @@ export interface AnalysisReport {
   platform: "PX4" | "ArduPilot";
   /** 机型：rotary_wing / fixed_wing / rover / airship / unknown（见 vehicle_status.vehicle_type） */
   vehicleType?: string;
+  /** 飞控软件版本（ver_sw 截断，如 e82c4e1a1f8e） */
+  verSw?: string;
+  /** 飞控硬件版本（ver_hw） */
+  verHw?: string;
   parserVersion: string;
   /** 日志内容指纹（SHA-256 hex）：同一份日志重复上传时直接载入历史结果 */
   logHash?: string;
@@ -115,7 +119,7 @@ export interface AnalysisReport {
   /** armed 段飞行阶段 */
   phases?: string[];
   checksRun?: string[];
-  checksSkipped?: { check: string; reason: string }[];
+  checksSkipped?: { check: string; reason: string; }[];
   /** 第三层故障知识库命中条目 */
   matchedFaults?: MatchedFault[];
   analyzedAt: string;

@@ -10,15 +10,16 @@ import {
   ShieldAlert,
   AlertTriangle,
   Info,
-  Lock,
   FileCheck2,
-  ExternalLink,
   History,
   LineChart,
   ScrollText,
   ClipboardCheck,
   ListFilter,
   Sparkles,
+  ExternalLink,
+  PanelLeftOpen,
+  PanelLeftClose,
 } from "lucide-react";
 import type {
   AnalysisReport,
@@ -45,6 +46,7 @@ import { cacheUsage, cachedLogHashes, getCachedLog, putCachedLog } from "@/lib/l
 import { LogCharts } from "./LogCharts";
 import { LogMessages, LogParams, SystemInfoPanel } from "./LogEventsParams";
 import { HistoryList, type HistoryItem } from "./HistoryList";
+import { PhaseStrip } from "./PhaseStrip";
 
 const VEHICLE_TYPE_LABELS: Record<string, string> = {
   rotary_wing: "旋翼",
@@ -138,6 +140,7 @@ export function LogAnalyzer() {
     entries: 0,
     bytes: 0,
   });
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const pendingHashRef = useRef<string>("");
   /** 本次解析要沿用的 AI 报告（重新解析不得把它覆盖成 null） */
   const pendingAiRef = useRef<string | null>(null);
@@ -227,6 +230,8 @@ export function LogAnalyzer() {
         durationSec: r.durationSec,
         platform: r.platform,
         vehicleType: r.vehicleType,
+        verSw: r.verSw,
+        verHw: r.verHw,
         parserVersion: r.parserVersion,
         logHash: hash ?? r.logHash,
         findings: r.findings,
@@ -601,120 +606,134 @@ export function LogAnalyzer() {
   const busy = stage !== "idle" && stage !== "done";
 
   return (
-    <div>
-      <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
-        {/* 左栏画布：上传 + 历史。两栏等高（不设 self-start，随 grid 行高拉伸） */}
-        <aside className="card min-w-0 space-y-5 p-5">
-          <p className="flex items-start gap-2 text-xs leading-5 text-muted">
-            <Lock className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-            <span>
-              日志在<strong className="font-medium text-text">你的浏览器本地</strong>由 Pyodide +
-              pyulog 解析，<strong className="font-medium text-text">原始 .ulg 不会上传</strong>；
-              仅将结构化检查结果发送到服务器生成中文解读。
+    <div className="mx-auto max-w-6xl">
+      {/* 上传栏（顶部通栏） */}
+      <div
+        onClick={() => inputRef.current?.click()}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          const f = e.dataTransfer.files?.[0];
+          if (f) void handleFile(f);
+        }}
+        className="mb-6 flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border-strong bg-surface-2 px-4 py-10 text-center transition-colors hover:border-text"
+      >
+        {busy ? (
+          <Loader2 className="mb-3 h-9 w-9 animate-spin text-primary" />
+        ) : (
+          <UploadCloud className="mb-3 h-9 w-9 text-primary" />
+        )}
+        <p className="text-base font-medium">
+          {busy ? STAGE_TEXT[stage as WorkerStage] : "选择或拖入 PX4 .ulg 日志"}
+        </p>
+        <p className="mt-1.5 text-sm text-muted">
+          {busy
+            ? "首次运行需下载约十余 MB 的 Pyodide 运行时，请稍候"
+            : "检查在本地浏览器完成，原始文件不上传。支持最大 300MB"}
+        </p>
+        {quota && (
+          <p className="mt-2 text-xs text-faint">
+            {quota.anonymous ? "匿名试用" : "AI"}：
+            <span
+              className={
+                quota.used >= quota.limit
+                  ? "font-semibold text-critical"
+                  : "font-semibold text-text"
+              }
+            >
+              {Math.max(quota.limit - quota.used, 0)}/{quota.limit} 次
             </span>
           </p>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".ulg,.ULG"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void handleFile(f);
+          }}
+        />
+      </div>
 
-          <div
-            onClick={() => inputRef.current?.click()}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              const f = e.dataTransfer.files?.[0];
-              if (f) void handleFile(f);
-            }}
-            className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border-strong px-4 py-9 text-center transition-colors hover:border-text"
-          >
-            {busy ? (
-              <Loader2 className="mb-3 h-8 w-8 animate-spin text-primary" />
-            ) : (
-              <UploadCloud className="mb-3 h-8 w-8 text-primary" />
-            )}
-            <p className="font-medium">
-              {busy ? STAGE_TEXT[stage as WorkerStage] : "选择或拖入 PX4 .ulg 日志"}
-            </p>
-            <p className="mt-1 text-xs text-muted">
-              {busy ? "首次运行需下载约十余 MB 的 Pyodide 运行时，请稍候" : "检查在本地完成，文件不上传"}
-            </p>
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".ulg,.ULG"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void handleFile(f);
-              }}
-            />
+      {/* 错误 */}
+      {error && (
+        <div className="mb-4 rounded-lg border border-critical/40 bg-critical/[0.06] p-4 text-sm text-critical">
+          {error}
+        </div>
+      )}
+
+      {/* 查重提示 */}
+      {dedupeNotice && (
+        <div className="mb-4 rounded-lg border border-border bg-surface-2 p-3.5 text-sm text-muted">
+          <div className="flex items-start gap-2">
+            <History className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <span>{dedupeNotice}</span>
           </div>
-
-          {quota && (
-            <p className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-muted">
-              {quota.anonymous ? "匿名免费试用（每日）" : "今日 AI 报告额度"}：
-              <span
-                className={
-                  quota.used >= quota.limit
-                    ? "font-semibold text-critical"
-                    : "font-semibold text-text"
+          {pendingBytes && (
+            <div className="mt-2.5 flex flex-wrap items-center gap-2 pl-6">
+              <button
+                type="button"
+                onClick={() =>
+                  parseBytes(pendingBytes.bytes, {
+                    name: pendingBytes.name,
+                    size: pendingBytes.size,
+                    hash: pendingBytes.hash,
+                    reportId: reportIdRef.current || newReportId(),
+                    priorAi: aiMarkdown,
+                  })
                 }
+                className="btn-ghost px-3 py-1.5 text-xs"
               >
-                {" "}
-                {Math.max(quota.limit - quota.used, 0)} / {quota.limit} 次剩余
-              </span>
-              {quota.anonymous ? "，登录后 10 次/天并同步云端历史" : "（每日 0 点重置）"}
-            </p>
-          )}
-
-          <HistoryList
-            items={mergedHistory}
-            localCount={history.length}
-            cachedHashes={cachedHashes}
-            cacheInfo={cacheInfo}
-            onView={(item) => void viewHistoryItem(item)}
-            onRestore={(item) => void restoreFullData(item)}
-            onDelete={deleteHistoryItem}
-            onClearLocal={clearLocal}
-          />
-        </aside>
-
-        {/* 右栏画布：分析结果 */}
-        <section className="card flex min-w-0 flex-col p-5 sm:p-6">
-          {error && (
-            <div className="rounded-lg border border-critical/40 bg-critical/[0.06] p-4 text-sm text-critical">
-              {error}
+                <LineChart className="h-3.5 w-3.5" />
+                解析完整数据（含图表与参数）
+              </button>
+              <span className="text-xs text-faint">约十余秒，不消耗额度</span>
             </div>
           )}
+        </div>
+      )}
 
-          {dedupeNotice && (
-            <div className="mb-4 rounded-lg border border-border bg-surface-2 p-3.5 text-sm text-muted">
-              <div className="flex items-start gap-2">
-                <History className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <span>{dedupeNotice}</span>
-              </div>
-              {/* 历史存档没有图表/参数；字节就在手上，直接给一键补全 */}
-              {pendingBytes && (
-                <div className="mt-2.5 flex flex-wrap items-center gap-2 pl-6">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      parseBytes(pendingBytes.bytes, {
-                        name: pendingBytes.name,
-                        size: pendingBytes.size,
-                        hash: pendingBytes.hash,
-                        reportId: reportIdRef.current || newReportId(),
-                        priorAi: aiMarkdown,
-                      })
-                    }
-                    className="btn-ghost px-3 py-1.5 text-xs"
-                  >
-                    <LineChart className="h-3.5 w-3.5" />
-                    解析完整数据（含图表与参数）
-                  </button>
-                  <span className="text-xs text-faint">约十余秒，不消耗额度</span>
-                </div>
-              )}
-            </div>
-          )}
+      {/* 主体：可折叠侧栏 + 分析区 */}
+      <div className="relative flex gap-4">
+        {sidebarOpen && (
+          <aside className="card w-[320px] shrink-0 p-3">
+            <HistoryList
+              items={mergedHistory}
+              localCount={history.length}
+              cachedHashes={cachedHashes}
+              cacheInfo={cacheInfo}
+              onRestore={(item) => void restoreFullData(item)}
+              onClearLocal={clearLocal}
+              headerRight={
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen(false)}
+                  className="-mr-1 rounded p-0.5 text-faint transition-colors hover:bg-surface-2 hover:text-muted"
+                  title="收起历史面板"
+                >
+                  <PanelLeftClose className="h-3.5 w-3.5" />
+                </button>
+              }
+            />
+          </aside>
+        )}
 
+        {/* 侧栏收起时，展开按钮浮在分析区左上角，不占列 */}
+        {!sidebarOpen && (
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="absolute left-0 top-3 rounded-r p-1 text-faint transition-colors hover:bg-surface-2 hover:text-muted"
+            title="展开历史面板"
+          >
+            <PanelLeftOpen className="h-4 w-4" />
+          </button>
+        )}
+
+        {/* 分析区（自适应撑满） */}
+        <section className="card flex min-w-0 flex-1 flex-col p-5 sm:p-6">
           {report ? (
             <ReportView
               report={report}
@@ -734,7 +753,7 @@ export function LogAnalyzer() {
                 <FileCheck2 className="h-10 w-10 text-muted/70" />
                 <p className="font-medium">上传日志后，这里显示分析结果</p>
                 <p className="max-w-sm text-xs leading-5 text-muted">
-                  左侧选择或拖入一份 PX4 .ulg 日志，将生成 15 项确定性检查结论、
+                  在顶部拖入或选择一份 PX4 .ulg 日志，将生成 15 项确定性检查结论、
                   故障知识库匹配、数据图表与 AI 中文解读。
                 </p>
               </div>
@@ -808,19 +827,24 @@ function ReportView({
         </div>
       </div>
 
-      {/* 飞行上下文：阶段 / 异常标签 / 数据质量 guard（第二层输出）
-          三组语义不同，各占一行并带行首标签，挤在一排会读不出区别 */}
-      {(report.phases?.length || report.guardTags?.length || report.tags?.length) && (
-        <div className="mt-5 mb-5 space-y-2.5">
-          {report.phases && report.phases.length > 0 && (
-            <TagRow label="飞行阶段">
-              {report.phases.map((p) => (
-                <span key={p} className="chip chip-brand">
-                  {PHASE_LABELS[p] ?? p}
-                </span>
-              ))}
-            </TagRow>
-          )}
+      {/* 飞行阶段时间轴：info 可用时用 PhaseStrip，否则回退到芯片标签 */}
+      {info?.phases?.length ? (
+        <PhaseStrip phases={info.phases} />
+      ) : report.phases?.length ? (
+        <div className="mb-5">
+          <TagRow label="飞行阶段">
+            {report.phases.map((p) => (
+              <span key={p} className="chip chip-brand">
+                {PHASE_LABELS[p] ?? p}
+              </span>
+            ))}
+          </TagRow>
+        </div>
+      ) : null}
+
+      {/* 异常标签 / 数据质量 guard */}
+      {(report.guardTags?.length || report.tags?.length) && (
+        <div className="mb-5 space-y-2.5">
           {report.tags && report.tags.length > 0 && (
             <TagRow label="异常标签">
               {report.tags.map((t) => (

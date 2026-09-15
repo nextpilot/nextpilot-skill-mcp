@@ -24,25 +24,25 @@ export type WorkerStage =
   | "done";
 
 export type WorkerInMessage =
-  | { type: "analyze"; file: Uint8Array }
+  | { type: "analyze"; file: Uint8Array; }
   | {
-      type: "series";
-      reqId: string;
-      topic: string;
-      instance: number;
-      fields: string[];
-    };
+    type: "series";
+    reqId: string;
+    topic: string;
+    instance: number;
+    fields: string[];
+  };
 
 export type WorkerOutMessage =
-  | { type: "stage"; stage: WorkerStage; detail?: string }
+  | { type: "stage"; stage: WorkerStage; detail?: string; }
   | {
-      type: "done";
-      report: unknown;
-      manifest: TopicManifest;
-      info: LogInfo;
-    }
-  | { type: "series"; reqId: string; data: unknown }
-  | { type: "error"; message: string };
+    type: "done";
+    report: unknown;
+    manifest: TopicManifest;
+    info: LogInfo;
+  }
+  | { type: "series"; reqId: string; data: unknown; }
+  | { type: "error"; message: string; };
 
 const post = (msg: WorkerOutMessage) =>
   (self as unknown as DedicatedWorkerGlobalScope).postMessage(msg);
@@ -50,7 +50,7 @@ const post = (msg: WorkerOutMessage) =>
 // 项目未安装 pyodide npm 类型包；Worker 内只用到下列方法，保持宽松类型
 type Pyodide = {
   loadPackage: (names: string[]) => Promise<void>;
-  pyimport: (name: string) => { install: (spec: string) => Promise<unknown> };
+  pyimport: (name: string) => { install: (spec: string) => Promise<unknown>; };
   globals: {
     set: (key: string, value: unknown) => void;
     get: (key: string) => unknown;
@@ -58,7 +58,7 @@ type Pyodide = {
   runPythonAsync: (code: string) => Promise<unknown>;
 };
 
-type LoadPyodide = (opts: { indexURL: string }) => Promise<Pyodide>;
+type LoadPyodide = (opts: { indexURL: string; }) => Promise<Pyodide>;
 
 let pyodidePromise: Promise<Pyodide> | null = null;
 
@@ -74,7 +74,7 @@ async function getPyodide(): Promise<Pyodide> {
       PYODIDE_INDEX_URL + "pyodide.js"
     );
     const loadPyodide = (
-      self as unknown as { loadPyodide?: LoadPyodide }
+      self as unknown as { loadPyodide?: LoadPyodide; }
     ).loadPyodide;
     if (typeof loadPyodide !== "function") {
       throw new Error(
@@ -86,7 +86,38 @@ async function getPyodide(): Promise<Pyodide> {
     post({ type: "stage", stage: "installing-parser", detail: "安装 pyulog…" });
     await pyodide.loadPackage(["micropip", "numpy"]);
     const micropip = pyodide.pyimport("micropip");
-    await micropip.install("pyulog");
+
+    // micropip 从 PyPI 下载，浏览器网络可能不稳定，重试 3 次
+    let lastErr: unknown;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await micropip.install("pyulog");
+        lastErr = null;
+        break;
+      } catch (e) {
+        lastErr = e;
+        if (attempt < 3) {
+          post({
+            type: "stage",
+            stage: "installing-parser",
+            detail: `安装 pyulog 失败，重试 ${attempt}/3…`,
+          });
+          await new Promise((r) => setTimeout(r, attempt * 2000));
+        }
+      }
+    }
+    if (lastErr) {
+      const msg =
+        lastErr instanceof Error ? lastErr.message : String(lastErr);
+      throw new Error(
+        `pyulog 安装失败（已重试 3 次）：${msg}\n\n` +
+        "可能原因：\n" +
+        "1. 网络不稳定或防火墙拦截了 PyPI 请求\n" +
+        "2. PyPI 服务暂时不可用\n" +
+        "3. 浏览器扩展（如广告拦截器）阻止了请求\n\n" +
+        "建议：刷新页面重试，或检查网络/防火墙设置。",
+      );
+    }
     return pyodide;
   })();
   return pyodidePromise;

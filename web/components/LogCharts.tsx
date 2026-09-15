@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Loader2, LineChart } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, Loader2, LineChart, Maximize2, RotateCcw, Share2, X } from "lucide-react";
 import type { FlightPhase, SeriesResponse, TopicManifest } from "@/lib/types";
 import {
   CHART_PRESETS,
@@ -62,6 +62,11 @@ function modeColor(mode: string): string {
 type PlotlyType = {
   react: (el: HTMLElement, data: unknown[], layout: Record<string, unknown>, cfg?: unknown) => Promise<unknown>;
   newPlot: (el: HTMLElement, data: unknown[], layout: Record<string, unknown>, cfg?: unknown) => Promise<unknown>;
+  relayout: (el: HTMLElement, update: Record<string, unknown>) => Promise<unknown>;
+  purge: (el: HTMLElement) => void;
+  Plots: {
+    resize: (el: HTMLElement) => void;
+  };
 };
 
 let plotlyPromise: Promise<PlotlyType> | null = null;
@@ -177,6 +182,16 @@ function PresetCard({
   requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
 }) {
   const [open, setOpen] = useState(false);
+  const [xRange, setXRange] = useState<[number, number] | null>(null);
+
+  const handleXRangeChange = useCallback((range: [number, number] | null) => {
+    setXRange(range);
+  }, []);
+
+  const handleResetXRange = useCallback(() => {
+    setXRange(null);
+  }, []);
+
   return (
     <div>
       <button
@@ -192,16 +207,35 @@ function PresetCard({
         />
       </button>
       {open && (
-        <div className="space-y-5 pb-5">
-          {panels.map((panel) => (
-            <PanelChart
-              key={panel.title}
-              panel={panel}
-              phases={phases}
-              requestSeries={requestSeries}
-              groupKey={id}
-            />
-          ))}
+        <div>
+          {xRange && panels.length > 1 && (
+            <div className="mb-3 flex items-center gap-2">
+              <span className="text-xs text-muted">
+                X 轴已同步：{xRange[0].toFixed(1)}s – {xRange[1].toFixed(1)}s
+              </span>
+              <button
+                type="button"
+                onClick={handleResetXRange}
+                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-primary hover:bg-primary/10"
+              >
+                <RotateCcw className="h-3 w-3" />
+                恢复
+              </button>
+            </div>
+          )}
+          <div className="space-y-5 pb-5">
+            {panels.map((panel) => (
+              <PanelChart
+                key={panel.title}
+                panel={panel}
+                phases={phases}
+                requestSeries={requestSeries}
+                groupKey={id}
+                xRange={xRange}
+                onXRangeChange={handleXRangeChange}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -213,15 +247,129 @@ function PanelChart({
   phases,
   requestSeries,
   groupKey,
+  xRange,
+  onXRangeChange,
 }: {
   panel: PanelSpec;
   phases: FlightPhase[];
   requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
   groupKey: string;
+  xRange: [number, number] | null;
+  onXRangeChange: (range: [number, number] | null) => void;
 }) {
   const elRef = useRef<HTMLDivElement>(null);
+  const localRangeRef = useRef<[number, number] | null>(null);
+  const ignoreNextRelayout = useRef(false);
   const [state, setState] = useState<"loading" | "error" | "done">("loading");
   const [error, setError] = useState<string | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const fullscreenRef = useRef<HTMLDivElement>(null);
+  const cacheRef = useRef<{ traces: unknown[]; layout: Record<string, unknown> } | null>(null);
+
+  // Resize chart after container becomes visible, and align modebar
+  useEffect(() => {
+    if (state !== "done" || !elRef.current) return;
+    const modebar = elRef.current.querySelector(".modebar") as HTMLElement | null;
+    if (modebar) modebar.style.top = "0px";
+    const timer = setTimeout(async () => {
+      try {
+        const Plotly = await getPlotly();
+        Plotly.Plots.resize(elRef.current!);
+      } catch {
+        // ignore
+      }
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [state]);
+
+  // Render chart in fullscreen overlay
+  useEffect(() => {
+    if (!fullscreen || !fullscreenRef.current || !cacheRef.current) return;
+    const cached = cacheRef.current;
+
+    const plotlyConfig = {
+      responsive: true,
+      displayModeBar: true,
+      modeBarButtonsToRemove: [
+        "sendDataToCloud",
+        "editInChartStudio",
+        "lasso2d",
+        "select2d",
+        "hoverClosestCartesian",
+        "hoverCompareCartesian",
+        "toggleSpikelines",
+        "zoom2d",
+        "resetScale2d",
+        "toImage",
+        "pan2d",
+        "zoomIn2d",
+        "zoomOut2d",
+        "autoScale2d",
+      ],
+      modeBarButtonsToAdd: [
+        "resetScale2d",
+        "toImage",
+        "pan2d",
+        "zoomIn2d",
+        "zoomOut2d",
+        "autoScale2d",
+      ],
+      displaylogo: false,
+    };
+
+    const fullscreenLayout = {
+      ...cached.layout,
+      height: window.innerHeight - 52,
+      margin: { l: 52, r: 42, t: 22, b: 48 },
+    };
+
+    let cancelled = false;
+    (async () => {
+      const Plotly = await getPlotly();
+      if (cancelled) return;
+      await Plotly.newPlot(fullscreenRef.current!, cached.traces, fullscreenLayout, plotlyConfig);
+    })();
+
+    return () => {
+      cancelled = true;
+      const Plotly = getPlotly();
+      if (fullscreenRef.current) {
+        Plotly.then((P) => P.purge(fullscreenRef.current!)).catch(() => {});
+      }
+    };
+  }, [fullscreen]);
+
+  // Apply external xRange changes to the plot
+  useEffect(() => {
+    if (state !== "done" || !elRef.current) return;
+    const el = elRef.current;
+    const applyRange = async () => {
+      try {
+        const Plotly = await getPlotly();
+        if (xRange) {
+          if (
+            localRangeRef.current?.[0] !== xRange[0] ||
+            localRangeRef.current?.[1] !== xRange[1]
+          ) {
+            ignoreNextRelayout.current = true;
+            await Plotly.relayout(el, {
+              "xaxis.range": [xRange[0], xRange[1]],
+            } as Record<string, unknown>);
+            localRangeRef.current = xRange;
+          }
+        } else if (localRangeRef.current) {
+          ignoreNextRelayout.current = true;
+          await Plotly.relayout(el, {
+            "xaxis.autorange": true,
+          } as Record<string, unknown>);
+          localRangeRef.current = null;
+        }
+      } catch {
+        // ignore relayout errors
+      }
+    };
+    void applyRange();
+  }, [xRange, state]);
 
   useEffect(() => {
     let cancelled = false;
@@ -308,8 +456,56 @@ function PanelChart({
 
         await Plotly.newPlot(elRef.current, traces, layout, {
           responsive: true,
-          displayModeBar: false,
+          displayModeBar: true,
+          modeBarButtonsToRemove: [
+            "sendDataToCloud",
+            "editInChartStudio",
+            "lasso2d",
+            "select2d",
+            "hoverClosestCartesian",
+            "hoverCompareCartesian",
+            "toggleSpikelines",
+            "zoom2d",
+            "resetScale2d",
+            "toImage",
+            "pan2d",
+            "zoomIn2d",
+            "zoomOut2d",
+            "autoScale2d",
+          ],
+          modeBarButtonsToAdd: [
+            "resetScale2d",
+            "toImage",
+            "pan2d",
+            "zoomIn2d",
+            "zoomOut2d",
+            "autoScale2d",
+          ],
+          displaylogo: false,
         });
+
+        cacheRef.current = { traces, layout };
+
+        // Listen for relayout events (zoom/pan)
+        const gd = elRef.current as unknown as {
+          on?: (event: string, cb: (e: Record<string, unknown>) => void) => void;
+        };
+        gd.on?.("plotly_relayout", (eventData) => {
+          if (ignoreNextRelayout.current) {
+            ignoreNextRelayout.current = false;
+            return;
+          }
+          const r0 = eventData["xaxis.range[0]"] as number | undefined;
+          const r1 = eventData["xaxis.range[1]"] as number | undefined;
+          if (r0 !== undefined && r1 !== undefined) {
+            localRangeRef.current = [r0, r1];
+            onXRangeChange([r0, r1]);
+          } else if (eventData["xaxis.autorange"] === true) {
+            localRangeRef.current = null;
+            onXRangeChange(null);
+          }
+        });
+
         if (!cancelled) setState("done");
       } catch (err) {
         if (!cancelled) {
@@ -324,19 +520,57 @@ function PanelChart({
   }, [panel, phases, requestSeries, groupKey]);
 
   return (
-    <div>
-      <p className="mb-1 text-sm font-medium text-muted">{panel.title}</p>
-      {state === "loading" && (
-        <div className="flex h-40 items-center justify-center gap-2 text-sm text-muted">
-          <Loader2 className="h-4 w-4 animate-spin" /> 正在抽取数据…
+    <div className="w-full min-w-0">
+      <div className="mb-1 flex items-center justify-between">
+        <p className="text-sm font-medium text-muted">{panel.title}</p>
+        {state === "done" && (
+          <div className="flex items-center gap-1">
+            <button
+              className="rounded p-0.5 text-muted opacity-60 transition hover:opacity-100"
+              onClick={() => { void navigator.clipboard.writeText(window.location.href).catch(() => {}); }}
+              title="复制链接"
+            >
+              <Share2 className="h-4 w-4" />
+            </button>
+            <button
+              className="rounded p-0.5 text-muted opacity-60 transition hover:opacity-100"
+              onClick={() => setFullscreen(true)}
+              title="全屏"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="relative">
+        {state === "loading" && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-surface-1/80 text-sm text-muted">
+            <Loader2 className="h-4 w-4 animate-spin" /> 正在抽取数据…
+          </div>
+        )}
+        {state === "error" && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface-1/80 text-sm text-critical">
+            绘图失败：{error}
+          </div>
+        )}
+        <div ref={elRef} className="w-full" style={{ minHeight: "300px" }} />
+      </div>
+
+      {fullscreen && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-surface-1">
+          <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2">
+            <span className="text-sm font-semibold">{panel.title}</span>
+            <button
+              className="rounded p-1 text-muted transition hover:text-text"
+              onClick={() => setFullscreen(false)}
+              title="退出全屏"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div ref={fullscreenRef} className="w-full flex-1" />
         </div>
       )}
-      {state === "error" && (
-        <div className="flex h-40 items-center justify-center text-sm text-critical">
-          绘图失败：{error}
-        </div>
-      )}
-      <div ref={elRef} className={state === "done" ? "" : "hidden"} />
     </div>
   );
 }
@@ -374,7 +608,13 @@ function buildLayout(
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: plotBg,
     font: { color: text, size: 11, family: "PingFang SC, Microsoft YaHei, sans-serif" },
-    margin: { l: 48, r: 12, t: 8, b: 40 },
+    margin: { l: 44, r: 34, t: 0, b: 40 },
+    modebar: {
+      orientation: "v",
+      bgcolor: "rgba(0,0,0,0)",
+      color: muted,
+      activecolor: text,
+    },
     xaxis: {
       title: { text: "秒（相对日志开始）", font: { color: muted, size: 10 } },
       gridcolor: grid,
@@ -399,6 +639,6 @@ function buildLayout(
     legend: { font: { color: muted, size: 10 }, orientation: "h", x: 0, y: 1.02 },
     hovermode: "x unified",
     shapes,
-    height: 280,
+    height: 300,
   };
 }
