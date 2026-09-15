@@ -3,14 +3,14 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { LocalizedText } from "@/components/LocalizedText";
 import { GuideMdx } from "@/components/GuideMdx";
 import { GuideMarkdown } from "@/components/GuideMarkdown";
-import { GuideOutline, GuideOutlineMobile } from "@/components/GuideOutline";
-import { GuideDocsSelect } from "@/components/GuideSidebar";
-import { getGuideNav } from "@/lib/guide";
-import { getGuideNeighbors, type GuideDoc } from "@/lib/guide";
+import { GuideOutline } from "@/components/GuideOutline";
+import { GuideMobileNav } from "@/components/GuideMobileNav";
+import { getGuideNav, getGuideNeighbors, type GuideDoc } from "@/lib/guide";
 
 /**
  * 一篇指南文档：标题区 + MD 正文 + 右侧本页目录 + 上/下一篇。
  * 左侧导航在 app/guide/layout.tsx，与本组件同宽于外层 flex。
+ * 移动端：面包屑下方显示「开始菜单」和「本页目录」两个互斥折叠面板。
  */
 export function GuideArticle({ doc }: { doc: GuideDoc }) {
   const { prev, next } = getGuideNeighbors(doc.slug);
@@ -18,6 +18,8 @@ export function GuideArticle({ doc }: { doc: GuideDoc }) {
   return (
     <div className="flex min-w-0 gap-10">
       <article className="min-w-0 max-w-3xl flex-1">
+        <GuideMobileNav groups={getGuideNav()} headings={doc.headings} />
+
         <header className="mb-8 border-b border-border pb-6">
           <h1 className="text-3xl font-semibold tracking-tight text-text sm:text-4xl">
             <LocalizedText zh={doc.title} en={doc.titleEn} />
@@ -26,11 +28,6 @@ export function GuideArticle({ doc }: { doc: GuideDoc }) {
             <LocalizedText zh={doc.description} en={doc.descriptionEn} />
           </p>
         </header>
-
-        <div className="mb-5 flex gap-2 lg:hidden">
-          <GuideDocsSelect groups={getGuideNav()} />
-          <GuideOutlineMobile headings={doc.headings} />
-        </div>
 
         <div className="prose-guide">
           {doc.renderer === "md" ? <GuideMarkdown source={doc.body} /> : <GuideMdx source={doc.body} />}
