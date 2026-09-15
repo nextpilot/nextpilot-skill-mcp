@@ -24,8 +24,8 @@ skip_reason: estimator_wind / wind_estimate not in log
 
 compute:
   # 版本分流写在节点上：when_fw 不满足时该节点被跳过、输出 None，由下面的 coalesce 选另一支。
-  # 1.15+ 用估计器风（日志里的 topic 名是 estimator_wind；上游 msg 文件名叫 wind，
-  # 所以字典里查不到 estimator_wind 这个名字——这正是"字典名 ≠ 日志 topic 名"的例子）
+  # 1.15+ 用估计器风。日志里这个 topic 叫 estimator_wind；上游另有一个叫 wind 的 topic
+  # （字典按 .msg 文件名收录，与日志 topic 名不是一一对应，所以字典里查不到 estimator_wind）
   - {out: n_new, from: estimator_wind.windspeed_north, op: read, when_fw: ">=1.15", optional: true}
   - {out: e_new, from: estimator_wind.windspeed_east, op: read, when_fw: ">=1.15", optional: true}
   # 1.15 之前是 wind_estimate（字段名相同）

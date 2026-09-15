@@ -29,6 +29,7 @@
       "gpsEphP95M": 0.0,
       "gpsEphMaxM": 0.0,
       "gpsSatellitesMin": 15,
+      "gpsJumpCount": 0,
       "navStateChanges": 3,
       "gyroBiasMaxRadS": 0.001,
       "gyroBiasDriftRadS": 0.0007,

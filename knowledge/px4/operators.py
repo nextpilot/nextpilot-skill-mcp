@@ -456,16 +456,18 @@ def op_scale_series(values, factor=1.0, **kw):
 @operator(
     "adjacent_speed_mps",
     in_arity=3,
-    doc="经纬度（1e7 度）与时间戳（us）→ 相邻样本地面速度序列（m/s）；"
-        "等距柱状近似，对任意 lat/lon/timestamp 三元组通用",
+    doc="经纬度与时间戳（us）→ 相邻样本地面速度序列（m/s）；等距柱状近似。"
+        "unit 说明经纬度口径：degE7（旧字段 lat/lon 的 1e7 度）或 deg（新字段 latitude_deg），"
+        "由经验文件按固件版本给出",
 )
-def op_adjacent_speed_mps(lat_1e7, lon_1e7, ts_us, **kw):
+def op_adjacent_speed_mps(lat_in, lon_in, ts_us, unit="degE7", **kw):
     import numpy as np
 
-    if lat_1e7 is None or lon_1e7 is None or ts_us is None:
+    if lat_in is None or lon_in is None or ts_us is None:
         return None
-    lat = np.radians(np.asarray(lat_1e7, dtype=float) / 1e7)
-    lon = np.radians(np.asarray(lon_1e7, dtype=float) / 1e7)
+    div = 1e7 if str(unit).lower() in ("dege7", "1e7") else 1.0
+    lat = np.radians(np.asarray(lat_in, dtype=float) / div)
+    lon = np.radians(np.asarray(lon_in, dtype=float) / div)
     if lat.size < 3 or lat.size != lon.size or lat.size != len(ts_us):
         return None
     dt = np.diff(np.asarray(ts_us, dtype=float)) / 1e6

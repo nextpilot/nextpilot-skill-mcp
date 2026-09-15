@@ -36,6 +36,13 @@ def main(argv):
             ins = node["from"] if isinstance(node["from"], list) else [node["from"]]
         outs = node["out"] if isinstance(node["out"], list) else [node["out"]]
         declared.extend(outs)
+        # 与框架一致：when_fw 不满足就跳过该节点、输出置 None
+        wf = node.get("when_fw")
+        if wf is not None and not ns["_match_firmware"](wf):
+            print("  [skip] op=%s when_fw=%s 不满足 -> %s=None" % (node["op"], wf, ", ".join(outs)))
+            for name in outs:
+                env[name] = None
+            continue
         args = []
         for ref in ins:
             if not isinstance(ref, str):

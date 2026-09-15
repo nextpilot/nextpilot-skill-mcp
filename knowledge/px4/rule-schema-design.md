@@ -57,10 +57,21 @@ compute:
 **上游字典**里找，分类为 命中 / 版本错配 / 已声明遗留（`aliases`、`known_legacy`）/ 可疑。
 自检过：把 `wind_estimate` 那支错标成 `>=1.15` 会精确报出"仅存在于 1.11"。
 
-一个必须记住的现实：**上游 `.msg` 文件名派生的字典名 ≠ 日志里的 topic 名**
-（字典 `wind` ↔ 日志 `estimator_wind`；字典 `sensor_gps` ↔ 日志里 `sensor_gps` 与
-遗留名 `vehicle_gps_position` 并存）。所以校验以**日志实测为准、字典为辅**；
-若真要按字典硬校验，得先补一份 topic/字段改名映射（设计里的 `topic-overrides.yaml`）。
+一个必须记住的现实：**同一物理量在不同固件下可能是不同的 topic（不是改名），也可能真的是改名**。
+两类都要处理，且不能凭名字相似去猜：
+
+| 情形 | 例子 | 处理 |
+| --- | --- | --- |
+| **不同 topic，语义不同**（同时存在） | `sensor_gps`（GPS 原始数据）与 `vehicle_gps_position`（融合/处理后的位置）是两个不同的东西 | 规则要明确读哪一个：GPS 跳变判定取**处理后的位置**（飞控实际用的），原始数据的野值由 GPS 模块自己过滤 |
+| **真改名**（同义不同名/不同单位） | `lat`/`lon`（旧，1e7 度）→ `latitude_deg`/`longitude_deg`（1.15+，度） | 节点级 `when_fw` 分流 + 单位口径写在算子参数上（如 `adjacent_speed_mps` 的 `unit: degE7` / `deg`） |
+
+字典（`meta/<tag>.json`）按上游 `.msg` **文件名**收录，与日志里的 topic 名并非一一对应，
+所以字段校验以**回归日志实测字段**为主要判据、字典为辅。若将来要以字典为硬判据，
+得先补一份 topic/字段改名映射（设计里的 `topic-overrides.yaml`）。
+
+**这套机制已经抓到过真问题**：`px4-gps-jump` 原来读 `vehicle_gps_position.lat/lon`，
+而 1.15+ 已改名成 `latitude_deg/longitude_deg`（单位也从 1e7 度变成度）——
+该经验在现代固件上其实一直静默不生效、连统计量都不产出；补上版本分流后才恢复正常。
 
 **怎么验证**：`python tools/calibrate/compare-baseline.py`（6 条日志逐字段比对）、
 `python tools/calibrate/check-artifact.py`（生成产物真实执行）、

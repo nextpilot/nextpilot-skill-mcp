@@ -1,4 +1,6 @@
 # GPS 位置跳变（F002 相关）：经纬度相邻差分速度 > 50 m/s 的次数，累计 >= 3 次告警。
+# 取 vehicle_gps_position（融合/处理后的位置，即飞控实际用的），不是 sensor_gps（原始 GPS 数据）：
+# 跳变判定要看“飞到哪儿去了”，原始数据的野值由 GPS 模块自己负责过滤。
 # 阈值 [暂定] px4-thresholds.toml [gps]：jump_speed_mps=50 / jump_min_count=3。
 
 id: px4-gps-jump
@@ -21,14 +23,29 @@ requires:
 skip_reason: vehicle_gps_position not in log
 
 compute:
-  - out: step
+  # 经纬度字段跨固件换过名字与口径：旧固件 lat/lon（1e7 度）、1.15+ latitude_deg/longitude_deg（度）。
+  # 两条分支各自 when_fw 圈定，单位口径写在各自的 unit 上，再由 coalesce 取生效的那支。
+  - out: step_new
+    in:
+      - vehicle_gps_position.latitude_deg
+      - vehicle_gps_position.longitude_deg
+      - vehicle_gps_position.timestamp
+    op: adjacent_speed_mps
+    unit: deg
+    when_fw: ">=1.15"
+    optional: true
+  - out: step_old
     in:
       - vehicle_gps_position.lat
       - vehicle_gps_position.lon
       - vehicle_gps_position.timestamp
     op: adjacent_speed_mps
-  - {out: njump_raw, in: [step], op: count_above, gt: 50.0}
-  - {out: njump, in: [njump_raw], op: to_int}
+    unit: degE7
+    when_fw: "<1.15"
+    optional: true
+  - {out: step, in: [step_new, step_old], op: coalesce, optional: true}
+  - {out: njump_raw, in: [step], op: count_above, gt: 50.0, optional: true}
+  - {out: njump, in: [njump_raw], op: to_int, optional: true}
 
 triggers:
   - expr: "njump >= 3"
