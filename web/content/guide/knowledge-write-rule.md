@@ -7,10 +7,16 @@ group: 知识库
 groupEn: Knowledge base
 order: 11
 ---
-写一条经验的权威参考：字段级定义、数据流（`compute`）语义、触发与输出、
-内置变量、算子目录，以及构建期会直接拒绝的写法。
 
-想看现有规则清单：[当前有哪些规则](/guide/knowledge-rules)。
+写一条经验的权威参考：字段级定义、数据流（`compute`）语义、触发与输出、内置变量、
+算子目录，以及构建期会直接拒绝的写法。内部设计（动机、实施状态与已知缺口）见仓库里的
+`knowledge/px4/CLAUDE.md`；现有规则清单：[当前有哪些规则](/guide/knowledge-rules)。
+
+> **本页是这份文档的唯一一份**：原先在 `knowledge/px4/guides/writing-rules.md`，现搬到指南的
+> 内容目录，不再由构建生成（同组的「当前有哪些规则」才是构建生成的）。
+> 单一事实源是 `knowledge/px4/rules/*.yaml`；标了 `<!-- BEGIN/END -->` 的两张表由
+> `python tools/px4/gen-rule-reference.py` 从 `operators.py` 与 `ulog_checks.py` 注入，
+> 改完算子请重跑该脚本，标记之间不要手改，其余内容手维护。
 
 ## 0. 一条经验怎么跑起来
 
@@ -149,6 +155,7 @@ compute:
 
 ### 4.3 算子目录
 
+<!-- BEGIN:operators -->
 **标量统计**
 
 | 算子 | 入参 | 输出 | 说明 |
@@ -288,6 +295,7 @@ compute:
 | `max_temp_range` | 2 | 1 个值 | 两个温度来源各自取极差（样本 < 2 的来源忽略），返回较大者 |
 
 共 **73** 个算子。入参个数由算子签名强制校验（`in:`/`out:` 数量对不上则构建失败）；各算子的可调参数（如 `gt` / `p` / `factor` / `codes` / `labels` / `min_count`）写在节点的同层键上。
+<!-- END:operators -->
 
 ## 5. triggers 与 emit
 
@@ -320,6 +328,7 @@ compute:
 
 ### 6.1 内置变量（直接引用，无需在 compute 声明）
 
+<!-- BEGIN:builtins -->
 | 变量 | 含义 |
 | --- | --- |
 | `firmware` | 固件标签（如 `1.15.0`，无法识别时为“未知（旧固件或无版本号）”） |
@@ -343,6 +352,7 @@ compute:
 | `restart_detected` | 是否有 topic 时间戳回退（疑似中途重启） |
 | `dropout_ms` | 全日志丢包累计（毫秒） |
 | `messages` | 日志消息条目列表 `[{tSec, message, level, level_name}]` |
+<!-- END:builtins -->
 
 ### 6.2 模板占位符
 

@@ -49,12 +49,37 @@ function Table({ children }: { children?: React.ReactNode }) {
 
 const components = { h2: H2, h3: H3, table: Table };
 
+interface MdNode {
+  type?: string;
+  value?: string;
+  children?: MdNode[];
+}
+
+/**
+ * 去掉 HTML 注释节点。markdown 规范里注释是不显示的，但 react-markdown 不解析原生 HTML，
+ * 会把 `<!-- ... -->` 当普通文本转义出来（页面上就多出一行 `<!-- BEGIN:operators -->`）。
+ * 只删 html 节点，行内代码与围栏代码块里的同名文本是 code 节点，不受影响。
+ * 注意 remark 插件是工厂：外层是 attacher，真正的 transformer 由它返回。
+ */
+function remarkDropComments() {
+  return function drop(tree: MdNode) {
+    if (!Array.isArray(tree.children)) return;
+    tree.children = tree.children.filter(
+      (child) => !(child?.type === "html" && /^\s*<!--[\s\S]*?-->\s*$/.test(child.value ?? "")),
+    );
+    for (const child of tree.children) drop(child);
+  };
+}
+
 /**
  * Markdown 正文渲染。与 `GuideMdx`（MDX）的区别在于解析器：
- * 知识文档是从 `knowledge/` 派生过来的机器产物，正文里有 `{invalid_frac:.0%}`、
- * `meta/<tag>.json` 这类写法——MDX 会把花括号当 JSX 表达式、尖括号当标签，
- * 普通 markdown 则原样输出，正是这些文档需要的。
+ * 知识文档里有 `{invalid_frac:.0%}`、`meta/<tag>.json` 这类写法——MDX 会把花括号当
+ * JSX 表达式、尖括号当标签，普通 markdown 则原样输出，正是这些文档需要的。
  */
 export function GuideMarkdown({ source }: { source: string }) {
-  return <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>{source}</ReactMarkdown>;
+  return (
+    <ReactMarkdown remarkPlugins={[remarkGfm, remarkDropComments]} components={components}>
+      {source}
+    </ReactMarkdown>
+  );
 }

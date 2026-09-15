@@ -2,7 +2,8 @@
 #
 # 用途：端侧确定性引擎先输出异常标签（阈值规则命中），再按
 #   trigger_tags / flight_phase / exclude_tags 匹配本文件，
-#   只把匹配成功的条目注入 LLM 上下文（见 knowledge/ulog/knowledge-authoring.md）。
+#   只把匹配成功的条目注入 LLM 上下文（匹配逻辑见 ulog_checks.py 的 match_fault_kb，
+#   这四类经验的归类见 CLAUDE.md「四类经验 → 四种载体」）。
 # LLM 禁止使用匹配条目以外的故障模式推断根因。
 #
 # 字段：

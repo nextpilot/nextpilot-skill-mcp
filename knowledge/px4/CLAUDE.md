@@ -3,7 +3,7 @@
 > **这是给 AI（Claude Code）读的项目上下文**：改 `rules/*.yaml`、`operators.py`、
 > `ulog_checks.py` 或构建脚本前，先按这里的约定来——它记着每条设计决策的动机、
 > 与最初设计的落地差异（避免把有意为之当成 bug 改回去）、以及已知缺口。
-> 面向人的入口见 `../README.md`（怎么读）与 [`guides/writing-rules.md`](guides/writing-rules.md)（怎么写经验）。
+> 面向人的入口见 `../README.md`（怎么读）与站内 [如何编写一条规则](/guide/knowledge-write-rule)（怎么写经验）。
 > 本文件不发布到网站：里面有实施状态、已知缺口与提交记录。
 
 ## 实施状态（2026-09-15：已实施）
@@ -14,8 +14,8 @@ guard），**73 个通用算子**；`px4-thresholds.toml` 已退场（阈值随�
 通过；构建期护栏生效（算子名/入参数量、表达式与文案里的未声明名字、缺 `firmware`/`airframe`、
 guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 
-字段级权威参考（写经验时看这份）：**[writing-rules.md](guides/writing-rules.md)**；
-经验索引（自动生成）：**[rules-index.md](reference/rules-index.md)**；迁移过程中顺带修掉的 6 处
+字段级权威参考（写经验时看这份）：站内 **[如何编写一条规则](/guide/knowledge-write-rule)**（源文件 `web/content/guide/knowledge-write-rule.md`）；
+经验索引（站内页面，构建时生成）：**[/guide/knowledge-rules](/guide/knowledge-rules)**；迁移过程中顺带修掉的 6 处
 真实缺陷见提交 `6a081d5` 的说明（最要紧的一条：日志消息级别判据按 ASCII 语义修正后，
 `Kill engaged / Flight termination active`、`no barometer found` 这类"冒烟的枪"才浮出来）。
 
@@ -86,6 +86,19 @@ compute:
 `python tools/calibrate/probe_rule.py <log.ulg> <rule_id>`（单条经验逐节点诊断）。
 
 ---
+
+## 四类经验 → 四种载体
+
+工程师的经验不能整段丢给模型；按性质拆四类、各归其位，Agent 只负责检索 / 组装 / 翻译：
+
+| 经验类型 | 载体 | 谁执行 |
+| --- | --- | --- |
+| ① 量化阈值（振动多大算异常） | `rules/*.yaml` 的 `compute` + `triggers[].threshold` | 确定性引擎判定，产出标签 |
+| ② 故障树（多条件耦合、排查优先级、禁忌） | `px4-fault-kb.yaml` 条目（字段定义见该文件头注释） | 引擎按 标签 / 阶段 / 排除标签 匹配，只把命中条目喂 LLM |
+| ③ 推理逻辑（工程师怎么想） | `llm/gjb841-system-prompt.md` | LLM 遵守 |
+| ④ 边界 / 禁忌（什么情况下不许下结论） | `rules/*.yaml` 的 `emit.guard_tags` → guard 标签（如 `insufficient_data`） | 引擎先拦（命中即可短路），Prompt 兜底 |
+
+"我这块经验该写成什么"按这张表判断；"我想做 X 去看哪个文件"见 `../README.md` 的导航表。
 
 ## Context（为什么做）
 
@@ -827,8 +840,8 @@ knowledge/px4/
 > 上图是**最初设计**。实际落地的目录结构与上述设想有几处不同（`guards/` 并入 `rules/` 用
 > slot 区分、`topics/`+`params/` 合并成 `meta/<tag>.json`、`tags.yaml` 与
 > `topic-overrides.yaml` 未建、文档按受众分进 `design/` `guides/` `reference/` `llm/`）：
-> 现状请看 [reference/rules-index.md](reference/rules-index.md) 与
-> [guides/writing-rules.md](guides/writing-rules.md)，差异清单见本文开头的
+> 现状请看站内 [/guide/knowledge-rules](/guide/knowledge-rules) 与
+> 站内 /guide/knowledge-write-rule，差异清单见本文开头的
 > 「实施状态与落地差异」。
 
 `px4-fault-kb.yaml` 保持单文件（故障模式会有几十条）。`topics/` 为生成物（提交进仓库，
