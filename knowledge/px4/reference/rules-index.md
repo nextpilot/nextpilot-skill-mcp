@@ -294,8 +294,12 @@
 - 文件：`rules/gps-jump.yaml` ｜ 位置：slot `gps_health` #3
 - 适用：firmware any ｜ airframe any ｜ 依赖(任一) vehicle_gps_position
 - 取值：
-- `adjacent_speed_mps` → **step**
+- `adjacent_speed_mps` unit=deg, when_fw=>=1.15 → **step_new**
+    输入：`vehicle_gps_position.latitude_deg`, `vehicle_gps_position.longitude_deg`, `vehicle_gps_position.timestamp`
+- `adjacent_speed_mps` unit=degE7, when_fw=<1.15 → **step_old**
     输入：`vehicle_gps_position.lat`, `vehicle_gps_position.lon`, `vehicle_gps_position.timestamp`
+- `coalesce` → **step**
+    输入：`step_new`, `step_old`
 - `count_above` gt=50.0 → **njump_raw**
     输入：`step`
 - `to_int` → **njump**

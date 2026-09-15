@@ -1,4 +1,4 @@
-"""从 rules/*.yaml 汇总生成经验索引文档（knowledge/px4/px4-ulog-rules.md）。
+"""从 rules/*.yaml 汇总生成经验索引文档（knowledge/px4/reference/rules-index.md）。
 
 规则改动后重跑本脚本即可，避免索引与经验漂移：
     python tools/px4/gen-rules-index.py
@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 RULES_DIR = ROOT / "knowledge" / "px4" / "rules"
-OUT = ROOT / "knowledge" / "px4" / "px4-ulog-rules.md"
+OUT = ROOT / "knowledge" / "px4" / "reference" / "rules-index.md"
 
 SLOT_LABEL = {
     "guards_early": "数据质量 guard（最早执行）",

@@ -24,10 +24,10 @@
 
 | 层 | 职责（全部非 AI，除第 4 层） | 我们的载体 |
 | --- | --- | --- |
-| ① 二进制解析层 | `.ulg` 解析：topic、元数据、固件/机型、起止时间、重启与截断识别；输出时间序列结构化数据 | Pyodide + pyulog（[ulog-worker.ts](../../web/workers/ulog-worker.ts)） |
-| ② 信号预处理与特征提取层 | 滑窗 RMS（选窗口、剔除起飞冲击/大机动）、瞬时 vs 持续压降、GPS EPH 统计、**飞行阶段识别**、事件识别、**数据质量识别**（日志过短/中途重启/topic 缺失）、阈值与时序逻辑 → 异常标签集合 + 统计摘要 + 关键片段 | [ulog-check-script.ts](../../web/workers/ulog-check-script.ts)（冲刺 3 大改，见第 6 节） |
+| ① 二进制解析层 | `.ulg` 解析：topic、元数据、固件/机型、起止时间、重启与截断识别；输出时间序列结构化数据 | Pyodide + pyulog（[ulog-worker.ts](../../../web/workers/ulog-worker.ts)） |
+| ② 信号预处理与特征提取层 | 滑窗 RMS（选窗口、剔除起飞冲击/大机动）、瞬时 vs 持续压降、GPS EPH 统计、**飞行阶段识别**、事件识别、**数据质量识别**（日志过短/中途重启/topic 缺失）、阈值与时序逻辑 → 异常标签集合 + 统计摘要 + 关键片段 | [ulog-check-script.ts](../../../web/workers/ulog-check-script.ts)（冲刺 3 大改，见第 6 节） |
 | ③ 知识库检索层 | 按标签 + 阶段 + 排除条件匹配故障库，只取命中条目；数据质量差直接跳过 LLM | 冲刺 3：引擎内 YAML 匹配器（确定性代码，非生成式 AI） |
-| ④ AI 生成层 | 只做"整理成 GJB-841 规范文档"：不解析、不算信号、不判时序、不发明故障 | [functions/api/explain.js](../../web/functions/api/explain.js) + DeepSeek |
+| ④ AI 生成层 | 只做"整理成 GJB-841 规范文档"：不解析、不算信号、不判时序、不发明故障 | [functions/api/explain.js](../../../web/functions/api/explain.js) + DeepSeek |
 
 要点：AI 看不到几万行采样点，只收到第 2 层的**标签 + 统计摘要 + 关键片段**。
 窗口选错、没剔除机动就算错 RMS，后面模型再强也错——这层预处理逻辑就是壁垒，prompt 被抄走也抄不走它。
@@ -64,8 +64,8 @@ emit:
 - 禁止把"当 RMS 大于 0.08 就要注意振动"写进 prompt——大模型会记错、忽略数值。
 - 每条规则必须有官方来源或校准记录；阈值就写在这条经验自己里面。
 - 一条规则输出：`tag`、严重度、命中字段、实测值、阈值、官方文档链接（沿用现有 Finding 结构）。
-- **完整字段定义、内置变量、算子目录、常见坑**：[rule-reference.md](rule-reference.md)；
-  全部经验清单：[px4-ulog-rules.md](px4-ulog-rules.md)。
+- **完整字段定义、内置变量、算子目录、常见坑**：[writing-rules.md](writing-rules.md)；
+  全部经验清单：[rules-index.md](../reference/rules-index.md)。
 
 ## 2. 故障树经验：故障知识库 YAML
 
@@ -159,10 +159,10 @@ GJB-841 输出四段式：**故障现象描述 → 数据依据 → 初步原因
 
 ## 6. 落地差距（当前实现 → 本规范，冲刺 3）
 
-当前冲刺 2 的 [functions/api/explain.js](../../web/functions/api/explain.js) 只把 findings JSON 交给 LLM，
+当前冲刺 2 的 [functions/api/explain.js](../../../web/functions/api/explain.js) 只把 findings JSON 交给 LLM，
 prompt 无工程师思考范式，引擎也不产出标签/阶段/故障树匹配。冲刺 3 改造项：
 
-1. **引擎产出标签**：[web/workers/ulog-check-script.ts](../../web/workers/ulog-check-script.ts) 每条规则补稳定 `tag`；
+1. **引擎产出标签**：[web/workers/ulog-check-script.ts](../../../web/workers/ulog-check-script.ts) 每条规则补稳定 `tag`；
    新增飞行阶段推断（参考 robotto armed/nav_state 边沿法）；新增 5 个 guard 标签。
 2. **故障树匹配器（Python，随引擎打包）**：加载 [px4-fault-kb.yaml](px4/px4-fault-kb.yaml)，
    按 2.2 节规则输出命中条目，挂到结果 JSON。Pyodide 内可用极简 YAML 解析（条目结构固定）或构建期转 JSON 打包。

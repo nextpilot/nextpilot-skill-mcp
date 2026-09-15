@@ -1,17 +1,17 @@
-"""从 PX4 上游同步 uORB msg 与参数元数据 → knowledge/px4/{topics,params}/。
+"""从 PX4 上游同步 uORB msg 与参数元数据 → knowledge/px4/meta/<tag>.json。
 
-设计依据：knowledge/px4/rule-schema-design.md「工具」一节。
+设计依据：knowledge/px4/design/rule-schema-design.md「工具」一节。
 - msg：按 tag 从 PX4/PX4-Autopilot 归档包解出 msg/*.msg，
-  汇总成 topics/<tag>.json（**一 tag 一文件**：200+ topic 若各占一个文件会污染仓库；
+  汇总进 meta/<tag>.json 的 topics（**一 tag 一文件**：200+ topic 各占一个文件会污染仓库；
   且这些文件只有机器读写，JSON 无 YAML 引号陷阱、引擎直接消费）
 - 参数：flight_review 的做法是只用一份 master 参数定义（实际参数值来自日志的
   initial_parameters），默认取 px4-travis S3 的 main parameters.json，
-  汇总成 params/<tag>.json；可用 --params-url / --params-tag 覆盖
+  汇总进同一个 meta/<tag>.json 的 parameters；可用 --params-url / --params-tag 覆盖
 - 原始下载缓存到 .cache/px4/<tag>/，不入库
 
 用法：
-  python tools/topics/sync-px4-msg.py --tags v1.15.0,v1.16.0,main
-  python tools/topics/sync-px4-msg.py --check          # 只比对不写入（CI 用），不一致则退出码 1
+  python tools/px4/sync-px4-msg.py --tags v1.15.0,v1.16.0,main
+  python tools/px4/sync-px4-msg.py --check          # 只比对不写入（CI 用），不一致则退出码 1
 
 依赖：仅标准库（urllib + tarfile + json）；无需 pip install。
 """

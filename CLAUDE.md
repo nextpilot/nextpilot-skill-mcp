@@ -296,7 +296,7 @@
 | Next.js 路由 | `page.tsx` / `route.ts` / `layout.tsx`（目录即路由） | `app/analyze/page.tsx`、`app/api/explain/route.ts` |
 | Python 模块 | snake_case + `.py` | `knowledge/px4/ulog_checks.py` |
 | 知识 / 经验文件 | 见 `knowledge/README.md`；阈值 `*.toml`、故障库 `*.yaml` | `px4-thresholds.toml`、`px4-fault-kb.yaml` |
-| 文档 | kebab-case + `.md` | `px4-ulog-rules.md` |
+| 文档 | kebab-case + `.md` | `reference/rules-index.md` |
 
 > 注意：Worker 相关文件统一用连字符（`ulog-worker.ts`），不要用点号（❌ `ulog.worker.ts`）。
 >

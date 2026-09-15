@@ -8,8 +8,8 @@ guard），**73 个通用算子**；`px4-thresholds.toml` 已退场（阈值随�
 通过；构建期护栏生效（算子名/入参数量、表达式与文案里的未声明名字、缺 `firmware`/`airframe`、
 guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 
-字段级权威参考（写经验时看这份）：**[rule-reference.md](rule-reference.md)**；
-经验索引（自动生成）：**[px4-ulog-rules.md](px4-ulog-rules.md)**；迁移过程中顺带修掉的 6 处
+字段级权威参考（写经验时看这份）：**[writing-rules.md](../guides/writing-rules.md)**；
+经验索引（自动生成）：**[rules-index.md](../reference/rules-index.md)**；迁移过程中顺带修掉的 6 处
 真实缺陷见提交 `6a081d5` 的说明（最要紧的一条：日志消息级别判据按 ASCII 语义修正后，
 `Kill engaged / Flight termination active`、`no barometer found` 这类"冒烟的枪"才浮出来）。
 
@@ -817,6 +817,13 @@ knowledge/px4/
   px4-fault-kb.yaml
   px4-ulog-rules.md
 ```
+
+> 上图是**最初设计**。实际落地的目录结构与上述设想有几处不同（`guards/` 并入 `rules/` 用
+> slot 区分、`topics/`+`params/` 合并成 `meta/<tag>.json`、`tags.yaml` 与
+> `topic-overrides.yaml` 未建、文档按受众分进 `design/` `guides/` `reference/` `llm/`）：
+> 现状请看 [../reference/rules-index.md](../reference/rules-index.md) 与
+> [../guides/writing-rules.md](../guides/writing-rules.md)，差异清单见本文开头的
+> 「实施状态与落地差异」。
 
 `px4-fault-kb.yaml` 保持单文件（故障模式会有几十条）。`topics/` 为生成物（提交进仓库，
 便于离线与 CI），人工语义放 `topic-overrides.yaml`；两者在构建期合并，顺带合并现有

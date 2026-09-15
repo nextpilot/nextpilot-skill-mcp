@@ -1,8 +1,8 @@
 # 经验文件（rules/*.yaml）完整参考
 
 这是**写一条经验的权威参考**：字段级定义、取值语义、内置变量、算子目录、常见坑。
-设计动机与演进史见 [rule-schema-design.md](rule-schema-design.md)；
-全部经验的清单见 [px4-ulog-rules.md](px4-ulog-rules.md)（生成物）。
+设计动机与演进史见 [rule-schema-design.md](../design/rule-schema-design.md)；
+全部经验的清单见 [rules-index.md](../reference/rules-index.md)（生成物）。
 
 > 单一事实源：`knowledge/px4/rules/*.yaml`。本文件里标了 `<!-- BEGIN/END -->` 的两张表
 > 由 `python tools/px4/gen-rule-reference.py` 从 `operators.py` 与 `ulog_checks.py` 生成，
