@@ -20,26 +20,30 @@ px4/
   meta/<tag>.json       固件元数据（生成物）：字段字典 + 参数字典（见 meta/README.md）
 
   ── 文档（按受众分）──
-  design/               ① 想了解"为什么这么设计"的人
-    rule-schema-design.md   设计全文：动机、七层画像、执行链路、实施状态与落地差异
-  guides/               ② 要动手写/改规则的人
+  CLAUDE.md             ⓐ 给 AI 与维护者：设计动机、七层画像、执行链路、实施状态与落地差异
+                        （子目录 CLAUDE.md：动 `px4/` 下的规则与引擎时会自动进上下文，不发布到网站）
+  guides/               ① 要动手写/改规则的人
     writing-rules.md        经验 YAML 完整参考：字段定义、内置变量、算子目录、常见坑
     knowledge-authoring.md  方法论：四类经验 → 四种载体（谁该写什么、写到哪）
-  reference/            ③ 要查"现在有哪些规则、各自管什么"的人
+  reference/            ② 要查"现在有哪些规则、各自管什么"的人
     rules-index.md          32 条经验清单（生成物：从 rules/*.yaml 汇总）
-  llm/                  ④ 给 AI 看的（第四层：LLM 只做翻译与组装）
+  llm/                  ③ 给 AI 看的（第四层：LLM 只做翻译与组装）
     gjb841-system-prompt.md GJB-841 思考范式
     report-empty.md         无 finding 时的固定结论文案
 ```
+
+其中 `guides/writing-rules.md` 与 `reference/rules-index.md` 两份会**自动生成成网站页面**
+（`/guide` 的「知识库」分组，产物在 `web/content/guide/knowledge-*.md`，构建时生成，见下）。
 
 ## 我要做什么 → 看哪里
 
 | 我要…… | 看 / 改 |
 | --- | --- |
-| 了解整套规则体系为什么这么设计 | [px4/design/rule-schema-design.md](px4/design/rule-schema-design.md) |
+| 了解整套规则体系为什么这么设计 | [px4/CLAUDE.md](px4/CLAUDE.md)（给 AI 与维护者的设计上下文） |
 | **写一条新规则 / 改一条现有规则** | [px4/guides/writing-rules.md](px4/guides/writing-rules.md)（字段、算子、常见坑） |
 | 弄清自己这类经验该写在哪 | [px4/guides/knowledge-authoring.md](px4/guides/knowledge-authoring.md) |
 | 查现在有哪些规则、各自读什么字段、什么条件触发 | [px4/reference/rules-index.md](px4/reference/rules-index.md) |
+| **只是想"用网页看"这些内容** | 站点 `/guide` 的「知识库」分组（怎么写规则 / 现有规则两页） |
 | 调一条阈值 | 直接改 `px4/rules/<那条经验>.yaml` 的 `threshold` 与 `triggers[].expr` |
 | 加一条故障模式（根因 / 排查步骤） | `px4/px4-fault-kb.yaml`（trigger_tags 必须是引擎会产出的标签） |
 | 加一个可复用计算步骤 | `px4/operators.py`（`@operator` 声明 in/out arity），再在经验的 `compute` 里引用 |
@@ -60,13 +64,21 @@ python tools/calibrate/lint-rules.py
 python tools/calibrate/probe_rule.py engine/tests/logs/<log>.ulg <rule_id>
 ```
 
-改完经验/算子后，记得同步生成物：`python tools/px4/gen-rules-index.py`（规则清单）、
-`python tools/px4/gen-rule-reference.py`（参考文档里的算子目录与内置变量表）。
+改完经验/算子后，记得同步生成物：`python tools/px4/gen-rule-reference.py`（参考文档里的
+算子目录与内置变量表）。**规则清单不用手动跑**——`build:kb` 会从 `rules/*.yaml` 重算它，
+同时生成网站页面：
+
+```bash
+python tools/px4/gen-guide.py          # 只刷新文档与指南页面，不跑前端构建
+python tools/px4/gen-guide.py --check  # 只比对（CI 用），漂移则退出码 1
+```
 
 生成产物（提交进仓库，EdgeOne 直接 `next build` 也有得用）：
 `web/workers/ulog-check-script.ts`（内联 operators.py + ulog_checks.py + rules/*.yaml）、
 `web/workers/ulog-data-script.ts`、`web/workers/fault-kb.generated.json`、
-`web/lib/knowledge/prompts.generated.js`。
+`web/lib/knowledge/prompts.generated.js`、
+`web/content/guide/knowledge-*.md`（指南「知识库」分组的三个页面）+
+`px4/reference/rules-index.md`（同一份规则清单的开发文档形态）。
 
 **铁律**：生成物不要手改；所有数值判断只在 `px4/rules/*.yaml` + 引擎框架里发生，
 LLM 只做翻译与组装。

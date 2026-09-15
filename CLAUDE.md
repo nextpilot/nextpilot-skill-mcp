@@ -302,8 +302,12 @@
 >
 > **日志分析的人工经验（阈值 / 故障树 / 检查逻辑 / LLM 范式）单一事实源在仓库根
 > `knowledge/px4/`**，web 与未来 MCP Server 都只消费其派生产物（`web/workers/*`、
-> `web/lib/knowledge/*.generated.js`）。改经验只改 `knowledge/`，然后
-> `cd web && pnpm build:kb`。
+> `web/lib/knowledge/*.generated.js`、`web/content/guide/knowledge-*.md`）。改经验只改
+> `knowledge/`，然后 `cd web && pnpm build:kb`（或只刷文档：`python tools/px4/gen-guide.py`）。
+>
+> 改 `knowledge/px4/` 下的规则、算子或引擎前，先读同目录的 **`knowledge/px4/CLAUDE.md`**：
+> 那里记着每条设计决策的动机、与最初设计的落地差异（有意为之，别当 bug 改回去）和已知缺口；
+> 它是给 AI 与维护者的上下文，不发布到网站。
 
 ---
 

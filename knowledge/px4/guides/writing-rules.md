@@ -1,7 +1,7 @@
 # 经验文件（rules/*.yaml）完整参考
 
 这是**写一条经验的权威参考**：字段级定义、取值语义、内置变量、算子目录、常见坑。
-设计动机与演进史见 [rule-schema-design.md](../design/rule-schema-design.md)；
+设计动机与演进史见 [../CLAUDE.md](../CLAUDE.md)（给 AI 与维护者的项目上下文）；
 全部经验的清单见 [rules-index.md](../reference/rules-index.md)（生成物）。
 
 > 单一事实源：`knowledge/px4/rules/*.yaml`。本文件里标了 `<!-- BEGIN/END -->` 的两张表

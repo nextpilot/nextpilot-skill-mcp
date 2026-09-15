@@ -1,6 +1,6 @@
 """从 PX4 上游同步 uORB msg 与参数元数据 → knowledge/px4/meta/<tag>.json。
 
-设计依据：knowledge/px4/design/rule-schema-design.md「工具」一节。
+设计依据：knowledge/px4/CLAUDE.md「工具」一节。
 - msg：按 tag 从 PX4/PX4-Autopilot 归档包解出 msg/*.msg，
   汇总进 meta/<tag>.json 的 topics（**一 tag 一文件**：200+ topic 各占一个文件会污染仓库；
   且这些文件只有机器读写，JSON 无 YAML 引号陷阱、引擎直接消费）
