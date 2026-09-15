@@ -1,24 +1,19 @@
-# PX4 `.ulg` 检查经验索引
+---
+title: 当前有哪些规则
+titleEn: Rule catalogue
+description: 全部检查经验的清单：各自读什么字段、什么条件触发、产出什么标签。
+descriptionEn: Every built-in check — the fields it reads, the condition that fires it, and the tags it emits.
+group: 知识库
+groupEn: Knowledge base
+order: 12
+---
+引擎当前内置的 **32 条检查经验**，按执行位置（slot）分组。每条给出：适用条件
+（固件 / 机架 / 依赖）、读哪些字段、什么条件触发、产出哪些标签与统计。
 
-> ⚠️ 本文件由 `pnpm build:kb`（web/scripts/build-guide.mjs）从 `rules/*.yaml` 汇总生成，请勿手改；
-> 改经验请直接改 `rules/<名字>.yaml`，然后重跑该命令。
->
-> 当前共 **32 条经验**（27 个 YAML 文件），算子 73 个。
-> 判定阈值**就在各自经验文件里**（原先集中在 px4-thresholds.toml，已退场）。
->
-> 铁律（CLAUDE.md 4.1）：所有数值判断只发生在确定性引擎；LLM 只翻译，不改数值。
-
-## 怎么读这张表
-
-- **slot** 决定执行位置：finding 的 `id`（F01、F02…）按发射顺序生成，所以 slot 必须与
-  它所替换的原过程式检查位置一致；同一 slot 内按 `order` 排序。
-- **取值** 是 `compute` 数据流（`topic.field` 或前序输出 → 算子）；字段名与阈值都写在经验里，
-  算子本身不认识具体 topic。
-- **判定** 自上而下命中第一条即发射；`expr` 走 AST 白名单求值（不用 eval）。
-- **产出** 里的 check 名用于 `checksRun`/`checksSkipped`；tag 喂给故障知识库匹配。
+判定阈值就写在各自的经验 YAML 里。所有判定都由确定性引擎在浏览器本地完成——LLM 只把结论
+翻译成中文报告，不参与任何数值判断。本页在构建时从 `rules/*.yaml` 自动生成。
 
 ---
-
 
 ## airspeed（slot: `airspeed`）
 

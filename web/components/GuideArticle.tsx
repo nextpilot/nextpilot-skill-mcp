@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { LocalizedText } from "@/components/LocalizedText";
 import { GuideMdx } from "@/components/GuideMdx";
+import { GuideMarkdown } from "@/components/GuideMarkdown";
 import { GuideOutline, GuideOutlineMobile } from "@/components/GuideOutline";
 import { GuideDocsSelect } from "@/components/GuideSidebar";
 import { getGuideNav } from "@/lib/guide";
@@ -32,7 +33,7 @@ export function GuideArticle({ doc }: { doc: GuideDoc }) {
         </div>
 
         <div className="prose-guide">
-          <GuideMdx source={doc.body} />
+          {doc.renderer === "md" ? <GuideMarkdown source={doc.body} /> : <GuideMdx source={doc.body} />}
         </div>
 
         {(prev || next) && (

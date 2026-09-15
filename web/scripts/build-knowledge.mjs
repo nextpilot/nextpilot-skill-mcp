@@ -21,6 +21,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readdirSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
+import { buildGuide } from "./build-guide.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
@@ -370,8 +371,13 @@ writeFileSync(
   "utf8",
 );
 
+// 5) 指南的「知识库」分组：知识文档 → 网页（含规则清单）
+// 与知识产物同一趟生成，规则改了网页就跟着变，不需要谁记得手动同步。
+const guide = buildGuide();
+
 console.log(
   `knowledge built: ${kb.length} fault entries, ${rules.length} rules, ` +
     `${Object.keys(signatures).length} operators; ` +
     "ulog-check-script.ts, ulog-data-script.ts, prompts.generated.js",
 );
+console.log(`guide built: ${guide.pages.join(", ")}`);

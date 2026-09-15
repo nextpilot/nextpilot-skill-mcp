@@ -25,6 +25,12 @@ export interface GuideDoc {
   order: number;
   body: string;
   headings: GuideHeading[];
+  /**
+   * 正文渲染器。手写页面是 `.mdx`（走 MDX，可用 <Callout> 等组件）；
+   * `knowledge/` 派生过来的 `.md` 走普通 markdown——那些文档里有 `{占位符}`、
+   * `meta/<tag>.json` 这类内容，MDX 会当成 JSX 表达式解析。
+   */
+  renderer: "mdx" | "md";
 }
 
 export interface GuideNavItem {
@@ -66,7 +72,7 @@ function extractHeadings(body: string): GuideHeading[] {
 
 /** index.mdx 对应用户访问的 /guide，其余文件用文件名做 slug */
 function slugOf(fileName: string): string {
-  const base = fileName.replace(/\.mdx$/, "");
+  const base = fileName.replace(/\.mdx?$/, "");
   return base === "index" ? "" : base;
 }
 
@@ -92,6 +98,7 @@ function parseGuideFile(fileName: string): GuideDoc {
     order: Number(data.order ?? 999),
     body,
     headings: extractHeadings(body),
+    renderer: fileName.endsWith(".mdx") ? "mdx" : "md",
   };
 }
 
@@ -99,7 +106,7 @@ export function getAllGuideDocs(): GuideDoc[] {
   if (!fs.existsSync(GUIDE_DIR)) return [];
   return fs
     .readdirSync(GUIDE_DIR)
-    .filter((f) => f.endsWith(".mdx"))
+    .filter((f) => /\.mdx?$/.test(f))
     .map(parseGuideFile)
     .sort((a, b) => a.order - b.order);
 }
