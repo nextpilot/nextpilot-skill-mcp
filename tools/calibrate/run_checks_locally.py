@@ -26,7 +26,6 @@ OPERATORS_PY = KN_PX4 / "operators.py"
 PY_CHECKS = KN_PX4 / "ulog_checks.py"
 RULES_DIR = KN_PX4 / "rules"
 PY_DATA = KN_PX4 / "ulog_data.py"
-THRESHOLDS_TOML = KN_PX4 / "px4-thresholds.toml"
 FAULT_KB_JSON = REPO_ROOT / "web" / "workers" / "fault-kb.generated.json"
 
 
@@ -49,7 +48,9 @@ def _load_rules() -> list:
 
     rules = []
     for f in sorted(RULES_DIR.glob("*.yaml")):
-        rules.append(yaml.load(f.read_text(encoding="utf-8"), Loader=_Loader))
+        loaded = yaml.load(f.read_text(encoding="utf-8"), Loader=_Loader)
+        # 一个 YAML 可以装多条经验（顶层写成数组），与构建脚本保持一致
+        rules.extend(loaded if isinstance(loaded, list) else [loaded])
     return rules
 
 
@@ -59,11 +60,7 @@ def _load_checks() -> str:
     entries = json.loads(FAULT_KB_JSON.read_text(encoding="utf-8"))["entries"]
     body = body.replace("__FAULT_KB__", repr(entries))
 
-    if tomllib is None:
-        raise RuntimeError("需要 Python 3.11+（标准库 tomllib）来读 px4-thresholds.toml")
-    thresholds = tomllib.loads(THRESHOLDS_TOML.read_text(encoding="utf-8"))
-    # Python 源里是 json.loads(r'''__X__''')；注入 JSON 字面量
-    body = body.replace("__THRESHOLDS__", json.dumps(thresholds, ensure_ascii=False))
+    # 阈值已随经验内联（px4-thresholds.toml 退场），无需再注入
     body = body.replace("__RULES__", json.dumps(_load_rules(), ensure_ascii=False))
     return body
 

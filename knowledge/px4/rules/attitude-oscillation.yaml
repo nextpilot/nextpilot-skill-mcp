@@ -1,0 +1,74 @@
+# 姿态误差高频振荡（F006 的第二条结论）：误差过零频率 >= 4 Hz 且跟踪误差同时超 warn 门限。
+# 阈值 [暂定]：振荡 4 Hz；warn 门限按机型（旋翼 15°、固定翼 25°）。
+# 说明：与超调共用同一个复合算子（对齐/掩码/统计都在里面），只是触发条件与文案不同。
+
+id: px4-attitude-oscillation
+slot: attitude_tracking
+order: 2
+name: 姿态误差高频振荡
+version: 1.1.0
+category: attitude
+status: stable
+author: {name: NextPilot 内置}
+license: CC-BY-4.0
+changelog:
+  - {version: 1.0.0, date: "2026-09-15", note: "从 ulog_checks.py 迁出（原与超调同块，拆为独立经验）"}
+  - {version: 1.1.0, date: "2026-09-15", note: "30 个节点收成一个复合算子 att_tracking_stats"}
+
+firmware: any
+airframe: any
+requires:
+  all_of: [vehicle_attitude, vehicle_attitude_setpoint]
+skip_reason: vehicle_attitude(_setpoint) 或 armed 段缺失
+not_applicable: {when: "not has_armed", skip_reason: vehicle_attitude(_setpoint) 或 armed 段缺失}
+ran_when: "seg_ok"
+
+compute:
+  - out: [p99, osc_hz, seg_n]
+    in:
+      - vehicle_attitude.q
+      - vehicle_attitude_setpoint.q_d
+      - vehicle_attitude_setpoint.roll_body
+      - vehicle_attitude_setpoint.pitch_body
+      - vehicle_attitude.timestamp
+      - vehicle_attitude_setpoint.timestamp
+      - armed_intervals
+      - fw_minor
+    op: att_tracking_stats
+    optional: true
+    tilt_min_deg: 10.0
+    min_samples: 50
+    sample_rate: 50
+  - {out: seg_ok, in: [seg_n, 50], op: gt, optional: true}
+  - {out: p99_stat, in: [seg_ok, p99], op: value_if, optional: true}
+  - {out: osc_stat, in: [seg_ok, osc_hz], op: value_if, optional: true}
+
+triggers:
+  - expr: "osc_stat >= 4.0 and p99_stat >= 25.0 and is_fixed_wing"
+    severity: warning
+    tag: attitude_overshoot
+    threshold: 4.0
+    value: osc_stat
+    round: 2
+    unit: Hz
+    field: "姿态跟踪误差符号翻转频率"
+    title: "姿态误差高频振荡（约 {osc_stat:.1f} Hz）"
+    suggestion: "振荡多与控制增益/机架共振相关，禁用大幅调参，先做频响检查。"
+  - expr: "osc_stat >= 4.0 and p99_stat >= 15.0 and not is_fixed_wing"
+    severity: warning
+    tag: attitude_overshoot
+    threshold: 4.0
+    value: osc_stat
+    round: 2
+    unit: Hz
+    field: "姿态跟踪误差符号翻转频率"
+    title: "姿态误差高频振荡（约 {osc_stat:.1f} Hz）"
+    suggestion: "振荡多与控制增益/机架共振相关，禁用大幅调参，先做频响检查。"
+
+emit:
+  check: attitude_tracking
+  tag: attitude_overshoot
+  doc: https://docs.px4.io/main/en/log/flight_log_analysis.html
+  stats:
+    attitudeErrDegP99: {var: p99_stat, round: 1}
+    attitudeOscHz: {var: osc_stat, round: 2}

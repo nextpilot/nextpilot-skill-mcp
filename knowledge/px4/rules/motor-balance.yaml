@@ -1,0 +1,70 @@
+# 电机输出不平衡（F008）：只在 armed 且悬停/定点段比较各电机通道均值极差；
+# 要求 >= 4 个活跃通道（均值 > 0.01，排除未接/未用通道），否则不出结论。
+# 掩码与逐通道均值都收在复合算子里；阈值 [暂定]：spread_warn=0.08 / spread_crit=0.15。
+
+id: px4-motor-unbalance
+slot: motor_balance
+order: 1
+name: 电机输出不平衡
+version: 1.1.0
+category: motor
+status: stable
+author: {name: NextPilot 内置}
+license: CC-BY-4.0
+changelog:
+  - {version: 1.0.0, date: "2026-09-15", note: "从 ulog_checks.py 迁出，逻辑与阈值不变"}
+  - {version: 1.1.0, date: "2026-09-15", note: "17 个节点收成两个复合算子"}
+
+firmware: any
+airframe: any
+
+requires:
+  any_of: [actuator_motors]
+skip_reason: actuator_motors not in log
+skip_reason_no_data: "active motor channels < 4 (非多旋翼或未记录全部电机)"
+# 原实现把 ran() 放在“活跃通道 >= 4”之后：不成立时只算 skipped，不算跑过
+ran_on_success: true
+
+compute:
+  - {out: mts, from: actuator_motors.timestamp, op: read}
+  - {out: cols, from: actuator_motors.control, op: read}
+  # armed 段 ∩ 悬停/定点（nav_state ∈ {2,4,6,14,21}）；悬停样本太少则退回整个 armed 段
+  - out: seg
+    in: [mts, armed_intervals, vehicle_status.nav_state, vehicle_status.timestamp]
+    op: active_window_mask
+    codes: [2, 4, 6, 14, 21]
+    min_active: 20
+  # 掩码内逐通道均值 → 活跃通道（> 0.01）的极差与最大/最小通道号；不足 4 个通道返回 None
+  - out: [spread, busiest, idlest, n_active]
+    in: [cols, seg]
+    op: column_spread_stats
+    min_mean: 0.01
+    min_channels: 4
+
+triggers:
+  - expr: "spread >= 0.15"
+    severity: critical
+    tag: motor_output_unbalance
+    threshold: 0.15
+    value: spread
+    round: 3
+    field: "actuator_motors.control[](悬停段均值极差)"
+    title: "电机输出不平衡（悬停段通道 {busiest} 与 {idlest} 差 {spread:.3f}）"
+    suggestion: "结合故障库 F008：检查桨叶型号/正反桨是否一致、单电机效率、机架形变。"
+  - expr: "spread >= 0.08"
+    severity: warning
+    tag: motor_output_unbalance
+    threshold: 0.08
+    value: spread
+    round: 3
+    field: "actuator_motors.control[](悬停段均值极差)"
+    title: "电机输出差异偏大（通道 {busiest} 与 {idlest} 差 {spread:.3f}）"
+    suggestion: "结合故障库 F008 排查动力一致性；偶发差异可先观察。"
+
+emit:
+  check: motor_balance
+  tag: motor_output_unbalance
+  doc: https://docs.px4.io/main/en/log/flight_log_analysis.html
+  stats:
+    motorControlSpread: {var: spread, round: 3}
+    motorCountActive: {var: n_active}

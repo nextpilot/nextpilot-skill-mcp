@@ -1,9 +1,7 @@
 // ⚠️ 自动生成，请勿手改。源文件在 knowledge/px4/，改完跑 `pnpm build:kb`（dev/build 自动执行）。
 import faultKbJson from "./fault-kb.generated.json";
 
-const thresholds = {"guard":{"min_flight_sec":60,"dropout_ms":1000},"vibration":{"vibe_warn":4.905,"vibe_crit":9.81,"stddev_warn":0.5,"stddev_crit":1,"clip_warn":100,"clip_crit":1000},"ekf":{"reject_ratio_warn":0.01,"reject_ratio_crit":0.05,"reject_min_count":3,"peak_warn":0.5,"peak_crit":1},"power":{"cell_warn":3.7,"cell_crit":3.55,"sag_volts":0.3,"sag_skip_takeoff_sec":5,"remaining_warn":0.2,"remaining_crit":0.1},"cpu":{"load_warn":0.9,"load_crit":0.95},"gps":{"eph_warn":5,"eph_crit":10,"sats_warn":8,"sats_crit":6,"jump_speed_mps":50,"jump_min_count":3},"mode":{"thrash_changes":12},"motor":{"spread_warn":0.08,"spread_crit":0.15},"gyro_bias":{"abs_warn":0.02,"abs_crit":0.05,"drift_warn":0.02,"drift_crit":0.05,"temp_range_warn":15,"temp_range_crit":25},"attitude":{"err_warn_rotary":15,"err_crit_rotary":30,"err_warn_fixedwing":25,"err_crit_fixedwing":40,"osc_hz":4,"sample_rate_hz":50,"min_seg_samples":50},"airspeed":{"invalid_ratio_warn":0.1,"invalid_ratio_crit":0.5},"vtol":{"transition_tilt_deg":8},"wind":{"speed_warn":8,"speed_crit":12},"messages":{"critical_max_level":3,"warn_level":4,"max_examples":5,"message_clip_len":200}};
-
-const rules = [{"id":"px4-cpu-load","slot":"cpu","name":"CPU 负载","version":"1.0.0","category":"system","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["cpuload"]},"skip_reason":"cpuload not in log","compute":[{"out":"cpu_max","from":"cpuload.load","op":"max"}],"triggers":[{"expr":"cpu_max >= 0.95","severity":"critical","threshold":0.95,"value":"cpu_max","round":3,"field":"cpuload.load(max)","title":"CPU 负载峰值 {cpu_max:.0%} 超阈值","suggestion":"CPU 长期接近满载会导致控制环丢步；检查高耗率模块与日志流配置。"},{"expr":"cpu_max >= 0.90","severity":"warning","threshold":0.9,"value":"cpu_max","round":3,"field":"cpuload.load(max)","title":"CPU 负载峰值 {cpu_max:.0%} 偏高","suggestion":"关注 CPU 余量，必要时降低消息发布率。"}],"emit":{"check":"cpu_load","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html","stats":{"cpuLoadMax":{"var":"cpu_max","round":3}}}},{"id":"px4-power-remaining","slot":"battery","order":3,"name":"电池剩余电量","version":"1.0.0","category":"power","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["battery_status"]},"skip_reason":"battery_status not in log","compute":[{"out":"rem","from":"battery_status.remaining","op":"min_ge","ge":0},{"out":"rem_pct","in":["rem"],"op":"scale","factor":100}],"triggers":[{"expr":"rem <= 0.10","severity":"critical","threshold":0.1,"value":"rem","round":3,"field":"battery_status.remaining(min)","title":"电池剩余电量极低（{rem_pct:.0f}%）","suggestion":"剩余电量低于 10%，应立即返航；检查电量估算与电池健康。"},{"expr":"rem <= 0.20","severity":"warning","threshold":0.2,"value":"rem","round":3,"field":"battery_status.remaining(min)","title":"电池剩余电量偏低（{rem_pct:.0f}%）","suggestion":"剩余电量低于 20%，注意返航裕度。"}],"emit":{"check":"battery","tag":"battery_voltage_drop","doc":"https://docs.px4.io/main/en/config/battery.html","stats":{"batteryRemainingMin":{"var":"rem","round":3}}}}];
+const rules = [{"id":"px4-airspeed-invalid","slot":"airspeed","order":1,"name":"空速健康","version":"1.0.0","category":"airspeed","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"fixed_wing","not_applicable":{"when":"airframe == 'unknown'","skip_reason":"机型未知，无法判定固定翼巡航段"},"silent_when":"'vehicle_attitude_setpoint' not in topics","requires":{"any_of":["airspeed_validated"]},"skip_reason":"无固定翼巡航段或未记录 airspeed_validated","skip_reason_no_data":"无固定翼巡航段或未记录 airspeed_validated","compute":[{"out":"fw_cruise","in":["vehicle_status.nav_state","vehicle_status.timestamp","armed_intervals"],"op":"masked_any_in","codes":[3,8]},{"out":"cruise_ok","in":["fw_cruise"],"op":"require_true"},{"out":"invalid_frac","from":"airspeed_validated.airspeed_sensor_measurement_valid","op":"ratio_equal","value":0,"optional":true},{"out":"has_invalid","in":["invalid_frac"],"op":"is_not_none","optional":true},{"out":"tas_min","from":"airspeed_validated.true_airspeed_m_s","op":"min","optional":true}],"triggers":[{"expr":"has_invalid and invalid_frac >= 0.50","severity":"critical","tag":"low_airspeed","threshold":0.5,"value":"invalid_frac","round":3,"field":"airspeed_validated.airspeed_sensor_measurement_valid","title":"空速传感器在固定翼段大部分时间无效（{invalid_frac:.0%} 样本）","suggestion":"结合故障库 F009：空速失效极易引发失速，检查空速管堵塞/积水、管路漏气与校准。"},{"expr":"has_invalid and invalid_frac >= 0.10","severity":"warning","tag":"low_airspeed","threshold":0.1,"value":"invalid_frac","round":3,"field":"airspeed_validated.airspeed_sensor_measurement_valid","title":"空速传感器间歇无效（{invalid_frac:.0%} 样本）","suggestion":"结合故障库 F009 检查空速管与管路密封。"}],"emit":{"check":"airspeed","tag":"low_airspeed","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html","stats":{"airspeedInvalidRatio":{"var":"invalid_frac","round":3},"airspeedMinM":{"var":"tas_min","round":1}}}},{"id":"px4-attitude-oscillation","slot":"attitude_tracking","order":2,"name":"姿态误差高频振荡","version":"1.1.0","category":"attitude","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出（原与超调同块，拆为独立经验）"},{"version":"1.1.0","date":"2026-09-15","note":"30 个节点收成一个复合算子 att_tracking_stats"}],"firmware":"any","airframe":"any","requires":{"all_of":["vehicle_attitude","vehicle_attitude_setpoint"]},"skip_reason":"vehicle_attitude(_setpoint) 或 armed 段缺失","not_applicable":{"when":"not has_armed","skip_reason":"vehicle_attitude(_setpoint) 或 armed 段缺失"},"ran_when":"seg_ok","compute":[{"out":["p99","osc_hz","seg_n"],"in":["vehicle_attitude.q","vehicle_attitude_setpoint.q_d","vehicle_attitude_setpoint.roll_body","vehicle_attitude_setpoint.pitch_body","vehicle_attitude.timestamp","vehicle_attitude_setpoint.timestamp","armed_intervals","fw_minor"],"op":"att_tracking_stats","optional":true,"tilt_min_deg":10,"min_samples":50,"sample_rate":50},{"out":"seg_ok","in":["seg_n",50],"op":"gt","optional":true},{"out":"p99_stat","in":["seg_ok","p99"],"op":"value_if","optional":true},{"out":"osc_stat","in":["seg_ok","osc_hz"],"op":"value_if","optional":true}],"triggers":[{"expr":"osc_stat >= 4.0 and p99_stat >= 25.0 and is_fixed_wing","severity":"warning","tag":"attitude_overshoot","threshold":4,"value":"osc_stat","round":2,"unit":"Hz","field":"姿态跟踪误差符号翻转频率","title":"姿态误差高频振荡（约 {osc_stat:.1f} Hz）","suggestion":"振荡多与控制增益/机架共振相关，禁用大幅调参，先做频响检查。"},{"expr":"osc_stat >= 4.0 and p99_stat >= 15.0 and not is_fixed_wing","severity":"warning","tag":"attitude_overshoot","threshold":4,"value":"osc_stat","round":2,"unit":"Hz","field":"姿态跟踪误差符号翻转频率","title":"姿态误差高频振荡（约 {osc_stat:.1f} Hz）","suggestion":"振荡多与控制增益/机架共振相关，禁用大幅调参，先做频响检查。"}],"emit":{"check":"attitude_tracking","tag":"attitude_overshoot","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html","stats":{"attitudeErrDegP99":{"var":"p99_stat","round":1},"attitudeOscHz":{"var":"osc_stat","round":2}}}},{"id":"px4-attitude-overshoot","slot":"attitude_tracking","order":1,"name":"姿态跟踪超调","version":"1.1.0","category":"attitude","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"},{"version":"1.1.0","date":"2026-09-15","note":"30 个节点收成一个复合算子 att_tracking_stats"}],"firmware":"any","airframe":"any","requires":{"all_of":["vehicle_attitude","vehicle_attitude_setpoint"]},"skip_reason":"vehicle_attitude(_setpoint) 或 armed 段缺失","not_applicable":{"when":"not has_armed","skip_reason":"vehicle_attitude(_setpoint) 或 armed 段缺失"},"ran_when":"seg_ok","compute":[{"out":["p99","osc_hz","seg_n"],"in":["vehicle_attitude.q","vehicle_attitude_setpoint.q_d","vehicle_attitude_setpoint.roll_body","vehicle_attitude_setpoint.pitch_body","vehicle_attitude.timestamp","vehicle_attitude_setpoint.timestamp","armed_intervals","fw_minor"],"op":"att_tracking_stats","optional":true,"tilt_min_deg":10,"min_samples":50,"sample_rate":50},{"out":"seg_ok","in":["seg_n",50],"op":"gt","optional":true},{"out":"p99_stat","in":["seg_ok","p99"],"op":"value_if","optional":true},{"out":"osc_stat","in":["seg_ok","osc_hz"],"op":"value_if","optional":true}],"triggers":[{"expr":"p99_stat >= 40.0 and is_fixed_wing","severity":"critical","tag":"attitude_overshoot","threshold":25,"value":"p99_stat","round":1,"unit":"°","field":"vehicle_attitude vs vehicle_attitude_setpoint（机动段）","title":"姿态跟踪误差过大（p99 {p99_stat:.1f}°）","suggestion":"结合故障库 F006：检查姿态环增益、机架共振；避免直接大幅降 PID。"},{"expr":"p99_stat >= 25.0 and is_fixed_wing","severity":"warning","tag":"attitude_overshoot","threshold":25,"value":"p99_stat","round":1,"unit":"°","field":"vehicle_attitude vs vehicle_attitude_setpoint（机动段）","title":"姿态跟踪误差偏大（p99 {p99_stat:.1f}°）","suggestion":"结合故障库 F006 排查；大风环境下优先归因环境扰动。"},{"expr":"p99_stat >= 30.0 and not is_fixed_wing","severity":"critical","tag":"attitude_overshoot","threshold":15,"value":"p99_stat","round":1,"unit":"°","field":"vehicle_attitude vs vehicle_attitude_setpoint（机动段）","title":"姿态跟踪误差过大（p99 {p99_stat:.1f}°）","suggestion":"结合故障库 F006：检查姿态环增益、机架共振；避免直接大幅降 PID。"},{"expr":"p99_stat >= 15.0 and not is_fixed_wing","severity":"warning","tag":"attitude_overshoot","threshold":15,"value":"p99_stat","round":1,"unit":"°","field":"vehicle_attitude vs vehicle_attitude_setpoint（机动段）","title":"姿态跟踪误差偏大（p99 {p99_stat:.1f}°）","suggestion":"结合故障库 F006 排查；大风环境下优先归因环境扰动。"}],"emit":{"check":"attitude_tracking","tag":"attitude_overshoot","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html","stats":{"attitudeErrDegP99":{"var":"p99_stat","round":1},"attitudeOscHz":{"var":"osc_stat","round":2}}}},{"id":"px4-cpu-load","slot":"cpu","name":"CPU 负载","version":"1.0.0","category":"system","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["cpuload"]},"skip_reason":"cpuload not in log","compute":[{"out":"cpu_max","from":"cpuload.load","op":"max"}],"triggers":[{"expr":"cpu_max >= 0.95","severity":"critical","threshold":0.95,"value":"cpu_max","round":3,"field":"cpuload.load(max)","title":"CPU 负载峰值 {cpu_max:.0%} 超阈值","suggestion":"CPU 长期接近满载会导致控制环丢步；检查高耗率模块与日志流配置。"},{"expr":"cpu_max >= 0.90","severity":"warning","threshold":0.9,"value":"cpu_max","round":3,"field":"cpuload.load(max)","title":"CPU 负载峰值 {cpu_max:.0%} 偏高","suggestion":"关注 CPU 余量，必要时降低消息发布率。"}],"emit":{"check":"cpu_load","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html","stats":{"cpuLoadMax":{"var":"cpu_max","round":3}}}},{"id":"px4-ekf-fault","slot":"ekf_faults","order":1,"name":"EKF 融合硬故障","version":"1.0.0","category":"ekf","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["estimator_status"]},"skip_reason":"estimator_status not in log","compute":[{"out":"fault_raw","from":"estimator_status.filter_fault_flags","op":"bit_or_max","per_instance":true,"optional":true},{"out":"nan_raw","from":"estimator_status.nan_flags","op":"max_of_max","per_instance":true,"optional":true},{"out":"fault_union","in":["fault_raw",0],"op":"coalesce","optional":true},{"out":"nan_v","in":["nan_raw",0],"op":"coalesce","optional":true},{"out":"nan_max","in":["nan_v"],"op":"to_int","optional":true},{"out":"crit_bits","in":["fault_union",63],"op":"has_bits","optional":true}],"triggers":[{"expr":"nan_max > 0 or crit_bits","severity":"critical","threshold":0,"value_text":"fault={fault_union},nan={nan_max}","field":"estimator_status.filter_fault_flags/nan_flags","title":"EKF 报告核心融合硬故障（filter_fault_flags={fault_union}, nan_flags={nan_max}）","suggestion":"估计器出现硬故障/NaN，建议停飞排查传感器与振动后重新标定。"},{"expr":"fault_union > 0 and not crit_bits and nan_max == 0","severity":"info","tag":null,"threshold":0,"value":"fault_union","field":"estimator_status.filter_fault_flags","title":"EKF 报告非核心辅助传感器融合拒绝（filter_fault_flags={fault_union}，常见为未使用视觉/光流）","suggestion":"若该机确实未启用视觉/光流定位，此位可忽略；否则检查对应传感器。"}],"emit":{"check":"ekf_faults","tag":"ekf_innovation_failure","doc":"https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"}},{"id":"px4-ekf-innovation","slot":"ekf_innovations","order":1,"name":"EKF 创新检验","version":"1.0.0","category":"ekf","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["estimator_status"]},"skip_reason":"estimator_status not in log","compute":[{"out":["frac","names","inst"],"in":["estimator_status.innovation_check_flags","estimator_status.vel_test_ratio","estimator_status.pos_test_ratio","estimator_status.hgt_test_ratio","estimator_status.hdg_test_ratio","estimator_status.mag_test_ratio","estimator_status.tas_test_ratio","estimator_status.hagl_test_ratio","estimator_status.beta_test_ratio"],"op":"worst_reject_ratio","per_instance":true,"primary_min":3,"primary_names":["速度","水平位置","垂直位置","磁罗盘 X","磁罗盘 Y","磁罗盘 Z","航向","空速","侧滑","离地高度","光流 X","光流 Y"],"ge":1,"channel_min":3,"channel_labels":["速度","水平位置","垂直高度","航向","磁罗盘","空速","离地高度","侧滑"],"fallback_label":"未知通道"},{"out":"pct","in":["frac"],"op":"scale","factor":100}],"triggers":[{"expr":"pct >= 5.0","severity":"critical","threshold":5,"value":"pct","round":2,"unit":"%","field":"estimator_status 创新检验拒绝样本占比","title":"EKF 创新检验持续失败（estimator #{inst}：{names}）","suggestion":"涉及：{names}。检查对应传感器健康度、安装与校准。"},{"expr":"pct >= 1.0","severity":"warning","threshold":1,"value":"pct","round":2,"unit":"%","field":"estimator_status 创新检验拒绝样本占比","title":"EKF 创新检验偶发失败（estimator #{inst}：{names}）","suggestion":"涉及：{names}。关注 GPS 卫星数、磁罗盘干扰、振动与气压计异常。"}],"emit":{"check":"ekf_innovations","tag":"ekf_innovation_failure","doc":"https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html","stats":{"ekfRejectRatioPct":{"var":"pct","round":2}}}},{"id":"px4-failsafe-failsafe","slot":"failsafe","order":1,"name":"失效保护触发","version":"1.0.0","category":"failsafe","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["vehicle_status"]},"skip_reason":"vehicle_status not in log","compute":[{"out":"events","in":["vehicle_status.failsafe","vehicle_status.timestamp","armed_intervals","t0_us"],"op":"rising_edge_events"}],"foreach":{"var":"events","keys":["t_s"]},"triggers":[{"expr":"True","severity":"critical","tag":"failsafe","value_text":"set at {t_s:.1f}s","field":"vehicle_status.failsafe","title":"触发失效保护（飞行中，t={t_s:.1f}s）","suggestion":"结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"}],"emit":{"check":"failsafe","doc":"https://docs.px4.io/main/en/config/safety.html"}},{"id":"px4-failsafe-rc_signal_lost","slot":"failsafe","order":2,"name":"遥控信号丢失","version":"1.0.0","category":"failsafe","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["vehicle_status"]},"skip_reason":"vehicle_status not in log","compute":[{"out":"events","in":["vehicle_status.rc_signal_lost","vehicle_status.timestamp","armed_intervals","t0_us"],"op":"rising_edge_events"}],"foreach":{"var":"events","keys":["t_s"]},"triggers":[{"expr":"True","severity":"warning","tag":"rc_lost","value_text":"set at {t_s:.1f}s","field":"vehicle_status.rc_signal_lost","title":"遥控信号丢失（飞行中，t={t_s:.1f}s）","suggestion":"结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"}],"emit":{"check":"failsafe","doc":"https://docs.px4.io/main/en/config/safety.html"}},{"id":"px4-failsafe-data_link_lost","slot":"failsafe","order":3,"name":"数据链路丢失","version":"1.0.0","category":"failsafe","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["vehicle_status"]},"skip_reason":"vehicle_status not in log","compute":[{"out":"events","in":["vehicle_status.data_link_lost","vehicle_status.timestamp","armed_intervals","t0_us"],"op":"rising_edge_events"}],"foreach":{"var":"events","keys":["t_s"]},"triggers":[{"expr":"True","severity":"warning","tag":null,"value_text":"set at {t_s:.1f}s","field":"vehicle_status.data_link_lost","title":"数据链路丢失（飞行中，t={t_s:.1f}s）","suggestion":"结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"}],"emit":{"check":"failsafe","doc":"https://docs.px4.io/main/en/config/safety.html"}},{"id":"px4-failsafe-engine_failure","slot":"failsafe","order":4,"name":"动力故障保护","version":"1.0.0","category":"failsafe","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["vehicle_status"]},"skip_reason":"vehicle_status not in log","compute":[{"out":"events","in":["vehicle_status.engine_failure","vehicle_status.timestamp","armed_intervals","t0_us"],"op":"rising_edge_events"}],"foreach":{"var":"events","keys":["t_s"]},"triggers":[{"expr":"True","severity":"critical","tag":null,"value_text":"set at {t_s:.1f}s","field":"vehicle_status.engine_failure","title":"发动机/动力故障保护（飞行中，t={t_s:.1f}s）","suggestion":"结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"}],"emit":{"check":"failsafe","doc":"https://docs.px4.io/main/en/config/safety.html"}},{"id":"px4-failsafe-mission_failure","slot":"failsafe","order":5,"name":"任务失效保护","version":"1.0.0","category":"failsafe","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["vehicle_status"]},"skip_reason":"vehicle_status not in log","compute":[{"out":"events","in":["vehicle_status.mission_failure","vehicle_status.timestamp","armed_intervals","t0_us"],"op":"rising_edge_events"}],"foreach":{"var":"events","keys":["t_s"]},"triggers":[{"expr":"True","severity":"critical","tag":null,"value_text":"set at {t_s:.1f}s","field":"vehicle_status.mission_failure","title":"任务失效保护（飞行中，t={t_s:.1f}s）","suggestion":"结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"}],"emit":{"check":"failsafe","doc":"https://docs.px4.io/main/en/config/safety.html"}},{"id":"px4-failsafe-nav","slot":"failsafe","order":6,"name":"失效保护导航状态","version":"1.0.0","category":"failsafe","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["vehicle_status"]},"skip_reason":"vehicle_status not in log","compute":[{"out":"events","in":["vehicle_status.nav_state","vehicle_status.timestamp","armed_intervals","t0_us"],"op":"step_into_events","codes":{"5":"AUTO_RTL","12":"DESCEND","13":"TERMINATION","18":"LAND"}}],"foreach":{"var":"events","keys":["t_s","code","name"]},"triggers":[{"expr":"True","severity":"critical","tag":"failsafe","value":"name","field":"vehicle_status.nav_state","title":"飞行中导航状态切换为 {name}（t={t_s:.1f}s）","suggestion":"说明飞控进入失效保护状态，需结合前文事件定位触发原因。"}],"emit":{"check":"failsafe","doc":"https://docs.px4.io/main/en/config/safety.html"}},{"id":"px4-gps-eph","slot":"gps_health","order":1,"name":"GPS 水平位置误差","version":"1.0.0","category":"gps","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["vehicle_gps_position"]},"skip_reason":"vehicle_gps_position not in log","compute":[{"out":"eph_pos","from":"vehicle_gps_position.eph","op":"keep_gt","gt":0},{"out":"eph_m","in":["eph_pos"],"op":"scale_series","factor":0.001},{"out":"e_p95","in":["eph_m"],"op":"percentile","p":95},{"out":"e_max","in":["eph_m"],"op":"max"}],"triggers":[{"expr":"e_p95 >= 10.0","severity":"warning","tag":"gps_eph_high","threshold":10,"value":"e_p95","round":2,"unit":"m","field":"vehicle_gps_position.eph(armed p95)","title":"GPS 水平位置误差持续偏大（p95 {e_p95:.1f} m）","suggestion":"结合故障库 F002：排查天线电磁干扰/遮挡/馈线虚接/多路径。"},{"expr":"e_p95 >= 5.0","severity":"info","tag":"gps_eph_high","threshold":5,"value":"e_p95","round":2,"unit":"m","field":"vehicle_gps_position.eph(armed p95)","title":"GPS 水平位置误差偶发偏大（p95 {e_p95:.1f} m）","suggestion":"关注天线安装位置与遮挡。"}],"emit":{"check":"gps_health","tag":"gps_eph_high","doc":"https://docs.px4.io/main/en/gps_compass/","stats":{"gpsEphP95M":{"var":"e_p95","round":2},"gpsEphMaxM":{"var":"e_max","round":2}}}},{"id":"px4-gps-jump","slot":"gps_health","order":3,"name":"GPS 位置跳变","version":"1.0.0","category":"gps","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["vehicle_gps_position"]},"skip_reason":"vehicle_gps_position not in log","compute":[{"out":"step","in":["vehicle_gps_position.lat","vehicle_gps_position.lon","vehicle_gps_position.timestamp"],"op":"adjacent_speed_mps"},{"out":"njump_raw","in":["step"],"op":"count_above","gt":50},{"out":"njump","in":["njump_raw"],"op":"to_int"}],"triggers":[{"expr":"njump >= 3","severity":"warning","tag":"gps_jump","threshold":3,"value":"njump","unit":"次","field":"vehicle_gps_position lat/lon 相邻差分","title":"GPS 位置出现 {njump} 次异常跳变（>50 m/s）","suggestion":"结合故障库 F002：排查多路径、馈线与电磁干扰；室内跳变为正常现象。"}],"emit":{"check":"gps_health","tag":"gps_jump","doc":"https://docs.px4.io/main/en/gps_compass/","stats":{"gpsJumpCount":{"var":"njump"}}}},{"id":"px4-gps-sats","slot":"gps_health","order":2,"name":"GPS 卫星数","version":"1.0.0","category":"gps","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["vehicle_gps_position"]},"skip_reason":"vehicle_gps_position not in log","compute":[{"out":"s_min_raw","from":"vehicle_gps_position.satellites_used","op":"min"},{"out":"s_min","in":["s_min_raw"],"op":"to_int"}],"triggers":[{"expr":"s_min <= 6","severity":"warning","tag":"gps_eph_high","threshold":8,"value":"s_min","unit":"颗","field":"vehicle_gps_position.satellites_used(min)","title":"GPS 卫星数最少仅 {s_min} 颗","suggestion":"卫星数不足时定位易跳变；排查遮挡与天线。"}],"emit":{"check":"gps_health","tag":"gps_eph_high","doc":"https://docs.px4.io/main/en/gps_compass/","stats":{"gpsSatellitesMin":{"var":"s_min"}}}},{"id":"px4-guard-log-dropouts","slot":"guards","order":3,"name":"数据质量-日志丢包","version":"1.0.0","category":"guard","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑不变"}],"firmware":"any","airframe":"any","emit":{"guard_tags":[{"when":"dropout_ms > 1000","tag":"log_dropouts_high"}]}},{"id":"px4-guard-restart","slot":"guards","order":1,"name":"数据质量-中途重启","version":"1.0.0","category":"guard","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑不变"}],"firmware":"any","airframe":"any","emit":{"guard_tags":[{"when":"restart_detected","tag":"restart_detected"}]}},{"id":"px4-guard-short-log","slot":"guards_early","order":1,"name":"数据质量-短日志","version":"1.0.0","category":"guard","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出；阈值随经验内联，TOML 退场"}],"firmware":"any","airframe":"any","emit":{"guard_tags":[{"when":"armed_s > 0 and armed_s < 60","tag":"insufficient_data"},{"when":"armed_s == 0 and duration_s < 60","tag":"insufficient_data"}]}},{"id":"px4-guard-topic-missing","slot":"guards","order":2,"name":"数据质量-关键 topic 缺失","version":"1.0.0","category":"guard","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑不变"}],"firmware":"any","airframe":"any","emit":{"guard_tags":[{"when":"'vehicle_status' not in topics","tag":"topic_missing:vehicle_status"},{"when":"'battery_status' not in topics","tag":"topic_missing:battery_status"},{"when":"'estimator_status' not in topics","tag":"topic_missing:estimator_status"}]}},{"id":"px4-imu-bias-drift","slot":"imu_bias","order":1,"name":"陀螺零偏漂移","version":"1.1.0","category":"imu","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"},{"version":"1.1.0","date":"2026-09-15","note":"41 个节点收成三个复合算子"}],"firmware":"any","airframe":"any","not_applicable":{"when":"not has_armed","skip_reason":"无 armed 段，不做零偏判定"},"skip_reason_no_data":"无陀螺零偏数据（无 estimator_sensor_bias / estimator_status.states）","compute":[{"out":["bx","by","bz","bts","src_text"],"in":["estimator_sensor_bias.gyro_bias","estimator_sensor_bias.timestamp","estimator_states.states","estimator_states.timestamp","estimator_status.states","estimator_status.timestamp","fw_minor"],"op":"gyro_bias_series","instance":0,"slot":10,"optional":true},{"out":["worst_abs","worst_axis","worst_drift","drift_axis"],"in":["bx","by","bz","bts","armed_intervals"],"op":"gyro_bias_worst","labels":["X","Y","Z"],"min_count":10,"optional":true},{"out":"abs_ready","in":["worst_axis"],"op":"is_not_none"},{"out":"abs_gate","in":["abs_ready"],"op":"require_true"},{"out":"temp_range","in":["vehicle_imu_status.temperature_gyro","vehicle_air_data.ambient_temperature"],"op":"max_temp_range","instance":0,"optional":true},{"out":"bias_stat","in":["worst_abs","worst_drift"],"op":"larger","optional":true}],"triggers":[{"expr":"worst_abs >= 0.05 or worst_drift >= 0.05","severity":"critical","tag":"imu_bias_drift","threshold":0.02,"value":"bias_stat","round":4,"unit":"rad/s","field":"{src_text}","title":"陀螺零偏异常（轴 {worst_axis}：绝对值 {worst_abs:.4f} rad/s，漂移 {worst_drift:.4f} rad/s）","suggestion":"结合故障库 F005：检查 IMU 安装紧固、执行陀螺/加计标定；若温度跨度大，优先按温度漂移解释。"},{"expr":"worst_abs >= 0.02 or worst_drift >= 0.02","severity":"warning","tag":"imu_bias_drift","threshold":0.02,"value":"bias_stat","round":4,"unit":"rad/s","field":"{src_text}","title":"陀螺零偏异常（轴 {worst_axis}：绝对值 {worst_abs:.4f} rad/s，漂移 {worst_drift:.4f} rad/s）","suggestion":"结合故障库 F005：检查 IMU 安装紧固、执行陀螺/加计标定；若温度跨度大，优先按温度漂移解释。"}],"emit":{"check":"imu_bias","tag":"imu_bias_drift","doc":"https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html","stats":{"gyroBiasMaxRadS":{"var":"worst_abs","round":4},"gyroBiasDriftRadS":{"var":"worst_drift","round":4},"gyroBiasSource":{"var":"src_text"},"imuTempRangeC":{"var":"temp_range","round":1}},"guard_tags":[{"when":"temp_range >= 15","tag":"temperature_change_large"}]}},{"id":"px4-imu-clipping","slot":"vibration","order":3,"name":"加速度计削波","version":"1.0.0","category":"vibration","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["vehicle_imu_status"]},"skip_reason":"vehicle_imu_status not in log","compute":[{"out":["clip","clip_idx","clip_axis"],"from":"vehicle_imu_status.accel_clipping","op":"worst_column_delta","per_instance":true,"aliases":{"vehicle_imu_status.accel_clipping":["clipping"]}},{"out":"clip_hit","in":["clip",0],"op":"gt","optional":true},{"out":"clip_stat","in":["clip_hit","clip"],"op":"value_if","optional":true}],"triggers":[{"expr":"clip >= 1000","severity":"critical","threshold":1000,"value":"clip","unit":"count","field":"vehicle_imu_status.accel_clipping[{clip_axis}](末值-首值)","title":"加速度计削波严重：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）","suggestion":"持续削波会破坏 EKF 估计，请优先排除机械振动源。"},{"expr":"clip >= 100","severity":"warning","threshold":100,"value":"clip","unit":"count","field":"vehicle_imu_status.accel_clipping[{clip_axis}](末值-首值)","title":"检测到明显加速度计削波：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）","suggestion":"削波表明振动峰值已超出传感器量程，建议排查机械振动源。"},{"expr":"clip > 0","severity":"info","tag":null,"threshold":0,"value":"clip","unit":"count","field":"vehicle_imu_status.accel_clipping[{clip_axis}](末值-首值)","title":"偶发加速度计削波：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）","suggestion":"少量削波可先观察；频次升高或伴随振动告警需排查机械问题。"}],"emit":{"check":"vibration","tag":"high_vibration","doc":"https://docs.px4.io/main/en/assembly/vibration_isolation.html","stats":{"imuAccelClippingCountMax":{"var":"clip_stat"}}}},{"id":"px4-log-errors","slot":"logged_messages","order":1,"name":"日志错误消息","version":"1.0.1","category":"messages","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"},{"version":"1.0.1","date":"2026-09-15","note":"修正级别判据：按 pyulog 语义用 ASCII 级别名（原 <=3 永不命中）"}],"firmware":"any","airframe":"any","compute":[{"out":"n","in":["messages"],"op":"count_items","key":"level_name","in_list":["EMERGENCY","ALERT","CRITICAL","ERROR"]},{"out":"samples","in":["messages"],"op":"take_items","key":"level_name","in_list":["EMERGENCY","ALERT","CRITICAL","ERROR"],"limit":5,"clip":{"message":200},"drop":["level","level_name"]}],"triggers":[{"expr":"n > 0","severity":"critical","tag":null,"threshold":0,"value":"n","unit":"条","field":"ulog.logged_messages(log_level<=3)","title":"日志中出现 {n} 条 ERROR 及以上消息","suggestion":"按时间顺序核对错误原文，这通常是定位根因最直接的证据。","evidence_extra":{"samples":"samples"}}],"emit":{"check":"logged_messages","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"}},{"id":"px4-log-warnings","slot":"logged_messages","order":2,"name":"日志警告消息","version":"1.0.1","category":"messages","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"},{"version":"1.0.1","date":"2026-09-15","note":"修正级别判据：按 pyulog 语义用 ASCII 级别名（原 ==4 永不命中）"}],"firmware":"any","airframe":"any","compute":[{"out":"n","in":["messages"],"op":"count_items","key":"level_name","eq":"WARNING"},{"out":"samples","in":["messages"],"op":"take_items","key":"level_name","eq":"WARNING","limit":5,"clip":{"message":200},"drop":["level","level_name"]}],"triggers":[{"expr":"n > 0","severity":"warning","tag":null,"threshold":0,"value":"n","unit":"条","field":"ulog.logged_messages(log_level=4)","title":"日志中出现 {n} 条 WARNING 消息","evidence_extra":{"samples":"samples"}}],"emit":{"check":"logged_messages","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"}},{"id":"px4-mode-thrash","slot":"mode_thrash","order":1,"name":"飞行模式抖动","version":"1.0.0","category":"mode","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["vehicle_status"]},"skip_reason":"vehicle_status not in log","compute":[{"out":"n_changes_raw","from":"vehicle_status.nav_state","op":"edges_count"},{"out":"n_changes","in":["n_changes_raw"],"op":"to_int"}],"triggers":[{"expr":"n_changes > 12","severity":"warning","tag":null,"threshold":12,"value":"n_changes","unit":"次","field":"vehicle_status.nav_state 变化次数","title":"飞行模式切换 {n_changes} 次（>12），可能存在模式抖动","suggestion":"频繁切模式易诱发操纵混乱；检查遥控器开关与失效保护反复触发。"}],"emit":{"check":"mode_thrash","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html","stats":{"navStateChanges":{"var":"n_changes"}}}},{"id":"px4-motor-unbalance","slot":"motor_balance","order":1,"name":"电机输出不平衡","version":"1.1.0","category":"motor","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"},{"version":"1.1.0","date":"2026-09-15","note":"17 个节点收成两个复合算子"}],"firmware":"any","airframe":"any","requires":{"any_of":["actuator_motors"]},"skip_reason":"actuator_motors not in log","skip_reason_no_data":"active motor channels < 4 (非多旋翼或未记录全部电机)","ran_on_success":true,"compute":[{"out":"mts","from":"actuator_motors.timestamp","op":"read"},{"out":"cols","from":"actuator_motors.control","op":"read"},{"out":"seg","in":["mts","armed_intervals","vehicle_status.nav_state","vehicle_status.timestamp"],"op":"active_window_mask","codes":[2,4,6,14,21],"min_active":20},{"out":["spread","busiest","idlest","n_active"],"in":["cols","seg"],"op":"column_spread_stats","min_mean":0.01,"min_channels":4}],"triggers":[{"expr":"spread >= 0.15","severity":"critical","tag":"motor_output_unbalance","threshold":0.15,"value":"spread","round":3,"field":"actuator_motors.control[](悬停段均值极差)","title":"电机输出不平衡（悬停段通道 {busiest} 与 {idlest} 差 {spread:.3f}）","suggestion":"结合故障库 F008：检查桨叶型号/正反桨是否一致、单电机效率、机架形变。"},{"expr":"spread >= 0.08","severity":"warning","tag":"motor_output_unbalance","threshold":0.08,"value":"spread","round":3,"field":"actuator_motors.control[](悬停段均值极差)","title":"电机输出差异偏大（通道 {busiest} 与 {idlest} 差 {spread:.3f}）","suggestion":"结合故障库 F008 排查动力一致性；偶发差异可先观察。"}],"emit":{"check":"motor_balance","tag":"motor_output_unbalance","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html","stats":{"motorControlSpread":{"var":"spread","round":3},"motorCountActive":{"var":"n_active"}}}},{"id":"px4-power-cell-voltage","slot":"battery","order":1,"name":"单电芯电压","version":"1.1.0","category":"power","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"},{"version":"1.1.0","date":"2026-09-15","note":"16 个节点收成一个复合算子 cell_voltage_min"}],"firmware":"any","airframe":"any","requires":{"any_of":["battery_status"]},"skip_reason":"battery_status not in log","compute":[{"out":["vmin","cell_min","cells","have_measured","have_fallback","no_cell"],"in":["battery_status.voltage_cell_v","battery_status.voltage_v","battery_status.voltage_filtered_v","battery_status.cell_count"],"op":"cell_voltage_min","optional":true}],"triggers":[{"expr":"have_measured and cell_min < 3.55","severity":"critical","threshold":3.55,"value":"cell_min","round":3,"unit":"V/cell","field":"battery_status.voltage_cell_v[](实测最小值)","title":"电芯电压严重过低","suggestion":"存在过放风险，检查电池老化、放电倍率匹配与低压告警阈值。"},{"expr":"have_fallback and not have_measured and cell_min < 3.55","severity":"critical","threshold":3.55,"value":"cell_min","round":3,"unit":"V/cell","field":"battery_status.voltage_v(min)/cell_count","title":"电芯电压严重过低","suggestion":"存在过放风险，检查电池老化、放电倍率匹配与低压告警阈值。"},{"expr":"have_measured and cell_min < 3.70","severity":"warning","threshold":3.7,"value":"cell_min","round":3,"unit":"V/cell","field":"battery_status.voltage_cell_v[](实测最小值)","title":"电芯电压偏低","suggestion":"建议核对剩余容量估计与返航电压裕度。"},{"expr":"have_fallback and not have_measured and cell_min < 3.70","severity":"warning","threshold":3.7,"value":"cell_min","round":3,"unit":"V/cell","field":"battery_status.voltage_v(min)/cell_count","title":"电芯电压偏低","suggestion":"建议核对剩余容量估计与返航电压裕度。"},{"expr":"no_cell","severity":"info","tag":null,"value_const":"missing","field":"battery_status.voltage_cell_v / cell_count","title":"日志缺少电芯电压与 cell_count，未做单电芯判断"}],"emit":{"check":"battery","tag":"battery_voltage_drop","doc":"https://docs.px4.io/main/en/config/battery.html","stats":{"batteryVoltageMin":{"var":"vmin","round":2},"batteryCellCount":{"var":"cells"},"batteryCellVoltageMin":{"var":"cell_min","round":3}}}},{"id":"px4-power-remaining","slot":"battery","order":3,"name":"电池剩余电量","version":"1.0.0","category":"power","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["battery_status"]},"skip_reason":"battery_status not in log","compute":[{"out":"rem","from":"battery_status.remaining","op":"min_ge","ge":0},{"out":"rem_pct","in":["rem"],"op":"scale","factor":100}],"triggers":[{"expr":"rem <= 0.10","severity":"critical","threshold":0.1,"value":"rem","round":3,"field":"battery_status.remaining(min)","title":"电池剩余电量极低（{rem_pct:.0f}%）","suggestion":"剩余电量低于 10%，应立即返航；检查电量估算与电池健康。"},{"expr":"rem <= 0.20","severity":"warning","threshold":0.2,"value":"rem","round":3,"field":"battery_status.remaining(min)","title":"电池剩余电量偏低（{rem_pct:.0f}%）","suggestion":"剩余电量低于 20%，注意返航裕度。"}],"emit":{"check":"battery","tag":"battery_voltage_drop","doc":"https://docs.px4.io/main/en/config/battery.html","stats":{"batteryRemainingMin":{"var":"rem","round":3}}}},{"id":"px4-power-sag","slot":"battery","order":2,"name":"飞行中持续压降","version":"1.0.0","category":"power","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["battery_status"]},"skip_reason":"battery_status not in log","compute":[{"out":"cell_min_t","from":"battery_status.voltage_cell_v","op":"rows_aggregate","agg":"min","gt":0},{"out":["drop","tail"],"in":["cell_min_t","battery_status.timestamp","armed_intervals"],"op":"head_tail_median_drop","skip_first_s":5,"min_seg":20}],"triggers":[{"expr":"drop >= 0.30 and tail < 3.70","severity":"warning","threshold":0.3,"value":"drop","round":3,"unit":"V","field":"battery_status.voltage_cell_v[] armed 段趋势","title":"飞行中单电芯持续压降 {drop:.2f} V（尾段中位 {tail:.2f} V）","suggestion":"持续压降区别于大机动瞬时压降：排查电芯老化内阻、插头虚接、线缆线径与负载匹配。"}],"emit":{"check":"battery","tag":"battery_voltage_drop","doc":"https://docs.px4.io/main/en/config/battery.html","stats":{"batteryCellSagFlight":{"var":"drop","round":3}}}},{"id":"px4-vibration-stddev","slot":"vibration","order":2,"name":"IMU 加速度标准差","version":"1.0.0","category":"vibration","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["vehicle_imu_status"]},"skip_reason":"vehicle_imu_status not in log","compute":[{"out":["stddev_rss","stddev_idx"],"in":["vehicle_imu_status.stddev_accel_x_m_s2","vehicle_imu_status.stddev_accel_y_m_s2","vehicle_imu_status.stddev_accel_z_m_s2"],"op":"worst_rss_mean","per_instance":true,"min_mean":0,"aliases":{"vehicle_imu_status.stddev_accel_x_m_s2":["stddev_accel_x"],"vehicle_imu_status.stddev_accel_y_m_s2":["stddev_accel_y"],"vehicle_imu_status.stddev_accel_z_m_s2":["stddev_accel_z"]}}],"triggers":[{"expr":"stddev_rss >= 1.0","severity":"critical","threshold":1,"value":"stddev_rss","round":3,"unit":"m/s^2","field":"vehicle_imu_status.stddev_accel_*_m_s2(RSS 均值)","title":"IMU 加速度标准差严重超标（IMU #{stddev_idx}）","suggestion":"结合故障库条目排查桨叶/电机轴承/机架紧固/减震。"},{"expr":"stddev_rss >= 0.5","severity":"warning","threshold":0.5,"value":"stddev_rss","round":3,"unit":"m/s^2","field":"vehicle_imu_status.stddev_accel_*_m_s2(RSS 均值)","title":"IMU 加速度标准差偏大（IMU #{stddev_idx}）","suggestion":"关注桨叶损伤、电机动平衡与 IMU 减震。"}],"emit":{"check":"vibration","tag":"high_vibration","doc":"https://docs.px4.io/main/en/assembly/vibration_isolation.html","stats":{"imuStddevAccelRssMax":{"var":"stddev_rss","round":3}}}},{"id":"px4-vibration","slot":"vibration","order":1,"name":"高频振动","version":"1.0.0","category":"vibration","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["vehicle_imu_status"]},"skip_reason":"vehicle_imu_status not in log","compute":[{"out":["vibe_mean","vibe_p95","vibe_max","imu_idx"],"from":"vehicle_imu_status.accel_vibration_metric","op":"worst_mean_stats","per_instance":true,"min_mean":0}],"triggers":[{"expr":"vibe_mean >= 9.81","severity":"critical","threshold":9.81,"value":"vibe_mean","round":3,"unit":"m/s^2","field":"vehicle_imu_status.accel_vibration_metric(均值)","title":"高频振动严重超标（IMU #{imu_idx}）","suggestion":"Flight Review 红色区间（>9.81 m/s^2）。结合故障库条目排查桨叶/电机/机架/减震。"},{"expr":"vibe_mean >= 4.905","severity":"warning","threshold":4.905,"value":"vibe_mean","round":3,"unit":"m/s^2","field":"vehicle_imu_status.accel_vibration_metric(均值)","title":"高频振动偏大（IMU #{imu_idx}）","suggestion":"Flight Review 橙色区间（4.905~9.81 m/s^2）。结合故障库条目排查桨叶动平衡/电机/IMU 减震。"}],"emit":{"check":"vibration","tag":"high_vibration","doc":"https://docs.px4.io/main/en/assembly/vibration_isolation.html","stats":{"imuAccelVibrationMean":{"var":"vibe_mean","round":3},"imuAccelVibrationP95":{"var":"vibe_p95","round":3},"imuAccelVibrationMax":{"var":"vibe_max","round":3}}}},{"id":"px4-vtol-transition-attitude","slot":"vtol_transition","order":1,"name":"VTOL 转换姿态越限","version":"1.0.0","category":"vtol","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","silent_when":"not has_armed or 'vehicle_status' not in topics","requires":{"any_of":["vtol_vehicle_status"]},"skip_reason":"vtol_vehicle_status not in log","compute":[{"out":"trans_n","from":"vtol_vehicle_status.vtol_in_trans_mode","op":"count_above","gt":0,"optional":true},{"out":"trans_n_i","in":["trans_n"],"op":"to_int","optional":true},{"out":"trans_mask","in":["vtol_vehicle_status.vtol_in_trans_mode","vtol_vehicle_status.timestamp","vehicle_attitude.timestamp"],"op":"fill_to","optional":true},{"out":["roll","pitch","yaw"],"in":["vehicle_attitude.q[0]","vehicle_attitude.q[1]","vehicle_attitude.q[2]","vehicle_attitude.q[3]"],"op":"quat_to_euler","optional":true},{"out":"tilt_r","in":["roll"],"op":"abs_values","optional":true},{"out":"tilt_p","in":["pitch"],"op":"abs_values","optional":true},{"out":"tilt_pt","in":["tilt_r","tilt_p"],"op":"larger","optional":true},{"out":"tilt_max","in":["tilt_pt","trans_mask"],"op":"masked_absmax","optional":true},{"out":"trans_cnt","in":["trans_mask"],"op":"count_true","optional":true},{"out":"enough","in":["trans_cnt",5],"op":"gt","optional":true},{"out":"has_tilt","in":["tilt_max"],"op":"is_not_none","optional":true},{"out":"tilt_stat","in":["enough","tilt_max"],"op":"value_if","optional":true}],"triggers":[{"expr":"has_tilt and enough and tilt_max > 8.0","severity":"warning","tag":"vtol_convert_attitude_over","threshold":8,"value":"tilt_max","round":1,"unit":"°","field":"vehicle_attitude（vtol_in_trans_mode 段）","title":"VTOL 转换阶段姿态越限（最大 {tilt_max:.1f}°，限值 8°）","suggestion":"结合故障库 F003：复盘转换时序与推力匹配，强风环境优先归因环境扰动。"}],"emit":{"check":"vtol_transition","tag":"vtol_convert_attitude_over","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html","stats":{"vtolTransitionSamples":{"var":"trans_n_i"},"vtolTransitionMaxTiltDeg":{"var":"tilt_stat","round":1}}}},{"id":"px4-wind-estimate","slot":"wind_estimate","order":1,"name":"风扰估计","version":"1.0.0","category":"wind","status":"stable","author":{"name":"NextPilot 内置"},"license":"CC-BY-4.0","changelog":[{"version":"1.0.0","date":"2026-09-15","note":"从 ulog_checks.py 迁出，逻辑与阈值不变"}],"firmware":"any","airframe":"any","requires":{"any_of":["estimator_wind","wind_estimate"]},"skip_reason":"estimator_wind / wind_estimate not in log","compute":[{"out":"n_new","from":"estimator_wind.windspeed_north","op":"read","optional":true},{"out":"e_new","from":"estimator_wind.windspeed_east","op":"read","optional":true},{"out":"n_old","from":"wind_estimate.windspeed_north","op":"read","optional":true},{"out":"e_old","from":"wind_estimate.windspeed_east","op":"read","optional":true},{"out":"wn","in":["n_new","n_old"],"op":"coalesce","optional":true},{"out":"we","in":["e_new","e_old"],"op":"coalesce","optional":true},{"out":"w","in":["wn","we"],"op":"hypot"},{"out":"w_p95","in":["w"],"op":"percentile","p":95}],"triggers":[{"expr":"w_p95 >= 12.0","severity":"warning","tag":"wind_disturb","guard_tag":"wind_strong","threshold":8,"value":"w_p95","round":1,"unit":"m/s","field":"estimator_wind.windspeed_north/east","title":"估计风速较大（p95 {w_p95:.1f} m/s）","suggestion":"结合故障库 F010：强风属环境扰动，姿态超调/转换越限优先归因风，不要直接改 PID。"},{"expr":"w_p95 >= 8.0","severity":"info","tag":"wind_disturb","guard_tag":"wind_strong","threshold":8,"value":"w_p95","round":1,"unit":"m/s","field":"estimator_wind.windspeed_north/east","title":"估计风速偏大（p95 {w_p95:.1f} m/s）","suggestion":"解释姿态类异常时需考虑风扰因素。"}],"emit":{"check":"wind_estimate","tag":"wind_disturb","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html","stats":{"windSpeedP95M":{"var":"w_p95","round":1}}}}];
 
 export const PY_ULG_CHECKS = String.raw`"""预定函数（算子）注册表 —— 经验文件里的 \`op:\` 只能引用这里注册的算子。
 
@@ -48,18 +46,21 @@ def _finite(values):
 
 @operator("max", doc="最大值（忽略 NaN）")
 def op_max(values, **kw):
+    if values is None: return None
     a = _finite(values)
     return float(a.max()) if a.size else None
 
 
 @operator("min", doc="最小值（忽略 NaN）")
 def op_min(values, **kw):
+    if values is None: return None
     a = _finite(values)
     return float(a.min()) if a.size else None
 
 
 @operator("min_ge", doc="有限且 >= ge 的最小值（排除无效值，如 remaining=-1 表示未知）")
 def op_min_ge(values, ge=None, **kw):
+    if values is None: return None
     a = _finite(values)
     if ge is not None:
         a = a[a >= float(ge)]
@@ -73,16 +74,1202 @@ def op_scale(x, factor=1.0, **kw):
 
 @operator("mean", doc="均值（忽略 NaN）")
 def op_mean(values, **kw):
+    if values is None: return None
     a = _finite(values)
     return float(a.mean()) if a.size else None
 
 
-import json, io, ast
+# ─────────────────────────── 空值 / 逻辑 / 算术（通用积木）───────────────────────────
+
+@operator("is_none", doc="值是否为 None（数据缺失在数据流里显式传播，而不是断链）")
+def op_is_none(x, **kw):
+    return x is None
+
+
+@operator("is_not_none", doc="值是否非 None")
+def op_is_not_none(x, **kw):
+    return x is not None
+
+
+@operator("gt", in_arity=2, doc="a > b 的布尔结果（把阈值条件变成可喂给 value_if 的标记）")
+def op_gt(a, b, **kw):
+    if a is None or b is None:
+        return None
+    return float(a) > float(b)
+
+
+@operator("both", in_arity=2, doc="逻辑与：两个布尔量皆真")
+def op_both(a, b, **kw):
+    return bool(a) and bool(b)
+
+
+@operator("coalesce", in_arity=2, doc="返回第一个非 None 的值，都缺失则 None")
+def op_coalesce(a, b, **kw):
+    return a if a is not None else b
+
+
+@operator("value_if", in_arity=2, doc="cond 为真返回 x，否则 None（条件性产出统计值）")
+def op_value_if(cond, x, **kw):
+    return x if cond else None
+
+
+@operator("div", in_arity=2, doc="a / b；b 为 0 或任一输入缺失返回 None；require_positive 时要求两者 >0")
+def op_div(a, b, require_positive=False, **kw):
+    if a is None or b is None or float(b) == 0:
+        return None
+    if require_positive and not (float(a) > 0 and float(b) > 0):
+        return None
+    return float(a) / float(b)
+
+
+# ─────────────────────────── 定长数组字段（任意 float32[n] 时间序列列集合）───────────────────────────
+
+def _as_columns(matrix):
+    """数组字段经 _read_field_ref 收集后是“每元素一列”的列表（各列为等长时间序列）；
+    单序列输入也兼容。跳过 None 占位列。"""
+    import numpy as np
+
+    if matrix is None:
+        return []
+    if not isinstance(matrix, (list, tuple)):
+        matrix = [matrix]
+    return [np.asarray(c, dtype=float) for c in matrix if c is not None]
+
+
+@operator(
+    "columns_aggregate",
+    doc="先对每列做 column_op 标量归约，再用 combine 跨列归约（如各电芯最小值中的最小值，gt=0 排除占位 0）",
+)
+def op_columns_aggregate(matrix, column_op="min", combine="min", gt=None, ge=None, **kw):
+    import numpy as np
+
+    scalars = []
+    for a in _as_columns(matrix):
+        a = _finite(a)
+        if gt is not None:
+            a = a[a > float(gt)]
+        if ge is not None:
+            a = a[a >= float(ge)]
+        if a.size:
+            scalars.append(float(getattr(np, str(column_op))(a)))
+    if not scalars:
+        return None
+    return float(getattr(np, str(combine))(scalars))
+
+
+@operator(
+    "rows_aggregate",
+    doc="跨列逐时刻归约成一条时间序列（如每个时刻各电芯的最低电压）；gt/ge 之外处置 NaN",
+)
+def op_rows_aggregate(matrix, agg="min", gt=None, ge=None, **kw):
+    import numpy as np
+
+    cols = _as_columns(matrix)
+    if not cols:
+        return None
+    stack = np.vstack(cols)
+    if gt is not None:
+        stack = np.where(stack > float(gt), stack, np.nan)
+    if ge is not None:
+        stack = np.where(stack >= float(ge), stack, np.nan)
+    return getattr(np, str(agg))(stack, axis=0)
+
+
+@operator(
+    "head_tail_median_drop",
+    in_arity=3,
+    out_arity=2,
+    out_names=["drop", "tail_median"],
+    doc="第一个区间内（跳过前 skip_first_s 秒）头段中位数 - 尾段中位数；任意 (序列, 时间戳, 区间) 通用",
+)
+def op_head_tail_median_drop(x, vts, intervals, skip_first_s=5, min_seg=20,
+                             head_frac=0.1, tail_frac=0.2, **kw):
+    """intervals 为 (start_us, end_us) 列表，只取第一个；seg 长度须 > min_seg。
+    返回 (落差, 尾段中位数)，数据不足返回 None。"""
+    import numpy as np
+
+    if x is None or vts is None or not intervals:
+        return None
+    x = np.asarray(x, dtype=float)
+    vts = np.asarray(vts, dtype=np.int64)
+    if len(x) != len(vts):
+        return None
+    start_us = int(intervals[0][0])
+    lo = int(np.searchsorted(vts, start_us + int(float(skip_first_s) * 1e6)))
+    seg = x[lo:]
+    seg = seg[np.isfinite(seg)]
+    if len(seg) <= int(min_seg):
+        return None
+    tail = float(np.median(seg[-max(5, int(len(seg) * float(tail_frac))):]))
+    head = float(np.median(seg[: max(5, int(len(seg) * float(head_frac)))]))
+    return float(head - tail), tail
+
+
+# ─────────────────────────── 多实例传感器（per-instance）───────────────────────────
+# 这类算子的输入是「每个传感器实例一组数据」的列表（框架对 per_instance 节点按
+# topic dataset 分组喂入）。数组字段（如 float32[3]）每组是「每元素一列」的列表。
+# 全部通用：不认识任何具体 topic/字段，只做跨实例归约，取「最差实例」并回传其序号。
+
+def _groups(groups):
+    return [g for g in (groups or []) if g is not None]
+
+
+def _as_group_list(x):
+    """per_instance 分组 → 列表，**保留 None 占位**。
+
+    实例序号（标题里的 “IMU #1”、estimator #2）必须与原始 dataset 顺序一致，
+    所以这里不能过滤 None——过滤会让后面的实例序号整体前移。
+    """
+    if x is None:
+        return []
+    if isinstance(x, (list, tuple)):
+        return list(x)
+    return [x]
+
+
+def _pick(lst, i):
+    return lst[i] if i < len(lst) else None
+
+
+@operator(
+    "worst_mean_stats",
+    out_arity=4,
+    out_names=["mean", "p95", "vmax", "instance"],
+    doc="每个实例一条标量序列：取均值最大的实例，回传其均值/p95/最大值/实例序号；"
+        "均值不超过 min_mean 的实例视作无效（缺省 0，即要求确有有效样本）",
+)
+def op_worst_mean_stats(groups, min_mean=0.0, **kw):
+    import numpy as np
+
+    best = None
+    for i, g in enumerate(_as_group_list(groups)):
+        if g is None or isinstance(g, (list, tuple)):
+            continue
+        a = _finite(g)
+        if not a.size:
+            continue
+        m = float(a.mean())
+        if m <= float(min_mean):
+            continue
+        if best is None or m > best[0]:      # 严格大于：并列时保留首个实例
+            best = (m, float(np.percentile(a, 95)), float(a.max()), i)
+    return best                                # 无有效实例时返回 None
+
+
+@operator(
+    "worst_rss_mean",
+    in_arity=3,
+    out_arity=2,
+    out_names=["rss", "instance"],
+    doc="每个实例三轴序列：mean(sqrt(x^2+y^2+z^2))，取 RSS 最大的实例及序号；"
+        "不超过 min_mean 的实例视作无效（缺省 0，与迁移前初值 0 的严格比较大一致）",
+)
+def op_worst_rss_mean(gx, gy, gz, min_mean=0.0, **kw):
+    import numpy as np
+
+    xs, ys, zs = _as_group_list(gx), _as_group_list(gy), _as_group_list(gz)
+    best = None
+    for i in range(max(len(xs), len(ys), len(zs))):
+        x, y, z = _pick(xs, i), _pick(ys, i), _pick(zs, i)
+        if x is None or y is None or z is None:
+            continue
+        if isinstance(x, (list, tuple)) or isinstance(y, (list, tuple)) or isinstance(z, (list, tuple)):
+            continue
+        rss = float(np.mean(np.sqrt(
+            np.asarray(x, float) ** 2 + np.asarray(y, float) ** 2 + np.asarray(z, float) ** 2)))
+        if rss <= float(min_mean):
+            continue
+        if best is None or rss > best[0]:
+            best = (rss, i)
+    return best
+
+
+@operator(
+    "worst_column_delta",
+    out_arity=3,
+    out_names=["count", "instance", "axis"],
+    doc="每个实例一组等长列（如 float32[3] 计数序列）：逐列取 max-min，回传全局最大差值及其实例/列序号",
+)
+def op_worst_column_delta(groups, **kw):
+    import numpy as np
+
+    best = None
+    for i, g in enumerate(_as_group_list(groups)):
+        if not isinstance(g, (list, tuple)):
+            continue
+        for axis, col in enumerate(g):
+            if col is None:
+                continue
+            delta = int(np.max(col)) - int(np.min(col))
+            if best is None or delta > best[0]:
+                best = (delta, i, axis)
+    return best
+
+
+# ─────────────────────────── 位掩码 / 跨实例归约（通用）───────────────────────────
+
+@operator("has_bits", in_arity=2, doc="value 是否置起了 mask 中的任意一位（mask 传 -1 表示“任意位非零”）")
+def op_has_bits(value, mask, **kw):
+    if value is None or mask is None:
+        return None
+    return bool(int(value) & int(mask))
+
+
+@operator("to_int", doc="取整（位掩码/计数类字段：保证证据与文案里按整数呈现，而不是 1.0）")
+def op_to_int(x, **kw):
+    return None if x is None else int(x)
+
+
+@operator("bit_or_max", doc="位掩码序列按实例分组：每实例取最大值后按位或（跨实例合并置位）")
+def op_bit_or_max(groups, **kw):
+    acc = 0
+    seen = False
+    for g in _groups(groups):
+        if g is None or isinstance(g, (list, tuple)) or not len(g):
+            continue
+        seen = True
+        acc |= int(max(int(v) for v in g))
+    return acc if seen else None
+
+
+@operator("max_of_max", doc="数值序列按实例分组：每实例取最大值，再跨实例取最大（忽略缺失实例）")
+def op_max_of_max(groups, **kw):
+    best = None
+    for g in _groups(groups):
+        if g is None or isinstance(g, (list, tuple)):
+            continue
+        a = _finite(g)
+        if not a.size:
+            continue
+        m = float(a.max())
+        if best is None or m > best:
+            best = m
+    return best
+
+
+@operator(
+    "worst_reject_ratio",
+    in_arity=9,
+    out_arity=3,
+    out_names=["frac", "names", "instance"],
+    doc="按实例扫描“拒绝占比”：主信号（位掩码，如创新检验标志）非空时用它（非零样本占比、"
+        "按位或展开位名），否则逐一比较候选通道（有限样本中 >= ge 的占比，需 >= channel_min 个）；"
+        "取全局最大占比，返回占比/命中名称/实例序号。字段名与标签全部由经验文件提供。",
+)
+def op_worst_reject_ratio(primary, ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7,
+                          primary_min=3, primary_names=None, ge=1.0, channel_min=3,
+                          channel_labels=None, fallback_label="未知通道", **kw):
+    import numpy as np
+
+    bit_names = list(primary_names or [])
+    chan_labels = list(channel_labels or [])
+    # 保留 None 占位：主信号整列缺失时仍要按实例序号继续扫通道（否则不产出任何候选）
+    primary_groups = _as_group_list(primary)
+    chan_groups = [_as_group_list(c) for c in (ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7)]
+    n_inst = max([len(primary_groups)] + [len(cg) for cg in chan_groups])
+    best = None
+    for i in range(n_inst):
+        g = _pick(primary_groups, i)
+        # 主信号存在且非空：该实例只用主信号（与迁移前一致，不再回落扫通道）
+        if g is not None and not isinstance(g, (list, tuple)) and len(g):
+            bad = int(np.count_nonzero(g))
+            if bad < int(primary_min):
+                continue
+            union = 0
+            for v in np.asarray(g):          # 不转 float：位掩码必须按位精确
+                union |= int(v)
+            fired = "、".join(bit_names[b] for b in range(len(bit_names)) if union & (1 << b))
+            frac = bad / float(len(g))
+            if best is None or frac > best[0]:
+                best = (frac, fired or fallback_label, i)
+            continue
+        for ci, cg in enumerate(chan_groups):
+            if cg is None or i >= len(cg) or cg[i] is None:
+                continue
+            arr = _finite(cg[i])
+            if not arr.size:
+                continue
+            n_bad = int(np.count_nonzero(arr >= float(ge)))
+            if n_bad < int(channel_min):
+                continue
+            frac = n_bad / float(arr.size)
+            label = chan_labels[ci] if ci < len(chan_labels) else ""
+            if best is None or frac > best[0]:
+                best = (frac, label or fallback_label, i)
+    return best
+
+
+# ─────────────────────────── 序列统计 / 边沿 / 地理（通用）───────────────────────────
+
+@operator("percentile", doc="有限值的第 p 百分位（如 p=95）；无有效值则 None")
+def op_percentile(values, p=95, **kw):
+    import numpy as np
+
+    if values is None:
+        return None
+    a = _finite(values)
+    return float(np.percentile(a, float(p))) if a.size else None
+
+
+@operator("count_above", doc="有限值中 > gt 的样本个数")
+def op_count_above(values, gt=0.0, **kw):
+    import numpy as np
+
+    if values is None:
+        return None
+    a = _finite(values)
+    return int(np.count_nonzero(a > float(gt)))
+
+
+@operator("edges_count", doc="相邻样本取值发生变化（不等于）的次数：状态/模式切换计数")
+def op_edges_count(values, **kw):
+    import numpy as np
+
+    if values is None:
+        return None
+    a = np.asarray(values)
+    if a.size < 2:
+        return 0
+    return int(np.count_nonzero(a[1:] != a[:-1]))
+
+
+@operator("is_zero", doc="是否等于 0（未置位/无效计数类字段的判据）")
+def op_is_zero(x, **kw):
+    return None if x is None else float(x) == 0.0
+
+
+@operator("keep_gt", doc="只保留有限且 > gt 的样本（如排除 eph<=0 的无效值），返回序列")
+def op_keep_gt(values, gt=0.0, **kw):
+    import numpy as np
+
+    if values is None:
+        return None
+    a = _finite(values)
+    a = a[a > float(gt)]
+    return a if a.size else None
+
+
+@operator("scale_series", doc="整条序列乘系数（如 mm → m），与标量版 scale 互补")
+def op_scale_series(values, factor=1.0, **kw):
+    import numpy as np
+
+    if values is None:
+        return None
+    return np.asarray(values, dtype=float) * float(factor)
+
+
+@operator(
+    "adjacent_speed_mps",
+    in_arity=3,
+    doc="经纬度（1e7 度）与时间戳（us）→ 相邻样本地面速度序列（m/s）；"
+        "等距柱状近似，对任意 lat/lon/timestamp 三元组通用",
+)
+def op_adjacent_speed_mps(lat_1e7, lon_1e7, ts_us, **kw):
+    import numpy as np
+
+    if lat_1e7 is None or lon_1e7 is None or ts_us is None:
+        return None
+    lat = np.radians(np.asarray(lat_1e7, dtype=float) / 1e7)
+    lon = np.radians(np.asarray(lon_1e7, dtype=float) / 1e7)
+    if lat.size < 3 or lat.size != lon.size or lat.size != len(ts_us):
+        return None
+    dt = np.diff(np.asarray(ts_us, dtype=float)) / 1e6
+    dlat = np.diff(lat) * 6371000.0
+    dlon = np.diff(lon) * 6371000.0 * np.cos(lat[:-1])
+    return np.sqrt(dlat ** 2 + dlon ** 2) / np.maximum(dt, 1e-3)
+
+
+@operator("read", doc="显式取数/透传：把字段原样放进环境（供 coalesce 等后续节点使用）")
+def op_read(values, **kw):
+    return values
+
+
+@operator("hypot", in_arity=2, doc="逐样本 sqrt(a^2 + b^2)（如由北/东风分量合成风速）")
+def op_hypot(a, b, **kw):
+    import numpy as np
+
+    if a is None or b is None:
+        return None
+    return np.sqrt(np.asarray(a, dtype=float) ** 2 + np.asarray(b, dtype=float) ** 2)
+
+
+@operator("ratio_equal", doc="取值为 value 的样本占比（如无效标志 == 0 的比例）；分母为全部样本")
+def op_ratio_equal(values, value=0.0, **kw):
+    import numpy as np
+
+    if values is None:
+        return None
+    a = np.asarray(values, dtype=float)
+    if not a.size:
+        return None
+    return float(np.count_nonzero(a == float(value))) / max(len(a), 1)
+
+
+@operator(
+    "masked_any_in",
+    in_arity=3,
+    doc="时间轴上的“区间内取值为集合之一”判定：在 intervals（us 区间列表）内是否存在取值"
+        "落在 codes 中的样本；codes 由经验文件给出，任意状态字段通用",
+)
+def op_masked_any_in(values, ts_us, intervals, codes=None, **kw):
+    import numpy as np
+
+    if values is None or ts_us is None or not intervals or not codes:
+        return None
+    vals = np.asarray(values)
+    ts = np.asarray(ts_us, dtype=np.int64)
+    if vals.size != ts.size:
+        return None
+    mask = np.zeros(ts.size, dtype=bool)
+    for s, e in intervals:
+        lo = int(np.searchsorted(ts, int(s)))
+        hi = ts.size if e is None else int(np.searchsorted(ts, int(e)))
+        mask[lo:hi] = True
+    if not np.any(mask):
+        return False
+    return bool(np.any(np.isin(vals[mask], list(codes))))
+
+
+@operator("require_true", doc="门控：条件为真返回 True，否则 None（使数据流在此中止，等效于原 if 分支）")
+def op_require_true(cond, **kw):
+    if cond is None:
+        return None
+    return True if cond else None
+
+
+# ─────────────────────────── 事件（一个规则 → 多条 finding）───────────────────────────
+# 返回「事件列表」（每项一个 dict）。配合规则级 \`foreach:\`：框架对每个事件按同一套
+# trigger 模板发一条 finding，因此文案仍写在经验文件里，算子只负责找事件。
+
+@operator(
+    "rising_edge_events",
+    in_arity=4,
+    doc="上升沿事件（前一拍 != 1 且当前 == 1）且落在 intervals 内："
+        "返回 [{t_s: 相对日志起点秒数}, ...]；t0_us 一般传内置变量 t0_us",
+)
+def op_rising_edge_events(values, ts_us, intervals, t0_us, **kw):
+    import numpy as np
+
+    if values is None or ts_us is None or not intervals:
+        return None
+    a = np.asarray(values)
+    ts = np.asarray(ts_us, dtype=np.int64)
+    if a.size != ts.size or a.size < 2:
+        return None
+    t0 = int(t0_us or 0)
+    events = []
+    for i in range(1, a.size):
+        if int(a[i]) != 1 or int(a[i - 1]) == 1:
+            continue
+        t = int(ts[i])
+        if not any(t >= int(s) and (e is None or t <= int(e)) for s, e in intervals):
+            continue
+        events.append({"t_s": (t - t0) / 1e6})
+    return events
+
+
+@operator(
+    "step_into_events",
+    in_arity=4,
+    doc="状态切换到 codes 集合内的取值、且落在 intervals 内的事件："
+        "返回 [{t_s, code, name}, ...]，codes 形如 {5: AUTO_RTL}（名称由经验文件给出）",
+)
+def op_step_into_events(values, ts_us, intervals, t0_us, codes=None, **kw):
+    import numpy as np
+
+    if values is None or ts_us is None or not intervals or not codes:
+        return None
+    a = np.asarray(values)
+    ts = np.asarray(ts_us, dtype=np.int64)
+    if a.size != ts.size or a.size < 2:
+        return None
+    t0 = int(t0_us or 0)
+    wanted = {int(k): str(v) for k, v in dict(codes).items()}
+    events = []
+    for i in range(1, a.size):
+        code = int(a[i])
+        if code == int(a[i - 1]) or code not in wanted:
+            continue
+        t = int(ts[i])
+        if not any(t >= int(s) and (e is None or t <= int(e)) for s, e in intervals):
+            continue
+        events.append({"t_s": (t - t0) / 1e6, "code": code, "name": wanted[code]})
+    return events
+
+
+# ─────────────────────────── 结构化条目列表（日志消息等）───────────────────────────
+
+def _item_hit(it, key, eq, lte, gte, in_list):
+    if not isinstance(it, dict):
+        return False
+    if eq is None and lte is None and gte is None and in_list is None:
+        return True                      # 无条件 = 全选（可当计数器用）
+    v = it.get(key)
+    if v is None:
+        return False
+    if in_list is not None:
+        return v in list(in_list)
+    return (eq is not None and v == eq) or (lte is not None and v <= lte) \
+        or (gte is not None and v >= gte)
+
+
+@operator("count_items", doc="条目列表里满足条件的条数：按 key 字段判定，in_list / eq / lte / gte")
+def op_count_items(items, key="level", eq=None, lte=None, gte=None, in_list=None, **kw):
+    if not items:
+        return 0
+    return sum(1 for it in items if _item_hit(it, key, eq, lte, gte, in_list))
+
+
+@operator("take_items", doc="条目列表里满足条件的前 limit 条（drop 可去掉辅助键；clip 可按字段截断文本）")
+def op_take_items(items, key="level", eq=None, lte=None, gte=None, in_list=None,
+                  limit=5, drop=None, clip=None, **kw):
+    out = []
+    clips = {str(k): int(v) for k, v in dict(clip or {}).items()}
+    for it in (items or []):
+        if not _item_hit(it, key, eq, lte, gte, in_list):
+            continue
+        item = dict(it)
+        for k in (drop if isinstance(drop, (list, tuple)) else [drop] if drop else []):
+            item.pop(k, None)
+        for k, n in clips.items():
+            if isinstance(item.get(k), str):
+                item[k] = item[k][:n]
+        out.append(item)
+        if len(out) >= int(limit):
+            break
+    return out
+
+
+# ─────────────────────────── 姿态 / 时间轴（通用）───────────────────────────
+
+@operator(
+    "quat_to_euler",
+    in_arity=4,
+    out_arity=3,
+    out_names=["roll", "pitch", "yaw"],
+    doc="四元数 (w,x,y,z) 三路序列 → 欧拉角序列；degrees 为真输出角度制。"
+        "对应设计文档里“4 进 3 出”的多输入多输出算子示例",
+)
+def op_quat_to_euler(q0, q1, q2, q3, degrees=True, **kw):
+    import numpy as np
+
+    if q0 is None or q1 is None or q2 is None or q3 is None:
+        return None
+    w = np.asarray(q0, dtype=float)
+    x = np.asarray(q1, dtype=float)
+    y = np.asarray(q2, dtype=float)
+    z = np.asarray(q3, dtype=float)
+    n = min(len(w), len(x), len(y), len(z))
+    w, x, y, z = w[:n], x[:n], y[:n], z[:n]
+    roll = np.arctan2(2 * (w * x + y * z), 1 - 2 * (x ** 2 + y ** 2))
+    pitch = np.arcsin(np.clip(2 * (w * y - z * x), -1, 1))
+    yaw = np.arctan2(2 * (w * z + x * y), 1 - 2 * (y ** 2 + z ** 2))
+    if degrees:
+        roll, pitch, yaw = np.degrees(roll), np.degrees(pitch), np.degrees(yaw)
+    return roll, pitch, yaw
+
+
+@operator(
+    "interp_to",
+    in_arity=3,
+    doc="把 src_ts 上的取值线性插值到 dst_ts 时间轴（如姿态指令对齐到姿态时间轴）",
+)
+def op_interp_to(values, src_ts, dst_ts, **kw):
+    import numpy as np
+
+    if values is None or src_ts is None or dst_ts is None:
+        return None
+    v = np.asarray(values, dtype=float)
+    s = np.asarray(src_ts, dtype=np.int64)
+    d = np.asarray(dst_ts, dtype=np.int64)
+    if v.size < 2 or s.size != v.size or not d.size:
+        return None
+    return np.interp(d, s[:v.size], v)
+
+
+@operator(
+    "fill_to",
+    in_arity=3,
+    doc="把 src_ts 上的取值按“向前保持”映射到 dst_ts（如转换段标志采样到姿态时间轴）",
+)
+def op_fill_to(values, src_ts, dst_ts, **kw):
+    import numpy as np
+
+    if values is None or src_ts is None or dst_ts is None:
+        return None
+    v = np.asarray(values)
+    s = np.asarray(src_ts, dtype=np.int64)
+    d = np.asarray(dst_ts, dtype=np.int64)
+    if not v.size or s.size != v.size or not d.size:
+        return None
+    idx = np.clip(np.searchsorted(s, d, side="right") - 1, 0, v.size - 1)
+    return v[idx]
+
+
+@operator("abs_values", doc="逐样本绝对值")
+def op_abs_values(values, **kw):
+    import numpy as np
+
+    if values is None:
+        return None
+    return np.abs(np.asarray(values, dtype=float))
+
+
+@operator("larger", in_arity=2, doc="逐样本取较大者（如 max(|roll|, |pitch|)）")
+def op_larger(a, b, **kw):
+    import numpy as np
+
+    if a is None or b is None:
+        return None
+    return np.maximum(np.asarray(a, dtype=float), np.asarray(b, dtype=float))
+
+
+@operator("masked_absmax", in_arity=2, doc="掩码为真的样本里 |值| 的最大值；无样本则 None")
+def op_masked_absmax(values, mask, **kw):
+    import numpy as np
+
+    if values is None or mask is None:
+        return None
+    v = np.asarray(values, dtype=float)
+    m = np.asarray(mask, dtype=bool)
+    n = min(v.size, m.size)
+    sel = np.abs(v[:n])[m[:n]]
+    sel = sel[np.isfinite(sel)]
+    return float(sel.max()) if sel.size else None
+
+
+@operator("count_true", doc="布尔掩码里为真的样本数")
+def op_count_true(mask, **kw):
+    import numpy as np
+
+    if mask is None:
+        return None
+    return int(np.count_nonzero(np.asarray(mask, dtype=bool)))
+
+
+# ─────────────────────────── 掩码 / 多通道（通用）───────────────────────────
+
+@operator("interval_mask", in_arity=2, doc="时间戳落在 intervals 内的布尔掩码（armed 段等）")
+def op_interval_mask(ts_us, intervals, **kw):
+    import numpy as np
+
+    if ts_us is None or not intervals:
+        return None
+    ts = np.asarray(ts_us, dtype=np.int64)
+    mask = np.zeros(ts.size, dtype=bool)
+    for s, e in intervals:
+        lo = int(np.searchsorted(ts, int(s)))
+        hi = ts.size if e is None else int(np.searchsorted(ts, int(e)))
+        mask[lo:hi] = True
+    return mask
+
+
+@operator("values_in", in_arity=2, doc="逐样本判定取值是否落在 codes 集合内，返回布尔掩码")
+def op_values_in(values, codes, **kw):
+    import numpy as np
+
+    if values is None or not codes:
+        return None
+    return np.isin(np.asarray(values), list(codes))
+
+
+@operator("mask_and", in_arity=2, doc="两个布尔掩码逐样本取与")
+def op_mask_and(a, b, **kw):
+    import numpy as np
+
+    if a is None or b is None:
+        return None
+    x, y = np.asarray(a, dtype=bool), np.asarray(b, dtype=bool)
+    n = min(x.size, y.size)
+    return x[:n] & y[:n]
+
+
+@operator("choose", in_arity=3, doc="cond 为真取 a，否则取 b（数据流里的分支合并）")
+def op_choose(cond, a, b, **kw):
+    return a if cond else b
+
+
+@operator("count_columns", doc="数组字段的有效列数（跳过 None/空占位列）")
+def op_count_columns(matrix, **kw):
+    return len(_as_columns(matrix))
+
+
+@operator(
+    "active_column_means",
+    in_arity=2,
+    doc="掩码内逐通道均值，只保留均值 > min_mean 的通道（未接/未用通道均值≈0，排除）；"
+        "返回 [{index, mean}, ...]；列长与掩码不一致时退化为前 N 个样本",
+)
+def op_active_column_means(matrix, mask, min_mean=0.01, **kw):
+    import numpy as np
+
+    if matrix is None or mask is None:
+        return None
+    m = np.asarray(mask, dtype=bool)
+    n_on = int(np.count_nonzero(m))
+    out = []
+    for i, col in enumerate(matrix if isinstance(matrix, (list, tuple)) else [matrix]):
+        if col is None:
+            continue
+        v = np.asarray(col, dtype=float)
+        if v.size == m.size:
+            v = v[m]
+        else:
+            v = v[:n_on]                 # 与原实现一致：长度不匹配时取前 N 个
+        v = v[np.isfinite(v)]
+        if v.size and float(np.mean(v)) > float(min_mean):
+            out.append({"index": i, "mean": float(np.mean(v))})
+    return out
+
+
+@operator(
+    "items_spread",
+    out_arity=3,
+    out_names=["spread", "max_index", "min_index"],
+    doc="条目列表按 value_key 求极差，并回传取最大/最小者（并列取先出现者）的 index_key",
+)
+def op_items_spread(items, value_key="mean", index_key="index", **kw):
+    if not items:
+        return None
+    best = worst = items[0]
+    for it in items[1:]:
+        if it[value_key] > best[value_key]:
+            best = it
+        if it[value_key] < worst[value_key]:
+            worst = it
+    return (float(best[value_key] - worst[value_key]), best.get(index_key), worst.get(index_key))
+
+
+# ─────────────────────────── 多轴传感器（通用）───────────────────────────
+
+@operator("apply_mask", in_arity=2, doc="按布尔掩码筛选序列（如只保留 armed 段样本），返回新序列")
+def op_apply_mask(values, mask, **kw):
+    import numpy as np
+
+    if values is None or mask is None:
+        return None
+    v = np.asarray(values, dtype=float)
+    m = np.asarray(mask, dtype=bool)
+    if v.size != m.size:
+        return None
+    return v[m]
+
+
+@operator("range_of", doc="有限样本的极差 max-min（样本 < 2 个时 None）")
+def op_range_of(values, **kw):
+    import numpy as np
+
+    if values is None:
+        return None
+    a = _finite(values)
+    return float(a.max() - a.min()) if a.size > 1 else None
+
+
+@operator(
+    "worst_named",
+    in_arity=3,
+    out_arity=2,
+    out_names=["value", "name"],
+    doc="三路序列各做一次归约（reduce: absmax | range | max | min | mean），"
+        "回传归约值最大的一路及名称（labels 由经验文件给出）；"
+        "样本数 < min_count 或归约值不超过 min_value 的路不参与（严格大于）",
+)
+def op_worst_named(a, b, c, reduce="absmax", labels=None, min_value=0.0, min_count=10, **kw):
+    import numpy as np
+
+    names = list(labels or [])
+    best = None
+    for i, s in enumerate((a, b, c)):
+        if s is None:
+            continue
+        arr = _finite(s)
+        if arr.size < int(min_count):
+            continue
+        if reduce == "absmax":
+            val = float(np.max(np.abs(arr)))
+        elif reduce == "range":
+            val = float(arr.max() - arr.min())
+        else:
+            val = float(getattr(np, reduce)(arr))
+        if val <= float(min_value):
+            continue
+        if best is None or val > best[0]:
+            best = (val, names[i] if i < len(names) else str(i))
+    return best
+
+
+@operator(
+    "label_if",
+    doc="cond 为真取 label_true，否则取 label_false（文案以节点选项给出；缺省 None，便于 coalesce 串联）。"
+        "注意参数名不用 yes/no：YAML 1.1 会把裸 yes/no 解析成布尔，PyYAML 与浏览器侧 yaml 库行为不一致。",
+)
+def op_label_if(cond, label_true=None, label_false=None, **kw):
+    return label_true if cond else label_false
+
+
+# ─────────────────────────── 逐样本数组运算（通用）───────────────────────────
+
+@operator("either", in_arity=2, doc="逻辑或（None 视作假）")
+def op_either(a, b, **kw):
+    return bool(a) or bool(b)
+
+
+@operator("abs_diff", in_arity=2, doc="逐样本 |a - b|（长度取较短者）")
+def op_abs_diff(a, b, **kw):
+    import numpy as np
+
+    if a is None or b is None:
+        return None
+    x, y = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
+    n = min(x.size, y.size)
+    return np.abs(x[:n] - y[:n])
+
+
+@operator("sum_abs", in_arity=2, doc="逐样本 |a| + |b|")
+def op_sum_abs(a, b, **kw):
+    import numpy as np
+
+    if a is None or b is None:
+        return None
+    x, y = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
+    n = min(x.size, y.size)
+    return np.abs(x[:n]) + np.abs(y[:n])
+
+
+@operator("greater", in_arity=2, doc="逐样本 a > b，返回布尔掩码")
+def op_greater(a, b, **kw):
+    import numpy as np
+
+    if a is None or b is None:
+        return None
+    x = np.asarray(a, dtype=float)
+    if np.isscalar(b):
+        return x > float(b)
+    y = np.asarray(b, dtype=float)
+    n = min(x.size, y.size)
+    return x[:n] > y[:n]
+
+
+@operator("degrees", doc="弧度序列 → 角度序列")
+def op_degrees(values, **kw):
+    import numpy as np
+
+    if values is None:
+        return None
+    return np.degrees(np.asarray(values, dtype=float))
+
+
+@operator("head", in_arity=2, doc="取序列前 count 个样本（用于按最短长度对齐多条时间序列）")
+def op_head(values, count, **kw):
+    import numpy as np
+
+    if values is None or count is None:
+        return None
+    a = np.asarray(values)
+    return a[: max(int(count), 0)]
+
+
+@operator("length_of", doc="序列长度（标量）")
+def op_length_of(values, **kw):
+    if values is None:
+        return None
+    try:
+        return int(len(values))
+    except TypeError:
+        return None
+
+
+@operator("smaller", in_arity=2, doc="两值取较小者")
+def op_smaller(a, b, **kw):
+    if a is None or b is None:
+        return None
+    return float(a) if float(a) <= float(b) else float(b)
+
+
+@operator(
+    "zero_cross_hz",
+    doc="相对中位数符号翻转频率（Hz）：翻转次数 / 2 / (样本数 / sample_rate)；"
+        "样本 < 3 时 None。用于判定“误差高频振荡”",
+)
+def op_zero_cross_hz(values, sample_rate=50.0, **kw):
+    import numpy as np
+
+    if values is None:
+        return None
+    a = _finite(values)
+    if a.size < 3:
+        return None
+    sign = np.sign(a - np.median(a))
+    sign = sign[sign != 0]
+    if sign.size < 2:
+        return 0.0
+    flips = int(np.count_nonzero(np.diff(sign) != 0))
+    dur = float(a.size) / float(sample_rate)
+    return flips / 2.0 / max(dur, 1e-3)
+
+
+# ─────────────────────────── 复合算子：整段分析（多入多出）───────────────────────────
+# 说明：多个小节点串起来的链条读起来太长（姿态那条曾是 30 个节点）。这类「取数 → 对齐 →
+# 掩码 → 统计」的固定套路可以收成一个算子：输入仍是 YAML 里写明的字段引用（算子不认识
+# 具体 topic/字段），参数（阈值/最少样本/采样率）也来自 YAML。
+
+@operator(
+    "att_tracking_stats",
+    in_arity=8,
+    out_arity=3,
+    out_names=["p99", "osc_hz", "seg_n"],
+    doc="姿态跟踪统计：把姿态与姿态指令在时间轴上对齐（取较短长度、指令线性插值到姿态时间轴），"
+        "只在 armed 且非悬停（指令倾角 > tilt_min_deg）样本上算跟踪误差，输出 p99（度）、"
+        "误差过零频率（Hz）、参与统计的样本数。指令源在 q_d 四元数与 roll/pitch_body 之间自动选择"
+        "（fw_minor >= 15 或有四元数而无 body 字段时用四元数）。核心数据缺失返回 None。",
+)
+def op_att_tracking_stats(att_q, sp_q, sp_roll, sp_pitch, att_ts, sp_ts, intervals,
+                          fw_minor=None, tilt_min_deg=10.0, min_samples=50,
+                          sample_rate=50.0, **kw):
+    import numpy as np
+
+    q = _as_columns(att_q)
+    if att_ts is None or len(q) < 4 or sp_ts is None or not intervals:
+        return None
+    ts = np.asarray(att_ts, dtype=np.int64)
+    sp_ts = np.asarray(sp_ts, dtype=np.int64)
+
+    w, x, y, z = (np.asarray(c, dtype=float) for c in q[:4])
+    n_q = min(len(w), len(x), len(y), len(z))
+    w, x, y, z = w[:n_q], x[:n_q], y[:n_q], z[:n_q]
+    roll = np.arctan2(2 * (w * x + y * z), 1 - 2 * (x ** 2 + y ** 2))          # 弧度
+    pitch = np.arcsin(np.clip(2 * (w * y - z * x), -1, 1))
+
+    # 指令源：1.15+ 只记四元数；旧固件记 roll/pitch_body（弧度）
+    qd = _as_columns(sp_q)
+    has_qd = len(qd) >= 4
+    use_q = has_qd and (sp_roll is None or fw_minor is None or int(fw_minor) >= 15)
+    if not use_q and sp_roll is None and has_qd:
+        use_q = True                       # 定制固件容错
+    if use_q:
+        d0, d1, d2, d3 = (np.asarray(c, dtype=float) for c in qd[:4])
+        ns = min(len(d0), len(d1), len(d2), len(d3))
+        d0, d1, d2, d3 = d0[:ns], d1[:ns], d2[:ns], d3[:ns]
+        r_sp_raw = np.arctan2(2 * (d0 * d1 + d2 * d3), 1 - 2 * (d1 ** 2 + d2 ** 2))
+        p_sp_raw = np.arcsin(np.clip(2 * (d0 * d2 - d3 * d1), -1, 1))
+    else:
+        if sp_roll is None:
+            return None
+        r_sp_raw = np.asarray(sp_roll, dtype=float)
+        p_sp_raw = (np.asarray(sp_pitch, dtype=float) if sp_pitch is not None
+                    else np.zeros(len(r_sp_raw)))
+
+    n = min(n_q, len(r_sp_raw), len(p_sp_raw))
+    if n < 1:
+        return None
+    ts_n = ts[:n]
+    r_sp = np.interp(ts_n, sp_ts[:len(r_sp_raw)], r_sp_raw)
+    p_sp = np.interp(ts_n, sp_ts[:len(p_sp_raw)], p_sp_raw)
+    err = np.degrees(np.maximum(np.abs(roll[:n] - r_sp), np.abs(pitch[:n] - p_sp)))
+
+    amask = np.zeros(n, dtype=bool)
+    for s, e in intervals:
+        lo = int(np.searchsorted(ts_n, int(s)))
+        hi = n if e is None else int(np.searchsorted(ts_n, int(e)))
+        amask[lo:hi] = True
+    active = amask & (np.degrees(np.abs(r_sp)) + np.degrees(np.abs(p_sp)) > float(tilt_min_deg))
+    seg = err[active] if int(np.count_nonzero(active)) > int(min_samples) else err[amask]
+    if seg.size <= int(min_samples):
+        return (None, None, int(seg.size))      # 样本不足：不出结论，但把样本数带出去
+
+    p99 = float(np.percentile(seg, 99))
+    sign = np.sign(seg - np.median(seg))
+    sign = sign[sign != 0]
+    flips = int(np.count_nonzero(np.diff(sign) != 0)) if sign.size >= 2 else 0
+    osc = flips / 2.0 / max(float(seg.size) / float(sample_rate), 1e-3)
+    return (p99, float(osc), int(seg.size))
+
+
+@operator(
+    "gyro_bias_series",
+    in_arity=7,
+    out_arity=5,
+    out_names=["bx", "by", "bz", "bts", "src_text"],
+    doc="陀螺零偏取源：1.15+ 直读零偏列（fw_minor >= 15 时优先），否则用 EKF 状态槽 10..12"
+        "（estimator_states 优先、estimator_status 兜底）。输入都是「数组字段的多列」或 None。"
+        "返回 三轴序列 + 时间戳 + 数据来源说明（用于 evidence.field）；主数据缺失返回 None。",
+)
+def op_gyro_bias_series(new_cols, new_ts, states_a_cols, states_a_ts,
+                        states_b_cols, states_b_ts, fw_minor, slot=10, **kw):
+    nb = _as_columns(new_cols)
+    la = _as_columns(states_a_cols)
+    lb = _as_columns(states_b_cols)
+    s = int(slot)
+
+    def pick3(cols):
+        return [cols[s], cols[s + 1], cols[s + 2]] if len(cols) >= s + 3 else None
+
+    leg_a, leg_b = pick3(la), pick3(lb)
+    use_new = len(nb) >= 3 and new_ts is not None and (fw_minor is None or int(fw_minor) >= 15)
+    if not use_new and leg_a is None and leg_b is None and len(nb) >= 3:
+        use_new = True                       # 定制固件容错：没有旧槽就用直读
+    if use_new:
+        return (nb[0], nb[1], nb[2], new_ts, "estimator_sensor_bias.gyro_bias[]")
+    if leg_a is not None and states_a_ts is not None:
+        return (leg_a[0], leg_a[1], leg_a[2], states_a_ts, "estimator_states.states[10..12]")
+    if leg_b is not None and states_b_ts is not None:
+        return (leg_b[0], leg_b[1], leg_b[2], states_b_ts, "estimator_status.states[10..12]")
+    return None
+
+
+@operator(
+    "gyro_bias_worst",
+    in_arity=5,
+    out_arity=4,
+    out_names=["abs_max", "abs_axis", "drift", "drift_axis"],
+    doc="三轴零偏在 armed 区间内逐轴取 |最大值| 与极差（漂移），回传各自最差的轴名。"
+        "样本 < min_count 的轴不参与；|零偏| 严格 > 0 才算有效；轴名由经验文件给出。",
+)
+def op_gyro_bias_worst(bx, by, bz, bts, intervals, labels=None, min_count=10, **kw):
+    import numpy as np
+
+    names = list(labels or ["X", "Y", "Z"])
+    if bts is None or not intervals:
+        return None
+    ts = np.asarray(bts, dtype=np.int64)
+    mask = np.zeros(ts.size, dtype=bool)
+    for s, e in intervals:
+        lo = int(np.searchsorted(ts, int(s)))
+        hi = ts.size if e is None else int(np.searchsorted(ts, int(e)))
+        mask[lo:hi] = True
+
+    worst_abs, worst_axis, worst_drift, drift_axis = 0.0, None, 0.0, None
+    for i, series in enumerate((bx, by, bz)):
+        if series is None:
+            continue
+        v = np.asarray(series, dtype=float)
+        if v.size == ts.size:
+            v = v[mask]
+        v = v[np.isfinite(v)]
+        if v.size < int(min_count):
+            continue
+        a_max = float(np.max(np.abs(v)))
+        rng = float(v.max() - v.min())
+        if a_max > worst_abs:
+            worst_abs, worst_axis = a_max, names[i] if i < len(names) else str(i)
+        if rng > worst_drift:
+            worst_drift, drift_axis = rng, names[i] if i < len(names) else str(i)
+    return (worst_abs if worst_axis else None, worst_axis, worst_drift, drift_axis)
+
+
+@operator(
+    "max_temp_range",
+    in_arity=2,
+    doc="两个温度来源各自取极差（样本 < 2 的来源忽略），返回较大者；都不可用则 None",
+)
+def op_max_temp_range(t_a, t_b, **kw):
+    import numpy as np
+
+    best = None
+    for t in (t_a, t_b):
+        if t is None:
+            continue
+        a = _finite(t)
+        if a.size > 1:
+            rng = float(a.max() - a.min())
+            best = rng if best is None else max(best, rng)
+    return best
+
+
+@operator(
+    "active_window_mask",
+    in_arity=4,
+    doc="活动窗口掩码：armed 区间 ∩ 状态取值落在 codes 内的样本；若交集样本 <= min_active，"
+        "退回整个 armed 区间（原实现“悬停样本太少就退用 armed 段”）。任意状态字段通用。",
+)
+def op_active_window_mask(ts_us, intervals, values, values_ts, codes=None, min_active=20, **kw):
+    import numpy as np
+
+    if ts_us is None or not intervals:
+        return None
+    ts = np.asarray(ts_us, dtype=np.int64)
+    mask = np.zeros(ts.size, dtype=bool)
+    for s, e in intervals:
+        lo = int(np.searchsorted(ts, int(s)))
+        hi = ts.size if e is None else int(np.searchsorted(ts, int(e)))
+        mask[lo:hi] = True
+    if values is None or values_ts is None or not codes:
+        return mask
+    vs = np.asarray(values)
+    vts = np.asarray(values_ts, dtype=np.int64)
+    if not vs.size or not vts.size:
+        return mask
+    idx = np.clip(np.searchsorted(vts, ts), 0, vs.size - 1)
+    narrow = mask & np.isin(vs[idx], list(codes))
+    return narrow if int(np.count_nonzero(narrow)) > int(min_active) else mask
+
+
+@operator(
+    "column_spread_stats",
+    in_arity=2,
+    out_arity=4,
+    out_names=["spread", "busiest", "idlest", "n_active"],
+    doc="多通道均值极差：掩码内逐通道求均值，只保留均值 > min_mean 的通道（排除未接/未用），"
+        "活跃通道数不足 min_channels 时返回 None；回传 极差 / 最大通道号 / 最小通道号 / 活跃数。",
+)
+def op_column_spread_stats(matrix, mask, min_mean=0.01, min_channels=4, **kw):
+    means = op_active_column_means(matrix, mask, min_mean=min_mean)
+    if means is None or len(means) < int(min_channels):
+        return None
+    best = worst = means[0]
+    for it in means[1:]:
+        if it["mean"] > best["mean"]:
+            best = it
+        if it["mean"] < worst["mean"]:
+            worst = it
+    return (float(best["mean"] - worst["mean"]), best["index"], worst["index"], len(means))
+
+
+@operator(
+    "cell_voltage_min",
+    in_arity=4,
+    out_arity=6,
+    out_names=["vmin", "cell_min", "cells", "have_measured", "have_fallback", "no_cell"],
+    doc="单电芯最低电压：优先 voltage_cell_v[] 实测（各列 > 0 的最小值中的最小值），"
+        "缺失时回退 总压最小值 / 电芯数（两者都 > 0 才成立）；两者都没有但有总压 → no_cell 为真。"
+        "cells 只在回退路径给出（与迁移前一致）。",
+)
+def op_cell_voltage_min(cell_cols, volt_v, volt_filtered, cell_count, **kw):
+    import numpy as np
+
+    volt = volt_v if volt_v is not None else volt_filtered
+    vmin = None
+    if volt is not None:
+        a = _finite(volt)
+        vmin = float(a.min()) if a.size else None
+
+    measured = None
+    for col in _as_columns(cell_cols):
+        pos = col[col > 0]
+        if pos.size:
+            m = float(pos.min())
+            measured = m if measured is None else min(measured, m)
+
+    cells = None
+    fallback = None
+    if measured is None and cell_count is not None and len(cell_count):
+        c = int(np.max(np.asarray(cell_count)))
+        if c > 0 and vmin is not None and vmin > 0:
+            fallback = vmin / c
+            cells = c
+
+    have_measured = measured is not None
+    have_fallback = fallback is not None
+    cell_min = measured if have_measured else fallback
+    no_cell = (not have_measured and not have_fallback and vmin is not None)
+    return (vmin, cell_min, cells, have_measured, have_fallback, no_cell)
+
+
+import json, io, ast, re
 import numpy as np
 from pyulog import ULog
 
 PX4_DOC_LOG = "https://docs.px4.io/main/en/log/flight_log_analysis.html"
-PX4_DOC_BATTERY = "https://docs.px4.io/main/en/config/battery.html"
 PX4_DOC_VIBRATION = "https://docs.px4.io/main/en/assembly/vibration_isolation.html"
 PX4_DOC_EKF = "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"
 PX4_DOC_GPS = "https://docs.px4.io/main/en/gps_compass/"
@@ -91,21 +1278,16 @@ PX4_DOC_FAILSAFE = "https://docs.px4.io/main/en/config/safety.html"
 # 故障知识库（构建期内联，第三层检索用）
 FAULT_KB = __FAULT_KB__
 
-# ---------------- 阈值（唯一数值来源：px4-thresholds.toml，构建期内联为 JSON）----
-# 本地用 python 跑（run_checks_locally.py）时由注入的 JSON 字面量提供；
-# Pyodide 端同样内联。改阈值只编辑 knowledge/px4/px4-thresholds.toml。
-TH = json.loads(r'''__THRESHOLDS__''')
-
-# 经验规则（rules/*.yaml 编译而来；见 knowledge/px4/rule-schema-design.md）
+# ---------------- 经验规则（rules/*.yaml 编译而来）----------------
 RULES = json.loads(r'''__RULES__''')
 
 # 执行位置必须与原过程式检查一致（finding.id 按发射顺序生成）。同一 slot 内多条规则
-# 按 order 字段排序（缺省 100000，再按 id 兜底）。迁移期未声明的 slot 排到最后。
+# 按 order 字段排序（缺省 100000，再按 id 兜底）。
 _SLOT_ORDER = [
     "vibration", "ekf_innovations", "ekf_faults", "battery", "cpu",
     "gps_health", "failsafe", "mode_thrash", "motor_balance", "imu_bias",
     "attitude_tracking", "airspeed", "vtol_transition", "wind_estimate",
-    "logged_messages",
+    "logged_messages", "guards_early", "guards",
 ]
 
 
@@ -117,39 +1299,15 @@ def _rule_pos(rule):
 
 RULES.sort(key=_rule_pos)
 
-VIBE_WARN, VIBE_CRIT = TH["vibration"]["vibe_warn"], TH["vibration"]["vibe_crit"]
-VIBE_STDDEV_WARN, VIBE_STDDEV_CRIT = TH["vibration"]["stddev_warn"], TH["vibration"]["stddev_crit"]
-CLIP_WARN, CLIP_CRIT = TH["vibration"]["clip_warn"], TH["vibration"]["clip_crit"]
-EKF_WARN, EKF_CRIT = TH["ekf"]["reject_ratio_warn"], TH["ekf"]["reject_ratio_crit"]
-EKF_PEAK_WARN, EKF_PEAK_CRIT = TH["ekf"]["peak_warn"], TH["ekf"]["peak_crit"]
-EKF_REJECT_MIN = TH["ekf"]["reject_min_count"]
-CELL_WARN, CELL_CRIT = TH["power"]["cell_warn"], TH["power"]["cell_crit"]
-CELL_SAG_V = TH["power"]["sag_volts"]
-SAG_SKIP_TAKEOFF_US = int(TH["power"]["sag_skip_takeoff_sec"] * 1e6)
-REMAIN_WARN, REMAIN_CRIT = TH["power"]["remaining_warn"], TH["power"]["remaining_crit"]
-CPU_WARN, CPU_CRIT = TH["cpu"]["load_warn"], TH["cpu"]["load_crit"]
-EPH_WARN, EPH_CRIT = TH["gps"]["eph_warn"], TH["gps"]["eph_crit"]
-SATS_WARN, SATS_CRIT = TH["gps"]["sats_warn"], TH["gps"]["sats_crit"]
-GPS_JUMP_SPEED, GPS_JUMP_MIN = TH["gps"]["jump_speed_mps"], TH["gps"]["jump_min_count"]
-MODE_THRASH_WARN = TH["mode"]["thrash_changes"]
-MIN_FLIGHT_SEC = TH["guard"]["min_flight_sec"]
-DROPOUT_LIMIT_MS = TH["guard"]["dropout_ms"]
-MOTOR_SPREAD_WARN, MOTOR_SPREAD_CRIT = TH["motor"]["spread_warn"], TH["motor"]["spread_crit"]
-GYRO_BIAS_ABS_WARN, GYRO_BIAS_ABS_CRIT = TH["gyro_bias"]["abs_warn"], TH["gyro_bias"]["abs_crit"]
-GYRO_BIAS_DRIFT_WARN, GYRO_BIAS_DRIFT_CRIT = TH["gyro_bias"]["drift_warn"], TH["gyro_bias"]["drift_crit"]
-TEMP_RANGE_WARN, TEMP_RANGE_CRIT = TH["gyro_bias"]["temp_range_warn"], TH["gyro_bias"]["temp_range_crit"]
-ATT_ERR_WARN, ATT_ERR_CRIT = TH["attitude"]["err_warn_rotary"], TH["attitude"]["err_crit_rotary"]
-ATT_ERR_WARN_FW, ATT_ERR_CRIT_FW = TH["attitude"]["err_warn_fixedwing"], TH["attitude"]["err_crit_fixedwing"]
-ATT_OSC_WARN = TH["attitude"]["osc_hz"]
-ATT_RATE_HZ = TH["attitude"]["sample_rate_hz"]
-ATT_MIN_SAMPLES = TH["attitude"]["min_seg_samples"]
-AIRSPEED_INVALID_WARN, AIRSPEED_INVALID_CRIT = TH["airspeed"]["invalid_ratio_warn"], TH["airspeed"]["invalid_ratio_crit"]
-VTOL_ATT_LIMIT = TH["vtol"]["transition_tilt_deg"]
-WIND_WARN, WIND_CRIT = TH["wind"]["speed_warn"], TH["wind"]["speed_crit"]
-LOG_LEVEL_CRIT_MAX = TH["messages"]["critical_max_level"]
-LOG_LEVEL_WARN = TH["messages"]["warn_level"]
-MSG_MAX_EXAMPLES = TH["messages"]["max_examples"]
-MSG_CLIP_LEN = TH["messages"]["message_clip_len"]
+# 阈值不再集中存放：每条经验的判定阈值都写在它自己的 rules/*.yaml 里
+# （px4-thresholds.toml 已退场）。本文件只保留引擎级格式常量。
+
+# ULog 日志级别：PX4 在 log_level 里填 ASCII 数字，映射与 pyulog Message.log_level_str() 一致
+# （见 pyulog/core.py）。经验文件按 level_name 判定，避免再犯“拿 3/4 去比 51/52”的错。
+_LOG_LEVEL_NAMES = {
+    ord("0"): "EMERGENCY", ord("1"): "ALERT", ord("2"): "CRITICAL", ord("3"): "ERROR",
+    ord("4"): "WARNING", ord("5"): "NOTICE", ord("6"): "INFO", ord("7"): "DEBUG",
+}
 
 findings = []
 checks_run = []
@@ -342,11 +1500,21 @@ if vs is not None and trans_mode is not None:
 stats["armedDurationSec"] = armed_duration_s
 stats["phases"] = sorted(phases_present)
 
-# 短日志 guard：不做需要时间累积的深度诊断（PID/振动根源等），但仍跑瞬时安全项
-short_log = (armed_duration_s > 0 and armed_duration_s < MIN_FLIGHT_SEC) or \
-            (armed_duration_s == 0 and (duration_s or 0) < MIN_FLIGHT_SEC)
-if short_log:
-    guard_tags.append("insufficient_data")
+# 短日志 guard 的标签由 rules/guard-short-log.yaml 给出；调用放在框架定义之后
+# （见下方 _run_rules("guards_early")），以保证它是第一个 guard 标签。
+
+# ---------------- 数据质量事实（供 guards 类经验判定）----------------
+# 中途重启：同一 topic 时间戳出现回退（样本 > 10 才算）
+restart_topics = 0
+for _d in ulog.data_list:
+    _t = getf(_d, "timestamp")
+    if _t is not None and len(_t) > 10:
+        _a = np.asarray(_t, dtype=np.int64)
+        if int(np.count_nonzero(np.diff(_a) < 0)) > 0:
+            restart_topics += 1
+# 日志丢包累计
+dropout_total_ms = int(sum(getattr(d, "duration", 0) for d in getattr(ulog, "dropouts", [])))
+stats["dropoutTotalMs"] = dropout_total_ms
 
 def in_armed(ts_us):
     for s, e in armed_intervals:
@@ -361,6 +1529,7 @@ def in_armed(ts_us):
 _ALLOWED_NODES = (
     ast.Expression, ast.BoolOp, ast.And, ast.Or, ast.UnaryOp, ast.Not, ast.USub,
     ast.Compare, ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.Eq, ast.NotEq, ast.In, ast.NotIn,
+    ast.Is, ast.IsNot,
     ast.BinOp, ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Mod,
     ast.Name, ast.Load, ast.Constant, ast.List, ast.Tuple, ast.Set,
 )
@@ -379,19 +1548,100 @@ def _eval_expr(expr, env):
 
 
 def _read_field_ref(ref):
-    """'topic.field' → 该字段在各实例上的值（多实例拼接）；topic/字段缺失返回 None。"""
+    """'topic.field' → 该字段在各实例上的值（多实例拼接）；topic/字段缺失返回 None。
+
+    数组字段（如 float32[14] voltage_cell_v）pyulog 按 'field[i]' 暴露，
+    直接 getf(field) 拿不到，这里尝试下标 0..31，返回**每元素一列的列表**；
+    缺的元素位置为 None。
+    """
     topic, _, field = ref.partition(".")
     ds = find_all(ulog, topic)
     if not ds:
         return None
-    vals = []
-    for d in ds:
-        v = getf(d, field)
-        if v is not None and len(v):
-            vals.append(np.asarray(v, dtype=float))
-    if not vals:
+
+    def gather(get_one):
+        vals = []
+        for d in ds:
+            v = get_one(d)
+            if v is not None and len(v):
+                vals.append(np.asarray(v, dtype=float))
+        if not vals:
+            return None
+        return np.concatenate(vals) if len(vals) > 1 else vals[0]
+
+    direct = gather(lambda d: getf(d, field))
+    if direct is not None:
+        return direct
+    def gather_cell(idx):
+        # pyulog 对定长数组通常暴露为 'field[0]'，个别构建为 'field_0'
+        return gather(lambda d: getf(d, f"{field}[{idx}]", f"{field}_{idx}"))
+
+    col0 = gather_cell(0)
+    if col0 is None:
         return None
-    return np.concatenate(vals) if len(vals) > 1 else vals[0]
+    columns = []
+    for i in range(32):
+        columns.append(gather_cell(i))
+    while columns and columns[-1] is None:
+        columns.pop()
+    return columns
+
+
+def _read_field_ref_grouped(ref, aliases=None):
+    """per_instance 取数：返回「每个 topic 实例一组」的列表（不跨实例拼接）。
+
+    每组是：标量字段 → 一维数组；定长数组字段 → 每元素一列的列表；缺失 → None。
+    aliases 为该字段的备用命名（pyulog 字段改名/旧固件）：标量按整名回退，
+    数组字段按 'stem[i]' / 'stem_i' 两种形态按下标展开。
+    """
+    topic, _, field = ref.partition(".")
+    ds = find_all(ulog, topic)
+    if not ds:
+        return None
+    aliases = list(aliases or [])
+    groups = []
+    for d in ds:
+        direct = getf(d, field, *aliases)
+        if direct is not None and len(direct):
+            groups.append(np.asarray(direct, dtype=float))
+            continue
+        stems = [field] + aliases
+        cols = []
+        for idx in range(32):
+            col = None
+            for stem in stems:
+                v = getf(d, f"{stem}[{idx}]", f"{stem}_{idx}")
+                if v is not None and len(v):
+                    col = np.asarray(v, dtype=float)
+                    break
+            cols.append(col)
+        while cols and cols[-1] is None:
+            cols.pop()
+        groups.append(cols if cols else None)
+    return groups
+
+
+def _collect_log_messages():
+    """ulog.logged_messages → [{tSec, message, level, level_name}]。
+
+    level 是 ULog 里的原始字节，PX4 填的是 **ASCII 数字**（'3'=51 才是 ERROR），
+    与 pyulog 的 Message.log_level_str() 一致；因此经验文件按 level_name 判定，
+    不要直接和 3/4 这种数字比（迁移前就是这么比错的，导致消息类经验从不命中）。
+    """
+    out = []
+    for m in getattr(ulog, "logged_messages", []):
+        try:
+            ts_s = round((int(m.timestamp) - t0) / 1e6, 2)
+        except Exception:
+            ts_s = None
+        lvl = int(getattr(m, "log_level", ord("6")))
+        out.append({
+            "tSec": ts_s,
+            "message": str(m.message).strip(),
+            "level": lvl,
+            "level_name": _LOG_LEVEL_NAMES.get(lvl, "UNKNOWN"),
+        })
+    return out
 
 
 def _rule_env():
@@ -409,7 +1659,54 @@ def _rule_env():
         "phases": phases_present,
         "tags": set(tags),
         "guard_tags": set(guard_tags),
+        # 时序算子（如 head_tail_median_drop）按 armed 区间切窗用
+        "armed_intervals": armed_intervals,
+        # 事件类算子的相对时间（t=xx.x s）基准
+        "t0_us": t0,
+        # 是否有 armed 段（原过程式大量用 \`if armed_intervals:\` 做外层门控）
+        "has_armed": bool(armed_intervals),
+        # 本日志实际存在的 topic 名集合（表达式里可写 "'xxx' in topics"）
+        "topics": set(d.name for d in ulog.data_list),
+        # 数据质量事实（guards 类经验用）
+        "restart_detected": restart_topics > 0,
+        "dropout_ms": dropout_total_ms,
+        # 日志消息（ulog.logged_messages）：供「日志消息聚合」类经验按级别筛选
+        "messages": _collect_log_messages(),
     }
+
+
+def _match_firmware(spec):
+    """适用范围轴①：固件版本。any / ">=1.15" / "<1.15" / ">=1.14,<1.15"（逗号=与）。"""
+    if not spec or spec == "any":
+        return True
+    if FW_MINOR is None:
+        return True          # 版本未知不因版本排除（与迁移前“按字段存在性判定”一致）
+    cur = (FW["major"] if FW["major"] is not None else 0, FW_MINOR)
+    for part in str(spec).split(","):
+        m = re.match(r"^\s*(>=|<=|==|>|<)?\s*(\d+)\.?(\d+)?\s*$", part)
+        if not m:
+            raise ValueError("无法解析 firmware 约束：%r" % spec)
+        op, maj, mi = m.group(1) or "==", int(m.group(2)), int(m.group(3) or 0)
+        want = (maj, mi)
+        ok = {">=": cur >= want, "<=": cur <= want, ">": cur > want,
+              "<": cur < want, "==": cur == want}[op]
+        if not ok:
+            return False
+    return True
+
+
+def _match_airframe(spec):
+    """适用范围轴②：机架。any / rotary_wing / [fixed_wing, vtol]；vtol 按子串匹配。"""
+    if not spec or spec == "any":
+        return True
+    wanted = spec if isinstance(spec, (list, tuple)) else [spec]
+    for w in wanted:
+        w = str(w)
+        if w == "vtol" and "vtol" in vehicle_type:
+            return True
+        if w == vehicle_type:
+            return True
+    return False
 
 
 def _run_rules(slot):
@@ -423,823 +1720,247 @@ def _run_rules(slot):
         if _rule.get("slot") != slot:
             continue
         _rid = _rule["id"]
-        _checks = _rule["emit"]["check"]
-        _checks = _checks if isinstance(_checks, list) else [_checks]
-        _need = (_rule.get("requires") or {}).get("any_of") or []
-        _missing = bool(_need) and not all(find_all(ulog, t) for t in _need)
-        if _missing:
+        _checks = (_rule.get("emit") or {}).get("check")
+        if _checks is None:
+            _checks = []            # guards 类经验没有 check 名（不记 ran/skipped）
+        elif not isinstance(_checks, list):
+            _checks = [_checks]
+        # not_applicable.when：声明式表达“该经验对本日志不适用”（如机型未知）。
+        # 必须在 firmware/airframe 轴判定**之前**：轴不匹配是静默的，而这里要留下
+        # skip 记录（如机型未知要写明原因，机型是旋翼却什么都不记——与原实现一致）。
+        _na = _rule.get("not_applicable") or {}
+        if _na.get("when") and _eval_expr(_na["when"], _rule_env()):
             for _check in _checks:
-                skipped(_check, _rule.get("skip_reason") or ("缺少依赖 topic：%s" % ", ".join(_need)))
+                skipped(_check, _na.get("skip_reason") or "不适用")
             continue
+        # silent_when：静默不适用——既不 ran 也不 skipped（对应原过程式“外层 if 不成立”）
+        _sw = _rule.get("silent_when")
+        if _sw and _eval_expr(_sw, _rule_env()):
+            continue
+        # 适用范围三轴：固件 / 机架（不适用则默认静默——既不 ran 也不 skipped，
+        # 与原过程式“外层 if 不成立”一致；确需留痕时用 skip_reason_axis 单独声明，
+        # 不要复用 not_applicable.skip_reason：那是给 not_applicable.when 用的，
+        # 两者混用会让“机型不匹配”也带上“机型未知”的原因。）
+        if not _match_firmware(_rule.get("firmware")) or not _match_airframe(_rule.get("airframe")):
+            if _rule.get("skip_reason_axis"):
+                for _check in _checks:
+                    skipped(_check, _rule["skip_reason_axis"])
+            continue
+        # requires.any_of / all_of：分别表示“任一存在即可”与“必须都存在”的依赖 topic
+        # （多版本同义 topic 用 any_of，如 estimator_wind / wind_estimate）。缺则 skipped。
+        _req = _rule.get("requires") or {}
+        _need_any = _req.get("any_of") or []
+        _need_all = _req.get("all_of") or []
+        _missing = (bool(_need_any) and not any(find_all(ulog, t) for t in _need_any)) or \
+                   (bool(_need_all) and not all(find_all(ulog, t) for t in _need_all))
+        if _missing:
+            _need_txt = list(_need_any) + list(_need_all)
+            for _check in _checks:
+                skipped(_check, _rule.get("skip_reason") or ("缺少依赖 topic：%s" % ", ".join(_need_txt)))
+            continue
+        # topic 在就 ran（与原过程式块一致：ran() 在块首，数据不足只代表不发射 finding）。
+        # ran_on_success：原实现把 ran() 放在数据判定**之后**（如 motor_balance 只在
+        # 活跃通道 >= 4 时才算“跑过”），这类规则改为 compute 成功后再记 ran。
+        _ran_late = bool(_rule.get("ran_on_success")) or _rule.get("ran_when") is not None
+        if not _ran_late:
+            for _check in _checks:
+                ran(_check)
+
         _env = _rule_env()
         _ok = True
-        for _node in _rule["compute"]:
+        for _node in (_rule.get("compute") or []):
             # 归一化：单输入可用短写法 from:（字符串或列表），单输出可直接写 out: 名字
             _ins = _node.get("in")
             if _ins is None:
                 _ins = _node["from"] if isinstance(_node["from"], list) else [_node["from"]]
             _outs = _node["out"] if isinstance(_node["out"], list) else [_node["out"]]
             _args = []
+            _per_inst = bool(_node.get("per_instance"))
+            _node_aliases = _node.get("aliases") or {}
             for _ref in _ins:
-                _args.append(_env[_ref] if _ref in _env else _read_field_ref(_ref))
-            if any(_a is None for _a in _args):
+                if not isinstance(_ref, str):
+                    _args.append(_ref)          # YAML 字面量（数字/布尔），直接作为算子入参
+                elif _ref in _env:
+                    _args.append(_env[_ref])
+                elif _node.get("instance") is not None:
+                    # instance: N —— 只取第 N 个实例（对应原过程式的 xxx_list[0]；
+                    # 多实例 topic（如每 IMU 一个 estimator_sensor_bias）必须显式指定，
+                    # 否则默认读取会把各实例拼接起来，语义就变了
+                    _grp = _read_field_ref_grouped(_ref, _node_aliases.get(_ref))
+                    _idx = int(_node["instance"])
+                    _args.append(_grp[_idx] if _grp and len(_grp) > _idx else None)
+                elif _per_inst:
+                    _args.append(_read_field_ref_grouped(_ref, _node_aliases.get(_ref)))
+                else:
+                    _args.append(_read_field_ref(_ref))
+            # optional: true 的节点允许 None 输入与 None 输出（缺失沿数据流显式传播）
+            if any(_a is None for _a in _args) and not _node.get("optional"):
                 _ok = False
                 break
-            _res = OPERATORS[_node["op"]](*_args, **_node)
+            try:
+                _res = OPERATORS[_node["op"]](*_args, **_node)
+            except Exception:
+                # 算子内部异常（脏数据/字段形态意外）不该中断整份日志：按“数据不足”中止本条规则
+                _ok = False
+                break
+            if _res is None and not _node.get("optional"):
+                _ok = False
+                break
             if _res is None:
-                _ok = False
-                break
+                for _name in _outs:
+                    _env[_name] = None
+                continue
             if not isinstance(_res, tuple):
                 _res = (_res,)
             for _name, _v in zip(_outs, _res):
                 _env[_name] = _v
         if not _ok:
-            for _check in _checks:
-                skipped(_check, _rule.get("skip_reason") or "数据不足，未做判定")
+            # 数据不足：默认不发射、不补 skipped（与原过程式语义一致）；规则显式声明
+            # skip_reason_no_data 时额外记一条（如 airspeed 的“无固定翼巡航段”）
+            if _rule.get("skip_reason_no_data"):
+                for _check in _checks:
+                    skipped(_check, _rule["skip_reason_no_data"])
             continue
-        for _check in _checks:
-            ran(_check)
+        if _ran_late:
+            # 原实现把 ran() 放在数据判定**之后**（如 motor_balance 只在活跃通道 >= 4 时
+            # 才算“跑过”、attitude 只在机动段样本足够时才算）。ran_when 可再给条件。
+            _ran_ok = True
+            if _rule.get("ran_when") is not None:
+                try:
+                    _ran_ok = bool(_eval_expr(_rule["ran_when"], _env))
+                except Exception:
+                    _ran_ok = False
+            if _ran_ok:
+                for _check in _checks:
+                    ran(_check)
 
         _emit = _rule["emit"]
+        # emit.guard_tags：按条件产生的数据质量标签（等价于原过程式的 guard_tags.append，
+        # 不依赖是否发出 finding——如陀螺零偏的“温度变化大”）
+        for _gspec in (_emit.get("guard_tags") or []):
+            try:
+                _g_hit = _eval_expr(_gspec["when"], _env)
+            except Exception:
+                _g_hit = False
+            if _g_hit and _gspec.get("tag") and _gspec["tag"] not in guard_tags:
+                guard_tags.append(_gspec["tag"])
         for _key, _spec in (_emit.get("stats") or {}).items():
             _v = _env.get(_spec["var"])
             if _v is None:
                 continue
             stats[_key] = round(float(_v), int(_spec["round"])) if "round" in _spec else _v
 
-        for _trig in _rule["triggers"]:
-            if _eval_expr(_trig["expr"], _env):
-                _val = _env.get(_trig["value"]) if _trig.get("value") else None
-                if _val is not None and _trig.get("round") is not None:
-                    _val = round(float(_val), int(_trig["round"]))
-                add(_trig["severity"], _rid, _trig.get("tag", _emit.get("tag")),
-                    _trig["title"].format_map(_env), _trig["field"], _val,
-                    _trig.get("threshold"), _trig.get("unit"),
-                    _emit.get("doc"), _trig.get("suggestion"))
-                break
-
-
-# ---------------- 规则 1：振动 / IMU 削波 ----------------
-imu_list = find_all(ulog, "vehicle_imu_status")
-if imu_list:
-    ran("vibration")
-    worst = {"mean": 0.0, "p95": 0.0, "max": 0.0, "imu": -1}
-    worst_stddev = {"rss": 0.0, "imu": -1}
-    worst_clip = {"count": 0, "axis": -1, "imu": -1}
-    for i, d in enumerate(imu_list):
-        vm = getf(d, "accel_vibration_metric")
-        if vm is not None:
-            v = np.asarray(vm, dtype=float); v = v[np.isfinite(v)]
-            if len(v) > 0:
-                m = float(np.mean(v))
-                if m > worst["mean"]:
-                    worst = {"mean": m, "p95": float(np.percentile(v, 95)),
-                             "max": float(np.max(v)), "imu": i}
-        sx = getf(d, "stddev_accel_x_m_s2", "stddev_accel_x")
-        sy = getf(d, "stddev_accel_y_m_s2", "stddev_accel_y")
-        sz = getf(d, "stddev_accel_z_m_s2", "stddev_accel_z")
-        if sx is not None and sy is not None and sz is not None:
-            rss = float(np.mean(np.sqrt(
-                np.asarray(sx, float) ** 2 + np.asarray(sy, float) ** 2 +
-                np.asarray(sz, float) ** 2)))
-            if rss > worst_stddev["rss"]:
-                worst_stddev = {"rss": rss, "imu": i}
-        for axis in range(3):
-            _, c = pick(d, "accel_clipping[%d]" % axis, "accel_clipping_%d" % axis,
-                        "clipping_%d" % axis)
-            if c is not None and len(c) > 0:
-                delta = int(np.max(c)) - int(np.min(c))
-                if delta > worst_clip["count"]:
-                    worst_clip = {"count": delta, "axis": axis, "imu": i}
-
-    if worst["imu"] >= 0:
-        stats["imuAccelVibrationMean"] = round(worst["mean"], 3)
-        stats["imuAccelVibrationP95"] = round(worst["p95"], 3)
-        stats["imuAccelVibrationMax"] = round(worst["max"], 3)
-        if worst["mean"] >= VIBE_CRIT:
-            add("critical", "px4-vibration", "high_vibration",
-                "高频振动严重超标（IMU #%d）" % worst["imu"],
-                "vehicle_imu_status.accel_vibration_metric(均值)",
-                round(worst["mean"], 3), VIBE_CRIT, "m/s^2", PX4_DOC_VIBRATION,
-                "Flight Review 红色区间（>9.81 m/s^2）。结合故障库条目排查桨叶/电机/机架/减震。")
-        elif worst["mean"] >= VIBE_WARN:
-            add("warning", "px4-vibration", "high_vibration",
-                "高频振动偏大（IMU #%d）" % worst["imu"],
-                "vehicle_imu_status.accel_vibration_metric(均值)",
-                round(worst["mean"], 3), VIBE_WARN, "m/s^2", PX4_DOC_VIBRATION,
-                "Flight Review 橙色区间（4.905~9.81 m/s^2）。结合故障库条目排查桨叶动平衡/电机/IMU 减震。")
-
-    if worst_stddev["imu"] >= 0:
-        stats["imuStddevAccelRssMax"] = round(worst_stddev["rss"], 3)
-        rss = worst_stddev["rss"]
-        if rss >= VIBE_STDDEV_CRIT:
-            add("critical", "px4-vibration", "high_vibration",
-                "IMU 加速度标准差严重超标（IMU #%d）" % worst_stddev["imu"],
-                "vehicle_imu_status.stddev_accel_*_m_s2(RSS 均值)",
-                round(rss, 3), VIBE_STDDEV_CRIT, "m/s^2", PX4_DOC_VIBRATION,
-                "结合故障库条目排查桨叶/电机轴承/机架紧固/减震。")
-        elif rss >= VIBE_STDDEV_WARN:
-            add("warning", "px4-vibration", "high_vibration",
-                "IMU 加速度标准差偏大（IMU #%d）" % worst_stddev["imu"],
-                "vehicle_imu_status.stddev_accel_*_m_s2(RSS 均值)",
-                round(rss, 3), VIBE_STDDEV_WARN, "m/s^2", PX4_DOC_VIBRATION,
-                "关注桨叶损伤、电机动平衡与 IMU 减震。")
-
-    if worst_clip["imu"] >= 0 and worst_clip["count"] > 0:
-        stats["imuAccelClippingCountMax"] = worst_clip["count"]
-        desc = "IMU #%d 轴 %d 全日志累计削波 %d 次（理想值为 0）" % (
-            worst_clip["imu"], worst_clip["axis"], worst_clip["count"])
-        field = "vehicle_imu_status.accel_clipping[%d](末值-首值)" % worst_clip["axis"]
-        if worst_clip["count"] >= CLIP_CRIT:
-            add("critical", "px4-imu-clipping", "high_vibration",
-                "加速度计削波严重：" + desc, field, worst_clip["count"], CLIP_CRIT,
-                "count", PX4_DOC_VIBRATION, "持续削波会破坏 EKF 估计，请优先排除机械振动源。")
-        elif worst_clip["count"] >= CLIP_WARN:
-            add("warning", "px4-imu-clipping", "high_vibration",
-                "检测到明显加速度计削波：" + desc, field, worst_clip["count"], CLIP_WARN,
-                "count", PX4_DOC_VIBRATION, "削波表明振动峰值已超出传感器量程，建议排查机械振动源。")
+        # foreach: 把一条规则算出的「事件列表」展开成多条 finding（如 failsafe 的每次边沿）。
+        # 事件 dict 的键会叠加进模板环境，所以文案仍写在经验文件里；
+        # 每个事件最多命中一条 trigger（自上而下第一条），与单事件规则一致。
+        # foreach 支持两种写法：\`foreach: events\` 或
+        # \`foreach: {var: events, keys: [t_s]}\`（后者让构建期能校验事件键的占位符）
+        _for_spec = _rule.get("foreach")
+        _for_key = _for_spec.get("var") if isinstance(_for_spec, dict) else _for_spec
+        if _for_key:
+            _items = _env.get(_for_key) or []
         else:
-            add("info", "px4-imu-clipping", None,
-                "偶发加速度计削波：" + desc, field, worst_clip["count"], 0,
-                "count", PX4_DOC_VIBRATION, "少量削波可先观察；频次升高或伴随振动告警需排查机械问题。")
-else:
-    skipped("vibration", "vehicle_imu_status not in log")
-
-# ---------------- 规则 2：EKF 创新检验 + 硬故障位 ----------------
-FLAG_BITS = {0: "速度", 1: "水平位置", 2: "垂直位置", 3: "磁罗盘 X", 4: "磁罗盘 Y",
-             5: "磁罗盘 Z", 6: "航向", 7: "空速", 8: "侧滑", 9: "离地高度",
-             10: "光流 X", 11: "光流 Y"}
-RATIO_CHANNELS = [
-    ("vel_test_ratio", "速度"), ("pos_test_ratio", "水平位置"),
-    ("hgt_test_ratio", "垂直高度"), ("hdg_test_ratio", "航向"),
-    ("mag_test_ratio", "磁罗盘"), ("tas_test_ratio", "空速"),
-    ("hagl_test_ratio", "离地高度"), ("beta_test_ratio", "侧滑"),
-]
-est_list = find_all(ulog, "estimator_status")
-if est_list:
-    ran("ekf_innovations")
-    ekf_worst = None
-    for ei, d in enumerate(est_list):
-        flags = getf(d, "innovation_check_flags")
-        if flags is not None and len(flags) > 0:
-            bad = int(np.count_nonzero(flags))
-            if bad < 3:
-                continue
-            ratio = bad / len(flags)
-            union = int(np.bitwise_or.reduce([int(x) for x in flags]))
-            fired = sorted(FLAG_BITS[b] for b in FLAG_BITS if union & (1 << b))
-            cand = (ratio, "、".join(fired), ei)
-            if ekf_worst is None or ratio > ekf_worst[0]:
-                ekf_worst = cand
-            continue
-        for name, label in RATIO_CHANNELS:
-            v = getf(d, name)
-            if v is None: continue
-            arr = np.asarray(v, dtype=float); arr = arr[np.isfinite(arr)]
-            if len(arr) == 0: continue
-            n_bad = int(np.count_nonzero(arr >= 1.0))
-            if n_bad < EKF_REJECT_MIN: continue   # 偶发尖峰/未启用传感器，避免误报
-            frac = n_bad / len(arr)
-            if ekf_worst is None or frac > ekf_worst[0]:
-                ekf_worst = (frac, label, ei)
-    if ekf_worst is not None:
-        frac, labels, ei = ekf_worst
-        pct = round(frac * 100, 2)
-        stats["ekfRejectRatioPct"] = pct
-        if frac >= EKF_CRIT:
-            add("critical", "px4-ekf-innovation", "ekf_innovation_failure",
-                "EKF 创新检验持续失败（estimator #%s：%s）" % (ei, labels or "未知通道"),
-                "estimator_status 创新检验拒绝样本占比", pct, EKF_CRIT * 100, "%",
-                PX4_DOC_EKF, "涉及：%s。检查对应传感器健康度、安装与校准。" % (labels or "未知通道"))
-        elif frac >= EKF_WARN:
-            add("warning", "px4-ekf-innovation", "ekf_innovation_failure",
-                "EKF 创新检验偶发失败（estimator #%s：%s）" % (ei, labels or "未知通道"),
-                "estimator_status 创新检验拒绝样本占比", pct, EKF_WARN * 100, "%",
-                PX4_DOC_EKF, "涉及：%s。关注 GPS 卫星数、磁罗盘干扰、振动与气压计异常。" % (labels or "未知通道"))
-
-    # EKF 硬故障位（robotto 经验）。filter_fault_flags 为位掩码，不能"任一非零即严重"：
-    # bit 0-5 为位置/速度/高度/偏航等核心融合故障（critical）；
-    # bit 10 视觉速度融合拒绝在未用 VIO 的飞机上为正常，避免误报。
-    ran("ekf_faults")
-    CRITICAL_FAULT_BITS = {0, 1, 2, 3, 4, 5}
-    fault_union, nan_max, benign_only = 0, 0, True
-    have_fault = False
-    for d in est_list:
-        ff = getf(d, "filter_fault_flags")
-        nf = getf(d, "nan_flags")
-        if ff is not None and len(ff) > 0:
-            have_fault = True; fmax = int(np.max(np.asarray(ff)))
-            fault_union |= fmax
-            if any(fmax & (1 << b) for b in CRITICAL_FAULT_BITS):
-                benign_only = False
-        if nf is not None and len(nf) > 0:
-            have_fault = True; nan_max = max(nan_max, int(np.max(np.asarray(nf))))
-            if nan_max: benign_only = False
-    if have_fault and (nan_max or any(fault_union & (1 << b) for b in CRITICAL_FAULT_BITS)):
-        add("critical", "px4-ekf-fault", "ekf_innovation_failure",
-            "EKF 报告核心融合硬故障（filter_fault_flags=%d, nan_flags=%d）" % (fault_union, nan_max),
-            "estimator_status.filter_fault_flags/nan_flags",
-            "fault=%d,nan=%d" % (fault_union, nan_max), 0, None,
-            PX4_DOC_EKF, "估计器出现硬故障/NaN，建议停飞排查传感器与振动后重新标定。")
-    elif have_fault and fault_union and benign_only:
-        add("info", "px4-ekf-fault", None,
-            "EKF 报告非核心辅助传感器融合拒绝（filter_fault_flags=%d，常见为未使用视觉/光流）" % fault_union,
-            "estimator_status.filter_fault_flags", fault_union, 0, None,
-            PX4_DOC_EKF, "若该机确实未启用视觉/光流定位，此位可忽略；否则检查对应传感器。")
-else:
-    skipped("ekf_innovations", "estimator_status not in log")
-    skipped("ekf_faults", "estimator_status not in log")
-
-# ---------------- 规则 3：电源（单芯电压 + 余量 + 飞行中持续压降）----------------
-bat_list = find_all(ulog, "battery_status")
-if bat_list:
-    ran("battery")
-    b0 = bat_list[0]
-    vts_b = np.asarray(getf(b0, "timestamp"), dtype=np.int64) if getf(b0, "timestamp") is not None else None
-    volt = getf(b0, "voltage_v", "voltage_filtered_v")
-    vmin = float(np.min(np.asarray(volt, dtype=float))) if volt is not None and len(volt) else None
-    if vmin is not None: stats["batteryVoltageMin"] = round(vmin, 2)
-
-    per_cell_min = None; source = None; cell_voltages = []
-    for idx in range(14):
-        vv = getf(b0, "voltage_cell_v[%d]" % idx, "voltage_cell_v_%d" % idx)
-        if vv is not None and len(vv) > 0:
-            cell_voltages.append(np.asarray(vv, dtype=float))
-    measured = [float(np.min(a[a > 0])) for a in cell_voltages if np.any(a > 0)]
-    if measured:
-        per_cell_min = min(measured); source = "battery_status.voltage_cell_v[](实测最小值)"
-    else:
-        cell_count = getf(b0, "cell_count")
-        if cell_count is not None and len(cell_count) > 0:
-            cells = int(np.max(cell_count))
-            if volt is not None and cells > 0 and vmin and vmin > 0:
-                per_cell_min = vmin / cells; source = "battery_status.voltage_v(min)/cell_count"
-                stats["batteryCellCount"] = cells
-    if per_cell_min is not None:
-        stats["batteryCellVoltageMin"] = round(per_cell_min, 3)
-        if per_cell_min < CELL_CRIT:
-            add("critical", "px4-power-cell-voltage", "battery_voltage_drop",
-                "电芯电压严重过低", source, round(per_cell_min, 3), CELL_CRIT, "V/cell",
-                PX4_DOC_BATTERY, "存在过放风险，检查电池老化、放电倍率匹配与低压告警阈值。")
-        elif per_cell_min < CELL_WARN:
-            add("warning", "px4-power-cell-voltage", "battery_voltage_drop",
-                "电芯电压偏低", source, round(per_cell_min, 3), CELL_WARN, "V/cell",
-                PX4_DOC_BATTERY, "建议核对剩余容量估计与返航电压裕度。")
-    elif volt is not None:
-        add("info", "px4-power-cell-voltage", None,
-            "日志缺少电芯电压与 cell_count，未做单电芯判断",
-            "battery_status.voltage_cell_v / cell_count", "missing", None, None,
-            PX4_DOC_BATTERY)
-
-    # 飞行中持续压降（剔除起飞冲击：armed 后 5s 起到结束，避免与瞬时机动混淆）
-    if cell_voltages and vts_b is not None and armed_intervals:
-        try:
-            stack = np.vstack([a for a in cell_voltages if len(a) == len(vts_b)])
-            per_cell_min_t = np.min(np.where(stack > 0, stack, np.nan), axis=0)
-            for s, _e in armed_intervals:
-                lo = np.searchsorted(vts_b, s + SAG_SKIP_TAKEOFF_US)
-                hi = len(vts_b)
-                seg = per_cell_min_t[lo:hi]
-                seg = seg[np.isfinite(seg)]
-                # 用末段 20% 中位数作为"持续低"参考，避免大机动瞬时点
-                if len(seg) > 20:
-                    tail = np.median(seg[-max(5, len(seg) // 5):])
-                    head = np.median(seg[: max(5, len(seg) // 10)])
-                    sag = float(head - tail)
-                    stats.setdefault("batteryCellSagFlight", round(sag, 3))
-                    if sag >= CELL_SAG_V and tail < CELL_WARN:
-                        add("warning", "px4-power-sag", "battery_voltage_drop",
-                            "飞行中单电芯持续压降 %.2f V（尾段中位 %.2f V）" % (sag, tail),
-                            "battery_status.voltage_cell_v[] armed 段趋势",
-                            round(sag, 3), CELL_SAG_V, "V", PX4_DOC_BATTERY,
-                            "持续压降区别于大机动瞬时压降：排查电芯老化内阻、插头虚接、线缆线径与负载匹配。")
+            _items = [None]
+        for _item in _items:
+            _tenv = _env
+            if _item is not None:
+                if not isinstance(_item, dict):
+                    continue
+                _tenv = dict(_env)
+                _tenv.update(_item)
+            for _trig in (_rule.get("triggers") or []):
+                # 单条触发条件出错（例如表达式把缺失值 None 与数值比较）不应让整份日志
+                # 的分析崩掉：视为未命中，继续下一条。这类错误应当在基线回归里暴露。
+                try:
+                    _hit = _eval_expr(_trig["expr"], _tenv)
+                except Exception:
+                    _hit = False
+                if not _hit:
+                    continue
+                # 数据质量标签副作用（如强风 wind_strong）：必须在 add() 之前追加，
+                # 顺序与原过程式代码一致（guardTags 数组顺序也参与基线比对）
+                _gt = _trig.get("guard_tag", _emit.get("guard_tag"))
+                if _gt and _gt not in guard_tags:
+                    guard_tags.append(_gt)
+                if "value_const" in _trig:
+                    _val = _trig["value_const"]
+                elif "value_text" in _trig:
+                    # 证据值本身是带占位符的文案（如 "fault=1024,nan=0"、"set at 25.6s"）
+                    _val = _trig["value_text"].format_map(_tenv)
+                else:
+                    _val = _tenv.get(_trig["value"]) if _trig.get("value") else None
+                    if _val is not None and _trig.get("round") is not None:
+                        _val = round(float(_val), int(_trig["round"]))
+                _field = _trig["field"]
+                if "{" in _field:
+                    _field = _field.format_map(_tenv)
+                # suggestion 同样允许占位符（如 "涉及：{names}。"），与 title 一致
+                _sugg = _trig.get("suggestion")
+                if _sugg and "{" in _sugg:
+                    _sugg = _sugg.format_map(_tenv)
+                add(_trig["severity"], _rid, _trig.get("tag", _emit.get("tag")),
+                    _trig["title"].format_map(_tenv), _field, _val,
+                    _trig.get("threshold"), _trig.get("unit"),
+                    _emit.get("doc"), _sugg)
+                # evidence_extra: {evidence 键: 变量名}，把额外证据挂到刚发出的 finding 上
+                # （如日志消息的 samples 原文列表）
+                for _ek, _evn in (_trig.get("evidence_extra") or {}).items():
+                    _evv = _tenv.get(_evn)
+                    if _evv is not None:
+                        findings[-1]["evidence"][_ek] = _evv
                 break
-        except Exception:
-            pass
 
-    # 剩余电量（px4-power-remaining 已迁至 rules/，由末尾 _run_rules("battery") 执行）
-else:
-    skipped("battery", "battery_status not in log")
 
-# battery slot：cell-voltage/sag 仍是过程式（在上面），remaining 已是规则
+# guards_early：必须在其它规则之前跑，保证 insufficient_data 是第一个 guard 标签
+_run_rules("guards_early")
+
+# ---------------- 规则 1：振动 / IMU 削波（vibration slot：三条经验，per_instance 取最差 IMU）----
+_run_rules("vibration")
+
+# ---------------- 规则 2：EKF 创新检验 + 硬故障位（ekf_innovations / ekf_faults 两个 slot）----
+_run_rules("ekf_innovations")
+_run_rules("ekf_faults")
+
+
+# ---------------- 规则 3：电源（battery slot：cell-voltage / sag / remaining 三条经验）----
 _run_rules("battery")
 
 # cpu slot（px4-cpu-load 已迁至 rules/；原过程式 CPU 段已删除）
 _run_rules("cpu")
 
 
-# ---------------- 规则 5：GPS 健康（F002）----------------
-gps_list = find_all(ulog, "vehicle_gps_position")
-if gps_list:
-    ran("gps_health")
-    g0 = gps_list[0]
-    eph = getf(g0, "eph", "eph_m")
-    sats = getf(g0, "satellites_used")
-    gps_bad = False
-    if eph is not None and len(eph) > 0:
-        # eph 单位 mm（PX4 vehicle_gps_position.eph），转 m；取 armed 段 p95，抗瞬时
-        earr = np.asarray(eph, dtype=float) / 1000.0
-        earr = earr[np.isfinite(earr) & (earr > 0)]
-        if len(earr) > 0:
-            e_p95 = float(np.percentile(earr, 95)); e_max = float(np.max(earr))
-            stats["gpsEphP95M"] = round(e_p95, 2); stats["gpsEphMaxM"] = round(e_max, 2)
-            if e_p95 >= EPH_CRIT:
-                gps_bad = True
-                add("warning", "px4-gps-eph", "gps_eph_high",
-                    "GPS 水平位置误差持续偏大（p95 %.1f m）" % e_p95,
-                    "vehicle_gps_position.eph(armed p95)", round(e_p95, 2), EPH_CRIT, "m",
-                    PX4_DOC_GPS, "结合故障库 F002：排查天线电磁干扰/遮挡/馈线虚接/多路径。")
-            elif e_p95 >= EPH_WARN:
-                gps_bad = True
-                add("info", "px4-gps-eph", "gps_eph_high",
-                    "GPS 水平位置误差偶发偏大（p95 %.1f m）" % e_p95,
-                    "vehicle_gps_position.eph(armed p95)", round(e_p95, 2), EPH_WARN, "m",
-                    PX4_DOC_GPS, "关注天线安装位置与遮挡。")
-    if sats is not None and len(sats) > 0:
-        sarr = np.asarray(sats, dtype=float)
-        s_min = int(np.min(sarr)); stats["gpsSatellitesMin"] = s_min
-        if s_min <= SATS_CRIT:
-            gps_bad = True
-            add("warning", "px4-gps-sats", "gps_eph_high",
-                "GPS 卫星数最少仅 %d 颗" % s_min,
-                "vehicle_gps_position.satellites_used(min)", s_min, SATS_WARN, "颗",
-                PX4_DOC_GPS, "卫星数不足时定位易跳变；排查遮挡与天线。")
-    # 明显跳变：相邻位置差分速度异常（阈值见 thresholds.toml [gps] jump_speed_mps）
-    lat = getf(g0, "lat"); lon = getf(g0, "lon"); gt = getf(g0, "timestamp")
-    if lat is not None and lon is not None and gt is not None and len(gt) > 2:
-        lat_r = np.radians(np.asarray(lat, dtype=float) / 1e7)
-        lon_r = np.radians(np.asarray(lon, dtype=float) / 1e7)
-        dt = np.diff(np.asarray(gt, dtype=float)) / 1e6
-        dlat = np.diff(lat_r) * 6371000.0
-        dlon = np.diff(lon_r) * 6371000.0 * np.cos(lat_r[:-1])
-        step = np.sqrt(dlat ** 2 + dlon ** 2) / np.maximum(dt, 1e-3)
-        njump = int(np.count_nonzero(step > GPS_JUMP_SPEED))
-        stats["gpsJumpCount"] = njump
-        if njump >= GPS_JUMP_MIN:
-            gps_bad = True
-            add("warning", "px4-gps-jump", "gps_jump",
-                "GPS 位置出现 %d 次异常跳变（>%g m/s）" % (njump, GPS_JUMP_SPEED),
-                "vehicle_gps_position lat/lon 相邻差分", njump, GPS_JUMP_MIN, "次",
-                PX4_DOC_GPS, "结合故障库 F002：排查多路径、馈线与电磁干扰；室内跳变为正常现象。")
-else:
-    skipped("gps_health", "vehicle_gps_position not in log")
+# ---------------- 规则 5：GPS 健康（gps_health slot：eph / sats / jump 三条经验）----
+_run_rules("gps_health")
 
-# ---------------- 规则 6：failsafe / 失联边沿（robotto + F007，仅 armed 段）----------------
-if vs is not None:
-    ran("failsafe")
-    vts_vs = np.asarray(getf(vs, "timestamp"), dtype=np.int64)
-    bool_fields = [
-        ("failsafe", "failsafe", "critical", "触发失效保护"),
-        ("rc_signal_lost", "rc_lost", "warning", "遥控信号丢失"),
-        ("data_link_lost", None, "warning", "数据链路丢失"),
-        ("engine_failure", None, "critical", "发动机/动力故障保护"),
-        ("mission_failure", None, "critical", "任务失效保护"),
-    ]
-    for field, tag, sev, label in bool_fields:
-        v = getf(vs, field)
-        if v is None: continue
-        arr = np.asarray(v)
-        for i in edge_indices(arr):
-            if int(arr[i]) != 1: continue   # 只报置位沿
-            ts_us = int(vts_vs[i])
-            if not in_armed(ts_us): continue
-            if tag: add_tag(tag)
-            add(sev, "px4-failsafe-%s" % field, tag,
-                "%s（飞行中，t=%.1fs）" % (label, (ts_us - t0) / 1e6),
-                "vehicle_status.%s" % field, "set at %.1fs" % ((ts_us - t0) / 1e6),
-                None, None, PX4_DOC_FAILSAFE,
-                "结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。")
-    # nav_state 进入 RTL/DESCEND/TERMINATION/LAND
-    nav = getf(vs, "nav_state")
-    if nav is not None:
-        nav_arr = np.asarray(nav)
-        for i in edge_indices(nav_arr):
-            code = int(nav_arr[i]); ts_us = int(vts_vs[i])
-            if code in (5, 12, 13, 18) and in_armed(ts_us):
-                name = {5: "AUTO_RTL", 12: "DESCEND", 13: "TERMINATION", 18: "LAND"}[code]
-                add("critical", "px4-failsafe-nav", "failsafe",
-                    "飞行中导航状态切换为 %s（t=%.1fs）" % (name, (ts_us - t0) / 1e6),
-                    "vehicle_status.nav_state", name, None, None, PX4_DOC_FAILSAFE,
-                    "说明飞控进入失效保护状态，需结合前文事件定位触发原因。")
-else:
-    skipped("failsafe", "vehicle_status not in log")
+# ---------------- 规则 6：failsafe / 失联边沿（failsafe slot：5 个布尔字段 + 导航状态）----
+_run_rules("failsafe")
 
-# ---------------- 规则 7：模式抖动（robotto）----------------
-if vs is not None:
-    ran("mode_thrash")
-    nav = getf(vs, "nav_state")
-    if nav is not None:
-        n_changes = len(edge_indices(nav))
-        stats["navStateChanges"] = n_changes
-        if n_changes > MODE_THRASH_WARN:
-            add("warning", "px4-mode-thrash", None,
-                "飞行模式切换 %d 次（>%d），可能存在模式抖动" % (n_changes, MODE_THRASH_WARN),
-                "vehicle_status.nav_state 变化次数", n_changes, MODE_THRASH_WARN, "次",
-                PX4_DOC_LOG, "频繁切模式易诱发操纵混乱；检查遥控器开关与失效保护反复触发。")
-else:
-    skipped("mode_thrash", "vehicle_status not in log")
+# ---------------- 规则 7：模式抖动（mode_thrash slot）----------------
+_run_rules("mode_thrash")
 
-# ---------------- 规则 9：电机输出不平衡（F008）----------------
-# 只在 armed 且悬停/定点段判定；要求 ≥4 个活跃通道，否则跳过（单通道日志无从比较）。
-mot = find_all(ulog, "actuator_motors")
-if mot and armed_intervals:
-    d = mot[0]
-    mts = getf(d, "timestamp")
-    cols = []
-    for i in range(12):
-        c = getf(d, "control[%d]" % i)
-        if c is not None and len(c):
-            cols.append((i, np.asarray(c, dtype=float)))
-    # armed 段内、悬停/定点阶段（nav_state 在 HOVERISH 集合内）的样本才比较
-    if mts is not None and len(cols) >= 4:
-        mts = np.asarray(mts, dtype=np.int64)
-        mask = np.zeros(len(mts), dtype=bool)
-        for s, e in armed_intervals:
-            lo = int(np.searchsorted(mts, s))
-            hi = len(mts) if e is None else int(np.searchsorted(mts, e))
-            mask[lo:hi] = True
-        hover_mask = mask.copy()
-        nav = getf(vs, "nav_state") if vs is not None else None
-        if nav is not None:
-            vts_vs = np.asarray(getf(vs, "timestamp"), dtype=np.int64)
-            nav_arr = np.asarray(nav)
-            # 采样到电机时间轴上，取悬停/定点状态
-            idx = np.clip(np.searchsorted(vts_vs, mts), 0, len(nav_arr) - 1)
-            state_at = nav_arr[idx]
-            hover_mask &= np.isin(state_at, list(NAV_HOVERISH))
-        seg = hover_mask if np.count_nonzero(hover_mask) > 20 else mask
-        means = []
-        for i, c in cols:
-            v = c[seg] if len(c) == len(mts) else c[:np.count_nonzero(seg)]
-            v = v[np.isfinite(v)]
-            if v.size and float(np.mean(v)) > 0.01:   # 未接/未用通道均值≈0，排除
-                means.append((i, float(np.mean(v))))
-        if len(means) >= 4:
-            ran("motor_balance")
-            vals = [m for _, m in means]
-            spread = max(vals) - min(vals)
-            stats["motorControlSpread"] = round(spread, 3)
-            stats["motorCountActive"] = len(means)
-            busiest = max(means, key=lambda x: x[1])
-            idlest = min(means, key=lambda x: x[1])
-            if spread >= MOTOR_SPREAD_CRIT:
-                add("critical", "px4-motor-unbalance", "motor_output_unbalance",
-                    "电机输出不平衡（悬停段通道 %d 与 %d 差 %.3f）" % (busiest[0], idlest[0], spread),
-                    "actuator_motors.control[](悬停段均值极差)", round(spread, 3),
-                    MOTOR_SPREAD_WARN, None, PX4_DOC_LOG,
-                    "结合故障库 F008：检查桨叶型号/正反桨是否一致、单电机效率、机架形变。")
-            elif spread >= MOTOR_SPREAD_WARN:
-                add("warning", "px4-motor-unbalance", "motor_output_unbalance",
-                    "电机输出差异偏大（通道 %d 与 %d 差 %.3f）" % (busiest[0], idlest[0], spread),
-                    "actuator_motors.control[](悬停段均值极差)", round(spread, 3),
-                    MOTOR_SPREAD_WARN, None, PX4_DOC_LOG,
-                    "结合故障库 F008 排查动力一致性；偶发差异可先观察。")
-        else:
-            skipped("motor_balance", "active motor channels < 4 (非多旋翼或未记录全部电机)")
-    else:
-        skipped("motor_balance", "actuator_motors 通道不足或无 armed 段")
-else:
-    skipped("motor_balance", "actuator_motors not in log")
+# ---------------- 规则 9：电机输出不平衡（motor_balance slot）----------------
+_run_rules("motor_balance")
 
-# ---------------- 规则 10：IMU 角速度零偏漂移（F005）----------------
-# 跨固件版本取源（PX4 1.15+ 拆分 topic）：
-#   新：estimator_sensor_bias.gyro_bias[]（直读零偏）
-#   旧：estimator_status.states[10..12] / 新：estimator_states.states[10..12]（EKF 状态里的零偏）
+# ---------------- 规则 10：IMU 角速度零偏漂移（imu_bias slot）----------------
+_run_rules("imu_bias")
 
-def _imu_bias_series():
-    """返回 (来源说明, [(轴名, 数组), ...])，按固件版本优先取直读零偏。"""
-    sb = find_all(ulog, "estimator_sensor_bias") if FW_PROFILE == "px4-1.15+" else None
-    if sb:
-        d = sb[0]
-        series = [(n, getf(d, "gyro_bias[%d]" % i), getf(d, "timestamp")) for i, n in
-                  enumerate(("X", "Y", "Z"))]
-        if any(x[1] is not None and len(x[1]) for x in series):
-            return "estimator_sensor_bias.gyro_bias[]", series
-    for topic in (("estimator_states", "estimator_status") if FW_PROFILE == "px4-1.15+"
-                  else ("estimator_status", "estimator_states")):
-        ds = find_all(ulog, topic)
-        if not ds:
-            continue
-        d = ds[0]
-        series = [(n, getf(d, "states[%d]" % (10 + i)), getf(d, "timestamp")) for i, n in
-                  enumerate(("X", "Y", "Z"))]
-        if any(x[1] is not None and len(x[1]) for x in series):
-            return "%s.states[10..12]" % topic, series
-    return None, None
+# ---------------- 规则 11：姿态跟踪超调 / 振荡（attitude_tracking slot：两条经验）----
+_run_rules("attitude_tracking")
 
-if armed_intervals:
-    bias_source, bias_series = _imu_bias_series()
-    if bias_source and bias_series:
-        ran("imu_bias")
-        bts = bias_series[0][2]
-        if bts is not None and len(bts):
-            bts = np.asarray(bts, dtype=np.int64)
-            amask = np.zeros(len(bts), dtype=bool)
-            for s_, e_ in armed_intervals:
-                lo = int(np.searchsorted(bts, s_))
-                hi = len(bts) if e_ is None else int(np.searchsorted(bts, e_))
-                amask[lo:hi] = True
-            worst_abs, worst_abs_axis = 0.0, None
-            worst_drift, worst_drift_axis = 0.0, None
-            for axis, b, _t in bias_series:
-                if b is None or not len(b):
-                    continue
-                v = np.asarray(b, dtype=float)[amask] if len(b) == len(bts) else np.asarray(b, dtype=float)
-                v = v[np.isfinite(v)]
-                if v.size < 10:
-                    continue
-                if float(np.max(np.abs(v))) > worst_abs:
-                    worst_abs, worst_abs_axis = float(np.max(np.abs(v))), axis
-                if float(np.max(v) - np.min(v)) > worst_drift:
-                    worst_drift, worst_drift_axis = float(np.max(v) - np.min(v)), axis
-            if worst_abs_axis:
-                stats["gyroBiasMaxRadS"] = round(worst_abs, 4)
-                stats["gyroBiasDriftRadS"] = round(worst_drift, 4)
-                stats["gyroBiasSource"] = bias_source
-                # 温度跨度：判定漂移是否可由温度解释
-                temp_range = None
-                for topic, field in (("vehicle_imu_status", "temperature_gyro"),
-                                      ("vehicle_air_data", "ambient_temperature")):
-                    ds = find_all(ulog, topic)
-                    if not ds:
-                        continue
-                    tv = getf(ds[0], field)
-                    if tv is None or not len(tv):
-                        continue
-                    t = np.asarray(tv, dtype=float); t = t[np.isfinite(t)]
-                    if t.size > 1:
-                        rng = float(np.max(t) - np.min(t))
-                        temp_range = rng if temp_range is None else max(temp_range, rng)
-                if temp_range is not None:
-                    stats["imuTempRangeC"] = round(temp_range, 1)
-                    if temp_range >= TEMP_RANGE_CRIT:
-                        guard_tags.append("temperature_change_large")
-                sev = None
-                if worst_abs >= GYRO_BIAS_ABS_CRIT or worst_drift >= GYRO_BIAS_DRIFT_CRIT:
-                    sev = "critical"
-                elif worst_abs >= GYRO_BIAS_ABS_WARN or worst_drift >= GYRO_BIAS_DRIFT_WARN:
-                    sev = "warning"
-                if sev:
-                    add(sev, "px4-imu-bias-drift", "imu_bias_drift",
-                        "陀螺零偏异常（轴 %s：绝对值 %.4f rad/s，漂移 %.4f rad/s）" % (
-                            worst_abs_axis, worst_abs, worst_drift),
-                        bias_source, round(max(worst_abs, worst_drift), 4),
-                        GYRO_BIAS_ABS_WARN, "rad/s", PX4_DOC_EKF,
-                        "结合故障库 F005：检查 IMU 安装紧固、执行陀螺/加计标定；"
-                        "若温度跨度大，优先按温度漂移解释。")
-    else:
-        skipped("imu_bias", "无陀螺零偏数据（无 estimator_sensor_bias / estimator_status.states）")
-else:
-    skipped("imu_bias", "无 armed 段，不做零偏判定")
+# ---------------- 规则 12：空速健康（airspeed slot，仅固定翼巡航段）----------------
+_run_rules("airspeed")
 
-# ---------------- 规则 11：姿态跟踪超调 / 振荡（F006）----------------
-# 只统计 armed 且非悬停的机动段，避免把悬停微调当作超调。
-# 跟踪误差阈值按机型区分：固定翼在手动/机动段天然误差更大，用更宽门限
-att = find_all(ulog, "vehicle_attitude")
-att_sp = find_all(ulog, "vehicle_attitude_setpoint")
-if att and att_sp and armed_intervals:
-    d, dsp = att[0], att_sp[0]
-    ts = getf(d, "timestamp")
-    q = [getf(d, "q[%d]" % i) for i in range(4)]
-    sp_ts = getf(dsp, "timestamp")
-    # 姿态指令：旧固件 roll_body/pitch_body；新固件只有 q_d 四元数
-    roll_sp = getf(dsp, "roll_body")
-    pitch_sp = getf(dsp, "pitch_body")
-    qd = [getf(dsp, "q_d[%d]" % i) for i in range(4)]
-    has_quat_sp = all(x is not None and len(x) for x in qd)
-    # 1.15+ 只记录四元数指令；旧固件记录 roll/pitch_body。版本未知时按字段存在性判定。
-    use_quat_sp = has_quat_sp if FW_MINOR is None else (FW_MINOR >= 15 and has_quat_sp)
-    if not use_quat_sp and roll_sp is None and has_quat_sp:
-        use_quat_sp = True   # 定制固件容错
-    if ts is not None and all(x is not None and len(x) for x in q) and sp_ts is not None and (
-            roll_sp is not None or use_quat_sp):
-        ts = np.asarray(ts, dtype=np.int64)
-        # 采样长度取姿态与该版本可用的姿态指令来源中的最小值
-        sp_lens = [len(x) for x in qd] if use_quat_sp else [
-            len(roll_sp)] + ([len(pitch_sp)] if pitch_sp is not None else [])
-        n = min([len(x) for x in q] + sp_lens)
-        q0, q1, q2, q3 = (np.asarray(x, dtype=float)[:n] for x in q)
-        roll = np.arctan2(2 * (q0 * q1 + q2 * q3), 1 - 2 * (q1 ** 2 + q2 ** 2))
-        pitch = np.arcsin(np.clip(2 * (q0 * q2 - q3 * q1), -1, 1))
-        # 将 setpoint 插值到姿态时间轴
-        sp_ts = np.asarray(sp_ts, dtype=np.int64)
-        if use_quat_sp:
-            ns = min(len(x) for x in qd)
-            d0, d1, d2, d3 = (np.asarray(x, dtype=float)[:ns] for x in qd)
-            r_sp_raw = np.arctan2(2 * (d0 * d1 + d2 * d3), 1 - 2 * (d1 ** 2 + d2 ** 2))
-            p_sp_raw = np.arcsin(np.clip(2 * (d0 * d2 - d3 * d1), -1, 1))
-        else:
-            r_sp_raw = np.asarray(roll_sp, dtype=float)
-            p_sp_raw = (np.asarray(pitch_sp, dtype=float) if pitch_sp is not None
-                        else np.zeros(len(r_sp_raw)))
-        r_sp = np.interp(ts[:n], sp_ts[:len(r_sp_raw)], r_sp_raw)
-        p_sp = np.interp(ts[:n], sp_ts[:len(p_sp_raw)], p_sp_raw)
-        err = np.degrees(np.maximum(np.abs(roll - r_sp), np.abs(pitch - p_sp)))
-        # 机动段掩码：armed 且姿态指令角速度/角度变化明显（用 setpoint 角速度近似）
-        amask = np.zeros(n, dtype=bool)
-        for s, e in armed_intervals:
-            lo = int(np.searchsorted(ts, s))
-            hi = n if e is None else int(np.searchsorted(ts, e))
-            amask[lo:hi] = True
-        # 排除近悬停：指令角接近 0 的样本不计
-        active = amask & (np.degrees(np.abs(r_sp)) + np.degrees(np.abs(p_sp)) > 10.0)
-        seg = err[active] if np.count_nonzero(active) > ATT_MIN_SAMPLES else err[amask]
-        if seg.size > ATT_MIN_SAMPLES:
-            ran("attitude_tracking")
-            p99 = float(np.percentile(seg, 99))
-            stats["attitudeErrDegP99"] = round(p99, 1)
-            # 振荡：误差过零频率
-            sign = np.sign(seg - np.median(seg))
-            flips = int(np.count_nonzero(np.diff(sign[sign != 0]) != 0))
-            dur = float(seg.size) / ATT_RATE_HZ     # 姿态约 50Hz 记录
-            osc_hz = flips / 2.0 / max(dur, 1e-3)
-            stats["attitudeOscHz"] = round(osc_hz, 2)
-            err_warn, err_crit = ((ATT_ERR_WARN_FW, ATT_ERR_CRIT_FW)
-                                  if vehicle_type == "fixed_wing"
-                                  else (ATT_ERR_WARN, ATT_ERR_CRIT))
-            if p99 >= err_crit:
-                add("critical", "px4-attitude-overshoot", "attitude_overshoot",
-                    "姿态跟踪误差过大（p99 %.1f°）" % p99,
-                    "vehicle_attitude vs vehicle_attitude_setpoint（机动段）", round(p99, 1),
-                    err_warn, "°", PX4_DOC_LOG,
-                    "结合故障库 F006：检查姿态环增益、机架共振；避免直接大幅降 PID。")
-            elif p99 >= err_warn:
-                add("warning", "px4-attitude-overshoot", "attitude_overshoot",
-                    "姿态跟踪误差偏大（p99 %.1f°）" % p99,
-                    "vehicle_attitude vs vehicle_attitude_setpoint（机动段）", round(p99, 1),
-                    err_warn, "°", PX4_DOC_LOG,
-                    "结合故障库 F006 排查；大风环境下优先归因环境扰动。")
-            if osc_hz >= ATT_OSC_WARN and p99 >= err_warn:
-                add("warning", "px4-attitude-oscillation", "attitude_overshoot",
-                    "姿态误差高频振荡（约 %.1f Hz）" % osc_hz,
-                    "姿态跟踪误差符号翻转频率", round(osc_hz, 2), ATT_OSC_WARN, "Hz",
-                    PX4_DOC_LOG, "振荡多与控制增益/机架共振相关，禁用大幅调参，先做频响检查。")
-    else:
-        skipped("attitude_tracking", "姿态或姿态指令字段缺失")
-else:
-    skipped("attitude_tracking", "vehicle_attitude(_setpoint) 或 armed 段缺失")
+# ---------------- 规则 13：VTOL 转换姿态越限（vtol_transition slot）----------------
+_run_rules("vtol_transition")
 
-# ---------------- 规则 12：空速健康（F009，固定翼/垂直起降巡航）----------------
-if att_sp and (vehicle_type in ("fixed_wing",)):
-    ran("airspeed")
-    av = find_all(ulog, "airspeed_validated")
-    fw_armed = False
-    if nav is not None:
-        nav_arr2 = np.asarray(nav)
-        vts2 = np.asarray(getf(vs, "timestamp"), dtype=np.int64)
-        m2 = np.zeros(len(nav_arr2), dtype=bool)
-        for s, e in armed_intervals:
-            lo = int(np.searchsorted(vts2, s))
-            hi = len(vts2) if e is None else int(np.searchsorted(vts2, e))
-            m2[lo:hi] = True
-        fw_armed = bool(np.any(np.isin(nav_arr2[m2], list(NAV_FW_CRUISE))))
-    if av and fw_armed:
-        d = av[0]
-        valid = getf(d, "airspeed_sensor_measurement_valid")
-        tas = getf(d, "true_airspeed_m_s")
-        if valid is not None and len(valid):
-            va = np.asarray(valid, dtype=float)
-            invalid_frac = float(np.count_nonzero(va == 0)) / max(len(va), 1)
-            stats["airspeedInvalidRatio"] = round(invalid_frac, 3)
-            if invalid_frac >= AIRSPEED_INVALID_CRIT:
-                add("critical", "px4-airspeed-invalid", "low_airspeed",
-                    "空速传感器在固定翼段大部分时间无效（%.0f%% 样本）" % (invalid_frac * 100),
-                    "airspeed_validated.airspeed_sensor_measurement_valid", round(invalid_frac, 3),
-                    AIRSPEED_INVALID_CRIT, None, PX4_DOC_LOG,
-                    "结合故障库 F009：空速失效极易引发失速，检查空速管堵塞/积水、管路漏气与校准。")
-            elif invalid_frac >= AIRSPEED_INVALID_WARN:
-                add("warning", "px4-airspeed-invalid", "low_airspeed",
-                    "空速传感器间歇无效（%.0f%% 样本）" % (invalid_frac * 100),
-                    "airspeed_validated.airspeed_sensor_measurement_valid", round(invalid_frac, 3),
-                    AIRSPEED_INVALID_WARN, None, PX4_DOC_LOG, "结合故障库 F009 检查空速管与管路密封。")
-        if tas is not None and len(tas):
-            t = np.asarray(tas, dtype=float); t = t[np.isfinite(t)]
-            if t.size:
-                stats["airspeedMinM"] = round(float(np.min(t)), 1)
-    else:
-        skipped("airspeed", "无固定翼巡航段或未记录 airspeed_validated")
-elif vehicle_type == "unknown":
-    skipped("airspeed", "机型未知，无法判定固定翼巡航段")
+# ---------------- 规则 14：风扰估计（wind_estimate slot；guard 标签 wind_strong）----
+_run_rules("wind_estimate")
 
-# ---------------- 规则 13：VTOL 转换姿态越限（F003）----------------
-if vs is not None and armed_intervals:
-    vtsv = find_all(ulog, "vtol_vehicle_status")
-    if vtsv:
-        ran("vtol_transition")
-        d = vtsv[0]
-        tr = getf(d, "vtol_in_trans_mode")
-        tts = getf(d, "timestamp")
-        in_trans = False
-        if tr is not None and len(tr):
-            tr_arr = np.asarray(tr, dtype=float)
-            in_trans = bool(np.count_nonzero(tr_arr) > 0)
-            stats["vtolTransitionSamples"] = int(np.count_nonzero(tr_arr))
-        if in_trans and att:
-            datt = att[0]
-            ats = getf(datt, "timestamp")
-            qq = [getf(datt, "q[%d]" % i) for i in range(4)]
-            if tts is not None and ats is not None and all(x is not None and len(x) for x in qq):
-                # 姿态时间轴上的转换掩码（向前填充转换状态）
-                a_ts = np.asarray(ats, dtype=np.int64)
-                tr_ts = np.asarray(tts, dtype=np.int64)
-                idx = np.clip(np.searchsorted(tr_ts, a_ts), 0, len(tr_arr) - 1)
-                trans_mask = tr_arr[idx] > 0
-                if np.count_nonzero(trans_mask) > 5:
-                    n2 = min(len(x) for x in qq)
-                    q0, q1, q2, q3 = (np.asarray(x, dtype=float)[:n2] for x in qq)
-                    roll = np.degrees(np.arctan2(2 * (q0 * q1 + q2 * q3), 1 - 2 * (q1 ** 2 + q2 ** 2)))
-                    pitch = np.degrees(np.arcsin(np.clip(2 * (q0 * q2 - q3 * q1), -1, 1)))
-                    tm = trans_mask[:n2]
-                    max_tilt = float(np.max(np.maximum(np.abs(roll[tm]), np.abs(pitch[tm]))))
-                    stats["vtolTransitionMaxTiltDeg"] = round(max_tilt, 1)
-                    if max_tilt > VTOL_ATT_LIMIT:
-                        add("warning", "px4-vtol-transition-attitude", "vtol_convert_attitude_over",
-                            "VTOL 转换阶段姿态越限（最大 %.1f°，限值 %.0f°）" % (max_tilt, VTOL_ATT_LIMIT),
-                            "vehicle_attitude（vtol_in_trans_mode 段）", round(max_tilt, 1),
-                            VTOL_ATT_LIMIT, "°", PX4_DOC_LOG,
-                            "结合故障库 F003：复盘转换时序与推力匹配，强风环境优先归因环境扰动。")
-    else:
-        skipped("vtol_transition", "vtol_vehicle_status not in log")
+# ---------------- 规则 8：日志消息聚合（logged_messages slot：ERROR / WARNING 两条经验）----
+_run_rules("logged_messages")
 
-# ---------------- 规则 14：风扰估计（F010，作为 guard 影响其他结论）----------------
-we = pick_versioned((15, find_all(ulog, "estimator_wind")),
-                    (None, find_all(ulog, "wind_estimate")))
-if we:
-    ran("wind_estimate")
-    d = we[0]
-    wn = getf(d, "windspeed_north")
-    ww = getf(d, "windspeed_east")
-    if wn is not None and ww is not None and len(wn):
-        w = np.sqrt(np.asarray(wn, dtype=float) ** 2 + np.asarray(ww, dtype=float) ** 2)
-        w = w[np.isfinite(w)]
-        if w.size:
-            w_p95 = float(np.percentile(w, 95))
-            stats["windSpeedP95M"] = round(w_p95, 1)
-            if w_p95 >= WIND_CRIT:
-                guard_tags.append("wind_strong")
-                add("warning", "px4-wind-strong", "wind_disturb",
-                    "估计风速较大（p95 %.1f m/s）" % w_p95,
-                    "estimator_wind.windspeed_north/east", round(w_p95, 1), WIND_WARN, "m/s",
-                    PX4_DOC_LOG,
-                    "结合故障库 F010：强风属环境扰动，姿态超调/转换越限优先归因风，不要直接改 PID。")
-            elif w_p95 >= WIND_WARN:
-                guard_tags.append("wind_strong")
-                add("info", "px4-wind-moderate", "wind_disturb",
-                    "估计风速偏大（p95 %.1f m/s）" % w_p95,
-                    "estimator_wind.windspeed_north/east", round(w_p95, 1), WIND_WARN, "m/s",
-                    PX4_DOC_LOG, "解释姿态类异常时需考虑风扰因素。")
-else:
-    skipped("wind_estimate", "estimator_wind / wind_estimate not in log")
-
-# ---------------- 规则 8：日志消息聚合（robotto：ERR+ 冒烟的枪）----------------
-severe_msgs, warning_msgs = [], []
-for m in getattr(ulog, "logged_messages", []):
-    lvl = int(getattr(m, "log_level", 6))
-    try:
-        ts_s = round((int(m.timestamp) - t0) / 1e6, 2)
-    except Exception:
-        ts_s = None
-    entry = {"tSec": ts_s, "message": str(m.message).strip()[:MSG_CLIP_LEN]}
-    if lvl <= LOG_LEVEL_CRIT_MAX: severe_msgs.append(entry)
-    elif lvl == LOG_LEVEL_WARN: warning_msgs.append(entry)
-ran("logged_messages")
-if severe_msgs:
-    samples = severe_msgs[:MSG_MAX_EXAMPLES]
-    add("critical", "px4-log-errors", None,
-        "日志中出现 %d 条 ERROR 及以上消息" % len(severe_msgs),
-        "ulog.logged_messages(log_level<=3)", len(severe_msgs), 0, "条",
-        PX4_DOC_LOG, "按时间顺序核对错误原文，这通常是定位根因最直接的证据。",
-        tags_extra=None)
-    findings[-1]["evidence"]["samples"] = samples
-if warning_msgs:
-    add("warning", "px4-log-warnings", None,
-        "日志中出现 %d 条 WARNING 消息" % len(warning_msgs),
-        "ulog.logged_messages(log_level=4)", len(warning_msgs), 0, "条",
-        PX4_DOC_LOG)
-    findings[-1]["evidence"]["samples"] = warning_msgs[:MSG_MAX_EXAMPLES]
-
-# ---------------- 数据质量 guard（第 2 层，不直接算故障）----------------
-# 中途重启：同一 topic 时间戳回退 或 dropouts
-restart_hints = 0
-for d in ulog.data_list:
-    t = getf(d, "timestamp")
-    if t is not None and len(t) > 10:
-        a = np.asarray(t, dtype=np.int64)
-        if int(np.count_nonzero(np.diff(a) < 0)) > 0:
-            restart_hints += 1
-if restart_hints > 0:
-    guard_tags.append("restart_detected")
-# 关键 topic 缺失
-for req_topic, gname in [("vehicle_status", "vehicle_status"),
-                         ("battery_status", "battery_status"),
-                         ("estimator_status", "estimator_status")]:
-    if not find_all(ulog, req_topic):
-        guard_tags.append("topic_missing:%s" % gname)
-# 日志丢包
-dropout_total_ms = int(sum(getattr(d, "duration", 0) for d in getattr(ulog, "dropouts", [])))
-stats["dropoutTotalMs"] = dropout_total_ms
-if dropout_total_ms > DROPOUT_LIMIT_MS:
-    guard_tags.append("log_dropouts_high")
+# ---------------- 数据质量 guard（guards slot：三条经验，产出 guard 标签）----------------
+_run_rules("guards")
 
 # ---------------- 第三层：故障知识库确定性匹配 ----------------
 def match_fault_kb():
@@ -1267,6 +1988,8 @@ def match_fault_kb():
         })
     return matched
 
+# 短日志由 guard 标签派生（阈值的唯一来源是 guard-short-log.yaml）
+short_log = "insufficient_data" in guard_tags
 matched_faults = [] if short_log else match_fault_kb()
 
 order = {"critical": 0, "warning": 1, "info": 2}
@@ -1288,5 +2011,4 @@ __result = json.dumps({
 }, ensure_ascii=False)
 `
   .replace("__FAULT_KB__", JSON.stringify(faultKbJson.entries))
-  .replace("__THRESHOLDS__", JSON.stringify(thresholds))
   .replace("__RULES__", JSON.stringify(rules));

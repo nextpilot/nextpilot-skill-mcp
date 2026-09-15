@@ -1,0 +1,55 @@
+# 飞行中单电芯持续压降（robotto）：armed 段剔除起飞冲击前 5s，头段中位 − 尾段中位。
+# 时序切窗是通用能力：rows_aggregate 把数组字段归约成时间序列，head_tail_median_drop
+# 对任意 (序列, 时间戳, 区间) 计算头/尾中位数落差。
+
+id: px4-power-sag
+slot: battery
+order: 2
+name: 飞行中持续压降
+version: 1.0.0
+category: power
+status: stable
+author: {name: NextPilot 内置}
+license: CC-BY-4.0
+changelog:
+  - {version: 1.0.0, date: "2026-09-15", note: 从 ulog_checks.py 迁出，逻辑与阈值不变}
+
+firmware: any
+airframe: any
+
+requires:
+  any_of: [battery_status]
+skip_reason: battery_status not in log
+
+compute:
+  # 每个时刻各电芯最低电压（0 是未接占位 → NaN）
+  - out: cell_min_t
+    from: battery_status.voltage_cell_v
+    op: rows_aggregate
+    agg: min
+    gt: 0
+  # 第一个 armed 区间、跳过前 5s；序列 <=20 点等数据不足时算子返回 None（静默不发射）
+  - out: [drop, tail]
+    in: [cell_min_t, battery_status.timestamp, armed_intervals]
+    op: head_tail_median_drop
+    skip_first_s: 5
+    min_seg: 20
+
+# 阈值 [暂定]：drop >= 0.30 V 且尾段中位已低于单电芯告警线 3.70 V
+triggers:
+  - expr: "drop >= 0.30 and tail < 3.70"
+    severity: warning
+    threshold: 0.30
+    value: drop
+    round: 3
+    unit: V
+    field: "battery_status.voltage_cell_v[] armed 段趋势"
+    title: "飞行中单电芯持续压降 {drop:.2f} V（尾段中位 {tail:.2f} V）"
+    suggestion: "持续压降区别于大机动瞬时压降：排查电芯老化内阻、插头虚接、线缆线径与负载匹配。"
+
+emit:
+  check: battery
+  tag: battery_voltage_drop
+  doc: https://docs.px4.io/main/en/config/battery.html
+  stats:
+    batteryCellSagFlight: {var: drop, round: 3}

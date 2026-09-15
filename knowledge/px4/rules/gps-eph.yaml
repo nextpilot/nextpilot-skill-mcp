@@ -1,0 +1,58 @@
+# GPS 水平位置误差（F002 相关）：eph 单位 mm（PX4 vehicle_gps_position.eph），先转 m 再取 p95。
+# 阈值 [暂定] px4-thresholds.toml [gps]：eph_warn=5.0 / eph_crit=10.0（m）。
+
+id: px4-gps-eph
+slot: gps_health
+order: 1                 # gps_health slot 内次序：eph=1, sats=2, jump=3
+name: GPS 水平位置误差
+version: 1.0.0
+category: gps
+status: stable
+author: {name: NextPilot 内置}
+license: CC-BY-4.0
+changelog:
+  - {version: 1.0.0, date: "2026-09-15", note: 从 ulog_checks.py 迁出，逻辑与阈值不变}
+
+firmware: any
+airframe: any
+
+requires:
+  any_of: [vehicle_gps_position]
+skip_reason: vehicle_gps_position not in log
+
+compute:
+  # 数据缺失/全为 0 时整条规则中止（不写 stats、不发 finding），与原过程式一致
+  - {out: eph_pos, from: vehicle_gps_position.eph, op: keep_gt, gt: 0}
+  - {out: eph_m, in: [eph_pos], op: scale_series, factor: 0.001}   # mm → m
+  - {out: e_p95, in: [eph_m], op: percentile, p: 95}
+  - {out: e_max, in: [eph_m], op: max}
+
+triggers:
+  - expr: "e_p95 >= 10.0"
+    severity: warning
+    tag: gps_eph_high
+    threshold: 10.0
+    value: e_p95
+    round: 2
+    unit: m
+    field: "vehicle_gps_position.eph(armed p95)"
+    title: "GPS 水平位置误差持续偏大（p95 {e_p95:.1f} m）"
+    suggestion: "结合故障库 F002：排查天线电磁干扰/遮挡/馈线虚接/多路径。"
+  - expr: "e_p95 >= 5.0"
+    severity: info
+    tag: gps_eph_high
+    threshold: 5.0
+    value: e_p95
+    round: 2
+    unit: m
+    field: "vehicle_gps_position.eph(armed p95)"
+    title: "GPS 水平位置误差偶发偏大（p95 {e_p95:.1f} m）"
+    suggestion: "关注天线安装位置与遮挡。"
+
+emit:
+  check: gps_health
+  tag: gps_eph_high
+  doc: https://docs.px4.io/main/en/gps_compass/
+  stats:
+    gpsEphP95M: {var: e_p95, round: 2}
+    gpsEphMaxM: {var: e_max, round: 2}

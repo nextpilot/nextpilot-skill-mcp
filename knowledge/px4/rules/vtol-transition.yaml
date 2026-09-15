@@ -1,0 +1,74 @@
+# VTOL 转换阶段姿态越限（F003）：在 vtol_in_trans_mode 为真的时段内，取 |roll|/|pitch| 的最大值。
+# 转换段标志从 vtol_vehicle_status 时间轴向前保持到姿态时间轴；样本过少（<=5）不出结论。
+# 阈值 [暂定] px4-thresholds.toml [vtol]：transition_tilt_deg=8.0。
+
+id: px4-vtol-transition-attitude
+slot: vtol_transition
+order: 1
+name: VTOL 转换姿态越限
+version: 1.0.0
+category: vtol
+status: stable
+author: {name: NextPilot 内置}
+license: CC-BY-4.0
+changelog:
+  - {version: 1.0.0, date: "2026-09-15", note: "从 ulog_checks.py 迁出，逻辑与阈值不变"}
+
+firmware: any
+airframe: any
+# 原实现的外层条件是「有 vehicle_status 且有 armed 段」，不成立时静默（既不 ran 也不 skipped）
+silent_when: "not has_armed or 'vehicle_status' not in topics"
+
+requires:
+  any_of: [vtol_vehicle_status]
+skip_reason: vtol_vehicle_status not in log
+
+compute:
+  # 转换段样本数：原实现先写这个统计量，再判断是否有可用姿态
+  - {out: trans_n, from: vtol_vehicle_status.vtol_in_trans_mode, op: count_above, gt: 0, optional: true}
+  - {out: trans_n_i, in: [trans_n], op: to_int, optional: true}
+  # 姿态时间轴上的“是否处于转换段”
+  - out: trans_mask
+    in:
+      - vtol_vehicle_status.vtol_in_trans_mode
+      - vtol_vehicle_status.timestamp
+      - vehicle_attitude.timestamp
+    op: fill_to
+    optional: true
+  - out: [roll, pitch, yaw]
+    in:
+      - vehicle_attitude.q[0]
+      - vehicle_attitude.q[1]
+      - vehicle_attitude.q[2]
+      - vehicle_attitude.q[3]
+    op: quat_to_euler
+    optional: true
+  - {out: tilt_r, in: [roll], op: abs_values, optional: true}
+  - {out: tilt_p, in: [pitch], op: abs_values, optional: true}
+  - {out: tilt_pt, in: [tilt_r, tilt_p], op: larger, optional: true}
+  - {out: tilt_max, in: [tilt_pt, trans_mask], op: masked_absmax, optional: true}
+  - {out: trans_cnt, in: [trans_mask], op: count_true, optional: true}
+  - {out: enough, in: [trans_cnt, 5], op: gt, optional: true}
+  - {out: has_tilt, in: [tilt_max], op: is_not_none, optional: true}
+  # 样本 <=5 时原实现不写倾斜统计量，这里同样条件性产出
+  - {out: tilt_stat, in: [enough, tilt_max], op: value_if, optional: true}
+
+triggers:
+  - expr: "has_tilt and enough and tilt_max > 8.0"
+    severity: warning
+    tag: vtol_convert_attitude_over
+    threshold: 8.0
+    value: tilt_max
+    round: 1
+    unit: "°"
+    field: "vehicle_attitude（vtol_in_trans_mode 段）"
+    title: "VTOL 转换阶段姿态越限（最大 {tilt_max:.1f}°，限值 8°）"
+    suggestion: "结合故障库 F003：复盘转换时序与推力匹配，强风环境优先归因环境扰动。"
+
+emit:
+  check: vtol_transition
+  tag: vtol_convert_attitude_over
+  doc: https://docs.px4.io/main/en/log/flight_log_analysis.html
+  stats:
+    vtolTransitionSamples: {var: trans_n_i}
+    vtolTransitionMaxTiltDeg: {var: tilt_stat, round: 1}

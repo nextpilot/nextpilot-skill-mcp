@@ -1,0 +1,88 @@
+# 单电芯最低电压（robotto）：优先实测电芯电压；日志没有电芯数组时回退 总压/电芯数；
+# 两者都没有但有总压时给 info。取数与回退链收在 cell_voltage_min 一个算子里；
+# 字段名、阈值与文案仍由本文件给出。
+
+id: px4-power-cell-voltage
+slot: battery
+order: 1                 # battery slot 内次序：cell-voltage=1, sag=2, remaining=3
+name: 单电芯电压
+version: 1.1.0
+category: power
+status: stable
+author: {name: NextPilot 内置}
+license: CC-BY-4.0
+changelog:
+  - {version: 1.0.0, date: "2026-09-15", note: 从 ulog_checks.py 迁出，逻辑与阈值不变}
+  - {version: 1.1.0, date: "2026-09-15", note: "16 个节点收成一个复合算子 cell_voltage_min"}
+
+firmware: any
+airframe: any
+
+requires:
+  any_of: [battery_status]
+skip_reason: battery_status not in log
+
+compute:
+  # 总压最小值 / 实测单电芯最低值 / 回退值 / 电芯数 / 三个分支标记，一并算出
+  - out: [vmin, cell_min, cells, have_measured, have_fallback, no_cell]
+    in:
+      - battery_status.voltage_cell_v
+      - battery_status.voltage_v
+      - battery_status.voltage_filtered_v
+      - battery_status.cell_count
+    op: cell_voltage_min
+    optional: true
+
+# 阈值 [暂定]：单电芯最低电压 V（crit 3.55 / warn 3.70）
+triggers:
+  - expr: "have_measured and cell_min < 3.55"
+    severity: critical
+    threshold: 3.55
+    value: cell_min
+    round: 3
+    unit: V/cell
+    field: "battery_status.voltage_cell_v[](实测最小值)"
+    title: "电芯电压严重过低"
+    suggestion: "存在过放风险，检查电池老化、放电倍率匹配与低压告警阈值。"
+  - expr: "have_fallback and not have_measured and cell_min < 3.55"
+    severity: critical
+    threshold: 3.55
+    value: cell_min
+    round: 3
+    unit: V/cell
+    field: "battery_status.voltage_v(min)/cell_count"
+    title: "电芯电压严重过低"
+    suggestion: "存在过放风险，检查电池老化、放电倍率匹配与低压告警阈值。"
+  - expr: "have_measured and cell_min < 3.70"
+    severity: warning
+    threshold: 3.70
+    value: cell_min
+    round: 3
+    unit: V/cell
+    field: "battery_status.voltage_cell_v[](实测最小值)"
+    title: "电芯电压偏低"
+    suggestion: "建议核对剩余容量估计与返航电压裕度。"
+  - expr: "have_fallback and not have_measured and cell_min < 3.70"
+    severity: warning
+    threshold: 3.70
+    value: cell_min
+    round: 3
+    unit: V/cell
+    field: "battery_status.voltage_v(min)/cell_count"
+    title: "电芯电压偏低"
+    suggestion: "建议核对剩余容量估计与返航电压裕度。"
+  - expr: "no_cell"
+    severity: info
+    tag: null                    # 信息提示不进故障标签
+    value_const: "missing"
+    field: "battery_status.voltage_cell_v / cell_count"
+    title: "日志缺少电芯电压与 cell_count，未做单电芯判断"
+
+emit:
+  check: battery
+  tag: battery_voltage_drop
+  doc: https://docs.px4.io/main/en/config/battery.html
+  stats:
+    batteryVoltageMin: {var: vmin, round: 2}
+    batteryCellCount: {var: cells}          # 只在回退路径有值（与迁移前一致）
+    batteryCellVoltageMin: {var: cell_min, round: 3}

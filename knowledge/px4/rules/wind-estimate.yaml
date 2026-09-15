@@ -1,0 +1,64 @@
+# 风扰估计（F010）：北/东风分量合成风速取 p95。1.15 起 topic 改名 estimator_wind，
+# 旧固件为 wind_estimate —— 两者用 coalesce 取先有的那个（新 topic 在旧固件本就不存在）。
+# 阈值 [暂定] px4-thresholds.toml [wind]：speed_warn=8.0 / speed_crit=12.0（m/s）。
+# 命中即打 guard 标签 wind_strong：解释姿态类异常时优先归因环境扰动。
+
+id: px4-wind-estimate
+slot: wind_estimate
+order: 1
+name: 风扰估计
+version: 1.0.0
+category: wind
+status: stable
+author: {name: NextPilot 内置}
+license: CC-BY-4.0
+changelog:
+  - {version: 1.0.0, date: "2026-09-15", note: 从 ulog_checks.py 迁出，逻辑与阈值不变}
+
+firmware: any
+airframe: any
+
+requires:
+  any_of: [estimator_wind, wind_estimate]
+skip_reason: estimator_wind / wind_estimate not in log
+
+compute:
+  - {out: n_new, from: estimator_wind.windspeed_north, op: read, optional: true}
+  - {out: e_new, from: estimator_wind.windspeed_east, op: read, optional: true}
+  - {out: n_old, from: wind_estimate.windspeed_north, op: read, optional: true}
+  - {out: e_old, from: wind_estimate.windspeed_east, op: read, optional: true}
+  - {out: wn, in: [n_new, n_old], op: coalesce, optional: true}
+  - {out: we, in: [e_new, e_old], op: coalesce, optional: true}
+  - {out: w, in: [wn, we], op: hypot}          # 缺任一路即中止（与原 len(wn) 判定一致）
+  - {out: w_p95, in: [w], op: percentile, p: 95}
+
+triggers:
+  - expr: "w_p95 >= 12.0"
+    severity: warning
+    tag: wind_disturb
+    guard_tag: wind_strong
+    threshold: 8.0
+    value: w_p95
+    round: 1
+    unit: m/s
+    field: "estimator_wind.windspeed_north/east"
+    title: "估计风速较大（p95 {w_p95:.1f} m/s）"
+    suggestion: "结合故障库 F010：强风属环境扰动，姿态超调/转换越限优先归因风，不要直接改 PID。"
+  - expr: "w_p95 >= 8.0"
+    severity: info
+    tag: wind_disturb
+    guard_tag: wind_strong
+    threshold: 8.0
+    value: w_p95
+    round: 1
+    unit: m/s
+    field: "estimator_wind.windspeed_north/east"
+    title: "估计风速偏大（p95 {w_p95:.1f} m/s）"
+    suggestion: "解释姿态类异常时需考虑风扰因素。"
+
+emit:
+  check: wind_estimate
+  tag: wind_disturb
+  doc: https://docs.px4.io/main/en/log/flight_log_analysis.html
+  stats:
+    windSpeedP95M: {var: w_p95, round: 1}

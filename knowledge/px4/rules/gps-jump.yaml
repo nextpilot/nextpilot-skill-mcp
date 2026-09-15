@@ -1,0 +1,49 @@
+# GPS 位置跳变（F002 相关）：经纬度相邻差分速度 > 50 m/s 的次数，累计 >= 3 次告警。
+# 阈值 [暂定] px4-thresholds.toml [gps]：jump_speed_mps=50 / jump_min_count=3。
+
+id: px4-gps-jump
+slot: gps_health
+order: 3
+name: GPS 位置跳变
+version: 1.0.0
+category: gps
+status: stable
+author: {name: NextPilot 内置}
+license: CC-BY-4.0
+changelog:
+  - {version: 1.0.0, date: "2026-09-15", note: 从 ulog_checks.py 迁出，逻辑与阈值不变}
+
+firmware: any
+airframe: any
+
+requires:
+  any_of: [vehicle_gps_position]
+skip_reason: vehicle_gps_position not in log
+
+compute:
+  - out: step
+    in:
+      - vehicle_gps_position.lat
+      - vehicle_gps_position.lon
+      - vehicle_gps_position.timestamp
+    op: adjacent_speed_mps
+  - {out: njump_raw, in: [step], op: count_above, gt: 50.0}
+  - {out: njump, in: [njump_raw], op: to_int}
+
+triggers:
+  - expr: "njump >= 3"
+    severity: warning
+    tag: gps_jump
+    threshold: 3
+    value: njump
+    unit: 次
+    field: "vehicle_gps_position lat/lon 相邻差分"
+    title: "GPS 位置出现 {njump} 次异常跳变（>50 m/s）"
+    suggestion: "结合故障库 F002：排查多路径、馈线与电磁干扰；室内跳变为正常现象。"
+
+emit:
+  check: gps_health
+  tag: gps_jump
+  doc: https://docs.px4.io/main/en/gps_compass/
+  stats:
+    gpsJumpCount: {var: njump}

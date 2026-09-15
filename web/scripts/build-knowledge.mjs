@@ -29,7 +29,6 @@ const KN = resolve(webRoot, "../knowledge/px4");
 const PY_CHECKS = resolve(KN, "ulog_checks.py");
 const PY_DATA = resolve(KN, "ulog_data.py");
 const YAML_PATH = resolve(KN, "px4-fault-kb.yaml");
-const TOML_PATH = resolve(KN, "px4-thresholds.toml");
 const RULES_DIR = resolve(KN, "rules");
 const OPERATORS_PY = resolve(KN, "operators.py");
 const PROMPT_PATH = resolve(KN, "llm/gjb841-system-prompt.md");
@@ -123,44 +122,6 @@ function parseFaultKb(text) {
   return kb;
 }
 
-/** 极简 TOML 读取器：仅支持本阈值文件用到的子集——[group]、key = 数字/字符串/
- *  行内数组、# 注释。结构固定，未知语法直接抛错（宁可构建失败也不静默吞阈值）。 */
-function parseSimpleToml(text) {
-  const root = {};
-  let group = root;
-  const coerce = (raw) => {
-    let v = raw.trim();
-    if (v.startsWith("[") && v.endsWith("]")) {
-      const inner = v.slice(1, -1).trim();
-      if (inner === "") return [];
-      return inner.split(",").map((x) => coerce(x));
-    }
-    if (
-      (v.startsWith('"') && v.endsWith('"')) ||
-      (v.startsWith("'") && v.endsWith("'"))
-    ) {
-      return v.slice(1, -1);
-    }
-    if (/^-?\d+(\.\d+)?$/.test(v)) return Number(v);
-    if (v === "true") return true;
-    if (v === "false") return false;
-    throw new Error(`TOML 含不支持的标量写法：${v}`);
-  };
-  for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine.replace(/(^|[^"'])#.*$/, "$1").trim(); // 去整行/行尾注释（不处理引号内#，够用）
-    if (!line) continue;
-    const g = line.match(/^\[([A-Za-z0-9_]+)\]$/);
-    if (g) {
-      group = root[g[1]] ??= {};
-      continue;
-    }
-    const kv = line.match(/^([A-Za-z0-9_]+)\s*=\s*(.+)$/);
-    if (!kv) throw new Error(`TOML 无法解析行：${rawLine}`);
-    group[kv[1]] = coerce(kv[2]);
-  }
-  return root;
-}
-
 /**
  * 把文本包进 TS String.raw 模板。raw 模板里反斜杠按字面保留（正合 Python 转义），
  * 所以只须转义反引号与 ${ 起始，绝不能转义反斜杠（否则 \\n 会变成 \\\\n）。
@@ -173,8 +134,18 @@ function toRawTemplate(text) {
 const BUILTIN_VARS = new Set([
   "firmware", "fw_major", "fw_minor", "fw_profile",
   "airframe", "is_rotary_wing", "is_fixed_wing", "is_vtol", "is_rover",
-  "duration_s", "armed_s", "phases", "tags", "guard_tags",
+  "duration_s", "armed_s", "phases", "tags", "guard_tags", "armed_intervals",
+  "t0_us", "has_armed", "topics", "messages", "restart_detected", "dropout_ms",
 ]);
+
+/** 表达式里允许出现、但不是变量名的关键字/字面量（校验标识符时跳过） */
+const EXPR_KEYWORDS = new Set([
+  "and", "or", "not", "in", "is", "True", "False", "None",
+]);
+
+/** 扫标识符前先去掉字符串字面量（如 'vehicle_status' not in topics 里的 topic 名） */
+const stripStrings = (s) =>
+  String(s).replace(/'[^']*'/g, " ").replace(/"[^"]*"/g, " ");
 
 /** 从 operators.py 解析算子签名（本文件由我们维护，格式固定；解析不到即构建失败） */
 function parseOperatorSignatures(py) {
@@ -205,10 +176,24 @@ function loadRules(dir, signatures) {
   const rules = [];
   const seen = new Set();
   for (const file of files) {
-    const raw = parseYaml(readFileSync(resolve(dir, file), "utf8"));
-    const where = `rules/${file}`;
+    const parsed = parseYaml(readFileSync(resolve(dir, file), "utf8"));
+    // 一个 YAML 可以装多条经验（顶层写成数组）；一般情况下仍是一条经验一个文件
+    const items = Array.isArray(parsed) ? parsed : [parsed];
+    for (const raw of items) {
+    const where = `rules/${file}` + (items.length > 1 ? `#${(raw && raw.id) || "?"}` : "");
+    // guards 类经验（只产 guard 标签、不发 finding）没有 compute/triggers/check，
+    // 它的“实质”在 emit.guard_tags 的条件里；其余经验仍要求完整六件套。
+    // 注意：普通经验也可以用 emit.guard_tags（如陀螺零偏的温度跨度标签），
+    // 所以“是不是 guard 类经验”要看有没有 compute/triggers，而不是有没有 guard_tags。
+    const guardTags = raw.emit?.guard_tags;
+    const hasCompute = Array.isArray(raw.compute) && raw.compute.length > 0;
+    const hasTriggers = Array.isArray(raw.triggers) && raw.triggers.length > 0;
+    const isGuardRule = Array.isArray(guardTags) && guardTags.length > 0 && !hasCompute && !hasTriggers;
     // 必填项：即使不限也必须显式写 any（隐式豁免正是空洞条目的入口）
-    for (const key of ["id", "slot", "name", "firmware", "airframe", "compute", "triggers", "emit"]) {
+    const requiredKeys = isGuardRule
+      ? ["id", "slot", "name", "firmware", "airframe", "emit"]
+      : ["id", "slot", "name", "firmware", "airframe", "compute", "triggers", "emit"];
+    for (const key of requiredKeys) {
       if (raw[key] === undefined || raw[key] === null || raw[key] === "") {
         throw new Error(`${where}: 缺少必填字段 ${key}`);
       }
@@ -217,10 +202,10 @@ function loadRules(dir, signatures) {
     seen.add(raw.id);
 
     const declared = new Set();
-    if (!Array.isArray(raw.compute) || raw.compute.length === 0) {
+    if (!isGuardRule && (!Array.isArray(raw.compute) || raw.compute.length === 0)) {
       throw new Error(`${where}: compute 必须是非空数组`);
     }
-    for (const node of raw.compute) {
+    for (const node of raw.compute || []) {
       const sig = signatures[node.op];
       if (!sig) throw new Error(`${where}: 未注册的算子 op=${node.op}`);
       const ins = node.in ?? (node.from !== undefined ? [].concat(node.from) : null);
@@ -233,32 +218,73 @@ function loadRules(dir, signatures) {
       }
       for (const o of outs) declared.add(o);
     }
-    if (!Array.isArray(raw.triggers) || raw.triggers.length === 0) {
+    // emit.guard_tags：数据质量标签的产生条件（普通经验也会用，如陀螺零偏的温度跨度）。
+    // 条件里的名字必须是内置变量或 compute 输出，避免写错变量名却默默不打标签。
+    if (Array.isArray(guardTags)) {
+      for (const g of guardTags) {
+        if (typeof g.when !== "string" || !g.tag) {
+          throw new Error(`${where}: emit.guard_tags 每项都要有 when 与 tag`);
+        }
+        for (const name of stripStrings(g.when).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
+          if (EXPR_KEYWORDS.has(name)) continue;
+          if (!declared.has(name) && !BUILTIN_VARS.has(name)) {
+            throw new Error(`${where}: guard_tags 条件引用了未声明的名字 ${name}`);
+          }
+        }
+        if (!/^[a-z0-9_:]+$/i.test(String(g.tag))) {
+          throw new Error(`${where}: guard 标签名不合法 ${g.tag}`);
+        }
+      }
+    }
+    if (!isGuardRule && (!Array.isArray(raw.triggers) || raw.triggers.length === 0)) {
       throw new Error(`${where}: triggers 必须是非空数组`);
     }
-    for (const t of raw.triggers) {
+    // foreach：把「事件列表」展开成多条 finding。事件 dict 的键（如 t_s / name）
+    // 会叠加进模板环境，因此必须显式声明 keys，才能继续做占位符校验。
+    const eventKeys = new Set();
+    if (raw.foreach) {
+      const fe = typeof raw.foreach === "string" ? { var: raw.foreach } : raw.foreach;
+      if (!fe.var) throw new Error(`${where}: foreach 需要 var（事件列表的变量名）`);
+      if (!declared.has(fe.var)) {
+        throw new Error(`${where}: foreach 引用的 ${fe.var} 不是 compute 的输出`);
+      }
+      for (const k of fe.keys || []) eventKeys.add(k);
+    }
+    for (const t of raw.triggers || []) {
       if (typeof t.expr !== "string") throw new Error(`${where}: trigger 缺 expr（须为字符串，注意加引号）`);
       if (!["critical", "warning", "info"].includes(t.severity)) {
         throw new Error(`${where}: trigger severity 非法：${t.severity}`);
       }
       if (typeof t.title !== "string") throw new Error(`${where}: trigger 缺 title`);
       if (typeof t.field !== "string") throw new Error(`${where}: trigger 缺 field（evidence.field）`);
-      // 表达式里的标识符必须已声明（内置变量或 compute 输出）
-      for (const name of t.expr.match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
-        if (["and", "or", "not", "True", "False"].includes(name)) continue;
-        if (!declared.has(name) && !BUILTIN_VARS.has(name)) {
+      // 表达式里的标识符必须已声明（内置变量 / compute 输出 / foreach 事件键）
+      for (const name of stripStrings(t.expr).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
+        if (EXPR_KEYWORDS.has(name)) continue;
+        if (!declared.has(name) && !BUILTIN_VARS.has(name) && !eventKeys.has(name)) {
           throw new Error(`${where}: 表达式引用了未声明的名字 ${name}（expr: ${t.expr}）`);
         }
       }
       // 标题里的占位符同理
       for (const m of t.title.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)(:[^}]*)?\}/g)) {
-        if (!declared.has(m[1]) && !BUILTIN_VARS.has(m[1])) {
+        if (!declared.has(m[1]) && !BUILTIN_VARS.has(m[1]) && !eventKeys.has(m[1])) {
           throw new Error(`${where}: 标题引用了未声明的名字 ${m[1]}`);
         }
       }
+      // 证据值/建议里的占位符同样校验（证据文案与 suggestion 也允许模板）
+      for (const txt of [t.value_text, t.suggestion, t.field]) {
+        if (typeof txt !== "string") continue;
+        for (const m of txt.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)(:[^}]*)?\}/g)) {
+          if (!declared.has(m[1]) && !BUILTIN_VARS.has(m[1]) && !eventKeys.has(m[1])) {
+            throw new Error(`${where}: 文案引用了未声明的名字 ${m[1]}`);
+          }
+        }
+      }
     }
-    if (!raw.emit.check) throw new Error(`${where}: emit.check 必填（ran/skipped 用）`);
+    if (!isGuardRule && !raw.emit.check) {
+      throw new Error(`${where}: emit.check 必填（ran/skipped 用）`);
+    }
     rules.push(raw);
+    }
   }
   return rules;
 }
@@ -268,16 +294,6 @@ const banner = `// ⚠️ 自动生成，请勿手改。源文件在 knowledge/p
 // 1) 故障库 JSON
 const kb = parseFaultKb(read(YAML_PATH));
 if (kb.length === 0) throw new Error("故障知识库解析为 0 条，终止");
-
-// 1b) 阈值 TOML → JSON
-const thresholds = parseSimpleToml(read(TOML_PATH));
-const requiredGroups = ["guard", "vibration", "ekf", "power", "cpu", "gps", "mode"];
-for (const g of requiredGroups) {
-  if (!thresholds[g] || Object.keys(thresholds[g]).length === 0) {
-    throw new Error(`阈值文件缺少分组 [${g}]`);
-  }
-}
-const thresholdsJson = JSON.stringify(thresholds);
 
 const outWorkers = resolve(webRoot, "workers");
 mkdirSync(outWorkers, { recursive: true });
@@ -292,14 +308,11 @@ const operatorsPy = read(OPERATORS_PY);
 const signatures = parseOperatorSignatures(operatorsPy);
 if (Object.keys(signatures).length === 0) throw new Error("operators.py 里没解析到任何算子签名");
 const rules = loadRules(RULES_DIR, signatures);
-if (rules.some((r) => !r.compute)) throw new Error("规则缺少 compute");
+// guards 类经验没有 compute（其判定在 emit.guard_tags），逐条校验已在 loadRules 里做
 
 const checkPy = read(PY_CHECKS);
 if (!checkPy.includes("__FAULT_KB__")) {
   throw new Error("ulog_checks.py 必须保留 __FAULT_KB__ 占位符");
-}
-if (!checkPy.includes("__THRESHOLDS__")) {
-  throw new Error("ulog_checks.py 必须保留 __THRESHOLDS__ 占位符");
 }
 if (!checkPy.includes("__RULES__")) {
   throw new Error("ulog_checks.py 必须保留 __RULES__ 占位符");
@@ -310,9 +323,6 @@ writeFileSync(
   resolve(outWorkers, "ulog-check-script.ts"),
   banner +
     "import faultKbJson from \"./fault-kb.generated.json\";\n\n" +
-    "const thresholds = " +
-    thresholdsJson +
-    ";\n\n" +
     "const rules = " +
     JSON.stringify(rules) +
     ";\n\n" +
@@ -320,7 +330,6 @@ writeFileSync(
     toRawTemplate(pyWithOperators) +
     "`\n" +
     '  .replace("__FAULT_KB__", JSON.stringify(faultKbJson.entries))\n' +
-    '  .replace("__THRESHOLDS__", JSON.stringify(thresholds))\n' +
     '  .replace("__RULES__", JSON.stringify(rules));\n',
   "utf8",
 );
@@ -353,18 +362,8 @@ writeFileSync(
   "utf8",
 );
 
-// 4b) 阈值 ESM（供将来服务端 / MCP 复用同一份数值）
-writeFileSync(
-  resolve(outLib, "thresholds.generated.js"),
-  "// ⚠️ 自动生成，源：knowledge/px4/px4-thresholds.toml。请勿手改。\n" +
-    "export const PX4_THRESHOLDS = " +
-    thresholdsJson +
-    ";\n",
-  "utf8",
-);
-
 console.log(
   `knowledge built: ${kb.length} fault entries, ${rules.length} rules, ` +
     `${Object.keys(signatures).length} operators; ` +
-    "ulog-check-script.ts, ulog-data-script.ts, prompts.generated.js, thresholds.generated.js",
+    "ulog-check-script.ts, ulog-data-script.ts, prompts.generated.js",
 );

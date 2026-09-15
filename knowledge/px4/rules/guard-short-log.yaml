@@ -1,0 +1,23 @@
+# 数据质量 guard：短日志（armed 时长短于 60s，或无 armed 段但日志本身 < 60s）。
+# 短日志不做需要时间累积的深度诊断，故障库匹配也会被短路（引擎读这条 guard 标签）。
+# 阈值 60s 原先在 px4-thresholds.toml [guard] min_flight_sec，现随本经验自包含。
+
+id: px4-guard-short-log
+slot: guards_early           # 在原过程式位置执行：尽早打标签，且要排在其它 guard 之前
+order: 1
+name: 数据质量-短日志
+version: 1.0.0
+category: guard
+status: stable
+author: {name: NextPilot 内置}
+license: CC-BY-4.0
+changelog:
+  - {version: 1.0.0, date: "2026-09-15", note: "从 ulog_checks.py 迁出；阈值随经验内联，TOML 退场"}
+
+firmware: any
+airframe: any
+
+emit:
+  guard_tags:
+    - {when: "armed_s > 0 and armed_s < 60", tag: insufficient_data}
+    - {when: "armed_s == 0 and duration_s < 60", tag: insufficient_data}

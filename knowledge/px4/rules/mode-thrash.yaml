@@ -1,0 +1,42 @@
+# 模式抖动（robotto）：nav_state 变化次数 > 12 视为抖动。
+# 阈值 [来源] px4-thresholds.toml [mode] thrash_changes=12。
+
+id: px4-mode-thrash
+slot: mode_thrash
+order: 1
+name: 飞行模式抖动
+version: 1.0.0
+category: mode
+status: stable
+author: {name: NextPilot 内置}
+license: CC-BY-4.0
+changelog:
+  - {version: 1.0.0, date: "2026-09-15", note: 从 ulog_checks.py 迁出，逻辑与阈值不变}
+
+firmware: any
+airframe: any
+
+requires:
+  any_of: [vehicle_status]
+skip_reason: vehicle_status not in log
+
+compute:
+  - {out: n_changes_raw, from: vehicle_status.nav_state, op: edges_count}
+  - {out: n_changes, in: [n_changes_raw], op: to_int}
+
+triggers:
+  - expr: "n_changes > 12"
+    severity: warning
+    tag: null
+    threshold: 12
+    value: n_changes
+    unit: 次
+    field: "vehicle_status.nav_state 变化次数"
+    title: "飞行模式切换 {n_changes} 次（>12），可能存在模式抖动"
+    suggestion: "频繁切模式易诱发操纵混乱；检查遥控器开关与失效保护反复触发。"
+
+emit:
+  check: mode_thrash
+  doc: https://docs.px4.io/main/en/log/flight_log_analysis.html
+  stats:
+    navStateChanges: {var: n_changes}

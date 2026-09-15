@@ -1,7 +1,7 @@
 """校验**生成产物**（web/workers/ulog-check-script.ts）能被当作合法 Python 执行。
 
 为什么需要它：本地回归跑的是 knowledge/ 下的源文件，而浏览器里跑的是构建产物
-（operators.py + ulog_checks.py 经 String.raw 内联 + __FAULT_KB__/__THRESHOLDS__/__RULES__
+（operators.py + ulog_checks.py 经 String.raw 内联 + __FAULT_KB__/__RULES__
 三处替换）。只有这一步能证明"真正进 Pyodide 的东西"是合法的——否则语法错误只能在
 用户浏览器里炸出来。
 
@@ -38,14 +38,15 @@ def main() -> int:
     # 占位符**应当**留在模板里：由生成文件里的 .replace(...) 链在模块加载时替换。
     # 这里校验那条替换链覆盖了全部占位符，再复现替换结果验证是合法 Python。
     replaces = re.findall(r'\.replace\("(__[A-Z_]+__)"', src)
-    missing = {"__FAULT_KB__", "__THRESHOLDS__", "__RULES__"} - set(replaces)
+    # 模板里出现的占位符必须都被 .replace 链覆盖（阈值占位符已随 px4-thresholds.toml 退场）
+    in_template = set(re.findall(r"(__[A-Z_]+__)", body))
+    missing = in_template - set(replaces)
     if missing:
         raise SystemExit(f"生成产物的 .replace 链缺占位符：{sorted(missing)}")
 
     # 用真实取值复现最终 Python 源码
     final = body
     final = final.replace("__FAULT_KB__", repr(json.loads(FAULT_KB.read_text(encoding="utf-8"))["entries"]))
-    final = final.replace("__THRESHOLDS__", json.dumps(extract_json_const(src, "thresholds"), ensure_ascii=False))
     final = final.replace("__RULES__", json.dumps(extract_json_const(src, "rules"), ensure_ascii=False))
 
     try:

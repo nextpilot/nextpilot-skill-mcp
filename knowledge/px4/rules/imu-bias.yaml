@@ -1,0 +1,91 @@
+# 陀螺零偏漂移（F005）：跨固件版本取源——1.15+ 直读 estimator_sensor_bias.gyro_bias[]，
+# 旧固件取 estimator_states/estimator_status.states[10..12]。只看 armed 段，逐轴取
+# |最大零偏| 与漂移（max-min），取最差轴；温度跨度作背景（跨度大优先按温度漂移解释）。
+# 取源、掩码、逐轴归约都收在复合算子里。
+# 阈值 [暂定]：abs/drift warn=0.02、crit=0.05、温度跨度 guard=15。
+
+id: px4-imu-bias-drift
+slot: imu_bias
+order: 1
+name: 陀螺零偏漂移
+version: 1.1.0
+category: imu
+status: stable
+author: {name: NextPilot 内置}
+license: CC-BY-4.0
+changelog:
+  - {version: 1.0.0, date: "2026-09-15", note: "从 ulog_checks.py 迁出，逻辑与阈值不变"}
+  - {version: 1.1.0, date: "2026-09-15", note: "41 个节点收成三个复合算子"}
+
+firmware: any
+airframe: any
+# 原实现外层是 `if armed_intervals:`，无 armed 段时留一条 skip 记录
+not_applicable: {when: "not has_armed", skip_reason: 无 armed 段，不做零偏判定}
+skip_reason_no_data: 无陀螺零偏数据（无 estimator_sensor_bias / estimator_status.states）
+
+compute:
+  # 取源（新/旧固件自动选，附带 evidence 用的来源说明）；主数据缺失返回 None
+  - out: [bx, by, bz, bts, src_text]
+    in:
+      - estimator_sensor_bias.gyro_bias
+      - estimator_sensor_bias.timestamp
+      - estimator_states.states
+      - estimator_states.timestamp
+      - estimator_status.states
+      - estimator_status.timestamp
+      - fw_minor
+    op: gyro_bias_series
+    instance: 0
+    slot: 10
+    optional: true
+  # armed 段内逐轴 |最大零偏| 与漂移，各取最差轴
+  - out: [worst_abs, worst_axis, worst_drift, drift_axis]
+    in: [bx, by, bz, bts, armed_intervals]
+    op: gyro_bias_worst
+    labels: [X, Y, Z]
+    min_count: 10
+    optional: true
+  - {out: abs_ready, in: [worst_axis], op: is_not_none}       # 至少一个轴有效
+  - {out: abs_gate, in: [abs_ready], op: require_true}
+  # 温度跨度：两个来源取较大者（样本 < 2 的来源忽略）
+  - out: temp_range
+    in: [vehicle_imu_status.temperature_gyro, vehicle_air_data.ambient_temperature]
+    op: max_temp_range
+    instance: 0
+    optional: true
+  - {out: bias_stat, in: [worst_abs, worst_drift], op: larger, optional: true}
+
+triggers:
+  - expr: "worst_abs >= 0.05 or worst_drift >= 0.05"
+    severity: critical
+    tag: imu_bias_drift
+    threshold: 0.02
+    value: bias_stat
+    round: 4
+    unit: rad/s
+    field: "{src_text}"
+    title: "陀螺零偏异常（轴 {worst_axis}：绝对值 {worst_abs:.4f} rad/s，漂移 {worst_drift:.4f} rad/s）"
+    suggestion: "结合故障库 F005：检查 IMU 安装紧固、执行陀螺/加计标定；若温度跨度大，优先按温度漂移解释。"
+  - expr: "worst_abs >= 0.02 or worst_drift >= 0.02"
+    severity: warning
+    tag: imu_bias_drift
+    threshold: 0.02
+    value: bias_stat
+    round: 4
+    unit: rad/s
+    field: "{src_text}"
+    title: "陀螺零偏异常（轴 {worst_axis}：绝对值 {worst_abs:.4f} rad/s，漂移 {worst_drift:.4f} rad/s）"
+    suggestion: "结合故障库 F005：检查 IMU 安装紧固、执行陀螺/加计标定；若温度跨度大，优先按温度漂移解释。"
+
+emit:
+  check: imu_bias
+  tag: imu_bias_drift
+  doc: https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html
+  stats:
+    gyroBiasMaxRadS: {var: worst_abs, round: 4}
+    gyroBiasDriftRadS: {var: worst_drift, round: 4}
+    gyroBiasSource: {var: src_text}
+    imuTempRangeC: {var: temp_range, round: 1}
+  # 温度跨度大：作为背景信息打 guard 标签（与原过程式一致，不依赖是否发 finding）
+  guard_tags:
+    - {when: "temp_range >= 15", tag: temperature_change_large}
