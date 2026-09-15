@@ -12,16 +12,18 @@
  *   web/workers/ulog-data-script.ts    （导出 PY_ULG_DATA_HELPERS）
  *   web/workers/fault-kb.generated.json
  *   web/lib/knowledge/prompts.generated.js（ESM，供边缘函数 import）
+ *   web/content/guide/knowledge-rules.md （指南「知识库」分组的规则清单页）
  *
- * 用法（在 web/ 下）：node scripts/build-knowledge.mjs | pnpm build:kb
+ * 用法（在 web/ 下）：
+ *   node scripts/build-knowledge.mjs           生成（= pnpm build:kb）
+ *   node scripts/build-knowledge.mjs --check   只比对：产物是否与 knowledge/ 一致（CI 用）
  * 不引入额外依赖；YAML 只解析故障库用到的固定子集，出错即构建失败。
  */
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readdirSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
-import { buildGuide } from "./build-guide.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
@@ -34,8 +36,23 @@ const RULES_DIR = resolve(KN, "rules");
 const OPERATORS_PY = resolve(KN, "operators.py");
 const PROMPT_PATH = resolve(KN, "llm/gjb841-system-prompt.md");
 const EMPTY_PATH = resolve(KN, "llm/report-empty.md");
+const GUIDE_DIR = resolve(webRoot, "content", "guide");
 
 const read = (p) => readFileSync(p, "utf8");
+
+/**
+ * 产物落盘。`--check` 时只比对不写入：产物是提交进仓库的，所以"改了 knowledge/ 却没重新
+ * 生成产物"必须在 CI 里能被发现，而不是等线上跑着旧规则（`pnpm build:kb --check`）。
+ */
+const CHECK = process.argv.includes("--check");
+const drifted = [];
+function emit(path, content) {
+  if (CHECK) {
+    if (!existsSync(path) || readFileSync(path, "utf8") !== content) drifted.push(relative(webRoot, path));
+    return;
+  }
+  writeFileSync(path, content, "utf8");
+}
 
 /** 极简 YAML 解析：只支持本故障库用到的子集，结构固定，宁可构建失败也不静默产出错 KB */
 function parseFaultKb(text) {
@@ -175,6 +192,7 @@ function loadRules(dir, signatures) {
   const files = readdirSync(dir).filter((f) => f.endsWith(".yaml")).sort();
   if (files.length === 0) throw new Error("rules/ 下没有规则文件");
   const rules = [];
+  const sources = [];   // 与 rules 一一对应的来源文件名（规则清单页要显示）
   const seen = new Set();
   for (const file of files) {
     const parsed = parseYaml(readFileSync(resolve(dir, file), "utf8"));
@@ -291,9 +309,157 @@ function loadRules(dir, signatures) {
       throw new Error(`${where}: emit.check 必填（ran/skipped 用）`);
     }
     rules.push(raw);
+    sources.push(file);
     }
   }
-  return rules;
+  return { rules, sources };
+}
+
+// ─────────────────── 指南「知识库」分组的规则清单页 ───────────────────
+//
+// 把 rules/*.yaml 渲染成 /guide/knowledge-rules 那一页（产物提交进仓库）。
+// 与引擎产物同源、同一次构建生成：规则改了页面就跟着变，不用谁记得手动同步。
+// 清单只出网站这一份，仓库里不留第二份拷贝（免得两处对不上）；同分组的
+// 「如何编写一条规则」是手维护页面（web/content/guide/knowledge-write-rule.md），本脚本不碰。
+
+const GROUP = { zh: "知识库", en: "Knowledge base" };
+
+const CATALOGUE_INTRO = `引擎当前内置的 **{n} 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
+每条给出：**适用**（固件 / 机架 / 依赖）、**取值**（读哪些字段、过哪个算子）、**判定**（自上而下
+命中第一条即发射）、**产出**（写进报告的 check 名、喂故障库匹配的标签、UI 用的统计）。
+
+判定阈值就写在各自的经验 YAML 里；slot 决定执行顺序（报告里的 F01、F02… 编号按发射顺序生成）。
+所有判定都由确定性引擎在浏览器本地完成——LLM 只把结论翻译成中文报告，不参与任何数值判断。
+本页在构建时从 \`rules/*.yaml\` 自动生成。`;
+
+/** 尽量贴近 Python 的 `%s`，免得清单文本因为换成 Node 生成而整篇 diff */
+function pyRepr(v) {
+  if (Array.isArray(v)) return "[" + v.map(pyRepr).join(", ") + "]";
+  if (v === null || v === undefined) return "None";
+  if (typeof v === "boolean") return v ? "True" : "False";
+  if (typeof v === "object") {
+    return "{" + Object.entries(v).map(([k, val]) => `'${k}': ${pyRepr(val)}`).join(", ") + "}";
+  }
+  return String(v);
+}
+
+const listOr = (v, fallback) =>
+  Array.isArray(v) ? v.join(",") : v === undefined || v === null ? fallback : String(v);
+
+function fmtApplicability(raw) {
+  const parts = [`firmware ${listOr(raw.firmware, "any")}`, `airframe ${listOr(raw.airframe, "any")}`];
+  const req = raw.requires || {};
+  if (req.all_of) parts.push("依赖(全部) " + req.all_of.join(", "));
+  if (req.any_of) parts.push("依赖(任一) " + req.any_of.join(", "));
+  if (raw.not_applicable?.when) parts.push("不适用当 " + raw.not_applicable.when);
+  if (raw.silent_when) parts.push("静默当 " + raw.silent_when);
+  return parts.join(" ｜ ");
+}
+
+function fmtCompute(raw) {
+  const lines = [];
+  for (const node of raw.compute || []) {
+    const ins = node.in ?? (node.from !== undefined ? [].concat(node.from) : []);
+    const opts = Object.entries(node)
+      .filter(([k]) => !["in", "from", "out", "op", "optional"].includes(k))
+      .map(([k, v]) => `${k}=${pyRepr(v)}`);
+    const optsTxt = opts.length ? " " + opts.join(", ") : "";
+    const outs = [].concat(node.out ?? []);
+    lines.push(`- \`${node.op}\`${optsTxt} → **${outs.join(", ")}**`);
+    // 嵌套列表（而不是续行缩进）：续行在 HTML 里会与上一行折成同一段，输入列就糊在算子后面
+    lines.push(`    - 输入：${ins.map((i) => `\`${i}\``).join(", ")}`);
+  }
+  return lines.join("\n") || "- （无 compute）";
+}
+
+function fmtTriggers(raw) {
+  const lines = [];
+  for (const t of raw.triggers || []) {
+    const bits = [`**${t.severity}**`, `\`${t.expr}\``];
+    if (t.threshold !== undefined && t.threshold !== null) bits.push(`阈值 ${t.threshold}`);
+    if (t.unit) bits.push(`单位 ${t.unit}`);
+    bits.push(`标题「${t.title}」`);
+    lines.push("- " + bits.join(" ｜ "));
+  }
+  for (const g of raw.emit?.guard_tags || []) {
+    lines.push(`- guard：当 \`${g.when}\` 时打标签 \`${g.tag}\``);
+  }
+  return lines.join("\n") || "- （只产 guard 标签，不发 finding）";
+}
+
+function fmtEmit(raw) {
+  const emit = raw.emit || {};
+  const bits = [];
+  if (emit.check) bits.push(`check=${emit.check}`);
+  if (emit.tag) bits.push(`tag=${emit.tag}`);
+  if (emit.stats) {
+    bits.push("stats=" + Object.entries(emit.stats).map(([k, v]) => `${k}(round ${v?.round ?? "-"})`).join(", "));
+  }
+  return bits.join("，") || "—";
+}
+
+const SLOT_LABEL = {
+  guards_early: "数据质量 guard（最早执行）",
+  guards: "数据质量 guard",
+};
+
+function renderCatalogue(rules, sources) {
+  // 按码点比较而非 localeCompare：后者的结果随机器 ICU 语言环境变化，
+  // 生成产物必须逐字节可复现（槽位名都是 ASCII，码点序就是稳定序）
+  const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  const bySlot = rules
+    .map((raw, i) => ({ file: sources[i], raw }))
+    .sort(
+      (a, b) =>
+        cmp(String(a.raw.slot ?? ""), String(b.raw.slot ?? "")) ||
+        Number(a.raw.order ?? 100000) - Number(b.raw.order ?? 100000),
+    );
+
+  const body = [];
+  let current = null;
+  for (const { file, raw } of bySlot) {
+    const slot = raw.slot ?? "";
+    if (slot !== current) {
+      current = slot;
+      body.push(`\n## ${SLOT_LABEL[slot] ?? slot}（slot: \`${slot}\`）\n`);
+    }
+    body.push(`### ${raw.id} — ${raw.name ?? ""}\n`);
+    body.push(`- 文件：\`rules/${file}\` ｜ 位置：slot \`${slot}\` #${raw.order ?? "—"}`);
+    body.push(`- 适用：${fmtApplicability(raw)}`);
+    body.push(`- 取值：\n${fmtCompute(raw)}`);
+    body.push(`- 判定：\n${fmtTriggers(raw)}`);
+    body.push(`- 产出：${fmtEmit(raw)}\n`);
+  }
+  return body.join("\n");
+}
+
+function catalogueFrontmatter({ title, titleEn, description, descriptionEn, order }) {
+  return [
+    "---",
+    `title: ${title}`,
+    `titleEn: ${titleEn}`,
+    `description: ${description}`,
+    `descriptionEn: ${descriptionEn}`,
+    `group: ${GROUP.zh}`,
+    `groupEn: ${GROUP.en}`,
+    `order: ${order}`,
+    "---",
+    "",
+  ].join("\n");
+}
+
+/** 规则清单页的完整内容（清单只出网站这一份，仓库里不留第二份拷贝） */
+function renderCataloguePage(rules, sources) {
+  return (
+    catalogueFrontmatter({
+      title: "当前有哪些规则",
+      titleEn: "Rule catalogue",
+      description: "全部检查经验的清单：各自读什么字段、什么条件触发、产出什么标签。",
+      descriptionEn: "Every built-in check — the fields it reads, the condition that fires it, and the tags it emits.",
+      order: 12,
+    }) +
+    `${CATALOGUE_INTRO.replace("{n}", String(rules.length))}\n\n---\n${renderCatalogue(rules, sources)}`
+  );
 }
 
 const banner = `// ⚠️ 自动生成，请勿手改。源文件在 knowledge/px4/，改完跑 \`pnpm build:kb\`（dev/build 自动执行）。\n`;
@@ -304,19 +470,18 @@ if (kb.length === 0) throw new Error("故障知识库解析为 0 条，终止");
 
 const outWorkers = resolve(webRoot, "workers");
 mkdirSync(outWorkers, { recursive: true });
-writeFileSync(
+emit(
   resolve(outWorkers, "fault-kb.generated.json"),
   // 不写 generatedAt：时间戳会让产物每次构建都产生 diff（而它没有任何消费者），
   // 产物应当可复现 —— 同样的 knowledge/ 输入必须得到逐字节相同的输出。
   JSON.stringify({ entries: kb }, null, 2) + "\n",
-  "utf8",
 );
 
 // 2) 检查脚本 .ts：内联 KB 与阈值，替换两个占位符
 const operatorsPy = read(OPERATORS_PY);
 const signatures = parseOperatorSignatures(operatorsPy);
 if (Object.keys(signatures).length === 0) throw new Error("operators.py 里没解析到任何算子签名");
-const rules = loadRules(RULES_DIR, signatures);
+const { rules, sources } = loadRules(RULES_DIR, signatures);
 // guards 类经验没有 compute（其判定在 emit.guard_tags），逐条校验已在 loadRules 里做
 
 const checkPy = read(PY_CHECKS);
@@ -328,7 +493,7 @@ if (!checkPy.includes("__RULES__")) {
 }
 // 算子定义必须在框架之前执行（框架用它按名字调用）
 const pyWithOperators = operatorsPy + "\n" + checkPy;
-writeFileSync(
+emit(
   resolve(outWorkers, "ulog-check-script.ts"),
   banner +
     "import faultKbJson from \"./fault-kb.generated.json\";\n\n" +
@@ -340,18 +505,16 @@ writeFileSync(
     "`\n" +
     '  .replace("__FAULT_KB__", JSON.stringify(faultKbJson.entries))\n' +
     '  .replace("__RULES__", JSON.stringify(rules));\n',
-  "utf8",
 );
 
 // 3) 数据层 .ts
 const dataPy = read(PY_DATA);
-writeFileSync(
+emit(
   resolve(outWorkers, "ulog-data-script.ts"),
   banner +
     "export const PY_ULG_DATA_HELPERS = String.raw`" +
     toRawTemplate(dataPy) +
     "`;\n",
-  "utf8",
 );
 
 // 4) LLM 提示词与空结论文案（边缘函数是 .js，直接生成 ESM）
@@ -359,7 +522,7 @@ const prompt = read(PROMPT_PATH).replace(/\s+$/, "\n");
 const emptyMd = read(EMPTY_PATH).trim();
 const outLib = resolve(webRoot, "lib/knowledge");
 mkdirSync(outLib, { recursive: true });
-writeFileSync(
+emit(
   resolve(outLib, "prompts.generated.js"),
   "// ⚠️ 自动生成，源：knowledge/px4/llm/。请勿手改。\n" +
     "export const GJB841_SYSTEM_PROMPT = " +
@@ -368,16 +531,24 @@ writeFileSync(
     "export const EMPTY_FINDINGS_MARKDOWN = " +
     JSON.stringify(emptyMd) +
     ";\n",
-  "utf8",
 );
 
-// 5) 指南的「知识库」分组：知识文档 → 网页（含规则清单）
-// 与知识产物同一趟生成，规则改了网页就跟着变，不需要谁记得手动同步。
-const guide = buildGuide();
+// 5) 指南的「知识库」分组：规则清单页（规则改了页面就跟着变，不用谁记得手动同步）
+if (!CHECK) mkdirSync(GUIDE_DIR, { recursive: true });
+emit(resolve(GUIDE_DIR, "knowledge-rules.md"), renderCataloguePage(rules, sources));
 
-console.log(
-  `knowledge built: ${kb.length} fault entries, ${rules.length} rules, ` +
-    `${Object.keys(signatures).length} operators; ` +
-    "ulog-check-script.ts, ulog-data-script.ts, prompts.generated.js",
-);
-console.log(`guide built: ${guide.pages.join(", ")}`);
+if (CHECK) {
+  if (drifted.length > 0) {
+    console.error("CHECK FAIL: 以下产物与 knowledge/ 不一致，重跑 pnpm build:kb\n  " + drifted.join("\n  "));
+    process.exitCode = 1;
+  } else {
+    console.log("OK 全部产物与 knowledge/ 一致");
+  }
+} else {
+  console.log(
+    `knowledge built: ${kb.length} fault entries, ${rules.length} rules, ` +
+      `${Object.keys(signatures).length} operators; ` +
+      "ulog-check-script.ts, ulog-data-script.ts, prompts.generated.js",
+  );
+  console.log("guide built: knowledge-rules.md");
+}
