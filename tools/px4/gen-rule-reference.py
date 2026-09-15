@@ -1,6 +1,6 @@
-"""把「算子目录」与「内置变量表」生成进 web/content/guide/knowledge-write-rule.md。
+"""把「算子目录」与「内置变量表」生成进 content/guide/knowledge-write-rule.md。
 
-为什么用生成：这两张表的事实源分别在 knowledge/px4/operators.py 与 ulog_checks.py 的
+为什么用生成：这两张表的事实源分别在 engine/operators.py 与 engine/rule_engine.py 的
 _rule_env()，手写必然漂移。参考文档里用标记圈出生成区，本脚本只重写标记之间的内容，
 其余（字段说明、示例）保持人工维护。
 
@@ -11,9 +11,9 @@ import ast
 import re
 
 ROOT = Path(__file__).resolve().parents[2]
-OPS = ROOT / "knowledge" / "px4" / "operators.py"
-CHECKS = ROOT / "knowledge" / "px4" / "ulog_checks.py"
-DOC = ROOT / "web" / "content" / "guide" / "knowledge-write-rule.md"
+OPS = ROOT / "engine" / "operators.py"
+CHECKS = ROOT / "engine" / "rule_engine.py"
+DOC = ROOT / "content" / "guide" / "knowledge-write-rule.md"
 
 BEGIN_OPS, END_OPS = "<!-- BEGIN:operators -->", "<!-- END:operators -->"
 BEGIN_VARS, END_VARS = "<!-- BEGIN:builtins -->", "<!-- END:builtins -->"

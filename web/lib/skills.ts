@@ -4,7 +4,7 @@ import matter from "gray-matter";
 import type { SkillMeta } from "./types";
 import { parseChangelog } from "./changelog";
 
-const SKILLS_DIR = path.join(process.cwd(), "content", "skills");
+const SKILLS_DIR = path.join(process.cwd(), "..", "content", "skills");
 
 export interface Skill extends SkillMeta {
   /** MDX 正文（System Prompt、示例、参考资料） */

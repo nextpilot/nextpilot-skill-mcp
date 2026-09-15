@@ -1,8 +1,8 @@
 {
   "log": "sample_log_small.ulg",
   "slug": "sample_log_small",
-  "source": "本仓库自带（engine/tests/logs/，未入库，需自备）",
-  "engine": "knowledge/px4/ulog_checks.py + ulog_data.py",
+  "source": "本仓库自带（tools/calibrate/logs/，未入库，需自备）",
+  "engine": "engine/rule_engine.py + engine/report_data.py",
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
     "platform": "PX4",

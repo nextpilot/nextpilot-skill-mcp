@@ -1,18 +1,21 @@
 /**
- * 知识构建：把 knowledge/px4/ 下工程师维护的经验文件，生成运行时所需的产物。
+ * 知识构建：把引擎源码（engine/）与人工经验（knowledge/px4/）拼成运行时所需的产物。
  *
- * 单一数据源全部在仓库根 knowledge/px4/：
- *   px4/ulog_checks.py        第一层 pyulog 解析 + 第二层规则/guard（Pyodide 执行）
- *   px4/ulog_data.py          报告页数据层 helpers（图表/事件/参数）
- *   px4/px4-fault-kb.yaml     第三层故障知识库（工程师只编辑这个）
- *   llm/gjb841-system-prompt.md  第四层 GJB-841 思考范式（LLM 只做组装）
+ * 单一数据源：
+ *   engine/operators.py           算子注册表（通用，不认识具体字段）
+ *   engine/rule_engine.py         第一层 pyulog 解析 + 第二层规则/guard 框架（Pyodide 执行）
+ *   engine/report_data.py         报告页数据层 helpers（图表/事件/参数）
+ *   knowledge/px4/rules/*.yaml    检查经验：阈值与判定条件（工程师最常改这里）
+ *   knowledge/px4/px4-fault-kb.yaml  第三层故障知识库
+ *   knowledge/px4/llm/*.md        第四层 GJB-841 思考范式（LLM 只做组装）
+ *   knowledge/px4/meta/*.json     固件字段与参数字典
  *
  * 本脚本生成（产物提交进仓库，EdgeOne 直接 next build 也能跑）：
  *   web/workers/ulog-check-script.ts   （导出 PY_ULG_CHECKS，内联 KB）
  *   web/workers/ulog-data-script.ts    （导出 PY_ULG_DATA_HELPERS）
  *   web/workers/fault-kb.generated.json
  *   web/lib/knowledge/prompts.generated.js（ESM，供边缘函数 import）
- *   web/content/guide/knowledge-rules.md （指南「知识库」分组的规则清单页）
+ *   content/guide/knowledge-rules.md     （指南「知识库」分组的规则清单页）
  *
  * 用法（在 web/ 下）：
  *   node scripts/build-knowledge.mjs           生成（= pnpm build:kb）
@@ -29,14 +32,16 @@ const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
 const KN = resolve(webRoot, "../knowledge/px4");
 
-const PY_CHECKS = resolve(KN, "ulog_checks.py");
-const PY_DATA = resolve(KN, "ulog_data.py");
+const ENGINE = resolve(webRoot, "../engine");   // 确定性引擎源码（浏览器与本地工具共用一份）
+const PY_RULE_ENGINE = resolve(ENGINE, "rule_engine.py");
+const PY_REPORT_DATA = resolve(ENGINE, "report_data.py");
 const YAML_PATH = resolve(KN, "px4-fault-kb.yaml");
+const FACTS_PATH = resolve(KN, "facts.yaml");   // 事实层的数据绑定与码表
 const RULES_DIR = resolve(KN, "rules");
-const OPERATORS_PY = resolve(KN, "operators.py");
+const OPERATORS_PY = resolve(ENGINE, "operators.py");
 const PROMPT_PATH = resolve(KN, "llm/gjb841-system-prompt.md");
 const EMPTY_PATH = resolve(KN, "llm/report-empty.md");
-const GUIDE_DIR = resolve(webRoot, "content", "guide");
+const GUIDES_DIR = resolve(webRoot, "../content/guide");   // 站点内容在仓库根 content/
 
 const read = (p) => readFileSync(p, "utf8");
 
@@ -148,7 +153,7 @@ function toRawTemplate(text) {
   return text.replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
 }
 
-/** 日志级内置变量：经验里可直接引用，无需在 compute 声明（与 ulog_checks.py 的 _rule_env 对齐） */
+/** 日志级内置变量：经验里可直接引用，无需在 compute 声明（与 engine/rule_engine.py 的 _rule_env 对齐） */
 const BUILTIN_VARS = new Set([
   "firmware", "fw_major", "fw_minor", "fw_profile",
   "airframe", "is_rotary_wing", "is_fixed_wing", "is_vtol", "is_rover",
@@ -320,7 +325,7 @@ function loadRules(dir, signatures) {
 // 把 rules/*.yaml 渲染成 /guide/knowledge-rules 那一页（产物提交进仓库）。
 // 与引擎产物同源、同一次构建生成：规则改了页面就跟着变，不用谁记得手动同步。
 // 清单只出网站这一份，仓库里不留第二份拷贝（免得两处对不上）；同分组的
-// 「如何编写一条规则」是手维护页面（web/content/guide/knowledge-write-rule.md），本脚本不碰。
+// 「如何编写一条规则」是手维护页面（content/guide/knowledge-write-rule.md），本脚本不碰。
 
 const GROUP = { zh: "知识库", en: "Knowledge base" };
 
@@ -462,7 +467,7 @@ function renderCataloguePage(rules, sources) {
   );
 }
 
-const banner = `// ⚠️ 自动生成，请勿手改。源文件在 knowledge/px4/，改完跑 \`pnpm build:kb\`（dev/build 自动执行）。\n`;
+const banner = `// ⚠️ 自动生成，请勿手改。源文件在 engine/ 与 knowledge/px4/，改完跑 \`pnpm build:kb\`（dev/build 自动执行）。\n`;
 
 // 1) 故障库 JSON
 const kb = parseFaultKb(read(YAML_PATH));
@@ -484,15 +489,38 @@ if (Object.keys(signatures).length === 0) throw new Error("operators.py 里没�
 const { rules, sources } = loadRules(RULES_DIR, signatures);
 // guards 类经验没有 compute（其判定在 emit.guard_tags），逐条校验已在 loadRules 里做
 
-const checkPy = read(PY_CHECKS);
-if (!checkPy.includes("__FAULT_KB__")) {
+const ruleEnginePy = read(PY_RULE_ENGINE);
+if (!ruleEnginePy.includes("__FAULT_KB__")) {
   throw new Error("ulog_checks.py 必须保留 __FAULT_KB__ 占位符");
 }
-if (!checkPy.includes("__RULES__")) {
-  throw new Error("ulog_checks.py 必须保留 __RULES__ 占位符");
+if (!ruleEnginePy.includes("__RULES__")) {
+  throw new Error("rule_engine.py 必须保留 __RULES__ 占位符");
+}
+if (!ruleEnginePy.includes("__FACTS__")) {
+  throw new Error("rule_engine.py 必须保留 __FACTS__ 占位符");
+}
+// facts.yaml：事实层的数据绑定与码表。键名是引擎约定的，缺一个就构建失败
+// （宁可构建失败，也不要在浏览器里跑到某个码表是空的才发现）。
+const facts = parseYaml(read(FACTS_PATH));
+for (const key of ["slot_order", "bindings", "log_levels", "vehicle_types",
+                   "nav_state_names", "nav_groups", "sys_info_keys"]) {
+  if (facts[key] === undefined) throw new Error(`facts.yaml 缺少 ${key}`);
+}
+if (!facts.bindings?.vehicle_status) throw new Error("facts.yaml 缺少 bindings.vehicle_status");
+if (!Array.isArray(facts.slot_order) || facts.slot_order.length === 0) {
+  throw new Error("facts.yaml 的 slot_order 不能为空");
+}
+
+// 经验声明的 slot 必须已登记在 facts.yaml 的 slot_order 里——否则那条经验**永远不会被执行**
+// （引擎按 slot_order 逐个 slot 跑），且失败是静默的。宁可构建失败。
+const knownSlots = new Set(facts.slot_order);
+for (const r of rules) {
+  if (!knownSlots.has(r.slot)) {
+    throw new Error(`规则 ${r.id} 的 slot「${r.slot}」未登记在 knowledge/px4/facts.yaml 的 slot_order`);
+  }
 }
 // 算子定义必须在框架之前执行（框架用它按名字调用）
-const pyWithOperators = operatorsPy + "\n" + checkPy;
+const pyWithOperators = operatorsPy + "\n" + ruleEnginePy;
 emit(
   resolve(outWorkers, "ulog-check-script.ts"),
   banner +
@@ -504,16 +532,17 @@ emit(
     toRawTemplate(pyWithOperators) +
     "`\n" +
     '  .replace("__FAULT_KB__", JSON.stringify(faultKbJson.entries))\n' +
-    '  .replace("__RULES__", JSON.stringify(rules));\n',
+    '  .replace("__RULES__", JSON.stringify(rules))\n' +
+    '  .replace("__FACTS__", JSON.stringify(facts));\n',
 );
 
 // 3) 数据层 .ts
-const dataPy = read(PY_DATA);
+const reportDataPy = read(PY_REPORT_DATA);
 emit(
   resolve(outWorkers, "ulog-data-script.ts"),
   banner +
     "export const PY_ULG_DATA_HELPERS = String.raw`" +
-    toRawTemplate(dataPy) +
+    toRawTemplate(reportDataPy) +
     "`;\n",
 );
 
@@ -534,8 +563,8 @@ emit(
 );
 
 // 5) 指南的「知识库」分组：规则清单页（规则改了页面就跟着变，不用谁记得手动同步）
-if (!CHECK) mkdirSync(GUIDE_DIR, { recursive: true });
-emit(resolve(GUIDE_DIR, "knowledge-rules.md"), renderCataloguePage(rules, sources));
+if (!CHECK) mkdirSync(GUIDES_DIR, { recursive: true });
+emit(resolve(GUIDES_DIR, "knowledge-rules.md"), renderCataloguePage(rules, sources));
 
 if (CHECK) {
   if (drifted.length > 0) {

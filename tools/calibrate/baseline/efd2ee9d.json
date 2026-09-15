@@ -2,7 +2,7 @@
   "log": "efd2ee9d-e0ff-44ac-ba83-5ac464adf470.ulg",
   "slug": "efd2ee9d",
   "source": "logs.px4.io 公开日志：GET https://logs.px4.io/download?log=efd2ee9d-e0ff-44ac-ba83-5ac464adf470（或 python tools/px4/download_px4_logs.py）",
-  "engine": "knowledge/px4/ulog_checks.py + ulog_data.py",
+  "engine": "engine/rule_engine.py + engine/report_data.py",
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
     "platform": "PX4",

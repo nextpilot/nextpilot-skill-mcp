@@ -3,7 +3,7 @@ import path from "node:path";
 import matter from "gray-matter";
 import { splitHeading, headingId } from "./heading";
 
-const GUIDE_DIR = path.join(process.cwd(), "content", "guide");
+const GUIDE_DIR = path.join(process.cwd(), "..", "content", "guide");
 
 export interface GuideHeading {
   id: string;

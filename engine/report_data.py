@@ -96,24 +96,19 @@ def np_series(topic, instance, fields_json, max_points=3000):
             out["series"][f] = None
     __result = json.dumps(out, ensure_ascii=False)
 
-# ============ 飞行模式枚举（PX4 commander vehicle_status_s）============
-NAV_STATE_NAMES = {
-    0: "Manual", 1: "Altitude", 2: "Position", 3: "Mission", 4: "Hold",
-    5: "Return", 6: "Position Slow", 7: "Free5", 8: "Free4", 10: "Acro",
-    11: "Free3", 12: "Descend", 13: "Termination", 14: "Offboard",
-    15: "Stabilized", 16: "Free2", 17: "Takeoff", 18: "Land", 19: "Free1",
-    20: "Follow", 21: "Orbit", 22: "VTOL Takeoff",
-}
-ARMING_STATE_NAMES = {0: "Disarmed", 1: "Standby", 2: "Armed", 3: "Standby Error", 4: "Shutdown"}
+# ============ 飞行模式枚举（数据在 knowledge/px4/facts.yaml）============
+# 码表都在 facts.yaml（引擎只提供机制）：改名字/加码值不用动 Python。
+_VS = FACTS["bindings"]["vehicle_status"]
+NAV_STATE_NAMES = {int(k): v for k, v in FACTS["nav_state_names"].items()}
 
 def _phases():
-    d = _np_find("vehicle_status", 0)
+    d = _np_find(_VS["topic"], 0)
     if d is None:
         return []
     ts = np.asarray(d.data["timestamp"], dtype=np.int64)
     t0 = int(ulog.start_timestamp) if getattr(ulog, "start_timestamp", 0) else int(ts[0])
-    nav = d.data.get("nav_state")
-    arm = d.data.get("arming_state")
+    nav = d.data.get(_VS["nav_state"])
+    arm = d.data.get(_VS["arming_state"])
     if nav is None:
         return []
     nav = np.asarray(nav)
@@ -134,19 +129,14 @@ def _phases():
             "endSec": round((int(ts[b]) - t0) / 1e6, 2),
             "navState": code,
             "mode": NAV_STATE_NAMES.get(code, "Mode %d" % code),
-            "armed": seg_arm == 2,
+            "armed": seg_arm == _VS["armed_value"],
         })
     return phases
 
 # ============ np_log_info：系统信息 / 事件 / 丢包 / 参数 / 阶段 ============
-LOG_LEVEL_NAMES = {0: "EMERGENCY", 1: "ALERT", 2: "CRITICAL", 3: "ERROR",
-                   4: "WARNING", 5: "NOTICE", 6: "INFO", 7: "DEBUG"}
-SYS_INFO_KEYS = [
-    "sys_name", "ver_sw", "ver_sw_release", "ver_vendor_sw_release",
-    "ver_hw", "ver_hw_subtype", "sys_os_name", "sys_os_ver",
-    "sys_toolchain", "sys_toolchain_ver", "sys_mcu", "time_start_utc",
-    "duration", "git_branch",
-]
+# 日志级别与「系统信息」字段清单同样来自 facts.yaml
+LOG_LEVEL_NAMES = {int(k): v for k, v in FACTS["log_levels"].items()}
+SYS_INFO_KEYS = FACTS["sys_info_keys"]
 
 def np_log_info():
     t0 = int(getattr(ulog, "start_timestamp", 0) or 0)

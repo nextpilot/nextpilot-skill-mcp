@@ -1,10 +1,10 @@
-"""本地校准/验证用：直接跑 knowledge/px4 下的 Python 源，在真实 .ulg 上验证。
+"""本地校准/验证用：直接跑 engine/ 下的 Python 源，在真实 .ulg 上验证。
 
 用法：
   python tools/calibrate/run_checks_locally.py <file.ulg> [more.ulg ...]
   python tools/calibrate/run_checks_locally.py --probe-data <file.ulg> ...
 
-经验的唯一事实源在 knowledge/px4/：阈值 TOML、故障库 YAML、经验规则 rules/*.yaml、检查逻辑 Python。
+规则与阈值在 knowledge/px4/（rules/*.yaml、故障库 YAML），引擎实现在 engine/。
 本脚本用 tomllib（Python 3.11+）读阈值、解析故障库 YAML 的产物 JSON，
 不依赖 Node 构建，因此改完 knowledge 即可在此回归。
 """
@@ -21,11 +21,13 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-KN_PX4 = REPO_ROOT / "knowledge" / "px4"
-OPERATORS_PY = KN_PX4 / "operators.py"
-PY_CHECKS = KN_PX4 / "ulog_checks.py"
+KN_PX4 = REPO_ROOT / "knowledge" / "px4"      # 规则与阈值（知识）
+ENGINE = REPO_ROOT / "engine"                 # 引擎源码（通用算子与框架）
+OPERATORS_PY = ENGINE / "operators.py"
+RULE_ENGINE_PY = ENGINE / "rule_engine.py"
+REPORT_DATA_PY = ENGINE / "report_data.py"
 RULES_DIR = KN_PX4 / "rules"
-PY_DATA = KN_PX4 / "ulog_data.py"
+FACTS_YAML = KN_PX4 / "facts.yaml"          # 事实层的数据绑定与码表
 FAULT_KB_JSON = REPO_ROOT / "web" / "workers" / "fault-kb.generated.json"
 
 
@@ -55,13 +57,18 @@ def _load_rules() -> list:
 
 
 def _load_checks() -> str:
-    body = PY_CHECKS.read_text(encoding="utf-8")
+    body = RULE_ENGINE_PY.read_text(encoding="utf-8")
 
     entries = json.loads(FAULT_KB_JSON.read_text(encoding="utf-8"))["entries"]
     body = body.replace("__FAULT_KB__", repr(entries))
 
     # 阈值已随经验内联（px4-thresholds.toml 退场），无需再注入
     body = body.replace("__RULES__", json.dumps(_load_rules(), ensure_ascii=False))
+
+    # 事实层的数据绑定与码表（facts.yaml），与构建期内联的是同一份
+    import yaml as _yaml
+    facts = _yaml.safe_load(FACTS_YAML.read_text(encoding="utf-8"))
+    body = body.replace("__FACTS__", json.dumps(facts, ensure_ascii=False))
     return body
 
 
@@ -72,10 +79,10 @@ def build_namespace(path: Path) -> dict:
         + "\n"
         + _load_checks()
         + "\n"
-        + PY_DATA.read_text(encoding="utf-8")
+        + REPORT_DATA_PY.read_text(encoding="utf-8")
     )
     namespace: dict = {"ulog_bytes": path.read_bytes()}
-    exec(compile(script, str(PY_CHECKS), "exec"), namespace)
+    exec(compile(script, str(RULE_ENGINE_PY), "exec"), namespace)
     return namespace
 
 

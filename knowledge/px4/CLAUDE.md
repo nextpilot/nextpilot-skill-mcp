@@ -1,7 +1,7 @@
 # 检查规则改为「一条经验一个配置文件」：一条经验的完整画像
 
-> **这是给 AI（Claude Code）读的项目上下文**：改 `rules/*.yaml`、`operators.py`、
-> `ulog_checks.py` 或构建脚本前，先按这里的约定来——它记着每条设计决策的动机、
+> **这是给 AI（Claude Code）读的项目上下文**：改 `rules/*.yaml`、`engine/` 下的算子与框架、
+> 或构建脚本前，先按这里的约定来——它记着每条设计决策的动机、
 > 与最初设计的落地差异（避免把有意为之当成 bug 改回去）、以及已知缺口。
 > 面向人的入口见 `../README.md`（怎么读）与站内 [如何编写一条规则](/guide/knowledge-write-rule)（怎么写经验）。
 > 本文件不发布到网站：里面有实施状态、已知缺口与提交记录。
@@ -14,7 +14,7 @@ guard），**73 个通用算子**；`px4-thresholds.toml` 已退场（阈值随�
 通过；构建期护栏生效（算子名/入参数量、表达式与文案里的未声明名字、缺 `firmware`/`airframe`、
 guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 
-字段级权威参考（写经验时看这份）：站内 **[如何编写一条规则](/guide/knowledge-write-rule)**（源文件 `web/content/guide/knowledge-write-rule.md`）；
+字段级权威参考（写经验时看这份）：站内 **[如何编写一条规则](/guide/knowledge-write-rule)**（源文件 `content/guide/knowledge-write-rule.md`）；
 经验索引（站内页面，构建时生成）：**[/guide/knowledge-rules](/guide/knowledge-rules)**；迁移过程中顺带修掉的 6 处
 真实缺陷见提交 `6a081d5` 的说明（最要紧的一条：日志消息级别判据按 ASCII 语义修正后，
 `Kill engaged / Flight termination active`、`no barometer found` 这类"冒烟的枪"才浮出来）。
@@ -128,9 +128,10 @@ load_crit = 0.95
 构建期（Node，web/scripts/build-knowledge.mjs）
   knowledge/px4/rules/*.yaml      ─┐
   knowledge/px4/guards/*.yaml     ─┤ 解析 + 校验（必填/算子白名单/表达式合法性）
+  knowledge/px4/facts.yaml        ─┤ 数据绑定与码表（字段名/码值/阶段分组/slot 顺序）
   knowledge/px4/meta/** 与 topic-overrides.yaml   ─┤
-  knowledge/px4/operators.py      ─┤
-  knowledge/px4/ulog_checks.py    ─┘
+  engine/operators.py             ─┤
+  engine/ulog_checks.py           ─┘
         ↓ 生成的产物（提交进仓库）
   web/workers/ulog-check-script.ts   ← Python 源码，内联 __RULES__/__GUARDS__/__TOPICS__ 的 JSON 字面量
   web/workers/fault-kb.generated.json
@@ -350,9 +351,9 @@ calibration:
 ```yaml
 fixtures:
   positive:
-    - {log: engine/tests/logs/39f26cce-*.ulg, expect: {severity: warning, fault_tags: [high_vibration]}}
+    - {log: tools/calibrate/logs/39f26cce-*.ulg, expect: {severity: warning, fault_tags: [high_vibration]}}
   negative:
-    - {log: engine/tests/logs/95b077d9-*.ulg}
+    - {log: tools/calibrate/logs/95b077d9-*.ulg}
 ```
 
 没有这一层，第三方的规则无法被验证，70/30 分成也就无从谈起；
@@ -435,10 +436,10 @@ calibration:
 
 fixtures:
   positive:
-    - {log: engine/tests/logs/39f26cce-337a-4f83-a967-45352f6e1e82.ulg,
+    - {log: tools/calibrate/logs/39f26cce-337a-4f83-a967-45352f6e1e82.ulg,
        expect: {severity: warning, fault_tags: [high_vibration]}}
   negative:
-    - {log: engine/tests/logs/95b077d9-d719-45ea-bf91-5926170cbc52.ulg}
+    - {log: tools/calibrate/logs/95b077d9-d719-45ea-bf91-5926170cbc52.ulg}
 ```
 
 **统一用 YAML**（经验、guard、字典同一格式，详见下方「格式结论」一节）。

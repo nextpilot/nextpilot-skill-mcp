@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import run_checks_locally as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-LOG_DIR = REPO_ROOT / "engine" / "tests" / "logs"
+LOG_DIR = Path(__file__).resolve().parent / "logs"   # 校准用真实日志（不入库，需自备）
 BASELINE_DIR = Path(__file__).resolve().parent / "baseline"
 
 # 重构期唯一可能"合理变化"的字段放这里（当前为空：要求严格等价）

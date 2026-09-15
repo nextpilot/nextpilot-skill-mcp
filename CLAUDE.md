@@ -216,7 +216,7 @@
 
 面向国内用户选型：
 
-- **前端 / 全栈**：Next.js + TypeScript + Tailwind CSS + shadcn/ui，**代码位于 `web/` 子目录**（monorepo 预留：未来浏览器 / 服务端共用的 Python 检查引擎放根目录 `engine/`）
+- **前端 / 全栈**：Next.js + TypeScript + Tailwind CSS + shadcn/ui，**代码位于 `web/` 子目录**；校验用真实日志放 `tools/calibrate/logs/`（不入库，含 GPS 轨迹），校准脚本与冻结基线在 `tools/calibrate/`
 - **登录认证**：Auth.js（NextAuth）。**冲刺 2 仅支持 GitHub + 邮箱验证码 / Magic Link（零资质，个人开发者可直接上线）**；**微信扫码、手机号验证码待注册企业主体后再接入**（微信开放平台网站应用需企业资质 + 300 元认证，短信签名 / 模板需企业资质审核）
 - **数据存储（EdgeOne 内置两层）**：
   - **EdgeOne KV**：小尺寸键值、读多写少，存元数据与索引——用户、配额计数、评论、报告元数据。**冲刺 1 不用**（Skill 是 MDX 静态文件，报告存 localStorage）；**冲刺 2 起随登录配额启用**，配额计数用唯一键 + 前缀列举避免竞态；注意最终一致，写后不立即回读。
@@ -294,15 +294,16 @@
 | Web Worker 入口 | kebab-case + `-worker.ts` | `ulog-worker.ts` |
 | Worker 内嵌脚本 / helper | kebab-case + `-script.ts` | 现由 `build-knowledge.mjs` **生成**，不手改 |
 | Next.js 路由 | `page.tsx` / `route.ts` / `layout.tsx`（目录即路由） | `app/analyze/page.tsx`、`app/api/explain/route.ts` |
-| Python 模块 | snake_case + `.py` | `knowledge/px4/ulog_checks.py` |
+| Python 模块 | snake_case + `.py` | `engine/ulog_checks.py` |
 | 知识 / 经验文件 | 见 `knowledge/README.md`；阈值 `*.toml`、故障库 `*.yaml` | `px4-thresholds.toml`、`px4-fault-kb.yaml` |
 | 文档 | kebab-case + `.md` | `llm/gjb841-system-prompt.md` |
 
 > 注意：Worker 相关文件统一用连字符（`ulog-worker.ts`），不要用点号（❌ `ulog.worker.ts`）。
 >
-> **日志分析的人工经验（阈值 / 故障树 / 检查逻辑 / LLM 范式）单一事实源在仓库根
-> `knowledge/px4/`**，web 与未来 MCP Server 都只消费其派生产物（`web/workers/*`、
-> `web/lib/knowledge/*.generated.js`、`web/content/guide/knowledge-*.md`）。改经验只改
+> **日志分析的人工经验（阈值 / 故障树 / 检查逻辑 / LLM 范式 / 事实层绑定与码表）单一事实源在仓库根
+> `knowledge/px4/`**（= `rules/*.yaml` + `px4-fault-kb.yaml` + `facts.yaml` + `llm/*.md`；
+> 引擎机制在 `engine/`，同样不含业务数据），web 与未来 MCP Server 都只消费其派生产物（`web/workers/*`、
+> `web/lib/knowledge/*.generated.js`、`content/guide/knowledge-*.md`）。改经验只改
 > `knowledge/`，然后 `cd web && pnpm build:kb`（只比对不写入：`cd web && pnpm build:kb --check`）。
 >
 > 改 `knowledge/px4/` 下的规则、算子或引擎前，先读同目录的 **`knowledge/px4/CLAUDE.md`**：
@@ -343,7 +344,7 @@
 
 **冲刺 4 的三步顺序（不可颠倒）：**
 
-1. **采购腾讯云轻量服务器**（前置依赖——MCP 是长连接，边缘 Functions 承载不了）：迁关系型数据库（SQLite + sqlite-vec 或 PostgreSQL，支撑复杂统计 / 团队空间 / 向量检索）、部署独立 FastAPI + Redis 日志解析服务（大文件与批量 API 下沉），并为后续支付 / 订单等有状态服务提供常驻环境。
+1. **采购腾讯云轻量服务器**（前置依赖——MCP 是长连接，边缘 Functions 承载不了）：迁关系型数据库（SQLite + sqlite-vec 或 PostgreSQL，支撑复杂统计 / 团队空间 / 向量检索）、部署独立 FastAPI + Redis 日志解析服务（大文件与批量 API 下沉），并为后续支付 / 订单等有状态服务提供常驻环境。届时把 `engine/*.py` 包成可 `import` 的 `nextpilot_engine`（parsers / models / rules 三层，规则仍从 `knowledge/` 加载，不另存一份），供服务端与 MCP 复用；ArduPilot `.bin` 适配器也加在这一层。
 2. **平台 MCP Server 上线**（依赖第 1 步）：对外提供 `search_skills` / `get_skill` / `analyze_findings` / `explain_finding` / `submit_skill`；检索走数据库向量列，解析走已下沉的 FastAPI，鉴权复用 KV/DB 里的用户与配额。
 3. **企业侧**：私有部署、脱敏故障数据集对外输出。
 

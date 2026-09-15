@@ -3,11 +3,6 @@ import json, io, ast, re
 import numpy as np
 from pyulog import ULog
 
-PX4_DOC_LOG = "https://docs.px4.io/main/en/log/flight_log_analysis.html"
-PX4_DOC_VIBRATION = "https://docs.px4.io/main/en/assembly/vibration_isolation.html"
-PX4_DOC_EKF = "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"
-PX4_DOC_GPS = "https://docs.px4.io/main/en/gps_compass/"
-PX4_DOC_FAILSAFE = "https://docs.px4.io/main/en/config/safety.html"
 
 # 故障知识库（构建期内联，第三层检索用）
 FAULT_KB = __FAULT_KB__
@@ -15,33 +10,23 @@ FAULT_KB = __FAULT_KB__
 # ---------------- 经验规则（rules/*.yaml 编译而来）----------------
 RULES = json.loads(r'''__RULES__''')
 
-# 执行位置必须与原过程式检查一致（finding.id 按发射顺序生成）。同一 slot 内多条规则
-# 按 order 字段排序（缺省 100000，再按 id 兜底）。
-_SLOT_ORDER = [
-    "vibration", "ekf_innovations", "ekf_faults", "battery", "cpu",
-    "gps_health", "failsafe", "mode_thrash", "motor_balance", "imu_bias",
-    "attitude_tracking", "airspeed", "vtol_transition", "wind_estimate",
-    "logged_messages", "guards_early", "guards",
-]
+# ---------------- 事实层的数据绑定与码表（knowledge/px4/facts.yaml 编译而来）----------------
+# 引擎只提供机制：字段名、码值、执行顺序都在 YAML 里，改数据不用碰 Python。
+FACTS = __FACTS__
+_VS = FACTS["bindings"]["vehicle_status"]
+_NAV_GROUPS = [(g["phase"], set(int(c) for c in g["codes"])) for g in FACTS["nav_groups"]]
 
-
-def _rule_pos(rule):
-    slot = rule.get("slot")
-    idx = _SLOT_ORDER.index(slot) if slot in _SLOT_ORDER else len(_SLOT_ORDER)
-    return (idx, rule.get("order", 100000), rule.get("id", ""))
-
-
-RULES.sort(key=_rule_pos)
+# 同一 slot 内多条规则按 order 字段排序（缺省 100000，再按 id 兜底）。
+# **跨 slot 的顺序不在这里决定**：由 facts.yaml 的 slot_order 决定（见文件末尾的执行循环），
+# 而 finding 的 id（F01、F02…）按发射顺序生成，所以改 slot_order 会改报告里的编号。
+RULES.sort(key=lambda r: (r.get("order", 100000), r.get("id", "")))
 
 # 阈值不再集中存放：每条经验的判定阈值都写在它自己的 rules/*.yaml 里
 # （px4-thresholds.toml 已退场）。本文件只保留引擎级格式常量。
 
 # ULog 日志级别：PX4 在 log_level 里填 ASCII 数字，映射与 pyulog Message.log_level_str() 一致
 # （见 pyulog/core.py）。经验文件按 level_name 判定，避免再犯“拿 3/4 去比 51/52”的错。
-_LOG_LEVEL_NAMES = {
-    ord("0"): "EMERGENCY", ord("1"): "ALERT", ord("2"): "CRITICAL", ord("3"): "ERROR",
-    ord("4"): "WARNING", ord("5"): "NOTICE", ord("6"): "INFO", ord("7"): "DEBUG",
-}
+_LOG_LEVEL_NAMES = {int(k): v for k, v in FACTS["log_levels"].items()}
 
 findings = []
 checks_run = []
@@ -157,16 +142,16 @@ duration_s = round((t_max - t_min) / 1e6, 1) if t_min is not None else None
 stats = {"durationSec": duration_s if duration_s is not None else 0}
 
 # ---------------- 机型识别 ----------------
-VEHICLE_TYPES = {1: "rotary_wing", 2: "fixed_wing", 3: "rover", 4: "airship"}
+VEHICLE_TYPES = {int(k): v for k, v in FACTS["vehicle_types"].items()}
 vehicle_type = "unknown"
-vs_list = find_all(ulog, "vehicle_status")
+vs_list = find_all(ulog, _VS["topic"])
 vs = vs_list[0] if vs_list else None
 if vs is not None:
-    vt = getf(vs, "vehicle_type")
+    vt = getf(vs, _VS["vehicle_type"])
     if vt is not None and len(vt) > 0:
         vehicle_type = VEHICLE_TYPES.get(int(vt[-1]), "unknown(%d)" % int(vt[-1]))
     else:
-        rw = getf(vs, "is_rotary_wing")
+        rw = getf(vs, _VS["is_rotary_wing"])
         if rw is not None and len(rw) > 0:
             vehicle_type = "rotary_wing" if int(rw[-1]) else "fixed_wing"
 stats["vehicleType"] = vehicle_type
@@ -176,32 +161,25 @@ if FW["hw"]:
     stats["hardware"] = FW["hw"]
 
 # ---------------- 飞行阶段识别（第二层，用于故障库 phase 匹配）----------------
-# nav_state 枚举（Flight Review config_tables / PX4 commander）
-NAV_TAKEOFF = {17, 22}
-NAV_HOVERISH = {2, 4, 6, 14, 21}           # Position/Hold/PositionSlow/Offboard/Orbit（多为悬停/定点）
-NAV_MANEUVER = {0, 1, 10, 15}              # Manual/Altitude/Acro/Stabilized（视为机动）
-NAV_FW_CRUISE = {3, 8}                     # Mission / Altitude Cruise（固定翼巡航近似）
-NAV_LAND = {18, 20}
-NAV_VTOL_TRANSITION = None                 # 由 vtol_in_trans_mode 字段判断
-NAV_RTL_DESCEND = {5, 12, 13}
+# nav_state 码值 → 飞行阶段的分组写在 facts.yaml 的 nav_groups（_NAV_GROUPS 已按它构建）
 
 phases_present = set()
 armed_intervals = []      # (start_us, end_us)，end=None 表示持续到日志结束
 armed_duration_s = 0.0
 
 if vs is not None:
-    nav = getf(vs, "nav_state")
-    arm = getf(vs, "arming_state")
-    vts = np.asarray(getf(vs, "timestamp"), dtype=np.int64)
+    nav = getf(vs, _VS["nav_state"])
+    arm = getf(vs, _VS["arming_state"])
+    vts = np.asarray(getf(vs, _VS["timestamp"]), dtype=np.int64)
 
     # armed 区间（failsafe 失联只在 armed 区间内才报）
     if arm is not None:
         a = np.asarray(arm)
         start_i = None
         for i in range(len(a)):
-            if int(a[i]) == 2 and start_i is None:
+            if int(a[i]) == _VS["armed_value"] and start_i is None:
                 start_i = i
-            elif int(a[i]) != 2 and start_i is not None:
+            elif int(a[i]) != _VS["armed_value"] and start_i is not None:
                 armed_intervals.append((int(vts[start_i]), int(vts[i])))
                 start_i = None
         if start_i is not None:
@@ -211,7 +189,7 @@ if vs is not None:
             total_us += ((e if e is not None else int(vts[-1])) - s)
         armed_duration_s = round(total_us / 1e6, 1)
 
-    trans_mode = getf(vs, "vtol_in_trans_mode")
+    trans_mode = getf(vs, _VS["vtol_in_trans_mode"])
     if nav is not None:
         nav_arr = np.asarray(nav)
         # 只统计 armed 段内的状态；未解锁的地面操作不产生飞行阶段
@@ -222,11 +200,9 @@ if vs is not None:
                 hi = len(vts) if e is None else int(np.searchsorted(vts, e))
                 amask[lo:hi] = True
             codes = set(int(c) for c in nav_arr[amask])
-            if codes & NAV_TAKEOFF: phases_present.add("takeoff")
-            if codes & NAV_HOVERISH: phases_present.add("hover")
-            if codes & NAV_MANEUVER: phases_present.add("maneuver")
-            if codes & NAV_FW_CRUISE: phases_present.add("fw_cruise")
-            if codes & (NAV_LAND | NAV_RTL_DESCEND): phases_present.add("landing")
+            for _phase, _codes in _NAV_GROUPS:
+                if codes & _codes:
+                    phases_present.add(_phase)
 if vs is not None and trans_mode is not None:
     if int(np.max(np.asarray(trans_mode))) > 0:
         phases_present.add("vtol_transition")
@@ -654,55 +630,13 @@ def _run_rules(slot):
 
 
 # guards_early：必须在其它规则之前跑，保证 insufficient_data 是第一个 guard 标签
-_run_rules("guards_early")
-
-# ---------------- 规则 1：振动 / IMU 削波（vibration slot：三条经验，per_instance 取最差 IMU）----
-_run_rules("vibration")
-
-# ---------------- 规则 2：EKF 创新检验 + 硬故障位（ekf_innovations / ekf_faults 两个 slot）----
-_run_rules("ekf_innovations")
-_run_rules("ekf_faults")
-
-
-# ---------------- 规则 3：电源（battery slot：cell-voltage / sag / remaining 三条经验）----
-_run_rules("battery")
-
-# cpu slot（px4-cpu-load 已迁至 rules/；原过程式 CPU 段已删除）
-_run_rules("cpu")
-
-
-# ---------------- 规则 5：GPS 健康（gps_health slot：eph / sats / jump 三条经验）----
-_run_rules("gps_health")
-
-# ---------------- 规则 6：failsafe / 失联边沿（failsafe slot：5 个布尔字段 + 导航状态）----
-_run_rules("failsafe")
-
-# ---------------- 规则 7：模式抖动（mode_thrash slot）----------------
-_run_rules("mode_thrash")
-
-# ---------------- 规则 9：电机输出不平衡（motor_balance slot）----------------
-_run_rules("motor_balance")
-
-# ---------------- 规则 10：IMU 角速度零偏漂移（imu_bias slot）----------------
-_run_rules("imu_bias")
-
-# ---------------- 规则 11：姿态跟踪超调 / 振荡（attitude_tracking slot：两条经验）----
-_run_rules("attitude_tracking")
-
-# ---------------- 规则 12：空速健康（airspeed slot，仅固定翼巡航段）----------------
-_run_rules("airspeed")
-
-# ---------------- 规则 13：VTOL 转换姿态越限（vtol_transition slot）----------------
-_run_rules("vtol_transition")
-
-# ---------------- 规则 14：风扰估计（wind_estimate slot；guard 标签 wind_strong）----
-_run_rules("wind_estimate")
-
-# ---------------- 规则 8：日志消息聚合（logged_messages slot：ERROR / WARNING 两条经验）----
-_run_rules("logged_messages")
-
-# ---------------- 数据质量 guard（guards slot：三条经验，产出 guard 标签）----------------
-_run_rules("guards")
+# ---------------- 按 facts.yaml 的 slot_order 顺序执行各 slot ----------------
+# 顺序即 finding 编号（F01、F02…）的生成顺序，也决定 guard 标签的先后
+# （guards_early 排第一，insufficient_data 才会是第一个 guard 标签）。
+# 新增经验只需把 slot 写进 knowledge/px4/facts.yaml 的 slot_order（或复用已有 slot）
+# 并让经验里的 slot 对上——**不用改这个文件**；构建期会校验 slot 是否都已登记。
+for _slot in FACTS["slot_order"]:
+    _run_rules(_slot)
 
 # ---------------- 第三层：故障知识库确定性匹配 ----------------
 def match_fault_kb():

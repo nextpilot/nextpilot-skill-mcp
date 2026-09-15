@@ -2,7 +2,7 @@
   "log": "ce302d3b-06bc-43ab-9c2a-027d29fcefd3.ulg",
   "slug": "ce302d3b",
   "source": "logs.px4.io 公开日志：GET https://logs.px4.io/download?log=ce302d3b-06bc-43ab-9c2a-027d29fcefd3（或 python tools/px4/download_px4_logs.py）",
-  "engine": "knowledge/px4/ulog_checks.py + ulog_data.py",
+  "engine": "engine/rule_engine.py + engine/report_data.py",
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
     "platform": "PX4",

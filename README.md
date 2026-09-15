@@ -5,7 +5,7 @@
 本项目采用 [BSD-3-Clause](LICENSE) 许可证。
 
 > 当前进度：冲刺 2（见 CLAUDE.md 第 8 节）。Skill Hub + GitHub/邮箱登录 + EdgeOne KV 已上线；
-> PX4 `.ulg` 端侧解析已扩到 **15 个检查组 + 10 条故障知识库**，输出 GJB-841 中文报告；
+> PX4 `.ulg` 端侧解析已扩到 **32 条自包含检查经验（16 个执行位置 / 73 个算子）+ 10 条故障知识库**，输出 GJB-841 中文报告；
 > 阈值仍在用真实日志校准（误报率尚未达 <10% 目标）。
 
 ## 目录结构
@@ -15,24 +15,23 @@
 ├── CLAUDE.md        # 项目说明（定位、架构、路线图、决策依据）
 ├── LICENSE          # BSD-3-Clause 许可证
 ├── README.md
-├── docs/            # 架构、运维文档
-├── engine/          # 服务端 Python 引擎包（阶段二预留，当前无运行时代码）
-├── knowledge/       # ★ 日志分析的唯一知识源：阈值 TOML / 故障库 YAML / 检查 Python / LLM 提示词
-├── mcp-server/      # 平台 MCP Server（阶段二预留）
-├── tools/           # 手动运行的开发工具：规则校准、浏览器链路自检、截图、图标
-└── web/             # Next.js 前端 + Pages Functions（当前冲刺代码）
+├── content/         # ★ 站点内容源（MDX）：guide/ 使用指南、skills/ Skill 卡片、mcp/
+├── docs/            # 架构、运维手册（operations/ 是真实可用的部署运行手册）
+├── engine/          # ★ 确定性引擎源码：operators / rule_engine / report_data
+├── knowledge/       # ★ 日志分析的经验与字典：rules/*.yaml / 故障库 / LLM 提示词 / meta
+├── tools/           # 手动运行的工具：px4/ 上游同步与文档生成、calibrate/ 回归校准
+└── web/             # Next.js 站点 + Pages Functions（当前冲刺代码）
     ├── app/         # 页面与 /api/auth 路由
     ├── components/
-    ├── content/skills/   # Skill 卡片源文件（MDX）
     ├── functions/   # EdgeOne 边缘函数（KV、配额、DeepSeek 转发）
     ├── lib/
     ├── scripts/     # 构建期脚本（build-knowledge.mjs，由 pnpm dev/build 前置调用）
-    └── workers/     # Pyodide Worker 与**生成**的 Python 规则脚本（勿手改）
+    └── workers/     # Pyodide Worker（手写）+ **生成**的 Python 规则脚本（勿手改）
 ```
 
-`engine/` 与 `mcp-server/` 当前仅保留目录边界与说明，按路线图在阶段二实现。
-日志分析的规则、阈值与提示词**只维护在 `knowledge/`**，改完跑 `cd web && pnpm build:kb`
-重新生成运行时产物；详见 [knowledge/README.md](knowledge/README.md)。
+日志分析的规则、阈值与提示词**只维护在 `knowledge/`**，改完跑 `cd web && pnpm build:kb --check`
+比对（不带 `--check` 则生成运行时产物与指南页）；详见 [knowledge/README.md](knowledge/README.md)。
+`engine/` 是阶段二服务端引擎的预留位，当前无运行时代码，说明见 [engine/README.md](engine/README.md)。
 
 ## 快速开始
 
@@ -64,7 +63,7 @@ pnpm dev
 - **第二层 规则检查**：`web/workers/ulog-check-script.ts` 中的 Python 规则（振动/IMU 削波、EKF 创新检验、电芯电压），阈值待真实日志校准
 - **第三层 LLM 解释**：`web/app/api/explain/route.ts`，只接收 findings，system prompt 禁止编造数值
 
-新增 Skill：在 `web/content/skills/` 添加一个 `.mdx` 文件并补全 frontmatter（字段规范见 CLAUDE.md 3.1）。
+新增 Skill：在 `content/skills/` 添加一个 `.mdx` 文件并补全 frontmatter（字段规范见 CLAUDE.md 3.1）。
 
 ## 待验证（冲刺 1 风险项）
 

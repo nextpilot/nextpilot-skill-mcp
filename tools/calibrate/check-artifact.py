@@ -1,6 +1,6 @@
 """校验**生成产物**（web/workers/ulog-check-script.ts）能被当作合法 Python 执行。
 
-为什么需要它：本地回归跑的是 knowledge/ 下的源文件，而浏览器里跑的是构建产物
+为什么需要它：本地回归跑的是 engine/ 下的源文件，而浏览器里跑的是构建产物
 （operators.py + ulog_checks.py 经 String.raw 内联 + __FAULT_KB__/__RULES__
 三处替换）。只有这一步能证明"真正进 Pyodide 的东西"是合法的——否则语法错误只能在
 用户浏览器里炸出来。
@@ -18,6 +18,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TS = REPO_ROOT / "web" / "workers" / "ulog-check-script.ts"
 FAULT_KB = REPO_ROOT / "web" / "workers" / "fault-kb.generated.json"
+FACTS_YAML = REPO_ROOT / "knowledge" / "px4" / "facts.yaml"
 
 
 def extract_json_const(src: str, name: str):
@@ -48,6 +49,11 @@ def main() -> int:
     final = body
     final = final.replace("__FAULT_KB__", repr(json.loads(FAULT_KB.read_text(encoding="utf-8"))["entries"]))
     final = final.replace("__RULES__", json.dumps(extract_json_const(src, "rules"), ensure_ascii=False))
+    # facts 同样在 .replace 链里（数据源 knowledge/px4/facts.yaml，与构建期同一份）
+    import yaml as _yaml
+
+    facts = _yaml.safe_load(FACTS_YAML.read_text(encoding="utf-8"))
+    final = final.replace("__FACTS__", json.dumps(facts, ensure_ascii=False))
 
     try:
         ast.parse(final)
@@ -65,7 +71,7 @@ def main() -> int:
     m2 = re.search(r"String\.raw`(.*)`;", data_ts, re.S)
     if not m2:
         raise SystemExit("数据层产物里找不到 String.raw 模板")
-    logs = sorted((REPO_ROOT / "engine" / "tests" / "logs").glob("*.ulg"), key=lambda p: p.stat().st_size)
+    logs = sorted((Path(__file__).resolve().parent / "logs").glob("*.ulg"), key=lambda p: p.stat().st_size)
     if not logs:
         print("（没有回归日志，跳过执行检查）")
         return 0

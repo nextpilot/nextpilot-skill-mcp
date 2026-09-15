@@ -1,0 +1,62 @@
+# 事实层的数据绑定与码表 —— 引擎（engine/*.py）只提供机制，具体数据全在这里。
+# 改这个文件不用碰 Python：`cd web && pnpm build:kb` 之后，浏览器与本地回归同时生效。
+#
+# 谁读它：
+#   engine/rule_engine.py   机型识别 / 飞行阶段判定 / 日志级别名 / 规则执行顺序
+#   engine/report_data.py   报告页的飞行模式名 / 系统信息字段清单
+# 怎么进去：构建期 web/scripts/build-knowledge.mjs 内联成 __FACTS__（与 __RULES__ 同一机制）。
+#
+# 下面这些**键名**是引擎约定的（改了要同步改 engine/）；**值**（字段名、码值、顺序）随 PX4 上游变。
+
+# 规则执行顺序：引擎就按这个列表逐个 slot 执行，**顺序即报告里 finding 编号
+# （F01、F02…）的生成顺序**，也决定 guard 标签的先后。
+#   · 新增一条经验：把它的 slot 加进这里（或复用已有 slot），并让经验里的 slot 对上即可，
+#     不用改任何 Python；构建期会校验"经验的 slot 是否都已登记"。
+#   · guards_early 必须排第一（insufficient_data 要是第一个 guard 标签），guards 排最后。
+slot_order:
+  [guards_early,
+   vibration, ekf_innovations, ekf_faults, battery, cpu, gps_health, failsafe,
+   mode_thrash, motor_balance, imu_bias, attitude_tracking, airspeed,
+   vtol_transition, wind_estimate, logged_messages,
+   guards]
+
+# 事实从哪个 topic 的哪个字段取（固件改了字段名就改这里；要按固件分支时见规则里的 when_fw）
+bindings:
+  vehicle_status:
+    topic: vehicle_status
+    timestamp: timestamp
+    nav_state: nav_state
+    arming_state: arming_state
+    vehicle_type: vehicle_type
+    is_rotary_wing: is_rotary_wing
+    vtol_in_trans_mode: vtol_in_trans_mode
+    armed_value: 2            # arming_state 等于这个值即视为已解锁
+
+# ULog 日志级别：PX4 把 **ASCII 码**写进 log_level（'0'=48 … '7'=55），与 pyulog
+# Message.log_level_str() 一致。经验里按 level_name 判定，别拿 3/4 去比 51/52。
+log_levels: {48: EMERGENCY, 49: ALERT, 50: CRITICAL, 51: ERROR,
+             52: WARNING, 53: NOTICE, 54: INFO, 55: DEBUG}
+
+# 机型（vehicle_status.vehicle_type 的码值）
+vehicle_types: {1: rotary_wing, 2: fixed_wing, 3: rover, 4: airship}
+
+# 飞行模式的显示名（报告页用；码值同 PX4 commander，与 meta/<tag>.json 的 nav_state 枚举同源）
+nav_state_names:
+  {0: Manual, 1: Altitude, 2: Position, 3: Mission, 4: Hold, 5: Return, 6: Position Slow,
+   7: Free5, 8: Free4, 10: Acro, 11: Free3, 12: Descend, 13: Termination, 14: Offboard,
+   15: Stabilized, 16: Free2, 17: Takeoff, 18: Land, 19: Free1, 20: Follow, 21: Orbit,
+   22: VTOL Takeoff}
+
+# 飞行模式码 → 飞行阶段（故障库按 flight_phase 匹配时用；codes 是 nav_state 的取值）
+nav_groups:
+  - {phase: takeoff,   codes: [17, 22]}
+  - {phase: hover,     codes: [2, 4, 6, 14, 21]}
+  - {phase: maneuver,  codes: [0, 1, 10, 15]}
+  - {phase: fw_cruise, codes: [3, 8]}
+  - {phase: landing,   codes: [18, 20, 5, 12, 13]}
+
+# 报告页「系统信息」展示哪些字段（按显示顺序）
+sys_info_keys:
+  [sys_name, ver_sw, ver_sw_release, ver_vendor_sw_release, ver_hw, ver_hw_subtype,
+   sys_os_name, sys_os_ver, sys_toolchain, sys_toolchain_ver, sys_mcu, time_start_utc,
+   duration, git_branch]

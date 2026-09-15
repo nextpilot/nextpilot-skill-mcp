@@ -32,7 +32,7 @@
 - 浏览器端引擎：Pyodide `v0.27.7`（从 `https://cdn.jsdelivr.net/pyodide/v0.27.7/full/`
   动态加载）跑在 **module worker**（`web/workers/ulog-worker.ts`）里，解析在 worker 线程，
   主线程只接收结果并渲染（含 plotly 图表）。
-- 测试日志：`engine/tests/logs/ce302d3b-06bc-43ab-9c2a-027d29fcefd3.ulg`（约 9.5 MB 量级）
+- 测试日志：`tools/calibrate/logs/ce302d3b-06bc-43ab-9c2a-027d29fcefd3.ulg`（约 9.5 MB 量级）
 
 ## 3. 复现步骤
 
@@ -44,7 +44,7 @@ cd web && pnpm dev
 
 # 3) 跑 e2e（脚本会自己开一个干净标签页、清历史、上传、等结果、截图）
 node tools/check-upload.mjs \
-  engine/tests/logs/ce302d3b-06bc-43ab-9c2a-027d29fcefd3.ulg /tmp/shot.png
+  tools/calibrate/logs/ce302d3b-06bc-43ab-9c2a-027d29fcefd3.ulg /tmp/shot.png
 ```
 
 典型输出（在「已清空本机历史」之后再无任何进展，直到外部超时杀进程）：

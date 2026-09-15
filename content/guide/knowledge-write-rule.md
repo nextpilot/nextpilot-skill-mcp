@@ -15,15 +15,17 @@ order: 11
 > **本页是这份文档的唯一一份**：原先在 `knowledge/px4/guides/writing-rules.md`，现搬到指南的
 > 内容目录，不再由构建生成（同组的「当前有哪些规则」才是构建生成的）。
 > 单一事实源是 `knowledge/px4/rules/*.yaml`；标了 `<!-- BEGIN/END -->` 的两张表由
-> `python tools/px4/gen-rule-reference.py` 从 `operators.py` 与 `ulog_checks.py` 注入，
+> `python tools/px4/gen-rule-reference.py` 从 `engine/operators.py` 与 `engine/rule_engine.py` 注入，
 > 改完算子请重跑该脚本，标记之间不要手改，其余内容手维护。
 
 ## 0. 一条经验怎么跑起来
 
 ```
-rules/<经验>.yaml  ──┐
-operators.py       ──┤ 构建期校验（字段/算子/表达式/文案）      ── 产物内联进 Python
-ulog_checks.py     ──┘   ↓                                      ↓
+rules/<经验>.yaml     ──┐
+facts.yaml（数据绑定/   ──┤ 构建期校验（字段/算子/表达式/文案、
+  码表/slot 顺序）      ──┤   slot 是否登记、facts 键是否齐全）    ── 产物内联进 Python
+engine/operators.py    ──┤
+engine/rule_engine.py  ──┘   ↓                                      ↓
                      web/workers/ulog-check-script.ts  →  Pyodide（浏览器）执行：
                      事实层 → 按 slot 顺序跑经验 → 取字段/调算子/求值表达式 → 发射 finding
 ```
@@ -121,7 +123,8 @@ vibration → ekf_innovations → ekf_faults → battery → cpu → gps_health 
 ```
 
 `guards_early` 在最前（`insufficient_data` 必须是第一个 guard 标签），`guards` 在最后
-（重启 / 缺 topic / 丢包）。新增 slot 需要同时在 `ulog_checks.py` 的 `_SLOT_ORDER` 与调用处登记。
+（重启 / 缺 topic / 丢包）。**执行顺序写在 `facts.yaml` 的 `slot_order` 里**——新增一条经验时把它加进那个列表
+（或复用已有 slot）即可，不用改任何 Python；构建期会校验每条经验的 slot 是否都已登记。
 
 ## 4. compute：数据流节点
 
@@ -129,7 +132,7 @@ vibration → ekf_innovations → ekf_faults → battery → cpu → gps_health 
 
 | 节点键 | 说明 |
 | --- | --- |
-| `op` | 算子名（必须在 `operators.py` 注册，见 §4.3） |
+| `op` | 算子名（必须在 `engine/operators.py` 注册，见 §4.3） |
 | `in` | 输入列表。每项可以是 `topic.field`、前序输出名、或字面量（数字/数组，如 `in: [step, 50.0]`、`in: [nav_at, [2,4,6,14,21]]`） |
 | `from` | 单输入的短写法（等价 `in: [x]`） |
 | `out` | 输出名；多输出写列表 `out: [a, b, c]`，数量必须与算子签名一致 |

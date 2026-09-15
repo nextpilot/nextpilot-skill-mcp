@@ -27,7 +27,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RULES_DIR = REPO_ROOT / "knowledge" / "px4" / "rules"
 META_DIR = REPO_ROOT / "knowledge" / "px4" / "meta"
-LOG_DIR = REPO_ROOT / "engine" / "tests" / "logs"
+LOG_DIR = Path(__file__).resolve().parent / "logs"   # 校准用真实日志（不入库，需自备）
 BASELINE_DIR = Path(__file__).resolve().parent / "baseline"
 ARRAY_SUFFIX = re.compile(r"\[\d+\]$")
 MAIN_VERSION = (99, 0)          # main = 开发主干，当作最新

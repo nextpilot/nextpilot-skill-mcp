@@ -4,7 +4,7 @@ import matter from "gray-matter";
 import type { McpServerMeta } from "./types";
 import { parseChangelog } from "./changelog";
 
-const MCP_DIR = path.join(process.cwd(), "content", "mcp");
+const MCP_DIR = path.join(process.cwd(), "..", "content", "mcp");
 
 export interface McpServer extends McpServerMeta {
   /** MDX 正文：工具说明、输入输出示例、使用建议 */

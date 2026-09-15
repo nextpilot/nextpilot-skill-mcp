@@ -5,7 +5,7 @@
 执行的是同一份规则源码、同一份数值——改完 `knowledge/` 无需 Node 构建即可回归。
 
 - `run_checks_locally.py <file.ulg> ...`：输出完整 findings JSON（规则文档见
-  [web/content/guide/knowledge-rules.md](../../web/content/guide/knowledge-rules.md)）。
+  [content/guide/knowledge-rules.md](../../content/guide/knowledge-rules.md)）。
 - `run_checks_locally.py --probe-data <file.ulg> ...`：校验数据层三个 API
   （`np_manifest` / `np_log_info` / `np_series`）的结构、JSON 合法性（NaN→null）
   与降采样点数。
@@ -15,7 +15,7 @@
 
 ## 冻结基线与等价比对（规则重构时必用）
 
-- `dump-baseline.py`：把 `engine/tests/logs/*.ulg` 的**完整引擎输出**冻结到 `baseline/<slug>.json`。
+- `dump-baseline.py`：把 `tools/calibrate/logs/*.ulg` 的**完整引擎输出**冻结到 `baseline/<slug>.json`。
   这是"一条经验一个 YAML"重构前的唯一真相，重构规则时不得改动（除非单独提交并说明理由）。
 - `compare-baseline.py`：重新跑同一份日志，与冻结基线**逐字段深度比较**
   （findings 的 id/ruleId/severity/tag/title/evidence/docUrl/suggestion 与 stats/tags/guards/
@@ -24,4 +24,4 @@
 
 依赖：`pip install pyulog numpy`；Python **3.11+**（读 TOML 用标准库 `tomllib`）。
 
-`../engine/tests/logs/` 存放校准用真实日志（含 GPS 轨迹，勿提交大文件 / 涉密日志）。
+`logs/` 存放校准用真实日志（含 GPS 轨迹，勿提交大文件 / 涉密日志）。

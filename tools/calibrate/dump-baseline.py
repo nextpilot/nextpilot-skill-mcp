@@ -1,6 +1,6 @@
 """冻结规则引擎的基线输出（规则格式重构前必须先跑）。
 
-把 engine/tests/logs/ 下每个回归日志的**完整引擎输出**（findings 全字段、stats、tags、
+把 tools/calibrate/logs/ 下每个回归日志的**完整引擎输出**（findings 全字段、stats、tags、
 guardTags、phases、checksRun/checksSkipped、matchedFaults）冻结到 baseline/ 下，
 作为后续"一条经验一个 YAML"重构的等价比对真相。
 
@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import run_checks_locally as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-LOG_DIR = REPO_ROOT / "engine" / "tests" / "logs"
+LOG_DIR = Path(__file__).resolve().parent / "logs"   # 校准用真实日志（不入库，需自备）
 BASELINE_DIR = Path(__file__).resolve().parent / "baseline"
 
 
@@ -44,7 +44,7 @@ def source_of(path: Path) -> str:
     if len(first) == 8 and all(c in "0123456789abcdef" for c in first):
         return ("logs.px4.io 公开日志：GET https://logs.px4.io/download?log=%s"
                 "（或 python tools/px4/download_px4_logs.py）" % stem)
-    return "本仓库自带（engine/tests/logs/，未入库，需自备）"
+    return "本仓库自带（tools/calibrate/logs/，未入库，需自备）"
 
 
 def dump_one(path: Path) -> Path:
@@ -53,7 +53,7 @@ def dump_one(path: Path) -> Path:
         "log": path.name,
         "slug": slug(path),
         "source": source_of(path),
-        "engine": "knowledge/px4/ulog_checks.py + ulog_data.py",
+        "engine": "engine/rule_engine.py + engine/report_data.py",
         "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
         "result": result,
     }
@@ -70,7 +70,7 @@ def main(argv: list[str]) -> int:
     args = argv[1:]
     logs = [Path(a) for a in args] if args else sorted(LOG_DIR.glob("*.ulg"))
     if not logs:
-        print("没有可冻结的日志（engine/tests/logs/*.ulg）")
+        print("没有可冻结的日志（tools/calibrate/logs/*.ulg）")
         return 2
     print(f"冻结 {len(logs)} 个日志的引擎输出到 {BASELINE_DIR.relative_to(REPO_ROOT)}/")
     for p in logs:

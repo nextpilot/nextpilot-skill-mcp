@@ -2,7 +2,7 @@
   "log": "39f26cce-337a-4f83-a967-45352f6e1e82.ulg",
   "slug": "39f26cce",
   "source": "logs.px4.io 公开日志：GET https://logs.px4.io/download?log=39f26cce-337a-4f83-a967-45352f6e1e82（或 python tools/px4/download_px4_logs.py）",
-  "engine": "knowledge/px4/ulog_checks.py + ulog_data.py",
+  "engine": "engine/rule_engine.py + engine/report_data.py",
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
     "platform": "PX4",
