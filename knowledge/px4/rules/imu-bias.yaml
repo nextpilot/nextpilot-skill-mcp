@@ -22,6 +22,9 @@ airframe: any
 # 原实现外层是 `if armed_intervals:`，无 armed 段时留一条 skip 记录
 not_applicable: {when: "not has_armed", skip_reason: 无 armed 段，不做零偏判定}
 skip_reason_no_data: 无陀螺零偏数据（无 estimator_sensor_bias / estimator_status.states）
+# 1.15 之前零偏藏在 estimator_status.states[10..12]（该字段在新固件已不存在），
+# 属于已知遗留：lint-rules.py 据此不再把它列为可疑引用
+known_legacy: [estimator_status.states]
 
 compute:
   # 取源（新/旧固件自动选，附带 evidence 用的来源说明）；主数据缺失返回 None

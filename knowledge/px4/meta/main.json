@@ -84,6 +84,10 @@
   "actuator_controls_status": {
    "file": "ActuatorControlsStatus.msg",
    "fields": {
+    "control_power": {
+     "type": "float32",
+     "array": 3
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -93,6 +97,12 @@
   "actuator_motors": {
    "file": "ActuatorMotors.msg",
    "fields": {
+    "control": {
+     "type": "float32",
+     "array": 12,
+     "unit": "stop the motors",
+     "note": "[@range -1, 1] Normalized thrust. Where 1 means maximum positive thrust, -1 maximum negative (if not supported by the output, <0 maps to NaN). NaN maps to disarmed (stop the motors)"
+    },
     "reversible_flags": {
      "type": "uint16",
      "note": "[-] Bitset indicating which motors are configured to be reversible"
@@ -114,6 +124,11 @@
      "type": "uint32",
      "note": "valid outputs"
     },
+    "output": {
+     "type": "float32",
+     "array": 16,
+     "note": "output data, in natural output units"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -123,6 +138,11 @@
   "actuator_servos": {
    "file": "ActuatorServos.msg",
    "fields": {
+    "control": {
+     "type": "float32",
+     "array": 15,
+     "note": "[-] [@range -1, 1] Normalized output. 1 means maximum positive position. -1 maximum negative position (if not supported by the output, <0 maps to NaN). NaN maps to disarmed."
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -139,12 +159,22 @@
     "timestamp": {
      "type": "uint64",
      "unit": "us"
+    },
+    "trim": {
+     "type": "float32",
+     "array": 15,
+     "note": "range: [-1, 1]"
     }
    }
   },
   "actuator_servos_v0": {
    "file": "ActuatorServosV0.msg",
    "fields": {
+    "control": {
+     "type": "float32",
+     "array": 8,
+     "note": "[-] [@range -1, 1] Normalized output. 1 means maximum positive position. -1 maximum negative position (if not supported by the output, <0 maps to NaN). NaN maps to disarmed."
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -193,9 +223,19 @@
   "adc_report": {
    "file": "AdcReport.msg",
    "fields": {
+    "channel_id": {
+     "type": "int16",
+     "array": 16,
+     "note": "[-] ADC channel IDs, negative for non-existent, TODO: should be kept same as array index"
+    },
     "device_id": {
      "type": "uint32",
      "note": "[-] unique device ID for the sensor that does not change between power cycles"
+    },
+    "raw_data": {
+     "type": "int32",
+     "array": 16,
+     "note": "[-] ADC channel raw value, accept negative value, valid if channel ID is positive"
     },
     "resolution": {
      "type": "uint32",
@@ -409,6 +449,12 @@
      "type": "bool",
      "note": "True if the component can arm. For navigation mode components, true if the component can arm in the mode or switch to the mode when already armed"
     },
+    "events": {
+     "type": "Event",
+     "array": 5,
+     "unit": "Queue of events to report to GCS",
+     "note": "Arming failure reasons (Queue of events to report to GCS)"
+    },
     "health_component_error": {
      "type": "bool",
      "note": "Unused. Intended for use with health events interface (health_component_t in events.json)"
@@ -500,6 +546,10 @@
     "can_arm_and_run": {
      "type": "bool",
      "note": "whether arming is possible, and if it's a navigation mode, if it can run"
+    },
+    "events": {
+     "type": "EventV0",
+     "array": 5
     },
     "health_component_error": {
      "type": "bool"
@@ -602,6 +652,16 @@
      "type": "float32",
      "note": "[-] Proportional attitude gain"
     },
+    "coeff": {
+     "type": "float32",
+     "array": 5,
+     "note": "[-] Coefficients of the identified discrete-time model"
+    },
+    "coeff_var": {
+     "type": "float32",
+     "array": 5,
+     "note": "[-] Coefficients' variance of the identified discrete-time model"
+    },
     "dt_model": {
      "type": "float32",
      "note": "[s] Model sample time used for identification"
@@ -633,6 +693,11 @@
      "type": "float32",
      "unit": "ideal form",
      "note": "[-] Integral rate-loop gain (ideal form)"
+    },
+    "rate_sp": {
+     "type": "float32",
+     "array": 3,
+     "note": "[rad/s] Rate setpoint commanded to the attitude controller."
     },
     "state": {
      "type": "uint8",
@@ -735,6 +800,11 @@
     "id": {
      "type": "uint8",
      "note": "Must match the id in the battery_status message for the same battery"
+    },
+    "serial_number": {
+     "type": "char",
+     "array": 32,
+     "note": "[@invalid 0 All bytes] Serial number of the battery pack in ASCII characters, 0 terminated"
     },
     "timestamp": {
      "type": "uint64",
@@ -888,6 +958,11 @@
     "volt_based_soc_estimate": {
      "type": "float32",
      "note": "[-] [@range 0, 1] Normalized volt based state of charge estimate"
+    },
+    "voltage_cell_v": {
+     "type": "float32",
+     "array": 14,
+     "note": "[V] [@invalid 0] Battery individual cell voltages"
     },
     "voltage_prediction": {
      "type": "float32",
@@ -1064,6 +1139,11 @@
      "type": "float32",
      "note": "[@range 0, 1] Normalized volt based state of charge estimate"
     },
+    "voltage_cell_v": {
+     "type": "float32",
+     "array": 14,
+     "note": "[V] [@invalid 0] Battery individual cell voltages"
+    },
     "voltage_prediction": {
      "type": "float32",
      "note": "[V] Predicted voltage"
@@ -1121,6 +1201,11 @@
      "type": "float64",
      "unit": "WGS84",
      "note": "Longitude in degrees (WGS84)"
+    },
+    "q": {
+     "type": "float32",
+     "array": 4,
+     "note": "Attitude of the camera relative to NED earth-fixed frame when using a gimbal, otherwise vehicle attitude"
     },
     "report": {
      "type": "bool",
@@ -1214,6 +1299,11 @@
      "type": "uint8",
      "note": "[-] [@invalid 0] LTE frequency band number"
     },
+    "cell_tower_id": {
+     "type": "char",
+     "array": 9,
+     "note": "[@invalid 0] ID of the currently connected cell tower. Must be NULL terminated if the length is less than 9 human-readable characters, and without NULL termination character if the length is exactly 9 characters"
+    },
     "channel_number": {
      "type": "uint32",
      "note": "[@invalid 0] Channel Number (CN), Absolute radio-frequency (ARFCN) / E-UTRA (EARFCN) / UTRA (UARFCN) / New radio (NR_CH)"
@@ -1306,6 +1396,16 @@
   "collision_constraints": {
    "file": "CollisionConstraints.msg",
    "fields": {
+    "adapted_setpoint": {
+     "type": "float32",
+     "array": 2,
+     "note": "velocities allowed"
+    },
+    "original_setpoint": {
+     "type": "float32",
+     "array": 2,
+     "note": "velocities demanded"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -1393,6 +1493,19 @@
      "type": "bool",
      "note": "True while an actuator group preflight check (VEHICLE_CMD_ACTUATOR_GROUP_TEST) is overriding the torque/thrust setpoint or collective-tilt"
     },
+    "actuator_saturation": {
+     "type": "int8",
+     "array": 16,
+     "note": "Indicates actuator saturation status.",
+     "values": {
+      "-2": "LOWER",
+      "-1": "DYN",
+      "0": "OK",
+      "1": "DYN",
+      "2": "UPPER"
+     },
+     "kind": "enum"
+    },
     "handled_motor_failure_mask": {
      "type": "uint16",
      "note": "Bitmask of failed motors that were removed from the allocation / effectiveness matrix. Not necessarily identical to the report from FailureDetector",
@@ -1413,6 +1526,16 @@
     "torque_setpoint_achieved": {
      "type": "bool",
      "note": "Boolean indicating whether the 3D torque setpoint was correctly allocated to actuators. 0 if not achieved, 1 if achieved."
+    },
+    "unallocated_thrust": {
+     "type": "float32",
+     "array": 3,
+     "note": "Unallocated thrust. Equal to 0 if the setpoint was achieved."
+    },
+    "unallocated_torque": {
+     "type": "float32",
+     "array": 3,
+     "note": "Unallocated torque. Equal to 0 if the setpoint was achieved."
     }
    }
   },
@@ -1439,6 +1562,10 @@
     "client_id": {
      "type": "uint8"
     },
+    "data": {
+     "type": "uint8",
+     "array": 56
+    },
     "data_length": {
      "type": "uint32"
     },
@@ -1464,6 +1591,10 @@
    "fields": {
     "client_id": {
      "type": "uint8"
+    },
+    "data": {
+     "type": "uint8",
+     "array": 56
     },
     "index": {
      "type": "uint32"
@@ -1497,9 +1628,20 @@
   "debug_array": {
    "file": "DebugArray.msg",
    "fields": {
+    "data": {
+     "type": "float32",
+     "array": 58,
+     "note": "data"
+    },
     "id": {
      "type": "uint16",
      "note": "unique ID of debug array, used to discriminate between arrays"
+    },
+    "name": {
+     "type": "char",
+     "array": 10,
+     "unit": "max. 10 characters",
+     "note": "name of the debug array (max. 10 characters)"
     },
     "timestamp": {
      "type": "uint64",
@@ -1510,6 +1652,11 @@
   "debug_key_value": {
    "file": "DebugKeyValue.msg",
    "fields": {
+    "key": {
+     "type": "char",
+     "array": 10,
+     "note": "max. 10 characters as key / name"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -1540,6 +1687,11 @@
   "debug_vect": {
    "file": "DebugVect.msg",
    "fields": {
+    "name": {
+     "type": "char",
+     "array": 10,
+     "note": "max. 10 characters as key / name"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -1671,6 +1823,26 @@
      },
      "kind": "enum"
     },
+    "firmware_version": {
+     "type": "char",
+     "array": 24,
+     "note": "[-] [@invalid empty if not available] Firmware version."
+    },
+    "hardware_version": {
+     "type": "char",
+     "array": 24,
+     "note": "[-] [@invalid empty if not available] Hardware version."
+    },
+    "name": {
+     "type": "char",
+     "array": 80,
+     "note": "Name of device e.g. DroneCAN node name"
+    },
+    "serial_number": {
+     "type": "char",
+     "array": 33,
+     "note": "[-] [@invalid empty if not available] Device serial number or unique identifier."
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -1751,6 +1923,11 @@
     "orientation": {
      "type": "uint8",
      "note": "Direction the sensor faces from MAV_SENSOR_ORIENTATION enum"
+    },
+    "q": {
+     "type": "float32",
+     "array": 4,
+     "note": "Quaterion sensor orientation with respect to the vehicle body frame to specify the orientation ROTATION_CUSTOM"
     },
     "signal_quality": {
      "type": "int8",
@@ -1865,6 +2042,11 @@
   "esc_eeprom_read": {
    "file": "EscEepromRead.msg",
    "fields": {
+    "data": {
+     "type": "uint8",
+     "array": 48,
+     "note": "[-] Raw ESC EEPROM data"
+    },
     "firmware": {
      "type": "uint8",
      "note": "[-] ESC firmware type (see ESC_FIRMWARE enum in MAVLink)"
@@ -1886,6 +2068,11 @@
   "esc_eeprom_write": {
    "file": "EscEepromWrite.msg",
    "fields": {
+    "data": {
+     "type": "uint8",
+     "array": 48,
+     "note": "[-] Raw ESC EEPROM data"
+    },
     "firmware": {
      "type": "uint8",
      "note": "[-] ESC firmware type (see ESC_FIRMWARE enum in MAVLink)"
@@ -1901,6 +2088,13 @@
     "timestamp": {
      "type": "uint64",
      "unit": "us"
+    },
+    "write_mask": {
+     "type": "uint32",
+     "array": 2,
+     "unit": "max 48 values",
+     "note": "[-] Bitmask indicating which bytes in the data array should be written (max 48 values)",
+     "kind": "bitmask"
     }
    }
   },
@@ -1967,6 +2161,19 @@
     "counter": {
      "type": "uint16",
      "note": "[-] Incremented by the writing thread everytime new data is stored"
+    },
+    "esc": {
+     "type": "EscReport",
+     "array": 12,
+     "values": {
+      "0": "PPM",
+      "1": "SERIAL",
+      "2": "ONESHOT",
+      "3": "I2C",
+      "4": "CAN",
+      "5": "DSHOT"
+     },
+     "kind": "enum"
     },
     "esc_armed_flags": {
      "type": "uint16",
@@ -2060,9 +2267,39 @@
      "type": "bool",
      "note": "true if the sample was successfully fused"
     },
+    "innovation": {
+     "type": "float32",
+     "array": 2
+    },
+    "innovation_filtered": {
+     "type": "float32",
+     "array": 2
+    },
     "innovation_rejected": {
      "type": "bool",
      "note": "true if the observation has been rejected"
+    },
+    "innovation_variance": {
+     "type": "float32",
+     "array": 2
+    },
+    "observation": {
+     "type": "float64",
+     "array": 2
+    },
+    "observation_variance": {
+     "type": "float32",
+     "array": 2
+    },
+    "test_ratio": {
+     "type": "float32",
+     "array": 2,
+     "note": "normalized innovation squared"
+    },
+    "test_ratio_filtered": {
+     "type": "float32",
+     "array": 2,
+     "note": "signed filtered test ratio"
     },
     "time_last_fuse": {
      "type": "uint64"
@@ -2090,9 +2327,39 @@
      "type": "bool",
      "note": "true if the sample was successfully fused"
     },
+    "innovation": {
+     "type": "float32",
+     "array": 3
+    },
+    "innovation_filtered": {
+     "type": "float32",
+     "array": 3
+    },
     "innovation_rejected": {
      "type": "bool",
      "note": "true if the observation has been rejected"
+    },
+    "innovation_variance": {
+     "type": "float32",
+     "array": 3
+    },
+    "observation": {
+     "type": "float32",
+     "array": 3
+    },
+    "observation_variance": {
+     "type": "float32",
+     "array": 3
+    },
+    "test_ratio": {
+     "type": "float32",
+     "array": 3,
+     "note": "normalized innovation squared"
+    },
+    "test_ratio_filtered": {
+     "type": "float32",
+     "array": 3,
+     "note": "signed filtered test ratio"
     },
     "time_last_fuse": {
      "type": "uint64"
@@ -2151,9 +2418,38 @@
   "estimator_bias3d": {
    "file": "EstimatorBias3d.msg",
    "fields": {
+    "bias": {
+     "type": "float32",
+     "array": 3,
+     "unit": "m",
+     "note": "estimated barometric altitude bias (m)"
+    },
+    "bias_var": {
+     "type": "float32",
+     "array": 3,
+     "unit": "m^2",
+     "note": "estimated barometric altitude bias variance (m^2)"
+    },
     "device_id": {
      "type": "uint32",
      "note": "unique device ID for the sensor that does not change between power cycles"
+    },
+    "innov": {
+     "type": "float32",
+     "array": 3,
+     "unit": "m",
+     "note": "innovation of the last measurement fusion (m)"
+    },
+    "innov_test_ratio": {
+     "type": "float32",
+     "array": 3,
+     "note": "normalized innovation squared test ratio"
+    },
+    "innov_var": {
+     "type": "float32",
+     "array": 3,
+     "unit": "m^2",
+     "note": "innovation variance of the last measurement fusion (m^2)"
     },
     "timestamp": {
      "type": "uint64",
@@ -2253,6 +2549,14 @@
   "estimator_fusion_control": {
    "file": "EstimatorFusionControl.msg",
    "fields": {
+    "agp_active": {
+     "type": "bool",
+     "array": 4
+    },
+    "agp_intended": {
+     "type": "bool",
+     "array": 4
+    },
     "aspd_active": {
      "type": "bool"
     },
@@ -2270,6 +2574,14 @@
     },
     "ev_intended": {
      "type": "bool"
+    },
+    "gps_active": {
+     "type": "bool",
+     "array": 2
+    },
+    "gps_intended": {
+     "type": "bool",
+     "array": 2
     },
     "mag_active": {
      "type": "bool"
@@ -2384,6 +2696,11 @@
      "type": "float32",
      "note": "airspeed innovation (m/sec) and innovation variance ((m/sec)**2)"
     },
+    "aux_hvel": {
+     "type": "float32",
+     "array": 2,
+     "note": "horizontal auxiliary velocity innovation from landing target measurement (m/sec) and innovation variance ((m/sec)**2)"
+    },
     "baro_vpos": {
      "type": "float32",
      "note": "barometer height innovation (m) and innovation variance (m**2)"
@@ -2391,6 +2708,21 @@
     "beta": {
      "type": "float32",
      "note": "synthetic sideslip innovation (rad) and innovation variance (rad**2)"
+    },
+    "drag": {
+     "type": "float32",
+     "array": 2,
+     "note": "drag specific force innovation (m/sec**2) and innovation variance ((m/sec)**2)"
+    },
+    "ev_hpos": {
+     "type": "float32",
+     "array": 2,
+     "note": "horizontal external vision position innovation (m) and innovation variance (m**2)"
+    },
+    "ev_hvel": {
+     "type": "float32",
+     "array": 2,
+     "note": "horizontal external vision velocity innovation (m/sec) and innovation variance ((m/sec)**2)"
     },
     "ev_vpos": {
      "type": "float32",
@@ -2400,6 +2732,21 @@
      "type": "float32",
      "note": "vertical external vision velocity innovation (m/sec) and innovation variance ((m/sec)**2)"
     },
+    "flow": {
+     "type": "float32",
+     "array": 2,
+     "note": "flow innvoation (rad/sec) and innovation variance ((rad/sec)**2)"
+    },
+    "gps_hpos": {
+     "type": "float32",
+     "array": 2,
+     "note": "horizontal GPS position innovation (m) and innovation variance (m**2)"
+    },
+    "gps_hvel": {
+     "type": "float32",
+     "array": 2,
+     "note": "horizontal GPS velocity innovation (m/sec) and innovation variance ((m/sec)**2)"
+    },
     "gps_vpos": {
      "type": "float32",
      "note": "vertical GPS position innovation (m) and innovation variance (m**2)"
@@ -2407,6 +2754,11 @@
     "gps_vvel": {
      "type": "float32",
      "note": "vertical GPS velocity innovation (m/sec) and innovation variance ((m/sec)**2)"
+    },
+    "gravity": {
+     "type": "float32",
+     "array": 3,
+     "note": "gravity innovation from accelerometerr vector (m/s**2)"
     },
     "hagl": {
      "type": "float32",
@@ -2419,6 +2771,11 @@
     "heading": {
      "type": "float32",
      "note": "heading innovation (rad) and innovation variance (rad**2)"
+    },
+    "mag_field": {
+     "type": "float32",
+     "array": 3,
+     "note": "earth magnetic field innovation (Gauss) and innovation variance (Gauss**2)"
     },
     "rng_vpos": {
      "type": "float32",
@@ -2443,14 +2800,30 @@
     "accel_fault_detected": {
      "type": "bool"
     },
+    "accumulated_accel_error": {
+     "type": "float32",
+     "array": 4
+    },
+    "accumulated_gyro_error": {
+     "type": "float32",
+     "array": 4
+    },
     "baro_device_id": {
      "type": "uint32"
+    },
+    "combined_test_ratio": {
+     "type": "float32",
+     "array": 9
     },
     "gyro_device_id": {
      "type": "uint32"
     },
     "gyro_fault_detected": {
      "type": "bool"
+    },
+    "healthy": {
+     "type": "bool",
+     "array": 9
     },
     "instance_changed_count": {
      "type": "uint32"
@@ -2467,6 +2840,10 @@
     "primary_instance": {
      "type": "uint8"
     },
+    "relative_test_ratio": {
+     "type": "float32",
+     "array": 9
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -2476,6 +2853,12 @@
   "estimator_sensor_bias": {
    "file": "EstimatorSensorBias.msg",
    "fields": {
+    "accel_bias": {
+     "type": "float32",
+     "array": 3,
+     "unit": "m/s^2",
+     "note": "accelerometer in-run bias in body frame (m/s^2)"
+    },
     "accel_bias_limit": {
      "type": "float32",
      "unit": "m/s^2",
@@ -2488,9 +2871,19 @@
     "accel_bias_valid": {
      "type": "bool"
     },
+    "accel_bias_variance": {
+     "type": "float32",
+     "array": 3
+    },
     "accel_device_id": {
      "type": "uint32",
      "note": "unique device ID for the sensor that does not change between power cycles"
+    },
+    "gyro_bias": {
+     "type": "float32",
+     "array": 3,
+     "unit": "rad/s",
+     "note": "gyroscope in-run bias in body frame (rad/s)"
     },
     "gyro_bias_limit": {
      "type": "float32",
@@ -2504,9 +2897,19 @@
     "gyro_bias_valid": {
      "type": "bool"
     },
+    "gyro_bias_variance": {
+     "type": "float32",
+     "array": 3
+    },
     "gyro_device_id": {
      "type": "uint32",
      "note": "unique device ID for the sensor that does not change between power cycles"
+    },
+    "mag_bias": {
+     "type": "float32",
+     "array": 3,
+     "unit": "Gauss",
+     "note": "magnetometer in-run bias in body frame (Gauss)"
     },
     "mag_bias_limit": {
      "type": "float32",
@@ -2519,6 +2922,10 @@
     },
     "mag_bias_valid": {
      "type": "bool"
+    },
+    "mag_bias_variance": {
+     "type": "float32",
+     "array": 3
     },
     "mag_device_id": {
      "type": "uint32",
@@ -2537,9 +2944,19 @@
   "estimator_states": {
    "file": "EstimatorStates.msg",
    "fields": {
+    "covariances": {
+     "type": "float32",
+     "array": 24,
+     "note": "Diagonal Elements of Covariance Matrix"
+    },
     "n_states": {
      "type": "uint8",
      "note": "Number of states effectively used"
+    },
+    "states": {
+     "type": "float32",
+     "array": 25,
+     "note": "Internal filter states"
     },
     "timestamp": {
      "type": "uint64",
@@ -2627,6 +3044,12 @@
     },
     "mag_strength_ref_gs": {
      "type": "float32"
+    },
+    "output_tracking_error": {
+     "type": "float32",
+     "array": 3,
+     "unit": "m",
+     "note": "return a vector containing the output predictor angular, velocity and position tracking error magnitudes (rad), (m/s), (m)"
     },
     "pos_horiz_accuracy": {
      "type": "float32",
@@ -2986,6 +3409,11 @@
   "event": {
    "file": "Event.msg",
    "fields": {
+    "arguments": {
+     "type": "uint8",
+     "array": 25,
+     "note": "(optional) arguments, depend on event id"
+    },
     "event_sequence": {
      "type": "uint16",
      "note": "Event sequence number"
@@ -3007,6 +3435,11 @@
   "event_v0": {
    "file": "EventV0.msg",
    "fields": {
+    "arguments": {
+     "type": "uint8",
+     "array": 25,
+     "note": "(optional) arguments, depend on event id"
+    },
     "event_sequence": {
      "type": "uint16",
      "note": "Event sequence number"
@@ -3265,15 +3698,57 @@
      "type": "uint8",
      "note": "number of valid entries in the arrays below"
     },
+    "failure_type": {
+     "type": "uint8",
+     "array": 4,
+     "note": "[@enum FAILURE_TYPE] failure mode per entry",
+     "values": {
+      "0": "OK",
+      "1": "OFF",
+      "2": "STUCK",
+      "3": "GARBAGE",
+      "4": "WRONG",
+      "5": "SLOW",
+      "6": "DELAYED",
+      "7": "INTERMITTENT",
+      "8": "DRIFT"
+     },
+     "kind": "enum"
+    },
+    "instance_mask": {
+     "type": "uint16",
+     "array": 4,
+     "note": "Bit i targets instance (i+1); 0xFFFF = all instances"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
+    },
+    "unit": {
+     "type": "uint8",
+     "array": 4,
+     "note": "[@enum FAILURE_UNIT] Affected component per entry"
     }
    }
   },
   "fiducial_marker_pos_report": {
    "file": "FiducialMarkerPosReport.msg",
    "fields": {
+    "cov_rel_pos": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m^2] Target position variance, expressed in the frame defined by q"
+    },
+    "q": {
+     "type": "float32",
+     "array": 4,
+     "note": "[-] Quaternion rotation from the rel_pos frame to the NED earth frame"
+    },
+    "rel_pos": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m] Target position relative to vehicle, expressed in the frame defined by q"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -3554,6 +4029,12 @@
   "follow_target_estimator": {
    "file": "FollowTargetEstimator.msg",
    "fields": {
+    "acc_est": {
+     "type": "float32",
+     "array": 3,
+     "unit": "m^2/s",
+     "note": "Estimated target NED acceleration (m^2/s)"
+    },
     "alt_est": {
      "type": "float32",
      "note": "Estimated target altitude"
@@ -3574,6 +4055,12 @@
      "type": "float64",
      "note": "Estimated target longitude"
     },
+    "pos_est": {
+     "type": "float32",
+     "array": 3,
+     "unit": "m",
+     "note": "Estimated target NED position (m)"
+    },
     "prediction_count": {
      "type": "uint64"
     },
@@ -3588,6 +4075,12 @@
     "valid": {
      "type": "bool",
      "note": "True if estimator states are okay to be used"
+    },
+    "vel_est": {
+     "type": "float32",
+     "array": 3,
+     "unit": "m/s",
+     "note": "Estimated target NED velocity (m/s)"
     }
    }
   },
@@ -3597,6 +4090,11 @@
     "angular_rate_setpoint": {
      "type": "float32",
      "note": "[rad/s] Angular rate commanded from Jerk-limited Orbit Angle trajectory for Orbit Angle"
+    },
+    "desired_position_raw": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m] Raw 'idealistic' desired drone position if a drone could teleport from place to places"
     },
     "follow_angle": {
      "type": "float32",
@@ -3670,6 +4168,21 @@
   "gain_compression": {
    "file": "GainCompression.msg",
    "fields": {
+    "compression_gains": {
+     "type": "float32",
+     "array": 3,
+     "note": "[-] [@frame FRD] [@range 0, 1] Multiplicative gain to modify the output of the controller per axis"
+    },
+    "spectral_damper_hpf": {
+     "type": "float32",
+     "array": 3,
+     "note": "[-] [@frame FRD] Squared output of spectral damper high-pass filter"
+    },
+    "spectral_damper_out": {
+     "type": "float32",
+     "array": 3,
+     "note": "[-] [@frame FRD] Spectral damper output squared"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -3774,6 +4287,11 @@
   "gimbal_controls": {
    "file": "GimbalControls.msg",
    "fields": {
+    "control": {
+     "type": "float32",
+     "array": 3,
+     "note": "Normalized output. 1 means maximum positive position. -1 maximum negative position. 0 means no deflection. NaN maps to disarmed."
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -3821,6 +4339,10 @@
     "gimbal_device_id": {
      "type": "uint8"
     },
+    "q": {
+     "type": "float32",
+     "array": 4
+    },
     "received_from_mavlink": {
      "type": "bool"
     },
@@ -3845,6 +4367,10 @@
     "custom_cap_flags": {
      "type": "uint16"
     },
+    "custom_name": {
+     "type": "uint8",
+     "array": 32
+    },
     "firmware_version": {
      "type": "uint32"
     },
@@ -3853,6 +4379,10 @@
     },
     "hardware_version": {
      "type": "uint32"
+    },
+    "model_name": {
+     "type": "uint8",
+     "array": 32
     },
     "pitch_max": {
      "type": "float32",
@@ -3876,6 +4406,10 @@
     },
     "uid": {
      "type": "uint64"
+    },
+    "vendor_name": {
+     "type": "uint8",
+     "array": 32
     },
     "yaw_max": {
      "type": "float32",
@@ -3901,6 +4435,10 @@
     },
     "flags": {
      "type": "uint16"
+    },
+    "q": {
+     "type": "float32",
+     "array": 4
     },
     "target_component": {
      "type": "uint8"
@@ -3976,6 +4514,10 @@
     },
     "origin_sysid": {
      "type": "uint8"
+    },
+    "q": {
+     "type": "float32",
+     "array": 4
     },
     "target_component": {
      "type": "uint8"
@@ -4095,6 +4637,11 @@
      "type": "float32",
      "note": "[m/s] (optional) Maximum speed (absolute) in the D-axis"
     },
+    "position": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m] [@frame NED] NED local world frame"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -4179,6 +4726,11 @@
   "gps_dump": {
    "file": "GpsDump.msg",
    "fields": {
+    "data": {
+     "type": "uint8",
+     "array": 79,
+     "note": "data to write to the log"
+    },
     "device_id": {
      "type": "uint32"
     },
@@ -4611,6 +5163,11 @@
     "timestamp_last_signal": {
      "type": "uint64",
      "note": "last valid reception time"
+    },
+    "values": {
+     "type": "uint16",
+     "array": 18,
+     "note": "measured pulse widths for each of the supported channels"
     }
    }
   },
@@ -5091,6 +5648,10 @@
      "type": "uint8",
      "note": "log level (same as in the linux kernel, starting with 0)"
     },
+    "text": {
+     "type": "char",
+     "array": 127
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -5196,6 +5757,10 @@
   "mag_worker_data": {
    "file": "MagWorkerData.msg",
    "fields": {
+    "calibration_counter_total": {
+     "type": "uint32",
+     "array": 4
+    },
     "calibration_interval_perside_us": {
      "type": "uint64"
     },
@@ -5205,6 +5770,10 @@
     "done_count": {
      "type": "uint32"
     },
+    "side_data_collected": {
+     "type": "bool",
+     "array": 4
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -5212,15 +5781,51 @@
     "timestamp_sample": {
      "type": "uint64",
      "unit": "us"
+    },
+    "x": {
+     "type": "float32",
+     "array": 4
+    },
+    "y": {
+     "type": "float32",
+     "array": 4
+    },
+    "z": {
+     "type": "float32",
+     "array": 4
     }
    }
   },
   "magnetometer_bias_estimate": {
    "file": "MagnetometerBiasEstimate.msg",
    "fields": {
+    "bias_x": {
+     "type": "float32",
+     "array": 4,
+     "note": "estimated X-bias of all the sensors"
+    },
+    "bias_y": {
+     "type": "float32",
+     "array": 4,
+     "note": "estimated Y-bias of all the sensors"
+    },
+    "bias_z": {
+     "type": "float32",
+     "array": 4,
+     "note": "estimated Z-bias of all the sensors"
+    },
+    "stable": {
+     "type": "bool",
+     "array": 4
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
+    },
+    "valid": {
+     "type": "bool",
+     "array": 4,
+     "note": "true if the estimator has converged"
     }
    }
   },
@@ -5449,6 +6054,10 @@
      "type": "uint8",
      "note": "log level (same as in the linux kernel, starting with 0)"
     },
+    "text": {
+     "type": "char",
+     "array": 127
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -5458,6 +6067,11 @@
   "mavlink_tunnel": {
    "file": "MavlinkTunnel.msg",
    "fields": {
+    "payload": {
+     "type": "uint8",
+     "array": 128,
+     "note": "Data itself"
+    },
     "payload_length": {
      "type": "uint8",
      "note": "Length of the data transported in payload"
@@ -5490,6 +6104,11 @@
     "timestamp": {
      "type": "uint64",
      "unit": "us"
+    },
+    "topic_name": {
+     "type": "char",
+     "array": 50,
+     "note": "E.g. /fmu/in/vehicle_command"
     }
    }
   },
@@ -5510,6 +6129,11 @@
     "timestamp": {
      "type": "uint64",
      "unit": "us"
+    },
+    "topic_name": {
+     "type": "char",
+     "array": 50,
+     "note": "E.g. /fmu/in/vehicle_command"
     }
    }
   },
@@ -5655,6 +6279,11 @@
   "mount_orientation": {
    "file": "MountOrientation.msg",
    "fields": {
+    "attitude_euler_angle": {
+     "type": "float32",
+     "array": 3,
+     "note": "Attitude/direction of the mount as euler angles in rad"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -5767,6 +6396,16 @@
      "type": "int32",
      "note": "[us] Time spent for NN inference"
     },
+    "network_output": {
+     "type": "float32",
+     "array": 4,
+     "note": "Output from neural network"
+    },
+    "observation": {
+     "type": "float32",
+     "array": 15,
+     "note": "Observation vector (pos error (3), att (6d), lin vel (3), ang vel (3))"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -5801,6 +6440,11 @@
     "angle_offset": {
      "type": "float32",
      "note": "Relative angle offset of the 0-index element in the distances array. Value of 0 corresponds to forward. Positive is clockwise direction, negative is counter-clockwise."
+    },
+    "distances": {
+     "type": "uint16",
+     "array": 72,
+     "note": "Distance of obstacles around the UAV with index 0 corresponding to local North. A value of 0 means that the obstacle is right in front of the sensor. A value of max_distance +1 means no obstacle is present. A value of UINT16_MAX for unknown/not used. In a array element, one unit corresponds to 1cm."
     },
     "frame": {
      "type": "uint8",
@@ -5861,6 +6505,56 @@
   "onboard_computer_status": {
    "file": "OnboardComputerStatus.msg",
    "fields": {
+    "cpu_combined": {
+     "type": "uint8",
+     "array": 10,
+     "note": "Combined CPU usage as the last 10 slices of 100 MS"
+    },
+    "cpu_cores": {
+     "type": "uint8",
+     "array": 8,
+     "note": "CPU usage on the component in percent"
+    },
+    "fan_speed": {
+     "type": "int16",
+     "array": 4,
+     "note": "[rpm] Fan speeds"
+    },
+    "gpu_combined": {
+     "type": "uint8",
+     "array": 10,
+     "note": "Combined GPU usage as the last 10 slices of 100 MS"
+    },
+    "gpu_cores": {
+     "type": "uint8",
+     "array": 4,
+     "note": "GPU usage on the component in percent"
+    },
+    "link_rx_max": {
+     "type": "uint32",
+     "array": 6,
+     "note": "[Kb/s] Network capacity to the component system"
+    },
+    "link_rx_rate": {
+     "type": "uint32",
+     "array": 6,
+     "note": "[Kb/s] Network traffic to the component system"
+    },
+    "link_tx_max": {
+     "type": "uint32",
+     "array": 6,
+     "note": "[Kb/s] Network capacity from the component system"
+    },
+    "link_tx_rate": {
+     "type": "uint32",
+     "array": 6,
+     "note": "[Kb/s] Network traffic from the component system"
+    },
+    "link_type": {
+     "type": "uint32",
+     "array": 6,
+     "note": "[Kb/s] Link type: 0-9: UART, 10-19: Wired network, 20-29: Wifi, 30-39: Point-to-point proprietary, 40-49: Mesh proprietary"
+    },
     "ram_total": {
      "type": "uint32",
      "note": "[MB] Total amount of RAM on the component system"
@@ -5869,9 +6563,30 @@
      "type": "uint32",
      "note": "[MB] Amount of used RAM on the component system"
     },
+    "storage_total": {
+     "type": "uint32",
+     "array": 4,
+     "note": "[MB] Total amount of storage space on the component system"
+    },
+    "storage_type": {
+     "type": "uint32",
+     "array": 4,
+     "unit": "removable",
+     "note": "Storage type: 0: HDD, 1: SSD, 2: EMMC, 3: SD card (non-removable), 4: SD card (removable)"
+    },
+    "storage_usage": {
+     "type": "uint32",
+     "array": 4,
+     "note": "[MB] Amount of used storage space on the component system"
+    },
     "temperature_board": {
      "type": "int8",
      "note": "[degC] Temperature of the board"
+    },
+    "temperature_core": {
+     "type": "int8",
+     "array": 8,
+     "note": "[degC] Temperature of the CPU core"
     },
     "timestamp": {
      "type": "uint64",
@@ -5891,6 +6606,10 @@
   "open_drone_id_arm_status": {
    "file": "OpenDroneIdArmStatus.msg",
    "fields": {
+    "error": {
+     "type": "char",
+     "array": 50
+    },
     "status": {
      "type": "uint8"
     },
@@ -5903,6 +6622,11 @@
   "open_drone_id_basic_id": {
    "file": "OpenDroneIdBasicId.msg",
    "fields": {
+    "id_or_mac": {
+     "type": "uint8",
+     "array": 20,
+     "note": "Only used for drone ID data received from other UAs, no null termination, null filled if shorter"
+    },
     "id_type": {
      "type": "uint8",
      "note": "MAV_ODID_ID_TYPE: indicates the format for the uas_id field"
@@ -5915,12 +6639,25 @@
      "type": "uint8",
      "unit": "Unmanned Aircraft",
      "note": "MAV_ODID_UA_TYPE: indicates the type of UA (Unmanned Aircraft)"
+    },
+    "uas_id": {
+     "type": "uint8",
+     "array": 20,
+     "note": "UAS (Unmanned Aircraft System) ID following the format specified by id_type, no null termination, null filled if shorter"
     }
    }
   },
   "open_drone_id_operator_id": {
    "file": "OpenDroneIdOperatorId.msg",
    "fields": {
+    "id_or_mac": {
+     "type": "uint8",
+     "array": 20
+    },
+    "operator_id": {
+     "type": "char",
+     "array": 20
+    },
     "operator_id_type": {
      "type": "uint8"
     },
@@ -5933,8 +6670,16 @@
   "open_drone_id_self_id": {
    "file": "OpenDroneIdSelfId.msg",
    "fields": {
+    "description": {
+     "type": "char",
+     "array": 23
+    },
     "description_type": {
      "type": "uint8"
+    },
+    "id_or_mac": {
+     "type": "uint8",
+     "array": 20
     },
     "timestamp": {
      "type": "uint64",
@@ -5965,6 +6710,10 @@
     },
     "classification_type": {
      "type": "uint8"
+    },
+    "id_or_mac": {
+     "type": "uint8",
+     "array": 20
     },
     "operator_altitude_geo": {
      "type": "float32"
@@ -5999,6 +6748,10 @@
   "orb_test_large": {
    "file": "OrbTestLarge.msg",
    "fields": {
+    "junk": {
+     "type": "uint8",
+     "array": 512
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -6011,6 +6764,10 @@
   "orb_test_medium": {
    "file": "OrbTestMedium.msg",
    "fields": {
+    "junk": {
+     "type": "uint8",
+     "array": 64
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -6556,6 +7313,26 @@
     "free_memory_bytes": {
      "type": "uint16"
     },
+    "pwm": {
+     "type": "uint16",
+     "array": 8
+    },
+    "pwm_disarmed": {
+     "type": "uint16",
+     "array": 8
+    },
+    "pwm_failsafe": {
+     "type": "uint16",
+     "array": 8
+    },
+    "pwm_rate_hz": {
+     "type": "uint16",
+     "array": 8
+    },
+    "raw_inputs": {
+     "type": "uint16",
+     "array": 18
+    },
     "rssi_v": {
      "type": "float32",
      "note": "RSSI pin voltage in volts"
@@ -6616,6 +7393,10 @@
   "qshell_req": {
    "file": "QshellReq.msg",
    "fields": {
+    "cmd": {
+     "type": "char",
+     "array": 100
+    },
     "request_sequence": {
      "type": "uint32"
     },
@@ -6750,6 +7531,31 @@
      "type": "bool",
      "note": "Signals if the policy is active (aka publishing actuator_motors)"
     },
+    "angular_velocity": {
+     "type": "float32",
+     "array": 3,
+     "note": "[rad/s]  [@frame FLU] Angular velocity in the body frame"
+    },
+    "linear_velocity": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m/s] [@frame FLU] Linear velocity in the vehicle_local_position frame"
+    },
+    "orientation": {
+     "type": "float32",
+     "array": 4,
+     "note": "[-] Orientation in the vehicle_attitude frame but using the FLU convention as a unit quaternion (w, x, y, z)"
+    },
+    "position": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m] [@frame FLU] Position of the vehicle_local_position frame"
+    },
+    "previous_action": {
+     "type": "float32",
+     "array": 4,
+     "note": "[@range -1, 1] Previous action. Motor commands normalized to [-1, 1]"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -6784,6 +7590,16 @@
       "6": "CONTROL"
      },
      "kind": "enum"
+    },
+    "internal_reference_linear_velocity": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m/s] [@frame FLU] Internal reference linear velocity"
+    },
+    "internal_reference_position": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m] [@frame FLU] Internal reference position"
     },
     "subscription_update_angular_velocity": {
      "type": "bool",
@@ -6893,9 +7709,52 @@
      "type": "uint8",
      "note": "Number of valid channels"
     },
+    "channels": {
+     "type": "float32",
+     "array": 18,
+     "note": "Scaled to -1..1 (throttle: 0..1)"
+    },
     "frame_drop_count": {
      "type": "uint32",
      "note": "Number of dropped frames"
+    },
+    "function": {
+     "type": "int8",
+     "array": 30,
+     "note": "Functions mapping",
+     "values": {
+      "0": "THROTTLE",
+      "1": "ROLL",
+      "2": "PITCH",
+      "3": "YAW",
+      "4": "RETURN",
+      "5": "LOITER",
+      "6": "COUNT",
+      "7": "FLAPS",
+      "8": "1",
+      "9": "2",
+      "10": "3",
+      "11": "4",
+      "12": "5",
+      "13": "6",
+      "14": "1",
+      "15": "2",
+      "16": "5",
+      "17": "KILLSWITCH",
+      "18": "TRANSITION",
+      "19": "GEAR",
+      "20": "ARMSWITCH",
+      "21": "1",
+      "22": "2",
+      "23": "3",
+      "24": "4",
+      "25": "5",
+      "26": "6",
+      "27": "MOTOR",
+      "28": "POWER",
+      "29": "TERMINATION"
+     },
+     "kind": "enum"
     },
     "rssi": {
      "type": "uint8",
@@ -6918,9 +7777,48 @@
   "rc_parameter_map": {
    "file": "RcParameterMap.msg",
    "fields": {
+    "param_id": {
+     "type": "char",
+     "array": 51,
+     "note": "MAP_NCHAN * (ID_LEN + 1) chars, corresponding param id, null terminated",
+     "values": {
+      "16": "LEN"
+     },
+     "kind": "enum"
+    },
+    "param_index": {
+     "type": "int32",
+     "array": 3,
+     "note": "corresponding param index, this field is ignored if set to -1, in this case param_id will be used"
+    },
+    "scale": {
+     "type": "float32",
+     "array": 3,
+     "note": "scale to map the RC input [-1, 1] to a parameter value"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
+    },
+    "valid": {
+     "type": "bool",
+     "array": 3,
+     "note": "true for RC-Param channels which are mapped to a param"
+    },
+    "value0": {
+     "type": "float32",
+     "array": 3,
+     "note": "initial value around which the parameter value is changed"
+    },
+    "value_max": {
+     "type": "float32",
+     "array": 3,
+     "note": "minimal parameter value"
+    },
+    "value_min": {
+     "type": "float32",
+     "array": 3,
+     "note": "minimal parameter value"
     }
    }
   },
@@ -6941,6 +7839,11 @@
      "type": "int8",
      "unit": "-1 if invalid",
      "note": "assigned mode ID (-1 if invalid)"
+    },
+    "name": {
+     "type": "char",
+     "array": 25,
+     "note": "name from the request"
     },
     "not_user_selectable": {
      "type": "bool",
@@ -6980,6 +7883,11 @@
      "unit": "-1 if invalid",
      "note": "assigned mode ID (-1 if invalid)"
     },
+    "name": {
+     "type": "char",
+     "array": 25,
+     "note": "name from the request"
+    },
     "px4_ros2_api_version": {
      "type": "uint16"
     },
@@ -7007,6 +7915,11 @@
     "enable_replace_internal_mode": {
      "type": "bool",
      "note": "set to true if an internal mode should be replaced"
+    },
+    "name": {
+     "type": "char",
+     "array": 25,
+     "note": "either the requested mode name, or component name"
     },
     "not_user_selectable": {
      "type": "bool",
@@ -7058,6 +7971,11 @@
      "type": "bool",
      "note": "set to true if an internal mode should be replaced"
     },
+    "name": {
+     "type": "char",
+     "array": 25,
+     "note": "either the requested mode name, or component name"
+    },
     "px4_ros2_api_version": {
      "type": "uint16",
      "note": "Set to LATEST_PX4_ROS2_API_VERSION"
@@ -7099,6 +8017,11 @@
     "enable_replace_internal_mode": {
      "type": "bool",
      "note": "set to true if an internal mode should be replaced"
+    },
+    "name": {
+     "type": "char",
+     "array": 25,
+     "note": "either the requested mode name, or component name"
     },
     "not_user_selectable": {
      "type": "bool",
@@ -7175,6 +8098,16 @@
     "cruising_speed": {
      "type": "float32",
      "note": "[m/s] [@range 0, inf] [@invalid NaN Defaults to maximum speed] Cruising speed"
+    },
+    "position_ned": {
+     "type": "float32",
+     "array": 2,
+     "note": "[m] [@range -inf, inf] [@frame NED] Target position"
+    },
+    "start_ned": {
+     "type": "float32",
+     "array": 2,
+     "note": "[m] [@range -inf, inf] [@frame NED] [@invalid NaN Defaults to vehicle position] Start position which specifies a line for the rover to track"
     },
     "timestamp": {
      "type": "uint64",
@@ -7322,6 +8255,11 @@
   "rtcm_data": {
    "file": "RtcmData.msg",
    "fields": {
+    "data": {
+     "type": "uint8",
+     "array": 300,
+     "note": "Correction payload (fixed-base RTCM3 and/or SPARTN frames, or moving-baseline RTCM3)"
+    },
     "device_id": {
      "type": "uint32",
      "note": "[-] Unique device ID of the publisher that produced this RTCM"
@@ -7393,19 +8331,54 @@
   "satellite_info": {
    "file": "SatelliteInfo.msg",
    "fields": {
+    "azimuth": {
+     "type": "uint8",
+     "array": 40,
+     "note": "Direction of satellite, 0: 0 deg, 255: 360 deg."
+    },
     "count": {
      "type": "uint8",
      "note": "Number of satellites visible to the receiver"
     },
+    "elevation": {
+     "type": "uint8",
+     "array": 40,
+     "note": "Elevation (0: right on top of receiver, 90: on the horizon) of satellite"
+    },
+    "prn": {
+     "type": "uint8",
+     "array": 40,
+     "note": "Satellite PRN code assignment, (psuedorandom number SBAS, valid codes are 120-144)"
+    },
+    "snr": {
+     "type": "uint8",
+     "array": 40,
+     "note": "dBHz, Signal to noise ratio of satellite C/N0, range 0..99, zero when not tracking this satellite."
+    },
+    "svid": {
+     "type": "uint8",
+     "array": 40,
+     "note": "Space vehicle ID [1..255], see scheme below"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
+    },
+    "used": {
+     "type": "uint8",
+     "array": 40,
+     "note": "0: Satellite not used, 1: used for navigation"
     }
    }
   },
   "sensor_accel": {
    "file": "SensorAccel.msg",
    "fields": {
+    "clip_counter": {
+     "type": "uint8",
+     "array": 3,
+     "note": "clip count per axis in the sample period"
+    },
     "device_id": {
      "type": "uint32",
      "note": "unique device ID for the sensor that does not change between power cycles"
@@ -7478,6 +8451,21 @@
     "timestamp_sample": {
      "type": "uint64",
      "unit": "us"
+    },
+    "x": {
+     "type": "int16",
+     "array": 32,
+     "note": "FRD board frame X-axis raw counts (m/s^2 = x * scale)"
+    },
+    "y": {
+     "type": "int16",
+     "array": 32,
+     "note": "FRD board frame Y-axis raw counts (m/s^2 = y * scale)"
+    },
+    "z": {
+     "type": "int16",
+     "array": 32,
+     "note": "FRD board frame Z-axis raw counts (m/s^2 = z * scale)"
     }
    }
   },
@@ -7554,6 +8542,11 @@
      "type": "uint32",
      "note": "accelerometer measurement sampling period in microseconds"
     },
+    "accelerometer_m_s2": {
+     "type": "float32",
+     "array": 3,
+     "note": "average value acceleration measured in the FRD body frame XYZ-axis in m/s^2 over the last accelerometer sampling period"
+    },
     "accelerometer_timestamp_relative": {
      "type": "int32",
      "note": "timestamp + accelerometer_timestamp_relative = Accelerometer timestamp"
@@ -7570,6 +8563,11 @@
      "type": "uint32",
      "note": "gyro measurement sampling period in microseconds"
     },
+    "gyro_rad": {
+     "type": "float32",
+     "array": 3,
+     "note": "average angular rate measured in the FRD body frame XYZ-axis in rad/s over the last gyro sampling period"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -7579,6 +8577,38 @@
   "sensor_correction": {
    "file": "SensorCorrection.msg",
    "fields": {
+    "accel_device_ids": {
+     "type": "uint32",
+     "array": 4
+    },
+    "accel_offset_0": {
+     "type": "float32",
+     "array": 3,
+     "note": "accelerometer 0 offsets in the FRD board frame XYZ-axis in m/s^s"
+    },
+    "accel_offset_1": {
+     "type": "float32",
+     "array": 3,
+     "note": "accelerometer 1 offsets in the FRD board frame XYZ-axis in m/s^s"
+    },
+    "accel_offset_2": {
+     "type": "float32",
+     "array": 3,
+     "note": "accelerometer 2 offsets in the FRD board frame XYZ-axis in m/s^s"
+    },
+    "accel_offset_3": {
+     "type": "float32",
+     "array": 3,
+     "note": "accelerometer 3 offsets in the FRD board frame XYZ-axis in m/s^s"
+    },
+    "accel_temperature": {
+     "type": "float32",
+     "array": 4
+    },
+    "baro_device_ids": {
+     "type": "uint32",
+     "array": 4
+    },
     "baro_offset_0": {
      "type": "float32",
      "note": "barometric pressure 0 offsets in the sensor frame in Pascals"
@@ -7594,6 +8624,66 @@
     "baro_offset_3": {
      "type": "float32",
      "note": "barometric pressure 3 offsets in the sensor frame in Pascals"
+    },
+    "baro_temperature": {
+     "type": "float32",
+     "array": 4
+    },
+    "gyro_device_ids": {
+     "type": "uint32",
+     "array": 4
+    },
+    "gyro_offset_0": {
+     "type": "float32",
+     "array": 3,
+     "note": "gyro 0 XYZ offsets in the sensor frame in rad/s"
+    },
+    "gyro_offset_1": {
+     "type": "float32",
+     "array": 3,
+     "note": "gyro 1 XYZ offsets in the sensor frame in rad/s"
+    },
+    "gyro_offset_2": {
+     "type": "float32",
+     "array": 3,
+     "note": "gyro 2 XYZ offsets in the sensor frame in rad/s"
+    },
+    "gyro_offset_3": {
+     "type": "float32",
+     "array": 3,
+     "note": "gyro 3 XYZ offsets in the sensor frame in rad/s"
+    },
+    "gyro_temperature": {
+     "type": "float32",
+     "array": 4
+    },
+    "mag_device_ids": {
+     "type": "uint32",
+     "array": 4
+    },
+    "mag_offset_0": {
+     "type": "float32",
+     "array": 3,
+     "note": "magnetometer 0 offsets in the FRD board frame XYZ-axis in m/s^s"
+    },
+    "mag_offset_1": {
+     "type": "float32",
+     "array": 3,
+     "note": "magnetometer 1 offsets in the FRD board frame XYZ-axis in m/s^s"
+    },
+    "mag_offset_2": {
+     "type": "float32",
+     "array": 3,
+     "note": "magnetometer 2 offsets in the FRD board frame XYZ-axis in m/s^s"
+    },
+    "mag_offset_3": {
+     "type": "float32",
+     "array": 3,
+     "note": "magnetometer 3 offsets in the FRD board frame XYZ-axis in m/s^s"
+    },
+    "mag_temperature": {
+     "type": "float32",
+     "array": 4
     },
     "timestamp": {
      "type": "uint64",
@@ -7645,6 +8735,18 @@
     "moving_base_mode": {
      "type": "bool",
      "note": "if the receiver is operating in moving base mode"
+    },
+    "position": {
+     "type": "float32",
+     "array": 3,
+     "unit": "m",
+     "note": "GPS NED relative position vector (m)"
+    },
+    "position_accuracy": {
+     "type": "float32",
+     "array": 3,
+     "unit": "m",
+     "note": "Accuracy of relative position (m)"
     },
     "position_length": {
      "type": "float32",
@@ -7799,6 +8901,11 @@
      "type": "uint32",
      "unit": "bin width",
      "note": "[Hz] Frequency resolution of the spectrum (bin width)"
+    },
+    "spectrum": {
+     "type": "uint8",
+     "array": 256,
+     "note": "[(2^-2)dB] Spectrum magnitude per bin (number of points = spectrum_span / resolution)"
     },
     "spectrum_span": {
      "type": "uint32",
@@ -8076,6 +9183,11 @@
   "sensor_gyro": {
    "file": "SensorGyro.msg",
    "fields": {
+    "clip_counter": {
+     "type": "uint8",
+     "array": 3,
+     "note": "clip count per axis in the sample period"
+    },
     "device_id": {
      "type": "uint32",
      "note": "unique device ID for the sensor that does not change between power cycles"
@@ -8124,6 +9236,36 @@
      "type": "uint32",
      "note": "unique device ID for the sensor that does not change between power cycles"
     },
+    "peak_frequencies_x": {
+     "type": "float32",
+     "array": 3,
+     "note": "x axis peak frequencies"
+    },
+    "peak_frequencies_y": {
+     "type": "float32",
+     "array": 3,
+     "note": "y axis peak frequencies"
+    },
+    "peak_frequencies_z": {
+     "type": "float32",
+     "array": 3,
+     "note": "z axis peak frequencies"
+    },
+    "peak_snr_x": {
+     "type": "float32",
+     "array": 3,
+     "note": "x axis peak SNR"
+    },
+    "peak_snr_y": {
+     "type": "float32",
+     "array": 3,
+     "note": "y axis peak SNR"
+    },
+    "peak_snr_z": {
+     "type": "float32",
+     "array": 3,
+     "note": "z axis peak SNR"
+    },
     "resolution_hz": {
      "type": "float32"
     },
@@ -8171,6 +9313,21 @@
     "timestamp_sample": {
      "type": "uint64",
      "unit": "us"
+    },
+    "x": {
+     "type": "int16",
+     "array": 32,
+     "note": "FRD board frame X-axis raw counts (rad/s = x * scale)"
+    },
+    "y": {
+     "type": "int16",
+     "array": 32,
+     "note": "FRD board frame Y-axis raw counts (rad/s = y * scale)"
+    },
+    "z": {
+     "type": "int16",
+     "array": 32,
+     "note": "FRD board frame Z-axis raw counts (rad/s = z * scale)"
     }
    }
   },
@@ -8247,6 +9404,11 @@
   "sensor_optical_flow": {
    "file": "SensorOpticalFlow.msg",
    "fields": {
+    "delta_angle": {
+     "type": "float32",
+     "array": 3,
+     "note": "(radians) accumulated gyro radians where a positive value is produced by a RH rotation about the body axis. Set to NaN if flow sensor does not have 3-axis gyro data."
+    },
     "delta_angle_available": {
      "type": "bool"
     },
@@ -8289,6 +9451,11 @@
       "3": "LOWLIGHT"
      },
      "kind": "enum"
+    },
+    "pixel_flow": {
+     "type": "float32",
+     "array": 2,
+     "note": "(radians) optical flow in radians where a positive value is produced by a RH rotation of the sensor about the body axis"
     },
     "quality": {
      "type": "uint8",
@@ -8455,6 +9622,32 @@
      "type": "uint32",
      "note": "current primary device id for reference"
     },
+    "device_ids": {
+     "type": "uint32",
+     "array": 4
+    },
+    "enabled": {
+     "type": "bool",
+     "array": 4
+    },
+    "external": {
+     "type": "bool",
+     "array": 4
+    },
+    "healthy": {
+     "type": "bool",
+     "array": 4,
+     "note": "sensor healthy"
+    },
+    "inconsistency": {
+     "type": "float32",
+     "array": 4,
+     "note": "magnitude of difference between sensor instance and mean"
+    },
+    "priority": {
+     "type": "uint8",
+     "array": 4
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -8468,9 +9661,43 @@
      "type": "uint32",
      "note": "current primary accel device id for reference"
     },
+    "accel_device_ids": {
+     "type": "uint32",
+     "array": 4
+    },
+    "accel_healthy": {
+     "type": "bool",
+     "array": 4
+    },
+    "accel_inconsistency_m_s_s": {
+     "type": "float32",
+     "array": 4,
+     "note": "magnitude of acceleration difference between IMU instance and mean in m/s^2."
+    },
+    "accel_priority": {
+     "type": "uint8",
+     "array": 4
+    },
     "gyro_device_id_primary": {
      "type": "uint32",
      "note": "current primary gyro device id for reference"
+    },
+    "gyro_device_ids": {
+     "type": "uint32",
+     "array": 4
+    },
+    "gyro_healthy": {
+     "type": "bool",
+     "array": 4
+    },
+    "gyro_inconsistency_rad_s": {
+     "type": "float32",
+     "array": 4,
+     "note": "magnitude of angular rate difference between IMU instance and mean in (rad/s)."
+    },
+    "gyro_priority": {
+     "type": "uint8",
+     "array": 4
     },
     "timestamp": {
      "type": "uint64",
@@ -8600,6 +9827,11 @@
      "type": "uint8",
      "note": "peripheral overcurrent when 1"
     },
+    "sensors3v3": {
+     "type": "float32",
+     "array": 4,
+     "note": "Sensors 3V3 rail voltage"
+    },
     "sensors3v3_valid": {
      "type": "uint8",
      "note": "Sensors 3V3 rail voltage was read (bitfield)."
@@ -8717,6 +9949,10 @@
    "fields": {
     "stack_free": {
      "type": "uint16"
+    },
+    "task_name": {
+     "type": "char",
+     "array": 24
     },
     "timestamp": {
      "type": "uint64",
@@ -9046,9 +10282,30 @@
   "trajectory_setpoint": {
    "file": "TrajectorySetpoint.msg",
    "fields": {
+    "acceleration": {
+     "type": "float32",
+     "array": 3,
+     "note": "in meters/second^2"
+    },
+    "jerk": {
+     "type": "float32",
+     "array": 3,
+     "unit": "for logging only",
+     "note": "in meters/second^3 (for logging only)"
+    },
+    "position": {
+     "type": "float32",
+     "array": 3,
+     "note": "in meters"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
+    },
+    "velocity": {
+     "type": "float32",
+     "array": 3,
+     "note": "in meters/second"
     },
     "yaw": {
      "type": "float32",
@@ -9063,9 +10320,40 @@
   "trajectory_setpoint6dof": {
    "file": "TrajectorySetpoint6dof.msg",
    "fields": {
+    "acceleration": {
+     "type": "float32",
+     "array": 3,
+     "note": "in meters/second^2"
+    },
+    "angular_velocity": {
+     "type": "float32",
+     "array": 3,
+     "note": "angular velocity in radians/second"
+    },
+    "jerk": {
+     "type": "float32",
+     "array": 3,
+     "unit": "for logging only",
+     "note": "in meters/second^3 (for logging only)"
+    },
+    "position": {
+     "type": "float32",
+     "array": 3,
+     "note": "in meters"
+    },
+    "quaternion": {
+     "type": "float32",
+     "array": 4,
+     "note": "unit quaternion"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
+    },
+    "velocity": {
+     "type": "float32",
+     "array": 3,
+     "note": "in meters/second"
     }
    }
   },
@@ -9079,6 +10367,11 @@
     "altitude_type": {
      "type": "uint8",
      "note": "Type from ADSB_ALTITUDE_TYPE enum"
+    },
+    "callsign": {
+     "type": "char",
+     "array": 9,
+     "note": "The callsign, 8+null, validity flag: PX4_ADSB_FLAGS_VALID_CALLSIGN"
     },
     "emitter_type": {
      "type": "uint8",
@@ -9120,6 +10413,11 @@
     "tslc": {
      "type": "uint8",
      "note": "[s] Time since last communication"
+    },
+    "uas_id": {
+     "type": "uint8",
+     "array": 18,
+     "note": "[-] Unique UAS ID, not part of ADSB_VEHICLE MAVLink message"
     },
     "ver_velocity": {
      "type": "float32",
@@ -9227,6 +10525,11 @@
      },
      "kind": "enum"
     },
+    "param_id": {
+     "type": "char",
+     "array": 17,
+     "note": "MAVLink/UAVCAN parameter name"
+    },
     "param_index": {
      "type": "int16",
      "note": "-1 if the param_id field should be used as identifier"
@@ -9266,6 +10569,11 @@
      "type": "uint16",
      "note": "number of parameters exposed by the node"
     },
+    "param_id": {
+     "type": "char",
+     "array": 17,
+     "note": "MAVLink/UAVCAN parameter name"
+    },
     "param_index": {
      "type": "int16",
      "note": "parameter index, if known"
@@ -9287,6 +10595,11 @@
   "ulog_stream": {
    "file": "UlogStream.msg",
    "fields": {
+    "data": {
+     "type": "uint8",
+     "array": 249,
+     "note": "ulog data"
+    },
     "first_message_offset": {
      "type": "uint8",
      "note": "offset into data where first message starts. This"
@@ -9343,6 +10656,11 @@
      "unit": "-1 if not registered",
      "note": "assigned mode ID (-1 if not registered)"
     },
+    "name": {
+     "type": "char",
+     "array": 25,
+     "note": "either the mode name, or component name"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -9359,6 +10677,11 @@
     "timestamp_sample": {
      "type": "uint64",
      "unit": "us"
+    },
+    "xyz": {
+     "type": "float32",
+     "array": 3,
+     "note": "Bias corrected acceleration (including gravity) in the FRD body frame XYZ-axis in m/s^2"
     }
    }
   },
@@ -9413,12 +10736,32 @@
     "timestamp_sample": {
      "type": "uint64",
      "unit": "us"
+    },
+    "xyz": {
+     "type": "float32",
+     "array": 3,
+     "note": "Bias corrected angular velocity about the FRD body frame XYZ-axis in rad/s"
+    },
+    "xyz_derivative": {
+     "type": "float32",
+     "array": 3,
+     "note": "angular acceleration about the FRD body frame XYZ-axis in rad/s^2"
     }
    }
   },
   "vehicle_attitude": {
    "file": "VehicleAttitude.msg",
    "fields": {
+    "delta_q_reset": {
+     "type": "float32",
+     "array": 4,
+     "note": "Amount by which quaternion has changed during last reset"
+    },
+    "q": {
+     "type": "float32",
+     "array": 4,
+     "note": "Quaternion rotation from the FRD body frame to the NED earth frame"
+    },
     "quat_reset_counter": {
      "type": "uint8",
      "note": "Quaternion reset counter"
@@ -9436,6 +10779,16 @@
   "vehicle_attitude_setpoint": {
    "file": "VehicleAttitudeSetpoint.msg",
    "fields": {
+    "q_d": {
+     "type": "float32",
+     "array": 4,
+     "note": "Desired quaternion for quaternion control"
+    },
+    "thrust_body": {
+     "type": "float32",
+     "array": 3,
+     "note": "Normalized thrust command in body FRD frame [-1,1]"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -9455,10 +10808,20 @@
      "unit": "used for auto takeoff on runway",
      "note": "control heading with steering wheel (used for auto takeoff on runway)"
     },
+    "q_d": {
+     "type": "float32",
+     "array": 4,
+     "note": "Desired quaternion for quaternion control"
+    },
     "reset_integral": {
      "type": "bool",
      "unit": "navigation logic change",
      "note": "Reset roll/pitch/yaw integrals (navigation logic change)"
+    },
+    "thrust_body": {
+     "type": "float32",
+     "array": 3,
+     "note": "Normalized thrust command in body FRD frame [-1,1]"
     },
     "timestamp": {
      "type": "uint64",
@@ -9862,6 +11225,11 @@
      "type": "uint32",
      "note": "Accelerometer unique device ID for the sensor that does not change between power cycles"
     },
+    "delta_angle": {
+     "type": "float32",
+     "array": 3,
+     "note": "delta angle about the FRD body frame XYZ-axis in rad over the integration time frame (delta_angle_dt)"
+    },
     "delta_angle_clipping": {
      "type": "uint8",
      "note": "bitfield indicating if there was any gyro clipping (per axis) during the integration time frame"
@@ -9869,6 +11237,11 @@
     "delta_angle_dt": {
      "type": "uint32",
      "note": "integration period in microseconds"
+    },
+    "delta_velocity": {
+     "type": "float32",
+     "array": 3,
+     "note": "delta velocity in the FRD body frame XYZ-axis in m/s over the integration time frame (delta_velocity_dt)"
     },
     "delta_velocity_clipping": {
      "type": "uint8",
@@ -9899,6 +11272,11 @@
   "vehicle_imu_status": {
    "file": "VehicleImuStatus.msg",
    "fields": {
+    "accel_clipping": {
+     "type": "uint32",
+     "array": 3,
+     "note": "total clipping per axis"
+    },
     "accel_device_id": {
      "type": "uint32",
      "note": "unique device ID for the sensor that does not change between power cycles"
@@ -9924,6 +11302,11 @@
      "unit": "rad^2",
      "note": "average IMU delta angle coning correction (rad^2)"
     },
+    "gyro_clipping": {
+     "type": "uint32",
+     "array": 3,
+     "note": "total clipping per axis"
+    },
     "gyro_device_id": {
      "type": "uint32",
      "note": "unique device ID for the sensor that does not change between power cycles"
@@ -9944,6 +11327,16 @@
      "unit": "rad/s",
      "note": "high frequency vibration level in the gyro data (rad/s)"
     },
+    "mean_accel": {
+     "type": "float32",
+     "array": 3,
+     "note": "average accelerometer readings since last publication"
+    },
+    "mean_gyro": {
+     "type": "float32",
+     "array": 3,
+     "note": "average gyroscope readings since last publication"
+    },
     "temperature_accel": {
      "type": "float32"
     },
@@ -9953,6 +11346,16 @@
     "timestamp": {
      "type": "uint64",
      "unit": "us"
+    },
+    "var_accel": {
+     "type": "float32",
+     "array": 3,
+     "note": "accelerometer variance since last publication"
+    },
+    "var_gyro": {
+     "type": "float32",
+     "array": 3,
+     "note": "gyroscope variance since last publication"
     }
    }
   },
@@ -10045,9 +11448,19 @@
      "type": "float32",
      "note": "Heading delta caused by latest heading reset [rad]"
     },
+    "delta_vxy": {
+     "type": "float32",
+     "array": 2,
+     "note": "Amount of lateral shift of velocity estimate in latest reset (in x and y) [m/s]"
+    },
     "delta_vz": {
      "type": "float32",
      "note": "Amount of vertical shift of velocity estimate in latest reset [m/s]"
+    },
+    "delta_xy": {
+     "type": "float32",
+     "array": 2,
+     "note": "Amount of lateral shift of position estimate in latest reset (in x and y) [m]"
     },
     "delta_z": {
      "type": "float32",
@@ -10256,6 +11669,16 @@
   "vehicle_local_position_setpoint": {
    "file": "VehicleLocalPositionSetpoint.msg",
    "fields": {
+    "acceleration": {
+     "type": "float32",
+     "array": 3,
+     "note": "in meters/sec^2"
+    },
+    "thrust": {
+     "type": "float32",
+     "array": 3,
+     "note": "normalized thrust vector in NED"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -10324,9 +11747,19 @@
      "type": "float32",
      "note": "Heading delta caused by latest heading reset [rad]"
     },
+    "delta_vxy": {
+     "type": "float32",
+     "array": 2,
+     "note": "Amount of lateral shift of velocity estimate in latest reset (in x and y) [m/s]"
+    },
     "delta_vz": {
      "type": "float32",
      "note": "Amount of vertical shift of velocity estimate in latest reset [m/s]"
+    },
+    "delta_xy": {
+     "type": "float32",
+     "array": 2,
+     "note": "Amount of lateral shift of position estimate in latest reset (in x and y) [m]"
     },
     "delta_z": {
      "type": "float32",
@@ -10538,6 +11971,11 @@
      "type": "uint32",
      "note": "unique device ID for the selected magnetometer"
     },
+    "magnetometer_ga": {
+     "type": "float32",
+     "array": 3,
+     "note": "Magnetic field in the FRD body frame XYZ-axis in Gauss"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -10551,6 +11989,17 @@
   "vehicle_odometry": {
    "file": "VehicleOdometry.msg",
    "fields": {
+    "angular_velocity": {
+     "type": "float32",
+     "array": 3,
+     "note": "[rad/s] [@frame @VELOCITY_FRAME_BODY_FRD] [@invalid NaN If invalid/unknown] Angular velocity in body-fixed frame"
+    },
+    "orientation_variance": {
+     "type": "float32",
+     "array": 3,
+     "unit": "expressed in body frame",
+     "note": "[rad^2] Variance of orientation/attitude error (expressed in body frame)"
+    },
     "pose_frame": {
      "type": "uint8",
      "note": "[@enum POSE_FRAME] Position and orientation frame of reference",
@@ -10560,6 +12009,21 @@
       "2": "FRD"
      },
      "kind": "enum"
+    },
+    "position": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m] [@frame local frame] [@invalid NaN If invalid/unknown] Position. Origin is position of GC at startup."
+    },
+    "position_variance": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m^2] Variance of position error"
+    },
+    "q": {
+     "type": "float32",
+     "array": 4,
+     "note": "[-] [@invalid NaN First value if invalid/unknown] Attitude (expressed as a quaternion) relative to pose reference frame at current location. Follows the Hamiltonian convention (w, x, y, z, right-handed, passive rotations from body to world)"
     },
     "quality": {
      "type": "int8",
@@ -10577,6 +12041,11 @@
      "type": "uint64",
      "unit": "us"
     },
+    "velocity": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m/s] [@frame @velocity_frame] [@invalid NaN If invalid/unknown] Velocity."
+    },
     "velocity_frame": {
      "type": "uint8",
      "note": "[@enum VELOCITY_FRAME] Reference frame of the velocity data",
@@ -10587,12 +12056,23 @@
       "3": "FRD"
      },
      "kind": "enum"
+    },
+    "velocity_variance": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m^2/s^2] Variance of velocity error"
     }
    }
   },
   "vehicle_optical_flow": {
    "file": "VehicleOpticalFlow.msg",
    "fields": {
+    "delta_angle": {
+     "type": "float32",
+     "array": 3,
+     "unit": "NAN if unavailable",
+     "note": "(radians) accumulated gyro radians where a positive value is produced by a RH rotation of the sensor about the body axis. (NAN if unavailable)"
+    },
     "device_id": {
      "type": "uint32",
      "note": "unique device ID for the sensor that does not change between power cycles"
@@ -10618,6 +12098,11 @@
      "type": "float32",
      "note": "(meters) Minimum distance from ground at which the optical flow sensor operates reliably"
     },
+    "pixel_flow": {
+     "type": "float32",
+     "array": 2,
+     "note": "(radians) accumulated optical flow in radians where a positive value is produced by a RH rotation about the body axis"
+    },
     "quality": {
      "type": "uint8",
      "note": "Average of quality of accumulated frames, 0: bad quality, 255: maximum quality"
@@ -10635,6 +12120,32 @@
   "vehicle_optical_flow_vel": {
    "file": "VehicleOpticalFlowVel.msg",
    "fields": {
+    "flow_rate_compensated": {
+     "type": "float32",
+     "array": 2,
+     "unit": "rad/s",
+     "note": "integrated optical flow measurement compensated for angular motion (rad/s)"
+    },
+    "flow_rate_uncompensated": {
+     "type": "float32",
+     "array": 2,
+     "unit": "rad/s",
+     "note": "integrated optical flow measurement (rad/s)"
+    },
+    "gyro_bias": {
+     "type": "float32",
+     "array": 3
+    },
+    "gyro_rate": {
+     "type": "float32",
+     "array": 3,
+     "unit": "rad/s",
+     "note": "gyro measurement synchronized with flow measurements (rad/s)"
+    },
+    "ref_gyro": {
+     "type": "float32",
+     "array": 3
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -10642,6 +12153,30 @@
     "timestamp_sample": {
      "type": "uint64",
      "unit": "us"
+    },
+    "vel_body": {
+     "type": "float32",
+     "array": 2,
+     "unit": "m/s",
+     "note": "velocity obtained from gyro-compensated and distance-scaled optical flow raw measurements in body frame(m/s)"
+    },
+    "vel_body_filtered": {
+     "type": "float32",
+     "array": 2,
+     "unit": "m/s",
+     "note": "filtered velocity obtained from gyro-compensated and distance-scaled optical flow raw measurements in body frame(m/s)"
+    },
+    "vel_ne": {
+     "type": "float32",
+     "array": 2,
+     "unit": "m/s",
+     "note": "same as vel_body but in local frame (m/s)"
+    },
+    "vel_ne_filtered": {
+     "type": "float32",
+     "array": 2,
+     "unit": "m/s",
+     "note": "filtered same as vel_body_filtered but in local frame (m/s)"
     }
    }
   },
@@ -10660,6 +12195,11 @@
     "roll": {
      "type": "float32",
      "note": "[rad/s] roll rate setpoint"
+    },
+    "thrust_body": {
+     "type": "float32",
+     "array": 3,
+     "note": "Normalized thrust command in body NED frame [-1,1]"
     },
     "timestamp": {
      "type": "uint64",
@@ -11803,6 +13343,11 @@
     "timestamp_sample": {
      "type": "uint64",
      "unit": "us"
+    },
+    "xyz": {
+     "type": "float32",
+     "array": 3,
+     "note": "[-] [@range -1, 1] Thrust setpoint along X, Y, Z body axis. If set to NAN the motors affecting this axis are stopped."
     }
    }
   },
@@ -11816,6 +13361,12 @@
     "timestamp_sample": {
      "type": "uint64",
      "unit": "us"
+    },
+    "xyz": {
+     "type": "float32",
+     "array": 3,
+     "unit": "normalized",
+     "note": "torque setpoint about X, Y, Z body axis (normalized)"
     }
    }
   },
@@ -11894,10 +13445,41 @@
   "vte_aid_source3d": {
    "file": "VteAidSource3d.msg",
    "fields": {
+    "fusion_status": {
+     "type": "uint8",
+     "array": 3,
+     "note": "[@enum VTE_FUSION_STATUS] Fusion status code per axis"
+    },
     "history_steps": {
      "type": "uint8",
      "unit": "0 if current or failed",
      "note": "[-] Number of steps replayed in OOSM (0 if current or failed)"
+    },
+    "innovation": {
+     "type": "float32",
+     "array": 3,
+     "note": "[-] [@frame NED] Kalman Filter innovation (y = z - Hx)"
+    },
+    "innovation_variance": {
+     "type": "float32",
+     "array": 3,
+     "note": "[-] [@frame NED] Kalman Filter variance of the innovation"
+    },
+    "observation": {
+     "type": "float32",
+     "array": 3,
+     "note": "[-] [@frame NED] Sensor observation attempted to be fused"
+    },
+    "observation_variance": {
+     "type": "float32",
+     "array": 3,
+     "note": "[-] [@frame NED] Variance of the observation attempted to be fused"
+    },
+    "test_ratio": {
+     "type": "float32",
+     "array": 3,
+     "unit": "NIS",
+     "note": "[-] Normalized innovation squared (NIS)"
     },
     "time_last_predict": {
      "type": "uint64",
@@ -11924,6 +13506,16 @@
      "type": "float32",
      "note": "[m] norm(raw_bias_k - raw_bias_k-1)"
     },
+    "filtered_bias": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m] [@frame NED] Low-pass filtered bias sample"
+    },
+    "raw_bias": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m] [@frame NED] Current GNSS-vision bias sample"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -11936,6 +13528,17 @@
     "acc_sample_count": {
      "type": "uint32",
      "note": "[-] Number of raw samples averaged into acc_xyz this cycle"
+    },
+    "acc_xyz": {
+     "type": "float32",
+     "array": 3,
+     "unit": "including gravity",
+     "note": "[m/s^2] [@frame NED] Downsampled UAV bias-corrected acceleration (including gravity)"
+    },
+    "q_att": {
+     "type": "float32",
+     "array": 4,
+     "note": "[-] Downsampled UAV attitude quaternion (FRD body -> NED earth)"
     },
     "timestamp": {
      "type": "uint64",
@@ -11979,6 +13582,46 @@
   "vte_position": {
    "file": "VtePosition.msg",
    "fields": {
+    "acc_target": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m/s^2] [@frame NED] Target acceleration"
+    },
+    "bias": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m] [@frame NED] GNSS bias between vehicle and target receivers"
+    },
+    "cov_acc_target": {
+     "type": "float32",
+     "array": 3,
+     "note": "[(m/s^2)^2] [@frame NED] Variance of acc_target"
+    },
+    "cov_bias": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m^2] [@frame NED] Variance of bias"
+    },
+    "cov_rel_pos": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m^2] [@frame NED] Variance of rel_pos"
+    },
+    "cov_vel_target": {
+     "type": "float32",
+     "array": 3,
+     "note": "[(m/s)^2] [@frame NED] Variance of vel_target"
+    },
+    "cov_vel_uav": {
+     "type": "float32",
+     "array": 3,
+     "note": "[(m/s)^2] [@frame NED] Variance of vel_uav"
+    },
+    "rel_pos": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m] [@frame NED] Target position relative to vehicle"
+    },
     "rel_pos_valid": {
      "type": "bool",
      "note": "[-] Relative position estimate valid"
@@ -11990,6 +13633,16 @@
     "timestamp": {
      "type": "uint64",
      "unit": "us"
+    },
+    "vel_target": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m/s] [@frame NED] Target velocity"
+    },
+    "vel_uav": {
+     "type": "float32",
+     "array": 3,
+     "note": "[m/s] [@frame NED] Vehicle velocity"
     }
    }
   },
@@ -12024,15 +13677,20 @@
    "fields": {
     "band": {
      "type": "int8",
-     "note": "Band number (0-23), negative values indicate frequency mode",
-     "values": {
-      "12": "LENGTH"
-     },
-     "kind": "enum"
+     "note": "Band number (0-23), negative values indicate frequency mode"
     },
     "band_letter": {
      "type": "uint8",
      "note": "Band letter as ASCII"
+    },
+    "band_name": {
+     "type": "uint8",
+     "array": 12,
+     "note": "Band name in ASCII without null termination",
+     "values": {
+      "12": "LENGTH"
+     },
+     "kind": "enum"
     },
     "channel": {
      "type": "int8",
@@ -12056,6 +13714,15 @@
      "values": {
       "0": "NORMAL",
       "1": "PIT"
+     },
+     "kind": "enum"
+    },
+    "power_label": {
+     "type": "uint8",
+     "array": 4,
+     "note": "Current power label in ASCII without null termination",
+     "values": {
+      "4": "LENGTH"
      },
      "kind": "enum"
     },
@@ -12086,6 +13753,16 @@
     "timestamp": {
      "type": "uint64",
      "unit": "us"
+    },
+    "wheel_angle": {
+     "type": "float32",
+     "array": 2,
+     "note": "[rad]"
+    },
+    "wheel_speed": {
+     "type": "float32",
+     "array": 2,
+     "note": "[rad/s]"
     }
    }
   },
@@ -12137,6 +13814,18 @@
   "yaw_estimator_status": {
    "file": "YawEstimatorStatus.msg",
    "fields": {
+    "innov_ve": {
+     "type": "float32",
+     "array": 5,
+     "unit": "m/s",
+     "note": "East velocity innovation for each model in the filter bank (m/s)"
+    },
+    "innov_vn": {
+     "type": "float32",
+     "array": 5,
+     "unit": "m/s",
+     "note": "North velocity innovation for each model in the filter bank (m/s)"
+    },
     "timestamp": {
      "type": "uint64",
      "unit": "us"
@@ -12144,6 +13833,17 @@
     "timestamp_sample": {
      "type": "uint64",
      "unit": "us"
+    },
+    "weight": {
+     "type": "float32",
+     "array": 5,
+     "note": "weighting for each model in the filter bank"
+    },
+    "yaw": {
+     "type": "float32",
+     "array": 5,
+     "unit": "rad",
+     "note": "yaw estimate for each model in the filter bank (rad)"
     },
     "yaw_composite": {
      "type": "float32",
