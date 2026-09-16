@@ -352,19 +352,19 @@ export function HistoryList({
         </p>
       ) : (
         <div className="max-h-[560px] overflow-auto">
-          <table className="w-full min-w-[900px] text-sm">
+          <table className="w-full table-fixed text-sm">
             <thead>
-              <tr className="text-left text-[11px] whitespace-nowrap text-muted">
-                <th className="pb-2 pr-3 font-normal">轨迹</th>
-                <th className="pb-2 pr-3 font-normal">飞行时间</th>
+              <tr className="text-left text-[11px] text-muted">
+                <th className="w-[72px] pb-2 pr-3 font-normal">轨迹</th>
+                <th className="w-[11%] pb-2 pr-3 font-normal">启动时间</th>
                 <th className="pb-2 pr-3 font-normal">文件名</th>
-                <th className="pb-2 pr-3 font-normal">时长</th>
-                <th className="pb-2 pr-3 font-normal">机型（机架）</th>
-                <th className="pb-2 pr-3 font-normal">硬件</th>
-                <th className="pb-2 pr-3 font-normal">软件</th>
-                <th className="pb-2 pr-3 font-normal">上传时间</th>
-                <th className="pb-2 pr-3 font-normal">大小</th>
-                <th className="pb-2 font-normal">结论</th>
+                <th className="w-[8%] pb-2 pr-3 font-normal">时长</th>
+                <th className="w-[10%] pb-2 pr-3 font-normal">机型（机架）</th>
+                <th className="w-[10%] pb-2 pr-3 font-normal">硬件</th>
+                <th className="w-[10%] pb-2 pr-3 font-normal">软件</th>
+                <th className="w-[11%] pb-2 pr-3 font-normal">上传时间</th>
+                <th className="w-[7%] pb-2 pr-3 font-normal">大小</th>
+                <th className="w-[10%] pb-2 font-normal">结论</th>
               </tr>
             </thead>
             <tbody>
@@ -397,7 +397,7 @@ export function HistoryList({
                     <td className="py-2 pr-3">
                       <TrackThumb points={r.trackThumb} />
                     </td>
-                    <td className="py-2 pr-3 font-mono text-xs whitespace-nowrap text-muted">
+                    <td className="py-2 pr-3 font-mono text-xs break-words text-muted">
                       {r.facts?.startUtc ? formatDateTime(r.facts.startUtc * 1000) : "—"}
                     </td>
                     <td className="max-w-[260px] py-2 pr-3">
@@ -424,17 +424,17 @@ export function HistoryList({
                     <td className="py-2 pr-3 whitespace-nowrap text-muted">
                       {fmtDuration(r.durationSec ?? r.facts?.durationSec)}
                     </td>
-                    <td className="py-2 pr-3 whitespace-nowrap text-text">
+                    <td className="py-2 pr-3 text-text">
                       {r.vehicleType ? (VEHICLE_TYPE_LABELS[r.vehicleType] ?? r.vehicleType) : "—"}
                       {r.facts?.airframeId ? (
                         <span className="text-muted">（{r.facts.airframeId}）</span>
                       ) : null}
                     </td>
-                    <td className="py-2 pr-3 font-mono text-xs whitespace-nowrap text-muted">{r.verHw ?? "—"}</td>
-                    <td className="py-2 pr-3 font-mono text-xs whitespace-nowrap text-muted">
+                    <td className="py-2 pr-3 font-mono text-xs break-words text-muted">{r.verHw ?? "—"}</td>
+                    <td className="py-2 pr-3 font-mono text-xs break-words text-muted">
                       {r.facts?.verSwBranch || r.verSw || "—"}
                     </td>
-                    <td className="py-2 pr-3 font-mono text-xs whitespace-nowrap text-muted">
+                    <td className="py-2 pr-3 font-mono text-xs break-words text-muted">
                       {formatDateTime(r.analyzedAt)}
                     </td>
                     <td className="py-2 pr-3 whitespace-nowrap text-muted">{fmtSize(r.fileSize)}</td>
