@@ -108,7 +108,7 @@ function PhaseStrip({ phases }: { phases: FlightPhase[] }) {
   for (const p of phases) legend.set(p.mode, modeStyle(p.mode, dark).label);
   return (
     <div>
-      <p className="mb-2 text-xs text-muted">飞行阶段（相对日志开始，浅色段为未解锁）</p>
+      <p className="mb-2 text-xs font-medium text-muted">飞行阶段（相对日志开始，浅色段为未解锁）</p>
       <div className="flex h-4 w-full overflow-hidden rounded">
         {phases.map((p, i) => (
           <div
@@ -173,7 +173,7 @@ function PresetCard({
         className="flex w-full items-center gap-2 py-3 text-left"
       >
         <LineChart className="h-4 w-4 shrink-0 text-primary" />
-        <span className="font-medium">{title}</span>
+        <span className="text-sm font-semibold">{title}</span>
         <span className="hidden text-xs text-muted sm:inline">{description}</span>
         <ChevronDown
           className={`ml-auto h-4 w-4 shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`}

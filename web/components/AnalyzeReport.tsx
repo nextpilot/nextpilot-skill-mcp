@@ -305,7 +305,7 @@ function MetricsTab({ report }: { report: AnalysisReport }) {
   const metrics = report.metrics ?? [];
   return (
     <div>
-      <h2 className="mb-3 text-base font-semibold">关键数据（确定性引擎实测）</h2>
+      <h2 className="mb-3 text-sm font-semibold">关键数据（确定性引擎实测）</h2>
       {metrics.length === 0 ? (
         <p className="flex items-center gap-2 text-sm text-muted">
           <Info className="h-4 w-4" />
@@ -335,7 +335,7 @@ function MetricsTab({ report }: { report: AnalysisReport }) {
 function SummaryTab({ report }: { report: AnalysisReport }) {
   return (
     <div>
-      <h2 className="mb-3 text-base font-semibold">检查明细（确定性引擎）</h2>
+      <h2 className="mb-3 text-sm font-semibold">检查明细（确定性引擎）</h2>
       {report.findings.length === 0 ? (
         <p className="flex items-center gap-2 text-sm text-ok">
           <Info className="h-4 w-4" />
@@ -352,7 +352,7 @@ function SummaryTab({ report }: { report: AnalysisReport }) {
       {/* 故障知识库 */}
       {report.matchedFaults && report.matchedFaults.length > 0 && (
         <div className="mt-6 space-y-3">
-          <h2 className="text-base font-semibold">
+          <h2 className="text-sm font-semibold">
             匹配故障模式（{report.matchedFaults.length}）
           </h2>
           {report.matchedFaults.map((mf) => (
@@ -412,7 +412,7 @@ function AiTab({
 }) {
   return (
     <div>
-      <h2 className="mb-3 text-base font-semibold">
+      <h2 className="mb-3 text-sm font-semibold">
         AI 中文解读（GJB-841 归零报告）
       </h2>
       {aiMarkdown ? (
@@ -478,7 +478,7 @@ function FindingCard({ finding }: { finding: Finding }) {
         {tone.icon}
         <span className="text-xs text-muted">{finding.id}</span>
         <span className="text-xs text-muted">· {finding.ruleId}</span>
-        <h3 className="font-medium">{finding.title}</h3>
+        <h3 className="text-sm font-medium">{finding.title}</h3>
       </div>
       <div className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
         <span className="text-muted">
