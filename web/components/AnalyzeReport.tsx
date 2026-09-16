@@ -200,6 +200,14 @@ export function AnalyzeReport({
         </div>
       )}
 
+      {/* 飞行轨迹（原来挂在"系统信息"框里，那个框已按要求去掉） */}
+      {info && (
+        <section className="mb-5 rounded-lg bg-surface-2 p-4">
+          <h3 className="mb-1 text-sm font-semibold">飞行轨迹</h3>
+          <LogFlightMap loadTrack={loadTrack} />
+        </section>
+      )}
+
       {/* 飞行阶段时间轴 */}
       {info?.phases?.length ? (
         <PhaseStrip phases={info.phases} />
@@ -214,14 +222,6 @@ export function AnalyzeReport({
           </TagRow>
         </div>
       ) : null}
-
-      {/* 飞行轨迹（原来挂在"系统信息"框里，那个框已按要求去掉） */}
-      {info && (
-        <section className="mb-5 rounded-lg bg-surface-2 p-4">
-          <h3 className="mb-1 text-sm font-semibold">飞行轨迹</h3>
-          <LogFlightMap loadTrack={loadTrack} />
-        </section>
-      )}
 
       {/* 纯历史（只有结论与 AI 文本，没有任何派生数据）：说明怎么把图表/参数/消息捞回来 */}
       {!info && (
