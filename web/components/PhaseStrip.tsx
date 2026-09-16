@@ -33,12 +33,14 @@ export function PhaseStrip({ phases }: { phases: FlightPhase[] }) {
   return (
     <div className="mb-5 rounded-lg border border-border bg-surface-2 p-3">
       <div className="mb-2 flex items-center gap-3">
-        <span
-          className="text-xs font-medium text-muted"
+        {/* 标题与「飞行轨迹」那个 h3 同款（text-sm font-semibold，不用灰字）：两个板块挨着，
+            一个 12px 灰、一个 14px 黑，看着就是没对齐 */}
+        <h3
+          className="text-sm font-semibold"
           title="整段日志的飞行模式时间轴：颜色 = PX4 飞行模式（定点/任务/返航…），悬停任一段看起止时间。数据图表里的底色用的也是同一套配色。时间是**开机以来的秒数**（与 Flight Review 一致）"
         >
           飞行阶段
-        </span>
+        </h3>
         <span className="text-[10px] text-faint" title="开机以来的时间（不是日志起点）">
           {formatLogTime(t0)} – {formatLogTime(phases[phases.length - 1].endSec)}
         </span>
