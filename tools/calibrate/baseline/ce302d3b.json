@@ -242,7 +242,7 @@
         "title": "电芯电压严重过低",
         "evidence": {
           "field": "battery_status.voltage_v(min)/cell_count",
-          "value": 3.339,
+          "value": "3.339",
           "threshold": 3.55,
           "unit": "V/cell"
         },
@@ -257,7 +257,7 @@
         "title": "电池剩余电量极低（8%）",
         "evidence": {
           "field": "battery_status.remaining(min)",
-          "value": 0.075,
+          "value": "0.075",
           "threshold": 0.1
         },
         "docUrl": "https://docs.px4.io/main/en/config/battery.html",
@@ -323,8 +323,8 @@
         "title": "EKF 创新检验偶发失败（estimator #2：空速）",
         "evidence": {
           "field": "estimator_status 创新检验拒绝样本占比",
-          "value": 1.15,
-          "threshold": 1.0,
+          "value": "1.15",
+          "threshold": 1,
           "unit": "%"
         },
         "docUrl": "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html",

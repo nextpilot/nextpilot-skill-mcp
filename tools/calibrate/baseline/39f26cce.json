@@ -250,7 +250,7 @@
         "title": "空速传感器在固定翼段大部分时间无效（100% 样本）",
         "evidence": {
           "field": "airspeed_validated.airspeed_sensor_measurement_valid",
-          "value": 1.0,
+          "value": "1.000",
           "threshold": 0.5
         },
         "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html",
@@ -301,7 +301,7 @@
         "title": "高频振动偏大（IMU #1）",
         "evidence": {
           "field": "vehicle_imu_status.accel_vibration_metric(均值)",
-          "value": 4.985,
+          "value": "4.985",
           "threshold": 4.905,
           "unit": "m/s^2"
         },
@@ -331,8 +331,8 @@
         "title": "姿态跟踪误差偏大（p99 27.5°）",
         "evidence": {
           "field": "vehicle_attitude vs vehicle_attitude_setpoint（机动段）",
-          "value": 27.5,
-          "threshold": 25.0,
+          "value": "27.5",
+          "threshold": 25,
           "unit": "°"
         },
         "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html",

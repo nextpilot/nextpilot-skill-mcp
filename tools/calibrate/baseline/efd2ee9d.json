@@ -194,7 +194,7 @@
         "title": "电池剩余电量极低（4%）",
         "evidence": {
           "field": "battery_status.remaining(min)",
-          "value": 0.039,
+          "value": "0.039",
           "threshold": 0.1
         },
         "docUrl": "https://docs.px4.io/main/en/config/battery.html",
@@ -233,7 +233,7 @@
         "title": "电芯电压偏低",
         "evidence": {
           "field": "battery_status.voltage_v(min)/cell_count",
-          "value": 3.559,
+          "value": "3.559",
           "threshold": 3.7,
           "unit": "V/cell"
         },
