@@ -359,6 +359,28 @@ export default function HomePage() {
           </div>
 
           <SubSection
+            en="Expert knowledge base"
+            zh="专家经验知识库"
+            note="规则、故障库、字段绑定与参数字典都在仓库里，可评审、可回归"
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              {KNOWLEDGE.map((k) => (
+                <div key={k.title} className="card flex gap-3 p-4">
+                  <span className="mt-0.5 shrink-0 text-primary">{k.icon}</span>
+                  <div>
+                    <p className="text-sm font-semibold text-text">
+                      <LocalizedText zh={k.title} en={k.titleEn} />
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-muted">
+                      <LocalizedText zh={k.desc} en={k.descEn} />
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SubSection>
+
+          <SubSection
             en="What gets checked"
             zh="日志里真正被检查的东西"
             note="每条结论都能回指到字段、阈值和官方文档"
@@ -377,12 +399,6 @@ export default function HomePage() {
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-3 text-xs leading-5 text-muted">
-                    <LocalizedText
-                      zh="解析与检查全部在你的浏览器里完成，服务端只收到结构化的检查结果。PX4 1.15 前后字段体系不同，引擎按固件版本自动切换字段。"
-                      en="Parsing and checking happen in your browser; the server only receives structured findings. Field names differ before/after PX4 1.15 and the engine switches by firmware version."
-                    />
-                  </p>
                 </div>
                 <div className="card flex flex-col p-5">
                   <h3 className="text-sm font-semibold text-text">
@@ -406,28 +422,6 @@ export default function HomePage() {
                   </dl>
                 </div>
               </div>
-          </SubSection>
-
-          <SubSection
-            en="Knowledge base"
-            zh="知识库"
-            note="规则、故障库、字段绑定与参数字典都在仓库里，可评审、可回归"
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              {KNOWLEDGE.map((k) => (
-                <div key={k.title} className="card flex gap-3 p-4">
-                  <span className="mt-0.5 shrink-0 text-primary">{k.icon}</span>
-                  <div>
-                    <p className="text-sm font-semibold text-text">
-                      <LocalizedText zh={k.title} en={k.titleEn} />
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-muted">
-                      <LocalizedText zh={k.desc} en={k.descEn} />
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
           </SubSection>
 
           <div className="mt-10 border-t border-border pt-8 text-center">
