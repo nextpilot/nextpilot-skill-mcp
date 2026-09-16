@@ -661,25 +661,21 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
             <td className="w-36 py-1 pr-3 align-top whitespace-nowrap text-muted" title="确定性引擎的检查结论条数（明细见「检查结论」tab）">
               检查结论
             </td>
+            {/* 与上面 异常标签 / 数据质量 / 飞行模式 用同一种 chip：同样的圆角、字号与描边。
+                原来是 rounded-full 的大胶囊（px-2 py-1 font-semibold），跟整块表不是一个调子 */}
             <td className="flex flex-wrap gap-1.5 py-1 align-top">
-              <CountPill
-                icon={<ShieldAlert className="h-3.5 w-3.5" />}
-                n={counts.critical}
-                label="严重"
-                tone="critical"
-              />
-              <CountPill
-                icon={<AlertTriangle className="h-3.5 w-3.5" />}
-                n={counts.warning}
-                label="警告"
-                tone="warning"
-              />
-              <CountPill
-                icon={<Info className="h-3.5 w-3.5" />}
-                n={counts.info}
-                label="提示"
-                tone="info"
-              />
+              <span className="chip border-critical/40 text-critical">
+                <ShieldAlert className="h-3 w-3" />
+                {counts.critical} 严重
+              </span>
+              <span className="chip border-warning/40 text-warning">
+                <AlertTriangle className="h-3 w-3" />
+                {counts.warning} 警告
+              </span>
+              <span className="chip border-border text-muted">
+                <Info className="h-3 w-3" />
+                {counts.info} 提示
+              </span>
             </td>
           </tr>
         </tbody>
@@ -704,38 +700,5 @@ function TagRow({
       </span>
       {children}
     </div>
-  );
-}
-
-function CountPill({
-  icon,
-  n,
-  label,
-  tone,
-}: {
-  icon: React.ReactNode;
-  n: number;
-  label: string;
-  tone: "critical" | "warning" | "info";
-}) {
-  const colors = {
-    critical: "text-critical border-critical/40",
-    warning: "text-warning border-warning/40",
-    info: "text-muted border-border",
-  }[tone];
-  return (
-    <span
-      className={`flex items-center gap-1 rounded-full border px-2 py-1 font-semibold ${colors}`}
-    >
-      {icon}
-      {n > 0 ? (
-        <>
-          <span>{n}</span>
-          <span className="font-normal">{label}</span>
-        </>
-      ) : (
-        <span className="font-normal">0 {label}</span>
-      )}
-    </span>
   );
 }
