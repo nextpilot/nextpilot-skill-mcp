@@ -1,18 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Trash2,
   History,
-  Clock,
-  FileText,
-  Timer,
-  Plane,
-  Cpu,
-  GitBranch,
   MapPin,
-  Upload,
   Search,
   ShieldAlert,
   AlertTriangle,
@@ -95,7 +89,7 @@ function fmtSize(bytes?: number): string {
  */
 function TrackThumb({ points }: { points?: [number, number][]; }) {
   const box =
-    "h-16 w-20 shrink-0 overflow-hidden rounded-md border border-border bg-surface-2";
+    "block h-12 w-16 shrink-0 overflow-hidden rounded-md border border-border bg-surface-2";
   if (!points || points.length < 2) {
     return (
       <span
@@ -167,6 +161,7 @@ export function HistoryList({
   /** 可选：标题栏右侧插槽（如折叠按钮） */
   headerRight?: React.ReactNode;
 }) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [vehicleFilter, setVehicleFilter] = useState("");
@@ -356,121 +351,110 @@ export function HistoryList({
           {hasFilters ? "没有匹配当前筛选条件的记录" : "没有匹配的记录"}
         </p>
       ) : (
-        <ul className="max-h-[560px] divide-y divide-border/30 overflow-y-auto">
-          {filtered.map((r) => {
-            // 双保险：cloud item 用 findingCount，local item 用 findings 数组；
-            // 两者都缺失时（极旧的本地记录）按 0 处理，不渲染崩页面
-            const findings = Array.isArray(r.findings) ? r.findings : [];
-            const total =
-              typeof r.findingCount === "number"
-                ? r.findingCount
-                : findings.length;
-            const hasSeverityCounts = typeof r.findingCount !== "number";
-            const c = hasSeverityCounts
-              ? {
-                  critical: findings.filter((f) => f.severity === "critical").length,
-                  warning: findings.filter((f) => f.severity === "warning").length,
-                  info: findings.filter((f) => f.severity === "info").length,
-                }
-              : null;
-            return (
-              // 整行即链接：**立即跳转**到结果页（结论与曲线都在存档里，不需要在这里先解析）
-              <li key={`${r.source}-${r.id}`}>
-                <Link
-                  href={`/analyze/${encodeURIComponent(r.id)}`}
-                  className="flex gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-surface-2"
-                >
-                <TrackThumb points={r.trackThumb} />
-                <div className="min-w-0 flex-1">
-                {/* 第一行：这次飞行是什么——飞行时间 · 飞行时长 · 机型（机架）· 硬件版本 · 软件版本
-                    飞行时间取日志记录的起始时刻（facts.startUtc，GPS 首次有效 UTC）；老存档没有就显示 — */}
-                <div
-                  className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted"
-                  title={`分析时间：${formatDateTime(r.analyzedAt)}`}
-                >
-                  <span className="flex items-center gap-1" title="飞行时间（日志记录的起始时刻，取 GPS 首次有效 UTC）">
-                    <Clock className="h-3.5 w-3.5 shrink-0 text-muted" />
-                    <span className="font-mono">
+        <div className="max-h-[560px] overflow-auto">
+          <table className="w-full min-w-[900px] text-sm">
+            <thead>
+              <tr className="text-left text-[11px] whitespace-nowrap text-muted">
+                <th className="pb-2 pr-3 font-normal">轨迹</th>
+                <th className="pb-2 pr-3 font-normal">飞行时间</th>
+                <th className="pb-2 pr-3 font-normal">文件名</th>
+                <th className="pb-2 pr-3 font-normal">时长</th>
+                <th className="pb-2 pr-3 font-normal">机型（机架）</th>
+                <th className="pb-2 pr-3 font-normal">硬件</th>
+                <th className="pb-2 pr-3 font-normal">软件</th>
+                <th className="pb-2 pr-3 font-normal">上传时间</th>
+                <th className="pb-2 pr-3 font-normal">大小</th>
+                <th className="pb-2 font-normal">结论</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((r) => {
+                // 双保险：cloud item 用 findingCount，local item 用 findings 数组；
+                // 两者都缺失时（极旧的本地记录）按 0 处理，不渲染崩页面
+                const findings = Array.isArray(r.findings) ? r.findings : [];
+                const total = typeof r.findingCount === "number" ? r.findingCount : findings.length;
+                const hasSeverityCounts = typeof r.findingCount !== "number";
+                const c = hasSeverityCounts
+                  ? {
+                      critical: findings.filter((f) => f.severity === "critical").length,
+                      warning: findings.filter((f) => f.severity === "warning").length,
+                      info: findings.filter((f) => f.severity === "info").length,
+                    }
+                  : null;
+                const href = `/analyze/${encodeURIComponent(r.id)}`;
+                return (
+                  // 整行可点（表格里没法把 <a> 套在 <tr> 上）：文件名那格仍是真链接，
+                  // 于是新标签页打开 / 复制链接这些浏览器行为都还在
+                  <tr
+                    key={`${r.source}-${r.id}`}
+                    onClick={(e) => {
+                      // 点在链接自己身上时交给 <a>，别双重跳转
+                      if ((e.target as HTMLElement).closest("a")) return;
+                      router.push(href);
+                    }}
+                    className="cursor-pointer border-t border-border/30 hover:bg-surface-2"
+                  >
+                    <td className="py-2 pr-3">
+                      <TrackThumb points={r.trackThumb} />
+                    </td>
+                    <td className="py-2 pr-3 font-mono text-xs whitespace-nowrap text-muted">
                       {r.facts?.startUtc ? formatDateTime(r.facts.startUtc * 1000) : "—"}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-1" title="日志时长">
-                    <Timer className="h-3.5 w-3.5 shrink-0 text-muted" />
-                    {fmtDuration(r.durationSec ?? r.facts?.durationSec)}
-                  </span>
-                  {r.vehicleType && (
-                    <span
-                      className="flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] text-text"
-                      title="机型与机架编号（SYS_AUTOSTART）"
-                    >
-                      <Plane className="h-3.5 w-3.5 shrink-0 text-text" />
-                      {VEHICLE_TYPE_LABELS[r.vehicleType] ?? r.vehicleType}
-                      {r.facts?.airframeId ? `（机架 ${r.facts.airframeId}）` : ""}
-                    </span>
-                  )}
-                  {r.verHw && (
-                    <span
-                      className="flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] text-faint"
-                      title="硬件版本（ver_hw）"
-                    >
-                      <Cpu className="h-3.5 w-3.5 shrink-0 text-muted" />
-                      {r.verHw}
-                    </span>
-                  )}
-                  {(r.facts?.verSwBranch || r.verSw) && (
-                    <span
-                      className="flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] font-mono text-faint"
-                      title={r.facts?.verSwBranch ? `固件分支（ver_sw_branch）；commit ${r.verSw ?? "?"}` : "固件 commit（ver_sw）"}
-                    >
-                      <GitBranch className="h-3.5 w-3.5 shrink-0 text-muted" />
-                      {r.facts?.verSwBranch || r.verSw}
-                    </span>
-                  )}
-                  <span
-                    className="ml-auto flex items-center gap-0.5"
-                    title={r.source === "cloud" ? "云端（跨设备可见）" : "仅本机"}
-                  >
-                    {r.source === "cloud" ? (
-                      <Cloud className="h-3 w-3 text-primary" />
-                    ) : (
-                      <HardDrive className="h-3 w-3" />
-                    )}
-                  </span>
-                </div>
-
-                {/* 文件名那一行：文件名 + 上传（分析）时间 + 文件大小 */}
-                <div className="mt-1 flex items-center gap-2">
-                  <p className="min-w-0 flex-1 truncate text-base font-medium text-text" title={r.fileName}>
-                    {r.fileName}
-                  </p>
-                  <span
-                    className="flex shrink-0 items-center gap-1 text-xs text-muted"
-                    title="上传并分析这份日志的时间"
-                  >
-                    <Upload className="h-3.5 w-3.5 shrink-0 text-muted" />
-                    <span className="font-mono">{formatDateTime(r.analyzedAt)}</span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-1 text-xs text-muted" title="日志文件大小">
-                    <FileText className="h-3.5 w-3.5 shrink-0 text-muted" />
-                    {fmtSize(r.fileSize)}
-                  </span>
-                </div>
-                <div className="mt-1.5 flex items-center gap-2">
-                  {c && (
-                    <span className="flex items-center gap-1.5 text-xs">
-                      <Count icon={<ShieldAlert className="h-3 w-3" />} n={c.critical} tone="critical" />
-                      <Count icon={<AlertTriangle className="h-3 w-3" />} n={c.warning} tone="warning" />
-                      <Count icon={<Info className="h-3 w-3" />} n={c.info} tone="info" />
-                    </span>
-                  )}
-                  {!c && <span className="text-xs text-muted">{total} 条检查结果</span>}
-                </div>
-                </div>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+                    </td>
+                    <td className="max-w-[260px] py-2 pr-3">
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className="shrink-0"
+                          title={r.source === "cloud" ? "云端（跨设备可见）" : "仅本机"}
+                        >
+                          {r.source === "cloud" ? (
+                            <Cloud className="h-3.5 w-3.5 text-primary" />
+                          ) : (
+                            <HardDrive className="h-3.5 w-3.5 text-faint" />
+                          )}
+                        </span>
+                        <Link
+                          href={href}
+                          className="min-w-0 truncate font-medium text-text hover:text-primary"
+                          title={r.fileName}
+                        >
+                          {r.fileName}
+                        </Link>
+                      </span>
+                    </td>
+                    <td className="py-2 pr-3 whitespace-nowrap text-muted">
+                      {fmtDuration(r.durationSec ?? r.facts?.durationSec)}
+                    </td>
+                    <td className="py-2 pr-3 whitespace-nowrap text-text">
+                      {r.vehicleType ? (VEHICLE_TYPE_LABELS[r.vehicleType] ?? r.vehicleType) : "—"}
+                      {r.facts?.airframeId ? (
+                        <span className="text-muted">（{r.facts.airframeId}）</span>
+                      ) : null}
+                    </td>
+                    <td className="py-2 pr-3 font-mono text-xs whitespace-nowrap text-muted">{r.verHw ?? "—"}</td>
+                    <td className="py-2 pr-3 font-mono text-xs whitespace-nowrap text-muted">
+                      {r.facts?.verSwBranch || r.verSw || "—"}
+                    </td>
+                    <td className="py-2 pr-3 font-mono text-xs whitespace-nowrap text-muted">
+                      {formatDateTime(r.analyzedAt)}
+                    </td>
+                    <td className="py-2 pr-3 whitespace-nowrap text-muted">{fmtSize(r.fileSize)}</td>
+                    <td className="py-2 whitespace-nowrap">
+                      {c ? (
+                        <span className="flex items-center gap-1.5 text-xs">
+                          <Count icon={<ShieldAlert className="h-3 w-3" />} n={c.critical} tone="critical" />
+                          <Count icon={<AlertTriangle className="h-3 w-3" />} n={c.warning} tone="warning" />
+                          <Count icon={<Info className="h-3 w-3" />} n={c.info} tone="info" />
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted">{total}</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {/* 如实告知本机占用：缓存了才可能"完整数据"，用户有权知道自己存了什么 */}
