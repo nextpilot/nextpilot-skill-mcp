@@ -8,17 +8,51 @@
 #
 # 下面这些**键名**是引擎约定的（改了要同步改 engine/）；**值**（字段名、码值、顺序）随 PX4 上游变。
 
-# 规则执行顺序：引擎就按这个列表逐个 slot 执行，**顺序即报告里 finding 编号
+# 规则执行顺序：引擎就按这个列表逐个 group 执行，**顺序即报告里 finding 编号
 # （F01、F02…）的生成顺序**，也决定 guard 标签的先后。
-#   · 新增一条经验：把它的 slot 加进这里（或复用已有 slot），并让经验里的 slot 对上即可，
-#     不用改任何 Python；构建期会校验"经验的 slot 是否都已登记"。
+#   · 新增一条经验：把它的 group 加进这里（或复用已有 group），并让经验里的 group 对上即可，
+#     不用改任何 Python；构建期会校验"经验的 group 是否都已登记"。
 #   · guards_early 必须排第一（insufficient_data 要是第一个 guard 标签），guards 排最后。
-slot_order:
+group_order:
   [guards_early,
    vibration, ekf_innovations, ekf_faults, battery, cpu, gps_health, failsafe,
    mode_thrash, motor_balance, imu_bias, attitude_tracking, airspeed,
    vtol_transition, wind_estimate, logged_messages,
    guards]
+
+# 规则元数据：**能从已有信息推出来的，就不让每条规则各写一遍**。
+#   defaults —— 身份块默认值；规则里写了就以规则里的为准（个别规则确实会偏离）
+#   by_group —— 按 group 派生的两个字段：
+#       category  分类（UI 分组用）
+#       doc       官方文档链接（每条 finding 必须可溯源）
+#   构建期规则：规则的 group 必须在这里登记；同一个 group 的 category / doc 必须唯一
+#   （要不一样就在规则里显式写，构建期会提示）。
+#   为什么不让规则各写一遍：32 条规则里 category 与 group 一一对应、doc 只有 6 种取值，
+#   写 32 遍纯属重复，而且改一处漏一处。
+rule_meta:
+  defaults:
+    version: "1.0.0"
+    status: stable
+    license: CC-BY-4.0
+    author: {name: NextPilot 内置}
+  by_group:
+    airspeed:          {category: airspeed, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html"}
+    attitude_tracking: {category: attitude, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html"}
+    battery:           {category: power,    doc: "https://docs.px4.io/main/en/config/battery.html"}
+    cpu:               {category: system,   doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html"}
+    ekf_faults:        {category: ekf,      doc: "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"}
+    ekf_innovations:   {category: ekf,      doc: "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"}
+    failsafe:          {category: failsafe, doc: "https://docs.px4.io/main/en/config/safety.html"}
+    gps_health:        {category: gps,      doc: "https://docs.px4.io/main/en/gps_compass/"}
+    guards:            {category: guard}          # guard 类不发 finding，没有 doc
+    guards_early:      {category: guard}
+    imu_bias:          {category: imu,      doc: "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"}
+    logged_messages:   {category: messages, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html"}
+    mode_thrash:       {category: mode,     doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html"}
+    motor_balance:     {category: motor,    doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html"}
+    vibration:         {category: vibration, doc: "https://docs.px4.io/main/en/assembly/vibration_isolation.html"}
+    vtol_transition:   {category: vtol,     doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html"}
+    wind_estimate:     {category: wind,     doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html"}
 
 # 事实从哪个 topic 的哪个字段取（固件改了字段名就改这里；要按固件分支时见规则里的 when_fw）
 bindings:
@@ -48,7 +82,8 @@ nav_state_names:
    22: VTOL Takeoff}
 
 # 飞行模式码 → 飞行阶段（故障库按 flight_phase 匹配时用；codes 是 nav_state 的取值）
-nav_groups:
+# 注意别和上面的 group 混：这里是 nav_state **码值**的分组，group 是**规则**的执行分组。
+nav_state_groups:
   - {phase: takeoff,   codes: [17, 22]}
   - {phase: hover,     codes: [2, 4, 6, 14, 21]}
   - {phase: maneuver,  codes: [0, 1, 10, 15]}

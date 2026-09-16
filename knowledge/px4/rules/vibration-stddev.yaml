@@ -3,62 +3,48 @@
 # 阈值 [暂定]（px4-thresholds.toml [vibration] stddev_warn/stddev_crit）。
 
 id: px4-vibration-stddev
-slot: vibration
-order: 2
+
 name: IMU 加速度标准差
-version: 1.0.0
-category: vibration
-status: stable
-author: {name: NextPilot 内置}
-license: CC-BY-4.0
-changelog:
-  - {version: 1.0.0, date: "2026-09-15", note: 从 ulog_checks.py 迁出，逻辑与阈值不变}
 
-firmware: any
-airframe: any
+group: vibration
 
-requires:
-  any_of: [vehicle_imu_status]
-skip_reason: vehicle_imu_status not in log
+order: 2
+
+firmware: "True"
+
+airframe: "True"
+
+skip:
+  - {when: "not has_topic('vehicle_imu_status')", reason: vehicle_imu_status not in log}
 
 compute:
-  # 三轴各自按实例分组；aliases 覆盖旧固件字段改名（stddev_accel_x[_m_s2]）
-  - out: [stddev_rss, stddev_idx]
-    in:
-      - vehicle_imu_status.stddev_accel_x_m_s2
-      - vehicle_imu_status.stddev_accel_y_m_s2
-      - vehicle_imu_status.stddev_accel_z_m_s2
-    op: worst_rss_mean
-    per_instance: true
-    min_mean: 0              # 迁移前以 0 为初值严格更大才替换：全零视为无有效数据
-    aliases:
-      vehicle_imu_status.stddev_accel_x_m_s2: [stddev_accel_x]
-      vehicle_imu_status.stddev_accel_y_m_s2: [stddev_accel_y]
-      vehicle_imu_status.stddev_accel_z_m_s2: [stddev_accel_z]
+  # 三轴各自按实例分组；alias 覆盖旧固件字段改名（stddev_accel_x[_m_s2]）
+  - >-
+      stddev_rss, stddev_idx = worst_rss_mean(
+      ref("vehicle_imu_status.stddev_accel_x_m_s2", per_instance=True, alias="stddev_accel_x"),
+      ref("vehicle_imu_status.stddev_accel_y_m_s2", per_instance=True, alias="stddev_accel_y"),
+      ref("vehicle_imu_status.stddev_accel_z_m_s2", per_instance=True, alias="stddev_accel_z"),
+      min_mean=0)
 
 triggers:
-  - expr: "stddev_rss >= 1.0"
+  - when: "stddev_rss >= 1.0"
     severity: critical
     threshold: 1.0
-    value: stddev_rss
-    round: 3
+    value: f"{stddev_rss:.3f}"
     unit: m/s^2
     field: "vehicle_imu_status.stddev_accel_*_m_s2(RSS 均值)"
     title: "IMU 加速度标准差严重超标（IMU #{stddev_idx}）"
     suggestion: "结合故障库条目排查桨叶/电机轴承/机架紧固/减震。"
-  - expr: "stddev_rss >= 0.5"
+  - when: "stddev_rss >= 0.5"
     severity: warning
     threshold: 0.5
-    value: stddev_rss
-    round: 3
+    value: f"{stddev_rss:.3f}"
     unit: m/s^2
     field: "vehicle_imu_status.stddev_accel_*_m_s2(RSS 均值)"
     title: "IMU 加速度标准差偏大（IMU #{stddev_idx}）"
     suggestion: "关注桨叶损伤、电机动平衡与 IMU 减震。"
 
 emit:
-  check: vibration
   tag: high_vibration
-  doc: https://docs.px4.io/main/en/assembly/vibration_isolation.html
   stats:
     imuStddevAccelRssMax: {var: stddev_rss, round: 3}

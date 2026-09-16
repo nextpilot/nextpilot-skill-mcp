@@ -3,67 +3,59 @@
 # 阈值 [暂定] px4-thresholds.toml [airspeed]：invalid_ratio_warn=0.10 / crit=0.50。
 
 id: px4-airspeed-invalid
-slot: airspeed
-order: 1
+
 name: 空速健康
-version: 1.0.0
-category: airspeed
-status: stable
-author: {name: NextPilot 内置}
-license: CC-BY-4.0
-changelog:
-  - {version: 1.0.0, date: "2026-09-15", note: 从 ulog_checks.py 迁出，逻辑与阈值不变}
 
-firmware: any
+group: airspeed
+
+order: 1
+
+firmware: "True"
 # 原实现只对固定翼判空速；旋翼/Rover 既不 ran 也不 skipped（静默）
-airframe: fixed_wing
+# 机型未知时给一条 skip 记录（与原实现的 elif 分支一致）——所以"未知"要放行机架轴，
+# 交给下面 skip 里的 `airframe == 'unknown'` 去留痕
+airframe: "is_fixed_wing or airframe == 'unknown'"
 # 机型未知时给一条 skip 记录（与原实现的 elif 分支一致）
-not_applicable: {when: "airframe == 'unknown'", skip_reason: 机型未知，无法判定固定翼巡航段}
 # 原外层条件还要求存在 vehicle_attitude_setpoint，缺失时静默
-silent_when: "'vehicle_attitude_setpoint' not in topics"
 
-requires:
-  any_of: [airspeed_validated]
-skip_reason: 无固定翼巡航段或未记录 airspeed_validated
-skip_reason_no_data: 无固定翼巡航段或未记录 airspeed_validated
+skip:
+  - {when: "airframe == 'unknown'", reason: 机型未知，无法判定固定翼巡航段}
+  - {when: "not has_topic('vehicle_attitude_setpoint')"}
+  - {when: "no_data", reason: 无固定翼巡航段或未记录 airspeed_validated}
+  - {when: "not has_topic('airspeed_validated')", reason: 无固定翼巡航段或未记录 airspeed_validated}
 
 compute:
-  # 固定翼巡航段：armed 区间内 nav_state 出现过 3/8
-  - out: fw_cruise
-    in: [vehicle_status.nav_state, vehicle_status.timestamp, armed_intervals]
-    op: masked_any_in
-    codes: [3, 8]
-  - {out: cruise_ok, in: [fw_cruise], op: require_true}
+  # 固定翼巡航段：armed 区间内 nav_state 出现过 3/8；不成立则整条中止（原 require_true 门控）
+  - >-
+      cruise_ok = require_true(masked_any_in(vehicle_status.nav_state,
+      vehicle_status.timestamp, armed_intervals, codes=[3, 8]))
   # 无效样本占比；字段缺失时保持可选（此时只用下面 tas 的统计，与原实现一致）
-  - {out: invalid_frac, from: airspeed_validated.airspeed_sensor_measurement_valid,
-     op: ratio_equal, value: 0, optional: true}
-  - {out: has_invalid, in: [invalid_frac], op: is_not_none, optional: true}
-  - {out: tas_min, from: airspeed_validated.true_airspeed_m_s, op: min, optional: true}
+  - >-
+      invalid_frac = _try(ratio_equal(
+      ref("airspeed_validated.airspeed_sensor_measurement_valid"), value=0))
+  - has_invalid = invalid_frac is not None
+  - tas_min = _try(min(airspeed_validated.true_airspeed_m_s))
 
 triggers:
-  - expr: "has_invalid and invalid_frac >= 0.50"
+  - when: "has_invalid and invalid_frac >= 0.50"
     severity: critical
     tag: low_airspeed
     threshold: 0.50
-    value: invalid_frac
-    round: 3
+    value: f"{invalid_frac:.3f}"
     field: "airspeed_validated.airspeed_sensor_measurement_valid"
     title: "空速传感器在固定翼段大部分时间无效（{invalid_frac:.0%} 样本）"
     suggestion: "结合故障库 F009：空速失效极易引发失速，检查空速管堵塞/积水、管路漏气与校准。"
-  - expr: "has_invalid and invalid_frac >= 0.10"
+  - when: "has_invalid and invalid_frac >= 0.10"
     severity: warning
     tag: low_airspeed
     threshold: 0.10
-    value: invalid_frac
-    round: 3
+    value: f"{invalid_frac:.3f}"
     field: "airspeed_validated.airspeed_sensor_measurement_valid"
     title: "空速传感器间歇无效（{invalid_frac:.0%} 样本）"
     suggestion: "结合故障库 F009 检查空速管与管路密封。"
 
 emit:
-  check: airspeed
   tag: low_airspeed
-  doc: https://docs.px4.io/main/en/log/flight_log_analysis.html
   stats:
     airspeedInvalidRatio: {var: invalid_frac, round: 3}
     airspeedMinM: {var: tas_min, round: 1}

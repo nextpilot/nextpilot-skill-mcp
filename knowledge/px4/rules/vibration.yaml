@@ -2,58 +2,48 @@
 # 阈值 [来源] Flight Review 振动色带 0.5g / 1g（与 px4-thresholds.toml [vibration] 一致）。
 
 id: px4-vibration
-slot: vibration
-order: 1                 # vibration slot 内次序：vibration=1, stddev=2, clipping=3
+
 name: 高频振动
-version: 1.0.0
-category: vibration
-status: stable
-author: {name: NextPilot 内置}
-license: CC-BY-4.0
-changelog:
-  - {version: 1.0.0, date: "2026-09-15", note: 从 ulog_checks.py 迁出，逻辑与阈值不变}
 
-firmware: any
-airframe: any
+group: vibration
 
-requires:
-  any_of: [vehicle_imu_status]
-skip_reason: vehicle_imu_status not in log
+order: 1                 # vibration group 内次序：vibration=1, stddev=2, clipping=3
+
+firmware: "True"
+
+airframe: "True"
+
+skip:
+  - {when: "not has_topic('vehicle_imu_status')", reason: vehicle_imu_status not in log}
 
 compute:
   # 每个 IMU 实例一条 accel_vibration_metric 序列；取均值最大的实例，
   # 同时得到该实例的 p95 与最大值（迁移前 worst 字典的三个统计量同源）。
-  # min_mean: 0 复刻迁移前「以 0 为初值、严格更大才替换」的语义：全零视为无有效数据
-  - out: [vibe_mean, vibe_p95, vibe_max, imu_idx]
-    from: vehicle_imu_status.accel_vibration_metric
-    op: worst_mean_stats
-    per_instance: true
-    min_mean: 0
+  # min_mean=0 复刻迁移前「以 0 为初值、严格更大才替换」的语义：全零视为无有效数据
+  - >-
+    vibe_mean, vibe_p95, vibe_max, imu_idx = worst_mean_stats(
+      ref("vehicle_imu_status.accel_vibration_metric", per_instance=True), min_mean=0)
 
 triggers:
-  - expr: "vibe_mean >= 9.81"
+  - when: "vibe_mean >= 9.81"
     severity: critical
     threshold: 9.81
-    value: vibe_mean
-    round: 3
+    value: f"{vibe_mean:.3f}"
     unit: m/s^2
     field: "vehicle_imu_status.accel_vibration_metric(均值)"
     title: "高频振动严重超标（IMU #{imu_idx}）"
     suggestion: "Flight Review 红色区间（>9.81 m/s^2）。结合故障库条目排查桨叶/电机/机架/减震。"
-  - expr: "vibe_mean >= 4.905"
+  - when: "vibe_mean >= 4.905"
     severity: warning
     threshold: 4.905
-    value: vibe_mean
-    round: 3
+    value: f"{vibe_mean:.3f}"
     unit: m/s^2
     field: "vehicle_imu_status.accel_vibration_metric(均值)"
     title: "高频振动偏大（IMU #{imu_idx}）"
     suggestion: "Flight Review 橙色区间（4.905~9.81 m/s^2）。结合故障库条目排查桨叶动平衡/电机/IMU 减震。"
 
 emit:
-  check: vibration
   tag: high_vibration
-  doc: https://docs.px4.io/main/en/assembly/vibration_isolation.html
   stats:
     imuAccelVibrationMean: {var: vibe_mean, round: 3}
     imuAccelVibrationP95: {var: vibe_p95, round: 3}

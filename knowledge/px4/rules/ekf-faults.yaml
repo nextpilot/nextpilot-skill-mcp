@@ -3,49 +3,45 @@
 # bit 10（视觉速度融合拒绝）在未用 VIO 的飞机上属正常 → 只报 info，避免误报。
 
 id: px4-ekf-fault
-slot: ekf_faults
-order: 1
+
 name: EKF 融合硬故障
-version: 1.0.0
-category: ekf
-status: stable
-author: {name: NextPilot 内置}
-license: CC-BY-4.0
-changelog:
-  - {version: 1.0.0, date: "2026-09-15", note: 从 ulog_checks.py 迁出，逻辑与阈值不变}
 
-firmware: any
-airframe: any
+group: ekf_faults
 
-requires:
-  any_of: [estimator_status]
-skip_reason: estimator_status not in log
+order: 1
+
+firmware: "True"
+
+airframe: "True"
+
+skip:
+  - {when: "not has_topic('estimator_status')", reason: estimator_status not in log}
 # nan_flags 是很早期的字段（1.11 起的日志与 1.15+ 字典里都没有），属已知遗留：
 # lint-rules.py 据此不再把它列为可疑引用
 known_legacy: [estimator_status.nan_flags]
 
 compute:
-  # 跨实例合并：每个实例取该实例内的最大置位，再按位或
-  - {out: fault_raw, from: estimator_status.filter_fault_flags, op: bit_or_max,
-     per_instance: true, optional: true}
-  - {out: nan_raw, from: estimator_status.nan_flags, op: max_of_max,
-     per_instance: true, optional: true}
-  # 字段缺失时按 0 处理：两条分支条件自然都不成立（与迁移前 have_fault 的语义一致）
-  - {out: fault_union, in: [fault_raw, 0], op: coalesce, optional: true}
-  - {out: nan_v, in: [nan_raw, 0], op: coalesce, optional: true}
-  - {out: nan_max, in: [nan_v], op: to_int, optional: true}
-  - {out: crit_bits, in: [fault_union, 63], op: has_bits, optional: true}   # 63 = bit0..bit5
+  # 位掩码跨实例合并置位；缺失按 0 处理（与原实现一致）
+  - >-
+      fault_raw = _try(bit_or_max(
+      ref("estimator_status.filter_fault_flags", per_instance=True)))
+  - >-
+      nan_raw = _try(max_of_max(
+      ref("estimator_status.nan_flags", per_instance=True)))
+  - fault_union = _try(coalesce(fault_raw, 0))
+  - nan_max = _try(to_int(coalesce(nan_raw, 0)))
+  - crit_bits = _try(has_bits(fault_union, 63))
 
 triggers:
-  - expr: "nan_max > 0 or crit_bits"
+  - when: "nan_max > 0 or crit_bits"
     severity: critical
     threshold: 0
-    value_text: "fault={fault_union},nan={nan_max}"
+    value: f"fault={fault_union},nan={nan_max}"
     field: "estimator_status.filter_fault_flags/nan_flags"
     title: "EKF 报告核心融合硬故障（filter_fault_flags={fault_union}, nan_flags={nan_max}）"
     suggestion: "估计器出现硬故障/NaN，建议停飞排查传感器与振动后重新标定。"
   # 仅非核心位（如未启用视觉）且无 NaN：给 info 提示，不当作故障
-  - expr: "fault_union > 0 and not crit_bits and nan_max == 0"
+  - when: "fault_union > 0 and not crit_bits and nan_max == 0"
     severity: info
     tag: null
     threshold: 0
@@ -55,6 +51,4 @@ triggers:
     suggestion: "若该机确实未启用视觉/光流定位，此位可忽略；否则检查对应传感器。"
 
 emit:
-  check: ekf_faults
   tag: ekf_innovation_failure
-  doc: https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html

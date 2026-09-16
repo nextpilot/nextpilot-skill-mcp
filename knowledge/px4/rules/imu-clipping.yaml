@@ -2,39 +2,32 @@
 # 累计削波次数；跨 IMU 实例与轴向取最大者。阈值 [暂定] 100 / 1000 次，1~99 次报 info。
 
 id: px4-imu-clipping
-slot: vibration
-order: 3
+
 name: 加速度计削波
-version: 1.0.0
-category: vibration
-status: stable
-author: {name: NextPilot 内置}
-license: CC-BY-4.0
-changelog:
-  - {version: 1.0.0, date: "2026-09-15", note: 从 ulog_checks.py 迁出，逻辑与阈值不变}
 
-firmware: any
-airframe: any
+group: vibration
 
-requires:
-  any_of: [vehicle_imu_status]
-skip_reason: vehicle_imu_status not in log
+order: 3
+
+firmware: "True"
+
+airframe: "True"
+
+skip:
+  - {when: "not has_topic('vehicle_imu_status')", reason: vehicle_imu_status not in log}
 
 compute:
-  # 每个实例每组 3 列（每轴一条累计计数序列）；逐列 max-min，取全局最大差值
-  - out: [clip, clip_idx, clip_axis]
-    from: vehicle_imu_status.accel_clipping
-    op: worst_column_delta
-    per_instance: true
-    aliases:
-      vehicle_imu_status.accel_clipping: [clipping]
-  # 原实现只在 count > 0 时写 imuAccelClippingCountMax，这里同样用条件性统计保持等价
-  - {out: clip_hit, in: [clip, 0], op: gt, optional: true}
-  - {out: clip_stat, in: [clip_hit, clip], op: value_if, optional: true}
+  # 每个实例每组 3 列（每轴一条累计计数序列）；逐列 max-min，取全局最大差值。
+  # alias 覆盖旧固件的字段改名；只在 count > 0 时写 imuAccelClippingCountMax
+  # （原实现同样用条件性统计保持等价）
+  - >-
+    clip, clip_idx, clip_axis = worst_column_delta(
+      ref("vehicle_imu_status.accel_clipping", per_instance=True, alias="clipping"))
+  - clip_stat = clip if clip > 0 else None
 
 triggers:
   # 0 次不报（与原实现 worst_clip["count"] > 0 一致）
-  - expr: "clip >= 1000"
+  - when: "clip >= 1000"
     severity: critical
     threshold: 1000
     value: clip
@@ -42,7 +35,7 @@ triggers:
     field: "vehicle_imu_status.accel_clipping[{clip_axis}](末值-首值)"
     title: "加速度计削波严重：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）"
     suggestion: "持续削波会破坏 EKF 估计，请优先排除机械振动源。"
-  - expr: "clip >= 100"
+  - when: "clip >= 100"
     severity: warning
     threshold: 100
     value: clip
@@ -50,7 +43,7 @@ triggers:
     field: "vehicle_imu_status.accel_clipping[{clip_axis}](末值-首值)"
     title: "检测到明显加速度计削波：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）"
     suggestion: "削波表明振动峰值已超出传感器量程，建议排查机械振动源。"
-  - expr: "clip > 0"
+  - when: "clip > 0"
     severity: info
     tag: null
     threshold: 0
@@ -61,8 +54,6 @@ triggers:
     suggestion: "少量削波可先观察；频次升高或伴随振动告警需排查机械问题。"
 
 emit:
-  check: vibration
   tag: high_vibration
-  doc: https://docs.px4.io/main/en/assembly/vibration_isolation.html
   stats:
     imuAccelClippingCountMax: {var: clip_stat}

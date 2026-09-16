@@ -2,19 +2,16 @@
 # 只打 guard 标签，不产 finding。
 
 id: px4-guard-log-dropouts
-slot: guards
-order: 3
-name: 数据质量-日志丢包
-version: 1.0.0
-category: guard
-status: stable
-author: {name: NextPilot 内置}
-license: CC-BY-4.0
-changelog:
-  - {version: 1.0.0, date: "2026-09-15", note: "从 ulog_checks.py 迁出，逻辑不变"}
 
-firmware: any
-airframe: any
+name: 数据质量-日志丢包
+
+group: guards
+
+order: 3
+
+firmware: "True"
+
+airframe: "True"
 
 emit:
   guard_tags:

@@ -4,51 +4,38 @@
 # 阈值 [暂定] px4-thresholds.toml [gps]：jump_speed_mps=50 / jump_min_count=3。
 
 id: px4-gps-jump
-slot: gps_health
-order: 3
+
 name: GPS 位置跳变
-version: 1.0.0
-category: gps
-status: stable
-author: {name: NextPilot 内置}
-license: CC-BY-4.0
-changelog:
-  - {version: 1.0.0, date: "2026-09-15", note: 从 ulog_checks.py 迁出，逻辑与阈值不变}
 
-firmware: any
-airframe: any
+group: gps_health
 
-requires:
-  any_of: [vehicle_gps_position]
-skip_reason: vehicle_gps_position not in log
+order: 3
+
+firmware: "True"
+
+airframe: "True"
+
+skip:
+  - {when: "not has_topic('vehicle_gps_position')", reason: vehicle_gps_position not in log}
 
 compute:
   # 经纬度字段跨固件换过名字与口径：旧固件 lat/lon（1e7 度）、1.15+ latitude_deg/longitude_deg（度）。
   # 两条分支各自 when_fw 圈定，单位口径写在各自的 unit 上，再由 coalesce 取生效的那支。
-  - out: step_new
-    in:
-      - vehicle_gps_position.latitude_deg
-      - vehicle_gps_position.longitude_deg
-      - vehicle_gps_position.timestamp
-    op: adjacent_speed_mps
-    unit: deg
-    when_fw: ">=1.15"
-    optional: true
-  - out: step_old
-    in:
-      - vehicle_gps_position.lat
-      - vehicle_gps_position.lon
-      - vehicle_gps_position.timestamp
-    op: adjacent_speed_mps
-    unit: degE7
-    when_fw: "<1.15"
-    optional: true
-  - {out: step, in: [step_new, step_old], op: coalesce, optional: true}
-  - {out: njump_raw, in: [step], op: count_above, gt: 50.0, optional: true}
-  - {out: njump, in: [njump_raw], op: to_int, optional: true}
+  - >-
+      step_new = _try(adjacent_speed_mps(
+      ref("vehicle_gps_position.latitude_deg", when_fw=">=1.15"),
+      ref("vehicle_gps_position.longitude_deg", when_fw=">=1.15"),
+      ref("vehicle_gps_position.timestamp", when_fw=">=1.15"), unit="deg"))
+  - >-
+      step_old = _try(adjacent_speed_mps(
+      ref("vehicle_gps_position.lat", when_fw="<1.15"),
+      ref("vehicle_gps_position.lon", when_fw="<1.15"),
+      ref("vehicle_gps_position.timestamp", when_fw="<1.15"), unit="degE7"))
+  - step = _try(coalesce(step_new, step_old))
+  - njump = _try(to_int(count_above(step, gt=50.0)))
 
 triggers:
-  - expr: "njump >= 3"
+  - when: "njump >= 3"
     severity: warning
     tag: gps_jump
     threshold: 3
@@ -59,8 +46,6 @@ triggers:
     suggestion: "结合故障库 F002：排查多路径、馈线与电磁干扰；室内跳变为正常现象。"
 
 emit:
-  check: gps_health
   tag: gps_jump
-  doc: https://docs.px4.io/main/en/gps_compass/
   stats:
     gpsJumpCount: {var: njump}

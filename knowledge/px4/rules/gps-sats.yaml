@@ -2,30 +2,26 @@
 # 注意：证据里的 threshold 用 sats_warn（8）——这是迁移前就有的写法，为保持等价按原样保留。
 
 id: px4-gps-sats
-slot: gps_health
-order: 2
+
 name: GPS 卫星数
-version: 1.0.0
-category: gps
-status: stable
-author: {name: NextPilot 内置}
-license: CC-BY-4.0
-changelog:
-  - {version: 1.0.0, date: "2026-09-15", note: 从 ulog_checks.py 迁出，逻辑与阈值不变}
 
-firmware: any
-airframe: any
+group: gps_health
 
-requires:
-  any_of: [vehicle_gps_position]
-skip_reason: vehicle_gps_position not in log
+order: 2
+
+firmware: "True"
+
+airframe: "True"
+
+skip:
+  - {when: "not has_topic('vehicle_gps_position')", reason: vehicle_gps_position not in log}
 
 compute:
-  - {out: s_min_raw, from: vehicle_gps_position.satellites_used, op: min}
-  - {out: s_min, in: [s_min_raw], op: to_int}
+  - s_min_raw = min(vehicle_gps_position.satellites_used)
+  - s_min = to_int(s_min_raw)
 
 triggers:
-  - expr: "s_min <= 6"
+  - when: "s_min <= 6"
     severity: warning
     tag: gps_eph_high
     threshold: 8
@@ -36,8 +32,6 @@ triggers:
     suggestion: "卫星数不足时定位易跳变；排查遮挡与天线。"
 
 emit:
-  check: gps_health
   tag: gps_eph_high
-  doc: https://docs.px4.io/main/en/gps_compass/
   stats:
     gpsSatellitesMin: {var: s_min}

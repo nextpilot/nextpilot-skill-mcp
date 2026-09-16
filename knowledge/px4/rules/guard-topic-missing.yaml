@@ -2,22 +2,19 @@
 # 只打 guard 标签，不产 finding；顺序与原实现一致（数组顺序参与比对）。
 
 id: px4-guard-topic-missing
-slot: guards
-order: 2
-name: 数据质量-关键 topic 缺失
-version: 1.0.0
-category: guard
-status: stable
-author: {name: NextPilot 内置}
-license: CC-BY-4.0
-changelog:
-  - {version: 1.0.0, date: "2026-09-15", note: "从 ulog_checks.py 迁出，逻辑不变"}
 
-firmware: any
-airframe: any
+name: 数据质量-关键 topic 缺失
+
+group: guards
+
+order: 2
+
+firmware: "True"
+
+airframe: "True"
 
 emit:
   guard_tags:
-    - {when: "'vehicle_status' not in topics", tag: "topic_missing:vehicle_status"}
-    - {when: "'battery_status' not in topics", tag: "topic_missing:battery_status"}
-    - {when: "'estimator_status' not in topics", tag: "topic_missing:estimator_status"}
+    - {when: "not has_topic('vehicle_status')", tag: "topic_missing:vehicle_status"}
+    - {when: "not has_topic('battery_status')", tag: "topic_missing:battery_status"}
+    - {when: "not has_topic('estimator_status')", tag: "topic_missing:estimator_status"}

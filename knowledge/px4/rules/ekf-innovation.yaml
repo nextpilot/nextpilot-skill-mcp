@@ -5,70 +5,62 @@
 # 阈值 [暂定] px4-thresholds.toml [ekf]：reject_ratio_warn=0.01 / crit=0.05，证据里换算成 %。
 
 id: px4-ekf-innovation
-slot: ekf_innovations
-order: 1
+
 name: EKF 创新检验
-version: 1.0.0
-category: ekf
-status: stable
-author: {name: NextPilot 内置}
-license: CC-BY-4.0
-changelog:
-  - {version: 1.0.0, date: "2026-09-15", note: 从 ulog_checks.py 迁出，逻辑与阈值不变}
 
-firmware: any
-airframe: any
+group: ekf_innovations
 
-requires:
-  any_of: [estimator_status]
-skip_reason: estimator_status not in log
+order: 1
+
+firmware: "True"
+
+airframe: "True"
+
+skip:
+  - {when: "not has_topic('estimator_status')", reason: estimator_status not in log}
 
 compute:
-  - out: [frac, names, inst]
-    in:
-      - estimator_status.innovation_check_flags
-      - estimator_status.vel_test_ratio
-      - estimator_status.pos_test_ratio
-      - estimator_status.hgt_test_ratio
-      - estimator_status.hdg_test_ratio
-      - estimator_status.mag_test_ratio
-      - estimator_status.tas_test_ratio
-      - estimator_status.hagl_test_ratio
-      - estimator_status.beta_test_ratio
-    op: worst_reject_ratio
-    per_instance: true
-    primary_min: 3            # 主信号（标志位）最少被拒样本数
-    primary_names: [速度, 水平位置, 垂直位置, 磁罗盘 X, 磁罗盘 Y, 磁罗盘 Z,
-                    航向, 空速, 侧滑, 离地高度, 光流 X, 光流 Y]
-    ge: 1.0                   # 通道判拒阈值：ratio >= 1 即该路观测被 EKF 拒绝
-    channel_min: 3            # 通道最少被拒样本数，去偶发尖峰毛刺
-    channel_labels: [速度, 水平位置, 垂直高度, 航向, 磁罗盘, 空速, 离地高度, 侧滑]
-    fallback_label: 未知通道
-  - {out: pct, in: [frac], op: scale, factor: 100}
+  # 每个 estimator 实例一组；主信号（位掩码）非空时用它，否则逐一比对各路 *_test_ratio。
+  # 字段名、位名、通道名全部由本文件给出（算子不认识任何具体 topic/字段）。
+  - >-
+    frac, names, inst = worst_reject_ratio(
+      ref("estimator_status.innovation_check_flags", per_instance=True),
+      ref("estimator_status.vel_test_ratio", per_instance=True),
+      ref("estimator_status.pos_test_ratio", per_instance=True),
+      ref("estimator_status.hgt_test_ratio", per_instance=True),
+      ref("estimator_status.hdg_test_ratio", per_instance=True),
+      ref("estimator_status.mag_test_ratio", per_instance=True),
+      ref("estimator_status.tas_test_ratio", per_instance=True),
+      ref("estimator_status.hagl_test_ratio", per_instance=True),
+      ref("estimator_status.beta_test_ratio", per_instance=True),
+      primary_min=3,
+      primary_names=["速度", "水平位置", "垂直位置", "磁罗盘 X", "磁罗盘 Y", "磁罗盘 Z",
+                     "航向", "空速", "侧滑", "离地高度", "光流 X", "光流 Y"],
+      ge=1.0,                    # 通道判拒阈值：ratio >= 1 即该路观测被 EKF 拒绝
+      channel_min=3,             # 通道最少被拒样本数，去偶发尖峰毛刺
+      channel_labels=["速度", "水平位置", "垂直高度", "航向", "磁罗盘", "空速", "离地高度", "侧滑"],
+      fallback_label="未知通道")
+  - pct = frac * 100           # 证据里换算成 %
 
 triggers:
-  - expr: "pct >= 5.0"
+  - when: "pct >= 5.0"
     severity: critical
     threshold: 5.0
-    value: pct
-    round: 2
+    value: f"{pct:.2f}"
     unit: "%"
     field: "estimator_status 创新检验拒绝样本占比"
     title: "EKF 创新检验持续失败（estimator #{inst}：{names}）"
     suggestion: "涉及：{names}。检查对应传感器健康度、安装与校准。"
-  - expr: "pct >= 1.0"
+  - when: "pct >= 1.0"
     severity: warning
     threshold: 1.0
-    value: pct
-    round: 2
+    value: f"{pct:.2f}"
     unit: "%"
     field: "estimator_status 创新检验拒绝样本占比"
     title: "EKF 创新检验偶发失败（estimator #{inst}：{names}）"
     suggestion: "涉及：{names}。关注 GPS 卫星数、磁罗盘干扰、振动与气压计异常。"
 
 emit:
-  check: ekf_innovations
   tag: ekf_innovation_failure
-  doc: https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html
   stats:
     ekfRejectRatioPct: {var: pct, round: 2}

@@ -4,65 +4,58 @@
 # 命中即打 guard 标签 wind_strong：解释姿态类异常时优先归因环境扰动。
 
 id: px4-wind-estimate
-slot: wind_estimate
-order: 1
+
 name: 风扰估计
-version: 1.0.0
-category: wind
-status: stable
-author: {name: NextPilot 内置}
-license: CC-BY-4.0
-changelog:
-  - {version: 1.0.0, date: "2026-09-15", note: 从 ulog_checks.py 迁出，逻辑与阈值不变}
 
-firmware: any
-airframe: any
+group: wind_estimate
 
-requires:
-  any_of: [estimator_wind, wind_estimate]
-skip_reason: estimator_wind / wind_estimate not in log
+order: 1
+
+firmware: "True"
+
+airframe: "True"
+
+skip:
+  - {when: "not has_topic('estimator_wind') and not has_topic('wind_estimate')", reason: estimator_wind / wind_estimate not in log}
 
 compute:
-  # 版本分流写在节点上：when_fw 不满足时该节点被跳过、输出 None，由下面的 coalesce 选另一支。
+  # 版本分流写在取数上：when_fw 不满足的那个引用返回 None，由 coalesce 选另一支。
   # 1.15+ 用估计器风。日志里这个 topic 叫 estimator_wind；上游另有一个叫 wind 的 topic
   # （字典按 .msg 文件名收录，与日志 topic 名不是一一对应，所以字典里查不到 estimator_wind）
-  - {out: n_new, from: estimator_wind.windspeed_north, op: read, when_fw: ">=1.15", optional: true}
-  - {out: e_new, from: estimator_wind.windspeed_east, op: read, when_fw: ">=1.15", optional: true}
-  # 1.15 之前是 wind_estimate（字段名相同）
-  - {out: n_old, from: wind_estimate.windspeed_north, op: read, when_fw: "<1.15", optional: true}
-  - {out: e_old, from: wind_estimate.windspeed_east, op: read, when_fw: "<1.15", optional: true}
-  - {out: wn, in: [n_new, n_old], op: coalesce, optional: true}
-  - {out: we, in: [e_new, e_old], op: coalesce, optional: true}
-  - {out: w, in: [wn, we], op: hypot}          # 缺任一路即中止（与原 len(wn) 判定一致）
-  - {out: w_p95, in: [w], op: percentile, p: 95}
+  # 缺任一路（两个 topic 都没有）时 hypot 得 None、w_p95 也是 None → 不出结论
+  - >-
+    w_p95 = percentile(
+      hypot(coalesce(ref("estimator_wind.windspeed_north", when_fw=">=1.15"),
+                     ref("wind_estimate.windspeed_north", when_fw="<1.15")),
+            coalesce(ref("estimator_wind.windspeed_east", when_fw=">=1.15"),
+                     ref("wind_estimate.windspeed_east", when_fw="<1.15"))),
+      p=95)
 
 triggers:
-  - expr: "w_p95 >= 12.0"
+  - when: "w_p95 >= 12.0"
     severity: warning
     tag: wind_disturb
-    guard_tag: wind_strong
     threshold: 8.0
-    value: w_p95
-    round: 1
+    value: f"{w_p95:.1f}"
     unit: m/s
     field: "estimator_wind.windspeed_north/east"
     title: "估计风速较大（p95 {w_p95:.1f} m/s）"
     suggestion: "结合故障库 F010：强风属环境扰动，姿态超调/转换越限优先归因风，不要直接改 PID。"
-  - expr: "w_p95 >= 8.0"
+  - when: "w_p95 >= 8.0"
     severity: info
     tag: wind_disturb
-    guard_tag: wind_strong
     threshold: 8.0
-    value: w_p95
-    round: 1
+    value: f"{w_p95:.1f}"
     unit: m/s
     field: "estimator_wind.windspeed_north/east"
     title: "估计风速偏大（p95 {w_p95:.1f} m/s）"
     suggestion: "解释姿态类异常时需考虑风扰因素。"
 
 emit:
-  check: wind_estimate
   tag: wind_disturb
-  doc: https://docs.px4.io/main/en/log/flight_log_analysis.html
+  # 风速偏大本身就是个事实（该进解读的背景），所以用 guard_tags 而不是 trigger 上的标记：
+  # 不依赖哪条 trigger 命中，算出来就带上
+  guard_tags:
+    - {when: "w_p95 >= 8.0", tag: wind_strong}
   stats:
     windSpeedP95M: {var: w_p95, round: 1}
