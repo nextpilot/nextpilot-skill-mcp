@@ -186,6 +186,24 @@
 
 两套引擎共同的设计哲学：`.ulg` / `.bin` → pyulog / pymavlink 解析 → 纯领域模型 FlightLog → 插件化检查器 → 每个发现附带官方文档链接，LLM 只把结构化结果翻译成自然语言，不直接"理解"原始日志。解析与规则代码在浏览器（Pyodide）与未来服务端引擎之间保持同一份 Python 源码、两种运行方式。
 
+### 4.5 报告页结构（前端）
+
+**一个 tab 一个组件**（`web/components/Log*Msg.tsx`），顺序如下（打开默认停在「基本情况」）：
+
+| tab | 组件 | 内容 |
+| --- | --- | --- |
+| 基本情况 | `AnalyzeReport.tsx` 内 · `MetricsTab` | 规则产出的关键数字（metrics，声明在 `facts.yaml`） |
+| 系统消息 | `LogSystemMsg.tsx` | 消息记录统计（逐字节数 `MSG_TYPE`）+ Information Message 字典（变量名 / 取值 / 说明） |
+| 事件消息 | `LogEventsMsg.tsx` | PX4 事件解码 + 固件文本消息 + 多值信息（'M'），可按级别过滤 |
+| 飞控参数 | `LogParamsMsg.tsx` | 参数 / 当前值 / 默认值 / 最小值 / 最大值 / 说明；**当前值 ≠ 默认值则整行标红**；默认按"与默认不同"筛 |
+| 数据图表 | `LogCharts.tsx` | 曲线预设（`knowledge/px4/plot/*.yml`），含飞行阶段底色 |
+| 检查结论 | `AnalyzeReport.tsx` 内 | findings + 故障知识库命中条目 |
+| AI 中文解读 | `AnalyzeReport.tsx` 内 | DeepSeek 报告 |
+
+报告页之外还有两块常驻区域：**飞行阶段条**（`PhaseStrip.tsx`）紧贴 **飞行轨迹地图**（`LogFlightMap.tsx`，高德瓦片：国内可达；轨迹按 WGS-84 → GCJ-02 换算后绘制，换算见 `lib/coord.ts`）。
+
+时间口径全站统一：**开机以来的秒数**，显示成 `hh:MM:ss`（与 Flight Review 一致）。数据层的硬规则与坑（事件解码、多值信息拼接、参数默认值怎么来、派生数据版本）见 **`knowledge/px4/CLAUDE.md` 的「报告页数据层」**——改 `engine/report_data.py` 前必读。
+
 ---
 
 ## 5. 平台 MCP Server
@@ -290,6 +308,7 @@
 | 类型 | 规则 | 示例 |
 | --- | --- | --- |
 | React 组件 | PascalCase + `.tsx` | `LogAnalyzer.tsx`、`SkillCard.tsx` |
+| 分析页 tab 组件 | 一个 tab 一个文件：`Log<用途>Msg.tsx` | `LogEventsMsg.tsx`、`LogParamsMsg.tsx`、`LogSystemMsg.tsx`、`LogFlightMap.tsx` |
 | 库 / 类型 / 常量 | kebab-case + `.ts` | `chart-presets.ts`、`types.ts`、`constants.ts` |
 | Web Worker 入口 | kebab-case + `-worker.ts` | `ulog-worker.ts` |
 | Worker 内嵌脚本 / helper | kebab-case + `-script.ts` | 现由 `build-knowledge.mjs` **生成**，不手改 |
@@ -308,7 +327,12 @@
 >
 > 改 `knowledge/px4/` 下的规则、算子或引擎前，先读同目录的 **`knowledge/px4/CLAUDE.md`**：
 > 那里记着每条设计决策的动机、与最初设计的落地差异（有意为之，别当 bug 改回去）和已知缺口；
-> 它是给 AI 与维护者的上下文，不发布到网站。
+> 它是给 AI 与维护者的上下文，不发布到网站。**报告页数据层**（`engine/report_data.py`）的硬规则
+> 也在那一份里（时间基准、事件解码、多值信息拼接、参数默认值怎么来、派生数据版本）。
+>
+> 派生数据版本（`web/lib/knowledge/derived-version.generated.ts`，构建期算的数据层源文件哈希）：
+> 改了 `engine/report_data.py` / `facts.yaml` / `plot/*.yml`，用户本机存档的派生数据会在打开时
+> **自动重解析一次**，不用挨个提醒重新上传。
 
 ---
 

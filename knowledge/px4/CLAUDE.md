@@ -14,6 +14,11 @@ guard），**73 个通用算子**；`px4-thresholds.toml` 已退场（阈值随�
 通过；构建期护栏生效（算子名/入参数量、表达式与文案里的未声明名字、缺 `firmware`/`airframe`、
 guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 
+**2026-09-16 追加**：报告页数据层（`engine/report_data.py`）的若干硬规则——时间基准改为
+**开机时间**、PX4 事件解码与文本消息合并、多值信息的两种拼接形态、参数默认值的推导与
+参数元数据的来源、**派生数据版本**让旧存档自动重解析。都在本文档下面的
+「报告页数据层」一节，改数据层前必读。
+
 字段级权威参考（写经验时看这份）：站内 **[如何编写一条规则](/guide/knowledge-write-rule)**（源文件 `content/guide/knowledge-write-rule.md`）；
 经验索引（站内页面，构建时生成）：**[/guide/knowledge-rules](/guide/knowledge-rules)**；迁移过程中顺带修掉的 6 处
 真实缺陷见提交 `6a081d5` 的说明（最要紧的一条：日志消息级别判据按 ASCII 语义修正后，
@@ -84,6 +89,37 @@ compute:
 `python tools/calibrate/check-artifact.py`（生成产物真实执行）、
 `python tools/calibrate/lint-rules.py`（字段引用 + 版本错配）、
 `python tools/calibrate/probe_rule.py <log.ulg> <rule_id>`（单条经验逐节点诊断）。
+
+---
+
+## 报告页数据层（`engine/report_data.py`）：踩过的硬规则
+
+> 这一层的产出（`np_manifest` / `np_series` / `np_track` / `np_log_info`）直接决定报告页每个 tab 长什么样。
+> 下面每一条都是**实机日志逼出来的**，改之前先看一遍，别按"想当然"改回去。
+
+| 规则 | 为什么 |
+| --- | --- |
+| **时间基准 = 开机以来的秒数**（`_since_boot`，就是 `t/1e6`） | PX4 时间戳本身就是开机起的微秒。曾经减过 `ulog.start_timestamp`（= 开始记录的时刻，通常比开机晚几秒到几分钟），于是同一份日志在本站与 Flight Review 上整体差出那一段——FR 的 Logged Messages 和曲线横轴用的都是开机时间（`plotted_tables.time_str` 直接除 timestamp） |
+| **事件消息 = 事件解码 + 文本消息，合成一条时间轴**（`kind` 区分 `event`/`log`） | PX4 对同一个事件写两样：`event` topic（二进制）**加**一条等价的旧格式文本（**以 `\t` 结尾**，如 `[commander] Armed by Stick gesture\t`）。FR 的做法是跳过 `\t` 行、改用解码出来的文字。我们用 pyulog 的 `PX4Events`，定义取自**日志自带的 `metadata_events`**（那个 xz blob 就是这份固件的事件定义）——不联网、与固件版本严格对应；解不出的 ID 显示 `[Unknown event with ID N]`（与 FR 一致） |
+| 固件**没带** `metadata_events` 时**保留** `\t` 行 | 否则 armed / takeoff 这类关键节点会凭空消失。判据是"这次解出事件了吗"，不是"FR 怎么做" |
+| `lzma` 是 Pyodide 的**可加载包**（不是内置模块），单独 `loadPackage` 且**允许失败** | 拿不到就退化成"不解码事件"，不能因为它把整个解析挡在门外 |
+| 多值信息（'M'）组内怎么拼，看**形态**：任一段自带换行 → 直接拼接；否则用 `\n` 连接 | 逐行型（`perf_counter_*`、`perf_top_*`）每段是一行完整文本、PX4 不给行尾换行，不补 `\n` 就全黏成一行；流式型（`boot_console_output`）是一整段控制台文本按定长切片、换行在段**内部**且一行可能跨段，补 `\n` 会凭空断行。整组都是原始字节的（`metadata_events`）只报总字节数 |
+| 消息类型统计**逐字节走文件**（`[uint16 长度][uint8 类型]`），不读 pyulog 的解析结果 | 要回答的是"文件里究竟有多少条"，顺带当**文件是否被截断**的旁证（走不到 EOF 就是不完整）。可与 pyulog 交叉验证：`L` = `logged_messages`、`D` = 各话题采样点数之和、`S` = `_sync_seq_cnt` |
+| Information Message 字典带**中文名与说明**，取 `facts.yaml` 的 `info_key_docs` | 上游没有这份对照表（PX4 只在源码里写死这些 key）。表里没有的键留空——**不猜、不编** |
+| 参数「默认值」靠 **'Q' 消息的语义**推出来，不依赖外部字典 | PX4 只记录**与当前值不同**的默认值（`logger.cpp: write_parameter_defaults`）→ 没记录就说明当前值等于默认值。于是每一行都能给出具体数字，不需要"一致 / 已改"这类占位文字。取法：机架默认 → 固件默认 → 当前值 |
+| 参数「最小值 / 最大值 / 说明」来自 `knowledge/px4/meta/main.json` → `web/public/params/px4-main.json`（按需拉取，175 KB / gzip 33 KB） | 上游**只有 main 分支**产出 `parameters.json`（release tag 没有，见 `meta/v1.15.0.json` 的 `parametersNote`），所以这是"最新分支快照"，与老固件可能有出入——界面必须如实标注来源。放 `public/` 而不是内联进 Pyodide：这份字典与具体日志无关，内联等于每份日志都要多下它一遍 |
+
+### 派生数据版本：改了数据层，旧存档自动重解析
+
+`web/scripts/build-knowledge.mjs` 对 `engine/report_data.py` + `knowledge/px4/facts.yaml` + `plot/*.yml`
+算内容哈希，写进 `web/lib/knowledge/derived-version.generated.ts`。本机存档里的派生数据
+（`info` / 曲线 / 轨迹）带着**生成时**的版本，与当前不一致就重新解析一次（`useLogAnalyzer.openSaved`：
+旧数据先渲染、后台重解析，解析完自动换成新的）。所以改完数据层不用逐个提醒用户"重新上传一遍"。
+
+- 规则文件（`rules/*.yaml`）**故意不进哈希**：改阈值不该让所有历史结论跟着重算；
+- 内容是**文件字节哈希**，所以连注释改动也会触发一次重解析——宁可多解析一次，也不漏掉真正的形状变化；
+- **已知缺口**：存档的原始日志已被 LRU 淘汰、且来自别的设备时，"重新解析"无从谈起，只能看旧格式数据
+  （此时界面不假装已修复）。
 
 ---
 
