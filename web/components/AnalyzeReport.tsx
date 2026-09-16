@@ -466,6 +466,13 @@ function FindingCard({ finding }: { finding: Finding }) {
   );
 }
 
+/** 秒数 → `hh时mm分ss秒`（小时不封顶：累计飞行常是几百小时，不折成"天"） */
+function formatHms(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(Math.floor(s / 3600))}时${p(Math.floor((s % 3600) / 60))}分${p(s % 60)}秒`;
+}
+
 /** 秒数 → "3 天 4 小时 21 分 8 秒"（不足一天的省略"天"） */
 function formatDuration(sec: number): string {
   const s = Math.max(0, Math.round(sec));
@@ -525,7 +532,7 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
   if (typeof g?.vehicleLifeS === "number") {
     rows.push({
       label: "累计飞行",
-      value: formatDuration(g.vehicleLifeS),
+      value: formatHms(g.vehicleLifeS),
       title: "载具累计飞行时长（参数 LND_FLIGHT_T_HI/LO）",
     });
   }
