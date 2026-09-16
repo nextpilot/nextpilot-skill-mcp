@@ -20,6 +20,11 @@ interface GpsPoint {
 // ⚠️ 子域名是 ["1".."4"]，拼出来是 webrd01 / webst01 这类主机名——写成 "01" 会得到
 // webrd001.is.autonavi.com（**该域名不存在**，地图一片灰，实测 curl 直接 DNS 失败）
 const TILE_SUBDOMAINS = ["1", "2", "3", "4"];
+/** 高德瓦片的原生最高级别：再往上要求它没有的图，返回的是空白 → 地图看着"没有图层"。
+ *  所以 maxNativeZoom 卡在 18（更高层级由 Leaflet 放大 18 级的瓦片），
+ *  默认视野也用 FIT_MAX_ZOOM 卡住，别一进来就顶到没数据的地方 */
+const TILE_MAX_NATIVE_ZOOM = 18;
+const FIT_MAX_ZOOM = 18;
 const AMAP_STREET = "https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}";
 const AMAP_SATELLITE = "https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}";
 const AMAP_SATELLITE_LABELS = "https://webst0{s}.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}";
@@ -141,7 +146,7 @@ export function LogFlightMap({
       const map = mapRef.current;
       if (!map) return;
       map.invalidateSize();
-      if (boundsRef.current) map.fitBounds(boundsRef.current, { padding: [20, 20] });
+      if (boundsRef.current) map.fitBounds(boundsRef.current, { padding: [20, 20], maxZoom: FIT_MAX_ZOOM });
     }, 100);
     return () => clearTimeout(timer);
   }, [state]);
@@ -164,16 +169,19 @@ export function LogFlightMap({
     const street = L.tileLayer(AMAP_STREET, {
       subdomains: TILE_SUBDOMAINS,
       attribution: AMAP_ATTRIBUTION,
+      maxNativeZoom: TILE_MAX_NATIVE_ZOOM,
       maxZoom: 19,
     });
     const satellite = L.tileLayer(AMAP_SATELLITE, {
       subdomains: TILE_SUBDOMAINS,
       attribution: AMAP_ATTRIBUTION,
+      maxNativeZoom: TILE_MAX_NATIVE_ZOOM,
       maxZoom: 19,
     });
     // 卫星图上的路名/地名/边界，另有一层（style=8 与街道图同源，但只作叠加用）
     const satelliteLabels = L.tileLayer(AMAP_SATELLITE_LABELS, {
       subdomains: TILE_SUBDOMAINS,
+      maxNativeZoom: TILE_MAX_NATIVE_ZOOM,
       maxZoom: 19,
     });
 
@@ -234,7 +242,7 @@ export function LogFlightMap({
 
     const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lon] as [number, number]));
     boundsRef.current = bounds;
-    map.fitBounds(bounds, { padding: [20, 20] });
+    map.fitBounds(bounds, { padding: [20, 20], maxZoom: FIT_MAX_ZOOM });
   }
 
   return (

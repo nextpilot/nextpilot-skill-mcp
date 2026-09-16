@@ -150,8 +150,7 @@ export function AnalyzeReport({
             {report.facts?.durationSec ? ` · 时长 ${Math.round(report.facts.durationSec)}s` : ""}
             {report.facts?.vehicleType
               ? ` · ${VEHICLE_TYPE_LABELS[report.facts.vehicleType] ?? report.facts.vehicleType}`
-              : ""}{" "}
-            · {report.parserVersion}
+              : ""}
           </p>
         </div>
         <div className="ml-auto flex gap-2 text-xs">
