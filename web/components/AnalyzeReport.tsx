@@ -38,6 +38,7 @@ import { LogSystemMsg } from "./LogSystemMsg";
 import { PhaseStrip } from "./PhaseStrip";
 import { formatDateTime } from "@/lib/format";
 import { vehicleTypeLabel } from "@/lib/vehicle-type";
+import { isDarkTheme, modeStyle } from "@/lib/phase-colors";
 import { LogFlightMap } from "./LogFlightMap";
 
 const PHASE_LABELS: Record<string, string> = {
@@ -504,6 +505,7 @@ function formatDuration(sec: number): string {
  */
 function GeneralInfo({ report }: { report: AnalysisReport }) {
   const g = report.facts;
+  const dark = isDarkTheme();
   const counts = {
     critical: report.findings.filter((f) => f.severity === "critical").length,
     warning: report.findings.filter((f) => f.severity === "warning").length,
@@ -526,6 +528,10 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
       value: formatDuration(report.facts.armedDurationSec),
       title: "本次日志里解锁（armed）的累计时长",
     });
+  }
+  // 飞行模式：整段日志出现过的 nav_state（按占样本数从多到少），配色与「飞行阶段」条、
+  // 数据图表底色同一套（lib/phase-colors.ts）
+  const modeList = g?.modes?.length ? g.modes : g?.mainMode ? [g.mainMode] : [];
   // 机型（机架）：机型是 PX4 的四类之一（vehicle_status.vehicle_type），机架是参数
   // SYS_AUTOSTART 的编号——编号对应的名字要查 PX4 的 airframes 表，本机没有那份表，
   // 就如实只给编号（别编名字）。两者合成一行：`旋翼（4040）`，只有一半时只显示那一半。
@@ -554,7 +560,6 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
       value: formatHms(g.vehicleLifeS),
       title: "载具累计飞行时长（参数 LND_FLIGHT_T_HI/LO）",
     });
-  }
   }
   // 软件版本：分支 / 标签（ver_sw_branch）+ git 提交（ver_sw）。老固件没有 branch，
   // 云端记录或极旧的存档可能没有 facts.verSw，退回报告记录上的 verSw（同源、截断过）
@@ -598,6 +603,28 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
               </td>
             </tr>
           ))}
+
+          {modeList.length > 0 && (
+            <tr>
+              <td className="w-36 py-1 pr-3 align-top whitespace-nowrap text-muted" title="这次日志里出现过的飞行模式（vehicle_status.nav_state，按占样本数从多到少）">
+                飞行模式
+              </td>
+              <td className="flex flex-wrap gap-1.5 py-1 align-top">
+                {modeList.map((m) => {
+                  const st = modeStyle(m, dark);
+                  return (
+                    <span key={m} className="chip" style={{ borderColor: st.color, color: st.color }}>
+                      <span
+                        className="inline-block h-2 w-2 rounded-sm"
+                        style={{ backgroundColor: st.color }}
+                      />
+                      {st.label}
+                    </span>
+                  );
+                })}
+              </td>
+            </tr>
+          )}
 
           {/* 异常标签 / 数据质量也归在这里：都是"这份日志是什么样"的客观描述 */}
           {tags.length > 0 && (

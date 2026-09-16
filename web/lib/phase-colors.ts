@@ -43,3 +43,9 @@ export function modeStyle(mode: string, dark = false): { color: string; label: s
   const s = MODE_STYLES[mode] ?? MODE_OTHER;
   return { color: dark ? s.colorDark : s.color, label: MODE_STYLES[mode]?.label ?? mode };
 }
+
+/** 当前是否暗色主题（`<html data-theme="dark">`）。阶段条、飞行概况的模式色都要按它挑深浅 */
+export function isDarkTheme(): boolean {
+  if (typeof document === "undefined") return false;
+  return document.documentElement.getAttribute("data-theme") === "dark";
+}

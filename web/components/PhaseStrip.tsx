@@ -1,13 +1,8 @@
 "use client";
 
 import type { FlightPhase } from "@/lib/types";
-import { modeStyle } from "@/lib/phase-colors";
+import { isDarkTheme, modeStyle } from "@/lib/phase-colors";
 import { formatLogTime } from "@/lib/format";
-
-function isDark(): boolean {
-  if (typeof document === "undefined") return false;
-  return document.documentElement.getAttribute("data-theme") === "dark";
-}
 
 /** 秒数显示：掐掉 -0。阶段起点比日志起点早零点几秒是常事（定时器对齐），
  *  (-0.4).toFixed(0) 会给出 "-0"，看着像 bug。 */
@@ -19,7 +14,7 @@ function secLabel(v: number, digits = 0): string {
 export function PhaseStrip({ phases }: { phases: FlightPhase[] }) {
   if (!phases || phases.length === 0) return null;
 
-  const dark = isDark();
+  const dark = isDarkTheme();
   const t0 = phases[0].startSec;
   const total = phases[phases.length - 1].endSec - t0;
   if (total <= 0) return null;

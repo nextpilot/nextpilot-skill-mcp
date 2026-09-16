@@ -503,7 +503,7 @@ export function HistoryList({
                 {/* 全部用百分比（不用 px 列）且合计正好 100%：table-fixed 下只要合计不是 100%，
                     多出来的宽度会被**按比例摊回各列**——轨迹那列本来只有缩略图宽，一摊就宽出一大截，
                     于是缩略图两侧留白。顺带让缩略图随列宽伸缩（见 TrackThumb），一点空白都不留。
-                    宽度按实测内容定（约 1200px 宽时）：
+                    宽度按实测内容定（约 1200px 宽时；列序：缩略图/上传时间/日志文件/启动时间/飞行时长/机型机架/硬件版本/软件版本/飞行模式/结论/来源）：
                       上传时间 / 启动时间 14% —— `2026-09-16 14:41:47` 一行要 ~160px，给少了就从中间折行；
                       软件 12% —— FR 口径的 `v1.15.0 (479ee0)` 要 ~134px；
                       飞行模式 14% —— `悬停、手动、返回、定高、定点、起飞` 一行 ~154px；
@@ -512,11 +512,11 @@ export function HistoryList({
                 <th className="w-[6%] pb-2 pr-2 font-normal">缩略图</th>
                 <th className="w-[14%] pb-2 pr-2 font-normal">上传时间</th>
                 <th className="w-[9%] pb-2 pr-2 font-normal">日志文件</th>
+                <th className="w-[14%] pb-2 pr-2 font-normal">启动时间</th>
+                <th className="w-[5%] pb-2 pr-2 font-normal">飞行时长</th>
                 <th className="w-[5%] pb-2 pr-2 font-normal">机型机架</th>
                 <th className="w-[9%] pb-2 pr-2 font-normal">硬件版本</th>
                 <th className="w-[12%] pb-2 pr-2 font-normal">软件版本</th>
-                <th className="w-[14%] pb-2 pr-2 font-normal">启动时间</th>
-                <th className="w-[5%] pb-2 pr-2 font-normal">飞行时长</th>
                 <th className="w-[14%] pb-2 pr-2 font-normal">飞行模式</th>
                 <th className="w-[8%] pb-2 pr-2 font-normal">结论</th>
                 <th className="w-[4%] pb-2 font-normal">来源</th>
@@ -572,19 +572,11 @@ export function HistoryList({
                         {fmtSize(r.fileSize)}
                       </span>
                     </td>
-                    {/* 机型与机架（SYS_AUTOSTART）分两行，机架那行小一号——跟「日志文件 / 大小」同一种排法 */}
-                    <td className="py-2 pr-2 text-center text-text">
-                      <span className="block truncate">
-                        {vehicleTypeLabel(r.vehicleType)}
-                      </span>
-                      {r.facts?.airframeId ? (
-                        <span
-                          className="block truncate text-[11px] leading-4"
-                          title="机架编号（SYS_AUTOSTART）"
-                        >
-                          {r.facts.airframeId}
-                        </span>
-                      ) : null}
+                    <td className="py-2 pr-2 text-center font-mono break-words text-text">
+                      {r.facts?.startUtc ? formatDateTime(r.facts.startUtc * 1000) : "—"}
+                    </td>
+                    <td className="py-2 pr-2 text-center whitespace-nowrap text-text">
+                      {fmtDuration(r.durationSec ?? r.facts?.durationSec)}
                     </td>
                     <td className="py-2 pr-2 text-center font-mono break-words text-text">{r.verHw ?? "—"}</td>
                     {/* 软件版本口径对齐 Flight Review browse：正式版 `v1.16.0`，其余给 git 短哈希 */}
@@ -600,11 +592,19 @@ export function HistoryList({
                         {formatFirmware(r.facts, r.verSw)}
                       </span>
                     </td>
-                    <td className="py-2 pr-2 text-center font-mono break-words text-text">
-                      {r.facts?.startUtc ? formatDateTime(r.facts.startUtc * 1000) : "—"}
-                    </td>
-                    <td className="py-2 pr-2 text-center whitespace-nowrap text-text">
-                      {fmtDuration(r.durationSec ?? r.facts?.durationSec)}
+                    {/* 机型与机架（SYS_AUTOSTART）分两行，机架那行小一号——跟「日志文件 / 大小」同一种排法 */}
+                    <td className="py-2 pr-2 text-center text-text">
+                      <span className="block truncate">
+                        {vehicleTypeLabel(r.vehicleType)}
+                      </span>
+                      {r.facts?.airframeId ? (
+                        <span
+                          className="block truncate text-[11px] leading-4"
+                          title="机架编号（SYS_AUTOSTART）"
+                        >
+                          {r.facts.airframeId}
+                        </span>
+                      ) : null}
                     </td>
                     <td
                       className="py-2 pr-2 text-center text-text"
