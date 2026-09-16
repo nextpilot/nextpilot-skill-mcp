@@ -220,7 +220,6 @@ async function removeMany(ids: string[]): Promise<void> {
 // ─────────────────────────── 内存镜像 + 迁移 ───────────────────────────
 
 let mirror: SavedReport[] = [];
-let initialized = false;
 
 /** 把老版本 localStorage 里的记录搬进 IndexedDB（只做一次，搬完删键） */
 async function migrateFromLocalStorage(): Promise<void> {
@@ -253,10 +252,23 @@ async function migrateFromLocalStorage(): Promise<void> {
   }
 }
 
-/** 打开库、迁移旧记录、把结论记录载入内存镜像。界面挂载时调一次即可 */
-export async function initReportStore(): Promise<void> {
-  if (initialized || typeof window === "undefined") return;
-  initialized = true;
+/**
+ * 打开库、迁移旧记录、把结论记录载入内存镜像。
+ *
+ * ⚠️ 必须**共享同一个 Promise**，不能只用 `initialized` 布尔量做"进过一次就返回"：
+ * 同一个页面上有两个调用方（`useLogAnalyzer` 的挂载 effect 先跑，报告页自己的 effect 紧随其后），
+ * 前者刚开始 await、后者就返回了 —— 于是报告页紧接着 `getReport(id)` 查的是**还没载入的镜像**，
+ * 结果就是"刷新 /analyze/<id> 说未找到该分析报告"（站内点进详情却正常，因为镜像早就在了）。
+ */
+let initPromise: Promise<void> | null = null;
+
+export function initReportStore(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (!initPromise) initPromise = doInitReportStore();
+  return initPromise;
+}
+
+async function doInitReportStore(): Promise<void> {
   try {
     await migrateFromLocalStorage();
     const db = await openDb();
