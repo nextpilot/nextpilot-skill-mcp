@@ -465,7 +465,7 @@ function PanelChart({
   return (
     <div className="w-full min-w-0">
       <p className="mb-1 text-sm font-medium text-muted">{panel.title}</p>
-      <div className="flex items-start gap-1.5">
+      <div className="flex items-start gap-1">
         <div className="relative min-w-0 flex-1">
           {state === "loading" && (
             <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-surface-1/80 text-sm text-muted">
@@ -568,7 +568,8 @@ function buildLayout(
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: plotBg,
     font: { color: text, size: 11, family: "PingFang SC, Microsoft YaHei, sans-serif" },
-    margin: { l: 44, r: 34, t: 0, b: 40 },
+    // r 只留刻度标签的宽度：工具栏现在贴在容器右侧，右内边距留大了它就离图很远
+    margin: { l: 44, r: 14, t: 0, b: 40 },
     modebar: {
       orientation: "h",   // 横排（原来 "v" 竖排，按钮叠在面板标题那一行上）
       bgcolor: "rgba(0,0,0,0)",
