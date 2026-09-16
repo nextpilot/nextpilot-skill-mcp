@@ -164,6 +164,37 @@ facts["firmwareProfile"] = FW_PROFILE
 if FW["hw"]:
     facts["hardware"] = FW["hw"]
 
+# ---------------- 载具身份与记录起始时刻 ----------------
+# 这几项与判定无关，但历史卡片与报告概况要用，且必须**随 report 存档**（派生数据 info 不进存档）。
+_info = getattr(ulog, "msg_info_dict", {})
+uuid = str(_info.get("sys_uuid", ""))
+if uuid:
+    facts["uuid"] = uuid
+# 软件版本用**分支/标签**（如 damiao_dm-fc01_v1.15.0）比 commit 号可读；新固件才有这个键
+_branch = str(_info.get("ver_sw_branch", ""))
+if _branch:
+    facts["verSwBranch"] = _branch
+
+# 载具累计飞行时长：参数 LND_FLIGHT_T_HI/LO 拼成的 64 位 µs 计数器（两个都是 int32，可能读成负数）
+_p = ulog.initial_parameters
+_hi, _lo = _p.get("LND_FLIGHT_T_HI"), _p.get("LND_FLIGHT_T_LO")
+if _hi is not None and _lo is not None:
+    facts["vehicleLifeS"] = round((((int(_hi) & 0xFFFFFFFF) << 32) | (int(_lo) & 0xFFFFFFFF)) / 1e6, 1)
+
+# 机架编号（SYS_AUTOSTART，如 4040）——机型之外再给一个可查的标识
+_af = _p.get("SYS_AUTOSTART")
+if _af is not None:
+    facts["airframeId"] = int(_af)
+
+# 记录起始的 UTC 时刻：取 GPS 首次给出有效时间的那一刻（比 boot_time_utc_us 可靠，后者要飞控对过时）
+_gps_topic = str((FACTS.get("track") or {}).get("topic", ""))
+_gps_list = find_all(ulog, _gps_topic) if _gps_topic else []
+if _gps_list and "time_utc_usec" in _gps_list[0].data:
+    _t = np.asarray(_gps_list[0].data["time_utc_usec"], dtype=np.int64)
+    _nz = np.nonzero(_t > 0)[0]
+    if len(_nz):
+        facts["startUtc"] = int(_t[_nz[0]] // 1000000)
+
 # ---------------- 飞行阶段识别（第二层，用于故障库 phase 匹配）----------------
 # nav_state 码值 → 飞行阶段的分组写在 facts.yaml 的 nav_groups（_NAV_GROUPS 已按它构建）
 

@@ -13,6 +13,11 @@
       "firmware": "1.11.2",
       "firmwareProfile": "px4-legacy",
       "hardware": "CUBEPILOT_CUBEORANGE",
+      "uuid": "000600000000383638393239510d0035002d",
+      "verSwBranch": "v1.11.2_w_rc_sysid",
+      "vehicleLifeS": 22035.4,
+      "airframeId": 13014,
+      "startUtc": 1618986658,
       "armedDurationSec": 5.6,
       "phases": [
         "maneuver"

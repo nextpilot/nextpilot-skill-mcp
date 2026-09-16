@@ -158,6 +158,13 @@ export function useLogAnalyzer() {
                     vehicleType: (r.vehicleType as string) ?? undefined,
                     parserVersion: String(r.parserVersion ?? ""),
                     logHash: r.logHash ? String(r.logHash) : undefined,
+                    verSw: r.verSw ? String(r.verSw) : undefined,
+                    verHw: r.verHw ? String(r.verHw) : undefined,
+                    facts: {
+                        durationSec: Number(r.durationSec ?? 0) || undefined,
+                        startUtc: typeof r.startUtc === "number" ? r.startUtc : undefined,
+                        airframeId: typeof r.airframeId === "number" ? r.airframeId : undefined,
+                    },
                     findings: [],
                     findingCount: Number(r.findingCount ?? 0),
                     metrics: [],

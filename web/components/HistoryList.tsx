@@ -5,6 +5,12 @@ import Link from "next/link";
 import {
   Trash2,
   History,
+  Clock,
+  FileText,
+  Timer,
+  Plane,
+  Cpu,
+  GitBranch,
   Search,
   ShieldAlert,
   AlertTriangle,
@@ -77,6 +83,12 @@ function fmtDuration(sec?: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.round(sec % 60);
   return m > 0 ? `${m}m${s}s` : `${s}s`;
+}
+
+/** 文件尺寸：与报告页概要同一写法（MB，两位小数） */
+function fmtSize(bytes?: number): string {
+  if (!bytes) return "—";
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
 export function HistoryList({
@@ -309,24 +321,54 @@ export function HistoryList({
                   href={`/analyze/${encodeURIComponent(r.id)}`}
                   className="block rounded-lg px-2 py-2.5 transition-colors hover:bg-surface-2"
                 >
-                <div className="flex items-center gap-2 text-xs text-muted">
-                  <span className="font-mono">{fmtTime(r.analyzedAt)}</span>
-                  {r.vehicleType && (
-                    <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[11px] text-text">
-                      {VEHICLE_TYPE_LABELS[r.vehicleType] ?? r.vehicleType}
+                {/* 元信息一行：飞行时间 · 文件尺寸 · 飞行时长 · 机型（机架）· 硬件版本 · 软件版本。
+                    飞行时间取日志记录的起始时刻（facts.startUtc）；老存档没有这项就退回显示分析时间。 */}
+                <div
+                  className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted"
+                  title={`分析时间：${fmtTime(r.analyzedAt)}`}
+                >
+                  <span className="flex items-center gap-1" title="飞行时间（日志记录的起始时刻）">
+                    <Clock className="h-3 w-3 shrink-0 text-faint" />
+                    <span className="font-mono">
+                      {r.facts?.startUtc ? fmtTime(new Date(r.facts.startUtc * 1000).toISOString()) : fmtTime(r.analyzedAt)}
                     </span>
-                  )}
-                  {r.verSw && (
-                    <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[11px] font-mono text-faint">
-                      {r.verSw}
+                  </span>
+                  <span className="flex items-center gap-1" title="日志文件大小">
+                    <FileText className="h-3 w-3 shrink-0 text-faint" />
+                    {fmtSize(r.fileSize)}
+                  </span>
+                  <span className="flex items-center gap-1" title="日志时长">
+                    <Timer className="h-3 w-3 shrink-0 text-faint" />
+                    {fmtDuration(r.durationSec ?? r.facts?.durationSec)}
+                  </span>
+                  {r.vehicleType && (
+                    <span
+                      className="flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] text-text"
+                      title="机型与机架编号（SYS_AUTOSTART）"
+                    >
+                      <Plane className="h-3 w-3 shrink-0" />
+                      {VEHICLE_TYPE_LABELS[r.vehicleType] ?? r.vehicleType}
+                      {r.facts?.airframeId ? `（机架 ${r.facts.airframeId}）` : ""}
                     </span>
                   )}
                   {r.verHw && (
-                    <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[11px] text-faint">
-                      HW:{r.verHw}
+                    <span
+                      className="flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] text-faint"
+                      title="硬件版本（ver_hw）"
+                    >
+                      <Cpu className="h-3 w-3 shrink-0" />
+                      {r.verHw}
                     </span>
                   )}
-                  <span>{fmtDuration(r.durationSec)}</span>
+                  {(r.facts?.verSwBranch || r.verSw) && (
+                    <span
+                      className="flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] font-mono text-faint"
+                      title={r.facts?.verSwBranch ? `固件分支（ver_sw_branch）；commit ${r.verSw ?? "?"}` : "固件 commit（ver_sw）"}
+                    >
+                      <GitBranch className="h-3 w-3 shrink-0" />
+                      {r.facts?.verSwBranch || r.verSw}
+                    </span>
+                  )}
                   <span
                     className="ml-auto flex items-center gap-0.5"
                     title={r.source === "cloud" ? "云端（跨设备可见）" : "仅本机"}

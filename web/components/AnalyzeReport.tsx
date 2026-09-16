@@ -176,7 +176,7 @@ export function AnalyzeReport({
       </div>
 
       {/* 飞行概况：载具身份 + 时长 + 记录起始时刻（对齐 Flight Review 的 General 表） */}
-      <GeneralInfo info={info} report={report} />
+      <GeneralInfo report={report} />
 
       {/* 异常标签 / 数据质量 guard */}
       {(report.guardTags?.length || report.tags?.length) && (
@@ -540,10 +540,10 @@ function formatDuration(sec: number): string {
 /**
  * 飞行概况（Flight Review 的 General 表口径）：
  *   Vehicle UUID / Vehicle Life（载具累计飞行时长）/ Flight Time（本次飞行时长）/ Logging Start
- * 数据由引擎算好（`info.general` 与 `report.facts`），这里只排版；缺哪项就不显示哪行。
+ * 数据由引擎算好并随 report 存档（`report.facts`），历史卡片与这里同源；缺哪项就不显示哪行。
  */
-function GeneralInfo({ info, report }: { info: LogInfo | null; report: AnalysisReport }) {
-  const g = info?.general;
+function GeneralInfo({ report }: { report: AnalysisReport }) {
+  const g = report.facts;
   const rows: { label: string; value: string; title?: string; mono?: boolean }[] = [];
 
   if (g?.uuid) rows.push({ label: "Vehicle UUID", value: g.uuid, mono: true });
@@ -557,8 +557,8 @@ function GeneralInfo({ info, report }: { info: LogInfo | null; report: AnalysisR
       title: "本次日志里解锁（armed）的累计时长",
     });
   }
-  if (g?.loggingStartUtc) {
-    const d = new Date(g.loggingStartUtc * 1000);
+  if (g?.startUtc) {
+    const d = new Date(g.startUtc * 1000);
     rows.push({
       label: "Logging Start",
       value: d.toLocaleString(),

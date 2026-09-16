@@ -32,6 +32,11 @@ export async function onRequestGet({ request, env, waitUntil }) {
       vehicleType: rec.vehicleType,
       parserVersion: rec.parserVersion,
       logHash: rec.logHash,
+      // 历史卡片用：记录起始时刻与机架编号（源是存档里的 report.facts）
+      startUtc: rec.facts?.startUtc,
+      airframeId: rec.facts?.airframeId,
+      verSw: rec.verSw,
+      verHw: rec.verHw,
       findingCount: Array.isArray(rec.findings) ? rec.findings.length : 0,
       hasReport: Boolean(rec.aiMarkdown),
       analyzedAt: rec.analyzedAt,

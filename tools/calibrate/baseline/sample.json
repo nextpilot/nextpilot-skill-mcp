@@ -13,6 +13,7 @@
       "firmware": "未知（旧固件或无版本号）",
       "firmwareProfile": "px4-legacy",
       "hardware": "AUAV_X21",
+      "airframeId": 10020,
       "armedDurationSec": 0.0,
       "phases": [],
       "dropoutTotalMs": 119
