@@ -95,8 +95,10 @@ function shortName(fileName: string): string {
 }
 
 function TrackThumb({ points }: { points?: [number, number][]; }) {
+  // 悬停放大成预览：SVG 是矢量的，放大不糊；transform 自带层叠上下文，z-20 能盖住右边的内容
   const box =
-    "block h-12 w-16 shrink-0 overflow-hidden rounded-md border border-border bg-surface-2";
+    "block h-12 w-16 shrink-0 overflow-hidden rounded-md border border-border bg-surface-2 " +
+    "transition-transform duration-150 origin-left hover:z-20 hover:scale-[2.6] hover:border-primary hover:shadow-lg";
   if (!points || points.length < 2) {
     return (
       <span
