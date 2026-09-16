@@ -497,21 +497,22 @@ export function HistoryList({
                     多出来的宽度会被**按比例摊回各列**——轨迹那列本来只有缩略图宽，一摊就宽出一大截，
                     于是缩略图两侧留白。顺带让缩略图随列宽伸缩（见 TrackThumb），一点空白都不留。
                     宽度按实测内容定（列序：缩略图/上传时间/日志文件/启动时间/飞行时长/机型机架/硬件版本/软件版本/飞行模式/结论/来源）：
-                      上传时间 / 启动时间 10%、日志文件 8%（用户指定）——注意 10% 在 1200px 宽的表格里
-                      只有 ~120px，装不下 19 字符的时间戳（~160px），会从中间折成两行；
+                      上传时间 / 启动时间 8%、日志文件 8%（用户指定）——注意 8% 在 1200px 宽的表格里
+                      只有 ~96px，装不下 19 字符的时间戳（~160px），会从中间折成两行；
+                      飞行时长 8%（`00:07:00` 八字符等宽 ~67px）、机型机架 8%（`旋翼` / `4040` 两行）；
                       软件版本 13% —— FR 口径的 `v1.15.0 (479ee0)` 要 ~134px；
                       飞行模式 16% —— `悬停、手动、返回、定高、定点、起飞` 一行 ~154px；
                       机型机架 6% —— 两行都只有 `旋翼` / `4040`；硬件 10%、缩略图 7%、时长 5%、结论 10%、来源 5%。 */}
                 <th className="w-[7%] pb-2 pr-2 font-normal">缩略图</th>
-                <th className="w-[10%] pb-2 pr-2 font-normal">上传时间</th>
+                <th className="w-[8%] pb-2 pr-2 font-normal">上传时间</th>
                 <th className="w-[8%] pb-2 pr-2 font-normal">日志文件</th>
-                <th className="w-[10%] pb-2 pr-2 font-normal">启动时间</th>
-                <th className="w-[5%] pb-2 pr-2 font-normal">飞行时长</th>
-                <th className="w-[6%] pb-2 pr-2 font-normal">机型机架</th>
+                <th className="w-[8%] pb-2 pr-2 font-normal">启动时间</th>
+                <th className="w-[8%] pb-2 pr-2 font-normal">飞行时长</th>
+                <th className="w-[8%] pb-2 pr-2 font-normal">机型机架</th>
                 <th className="w-[10%] pb-2 pr-2 font-normal">硬件版本</th>
                 <th className="w-[13%] pb-2 pr-2 font-normal">软件版本</th>
                 <th className="w-[16%] pb-2 pr-2 font-normal">飞行模式</th>
-                <th className="w-[10%] pb-2 pr-2 font-normal">结论</th>
+                <th className="w-[9%] pb-2 pr-2 font-normal">结论</th>
                 <th className="w-[5%] pb-2 font-normal">来源</th>
               </tr>
             </thead>
