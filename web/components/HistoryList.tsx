@@ -402,7 +402,7 @@ export function HistoryList({
                         <TrackThumb points={r.trackThumb} />
                       </div>
                     </td>
-                    <td className="py-2 pr-2 text-center font-mono text-xs break-words text-text">
+                    <td className="py-2 pr-2 text-center font-mono break-words text-text">
                       {formatDateTime(r.analyzedAt)}
                     </td>
                     <td className="py-2 pr-2">
@@ -422,11 +422,11 @@ export function HistoryList({
                         <span className="text-text">（{r.facts.airframeId}）</span>
                       ) : null}
                     </td>
-                    <td className="py-2 pr-2 text-center font-mono text-xs break-words text-text">{r.verHw ?? "—"}</td>
-                    <td className="py-2 pr-2 text-center font-mono text-xs break-words text-text">
+                    <td className="py-2 pr-2 text-center font-mono break-words text-text">{r.verHw ?? "—"}</td>
+                    <td className="py-2 pr-2 text-center font-mono break-words text-text">
                       {r.facts?.verSwBranch || r.verSw || "—"}
                     </td>
-                    <td className="py-2 pr-2 text-center font-mono text-xs break-words text-text">
+                    <td className="py-2 pr-2 text-center font-mono break-words text-text">
                       {r.facts?.startUtc ? formatDateTime(r.facts.startUtc * 1000) : "—"}
                     </td>
                     <td className="py-2 pr-2 text-center whitespace-nowrap text-text">
@@ -437,13 +437,13 @@ export function HistoryList({
                     </td>
                     <td className="py-2 text-center whitespace-nowrap">
                       {c ? (
-                        <span className="flex items-center justify-center gap-1.5 text-xs">
+                        <span className="flex items-center justify-center gap-1.5">
                           <Count icon={<ShieldAlert className="h-3 w-3" />} n={c.critical} tone="critical" />
                           <Count icon={<AlertTriangle className="h-3 w-3" />} n={c.warning} tone="warning" />
                           <Count icon={<Info className="h-3 w-3" />} n={c.info} tone="info" />
                         </span>
                       ) : (
-                        <span className="text-xs text-muted">{total}</span>
+                        <span className="text-muted">{total}</span>
                       )}
                     </td>
                     <td className="py-2 text-center">
