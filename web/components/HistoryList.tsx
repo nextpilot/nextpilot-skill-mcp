@@ -573,20 +573,6 @@ export function HistoryList({
                       {/* 时长与日志内的时间同一写法：hh:MM:ss（超过 24 小时小时位自然变三位） */}
                       {durSec ? formatLogTime(durSec) : "—"}
                     </td>
-                    <td className="py-2 pr-2 text-center font-mono break-words text-text">{r.verHw ?? "—"}</td>
-                    {/* 软件版本口径对齐 Flight Review browse：正式版 `v1.16.0`，其余给 git 短哈希 */}
-                    <td className="py-2 pr-2 text-center font-mono break-words text-text">
-                      <span
-                        title={[
-                          r.facts?.verSwBranch ? `分支 ${r.facts.verSwBranch}` : "",
-                          r.verSw ? `git ${r.verSw}` : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" · ") || undefined}
-                      >
-                        {formatFirmware(r.facts, r.verSw)}
-                      </span>
-                    </td>
                     {/* 机型与机架（SYS_AUTOSTART）分两行，机架那行小一号——跟「日志文件 / 大小」同一种排法 */}
                     <td className="py-2 pr-2 text-center text-text">
                       <span className="block truncate">
@@ -600,6 +586,20 @@ export function HistoryList({
                           {r.facts.airframeId}
                         </span>
                       ) : null}
+                    </td>
+                    <td className="py-2 pr-2 text-center font-mono break-words text-text">{r.verHw ?? "—"}</td>
+                    {/* 软件版本口径对齐 Flight Review browse：正式版 `v1.16.0`，其余给 git 短哈希 */}
+                    <td className="py-2 pr-2 text-center font-mono break-words text-text">
+                      <span
+                        title={[
+                          r.facts?.verSwBranch ? `分支 ${r.facts.verSwBranch}` : "",
+                          r.verSw ? `git ${r.verSw}` : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" · ") || undefined}
+                      >
+                        {formatFirmware(r.facts, r.verSw)}
+                      </span>
                     </td>
                     <td
                       className="py-2 pr-2 text-center text-text"
