@@ -6,6 +6,10 @@ import remarkGfm from "remark-gfm";
 import {
   ShieldAlert,
   AlertTriangle,
+  Fingerprint,
+  CalendarClock,
+  Clock,
+  Timer,
   Activity,
   Info,
   FileCheck2,
@@ -520,16 +524,32 @@ function formatDuration(sec: number): string {
  */
 function GeneralInfo({ report }: { report: AnalysisReport }) {
   const g = report.facts;
-  const rows: { label: string; value: string; title?: string; mono?: boolean }[] = [];
+  type Row = { label: string; value: string; title?: string; mono?: boolean; icon: React.ReactNode };
+  const rows: Row[] = [];
+  const icon = "h-3.5 w-3.5 shrink-0 text-faint";
 
-  if (g?.uuid) rows.push({ label: "Vehicle UUID", value: g.uuid, mono: true });
+  if (g?.uuid) {
+    rows.push({
+      label: "Vehicle UUID",
+      value: g.uuid,
+      mono: true,
+      icon: <Fingerprint className={icon} />,
+      title: "飞控唯一 ID（sys_uuid / PX4GUID）",
+    });
+  }
   if (typeof g?.vehicleLifeS === "number") {
-    rows.push({ label: "Vehicle Life", value: formatDuration(g.vehicleLifeS), title: "载具累计飞行时长（参数 LND_FLIGHT_T_HI/LO）" });
+    rows.push({
+      label: "Vehicle Life",
+      value: formatDuration(g.vehicleLifeS),
+      icon: <Timer className={icon} />,
+      title: "载具累计飞行时长（参数 LND_FLIGHT_T_HI/LO）",
+    });
   }
   if (report.facts?.armedDurationSec) {
     rows.push({
       label: "Flight Time",
       value: formatDuration(report.facts.armedDurationSec),
+      icon: <Clock className={icon} />,
       title: "本次日志里解锁（armed）的累计时长",
     });
   }
@@ -538,6 +558,7 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
     rows.push({
       label: "Logging Start",
       value: d.toLocaleString(),
+      icon: <CalendarClock className={icon} />,
       title: `记录起始时刻（本机时区）。UTC：${d.toISOString().replace("T", " ").slice(0, 19)}`,
     });
   }
@@ -553,8 +574,11 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
         <tbody>
           {rows.map((r) => (
             <tr key={r.label}>
-              <td className="w-32 py-0.5 pr-3 align-top text-xs whitespace-nowrap text-muted" title={r.title}>
-                {r.label}
+              <td className="w-36 py-0.5 pr-3 align-top text-xs whitespace-nowrap text-muted" title={r.title}>
+                <span className="flex items-center gap-1.5">
+                  {r.icon}
+                  {r.label}
+                </span>
               </td>
               <td className={`py-0.5 align-top break-all ${r.mono ? "font-mono text-xs" : ""} text-text`}>
                 {r.value}
@@ -565,8 +589,11 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
           {/* 异常标签 / 数据质量也归在这里：都是"这份日志是什么样"的客观描述 */}
           {tags.length > 0 && (
             <tr>
-              <td className="w-32 py-1 pr-3 align-top text-xs whitespace-nowrap text-muted" title="确定性引擎命中的异常标签（喂给故障知识库匹配）">
-                异常标签
+              <td className="w-36 py-1 pr-3 align-top text-xs whitespace-nowrap text-muted" title="确定性引擎命中的异常标签（喂给故障知识库匹配）">
+                <span className="flex items-center gap-1.5">
+                  <AlertTriangle className={icon} />
+                  异常标签
+                </span>
               </td>
               <td className="flex flex-wrap gap-1 py-1 align-top">
                 {tags.map((t) => (
@@ -579,8 +606,11 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
           )}
           {guards.length > 0 && (
             <tr>
-              <td className="w-32 py-1 pr-3 align-top text-xs whitespace-nowrap text-muted" title="数据质量标签：影响结论可信度">
-                数据质量
+              <td className="w-36 py-1 pr-3 align-top text-xs whitespace-nowrap text-muted" title="数据质量标签：影响结论可信度">
+                <span className="flex items-center gap-1.5">
+                  <ShieldAlert className={icon} />
+                  数据质量
+                </span>
               </td>
               <td className="flex flex-wrap gap-1 py-1 align-top">
                 {guards.map((g) => (
