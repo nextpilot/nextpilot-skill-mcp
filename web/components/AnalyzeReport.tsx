@@ -107,12 +107,6 @@ export function AnalyzeReport({
   activeTab: TabKey;
   onTabChange: (tab: TabKey) => void;
 }) {
-  const counts = {
-    critical: report.findings.filter((f) => f.severity === "critical").length,
-    warning: report.findings.filter((f) => f.severity === "warning").length,
-    info: report.findings.filter((f) => f.severity === "info").length,
-  };
-
   // "纯历史"指只能看结论（没有参数/消息/曲线）：此时强制停在结论页并给出恢复提示
   const isHistory = !info && !manifest && !storedPlots?.panels?.length;
   const tabs: { key: TabKey; label: string; icon: React.ReactNode; disabled?: boolean }[] = [
@@ -146,26 +140,6 @@ export function AnalyzeReport({
               ? ` · ${vehicleTypeLabel(report.facts.vehicleType)}`
               : ""}
           </p>
-        </div>
-        <div className="ml-auto flex gap-2 text-xs">
-          <CountPill
-            icon={<ShieldAlert className="h-3.5 w-3.5" />}
-            n={counts.critical}
-            label="严重"
-            tone="critical"
-          />
-          <CountPill
-            icon={<AlertTriangle className="h-3.5 w-3.5" />}
-            n={counts.warning}
-            label="警告"
-            tone="warning"
-          />
-          <CountPill
-            icon={<Info className="h-3.5 w-3.5" />}
-            n={counts.info}
-            label="提示"
-            tone="info"
-          />
         </div>
       </div>
 
@@ -517,6 +491,11 @@ function formatDuration(sec: number): string {
  */
 function GeneralInfo({ report }: { report: AnalysisReport }) {
   const g = report.facts;
+  const counts = {
+    critical: report.findings.filter((f) => f.severity === "critical").length,
+    warning: report.findings.filter((f) => f.severity === "warning").length,
+    info: report.findings.filter((f) => f.severity === "info").length,
+  };
   // 标签与取值同字号、同字体（不再给 UUID / 提交号之类套 font-mono：一处 12px 一处 14px 看着就是不齐）
   type Row = { label: string; value: string; title?: string };
   const rows: Row[] = [];
@@ -557,13 +536,13 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
       value: formatDateTime(d),
       title: `记录起始时刻（本机时区）。UTC：${d.toISOString().replace("T", " ").slice(0, 19)}`,
     });
-      if (report.facts?.armedDurationSec) {
+  }
+  if (report.facts?.armedDurationSec) {
     rows.push({
       label: "飞行时长",
       value: formatDuration(report.facts.armedDurationSec),
       title: "本次日志里解锁（armed）的累计时长",
     });
-  }
   }
 
   // 软件版本：分支 / 标签（ver_sw_branch）+ git 提交（ver_sw）。老固件没有 branch，
@@ -593,8 +572,6 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
 
   const tags = report.tags ?? [];
   const guards = report.guardTags ?? [];
-  if (rows.length === 0 && tags.length === 0 && guards.length === 0) return null;
-
   return (
     <div className="mb-5 rounded-lg border border-border bg-surface-2 p-3">
       <h3 className="mb-2 text-sm font-semibold">飞行概况</h3>
@@ -640,6 +617,33 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
               </td>
             </tr>
           )}
+
+          {/* 检查结论的三档计数：原在页面顶部那三个胶囊里，挪进来与"这份日志是什么样"放在一起 */}
+          <tr>
+            <td className="w-36 py-1 pr-3 align-top whitespace-nowrap text-muted" title="确定性引擎的检查结论条数（明细见「检查结论」tab）">
+              检查结论
+            </td>
+            <td className="flex flex-wrap gap-1.5 py-1 align-top">
+              <CountPill
+                icon={<ShieldAlert className="h-3.5 w-3.5" />}
+                n={counts.critical}
+                label="严重"
+                tone="critical"
+              />
+              <CountPill
+                icon={<AlertTriangle className="h-3.5 w-3.5" />}
+                n={counts.warning}
+                label="警告"
+                tone="warning"
+              />
+              <CountPill
+                icon={<Info className="h-3.5 w-3.5" />}
+                n={counts.info}
+                label="提示"
+                tone="info"
+              />
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
