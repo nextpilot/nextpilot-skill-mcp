@@ -12,6 +12,7 @@ import {
   Cpu,
   GitBranch,
   MapPin,
+  Upload,
   Search,
   ShieldAlert,
   AlertTriangle,
@@ -381,21 +382,17 @@ export function HistoryList({
                 >
                 <TrackThumb points={r.trackThumb} />
                 <div className="min-w-0 flex-1">
-                {/* 元信息一行：飞行时间 · 文件尺寸 · 飞行时长 · 机型（机架）· 硬件版本 · 软件版本。
-                    飞行时间取日志记录的起始时刻（facts.startUtc）；老存档没有这项就退回显示分析时间。 */}
+                {/* 第一行：这次飞行是什么——飞行时间 · 飞行时长 · 机型（机架）· 硬件版本 · 软件版本
+                    飞行时间取日志记录的起始时刻（facts.startUtc，GPS 首次有效 UTC）；老存档没有就显示 — */}
                 <div
                   className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted"
                   title={`分析时间：${formatDateTime(r.analyzedAt)}`}
                 >
-                  <span className="flex items-center gap-1" title="飞行时间（日志记录的起始时刻）">
+                  <span className="flex items-center gap-1" title="飞行时间（日志记录的起始时刻，取 GPS 首次有效 UTC）">
                     <Clock className="h-3.5 w-3.5 shrink-0 text-muted" />
                     <span className="font-mono">
-                      {formatDateTime(r.facts?.startUtc ? r.facts.startUtc * 1000 : r.analyzedAt)}
+                      {r.facts?.startUtc ? formatDateTime(r.facts.startUtc * 1000) : "—"}
                     </span>
-                  </span>
-                  <span className="flex items-center gap-1" title="日志文件大小">
-                    <FileText className="h-3.5 w-3.5 shrink-0 text-muted" />
-                    {fmtSize(r.fileSize)}
                   </span>
                   <span className="flex items-center gap-1" title="日志时长">
                     <Timer className="h-3.5 w-3.5 shrink-0 text-muted" />
@@ -438,6 +435,18 @@ export function HistoryList({
                     ) : (
                       <HardDrive className="h-3 w-3" />
                     )}
+                  </span>
+                </div>
+
+                {/* 第二行：上传（分析）时间与文件大小——与"这次飞行"的信息分开，别挤在一行 */}
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+                  <span className="flex items-center gap-1" title="上传并分析这份日志的时间">
+                    <Upload className="h-3.5 w-3.5 shrink-0 text-muted" />
+                    <span className="font-mono">{formatDateTime(r.analyzedAt)}</span>
+                  </span>
+                  <span className="flex items-center gap-1" title="日志文件大小">
+                    <FileText className="h-3.5 w-3.5 shrink-0 text-muted" />
+                    {fmtSize(r.fileSize)}
                   </span>
                 </div>
                 <p className="mt-1 truncate text-base font-medium text-text" title={r.fileName}>
