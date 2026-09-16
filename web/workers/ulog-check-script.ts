@@ -1456,6 +1456,20 @@ facts["firmwareProfile"] = FW_PROFILE
 if FW["hw"]:
     facts["hardware"] = FW["hw"]
 
+# ---------------- 主飞行模式 ----------------
+# 占样本最多的 nav_state 模式（名字取 facts.yaml 的 nav_state_names）——列表"飞行模式"列用一句话概括这次主要怎么飞的
+_NAV_NAMES = {int(k): v for k, v in FACTS.get("nav_state_names", {}).items()}
+_vs_first = find_all(ulog, _VS["topic"])
+if _vs_first:
+    _nav = getf(_vs_first[0], _VS["nav_state"])
+    if _nav is not None and len(_nav) > 0:
+        _counts = {}
+        for _code in _nav:
+            _c = int(_code)
+            _counts[_c] = _counts.get(_c, 0) + 1
+        _main = max(_counts, key=_counts.get)
+        facts["mainMode"] = str(_NAV_NAMES.get(_main, "Mode %d" % _main))
+
 # ---------------- 载具身份与记录起始时刻 ----------------
 # 这几项与判定无关，但历史卡片与报告概况要用，且必须**随 report 存档**（派生数据 info 不进存档）。
 _info = getattr(ulog, "msg_info_dict", {})

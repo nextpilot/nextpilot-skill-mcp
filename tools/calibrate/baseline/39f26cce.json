@@ -13,6 +13,7 @@
       "firmware": "1.16.0",
       "firmwareProfile": "px4-1.15+",
       "hardware": "PX4_FMU_V6C",
+      "mainMode": "Mission",
       "uuid": "0006000000003132343830345115001e0023",
       "vehicleLifeS": 695.3,
       "airframeId": 2100,

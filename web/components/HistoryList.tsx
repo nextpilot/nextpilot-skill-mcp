@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import type { SavedReport } from "@/lib/report-history";
 import { formatDateTime } from "@/lib/format";
+import { modeStyle } from "@/lib/phase-colors";
 
 const VEHICLE_TYPE_LABELS: Record<string, string> = {
   rotary_wing: "旋翼",
@@ -354,16 +355,17 @@ export function HistoryList({
         <div className="max-h-[560px] overflow-auto">
           <table className="w-full table-fixed text-sm">
             <thead>
-              <tr className="text-left text-[11px] text-muted">
-                <th className="w-[72px] pb-2 pr-3 font-normal">轨迹</th>
-                <th className="w-[11%] pb-2 pr-3 font-normal">启动时间</th>
-                <th className="pb-2 pr-3 font-normal">文件名</th>
-                <th className="w-[8%] pb-2 pr-3 font-normal">时长</th>
-                <th className="w-[10%] pb-2 pr-3 font-normal">机型（机架）</th>
-                <th className="w-[10%] pb-2 pr-3 font-normal">硬件</th>
-                <th className="w-[10%] pb-2 pr-3 font-normal">软件</th>
-                <th className="w-[11%] pb-2 pr-3 font-normal">上传时间</th>
-                <th className="w-[7%] pb-2 pr-3 font-normal">大小</th>
+              <tr className="text-center text-[11px] text-muted">
+                <th className="w-[72px] pb-2 pr-2 font-normal">轨迹</th>
+                <th className="w-[11%] pb-2 pr-2 font-normal">上传时间</th>
+                <th className="pb-2 pr-2 font-normal">文件名</th>
+                <th className="w-[7%] pb-2 pr-2 font-normal">大小</th>
+                <th className="w-[8%] pb-2 pr-2 font-normal">机型</th>
+                <th className="w-[9%] pb-2 pr-2 font-normal">硬件</th>
+                <th className="w-[9%] pb-2 pr-2 font-normal">软件</th>
+                <th className="w-[11%] pb-2 pr-2 font-normal">启动时间</th>
+                <th className="w-[6%] pb-2 pr-2 font-normal">时长</th>
+                <th className="w-[8%] pb-2 pr-2 font-normal">飞行模式</th>
                 <th className="w-[10%] pb-2 font-normal">结论</th>
               </tr>
             </thead>
@@ -394,16 +396,18 @@ export function HistoryList({
                     }}
                     className="cursor-pointer border-t border-border/30 hover:bg-surface-2"
                   >
-                    <td className="py-2 pr-3">
-                      <TrackThumb points={r.trackThumb} />
+                    <td className="py-2 pr-2 align-middle">
+                      <div className="flex justify-center">
+                        <TrackThumb points={r.trackThumb} />
+                      </div>
                     </td>
-                    <td className="py-2 pr-3 font-mono text-xs break-words text-muted">
-                      {r.facts?.startUtc ? formatDateTime(r.facts.startUtc * 1000) : "—"}
+                    <td className="py-2 pr-2 text-center font-mono text-xs break-words text-text">
+                      {formatDateTime(r.analyzedAt)}
                     </td>
-                    <td className="max-w-[260px] py-2 pr-3">
-                      <span className="flex items-center gap-1.5">
+                    <td className="py-2 pr-2">
+                      <span className="flex items-start justify-center gap-1.5">
                         <span
-                          className="shrink-0"
+                          className="mt-0.5 shrink-0"
                           title={r.source === "cloud" ? "云端（跨设备可见）" : "仅本机"}
                         >
                           {r.source === "cloud" ? (
@@ -412,35 +416,39 @@ export function HistoryList({
                             <HardDrive className="h-3.5 w-3.5 text-faint" />
                           )}
                         </span>
+                        {/* 文件名较长：整词换行（break-all），不截断 */}
                         <Link
                           href={href}
-                          className="min-w-0 truncate font-medium text-text hover:text-primary"
+                          className="min-w-0 font-medium break-all text-text hover:text-primary"
                           title={r.fileName}
                         >
                           {r.fileName}
                         </Link>
                       </span>
                     </td>
-                    <td className="py-2 pr-3 whitespace-nowrap text-muted">
-                      {fmtDuration(r.durationSec ?? r.facts?.durationSec)}
-                    </td>
-                    <td className="py-2 pr-3 text-text">
+                    <td className="py-2 pr-2 text-center whitespace-nowrap text-text">{fmtSize(r.fileSize)}</td>
+                    <td className="py-2 pr-2 text-center text-text">
                       {r.vehicleType ? (VEHICLE_TYPE_LABELS[r.vehicleType] ?? r.vehicleType) : "—"}
                       {r.facts?.airframeId ? (
-                        <span className="text-muted">（{r.facts.airframeId}）</span>
+                        <span className="text-text">（{r.facts.airframeId}）</span>
                       ) : null}
                     </td>
-                    <td className="py-2 pr-3 font-mono text-xs break-words text-muted">{r.verHw ?? "—"}</td>
-                    <td className="py-2 pr-3 font-mono text-xs break-words text-muted">
+                    <td className="py-2 pr-2 text-center font-mono text-xs break-words text-text">{r.verHw ?? "—"}</td>
+                    <td className="py-2 pr-2 text-center font-mono text-xs break-words text-text">
                       {r.facts?.verSwBranch || r.verSw || "—"}
                     </td>
-                    <td className="py-2 pr-3 font-mono text-xs break-words text-muted">
-                      {formatDateTime(r.analyzedAt)}
+                    <td className="py-2 pr-2 text-center font-mono text-xs break-words text-text">
+                      {r.facts?.startUtc ? formatDateTime(r.facts.startUtc * 1000) : "—"}
                     </td>
-                    <td className="py-2 pr-3 whitespace-nowrap text-muted">{fmtSize(r.fileSize)}</td>
-                    <td className="py-2 whitespace-nowrap">
+                    <td className="py-2 pr-2 text-center whitespace-nowrap text-text">
+                      {fmtDuration(r.durationSec ?? r.facts?.durationSec)}
+                    </td>
+                    <td className="py-2 pr-2 text-center whitespace-nowrap text-text" title={r.facts?.mainMode}>
+                      {r.facts?.mainMode ? modeStyle(r.facts.mainMode).label : "—"}
+                    </td>
+                    <td className="py-2 text-center whitespace-nowrap">
                       {c ? (
-                        <span className="flex items-center gap-1.5 text-xs">
+                        <span className="flex items-center justify-center gap-1.5 text-xs">
                           <Count icon={<ShieldAlert className="h-3 w-3" />} n={c.critical} tone="critical" />
                           <Count icon={<AlertTriangle className="h-3 w-3" />} n={c.warning} tone="warning" />
                           <Count icon={<Info className="h-3 w-3" />} n={c.info} tone="info" />

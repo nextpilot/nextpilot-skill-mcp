@@ -121,6 +121,8 @@ export interface LogFacts {
   startUtc?: number;
   /** 固件分支 / 标签（msg_info_dict.ver_sw_branch，如 damiao_dm-fc01_v1.15.0）；旧固件没有 */
   verSwBranch?: string;
+  /** 主飞行模式：占样本最多的 nav_state（PX4 模式名，如 Position / Mission） */
+  mainMode?: string;
 }
 
 /** 概览指标的一项：order/label/unit 由 knowledge/px4/facts.yaml 的 metrics 声明 */
