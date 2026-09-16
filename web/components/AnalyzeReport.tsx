@@ -178,30 +178,6 @@ export function AnalyzeReport({
       {/* 飞行概况：载具身份 + 时长 + 记录起始时刻（对齐 Flight Review 的 General 表） */}
       <GeneralInfo report={report} />
 
-      {/* 异常标签 / 数据质量 guard */}
-      {(report.guardTags?.length || report.tags?.length) && (
-        <div className="mb-5 space-y-2.5">
-          {report.tags && report.tags.length > 0 && (
-            <TagRow label="异常标签">
-              {report.tags.map((t) => (
-                <span key={t} className="chip border-warning/40 text-warning">
-                  {TAG_LABELS[t] ?? t}
-                </span>
-              ))}
-            </TagRow>
-          )}
-          {report.guardTags && report.guardTags.length > 0 && (
-            <TagRow label="数据质量" hint="影响结论可信度">
-              {report.guardTags.map((g) => (
-                <span key={g} className="chip border-critical/40 text-critical">
-                  {GUARD_LABELS[g] ?? g}
-                </span>
-              ))}
-            </TagRow>
-          )}
-        </div>
-      )}
-
       {/* 飞行轨迹（原来挂在"系统信息"框里，那个框已按要求去掉） */}
       {info && (
         <section className="mb-5 rounded-lg bg-surface-2 p-4">
@@ -566,7 +542,10 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
     });
   }
 
-  if (rows.length === 0) return null;
+  const tags = report.tags ?? [];
+  const guards = report.guardTags ?? [];
+  if (rows.length === 0 && tags.length === 0 && guards.length === 0) return null;
+
   return (
     <div className="mb-5 rounded-lg border border-border bg-surface-2 p-3">
       <h3 className="mb-2 text-sm font-semibold">飞行概况</h3>
@@ -582,6 +561,36 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
               </td>
             </tr>
           ))}
+
+          {/* 异常标签 / 数据质量也归在这里：都是"这份日志是什么样"的客观描述 */}
+          {tags.length > 0 && (
+            <tr>
+              <td className="w-32 py-1 pr-3 align-top text-xs whitespace-nowrap text-muted" title="确定性引擎命中的异常标签（喂给故障知识库匹配）">
+                异常标签
+              </td>
+              <td className="flex flex-wrap gap-1 py-1 align-top">
+                {tags.map((t) => (
+                  <span key={t} className="chip border-warning/40 text-warning">
+                    {TAG_LABELS[t] ?? t}
+                  </span>
+                ))}
+              </td>
+            </tr>
+          )}
+          {guards.length > 0 && (
+            <tr>
+              <td className="w-32 py-1 pr-3 align-top text-xs whitespace-nowrap text-muted" title="数据质量标签：影响结论可信度">
+                数据质量
+              </td>
+              <td className="flex flex-wrap gap-1 py-1 align-top">
+                {guards.map((g) => (
+                  <span key={g} className="chip border-critical/40 text-critical">
+                    {GUARD_LABELS[g] ?? g}
+                  </span>
+                ))}
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
