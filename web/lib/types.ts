@@ -33,8 +33,8 @@ export interface ChangelogEntry {
 }
 
 /**
- * MCP Server 元数据。
- * 与 Skill 并列而非其子类：Skill 是模型读到的提示词与约定，MCP Server 是客户端
+ * MCP 服务元数据。
+ * 与 Skill 并列而非其子类：Skill 是模型读到的提示词与约定，MCP 服务是客户端
  * 能真正调用的工具集，两者的字段、评估方式和安全要求都不同。
  */
 export interface McpServerMeta {

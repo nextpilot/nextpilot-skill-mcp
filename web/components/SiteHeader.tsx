@@ -19,13 +19,13 @@ export function SiteHeader() {
     setOpen(false);
   }, [pathname]);
 
-  // MCP Server 是与 Skill 并列的一类内容，不再作为 Skill 库的子分类跳转
+  // MCP 服务是与 Skill 并列的一类内容，不再作为 Skill 技能库的子分类跳转
   const links = [
     // 图标本身是回首页的链接，但它不够显眼，菜单里再给一条明路
     { href: "/", label: t("首页", "Home") },
     { href: "/analyze", label: t("日志分析", "Log analysis") },
-    { href: "/skills", label: t("Skill 库", "Skill library") },
-    { href: "/mcp", label: t("MCP Server", "MCP servers") },
+    { href: "/skills", label: t("Skill 技能", "Skill library") },
+    { href: "/mcp", label: t("MCP 服务", "MCP servers") },
     { href: "/guide", label: t("使用指南", "Guide") },
   ];
 

@@ -3,7 +3,7 @@ icon: "📡"
 clients: ["Claude", "Cursor", "Claude Code"]
 version: "1.4.0"
 name: ArduPilot 日志诊断 MCP
-description: furkanisikay 开源的 ArduPilot .bin 诊断 MCP Server，16 项检查、每条发现附阈值来源与官方文档链接，40 个真实炸机日志验证
+description: furkanisikay 开源的 ArduPilot .bin 诊断 MCP 服务，16 项检查、每条发现附阈值来源与官方文档链接，40 个真实炸机日志验证
 platforms: ["ArduPilot"]
 models: ["GPT-4o-mini", "Claude", "DeepSeek"]
 tools: ["analyze_log", "list_checks", "explain_finding"]
@@ -20,7 +20,7 @@ updatedAt: "2026-09-10"
 
 ## 解决什么问题
 
-ArduPilot `.bin` 日志字段繁多，人工排查耗时。该 MCP Server 内置 16 项确定性检查（振动、EKF、电源、GPS、电机平衡、参数审计等），返回按严重度排序的 findings，LLM 只负责解释，所有数值判断均由规则引擎完成，防止模型编造数字。
+ArduPilot `.bin` 日志字段繁多，人工排查耗时。该 MCP 服务内置 16 项确定性检查（振动、EKF、电源、GPS、电机平衡、参数审计等），返回按严重度排序的 findings，LLM 只负责解释，所有数值判断均由规则引擎完成，防止模型编造数字。
 
 ## 与本平台的关系
 

@@ -3,7 +3,7 @@ icon: "🛩️"
 clients: ["Claude", "Cursor", "Claude Code"]
 version: "1.2.0"
 name: MSFS 模拟飞行 MCP 控制
-description: 通过 MCP Server 让 LLM 直接读取微软模拟飞行仪表、操纵舵面、执行起降程序，用于训练飞行语言智能体与自动化测试
+description: 通过 MCP 服务让 LLM 直接读取微软模拟飞行仪表、操纵舵面、执行起降程序，用于训练飞行语言智能体与自动化测试
 platforms: ["仿真", "MSFS"]
 models: ["Claude", "GPT-4o", "DeepSeek-V3"]
 tools: ["get_instruments", "set_controls", "run_checklist"]
@@ -18,14 +18,14 @@ updatedAt: "2026-08-22"
 
 ## 解决什么问题
 
-在接触真机前，需要一个安全、可无限重试的环境验证"语言 → 飞行动作"链路。MSFS MCP Server 把模拟飞行的仪表数据和舵面操纵封装成 MCP 工具，LLM 可以读姿态、速度、航向，操作油门 / 副翼 / 升降舵，并执行检查单式起降。
+在接触真机前，需要一个安全、可无限重试的环境验证"语言 → 飞行动作"链路。MSFS MCP 服务把模拟飞行的仪表数据和舵面操纵封装成 MCP 工具，LLM 可以读姿态、速度、航向，操作油门 / 副翼 / 升降舵，并执行检查单式起降。
 
 ## 核心逻辑
 
 ```text
 MSFS（SimConnect SDK）
    ↕ 仪表变量 / 控制事件
-MCP Server（工具：get_instruments、set_controls、run_checklist）
+MCP 服务（工具：get_instruments、set_controls、run_checklist）
    ↕
 LLM 客户端（Claude / Cursor 等）
 ```

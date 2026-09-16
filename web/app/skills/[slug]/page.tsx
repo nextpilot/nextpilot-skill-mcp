@@ -48,7 +48,7 @@ export default async function SkillDetailPage({
 
   return (
     <div className="page-shell pt-4 pb-10 sm:pt-5">
-      <Breadcrumbs items={[{ label: "Skill 库", href: "/skills" }, { label: skill.slug }]} />
+      <Breadcrumbs items={[{ label: "Skill 技能库", href: "/skills" }, { label: skill.slug }]} />
 
       {/* 两栏：左栏 = 标题 + 内容（纵向堆叠），右栏 = 粘性侧栏（对应 SkillHub 的 390px 侧栏） */}
       <div className="flex flex-col gap-4 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">

@@ -6,8 +6,8 @@ import { LocalizedText } from "@/components/LocalizedText";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export const metadata: Metadata = {
-  title: "MCP Server · NextPilot Skill",
-  description: "飞控方向的 MCP Server 目录：可被 Claude / Cursor 等客户端直接调用的工具集。",
+  title: "MCP 服务 · NextPilot Skill",
+  description: "飞控方向的 MCP 服务目录：可被 Claude / Cursor 等客户端直接调用的工具集。",
 };
 
 export default function McpPage() {
@@ -15,18 +15,18 @@ export default function McpPage() {
 
   return (
     <div className="page-shell pt-4 pb-10 sm:pt-5">
-      <Breadcrumbs items={[{ label: "MCP Server" }]} />
+      <Breadcrumbs items={[{ label: "MCP 服务" }]} />
       <header className="mb-8">
         <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
           <Plug className="h-4 w-4" />
-          MCP Server
+          MCP 服务
         </p>
         <h1 className="text-2xl font-bold text-text">
-          <LocalizedText zh="MCP Server 目录" en="MCP server directory" />
+          <LocalizedText zh="MCP 服务目录" en="MCP server directory" />
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
           <LocalizedText
-            zh={`${servers.length} 个 MCP Server。与 Skill 不同：Skill 是模型读到的提示词与约定，MCP Server 是客户端能真正调用的工具集——所以这里的每个条目都要说明它暴露了哪些工具、能不能写数据。`}
+            zh={`${servers.length} 个 MCP 服务。与 Skill 不同：Skill 是模型读到的提示词与约定，MCP 服务是客户端能真正调用的工具集——所以这里的每个条目都要说明它暴露了哪些工具、能不能写数据。`}
             en={`${servers.length} MCP servers. Unlike a Skill — which is context the model reads — an MCP server exposes tools a client can actually call. Each entry here states which tools it offers and whether it can write.`}
           />
         </p>

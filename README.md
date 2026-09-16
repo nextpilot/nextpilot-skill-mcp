@@ -46,7 +46,7 @@ pnpm dev
 
 - `/` 首页与精选 Skill
 - `/guide` Skill / MCP 帮助文档与提交使用指南
-- `/skills` Skill 库（构建期读取 `content/skills/*.mdx`，Fuse.js 客户端搜索）
+- `/skills` Skill 技能库（构建期读取 `content/skills/*.mdx`，Fuse.js 客户端搜索）
 - `/analyze` PX4 日志分析（Pyodide + pyulog 在 Web Worker 中本地解析）
 
 ## 架构

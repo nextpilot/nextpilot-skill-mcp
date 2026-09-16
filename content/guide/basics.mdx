@@ -33,12 +33,12 @@ on bad input. All three must be explicit.
 ## MCP 是什么 | What MCP is
 
 <Zh>
-MCP（Model Context Protocol）是一种连接 AI 与外部工具、数据源的协议。MCP Server 暴露工具，
+MCP（Model Context Protocol）是一种连接 AI 与外部工具、数据源的协议。MCP 服务暴露工具，
 客户端按协议发现并调用它们。
 </Zh>
 
 <En>
-MCP (Model Context Protocol) connects AI to external tools and data. An MCP Server exposes tools
+MCP (Model Context Protocol) connects AI to external tools and data. An MCP 服务 exposes tools
 that clients discover and call over the protocol.
 </En>
 
@@ -56,15 +56,15 @@ boundaries come first.
 ## 它们如何协作 | How they work together
 
 - <Zh><strong>Skill</strong>——描述能力与工作方式</Zh><En><strong>Skill</strong> — describes the capability</En>
-- <Zh><strong>MCP Server</strong>——提供可调用的工具</Zh><En><strong>MCP Server</strong> — provides callable tools</En>
+- <Zh><strong>MCP 服务</strong>——提供可调用的工具</Zh><En><strong>MCP server</strong> — provides callable tools</En>
 - <Zh><strong>AI 客户端</strong>——理解任务并选择调用</Zh><En><strong>AI client</strong> — chooses tools for a task</En>
 
 <Zh>
 三者叠起来才构成一次完整的能力调用：客户端理解意图，Skill 提供方法与约束，
-MCP Server 执行真正的读写。缺任何一层，能力都只停留在纸面上。
+MCP 服务执行真正的读写。缺任何一层，能力都只停留在纸面上。
 </Zh>
 
 <En>
 All three together make one capability call: the client understands intent, the Skill supplies
-method and constraints, and the MCP server performs the actual read or write.
+method and constraints, and the MCP 服务 performs the actual read or write.
 </En>

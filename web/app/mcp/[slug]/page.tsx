@@ -23,7 +23,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const server = getMcpServerBySlug(slug);
   if (!server) return {};
-  return { title: `${server.name} · MCP Server`, description: server.description };
+  return { title: `${server.name} · MCP 服务`, description: server.description };
 }
 
 export default async function McpDetailPage({
@@ -50,7 +50,7 @@ export default async function McpDetailPage({
 
   return (
     <div className="page-shell pt-4 pb-10 sm:pt-5">
-      <Breadcrumbs items={[{ label: "MCP Server", href: "/mcp" }, { label: server.slug }]} />
+      <Breadcrumbs items={[{ label: "MCP 服务", href: "/mcp" }, { label: server.slug }]} />
 
       <div className="flex flex-col gap-4 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">
         <div className="card min-w-0 p-5 sm:p-6">
@@ -169,7 +169,7 @@ export default async function McpDetailPage({
             baseDownloads={server.downloads}
             copyText={copyText}
             installHint="复制下方内容，粘贴到 Claude / Cursor 等支持 MCP 的客户端的配置中即可接入；致动类工具默认关闭，需要时显式开启。"
-            installTitle="把配置发给你的 AI 客户端，即可接入该 MCP Server"
+            installTitle="把配置发给你的 AI 客户端，即可接入该 MCP 服务"
             related={related}
           />
         </aside>

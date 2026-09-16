@@ -6,7 +6,7 @@ import type { McpServerMeta } from "@/lib/types";
 import { LocalizedText } from "@/components/LocalizedText";
 
 /**
- * MCP Server 卡片。与 SkillCard 的关键差别：这里首先回答「它能碰什么」——
+ * MCP 服务卡片。与 SkillCard 的关键差别：这里首先回答「它能碰什么」——
  * 工具数与只读 / 致动标记，比评分更该先看到。
  * 下载数由父级传入（已叠加 KV 实时增量）。
  */

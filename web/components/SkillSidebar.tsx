@@ -31,7 +31,7 @@ export function SkillSidebar({
   baseDownloads: number;
   copyText: string;
   installHint: string;
-  /** 安装卡标题（MCP 用「该 MCP Server」） */
+  /** 安装卡标题（MCP 用「该 MCP 服务」） */
   installTitle?: string;
   related: { slug: string; name: string; description: string; icon?: string }[];
 }) {

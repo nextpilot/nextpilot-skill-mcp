@@ -6,7 +6,7 @@
 
 平台由两部分组成：
 
-1. **Skill / MCP 社区（Skill Hub）**：飞控 AI Skill 与 MCP Server 的提交、浏览、语义搜索、在线试用与评分分享，免费开放引流。
+1. **Skill / MCP 社区（Skill Hub）**：飞控 AI Skill 与 MCP 服务的提交、浏览、语义搜索、在线试用与评分分享，免费开放引流。
 2. **飞控日志分析服务（内置核心服务）**：平台自营的确定性日志诊断服务，**首发支持 PX4 `.ulg`，ArduPilot `.bin` 在第 3-4 周跟进**，输出结构化检查结果与 LLM 中文报告，是主要收费锚点。
 
 内容与能力按 **感知 → 决策 → 控制 → 工具链** 四个维度组织。
@@ -23,13 +23,13 @@
 
 ```text
 ┌──────────────────────────────────────────────────────────┐
-│                  NextPilot Skill 平台                 │
+│         │                  NextPilot Skill 平台          │
 ├───────────────┬──────────────────────┬───────────────────┤
-│  Skill Hub    │  日志分析服务（内置）  │  平台 MCP Server  │
-│  社区 / 免费  │  确定性引擎 + LLM 解释 │  对外能力分发      │
+│  Skill Hub    │  日志分析服务（内置）│  平台 MCP 服务    │
+│  社区 / 免费  │  确定性引擎 + LLM 解 │  对外能力分发     │
 ├───────────────┴──────────────────────┴───────────────────┤
-│ 冲刺 1：EdgeOne 静态站 + Pages Functions；端侧 Pyodide     │
-│ 冲刺 2 起：EdgeOne Pages + KV（元数据）+ Blob（大对象）   │
+│ 冲刺 1：EdgeOne 静态站 + Pages Functions；端侧 Pyodide   │
+│ 冲刺 2 起：EdgeOne Pages + KV（元数据）+ Blob（大对象）  │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -107,7 +107,7 @@
 | PX4 / ArduPilot 集成 | 将 LLM 决策输出对接真实飞控栈 |
 | MAVLink 协议交互 | 飞控通信协议解析与指令封装 |
 | MBSE 智能建模 | 用 AI 大模型 + 知识图谱做飞控系统建模 |
-| MSFS 模拟飞行控制 | MCP Server 让 LLM 直接读仪表、控舵面、执行起降 |
+| MSFS 模拟飞行控制 | MCP 服务让 LLM 直接读仪表、控舵面、执行起降 |
 | 机载部署优化 | 量化、剪枝、NPU 加速，把模型塞进 1.7M 参数以内 |
 
 ### 3.4 冷启动种子内容
@@ -177,7 +177,7 @@
 | 项目 | 作者 / 来源 | 借鉴点 |
 | --- | --- | --- |
 | **PX4 ULog Analyzer** ⭐首发底座 | robotto-xyz | PX4 `.ulg` 日志分析，"确定性工具解析 + LLM 只做解释"架构，**第 1 周直接 fork 起步**（pyulog 解析 + 检查器骨架） |
-| **ardupilot-mcp** | furkanisikay，MIT | ArduPilot `.bin` 诊断 MCP Server，16 项检查（振动、EKF、电源、GPS、电机平衡、参数审计等），每条发现附带阈值来源（docs/SOURCES.md）与官方文档链接；40 个真实炸机日志验证；贡献指南开放。检查套件设计（analyze_log 返回严重度排序的 findings）是规则层的直接模板，第 3-4 周接入 `.bin` 时复用 |
+| **ardupilot-mcp** | furkanisikay，MIT | ArduPilot `.bin` 诊断 MCP 服务，16 项检查（振动、EKF、电源、GPS、电机平衡、参数审计等），每条发现附带阈值来源（docs/SOURCES.md）与官方文档链接；40 个真实炸机日志验证；贡献指南开放。检查套件设计（analyze_log 返回严重度排序的 findings）是规则层的直接模板，第 3-4 周接入 `.bin` 时复用 |
 | **ArduPilot 实时连接 MCP** | rmeadomavic，MIT | 通过 MAVLink 实时读状态、改参数、切模式、诊断无法解锁原因；**默认只读**，致动功能需显式传参启用，对真实载具有额外安全门禁——平台安全设计的参照 |
 | **PX4 SITL MCP** | — | 仅仿真环境，向 PX4 SITL 发送指令并带安全门禁 |
 | **UAV-Insight-Toolkit** | — | Streamlit + pymavlink + GLM-4.5 已跑通同类流程，可作为工程参考 |
@@ -206,9 +206,9 @@
 
 ---
 
-## 5. 平台 MCP Server
+## 5. 平台 MCP 服务
 
-网站本身对外暴露一个 MCP Server，让 Claude / Cursor 等客户端直接调用平台能力，是最自然的分发渠道。**上线时间在阶段二（轻量云服务器）之后**——MCP 为长连接，边缘 Functions 不适合承载。工具定义先行设计：
+网站本身对外暴露一个 MCP 服务，让 Claude / Cursor 等客户端直接调用平台能力，是最自然的分发渠道。**上线时间在阶段二（轻量云服务器）之后**——MCP 为长连接，边缘 Functions 不适合承载。工具定义先行设计：
 
 | Tool | 说明 |
 | --- | --- |
@@ -247,7 +247,7 @@
 - **日志解析（端侧优先）**：**Pyodide（WASM Python）运行在 Web Worker 中**，首发加载 pyulog（PX4 `.ulg`），第 3-4 周加载 pymavlink（ArduPilot `.bin`）；规则检查器与解析器为同一份纯 Python 包，浏览器与服务端共用。**blackbox_decode（Betaflight）推后**：它是 C 编译二进制、无法直接进 Pyodide，需 WASM 重写或等阶段二服务端引擎支持
 - **任务形态**：解析在端侧异步进行，无需服务端队列；第 1 周不部署独立 Python 服务。大文件（约 50MB 以上）或批量分析 API 阶段，再把同一套引擎下沉为 FastAPI + Redis（ARQ / BullMQ）常驻容器服务
 - **LLM**：服务端调用 **DeepSeek** 首选，prompt 保持模型无关，GLM-4.5-flash / qwen-turbo 作为备选；仅接收结构化 findings，不接触原始日志；配合 prompt 缓存与报告缓存，单份报告成本控制在 ¥0.1 以内
-- **MCP Server**：TypeScript MCP SDK，独立小服务；**上线时间后移到阶段二**（购买轻量云服务器后）——MCP 为 SSE / 长连接，无状态、有超时的边缘 Functions 不适合承载
+- **MCP 服务**：TypeScript MCP SDK，独立小服务；**上线时间后移到阶段二**（购买轻量云服务器后）——MCP 为 SSE / 长连接，无状态、有超时的边缘 Functions 不适合承载
 
 ### 6.2 部署与第三方服务
 
@@ -321,7 +321,7 @@
 >
 > **日志分析的人工经验（阈值 / 故障树 / 检查逻辑 / LLM 范式 / 事实层绑定与码表）单一事实源在仓库根
 > `knowledge/px4/`**（= `rules/*.yaml` + `px4-fault-kb.yaml` + `facts.yaml` + `llm/*.md`；
-> 引擎机制在 `engine/`，同样不含业务数据），web 与未来 MCP Server 都只消费其派生产物（`web/workers/*`、
+> 引擎机制在 `engine/`，同样不含业务数据），web 与未来 MCP 服务都只消费其派生产物（`web/workers/*`、
 > `web/lib/knowledge/*.generated.js`、`content/guide/knowledge-*.md`）。改经验只改
 > `knowledge/`，然后 `cd web && pnpm build:kb`（只比对不写入：`cd web && pnpm build:kb --check`）。
 >
@@ -364,12 +364,12 @@
 | 冲刺 1：Skill/MCP 社区网站 | 网站基础框架与内容：预制 Skill（8-10 个种子）+ MCP 专区 + 使用指南；**登录与账号体系（GitHub + 邮箱验证码，微信/手机号待企业资质）**；EdgeOne KV 持久化；**社区指标：真实下载/获取次数（设备+IP 每日去重的 KV 事件计数，不是写死的 frontmatter）、1-5 星评分（同设备可改）、更新时间展示、按下载/评分/更新排序、热门排行榜**；**语义搜索**（BGE 端侧 embedding 暴力匹配）；关键词搜索。详情页参考腾讯 SkillHub（skillhub.cloud.tencent.com）：头部元信息、复制提示词/安装命令、评分与获取入口、版本/许可证/更新时间。日志分析此阶段保留页面入口，不作为交付重点。 |
 | 冲刺 2：日志分析（核心收费锚点） | **确定性日志诊断引擎 + 所有用户免费试用**：匿名 3 次/天（按设备 ID + IP 日上限防刷），登录 10 次/天，每日重置，仅作成本闸门不是会员墙；匿名报告只存本机 localStorage，登录后同步云端 7 天。PX4 `.ulg` 先行，规则补到 16+；四层架构（pyulog 解析 → 信号预处理/特征/数据质量 guard → 故障知识库确定性匹配 → LLM 按 GJB-841 组装），吸收 PX4 ULog Analyzer 与 Flight Review 经验；**接入 ArduPilot `.bin`（pymavlink + ardupilot-mcp 检查套件，同样打包进 Pyodide）**；10-20 个真实日志校准误报率 < 10%；报告趋势对比。 |
 | 冲刺 3：会员与社区商业化 | **会员/付费体系**（免费/Pro/团队，微信支付+支付宝），在线试用（不跳转就能跑）；规则/故障知识包贡献与 **70/30 分成**；Skill 组合编排；LLM 自动实测评分；报告趋势对比完善；**微信 / 手机号登录（取得企业资质后）**。 |
-| 冲刺 4：轻量服务器 → 平台 MCP Server | **先解决承载，再对外分发**。见下方分步说明。 |
+| 冲刺 4：轻量服务器 → 平台 MCP 服务 | **先解决承载，再对外分发**。见下方分步说明。 |
 
 **冲刺 4 的三步顺序（不可颠倒）：**
 
 1. **采购腾讯云轻量服务器**（前置依赖——MCP 是长连接，边缘 Functions 承载不了）：迁关系型数据库（SQLite + sqlite-vec 或 PostgreSQL，支撑复杂统计 / 团队空间 / 向量检索）、部署独立 FastAPI + Redis 日志解析服务（大文件与批量 API 下沉），并为后续支付 / 订单等有状态服务提供常驻环境。届时把 `engine/*.py` 包成可 `import` 的 `nextpilot_engine`（parsers / models / rules 三层，规则仍从 `knowledge/` 加载，不另存一份），供服务端与 MCP 复用；ArduPilot `.bin` 适配器也加在这一层。
-2. **平台 MCP Server 上线**（依赖第 1 步）：对外提供 `search_skills` / `get_skill` / `analyze_findings` / `explain_finding` / `submit_skill`；检索走数据库向量列，解析走已下沉的 FastAPI，鉴权复用 KV/DB 里的用户与配额。
+2. **平台 MCP 服务上线**（依赖第 1 步）：对外提供 `search_skills` / `get_skill` / `analyze_findings` / `explain_finding` / `submit_skill`；检索走数据库向量列，解析走已下沉的 FastAPI，鉴权复用 KV/DB 里的用户与配额。
 3. **企业侧**：私有部署、脱敏故障数据集对外输出。
 
 > 冲刺边界按"可独立上线的产品板块"划分，取代旧版按周（第 1/2/3-4 周）的切分；各冲刺内部仍可小步发布。
