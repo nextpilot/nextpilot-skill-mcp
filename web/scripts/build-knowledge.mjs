@@ -653,10 +653,13 @@ emit(
 
 // 4.6) 派生数据版本：**内容哈希**，不是手写常量——改了数据层就会出现新值，
 //      浏览器据此判断"这份存档的 info/曲线/轨迹是不是旧引擎生成的"，是就重解析一次。
-//      覆盖范围只放"决定派生数据形状"的源：data 层 Python、facts.yaml、曲线预设；
+//      覆盖范围只放"决定派生数据形状"的源：data 层 Python、事实层 Python、facts.yaml、曲线预设；
 //      规则（rules/*.yaml）不在其内——那影响的是结论文本，不该因为改个阈值就让所有历史重算。
+//      rule_engine.py 在列：它产出的 facts / findings **同样随报告一起归档**，口径一变
+//      （如 2026-09-16 那次软件版本串）老存档也得跟着刷一次，否则只能靠用户重新上传。
 const versionSources = [
   ["engine/report_data.py", PY_REPORT_DATA],
+  ["engine/rule_engine.py", PY_RULE_ENGINE],
   ["knowledge/px4/facts.yaml", FACTS_PATH],
   ...plotFiles.map((f) => [`knowledge/px4/plot/${f}`, resolve(PLOT_DIR, f)]),
 ];

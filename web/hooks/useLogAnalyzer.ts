@@ -166,6 +166,11 @@ export function useLogAnalyzer() {
                         durationSec: Number(r.durationSec ?? 0) || undefined,
                         startUtc: typeof r.startUtc === "number" ? r.startUtc : undefined,
                         airframeId: typeof r.airframeId === "number" ? r.airframeId : undefined,
+                        // 软件版本串跟着云端记录一起带回来，否则云端行会退回裸哈希、
+                        // 与同一份日志的本地行显示不一致（见 lib/format.ts 的 formatFirmware）
+                        firmwareDisplay: r.firmwareDisplay ? String(r.firmwareDisplay) : undefined,
+                        fwReleaseType: typeof r.fwReleaseType === "number" ? r.fwReleaseType : null,
+                        firmware: r.firmware ? String(r.firmware) : undefined,
                     },
                     findings: [],
                     findingCount: Number(r.findingCount ?? 0),

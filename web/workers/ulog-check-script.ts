@@ -1473,18 +1473,31 @@ if _vs_first:
         facts["modes"] = [str(_NAV_NAMES.get(c, "Mode %d" % c)) for c in _ordered]
         facts["mainMode"] = facts["modes"][0]
 
-# 软件版本的展示串（严格对齐 Flight Review browse）。
-# FR 的口径很窄：**只有正式版**（ver_sw_release 的类型码 == 255）才换成 \`v1.16.0\`，
-# alpha(64) / beta(128) / RC(192) / 开发版(0) 一律退回 \`ver_sw[:6]\` 的 git 短哈希
-# （browse.py：\`if release_type == 255: ver_sw = release_split[0]\`，此前 \`len > 10\` 才截 6 位）。
-# 所以别加 \`-beta\` 后缀、也别括注哈希——那是我们自己发明的写法，跟 FR 对不上。
-# ver_sw_release 打包是 major<<24 | minor<<16 | patch<<8 | 类型。
+# 软件版本的展示串（对齐 Flight Review 的 \`_format_sw_version\`，app/tornado_handlers/browse.py）。
+# 规则（**别凭直觉改**，2026-09-16 踩过一次：拿 2024 年的旧 checkout 对齐，把 \`v1.15.0 (479ee0)\`
+# 改成了裸哈希，看着"更 FR"其实正好相反）：
+#   有 ver_sw_release 时按类型码出串，类型码 = ver_sw_release & 0xFF：
+#     64 → \`v1.17.0-alpha\`、128 → \`-beta\`、192 → \`-rc\`、255 → \`v1.16.0\`（正式版无后缀）；
+#     **只有 0（未打标签的开发版）才在版本号后面括注 git 短哈希** → \`v1.14.3 (08310a)\`；
+#   没有 ver_sw_release（老固件）→ 直接给 git 短哈希（\`> 10\` 位才截 6 位）。
+# alpha/beta/RC **不带**哈希，开发版**带**——这是 FR 的原样逻辑，实测 review.px4.io 上
+# 一份开发版日志显示的就是 \`v1.14.3 (08310a)\` 两行。
+# ver_sw_release 的打包：major<<24 | minor<<16 | patch<<8 | 类型。
+_RELEASE_TYPE_SUFFIX = {64: "-alpha", 128: "-beta", 192: "-rc", 255: ""}
 _sw = str(_info.get("ver_sw", ""))
-_rel_type = (int(FW["release"]) & 0xFF) if FW["release"] is not None else None
-if FW_MINOR is not None and _rel_type == 255:
-    facts["firmwareDisplay"] = "v%d.%d.%d" % (FW["major"], FW["minor"], FW["patch"])
-elif _sw:
-    facts["firmwareDisplay"] = _sw[:6] if len(_sw) > 10 else _sw
+_short_sw = _sw[:6] if len(_sw) > 10 else _sw
+_rel = FW["release"]
+if _rel is None:
+    facts["firmwareDisplay"] = _short_sw
+else:
+    _rtype = int(_rel) & 0xFF
+    _disp = "v%d.%d.%d%s" % (FW["major"], FW["minor"], FW["patch"],
+                             _RELEASE_TYPE_SUFFIX.get(_rtype, ""))
+    if _rtype not in _RELEASE_TYPE_SUFFIX and _sw:   # 未打标签的开发版：附短哈希便于对上游
+        _disp += " (%s)" % _short_sw
+    facts["firmwareDisplay"] = _disp
+# 类型码另存一份：以后要再调口径，前端能凭它重算，不必重新解析日志
+facts["fwReleaseType"] = None if _rel is None else int(_rel) & 0xFF
 
 # ---------------- 载具身份与记录起始时刻 ----------------
 # 这几项与判定无关，但历史卡片与报告概况要用，且必须**随 report 存档**（派生数据 info 不进存档）。

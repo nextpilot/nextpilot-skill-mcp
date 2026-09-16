@@ -330,9 +330,9 @@
 > 它是给 AI 与维护者的上下文，不发布到网站。**报告页数据层**（`engine/report_data.py`）的硬规则
 > 也在那一份里（时间基准、事件解码、多值信息拼接、参数默认值怎么来、派生数据版本）。
 >
-> 派生数据版本（`web/lib/knowledge/derived-version.generated.ts`，构建期算的数据层源文件哈希）：
-> 改了 `engine/report_data.py` / `facts.yaml` / `plot/*.yml`，用户本机存档的派生数据会在打开时
-> **自动重解析一次**，不用挨个提醒重新上传。
+> 派生数据版本（`web/lib/knowledge/derived-version.generated.ts`，构建期算的引擎源文件哈希）：
+> 改了 `engine/report_data.py` / `engine/rule_engine.py` / `facts.yaml` / `plot/*.yml`，用户本机存档
+> 会在打开时**自动重解析一次**（facts / findings 一并刷新，AI 报告保留），不用挨个提醒重新上传。
 
 ---
 

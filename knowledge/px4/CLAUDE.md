@@ -111,25 +111,38 @@ compute:
 
 ### 「软件版本」的展示口径（`engine/rule_engine.py` 的 `facts.firmwareDisplay`）
 
-**只认正式版**：`ver_sw_release` 的类型码（`& 0xFF`）== **255** 才显示 `v1.16.0`；
-alpha(64) / beta(128) / RC(192) / 开发版(0) **一律退回 `ver_sw[:6]` 的 git 短哈希**。
+**照抄 FR 的 `_format_sw_version`**（`app/tornado_handlers/browse.py`，2026-09-16 从 upstream main 取回源码核过）。
+类型码 = `ver_sw_release & 0xFF`：
 
-这就是 FR `tornado_handlers/browse.py` 的全部逻辑（`if release_type == 255: ver_sw = release_split[0]`，
-此前 `len(ver_sw) > 10` 才截 6 位）。**别自作聪明加 `-beta` 后缀或括注 `(c2fb48)`**——那是我方
-发明的写法，一比就发现跟 FR 对不上（实测 ce302d3b 一份 1.17.0-alpha 的日志：FR 显示 `c2fb48`）。
+| 类型码 | 展示 | 例 |
+| --- | --- | --- |
+| 255 正式版 | `vX.Y.Z`（无后缀、无哈希） | `v1.16.0` |
+| 64 / 128 / 192 alpha / beta / RC | `vX.Y.Z-alpha` 等（**带后缀、不带哈希**） | `v1.17.0-alpha` |
+| 0 未打标签的开发版 | `vX.Y.Z (短哈希)` | `v1.14.3 (08310a)` |
+| 无 `ver_sw_release`（老固件） | git 短哈希（`> 10` 位才截 6 位） | `fd4833` |
 
-前端 `lib/format.ts` 的 `formatFirmware()` 按同一规则再判一次（`vX.Y.Z` 才认作发布号，否则取哈希前 6 位），
-于是**本机存档里旧口径写下的 `v1.17.0-alpha (c2fb48)` 也会就地收敛成 `c2fb48`**，不必重新分析。
-历史列表的「软件版本」筛选下拉也用这个函数取值，避免"列里是 `v1.16.0`、下拉里是裸哈希"。
+**踩过的坑**：本机 `PX4-flight_review` 那份 checkout 是 2024-03 的，那会儿 browse.py 还只认正式版
+（`if release_type == 255` 才换发布号，其余一律给哈希）。照它改完，`v1.15.0 (479ee0)` 被改成 `479ee0`，
+看着"更 FR"其实正好相反——实测 review.px4.io 上一份开发版日志显示的是 `v1.14.3 (08310a)` 两行。
+**再核口径就去 `git fetch` upstream main 取当场源码**（本地 checkout 会过期）。
+
+`facts.fwReleaseType` 另存了类型码：前端 `lib/format.ts` 的 `formatFirmware()` 凭它 + `firmware` + `verSw`
+能完整重算展示串，所以云端记录（只带摘要字段）与老存档都能在界面上纠正过来，不必重新解析日志。
+
+`engine/rule_engine.py` 已进派生数据版本的哈希——facts / findings 同样随报告归档，
+口径一变老存档打开时会自动重解析一次（AI 报告不变，见下面）。
 
 ### 派生数据版本：改了数据层，旧存档自动重解析
 
-`web/scripts/build-knowledge.mjs` 对 `engine/report_data.py` + `knowledge/px4/facts.yaml` + `plot/*.yml`
-算内容哈希，写进 `web/lib/knowledge/derived-version.generated.ts`。本机存档里的派生数据
-（`info` / 曲线 / 轨迹）带着**生成时**的版本，与当前不一致就重新解析一次（`useLogAnalyzer.openSaved`：
-旧数据先渲染、后台重解析，解析完自动换成新的）。所以改完数据层不用逐个提醒用户"重新上传一遍"。
+`web/scripts/build-knowledge.mjs` 对 `engine/report_data.py` + `engine/rule_engine.py` +
+`knowledge/px4/facts.yaml` + `plot/*.yml` 算内容哈希，写进 `web/lib/knowledge/derived-version.generated.ts`。
+本机存档里的派生数据（`info` / 曲线 / 轨迹）带着**生成时**的版本，与当前不一致就重新解析一次
+（`useLogAnalyzer.openSaved`：旧数据先渲染、后台重解析，解析完自动换成新的；facts / findings 也一并刷新，
+**AI 报告保留**）。所以改完引擎不用逐个提醒用户"重新上传一遍"。
 
 - 规则文件（`rules/*.yaml`）**故意不进哈希**：改阈值不该让所有历史结论跟着重算；
+- `rule_engine.py` 在**列**：它产出的 facts / findings 同样随报告归档，口径一变（如软件版本串）
+  老存档也得刷一次；
 - 内容是**文件字节哈希**，所以连注释改动也会触发一次重解析——宁可多解析一次，也不漏掉真正的形状变化；
 - **已知缺口**：存档的原始日志已被 LRU 淘汰、且来自别的设备时，"重新解析"无从谈起，只能看旧格式数据
   （此时界面不假装已修复）。

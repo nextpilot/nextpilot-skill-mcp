@@ -20,7 +20,8 @@
         "Manual"
       ],
       "mainMode": "Hold",
-      "firmwareDisplay": "c2fb48",
+      "firmwareDisplay": "v1.17.0-alpha",
+      "fwReleaseType": 64,
       "uuid": "000200000000323335373233510100410023",
       "vehicleLifeS": 650.9,
       "airframeId": 2100,

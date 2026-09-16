@@ -18,6 +18,7 @@
       ],
       "mainMode": "Manual",
       "firmwareDisplay": "fd4833",
+      "fwReleaseType": null,
       "airframeId": 10020,
       "armedDurationSec": 0.0,
       "phases": [],

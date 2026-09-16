@@ -32,20 +32,28 @@ export function formatDateTime(value: Date | number | string): string {
 }
 
 /**
- * 飞控软件版本的展示串（对齐 Flight Review browse）。
+ * 飞控软件版本的展示串（口径 = Flight Review 的 `_format_sw_version`）。
  *
- * FR 只把**正式版**换成发布号 `v1.16.0`（ver_sw_release 的类型码 == 255），
- * alpha / beta / RC / 开发版一律显示 `ver_sw` 的 git 短哈希——不带后缀、不括注哈希。
- * 这里按同一规则渲染：`firmwareDisplay` 是纯 `vX.Y.Z` 才认，否则退回哈希前 6 位。
- * 顺带把本机存档里旧口径写下的 `v1.17.0-alpha (c2fb48)` 收敛成 `c2fb48`，不必重新分析。
+ * 引擎已经把结论算进 `facts.firmwareDisplay`（`v1.16.0` / `v1.17.0-alpha` / `v1.14.3 (08310a)` /
+ * 无版本号时给 git 短哈希），这里优先直接用它；缺了才按同一规则用 `fwReleaseType` +
+ * `firmware` + `verSw` 重算一遍（云端记录、或引擎之后又调了口径的老存档，都能在界面上纠正过来，
+ * 不必重新解析日志）。
  */
 export function formatFirmware(
-  facts?: { firmwareDisplay?: string; verSwBranch?: string; },
+  facts?: { firmwareDisplay?: string; firmware?: string; fwReleaseType?: number | null; verSwBranch?: string; },
   verSw?: string,
 ): string {
-  const disp = (facts?.firmwareDisplay ?? "").trim();
-  if (/^v\d+\.\d+\.\d+$/.test(disp)) return disp;
   const hash = (verSw ?? "").trim();
-  if (hash) return hash.length > 10 ? hash.slice(0, 6) : hash;
-  return disp || "—";
+  const short = hash.length > 10 ? hash.slice(0, 6) : hash;
+  const type = facts?.fwReleaseType;
+  // 有类型码就能完整重算：0 = 未打标签的开发版（附短哈希），255 = 正式版（无后缀），
+  // 64/128/192 = alpha/beta/RC（带后缀、不带哈希）
+  if (typeof type === "number" && facts?.firmware) {
+    const suffix = { 64: "-alpha", 128: "-beta", 192: "-rc", 255: "" }[type] ?? "";
+    const label = `${facts.firmware}${suffix}`.replace(/^v?/, "v");
+    return type === 0 && short ? `${label} (${short})` : label;
+  }
+  const disp = (facts?.firmwareDisplay ?? "").trim();
+  if (disp) return disp;
+  return short || "—";
 }

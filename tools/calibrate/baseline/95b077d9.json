@@ -21,6 +21,7 @@
       ],
       "mainMode": "Mission",
       "firmwareDisplay": "v1.17.0",
+      "fwReleaseType": 255,
       "uuid": "0006000000003736333130335109002c003b",
       "vehicleLifeS": 2657.3,
       "airframeId": 51000,

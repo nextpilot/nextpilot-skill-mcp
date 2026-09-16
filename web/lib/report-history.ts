@@ -306,6 +306,13 @@ export function deleteReport(id: string): void {
   void removeMany([id]);
 }
 
+/** 清空本机的历史记录：**只删 `reports` + `reportData` 两个 store**。
+ *
+ *  刻意**不碰**另两处缓存：
+ *    · `nextpilot-cache/logs`（原始 .ulg 字节）——留着才能"恢复完整数据"；
+ *    · Service Worker 的 `nextpilot-runtime-*`（Pyodide + numpy + pyulog，约 16MB，见 public/sw.js）
+ *      ——清个历史不该让下次分析重新下载一遍运行时。
+ *  想连它们一起清，得显式调 clearCachedLogs() / caches.delete()，别在这里顺手加。 */
 export function clearReports(): void {
   const ids = mirror.map((r) => r.id);
   mirror = [];

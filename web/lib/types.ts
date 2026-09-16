@@ -125,8 +125,11 @@ export interface LogFacts {
   mainMode?: string;
   /** 这次日志出现过的全部模式，按占样本数从多到少（Flight Review browse 页也是列全量） */
   modes?: string[];
-  /** 软件版本的展示串（FR 口径：`v1.16.0` / `v1.15.0-beta (6ea3539)` / 无发布号时给短哈希） */
+  /** 软件版本的展示串（FR 口径：`v1.16.0` / `v1.17.0-alpha` / `v1.14.3 (08310a)` / 无发布号时给短哈希） */
   firmwareDisplay?: string;
+  /** ver_sw_release 的类型码（64 alpha / 128 beta / 192 rc / 255 正式 / 0 未打标签；无发布号则 null）。
+   *  另存一份是为了以后调口径时前端能重算，不必重新解析日志 */
+  fwReleaseType?: number | null;
 }
 
 /** 概览指标的一项：order/label/unit 由 knowledge/px4/facts.yaml 的 metrics 声明 */

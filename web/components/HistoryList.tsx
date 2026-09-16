@@ -348,6 +348,7 @@ export function HistoryList({
           {localCount > 0 &&
             (confirmingClear ? (
               <span className="flex items-center gap-1.5 text-xs">
+                <span className="text-muted">只清历史记录，保留原始日志与 pyulog 解析缓存</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -471,18 +472,20 @@ export function HistoryList({
                 {/* 全部用百分比（不用 px 列）且合计正好 100%：table-fixed 下只要合计不是 100%，
                     多出来的宽度会被**按比例摊回各列**——轨迹那列本来只有缩略图宽，一摊就宽出一大截，
                     于是缩略图两侧留白。顺带让缩略图随列宽伸缩（见 TrackThumb），一点空白都不留。
-                    宽度按内容定：两个时间戳列最长（`2026-09-16 13:29:41`），给它俩 13%；
-                    软件只剩 `v1.16.0` / `c2fb48` 这种 6~7 字符，6% 够；时长 `10m33s` 给 5%。 */}
+                    宽度按内容定：两个时间戳最长（`2026-09-16 13:29:41` 不换行要 ~160px）给 13%；
+                    软件串现在是 FR 口径 `v1.15.0 (479ee0)`（~134px），从 6% 提到 12%；
+                    日志文件 / 机型 / 硬件都是短内容或两行，9% 够；时长 `10m33s` 5%。
+                    约 1200px 宽时：72 / 156 / 108 / 108 / 108 / 144 / 156 / 60 / 120 / 108 / 60。 */}
                 <th className="w-[6%] pb-2 pr-2 font-normal">轨迹</th>
                 <th className="w-[13%] pb-2 pr-2 font-normal">上传时间</th>
-                <th className="w-[10%] pb-2 pr-2 font-normal">日志文件</th>
-                <th className="w-[10%] pb-2 pr-2 font-normal">机型</th>
-                <th className="w-[10%] pb-2 pr-2 font-normal">硬件</th>
-                <th className="w-[6%] pb-2 pr-2 font-normal">软件</th>
+                <th className="w-[9%] pb-2 pr-2 font-normal">日志文件</th>
+                <th className="w-[9%] pb-2 pr-2 font-normal">机型</th>
+                <th className="w-[9%] pb-2 pr-2 font-normal">硬件</th>
+                <th className="w-[12%] pb-2 pr-2 font-normal">软件</th>
                 <th className="w-[13%] pb-2 pr-2 font-normal">启动时间</th>
                 <th className="w-[5%] pb-2 pr-2 font-normal">时长</th>
-                <th className="w-[12%] pb-2 pr-2 font-normal">飞行模式</th>
-                <th className="w-[10%] pb-2 pr-2 font-normal">结论</th>
+                <th className="w-[10%] pb-2 pr-2 font-normal">飞行模式</th>
+                <th className="w-[9%] pb-2 pr-2 font-normal">结论</th>
                 <th className="w-[5%] pb-2 font-normal">来源</th>
               </tr>
             </thead>

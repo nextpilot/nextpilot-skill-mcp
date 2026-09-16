@@ -32,9 +32,14 @@ export async function onRequestGet({ request, env, waitUntil }) {
       vehicleType: rec.vehicleType,
       parserVersion: rec.parserVersion,
       logHash: rec.logHash,
-      // 历史卡片用：记录起始时刻与机架编号（源是存档里的 report.facts）
+      // 历史卡片用：记录起始时刻、机架编号与软件版本串（源是存档里的 report.facts）
+      // 软件版本串必须一起带上：本地行用 facts.firmwareDisplay 渲染，云端行少了它就会退回
+      // 裸哈希，同一份日志在两个来源下显示不一样
       startUtc: rec.facts?.startUtc,
       airframeId: rec.facts?.airframeId,
+      firmwareDisplay: rec.facts?.firmwareDisplay,
+      fwReleaseType: rec.facts?.fwReleaseType,
+      firmware: rec.facts?.firmware,
       verSw: rec.verSw,
       verHw: rec.verHw,
       findingCount: Array.isArray(rec.findings) ? rec.findings.length : 0,
