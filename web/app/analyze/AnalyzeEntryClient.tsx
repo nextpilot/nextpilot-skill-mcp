@@ -38,8 +38,6 @@ export function AnalyzeEntryClient() {
     cacheInfo,
     busy,
     handleFile,
-    restoreFullData,
-    deleteHistoryItem,
     clearLocal,
     reportIdRef,
   } = useLogAnalyzer();
@@ -180,7 +178,6 @@ export function AnalyzeEntryClient() {
             localCount={localCount}
             cachedHashes={cachedHashes}
             cacheInfo={cacheInfo}
-            onRestore={(item) => void restoreFullData(item)}
             onClearLocal={clearLocal}
           />
         </div>

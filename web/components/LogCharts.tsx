@@ -8,35 +8,10 @@ import {
   SERIES_COLORS_DARK,
   SERIES_COLORS_LIGHT,
   type PanelSpec,
+  type StoredPlotPanel,
+  type StoredPlotSeries,
   type SeriesRequest,
 } from "@/lib/chart-presets";
-
-/** 四元数 -> 欧拉角（deg）。PX4 q = [w, x, y, z] */
-function quatToEuler(q: (number | null)[]): {
-  roll: (number | null)[];
-  pitch: (number | null)[];
-  yaw: (number | null)[];
-} {
-  const roll: (number | null)[] = [];
-  const pitch: (number | null)[] = [];
-  const yaw: (number | null)[] = [];
-  for (let i = 0; i < q.length; i += 4) {
-    const w = q[i], x = q[i + 1], y = q[i + 2], z = q[i + 3];
-    if (w == null || x == null || y == null || z == null) {
-      roll.push(null); pitch.push(null); yaw.push(null);
-      continue;
-    }
-    const sr = 2 * (w * x + y * z);
-    const cr = 1 - 2 * (x * x + y * y);
-    const sp = 2 * (w * y - z * x);
-    const sy = 2 * (w * z + x * y);
-    const cy = 1 - 2 * (y * y + z * z);
-    roll.push((Math.atan2(sr, cr) * 180) / Math.PI);
-    pitch.push((Math.asin(Math.max(-1, Math.min(1, sp))) * 180) / Math.PI);
-    yaw.push((Math.atan2(sy, cy) * 180) / Math.PI);
-  }
-  return { roll, pitch, yaw };
-}
 
 // 模式配色（固定顺序，最多覆盖常见模式，其余归 "Other" 灰）
 const MODE_COLORS: Record<string, string> = {
@@ -85,20 +60,31 @@ function isDark(): boolean {
 
 export function LogCharts({
   manifest,
+  storedPanels,
+  storedSeries,
   phases,
   requestSeries,
 }: {
-  manifest: TopicManifest;
+  /** 实时分析：用 manifest 解析面板；打开历史：manifest 为空、改用下面两项 */
+  manifest?: TopicManifest | null;
+  storedPanels?: StoredPlotPanel[] | null;
+  storedSeries?: StoredPlotSeries | null;
   phases: FlightPhase[];
   requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
 }) {
-  const presets = useMemo(
-    () =>
-      CHART_PRESETS.map((p) => ({ preset: p, panels: p.resolve(manifest) })).filter(
-        (x) => x.panels && x.panels.length > 0,
-      ),
-    [manifest],
-  );
+  /** 面板来源：存档优先（打开历史不必解析），否则用 manifest 现解析 */
+  const presets = useMemo(() => {
+    if (storedPanels && storedPanels.length > 0) {
+      return storedPanels.map((sp) => ({
+        preset: { id: sp.presetId, title: sp.title, description: sp.description },
+        panels: sp.panels,
+      }));
+    }
+    if (!manifest) return [];
+    return CHART_PRESETS.map((p) => ({ preset: p, panels: p.resolve(manifest) })).filter(
+      (x) => x.panels && x.panels.length > 0,
+    );
+  }, [manifest, storedPanels]);
 
   if (phases.length === 0) {
     return (
@@ -126,6 +112,7 @@ export function LogCharts({
               panels={panels!}
               phases={phases}
               requestSeries={requestSeries}
+              storedSeries={storedSeries ?? null}
             />
           ))}
         </div>
@@ -173,6 +160,7 @@ function PresetCard({
   panels,
   phases,
   requestSeries,
+  storedSeries,
 }: {
   id: string;
   title: string;
@@ -180,6 +168,7 @@ function PresetCard({
   panels: PanelSpec[];
   phases: FlightPhase[];
   requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
+  storedSeries: StoredPlotSeries | null;
 }) {
   const [open, setOpen] = useState(false);
   const [xRange, setXRange] = useState<[number, number] | null>(null);
@@ -224,12 +213,14 @@ function PresetCard({
             </div>
           )}
           <div className="space-y-5 pb-5">
-            {panels.map((panel) => (
+            {panels.map((panel, i) => (
               <PanelChart
                 key={panel.title}
                 panel={panel}
                 phases={phases}
                 requestSeries={requestSeries}
+                storedSeries={storedSeries}
+                seriesKey={`${id}#${i}`}
                 groupKey={id}
                 xRange={xRange}
                 onXRangeChange={handleXRangeChange}
@@ -246,6 +237,8 @@ function PanelChart({
   panel,
   phases,
   requestSeries,
+  storedSeries,
+  seriesKey,
   groupKey,
   xRange,
   onXRangeChange,
@@ -253,6 +246,10 @@ function PanelChart({
   panel: PanelSpec;
   phases: FlightPhase[];
   requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
+  /** 存档里的曲线：命中就直接画，不打扰 Worker（打开历史时无 Worker 可问） */
+  storedSeries: StoredPlotSeries | null;
+  /** `${presetId}#${面板序号}`，与落盘时的键一致 */
+  seriesKey: string;
   groupKey: string;
   xRange: [number, number] | null;
   onXRangeChange: (range: [number, number] | null) => void;
@@ -375,8 +372,11 @@ function PanelChart({
     let cancelled = false;
     (async () => {
       try {
+        const stored = storedSeries?.[seriesKey];
         const responses = await Promise.all(
-          panel.requests.map((r) => requestSeries(r)),
+          panel.requests.map((r, i) =>
+            i === 0 && stored ? Promise.resolve(stored) : requestSeries(r),
+          ),
         );
         if (cancelled || !elRef.current) return;
         const Plotly = await getPlotly();
@@ -389,15 +389,13 @@ function PanelChart({
         for (const resp of responses) {
           if (resp.error || !resp.series) continue;
           const t = resp.t;
-          if (panel.kind === "quaternion") {
-            const q = resp.series["q[0]"] ?? [];
-            const e = quatToEuler(q);
-            const rows: [string, (number | null)[]][] = [
-              ["Roll", e.roll],
-              ["Pitch", e.pitch],
-              ["Yaw", e.yaw],
-            ];
-            for (const [label, vals] of rows) {
+          // 画什么完全看引擎返回的 series：无 op 时键=请求的字段名，
+          // 有 op 时键=算子的 out_names（如 roll/pitch/yaw）——前端不做任何换算
+          const opLabels = panel.requests[0]?.op?.labels ?? [];
+          Object.entries(resp.series as Record<string, (number | null)[] | null>).forEach(
+            ([key, vals], i) => {
+              if (!vals) return;
+              const label = opLabels[i] ?? panel.fieldLabels?.[key] ?? key;
               traces.push({
                 x: t,
                 y: vals,
@@ -407,23 +405,8 @@ function PanelChart({
                 line: { color: colors[colorIdx++ % colors.length], width: 2 },
                 connectgaps: false,
               });
-            }
-          } else {
-            for (const field of panel.requests[0]?.fields ?? []) {
-              const vals = resp.series[field];
-              if (!vals) continue;
-              const label = panel.fieldLabels?.[field] ?? field;
-              traces.push({
-                x: t,
-                y: vals,
-                type: "scatter",
-                mode: "lines",
-                name: label,
-                line: { color: colors[colorIdx++ % colors.length], width: 2 },
-                connectgaps: false,
-              });
-            }
-          }
+            },
+          );
         }
 
         if (panel.hlines) {

@@ -117,23 +117,26 @@ export async function onRequestPost({ request, env, waitUntil }) {
     suggestion: f.suggestion ?? null,
   }));
 
-  // 第四层报文契约：统计摘要（含标签/阶段/guard）+ 仅命中的故障库条目
+  // 第四层报文契约：事实（机型/固件/时长/阶段）+ 关键数字 + 标签/guard + 仅命中的故障库条目
+  const facts = body.facts && typeof body.facts === "object" ? body.facts : {};
+  const metrics = Array.isArray(body.metrics) ? body.metrics : [];
   const summary = {
-    durationSec: body.stats?.durationSec ?? null,
-    armedDurationSec: body.stats?.armedDurationSec ?? null,
-    vehicleType: body.stats?.vehicleType ?? null,
-    firmware: body.stats?.firmware ?? null,
-    firmwareProfile: body.stats?.firmwareProfile ?? null,
-    hardware: body.stats?.hardware ?? null,
-    phases: body.phases ?? [],
+    durationSec: facts.durationSec ?? null,
+    armedDurationSec: facts.armedDurationSec ?? null,
+    vehicleType: facts.vehicleType ?? null,
+    firmware: facts.firmware ?? null,
+    firmwareProfile: facts.firmwareProfile ?? null,
+    hardware: facts.hardware ?? null,
+    phases: facts.phases ?? [],
+    dropoutTotalMs: facts.dropoutTotalMs ?? null,
     tags: body.tags ?? [],
     guardTags: body.guardTags ?? [],
     checksRun: body.checksRun ?? [],
     checksSkipped: body.checksSkipped ?? [],
-    keyStats: body.stats ?? {},
+    keyMetrics: metrics,
   };
 
-  const userContent = `【日志统计摘要（来自代码预处理）】
+  const userContent = `【日志事实与关键数据（来自确定性引擎）】
 ${JSON.stringify(summary, null, 2)}
 
 【检查结果 findings】
@@ -149,8 +152,8 @@ ${JSON.stringify(body.matchedFaults ?? [], null, 2)}
     // 模拟报告：结构与真实 GJB-841 输出一致，但明确标注为本地模拟
     markdown = [
       "## 故障现象描述",
-      `本次日志（${body.fileName ?? "unknown"}，机型 ${body.stats?.vehicleType ?? "未知"}，` +
-        `固件 ${body.stats?.firmware ?? "未知"}）确定性引擎共给出 ${findings.length} 条检查结果。`,
+      `本次日志（${body.fileName ?? "unknown"}，机型 ${facts.vehicleType ?? "未知"}，` +
+        `固件 ${facts.firmware ?? "未知"}）确定性引擎共给出 ${findings.length} 条检查结果。`,
       "",
       "## 数据依据",
       ...findings.slice(0, 5).map(
@@ -228,17 +231,18 @@ ${markdown}`;
         id: reportId,
         fileName: String(body.fileName ?? "unknown").slice(0, 300),
         fileSize: Number(body.fileSize ?? 0) || 0,
-        durationSec: Number(body.durationSec ?? 0) || undefined,
+        durationSec: Number(facts.durationSec ?? 0) || undefined,
         platform: String(body.platform ?? "px4"),
-        vehicleType: body.stats?.vehicleType ? String(body.stats.vehicleType) : undefined,
+        vehicleType: facts.vehicleType ? String(facts.vehicleType) : undefined,
         parserVersion: String(body.parserVersion ?? ""),
         // 日志内容指纹：同一份日志重复上传时前端据此直接载入结论，不再解析
         logHash: typeof body.logHash === "string" ? body.logHash.slice(0, 128) : undefined,
         findings: safe,
-        stats: body.stats && typeof body.stats === "object" ? body.stats : {},
+        // 事实层两块照原样存（durationSec/vehicleType 上面另存一份平的，供列表接口直接读）
+        facts,
+        metrics,
         tags: Array.isArray(body.tags) ? body.tags : [],
         guardTags: Array.isArray(body.guardTags) ? body.guardTags : [],
-        phases: Array.isArray(body.phases) ? body.phases : [],
         matchedFaults: Array.isArray(body.matchedFaults) ? body.matchedFaults : [],
         aiMarkdown: markdown,
         analyzedAt: new Date(now).toISOString(),

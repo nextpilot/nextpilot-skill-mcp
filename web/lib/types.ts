@@ -96,13 +96,35 @@ export interface MatchedFault {
   matchedPhases: string[];
 }
 
+/** 事实层产出之一：日志客观"是什么"（离散、驱动判定），由 engine/rule_engine.py 按 facts.yaml 的绑定取出 */
+export interface LogFacts {
+  durationSec?: number;
+  /** 机型：rotary_wing / fixed_wing / rover / airship / unknown（见 vehicle_status.vehicle_type） */
+  vehicleType?: string;
+  firmware?: string;
+  /** px4-1.15+ / px4-legacy（规则里用 fw_profile 判定） */
+  firmwareProfile?: string;
+  hardware?: string;
+  /** armed 总时长（秒） */
+  armedDurationSec?: number;
+  /** armed 段出现过的飞行阶段 */
+  phases?: string[];
+  /** 全日志丢包累计（毫秒） */
+  dropoutTotalMs?: number;
+}
+
+/** 概览指标的一项：order/label/unit 由 knowledge/px4/facts.yaml 的 metrics 声明 */
+export interface MetricEntry {
+  key: string;
+  label?: string;
+  unit?: string;
+  value: number | string;
+}
+
 export interface AnalysisReport {
   fileName: string;
   fileSize: number;
-  durationSec?: number;
   platform: "PX4" | "ArduPilot";
-  /** 机型：rotary_wing / fixed_wing / rover / airship / unknown（见 vehicle_status.vehicle_type） */
-  vehicleType?: string;
   /** 飞控软件版本（ver_sw 截断，如 e82c4e1a1f8e） */
   verSw?: string;
   /** 飞控硬件版本（ver_hw） */
@@ -111,13 +133,14 @@ export interface AnalysisReport {
   /** 日志内容指纹（SHA-256 hex）：同一份日志重复上传时直接载入历史结果 */
   logHash?: string;
   findings: Finding[];
-  stats: Record<string, number | string>;
+  /** 事实层产出之二：日志客观事实（机型/固件/时长/armed/阶段/丢包） */
+  facts?: LogFacts;
+  /** 事实层产出之三：关键数字（有序、带中文名与单位；声明在 facts.yaml 的 metrics） */
+  metrics?: MetricEntry[];
   /** 第二层异常标签 */
   tags?: string[];
   /** 数据质量 / 边界 guard 标签（insufficient_data 等） */
   guardTags?: string[];
-  /** armed 段飞行阶段 */
-  phases?: string[];
   checksRun?: string[];
   checksSkipped?: { check: string; reason: string; }[];
   /** 第三层故障知识库命中条目 */
@@ -155,6 +178,16 @@ export interface SeriesResponse {
   error?: string;
 }
 
+/** GPS 轨迹（地图用）：np_track() 的产物，经纬高**已按固件换算成度/米** */
+export interface TrackData {
+  t: number[];
+  lat: number[];
+  lon: number[];
+  alt: number[];
+  fullCount?: number;
+  error?: string;
+}
+
 export interface LogMessage {
   tSec: number;
   level: number;
@@ -181,10 +214,21 @@ export interface ChangedParam {
   value: number | string | null;
 }
 
-/** np_log_info() 的返回：系统信息 / 事件 / 丢包 / 参数 / 飞行阶段 */
+/** Multi Information（ULog 的 information_multiple）：键 → 多组值，没有时间戳 */
+export interface LogMultiInfo {
+  key: string;
+  /** 上游给的类型标记（多数为空） */
+  type?: string;
+  /** 每组一次记录（pyulog 已把续行并进同一组，这里已拼成一行） */
+  values: string[];
+}
+
+/** np_log_info() 的返回：系统信息 / 事件 / 多值信息 / 丢包 / 参数 / 飞行阶段 */
 export interface LogInfo {
   sysInfo: Record<string, string>;
   messages: LogMessage[];
+  /** Multi Information（固件 boot 日志、性能计数、被排除的话题等） */
+  messagesMulti?: LogMultiInfo[];
   dropouts: Dropout[];
   params: Record<string, number | string>;
   changedParams: ChangedParam[];

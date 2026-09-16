@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Trash2,
   History,
@@ -13,6 +14,7 @@ import {
   X,
   Filter,
   RotateCcw,
+  ChevronRight,
 } from "lucide-react";
 import type { SavedReport } from "@/lib/report-history";
 
@@ -82,16 +84,14 @@ export function HistoryList({
   localCount,
   cachedHashes,
   cacheInfo,
-  onRestore,
   onClearLocal,
   headerRight,
 }: {
   items: HistoryItem[];
   localCount: number;
-  /** 本机缓存了日志的指纹：命中的历史条目可以一键恢复图表/参数 */
+  /** 本机缓存了日志的指纹：有缓存的条目重解析更快，这里只用于提示 */
   cachedHashes: Set<string>;
   cacheInfo: { entries: number; bytes: number };
-  onRestore: (r: HistoryItem) => void;
   onClearLocal: () => void;
   /** 可选：标题栏右侧插槽（如折叠按钮） */
   headerRight?: React.ReactNode;
@@ -303,7 +303,12 @@ export function HistoryList({
                 }
               : null;
             return (
-              <li key={`${r.source}-${r.id}`} className="py-2.5">
+              // 整行即链接：**立即跳转**到结果页（结论与曲线都在存档里，不需要在这里先解析）
+              <li key={`${r.source}-${r.id}`}>
+                <Link
+                  href={`/analyze/${encodeURIComponent(r.id)}`}
+                  className="block rounded-lg px-2 py-2.5 transition-colors hover:bg-surface-2"
+                >
                 <div className="flex items-center gap-2 text-xs text-muted">
                   <span className="font-mono">{fmtTime(r.analyzedAt)}</span>
                   {r.vehicleType && (
@@ -345,19 +350,12 @@ export function HistoryList({
                     </span>
                   )}
                   {!c && <span className="text-xs text-muted">{total} 条检查结果</span>}
-                  <span className="ml-auto flex items-center">
-                    {r.logHash && cachedHashes.has(r.logHash) && (
-                      <button
-                        type="button"
-                        onClick={() => onRestore(r)}
-                        title="用本机缓存的原始日志重解析，恢复图表、事件与参数"
-                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-primary hover:bg-primary/10"
-                      >
-                        查看
-                      </button>
-                    )}
+                  <span className="ml-auto flex items-center gap-1 text-xs text-primary">
+                    查看
+                    <ChevronRight className="h-3 w-3" />
                   </span>
                 </div>
+                </Link>
               </li>
             );
           })}

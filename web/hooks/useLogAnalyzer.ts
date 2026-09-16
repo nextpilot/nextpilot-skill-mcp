@@ -6,15 +6,23 @@ import type {
     LogInfo,
     SeriesResponse,
     TopicManifest,
+    TrackData,
 } from "@/lib/types";
-import type { WorkerStage } from "@/workers/ulog-worker";
-import type { SeriesRequest } from "@/lib/chart-presets";
+import type { WorkerOutMessage, WorkerStage } from "@/workers/ulog-worker";
+import {
+    resolvePlotPanels,
+    type SeriesRequest,
+    type StoredPlotPanel,
+    type StoredPlotSeries,
+} from "@/lib/chart-presets";
 import {
     clearReports,
-    deleteReport,
+    getReportData,
+    initReportStore,
     listReports,
     newReportId,
     saveReport,
+    saveReportData,
     type SavedReport,
 } from "@/lib/report-history";
 import { getDeviceId } from "@/lib/device-id";
@@ -22,8 +30,67 @@ import { fallbackLogKey, hashLogBytes } from "@/lib/log-hash";
 import { cacheUsage, cachedLogHashes, getCachedLog, putCachedLog } from "@/lib/log-cache";
 import type { HistoryItem } from "@/components/HistoryList";
 
+/**
+ * Worker 跨路由复用（模块级单例）。
+ *
+ * 为什么不能跟 hook 一起销毁：本 hook 在 /analyze 与 /analyze/[id] 各挂一次，卸载时会 terminate；
+ * 而 Worker 里的 Pyodide 初始化很贵——运行时（约 10MB）要下载并做 WASM 编译，还要装 numpy
+ * （约 6MB wheel）与 pyulog（micropym 会去 PyPI 查索引）。跟 hook 一起销毁的话，
+ * 列表↔结果页来回切一趟就要重来一遍，表现出来就是"每次上传都要重新下载 pyulog"。
+ *
+ * 现在：Worker 常驻到页面关闭（或自身出错被丢弃）；多个 hook 实例通过监听器广播共享它，
+ * 各自只管自己的 pending（在飞的 series 请求、当前文件信息）。
+ */
+let sharedWorker: Worker | null = null;
+const sharedListeners = new Set<(msg: WorkerOutMessage) => void>();
+const sharedErrorListeners = new Set<(message: string) => void>();
+
+function broadcastError(message: string) {
+    for (const l of sharedErrorListeners) l(message);
+}
+
+function getSharedWorker(): Worker | null {
+    if (typeof Worker === "undefined") return null;
+    if (sharedWorker) return sharedWorker;
+    try {
+        const w = new Worker(new URL("../workers/ulog-worker.ts", import.meta.url), { type: "module" });
+        w.onmessage = (e: MessageEvent) => {
+            for (const l of sharedListeners) l(e.data);
+        };
+        w.onerror = (e) =>
+            broadcastError(
+                `本地解析引擎加载失败：${e.message || "无法加载 Worker 脚本"}。` +
+                    `若是网络原因（Pyodide 从 CDN 加载），请检查网络后重试。`,
+            );
+        w.onmessageerror = () => broadcastError("本地解析引擎消息解析失败，请刷新页面重试。");
+        sharedWorker = w;
+        return w;
+    } catch {
+        return null;
+    }
+}
+
+/** 只在 Worker 自己坏掉时丢弃（下一次分析会重建）；正常卸载不调用 */
+function dropSharedWorker() {
+    sharedWorker?.terminate();
+    sharedWorker = null;
+}
+
+/**
+ * 刚分析完的那一份结果（模块级）。
+ *
+ * 为什么需要：在列表页分析完会跳到结果页，而结果页是**另一个 hook 实例**，它去 IndexedDB
+ * 读派生数据时，后台的曲线抽取（约 1 秒）往往还没写完 —— 于是只看到参数/消息、没有曲线，
+ * 图表 tab 就被判成"不可用"。这里把内存里的结果直接交接过去，既消除竞态，也省掉一次重复解析。
+ */
+let liveAnalysis: {
+    id: string;
+    manifest: TopicManifest;
+    info: LogInfo;
+    storedPlots?: { panels: StoredPlotPanel[]; series: StoredPlotSeries; };
+} | null = null;
+
 export function useLogAnalyzer() {
-    const workerRef = useRef<Worker | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const pendingRef = useRef<Map<string, (data: unknown) => void>>(new Map());
     const reqIdRef = useRef(0);
@@ -56,14 +123,22 @@ export function useLogAnalyzer() {
         bytes: Uint8Array;
     } | null>(null);
     const [cachedHashes, setCachedHashes] = useState<Set<string>>(new Set());
+    /** 存档里的曲线（打开历史时直接渲染，不必解析日志）；分析完成后也会被填上 */
+    const [storedPlots, setStoredPlots] = useState<{
+        panels: StoredPlotPanel[];
+        series: StoredPlotSeries;
+    } | null>(null);
+    const lastInfoRef = useRef<LogInfo | null>(null);
+    /** 轨迹（地图用）：存档里有就直接画，没有就问 Worker 要 */
+    const [storedTrack, setStoredTrack] = useState<TrackData | null>(null);
     const [cacheInfo, setCacheInfo] = useState<{ entries: number; bytes: number; }>({
         entries: 0,
         bytes: 0,
     });
 
+    /** 丢弃共享 Worker（仅在其自身出错时用；正常卸载只摘监听器，见下面 effect 的清理） */
     const resetWorker = useCallback(() => {
-        workerRef.current?.terminate();
-        workerRef.current = null;
+        dropSharedWorker();
         pendingRef.current.clear();
     }, []);
 
@@ -84,7 +159,7 @@ export function useLogAnalyzer() {
                     logHash: r.logHash ? String(r.logHash) : undefined,
                     findings: [],
                     findingCount: Number(r.findingCount ?? 0),
-                    stats: {},
+                    metrics: [],
                     aiMarkdown: null,
                     analyzedAt: String(r.analyzedAt),
                     source: "cloud",
@@ -121,15 +196,6 @@ export function useLogAnalyzer() {
         }
     }, [refreshCloud]);
 
-    useEffect(() => {
-        setHistory(listReports());
-        void refreshMe();
-        void cachedLogHashes().then(setCachedHashes);
-        void cacheUsage().then(setCacheInfo);
-        return () => {
-            resetWorker();
-        };
-    }, [refreshMe, resetWorker]);
 
     const persist = useCallback(
         (r: AnalysisReport, id: string, ai: string | null, hash?: string) => {
@@ -137,18 +203,18 @@ export function useLogAnalyzer() {
                 id,
                 fileName: r.fileName,
                 fileSize: r.fileSize,
-                durationSec: r.durationSec,
+                durationSec: r.facts?.durationSec,
                 platform: r.platform,
-                vehicleType: r.vehicleType,
+                vehicleType: r.facts?.vehicleType,
                 verSw: r.verSw,
                 verHw: r.verHw,
                 parserVersion: r.parserVersion,
                 logHash: hash ?? r.logHash,
                 findings: r.findings,
-                stats: r.stats,
+                facts: r.facts,
+                metrics: r.metrics,
                 tags: r.tags,
                 guardTags: r.guardTags,
-                phases: r.phases,
                 matchedFaults: r.matchedFaults,
                 aiMarkdown: ai,
                 analyzedAt: r.analyzedAt,
@@ -175,15 +241,14 @@ export function useLogAnalyzer() {
                         deviceId: getDeviceId(),
                         fileName: r.fileName,
                         fileSize: r.fileSize,
-                        durationSec: r.durationSec,
                         platform: r.platform,
                         parserVersion: r.parserVersion,
                         logHash: r.logHash ?? pendingHashRef.current,
                         findings: r.findings,
-                        stats: r.stats,
+                        facts: r.facts ?? {},
+                        metrics: r.metrics ?? {},
                         tags: r.tags ?? [],
                         guardTags: r.guardTags ?? [],
-                        phases: r.phases ?? [],
                         checksRun: r.checksRun ?? [],
                         checksSkipped: r.checksSkipped ?? [],
                         matchedFaults: r.matchedFaults ?? [],
@@ -221,7 +286,7 @@ export function useLogAnalyzer() {
 
     const requestSeries = useCallback(
         (req: SeriesRequest): Promise<SeriesResponse> => {
-            const worker = workerRef.current;
+            const worker = getSharedWorker();
             if (!worker) return Promise.resolve({ error: "worker 未就绪" } as SeriesResponse);
             const reqId = `s${reqIdRef.current++}`;
             return new Promise((resolve) => {
@@ -238,6 +303,57 @@ export function useLogAnalyzer() {
         [],
     );
 
+    /** 要一份 GPS 轨迹；与 requestSeries 同一套 pending 机制 */
+    const requestTrack = useCallback((): Promise<TrackData> => {
+        const worker = getSharedWorker();
+        if (!worker) return Promise.resolve({ error: "worker 未就绪" } as unknown as TrackData);
+        const reqId = `t${reqIdRef.current++}`;
+        return new Promise((resolve) => {
+            pendingRef.current.set(reqId, (data) => resolve(data as TrackData));
+            worker.postMessage({ type: "track", reqId });
+        });
+    }, []);
+
+    /** 把各预设的曲线抽出来存进报告存档（键与 LogCharts 的 seriesKey 一致：`presetId#面板序号`） */
+    const extractPlots = useCallback(
+        async (id: string, manifest: TopicManifest, info: LogInfo) => {
+            try {
+                const panels = resolvePlotPanels(manifest);
+                if (panels.length === 0) return;
+                const series: StoredPlotSeries = {};
+                for (const sp of panels) {
+                    for (let i = 0; i < sp.panels.length; i++) {
+                        const req = sp.panels[i].requests[0];
+                        if (!req) continue;
+                        const resp = await requestSeries(req);
+                        if (resp && !(resp as { error?: string }).error) series[`${sp.presetId}#${i}`] = resp;
+                    }
+                }
+                setStoredPlots({ panels, series });
+                if (liveAnalysis?.id === id) liveAnalysis.storedPlots = { panels, series };
+                // 轨迹（地图用）：一次抽好存下，之后打开历史不必再解析
+                const track = await requestTrack();
+                const hasTrack = track && !track.error && (track.lat?.length ?? 0) > 1;
+                if (hasTrack) setStoredTrack(track);
+                await saveReportData(id, {
+                    info,
+                    plotPanels: panels,
+                    plotSeries: series,
+                    ...(hasTrack ? { track } : {}),
+                });
+            } catch {
+                // 抽曲线失败不影响结论展示；下次打开会退回"重新解析"
+            }
+        },
+        [requestSeries, requestTrack],
+    );
+
+    /** 地图用：优先用存档里的轨迹（打开历史时不必解析），否则问 Worker 要 */
+    const loadTrack = useCallback(async (): Promise<TrackData> => {
+        if (storedTrack && !storedTrack.error) return storedTrack;
+        return requestTrack();
+    }, [requestTrack, storedTrack]);
+
     const viewSaved = useCallback((saved: SavedReport) => {
         setError(null);
         setManifest(null);
@@ -248,39 +364,19 @@ export function useLogAnalyzer() {
         setReport({
             fileName: saved.fileName,
             fileSize: saved.fileSize,
-            durationSec: saved.durationSec,
             platform: saved.platform as AnalysisReport["platform"],
-            vehicleType: saved.vehicleType,
             parserVersion: saved.parserVersion,
             logHash: saved.logHash,
             findings: saved.findings,
-            stats: saved.stats,
+            facts: saved.facts,
+            metrics: saved.metrics,
             tags: saved.tags,
             guardTags: saved.guardTags,
-            phases: saved.phases,
             matchedFaults: saved.matchedFaults,
             analyzedAt: saved.analyzedAt,
         });
         setStage("done");
     }, []);
-
-    const viewHistoryItem = useCallback(
-        async (item: HistoryItem) => {
-            if (item.source === "cloud") {
-                try {
-                    const resp = await fetch(`/api/reports/${item.id}`);
-                    if (!resp.ok) return;
-                    const data = await resp.json();
-                    if (data.report) viewSaved(data.report as SavedReport);
-                } catch {
-                    // 网络异常时静默
-                }
-                return;
-            }
-            viewSaved(item);
-        },
-        [viewSaved],
-    );
 
     const findExistingByHash = useCallback(
         async (hash: string): Promise<HistoryItem | null> => {
@@ -303,59 +399,94 @@ export function useLogAnalyzer() {
         }
     }, []);
 
-    const ensureWorker = useCallback((): Worker | null => {
-        if (workerRef.current) return workerRef.current;
-        const worker = new Worker(
-            new URL("../workers/ulog-worker.ts", import.meta.url),
-            { type: "module" },
-        );
-        worker.onerror = (e) => {
-            resetWorker();
-            setError(
-                `本地解析引擎加载失败：${e.message || "无法加载 Worker 脚本"}。` +
-                `若是网络原因（Pyodide 从 CDN 加载），请检查网络后重试。`,
-            );
-            setStage("idle");
-        };
-        worker.onmessageerror = () => {
-            resetWorker();
-            setError("本地解析引擎消息解析失败，请刷新页面重试。");
-            setStage("idle");
-        };
-        worker.onmessage = (e: MessageEvent) => {
-            const msg = e.data;
-            if (msg.type === "stage") {
-                setStage(msg.stage);
-            } else if (msg.type === "error") {
-                setError(msg.message);
+    /** Worker 消息处理：监听器挂在模块级注册表上，Worker 重建后依然有效 */
+    const handleWorkerMessage = useCallback(
+        (m: WorkerOutMessage) => {
+            if (m.type === "stage") {
+                setStage(m.stage);
+            } else if (m.type === "error") {
+                setError(m.message ?? "解析失败");
                 setStage("idle");
-            } else if (msg.type === "done") {
-                const r = msg.report as AnalysisReport;
+            } else if (m.type === "done") {
+                const r = m.report as AnalysisReport;
                 r.fileName = pendingFileRef.current.name;
                 r.fileSize = pendingFileRef.current.size;
                 r.analyzedAt = new Date().toISOString();
                 r.logHash = pendingHashRef.current;
-                const sys = (msg.info as LogInfo)?.sysInfo ?? {};
+                const sys = (m.info as LogInfo)?.sysInfo ?? {};
                 r.verSw = sys["ver_sw"]?.slice(0, 20);
                 r.verHw = sys["ver_hw"];
                 setReport(r);
-                setManifest(msg.manifest as TopicManifest);
-                setInfo(msg.info as LogInfo);
+                setManifest(m.manifest as TopicManifest);
+                setInfo(m.info as LogInfo);
+                // 交接给结果页（同一次分析，避免它去 IndexedDB 抢在落盘之前读）
+                liveAnalysis = {
+                    id: reportIdRef.current,
+                    manifest: m.manifest as TopicManifest,
+                    info: m.info as LogInfo,
+                };
                 setStage("done");
                 setAiMarkdown(pendingAiRef.current);
                 persist(r, reportIdRef.current, pendingAiRef.current, pendingHashRef.current);
                 void cacheCurrentLog();
-            } else if (msg.type === "series") {
-                const resolve = pendingRef.current.get(msg.reqId);
+                // 派生数据随报告落盘：下次打开这份报告，参数/消息/阶段/曲线直接渲染，**不再解析原始日志**。
+                const info = m.info as LogInfo;
+                lastInfoRef.current = info;
+                void saveReportData(reportIdRef.current, { info });
+                // 曲线：解析已结束，后台把各预设的降采样序列抽出来存下（用户此刻已在看结论页，无感）
+                void extractPlots(reportIdRef.current, m.manifest as TopicManifest, info);
+            } else if (m.type === "track") {
+                const resolve = pendingRef.current.get(m.reqId ?? "");
                 if (resolve) {
-                    pendingRef.current.delete(msg.reqId);
-                    resolve(msg.data);
+                    pendingRef.current.delete(m.reqId ?? "");
+                    resolve(m.data as never);
+                }
+            } else if (m.type === "series") {
+                const resolve = pendingRef.current.get(m.reqId ?? "");
+                if (resolve) {
+                    pendingRef.current.delete(m.reqId ?? "");
+                    resolve(m.data);
                 }
             }
+        },
+        [cacheCurrentLog, extractPlots, persist],
+    );
+
+    useEffect(() => {
+        // 先初始化报告库（IndexedDB，含老 localStorage 记录的迁移），再列历史
+        void (async () => {
+            await initReportStore();
+            setHistory(listReports());
+        })();
+        void refreshMe();
+        void cachedLogHashes().then(setCachedHashes);
+        void cacheUsage().then(setCacheInfo);
+
+        // 订阅共享 Worker 的消息；卸载时只摘监听器——**不销毁 Worker**，
+        // 否则每次路由切换都要重下 Pyodide 与 numpy/pyulog（见文件顶部说明）
+        const onMsg = (msg: WorkerOutMessage) => handleWorkerMessage(msg);
+        const onErr = (message: string) => {
+            setError(message);
+            setStage("idle");
         };
-        workerRef.current = worker;
+        sharedListeners.add(onMsg);
+        sharedErrorListeners.add(onErr);
+        return () => {
+            sharedListeners.delete(onMsg);
+            sharedErrorListeners.delete(onErr);
+            pendingRef.current.clear();
+        };
+    }, [handleWorkerMessage, refreshMe]);
+
+    /** 拿共享 Worker；本 hook 的监听器在挂载 effect 里注册（只注册一次） */
+    const ensureWorker = useCallback((): Worker | null => {
+        const worker = getSharedWorker();
+        if (!worker) {
+            setError("本地解析引擎无法启动（浏览器不支持 Web Worker？）");
+            setStage("idle");
+        }
         return worker;
-    }, [cacheCurrentLog, persist, resetWorker]);
+    }, []);
 
     const parseBytes = useCallback(
         (
@@ -381,6 +512,61 @@ export function useLogAnalyzer() {
             worker.postMessage({ type: "analyze", file: bytes });
         },
         [ensureWorker],
+    );
+
+    /** 取派生数据并按需填充 UI；返回 true 表示"无需解析即可完整展示" */
+    /** 读存档的派生数据并填充 UI；告诉调用方"参数/消息"与"曲线"各有没有 */
+    const loadReportData = useCallback(
+        async (id: string): Promise<{ hasInfo: boolean; hasPlots: boolean; }> => {
+            const data = await getReportData(id);
+            if (!data) return { hasInfo: false, hasPlots: false };
+            if (data.info) setInfo(data.info as LogInfo);
+            const panels = data.plotPanels;
+            if (panels?.length) setStoredPlots({ panels, series: data.plotSeries ?? {} });
+            if (data.track && !data.track.error) setStoredTrack(data.track);
+            return { hasInfo: Boolean(data.info), hasPlots: Boolean(panels?.length) };
+        },
+        [],
+    );
+
+    /** 本会话刚分析完的那份结果，直接沿用（见文件顶部 liveAnalysis 的说明） */
+    const adoptLiveAnalysis = useCallback((id: string): boolean => {
+        if (!liveAnalysis || liveAnalysis.id !== id) return false;
+        setManifest(liveAnalysis.manifest);
+        setInfo(liveAnalysis.info);
+        if (liveAnalysis.storedPlots) setStoredPlots(liveAnalysis.storedPlots);
+        return true;
+    }, []);
+
+    /**
+     * 打开一份已存档的报告（本机历史 / 云端记录 / 去重命中都走这里）：
+     * 1) 先用存档的结论立刻渲染；
+     * 2) 本会话刚分析完的，直接沿用内存里的 manifest / 曲线（不等后台落盘）；
+     * 3) 否则读存档的派生数据：**曲线也有了就不用解析**；
+     * 4) 曲线缺（老记录）时，才退回"拿本机缓存的原始字节重新解析"，顺便把曲线补齐。
+     */
+    const openSaved = useCallback(
+        async (saved: SavedReport) => {
+            viewSaved(saved);
+            reportIdRef.current = saved.id;
+            if (adoptLiveAnalysis(saved.id)) return true;
+            const { hasInfo, hasPlots } = await loadReportData(saved.id);
+            if (hasPlots) return true;
+            if (saved.logHash) {
+                const cached = await getCachedLog(saved.logHash);
+                if (cached) {
+                    parseBytes(cached.bytes, {
+                        name: cached.name || saved.fileName,
+                        size: cached.bytes.byteLength,
+                        hash: saved.logHash,
+                        reportId: saved.id,
+                        priorAi: saved.aiMarkdown,
+                    });
+                }
+            }
+            return hasInfo;
+        },
+        [adoptLiveAnalysis, loadReportData, parseBytes, viewSaved],
     );
 
     const handleFile = useCallback(
@@ -410,8 +596,20 @@ export function useLogAnalyzer() {
                     fallbackLogKey(file.name, file.size, file.lastModified);
                 const existing = await findExistingByHash(hash);
                 if (existing) {
-                    if (existing.source === "cloud") await viewHistoryItem(existing);
-                    else viewSaved(existing);
+                    if (existing.source === "cloud") {
+                        // 云端列表只给了摘要，先取回完整记录再走统一的打开路径
+                        try {
+                            const resp = await fetch(`/api/reports/${existing.id}`);
+                            if (resp.ok) {
+                                const data = await resp.json();
+                                if (data.report) await openSaved(data.report as SavedReport);
+                            }
+                        } catch {
+                            // 取不到就只提示"已分析过"，不阻断
+                        }
+                    } else {
+                        await openSaved(existing);
+                    }
                     setPendingBytes({ name: file.name, size: file.size, hash, bytes });
                     setDedupeNotice(
                         "这份日志此前已分析过（内容一致），已直接载入历史结论，未重复解析。",
@@ -429,7 +627,6 @@ export function useLogAnalyzer() {
                 });
                 return reportId;
             } catch (err) {
-                resetWorker();
                 setStage("idle");
                 setError(
                     `日志上传失败：${err instanceof Error ? err.message : String(err)}。请确认文件未损坏后重试。`,
@@ -437,51 +634,7 @@ export function useLogAnalyzer() {
                 return null;
             }
         },
-        [findExistingByHash, parseBytes, resetWorker, viewHistoryItem, viewSaved],
-    );
-
-    const restoreFullData = useCallback(
-        async (item: HistoryItem) => {
-            const hash = item.logHash;
-            if (!hash) {
-                setError("这条历史记录没有日志指纹，无法定位缓存文件，请重新选择该日志。");
-                return;
-            }
-            const cached = await getCachedLog(hash);
-            if (!cached) {
-                setError(
-                    "本机没有这份日志的缓存（可能已被容量淘汰，或报告来自其他设备）。" +
-                    "重新选择该 .ulg 文件即可恢复图表与参数。",
-                );
-                return;
-            }
-            setError(null);
-            setDedupeNotice(null);
-            setManifest(null);
-            setInfo(null);
-            parseBytes(cached.bytes, {
-                name: cached.name || item.fileName,
-                size: cached.bytes.byteLength,
-                hash,
-                reportId: item.id,
-                priorAi: item.aiMarkdown,
-            });
-        },
-        [parseBytes],
-    );
-
-    const deleteHistoryItem = useCallback(
-        (item: HistoryItem) => {
-            if (item.source === "cloud") {
-                void fetch(`/api/reports/${item.id}`, {
-                    method: "DELETE",
-                }).then(() => void refreshCloud());
-            } else {
-                deleteReport(item.id);
-                setHistory(listReports());
-            }
-        },
-        [refreshCloud],
+        [findExistingByHash, openSaved, parseBytes],
     );
 
     const clearLocal = useCallback(() => {
@@ -494,7 +647,6 @@ export function useLogAnalyzer() {
     return {
         // refs
         inputRef,
-        workerRef,
         reportIdRef,
         pendingHashRef,
         // state
@@ -527,10 +679,11 @@ export function useLogAnalyzer() {
         explain,
         requestSeries,
         viewSaved,
-        viewHistoryItem,
+        storedPlots,
+        loadTrack,
+        openSaved,
+        loadReportData,
         handleFile,
-        restoreFullData,
-        deleteHistoryItem,
         clearLocal,
         parseBytes,
     };

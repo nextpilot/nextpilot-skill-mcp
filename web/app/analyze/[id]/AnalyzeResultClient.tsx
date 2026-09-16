@@ -5,12 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useLogAnalyzer } from "@/hooks/useLogAnalyzer";
 import { AnalyzeReport } from "@/components/AnalyzeReport";
-import { getReport } from "@/lib/report-history";
-import { getCachedLog } from "@/lib/log-cache";
+import { getReport, initReportStore } from "@/lib/report-history";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { ArrowLeft, Loader2, Sparkles } from "lucide-react";
 
-type TabKey = "summary" | "charts" | "messages" | "params" | "ai";
+type TabKey = "metrics" | "messages" | "params" | "charts" | "summary" | "ai";
 
 const STAGE_TEXT: Record<string, string> = {
   "loading-runtime": "加载 Pyodide 运行时",
@@ -31,59 +30,46 @@ export function AnalyzeResultClient() {
     manifest,
     info,
     aiMarkdown,
+    storedPlots,
     quota,
     loggedIn,
     cachedHashes,
     busy,
     explain,
     requestSeries,
-    viewSaved,
-    parseBytes,
+    loadTrack,
+    openSaved,
   } = useLogAnalyzer();
 
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<TabKey>("summary");
+  const [tab, setTab] = useState<TabKey>("metrics");
   const loadedRef = useRef(false);
 
-  // 加载报告：优先本地，否则尝试云端
+  // 加载报告：优先本机存档，其次云端。
+  // 存档里若带着派生数据（参数/消息/曲线），openSaved 会直接渲染 —— **不启动 Worker、不解析日志**；
+  // 只有老记录（没有派生数据）才会退回"用本机缓存的原始字节重新解析"。
   useEffect(() => {
     if (loadedRef.current) return;
     loadedRef.current = true;
 
-    const saved = getReport(id);
-    if (saved) {
-      viewSaved(saved);
-      // 从缓存加载完整数据
-      if (saved.logHash) {
-        void getCachedLog(saved.logHash).then((cached) => {
-          if (cached) {
-            parseBytes(cached.bytes, {
-              name: cached.name || saved.fileName,
-              size: cached.bytes.byteLength,
-              hash: saved.logHash!,
-              reportId: id,
-              priorAi: saved.aiMarkdown,
-            });
-          }
-        });
+    void (async () => {
+      await initReportStore(); // 幂等；保证内存镜像已载入，getReport 才查得到
+      const saved = getReport(id);
+      if (saved) {
+        void openSaved(saved);
+        setLoading(false);
+        return;
+      }
+      try {
+        const resp = await fetch(`/api/reports/${id}`);
+        if (!resp.ok) throw new Error("not found");
+        const data = await resp.json();
+        if (data.report) await openSaved(data.report);
+      } catch {
+        // 本机与云端都没有：下面按"未找到"渲染
       }
       setLoading(false);
-      return;
-    }
-
-    // 本地没有，尝试云端
-    fetch(`/api/reports/${id}`)
-      .then((resp) => {
-        if (!resp.ok) throw new Error("not found");
-        return resp.json();
-      })
-      .then((data) => {
-        if (data.report) viewSaved(data.report);
-        setLoading(false);
-      })
-      .catch(() => {
-        setLoading(false);
-      });
+    })();
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleGenerateAi = () => {
@@ -146,12 +132,24 @@ export function AnalyzeResultClient() {
         </div>
       </div>
 
-      {/* Worker 加载状态 */}
+      {/* 处理中提示：跳转是立即的，这里明确告诉用户在做什么，别让人以为卡死 */}
       {busy && !manifest && (
-        <div className="mb-5 flex items-center gap-3 rounded-lg border border-border bg-surface-2 px-4 py-3 text-sm text-muted">
-          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-          {STAGE_TEXT[stage] ?? "加载中…"}
-          {stage === "loading-runtime" && <span className="text-xs">（首次运行需下载运行时，约十余秒）</span>}
+        <div className="mb-5 flex items-start gap-3 rounded-lg border border-border bg-surface-2 px-4 py-3 text-sm">
+          <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-primary" />
+          <div>
+            <p className="font-medium text-text">
+              正在处理数据…{report ? "（补齐图表数据）" : ""}
+            </p>
+            <p className="mt-0.5 text-xs text-muted">
+              {STAGE_TEXT[stage] ?? "加载中…"}
+              {stage === "loading-runtime" && "（首次运行需下载解析运行时，约十余秒）"}
+            </p>
+            {report && (
+              <p className="mt-0.5 text-xs text-faint">
+                这份报告生成时没有缓存图表数据，会重新解析一遍原始日志；之后打开即秒开。
+              </p>
+            )}
+          </div>
         </div>
       )}
 
@@ -168,8 +166,10 @@ export function AnalyzeResultClient() {
           report={report}
           aiMarkdown={aiMarkdown}
           manifest={manifest}
+          storedPlots={storedPlots}
           info={info}
           requestSeries={requestSeries}
+          loadTrack={loadTrack}
           explaining={stage === "explaining"}
           loggedIn={loggedIn}
           quota={quota}

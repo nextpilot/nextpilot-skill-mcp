@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { TopicManifest, SeriesResponse } from "@/lib/types";
-import type { SeriesRequest } from "@/lib/chart-presets";
+import type { TrackData } from "@/lib/types";
 import { Loader2, MapPin } from "lucide-react";
 
 interface GpsPoint {
@@ -11,10 +10,6 @@ interface GpsPoint {
   alt: number;
 }
 
-function findGpsInstance(manifest: TopicManifest): number | null {
-  const topic = manifest.topics.find((t) => t.topic === "vehicle_gps_position");
-  return topic !== undefined ? topic.instance : null;
-}
 
 function altitudeColor(alt: number, minAlt: number, maxAlt: number): string {
   if (maxAlt <= minAlt) return "#4a8cf7";
@@ -33,26 +28,19 @@ async function getLeaflet(): Promise<LeafletModule> {
 }
 
 export function FlightMap({
-  manifest,
-  requestSeries,
+  loadTrack,
 }: {
-  manifest: TopicManifest;
-  requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
+  /** 取轨迹：存档里有就直接给（打开历史时不必解析），否则问 Worker 要 */
+  loadTrack: () => Promise<TrackData>;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [altRange, setAltRange] = useState<[number, number] | null>(null);
   const [pointCount, setPointCount] = useState(0);
-
-  const gpsInstance = findGpsInstance(manifest);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    if (gpsInstance === null) {
-      setState("error");
-      return;
-    }
-
     let cancelled = false;
     let LModule: LeafletModule | null = null;
 
@@ -60,35 +48,22 @@ export function FlightMap({
       try {
         LModule = await getLeaflet();
 
-        const resp = await requestSeries({
-          topic: "vehicle_gps_position",
-          instance: gpsInstance!,
-          fields: ["lat", "lon", "alt"],
-          panel: -1,
-        });
-
+        // 轨迹由引擎按 facts.yaml 的声明取好并换算（旧固件 degE7/mm、新固件 deg/m 都在这儿消化）
+        const track = await loadTrack();
         if (cancelled) return;
 
-        const latArr = resp.series["lat"];
-        const lonArr = resp.series["lon"];
-        const altArr = resp.series["alt"];
-
-        if (!latArr || !lonArr) {
+        if (track.error || !track.lat?.length || !track.lon?.length) {
+          setErrorMsg(track.error ?? "日志里没有可用的 GPS 轨迹");
           setState("error");
           return;
         }
 
         const points: GpsPoint[] = [];
-        for (let i = 0; i < latArr.length; i++) {
-          const lat = latArr[i];
-          const lon = lonArr[i];
+        for (let i = 0; i < track.lat.length; i++) {
+          const lat = track.lat[i];
+          const lon = track.lon[i];
           if (lat !== null && lon !== null) {
-            const altVal = altArr?.[i];
-            points.push({
-              lat: lat / 1e7,
-              lon: lon / 1e7,
-              alt: altVal !== null && altVal !== undefined ? altVal / 1000 : 0,
-            });
+            points.push({ lat, lon, alt: track.alt?.[i] ?? 0 });
           }
         }
 
@@ -112,7 +87,7 @@ export function FlightMap({
     return () => {
       cancelled = true;
     };
-  }, [gpsInstance, requestSeries]);
+  }, [loadTrack]);
 
   useEffect(() => {
     return () => {
@@ -195,10 +170,6 @@ export function FlightMap({
     map.fitBounds(bounds, { padding: [20, 20] });
   }
 
-  if (gpsInstance === null) {
-    return null;
-  }
-
   return (
     <div className="mt-3">
       <h4 className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted">
@@ -215,7 +186,7 @@ export function FlightMap({
 
       {state === "error" && (
         <p className="rounded-lg py-6 text-center text-xs text-muted">
-          无法加载 GPS 轨迹数据
+          {errorMsg ?? "无法加载 GPS 轨迹数据"}
         </p>
       )}
 

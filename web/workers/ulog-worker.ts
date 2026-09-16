@@ -12,10 +12,15 @@ import { PY_ULG_CHECKS } from "./ulog-check-script";
 import { PY_ULG_DATA_HELPERS } from "./ulog-data-script";
 import type { LogInfo, TopicManifest } from "@/lib/types";
 
-// 默认走 jsdelivr CDN；生产可在 .env 中改 NEXT_PUBLIC_PYODIDE_URL 指向 EdgeOne Blob 自托管
+// 默认走 jsdelivr CDN；生产建议改 NEXT_PUBLIC_PYODIDE_URL 指向自托管（EdgeOne Blob）——
+// 国内访问 jsdelivr / PyPI 都不稳，自托管后运行时与 wheel 都是一次下载、长期缓存。
 const PYODIDE_INDEX_URL =
   process.env.NEXT_PUBLIC_PYODIDE_URL ??
   "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/";
+
+// pyulog 的 wheel 地址（可选）。给了就直接装这个文件：**跳过 PyPI 索引查询**（那一步每次
+// 都要联网、且不受缓存保护），配合自托管就是"下载一次"。用 tools/px4/fetch-pyodide-assets.py 抓。
+const PYULOG_WHEEL = process.env.NEXT_PUBLIC_PYULOG_WHEEL ?? "";
 
 export type WorkerStage =
   | "loading-runtime"
@@ -25,12 +30,15 @@ export type WorkerStage =
 
 export type WorkerInMessage =
   | { type: "analyze"; file: Uint8Array; }
+  | { type: "track"; reqId: string; }
   | {
     type: "series";
     reqId: string;
     topic: string;
     instance: number;
     fields: string[];
+    /** 预处理算子（可选）：换算在引擎侧做，别在前端写数学 */
+    op?: { name: string; labels?: string[]; };
   };
 
 export type WorkerOutMessage =
@@ -42,6 +50,7 @@ export type WorkerOutMessage =
     info: LogInfo;
   }
   | { type: "series"; reqId: string; data: unknown; }
+  | { type: "track"; reqId: string; data: unknown; }
   | { type: "error"; message: string; };
 
 const post = (msg: WorkerOutMessage) =>
@@ -87,11 +96,12 @@ async function getPyodide(): Promise<Pyodide> {
     await pyodide.loadPackage(["micropip", "numpy"]);
     const micropip = pyodide.pyimport("micropip");
 
-    // micropip 从 PyPI 下载，浏览器网络可能不稳定，重试 3 次
+    // 装了自托管 wheel 就直接装它（不走 PyPI 索引）；否则回退到按包名装，重试 3 次
+    const pyulogTarget = PYULOG_WHEEL || "pyulog";
     let lastErr: unknown;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        await micropip.install("pyulog");
+        await micropip.install(pyulogTarget);
         lastErr = null;
         break;
       } catch (e) {
@@ -138,12 +148,27 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
   try {
     const pyodide = await getPyodide();
 
+    if (msg.type === "track") {
+      try {
+        // 轨迹字段名与量纲随固件改过，候选与换算写在 facts.yaml 的 track 里（引擎侧解析）
+        const data = await runJson(pyodide, "np_track()");
+        post({ type: "track", reqId: msg.reqId, data });
+      } catch (err) {
+        post({
+          type: "track",
+          reqId: msg.reqId,
+          data: { error: err instanceof Error ? err.message : String(err) },
+        });
+      }
+      return;
+    }
+
     if (msg.type === "series") {
       try {
         // 入参经 json.dumps 字符串传入，避免 Python 侧注入问题
         const code = `np_series(${JSON.stringify(msg.topic)}, ${msg.instance}, ${JSON.stringify(
           JSON.stringify(msg.fields),
-        )}, 3000)`;
+        )}, 1500, ${msg.op ? JSON.stringify(JSON.stringify(msg.op)) : "None"})`;
         const data = await runJson(pyodide, code);
         post({ type: "series", reqId: msg.reqId, data });
       } catch (err) {

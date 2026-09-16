@@ -1,9 +1,13 @@
-import type { TopicManifest } from "./types";
+import type { SeriesResponse, TopicManifest } from "./types";
+import { PLOT_PRESETS } from "./knowledge/plots.generated";
 
 /**
- * 图表预设（Flight Review 对标 A/C）。每个 preset 只声明"读哪些字段、怎么画"，
- * 可用性由 manifest 校验，数据由 LogCharts 挂载时按需向 Worker 请求。
- * 分类色用 dataviz 参考调色板（已对站点浅/深表面通过校验），按固定槽位顺序取。
+ * 曲线预设的**解释器**：数据在 `knowledge/px4/plot/*.yml`（构建期生成 plots.generated.ts），
+ * 这里只负责"按声明在 manifest 上解析出可画的面板"——加/改图请改 YAML，不要改这个文件。
+ *
+ * 解析规则（与 plot/README.md 对应）：
+ * - 字段不存在就跳过该条线；一个面板一条线都不剩则不显示；一组图一个面板都不剩则整体隐藏
+ * - `topics: [a, b]` 取第一个存在的话题（新老固件话题改名时用）；`instance: all` 每实例一个面板
  */
 
 export type SeriesRequest = {
@@ -12,6 +16,8 @@ export type SeriesRequest = {
   fields: string[];
   /** 该面板在预设内的索引，用于日志/去重 */
   panel: number;
+  /** 预处理算子（如 quat_to_euler）：换算在引擎侧做，返回的 series 键是算子的 out_names */
+  op?: { name: string; labels?: string[]; };
 };
 
 export type PanelSpec = {
@@ -19,12 +25,10 @@ export type PanelSpec = {
   /** 面板级共享 y 轴标签（单 Y 轴约束，见 dataviz skill） */
   yLabel: string;
   requests: SeriesRequest[];
-  /** fields=每列一条线；quaternion=q[0..3] 转欧拉角 */
-  kind: "fields" | "quaternion";
   /** field -> 图例标签（缺省用字段名） */
   fieldLabels?: Record<string, string>;
   /** 水平参考线 */
-  hlines?: { value: number; color: string; label?: string }[];
+  hlines?: { value: number; color: string; label?: string; }[];
 };
 
 export type ChartPreset = {
@@ -34,30 +38,102 @@ export type ChartPreset = {
   resolve: (manifest: TopicManifest) => PanelSpec[] | null;
 };
 
-function topicInstances(m: TopicManifest, topic: string): number[] {  return m.topics
+/** plot/*.yml 的一条线的两种写法：字段名，或"候选字段取第一个存在 + 中文图例" */
+type FieldSpec =
+  | string
+  | { label?: string; fields: string[]; only_when_missing?: string; };
+
+type PlotPanel = {
+  title: string;
+  yLabel: string;
+  topic?: string;
+  topics?: string[];
+  instance?: "first" | "all";
+  op?: { name: string; labels?: string[]; };
+  fields: FieldSpec[];
+  hlines?: { value: number; level: "ok" | "warning" | "critical"; label: string; }[];
+};
+
+type PlotPreset = {
+  id: string;
+  title: string;
+  description: string;
+  panels: PlotPanel[];
+};
+
+function topicInstances(m: TopicManifest, topic: string): number[] {
+  return m.topics
     .filter((t) => t.topic === topic && t.n > 1)
     .map((t) => t.instance)
     .sort((a, b) => a - b);
 }
-function hasField(
-  m: TopicManifest,
-  topic: string,
-  instance: number,
-  field: string,
-): boolean {
+
+function hasField(m: TopicManifest, topic: string, instance: number, field: string): boolean {
   return m.topics.some(
     (t) => t.topic === topic && t.instance === instance && t.fields.some((f) => f.name === field),
   );
 }
 
-function firstField(
-  m: TopicManifest,
+/** 候选话题里第一个在日志中存在且有多于一个采样的（新老固件话题改名时用） */
+function pickTopic(m: TopicManifest, panel: PlotPanel): string | null {
+  const candidates = panel.topic ? [panel.topic] : (panel.topics ?? []);
+  return candidates.find((t) => topicInstances(m, t).length > 0) ?? null;
+}
+
+/** 解析一个面板在某实例上的线：字段不存在就跳过；返回 null 表示这个面板不用画 */
+function resolvePanel(
+  panel: PlotPanel,
   topic: string,
   instance: number,
-  candidates: string[],
-): string | null {
-  for (const c of candidates) if (hasField(m, topic, instance, c)) return c;
-  return null;
+  panelIndex: number,
+  manifest: TopicManifest,
+): PanelSpec | null {
+  const fields: string[] = [];
+  const fieldLabels: Record<string, string> = {};
+
+  for (const spec of panel.fields) {
+    // only_when_missing：老固件回退用的线——那个字段在，就说明这次不用画我
+    if (typeof spec !== "string" && spec.only_when_missing
+        && hasField(manifest, topic, instance, spec.only_when_missing)) continue;
+    const candidates = typeof spec === "string" ? [spec] : spec.fields;
+    const hit = candidates.find((f) => hasField(manifest, topic, instance, f));
+    if (!hit) continue;
+    fields.push(hit);
+    if (typeof spec !== "string" && spec.label) fieldLabels[hit] = spec.label;
+  }
+  if (fields.length === 0) return null;
+
+  const request: SeriesRequest = { topic, instance, fields, panel: panelIndex };
+  if (panel.op) request.op = panel.op;
+  const spec: PanelSpec = {
+    title: panel.title.replace("{instance}", String(instance)).replace("{topic}", topic),
+    yLabel: panel.yLabel,
+    requests: [request],
+  };
+  if (Object.keys(fieldLabels).length > 0) spec.fieldLabels = fieldLabels;
+  if (panel.hlines?.length) {
+    spec.hlines = panel.hlines.map((h) => ({
+      value: h.value,
+      color: STATUS_COLORS[h.level],
+      label: h.label,
+    }));
+  }
+  return spec;
+}
+
+function resolvePreset(data: PlotPreset, manifest: TopicManifest): PanelSpec[] | null {
+  const panels: PanelSpec[] = [];
+  for (const panel of data.panels) {
+    const topic = pickTopic(manifest, panel);
+    if (!topic) continue;
+    const instances =
+      panel.instance === "all" ? topicInstances(manifest, topic) : topicInstances(manifest, topic).slice(0, 1);
+    for (const inst of instances) {
+      const spec = resolvePanel(panel, topic, inst, panels.length, manifest);
+      if (spec) panels.push(spec);
+    }
+  }
+  return panels.length > 0 ? panels : null;
 }
 
 // 分类槽位（dataviz 参考调色板，浅/深两套）
@@ -89,165 +165,30 @@ export const STATUS_COLORS = {
   critical: "#f87171",
 };
 
-export const CHART_PRESETS: ChartPreset[] = [
-  {
-    id: "vibration",
-    title: "振动",
-    description: "每个 IMU 的高频振动指标（accel_vibration_metric，m/s²），参考线 4.905 / 9.81。",
-    resolve: (m) => {
-      const insts = topicInstances(m, "vehicle_imu_status");
-      if (insts.length === 0) return null;
-      return insts.map((inst, i) => ({
-        title: `IMU #${inst}`,
-        yLabel: "m/s²",
-        kind: "fields" as const,
-        requests: [
-          { topic: "vehicle_imu_status", instance: inst, fields: ["accel_vibration_metric"], panel: i },
-        ],
-        hlines: [
-          { value: 4.905, color: STATUS_COLORS.warning, label: "4.905 (警告)" },
-          { value: 9.81, color: STATUS_COLORS.critical, label: "9.81 (严重)" },
-        ],
-      }));
-    },
-  },
-  {
-    id: "imu-accel",
-    title: "IMU 原始加速度",
-    description: "三轴加速度（m/s²）。旧固件可能未记录该话题。",
-    resolve: (m) => {
-      const insts = topicInstances(m, "sensor_combined");
-      const fallback = topicInstances(m, "sensor_accel");
-      const inst = insts[0] ?? fallback[0];
-      if (inst === undefined) return null;
-      const topic = insts.length ? "sensor_combined" : "sensor_accel";
-      return [
-        {
-          title: `IMU 加速度（${topic}#${inst}）`,
-          yLabel: "m/s²",
-          kind: "fields",
-          requests: [
-            {
-              topic,
-              instance: inst,
-              fields: ["accelerometer_m_s2[0]", "accelerometer_m_s2[1]", "accelerometer_m_s2[2]"],
-              panel: 0,
-            },
-          ],
-        },
-      ];
-    },
-  },
-  {
-    id: "attitude",
-    title: "姿态",
-    description: "四元数转欧拉角（Roll / Pitch / Yaw，度）。",
-    resolve: (m) => {
-      const inst = topicInstances(m, "vehicle_attitude")[0];
-      if (inst === undefined) return null;
-      return [
-        {
-          title: "欧拉角",
-          yLabel: "deg",
-          kind: "fields",
-          requests: [
-            {
-              topic: "vehicle_attitude",
-              instance: inst,
-              fields: ["q[0]", "q[1]", "q[2]", "q[3]"],
-              panel: 0,
-            },
-          ],
-        },
-      ];
-    },
-  },
-  {
-    id: "ekf",
-    title: "EKF 创新检验",
-    description: "创新值与检验门限之比（≥1 表示该路观测被 EKF 拒绝），参考线 1.0。",
-    resolve: (m) => {
-      const inst = topicInstances(m, "estimator_status")[0];
-      if (inst === undefined) return null;
-      const channels: { label: string; field: string }[] = [];
-      const add = (label: string, field: string) => {
-        if (hasField(m, "estimator_status", inst, field)) channels.push({ label, field });
-      };
-      add("速度", "vel_test_ratio");
-      add("水平位置", "pos_test_ratio");
-      add("垂直高度", "hgt_test_ratio");
-      add("航向", "hdg_test_ratio");
-      if (!hasField(m, "estimator_status", inst, "hdg_test_ratio")) add("磁罗盘", "mag_test_ratio");
-      add("空速", "tas_test_ratio");
-      add("离地高度", "hagl_test_ratio");
-      add("侧滑", "beta_test_ratio");
-      if (channels.length === 0) return null;
-      const fieldLabels: Record<string, string> = {};
-      for (const c of channels) fieldLabels[c.field] = c.label;
-      return [
-        {
-          title: `estimator_status #${inst}`,
-          yLabel: "ratio",
-          kind: "fields",
-          fieldLabels,
-          requests: [
-            {
-              topic: "estimator_status",
-              instance: inst,
-              fields: channels.map((c) => c.field),
-              panel: 0,
-            },
-          ],
-          hlines: [{ value: 1.0, color: STATUS_COLORS.critical, label: "1.0 (拒绝)" }],
-        },
-      ];
-    },
-  },
-  {
-    id: "power",
-    title: "电源",
-    description: "电压 / 电流 / 剩余电量，多面板共享时间轴。",
-    resolve: (m) => {
-      const inst = topicInstances(m, "battery_status")[0];
-      if (inst === undefined) return null;
-      const panels: PanelSpec[] = [];
-      const addPanel = (title: string, yLabel: string, fields: string[]) => {
-        const ok = fields.filter((f) => hasField(m, "battery_status", inst, f));
-        if (ok.length) panels.push({ title, yLabel, kind: "fields", requests: [{ topic: "battery_status", instance: inst, fields: ok, panel: panels.length }] });
-      };
-      addPanel("电压", "V", ["voltage_v", "voltage_filtered_v"]);
-      addPanel("电流", "A", ["current_a"]);
-      addPanel("剩余电量", "%", ["remaining"]);
-      return panels.length ? panels : null;
-    },
-  },
-  {
-    id: "gps",
-    title: "GPS",
-    description: "卫星数与定位精度（HDOP/EPH/EPV）。",
-    resolve: (m) => {
-      const inst = topicInstances(m, "vehicle_gps_position")[0];
-      if (inst === undefined) return null;
-      const sat = firstField(m, "vehicle_gps_position", inst, ["satellites_used", "satellites_visible"]);
-      const panels: PanelSpec[] = [];
-      if (sat) {
-        panels.push({
-          title: "卫星数",
-          yLabel: "count",
-          kind: "fields",
-          requests: [{ topic: "vehicle_gps_position", instance: inst, fields: [sat], panel: 0 }],
-        });
-      }
-      const accFields = ["eph", "epv", "hdop"].filter((f) => hasField(m, "vehicle_gps_position", inst, f));
-      if (accFields.length) {
-        panels.push({
-          title: "定位精度",
-          yLabel: "m",
-          kind: "fields",
-          requests: [{ topic: "vehicle_gps_position", instance: inst, fields: accFields, panel: panels.length }],
-        });
-      }
-      return panels.length ? panels : null;
-    },
-  },
-];
+/** 存档里的一组图（面板已解析好，打开历史时不必再要 manifest） */
+export type StoredPlotPanel = {
+  presetId: string;
+  title: string;
+  description: string;
+  panels: PanelSpec[];
+};
+
+/** 存档里的曲线数据：键 `${presetId}#${面板序号}` → 引擎返回的序列 */
+export type StoredPlotSeries = Record<string, SeriesResponse>;
+
+/** 把 manifest 一次性解析成所有预设的面板（分析完成时用来落盘存图） */
+export function resolvePlotPanels(manifest: TopicManifest): StoredPlotPanel[] {
+  return CHART_PRESETS.map((preset) => {
+    const panels = preset.resolve(manifest);
+    return panels
+      ? { presetId: preset.id, title: preset.title, description: preset.description, panels }
+      : null;
+  }).filter((x): x is StoredPlotPanel => x !== null);
+}
+
+export const CHART_PRESETS: ChartPreset[] = (PLOT_PRESETS as unknown as PlotPreset[]).map((data) => ({
+  id: data.id,
+  title: data.title,
+  description: data.description,
+  resolve: (m: TopicManifest) => resolvePreset(data, m),
+}));
