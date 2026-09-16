@@ -62,6 +62,9 @@ export interface SavedReport {
 
 /** 与结论分开存的**派生数据**：命中时直接给「消息 / 参数 / 图表」用，不必再解析原始日志 */
 export interface ReportData {
+  /** 产出这份派生数据的引擎版本（build 期算的源文件哈希）。
+   *  与当前版本不一致 = 旧引擎生成的（比如多值信息的分行规则变了），打开时重解析一次。 */
+  derivedVersion?: string;
   /** np_log_info() 的产物：系统信息 / 消息 / 丢包 / 参数 / 变更参数 / 阶段 */
   info?: LogInfo;
   /** 曲线：各预设解析出的面板（含标题/单位/参考线/字段），打开历史时不必再要 manifest */
@@ -298,11 +301,14 @@ async function pruneReportData(): Promise<void> {
   }
 }
 
-/** 存派生数据（参数/消息/曲线）：分析完成或首次画图后调，之后命中就能直接渲染 */
+/** 存派生数据（参数/消息/曲线）：分析完成或首次画图后调，之后命中就能直接渲染。
+ *  **按字段合并**而不是整条覆盖：两处调用各带一部分数据（分析完成只有 info，抽完曲线才有
+ *  plotPanels/track），谁后到都不该把对方写没了。 */
 export async function saveReportData(id: string, data: ReportData): Promise<void> {
   if (typeof window === "undefined" || !id) return;
   try {
-    await put(STORE_DATA, { id, ...data, savedAt: Date.now() });
+    const prev = await get<ReportData & { id: string; }>(STORE_DATA, id);
+    await put(STORE_DATA, { ...prev, id, ...data, savedAt: Date.now() });
     await pruneReportData();
   } catch {
     // 落库失败不阻断展示

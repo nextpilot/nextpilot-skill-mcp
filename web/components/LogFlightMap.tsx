@@ -3,12 +3,24 @@
 import { useEffect, useRef, useState } from "react";
 import type { TrackData } from "@/lib/types";
 import { Loader2, MapPin } from "lucide-react";
+import { wgs84ToGcj02 } from "@/lib/coord";
 
 interface GpsPoint {
   lat: number;
   lon: number;
   alt: number;
 }
+
+/**
+ * 底图：**国内可达**的高德瓦片（OpenStreetMap / Esri 在国内实测连不上，地图会是一片灰）。
+ * 代价是坐标系——高德是 GCJ-02，日志是 WGS-84，所以画之前统一换算（见 lib/coord.ts）。
+ * 上线正式域名时建议换成带 key 的正式瓦片服务（高德 JS API 或天地图）。
+ */
+const TILE_SUBDOMAINS = ["01", "02", "03", "04"];
+const AMAP_STREET = "https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}";
+const AMAP_SATELLITE = "https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}";
+const AMAP_SATELLITE_LABELS = "https://webst0{s}.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}";
+const AMAP_ATTRIBUTION = '&copy; <a href="https://www.amap.com/">高德地图</a>';
 
 
 function altitudeColor(alt: number, minAlt: number, maxAlt: number): string {
@@ -27,7 +39,7 @@ async function getLeaflet(): Promise<LeafletModule> {
   return L;
 }
 
-export function FlightMap({
+export function LogFlightMap({
   loadTrack,
 }: {
   /** 取轨迹：存档里有就直接给（打开历史时不必解析），否则问 Worker 要 */
@@ -39,6 +51,8 @@ export function FlightMap({
   const [altRange, setAltRange] = useState<[number, number] | null>(null);
   const [pointCount, setPointCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  /** "在高德地图打开起点"的链接（用换算后的 GCJ-02 坐标，点开就落在正确位置） */
+  const [amapUrl, setAmapUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,10 +89,20 @@ export function FlightMap({
         const alts = points.map((p) => p.alt);
         setAltRange([Math.min(...alts), Math.max(...alts)]);
         setPointCount(points.length);
-        buildMap(LModule, points);
+        // 底图是高德的 GCJ-02，日志是 WGS-84：画之前统一换算，否则轨迹整体偏几百米。
+        // 只换算画图用的那份，"这份轨迹是 WGS-84" 的事实不被改写。
+        const drawPoints = points.map((p) => {
+          const [lat, lon] = wgs84ToGcj02(p.lat, p.lon);
+          return { ...p, lat, lon };
+        });
+        const [startLat, startLon] = wgs84ToGcj02(points[0].lat, points[0].lon);
+        setAmapUrl(
+          `https://uri.amap.com/marker?position=${startLon.toFixed(6)},${startLat.toFixed(6)}&name=${encodeURIComponent("飞行起点")}`,
+        );
+        buildMap(LModule, drawPoints);
         setState("ready");
       } catch (err) {
-        console.error("FlightMap 加载失败:", err);
+        console.error("LogFlightMap 加载失败:", err);
         if (!cancelled) setState("error");
       }
     }
@@ -118,14 +142,38 @@ export function FlightMap({
     const map = L.map(containerRef.current, {
       zoomControl: true,
       scrollWheelZoom: true,
-      attributionControl: false,
+      attributionControl: true,
     });
     mapRef.current = map;
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "&copy; OpenStreetMap",
+    const street = L.tileLayer(AMAP_STREET, {
+      subdomains: TILE_SUBDOMAINS,
+      attribution: AMAP_ATTRIBUTION,
       maxZoom: 19,
-    }).addTo(map);
+    });
+    const satellite = L.tileLayer(AMAP_SATELLITE, {
+      subdomains: TILE_SUBDOMAINS,
+      attribution: AMAP_ATTRIBUTION,
+      maxZoom: 19,
+    });
+    // 卫星图上的路名/地名/边界，另有一层（style=8 与街道图同源，但只作叠加用）
+    const satelliteLabels = L.tileLayer(AMAP_SATELLITE_LABELS, {
+      subdomains: TILE_SUBDOMAINS,
+      maxZoom: 19,
+    });
+
+    // 默认卫星影像 + 标注：一眼能看出飞在哪片地/哪个园区；街道图在同一控件里切换
+    satellite.addTo(map);
+    satelliteLabels.addTo(map);
+    L.control
+      .layers(
+        { 卫星影像: satellite, 街道图: street },
+        { 路名标注: satelliteLabels },
+        { position: "topright", collapsed: true },
+      )
+      .addTo(map);
+    // 比例尺：判断"飞了多远"比看经纬度直观
+    L.control.scale({ imperial: false, position: "bottomleft" }).addTo(map);
 
     const alts = points.map((p) => p.alt);
     const minAlt = Math.min(...alts);
@@ -172,9 +220,22 @@ export function FlightMap({
 
   return (
     <div className="mt-3">
-      <h4 className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted">
+      <h4 className="mb-2 flex flex-wrap items-center gap-1.5 text-xs font-medium text-muted">
         <MapPin className="h-3.5 w-3.5" />
         GPS 轨迹 · {pointCount > 0 ? `${pointCount} 点` : ""}
+        <span className="text-faint">
+          （底图高德，坐标已从 WGS-84 换算到 GCJ-02；右上角可切街道图）
+        </span>
+        {state === "ready" && amapUrl && (
+          <a
+            href={amapUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-auto text-primary hover:underline"
+          >
+            在高德地图打开起点
+          </a>
+        )}
       </h4>
 
       {state === "loading" && (

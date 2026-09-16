@@ -9,7 +9,7 @@ import { getReport, initReportStore } from "@/lib/report-history";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { ArrowLeft, Loader2, Sparkles } from "lucide-react";
 
-type TabKey = "metrics" | "messages" | "params" | "charts" | "summary" | "ai";
+type TabKey = "sysmsg" | "metrics" | "messages" | "params" | "charts" | "summary" | "ai";
 
 const STAGE_TEXT: Record<string, string> = {
   "loading-runtime": "加载 Pyodide 运行时",
@@ -42,6 +42,7 @@ export function AnalyzeResultClient() {
   } = useLogAnalyzer();
 
   const [loading, setLoading] = useState(true);
+  // 打开报告默认停在「基本情况」（tab 顺序变了，落点仍按原来的习惯）
   const [tab, setTab] = useState<TabKey>("metrics");
   const loadedRef = useRef(false);
 

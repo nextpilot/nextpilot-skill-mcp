@@ -26,6 +26,7 @@ import {
     type SavedReport,
 } from "@/lib/report-history";
 import { getDeviceId } from "@/lib/device-id";
+import { DERIVED_DATA_VERSION } from "@/lib/knowledge/derived-version.generated";
 import { fallbackLogKey, hashLogBytes } from "@/lib/log-hash";
 import { cacheUsage, cachedLogHashes, getCachedLog, putCachedLog } from "@/lib/log-cache";
 import type { HistoryItem } from "@/components/HistoryList";
@@ -336,6 +337,7 @@ export function useLogAnalyzer() {
                 const hasTrack = track && !track.error && (track.lat?.length ?? 0) > 1;
                 if (hasTrack) setStoredTrack(track);
                 await saveReportData(id, {
+                    derivedVersion: DERIVED_DATA_VERSION,
                     info,
                     plotPanels: panels,
                     plotSeries: series,
@@ -432,7 +434,7 @@ export function useLogAnalyzer() {
                 // 派生数据随报告落盘：下次打开这份报告，参数/消息/阶段/曲线直接渲染，**不再解析原始日志**。
                 const info = m.info as LogInfo;
                 lastInfoRef.current = info;
-                void saveReportData(reportIdRef.current, { info });
+                void saveReportData(reportIdRef.current, { derivedVersion: DERIVED_DATA_VERSION, info });
                 // 曲线：解析已结束，后台把各预设的降采样序列抽出来存下（用户此刻已在看结论页，无感）
                 void extractPlots(reportIdRef.current, m.manifest as TopicManifest, info);
             } else if (m.type === "track") {
@@ -514,12 +516,16 @@ export function useLogAnalyzer() {
         [ensureWorker],
     );
 
-    /** 取派生数据并按需填充 UI；返回 true 表示"无需解析即可完整展示" */
-    /** 读存档的派生数据并填充 UI；告诉调用方"参数/消息"与"曲线"各有没有 */
+    /** 读存档的派生数据并填充 UI；告诉调用方"参数/消息"与"曲线"各有没有、是不是旧引擎生成的 */
     const loadReportData = useCallback(
-        async (id: string): Promise<{ hasInfo: boolean; hasPlots: boolean; hasTrack: boolean; }> => {
+        async (
+            id: string,
+        ): Promise<{ hasInfo: boolean; hasPlots: boolean; hasTrack: boolean; stale: boolean; }> => {
             const data = await getReportData(id);
-            if (!data) return { hasInfo: false, hasPlots: false, hasTrack: false };
+            if (!data) return { hasInfo: false, hasPlots: false, hasTrack: false, stale: false };
+            // 派生数据的形状随引擎改（多值信息分行、新增 infoDict…）：版本不对就当作"得重新解析"，
+            // 但**照样先用它渲染**——重解析在后台进行，页面不会白一下
+            const stale = data.derivedVersion !== DERIVED_DATA_VERSION;
             if (data.info) setInfo(data.info as LogInfo);
             const panels = data.plotPanels;
             if (panels?.length) setStoredPlots({ panels, series: data.plotSeries ?? {} });
@@ -528,6 +534,7 @@ export function useLogAnalyzer() {
                 hasInfo: Boolean(data.info),
                 hasPlots: Boolean(panels?.length),
                 hasTrack: Boolean(data.track && !data.track.error),
+                stale,
             };
         },
         [],
@@ -546,17 +553,19 @@ export function useLogAnalyzer() {
      * 打开一份已存档的报告（本机历史 / 云端记录 / 去重命中都走这里）：
      * 1) 先用存档的结论立刻渲染；
      * 2) 本会话刚分析完的，直接沿用内存里的 manifest / 曲线（不等后台落盘）；
-     * 3) 否则读存档的派生数据：**曲线也有了就不用解析**；
-     * 4) 曲线缺（老记录）时，才退回"拿本机缓存的原始字节重新解析"，顺便把曲线补齐。
+     * 3) 否则读存档的派生数据：**齐全且版本一致**就不用解析；
+     * 4) 缺曲线/轨迹，或派生数据是旧版本引擎生成的（造型改过），就退回"拿本机缓存的原始字节
+     *    重新解析"补齐——旧数据先渲染着，解析完自动换成新的。
+     * 返回 reparsing / stale 供调用方决定提示文案与是否补一次解析。
      */
     const openSaved = useCallback(
-        async (saved: SavedReport) => {
+        async (saved: SavedReport): Promise<{ reparsing: boolean; stale: boolean }> => {
             viewSaved(saved);
             reportIdRef.current = saved.id;
-            if (adoptLiveAnalysis(saved.id)) return true;
-            const { hasInfo, hasPlots, hasTrack } = await loadReportData(saved.id);
-            // 曲线与轨迹都齐了才算"不必解析"；缺任一项就用缓存字节补（补齐后会存下来）
-            if (hasPlots && hasTrack) return true;
+            if (adoptLiveAnalysis(saved.id)) return { reparsing: false, stale: false };
+            const { hasPlots, hasTrack, stale } = await loadReportData(saved.id);
+            // 曲线、轨迹都齐了、且是当前引擎生成的，才算"不必解析"
+            if (hasPlots && hasTrack && !stale) return { reparsing: false, stale: false };
             if (saved.logHash) {
                 const cached = await getCachedLog(saved.logHash);
                 if (cached) {
@@ -567,9 +576,10 @@ export function useLogAnalyzer() {
                         reportId: saved.id,
                         priorAi: saved.aiMarkdown,
                     });
+                    return { reparsing: true, stale };
                 }
             }
-            return hasInfo;
+            return { reparsing: false, stale };
         },
         [adoptLiveAnalysis, loadReportData, parseBytes, viewSaved],
     );
@@ -601,23 +611,39 @@ export function useLogAnalyzer() {
                     fallbackLogKey(file.name, file.size, file.lastModified);
                 const existing = await findExistingByHash(hash);
                 if (existing) {
+                    let opened: { reparsing: boolean; stale: boolean } = { reparsing: false, stale: false };
                     if (existing.source === "cloud") {
                         // 云端列表只给了摘要，先取回完整记录再走统一的打开路径
                         try {
                             const resp = await fetch(`/api/reports/${existing.id}`);
                             if (resp.ok) {
                                 const data = await resp.json();
-                                if (data.report) await openSaved(data.report as SavedReport);
+                                if (data.report) opened = await openSaved(data.report as SavedReport);
                             }
                         } catch {
                             // 取不到就只提示"已分析过"，不阻断
                         }
                     } else {
-                        await openSaved(existing);
+                        opened = await openSaved(existing);
+                    }
+                    // 存档是旧引擎生成的、而原始日志又不在本机缓存里（被淘汰或来自别的设备）：
+                    // 手里正好有新上传的字节，直接重新解析一遍补上，别让用户看旧格式
+                    let reparsing = opened.reparsing;
+                    if (opened.stale && !reparsing) {
+                        parseBytes(bytes, {
+                            name: file.name,
+                            size: file.size,
+                            hash,
+                            reportId: existing.id,
+                            priorAi: existing.aiMarkdown,
+                        });
+                        reparsing = true;
                     }
                     setPendingBytes({ name: file.name, size: file.size, hash, bytes });
                     setDedupeNotice(
-                        "这份日志此前已分析过（内容一致），已直接载入历史结论，未重复解析。",
+                        reparsing
+                            ? "这份日志此前已分析过，但那份存档是旧版本引擎生成的（消息/参数的呈现方式已更新），已重新解析一遍。"
+                            : "这份日志此前已分析过（内容一致），已直接载入历史结论，未重复解析。",
                     );
                     return existing.id;
                 }

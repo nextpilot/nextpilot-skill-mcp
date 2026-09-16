@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import type { LogInfo } from "@/lib/types";
+import type { LogInfo, LogMessage } from "@/lib/types";
+import { formatLogTime } from "@/lib/format";
 
 const LEVEL_STYLE: Record<string, { cls: string; label: string }> = {
   ERROR: { cls: "bg-critical/15 text-critical border-critical/40", label: "错误" },
@@ -28,42 +29,34 @@ const GROUP_OF: Record<string, LevelGroup> = {
   DEBUG: "info",
 };
 
-function fmtTime(tSec: number): string {
-  const m = Math.floor(tSec / 60);
-  const s = tSec - m * 60;
-  return `${String(m).padStart(2, "0")}:${s.toFixed(1).padStart(4, "0")}`;
-}
-
 const inputCls =
   "w-56 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-sm text-text placeholder:text-muted focus:border-primary focus:outline-none";
 
 /**
- * 事件消息 tab：ULog 的 **Information Message**（带时间戳与级别）与
- * **Multi Information**（键 → 多组值，无时间戳）都在这里。
- * 两者各自可搜索；消息另可按级别档过滤。
+ * 事件消息 tab：ULog 的 **Logged String Message**（'L'，带时间戳与级别）与
+ * **Tagged Logged String Message**（'C'，同形，多一个来源 tag）并成一条时间轴，
+ * 下面是 **Multi Information**（'M'，键 → 多组值、无时间戳）—— 都是"发生了什么"。
+ * 消息可按级别档过滤、按内容搜索；多值信息按组折叠、单独搜索。
+ * 键值字典（Information Message）与消息记录统计在「系统消息」tab。
  */
-export function LogMessages({ info }: { info: LogInfo }) {
+export function LogEventsMsg({ info }: { info: LogInfo }) {
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState<LevelGroup>("all");
   const [multiQuery, setMultiQuery] = useState("");
 
-  const messages = info.messages ?? [];
+  // 引擎已把「事件解码结果 + 文本消息 + 带 tag 的消息」并成一条时间轴（kind 区分来源）；
+  // 老存档里 'C' 消息还是单独一段，这里并进来即可
+  const messages = useMemo<(LogMessage & { tag?: number })[]>(() => {
+    const all: (LogMessage & { tag?: number })[] = [
+      ...(info.messages ?? []),
+      ...(info.messagesTagged ?? []),
+    ];
+    return all.sort((a, b) => a.tSec - b.tSec);
+  }, [info.messages, info.messagesTagged]);
+
+  /** Multi Information（'M'）：键 → 多组值、无时间戳。内容是固件 boot 日志、性能计数、
+   *  被排除的话题这类"发生了什么"，所以和日志消息同 tab，只是它没有时间戳、按组折叠。 */
   const multi = info.messagesMulti ?? [];
-
-  const counts = useMemo(() => {
-    const c = { all: messages.length, error: 0, warning: 0, info: 0 };
-    for (const m of messages) c[GROUP_OF[m.levelStr] ?? "info"] += 1;
-    return c;
-  }, [messages]);
-
-  const shown = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return messages.filter((m) => {
-      if (group !== "all" && (GROUP_OF[m.levelStr] ?? "info") !== group) return false;
-      if (q && !m.message.toLowerCase().includes(q) && !m.levelStr.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [messages, query, group]);
 
   const multiShown = useMemo(() => {
     const q = multiQuery.trim().toLowerCase();
@@ -75,6 +68,24 @@ export function LogMessages({ info }: { info: LogInfo }) {
       }))
       .filter((g) => g.values.length > 0);
   }, [multi, multiQuery]);
+
+  const counts = useMemo(() => {
+    const c = { all: messages.length, error: 0, warning: 0, info: 0 };
+    for (const m of messages) c[GROUP_OF[m.levelStr] ?? "info"] += 1;
+    return c;
+  }, [messages]);
+
+  /** 有 'C' 消息才占一列来源 tag（没有时整列不出现，免得空一列） */
+  const hasTagged = useMemo(() => messages.some((m) => m.tag !== undefined), [messages]);
+
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return messages.filter((m) => {
+      if (group !== "all" && (GROUP_OF[m.levelStr] ?? "info") !== group) return false;
+      if (q && !m.message.toLowerCase().includes(q) && !m.levelStr.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [messages, query, group]);
 
   const tabs: { key: LevelGroup; label: string; n: number; }[] = [
     { key: "all", label: "全部", n: counts.all },
@@ -120,22 +131,36 @@ export function LogMessages({ info }: { info: LogInfo }) {
               : "没有消息。"}
         </p>
       ) : (
-        <div className="max-h-[520px] overflow-y-auto rounded-xl bg-surface-2 p-3">
-          <table className="w-full text-sm">
+        <div className="max-h-[520px] overflow-auto rounded-xl bg-surface-2 p-3">
+          {/* table-fixed + 给时间/级别列定宽：长消息不会把这两列挤到显示不全 */}
+          <table className="w-full min-w-[560px] table-fixed text-sm">
             <tbody>
               {shown.map((m, i) => {
                 const st = LEVEL_STYLE[m.levelStr] ?? LEVEL_STYLE.INFO;
                 return (
                   <tr key={i} className="border-b border-border/50 last:border-0">
-                    <td className="whitespace-nowrap py-1.5 pr-3 align-top font-mono text-xs text-muted">
-                      {fmtTime(m.tSec)}
+                    <td className="w-[76px] py-1.5 pr-3 align-top font-mono text-xs whitespace-nowrap text-muted tabular-nums">
+                      {formatLogTime(m.tSec)}
                     </td>
-                    <td className="whitespace-nowrap py-1.5 pr-2 align-top" title={st.label}>
+                    <td className="w-[104px] py-1.5 pr-2 align-top whitespace-nowrap" title={st.label}>
                       <span className={`rounded-full border px-2 py-0.5 text-[11px] ${st.cls}`}>
                         {m.levelStr}
                       </span>
                     </td>
-                    <td className="py-1.5 text-text">{m.message}</td>
+                    {hasTagged && (
+                      <td className="w-[56px] py-1.5 pr-2 align-top whitespace-nowrap">
+                        {m.tag !== undefined && (
+                          <span
+                            className="rounded border border-border px-1.5 py-0.5 font-mono text-[11px] text-muted"
+                            title="消息来源标识（tag）：代表产生这条消息的进程 / 线程 / 类，含义由机载系统自定义"
+                          >
+                            #{m.tag}
+                          </span>
+                        )}
+                      </td>
+                    )}
+                    {/* 长消息（无空格的路径 / 十六进制）靠 break-words 换行，别撑破定宽列 */}
+                    <td className="py-1.5 whitespace-pre-wrap break-words text-text">{m.message}</td>
                   </tr>
                 );
               })}
@@ -149,7 +174,7 @@ export function LogMessages({ info }: { info: LogInfo }) {
         <section className="mt-6">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold">
-              多值信息 <span className="font-normal text-muted">（Multi Information · {multi.length} 项）</span>
+              多值信息 <span className="font-normal text-muted">（共 {multi.length} 项）</span>
             </h3>
             <label className="relative ml-auto">
               <Search className="pointer-events-none absolute top-2 left-2.5 h-3.5 w-3.5 text-muted" />
@@ -174,7 +199,10 @@ export function LogMessages({ info }: { info: LogInfo }) {
                   </summary>
                   <div className="mt-2 max-h-64 overflow-y-auto">
                     {g.values.map((v, i) => (
-                      <p key={i} className="border-b border-border/40 py-1 text-xs leading-5 text-muted last:border-0">
+                      <p
+                        key={i}
+                        className="border-b border-border/40 py-1 font-mono text-xs leading-5 whitespace-pre-wrap break-all text-muted last:border-0"
+                      >
                         {v}
                       </p>
                     ))}
@@ -185,85 +213,6 @@ export function LogMessages({ info }: { info: LogInfo }) {
           )}
         </section>
       )}
-    </div>
-  );
-}
-
-/**
- * 参数 tab：ULog 的 **Parameter Message**（当前值）与 **Default Parameter Message**（默认值，
- * 用来判断哪些参数被改过）都在这里。可按名称/值搜索，也可只看"飞行中变更过"的。
- */
-export function LogParams({ info }: { info: LogInfo }) {
-  const [paramQuery, setParamQuery] = useState("");
-  const [changedOnly, setChangedOnly] = useState(false);
-
-  const changedNames = useMemo(
-    () => new Set(info.changedParams.map((p) => p.name)),
-    [info.changedParams],
-  );
-
-  const params = useMemo(() => {
-    const q = paramQuery.trim().toLowerCase();
-    return Object.entries(info.params)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .filter(([k, v]) => {
-        if (changedOnly && !changedNames.has(k)) return false;
-        if (!q) return true;
-        return k.toLowerCase().includes(q) || String(v).toLowerCase().includes(q);
-      });
-  }, [info.params, paramQuery, changedOnly, changedNames]);
-
-  return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <span className="text-xs text-muted">
-          共 {Object.keys(info.params).length} 项
-          {info.changedParams.length > 0 ? `，飞行中变更 ${info.changedParams.length} 项` : ""}
-          {paramQuery || changedOnly ? `，筛出 ${params.length} 项` : ""}
-        </span>
-        <label className="ml-auto flex items-center gap-1.5 text-xs text-muted">
-          <input
-            type="checkbox"
-            checked={changedOnly}
-            onChange={(e) => setChangedOnly(e.target.checked)}
-            className="h-3.5 w-3.5 accent-[var(--color-primary)]"
-          />
-          只看变更过的
-        </label>
-        <label className="relative">
-          <Search className="pointer-events-none absolute top-2 left-2.5 h-3.5 w-3.5 text-muted" />
-          <input
-            value={paramQuery}
-            onChange={(e) => setParamQuery(e.target.value)}
-            placeholder="按名称 / 值搜索…"
-            className={`${inputCls} pl-8`}
-          />
-        </label>
-      </div>
-      <div className="max-h-[600px] overflow-y-auto rounded-xl bg-surface-2 p-3">
-        <table className="w-full text-sm">
-          <tbody>
-            {params.map(([k, v]) => (
-              <tr key={k} className="border-b border-border/50 last:border-0">
-                <td className="w-1/2 py-1.5 pr-3 font-mono text-xs text-primary">{k}</td>
-                <td className="py-1.5 text-text">
-                  {String(v)}
-                  {changedNames.has(k) && (
-                    <span className="ml-2 rounded bg-warning/15 px-1.5 py-0.5 text-[11px] text-warning">
-                      已变更
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {params.length === 0 && (
-          <p className="py-4 text-center text-sm text-muted">
-            {changedOnly ? "没有飞行中变更的参数。" : "没有匹配的参数。"}
-          </p>
-        )}
-      </div>
     </div>
   );
 }

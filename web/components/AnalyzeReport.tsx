@@ -13,6 +13,7 @@ import {
   ScrollText,
   ClipboardCheck,
   ListFilter,
+  Database,
   Sparkles,
   ExternalLink,
   Loader2,
@@ -29,9 +30,11 @@ import type { SeriesRequest } from "@/lib/chart-presets";
 import type { TrackData } from "@/lib/types";
 import { LogCharts } from "./LogCharts";
 import type { StoredPlotPanel, StoredPlotSeries } from "@/lib/chart-presets";
-import { LogMessages, LogParams } from "./LogEventsParams";
+import { LogEventsMsg } from "./LogEventsMsg";
+import { LogParamsMsg } from "./LogParamsMsg";
+import { LogSystemMsg } from "./LogSystemMsg";
 import { PhaseStrip } from "./PhaseStrip";
-import { FlightMap } from "./FlightMap";
+import { LogFlightMap } from "./LogFlightMap";
 
 const VEHICLE_TYPE_LABELS: Record<string, string> = {
   rotary_wing: "旋翼",
@@ -75,7 +78,7 @@ const TAG_LABELS: Record<string, string> = {
   failsafe: "触发失效保护",
 };
 
-type TabKey = "metrics" | "messages" | "params" | "charts" | "summary" | "ai";
+type TabKey = "sysmsg" | "metrics" | "messages" | "params" | "charts" | "summary" | "ai";
 
 export function AnalyzeReport({
   report,
@@ -119,8 +122,9 @@ export function AnalyzeReport({
   // "纯历史"指只能看结论（没有参数/消息/曲线）：此时强制停在结论页并给出恢复提示
   const isHistory = !info && !manifest && !storedPlots?.panels?.length;
   const tabs: { key: TabKey; label: string; icon: React.ReactNode; disabled?: boolean }[] = [
-    // 顺序：先看"这份日志是什么样"（关键数据 → 消息 → 参数 → 曲线），再看"判定结论"，最后 AI
-    { key: "metrics", label: "关键数据", icon: <Activity className="h-4 w-4" /> },
+    // 顺序：先看"这份日志是什么"（基本情况 → 系统消息 → 事件 → 参数 → 曲线），再看"判定结论"，最后 AI
+    { key: "metrics", label: "基本情况", icon: <Activity className="h-4 w-4" /> },
+    { key: "sysmsg", label: "系统消息", icon: <Database className="h-4 w-4" />, disabled: !info },
     { key: "messages", label: "事件消息", icon: <ScrollText className="h-4 w-4" />, disabled: !info },
     { key: "params", label: "飞控参数", icon: <ListFilter className="h-4 w-4" />, disabled: !info },
     {
@@ -172,21 +176,6 @@ export function AnalyzeReport({
         </div>
       </div>
 
-      {/* 飞行阶段时间轴 */}
-      {info?.phases?.length ? (
-        <PhaseStrip phases={info.phases} />
-      ) : report.facts?.phases?.length ? (
-        <div className="mb-5">
-          <TagRow label="飞行阶段">
-            {report.facts.phases.map((p) => (
-              <span key={p} className="chip chip-brand">
-                {PHASE_LABELS[p] ?? p}
-              </span>
-            ))}
-          </TagRow>
-        </div>
-      ) : null}
-
       {/* 异常标签 / 数据质量 guard */}
       {(report.guardTags?.length || report.tags?.length) && (
         <div className="mb-5 space-y-2.5">
@@ -211,11 +200,26 @@ export function AnalyzeReport({
         </div>
       )}
 
+      {/* 飞行阶段时间轴 */}
+      {info?.phases?.length ? (
+        <PhaseStrip phases={info.phases} />
+      ) : report.facts?.phases?.length ? (
+        <div className="mb-5">
+          <TagRow label="飞行阶段">
+            {report.facts.phases.map((p) => (
+              <span key={p} className="chip chip-brand">
+                {PHASE_LABELS[p] ?? p}
+              </span>
+            ))}
+          </TagRow>
+        </div>
+      ) : null}
+
       {/* 飞行轨迹（原来挂在"系统信息"框里，那个框已按要求去掉） */}
       {info && (
         <section className="mb-5 rounded-lg bg-surface-2 p-4">
           <h3 className="mb-1 text-sm font-semibold">飞行轨迹</h3>
-          <FlightMap loadTrack={loadTrack} />
+          <LogFlightMap loadTrack={loadTrack} />
         </section>
       )}
 
@@ -287,8 +291,9 @@ export function AnalyzeReport({
             requestSeries={requestSeries}
           />
         )}
-        {effectiveTab === "messages" && info && <LogMessages info={info} />}
-        {effectiveTab === "params" && info && <LogParams info={info} />}
+        {effectiveTab === "messages" && info && <LogEventsMsg info={info} />}
+        {effectiveTab === "sysmsg" && info && <LogSystemMsg info={info} />}
+        {effectiveTab === "params" && info && <LogParamsMsg info={info} />}
       </div>
     </div>
   );

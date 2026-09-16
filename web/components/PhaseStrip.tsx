@@ -40,6 +40,13 @@ function isDark(): boolean {
   return document.documentElement.getAttribute("data-theme") === "dark";
 }
 
+/** 秒数显示：掐掉 -0。阶段起点比日志起点早零点几秒是常事（定时器对齐），
+ *  (-0.4).toFixed(0) 会给出 "-0"，看着像 bug。 */
+function secLabel(v: number, digits = 0): string {
+  const r = Number(v.toFixed(digits));
+  return (r === 0 ? 0 : r).toFixed(digits);
+}
+
 export function PhaseStrip({ phases }: { phases: FlightPhase[] }) {
   if (!phases || phases.length === 0) return null;
 
@@ -59,7 +66,7 @@ export function PhaseStrip({ phases }: { phases: FlightPhase[] }) {
       <div className="mb-2 flex items-center gap-3">
         <span className="text-xs font-medium text-muted">飞行阶段</span>
         <span className="text-[10px] text-faint">
-          {t0.toFixed(0)}s – {phases[phases.length - 1].endSec.toFixed(0)}s
+          {secLabel(t0)}s – {secLabel(phases[phases.length - 1].endSec)}s
         </span>
         <div className="ml-auto flex flex-wrap gap-x-3 gap-y-1">
           {uniqueModes.map((p) => {
@@ -94,7 +101,7 @@ export function PhaseStrip({ phases }: { phases: FlightPhase[] }) {
                 color: c.text,
                 borderRight: `1px solid ${c.border}`,
               }}
-              title={`${label} ${p.startSec.toFixed(1)}s – ${p.endSec.toFixed(1)}s`}
+              title={`${label} ${secLabel(p.startSec, 1)}s – ${secLabel(p.endSec, 1)}s`}
             >
               {width > 6 ? label : ""}
             </div>

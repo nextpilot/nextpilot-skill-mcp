@@ -8,3 +8,14 @@ export function formatDate(iso: string): string {
   const thisYear = new Date().getUTCFullYear();
   return y === thisYear ? `${m}-${day}` : `${y}-${m}-${day}`;
 }
+
+/** 日志内的时间戳（相对日志起点的秒数）→ `hh:MM:ss`，给事件消息与参数变更用。
+ *  按整秒向下取整（秒以下不显示）；日志起点前的负值（阶段起点可能早零点几秒）按 0 处理。 */
+export function formatLogTime(tSec: number): string {
+  const total = Math.max(0, Math.floor(tSec));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}

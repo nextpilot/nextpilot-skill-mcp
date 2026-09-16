@@ -171,7 +171,7 @@ export interface TopicManifest {
 export interface SeriesResponse {
   topic: string;
   instance: number;
-  t0us: number;
+  /** 时间基准：**开机以来的秒数**（与 Flight Review 一致） */
   t: number[];
   series: Record<string, (number | null)[] | null>;
   fullCount: number;
@@ -193,6 +193,8 @@ export interface LogMessage {
   level: number;
   levelStr: string;
   message: string;
+  /** 来源：`log` = 固件打印的文本行（'L'/'C'）；`event` = 从 `event` topic 解码出来的事件 */
+  kind?: "log" | "event";
 }
 
 export interface Dropout {
@@ -214,23 +216,73 @@ export interface ChangedParam {
   value: number | string | null;
 }
 
+/** ULog 的 Parameter Default（'Q' 消息）。PX4 只记录**与当前值不同**的默认值：
+ *  某个键缺失 = 当前值与该默认相同；整条记录存在 = 该参数被改过。 */
+export interface ParamDefault {
+  /** current_setup：机架配置 + 自定义默认文件算出来的默认值 */
+  setup?: number | string | null;
+  /** system：编译进固件的出厂默认值 */
+  system?: number | string | null;
+}
+
+/** Information Message（ULog 的 'I' 消息）全集里的一条：键 / 中文名 / 类型 / 值 / 说明 */
+export interface LogInfoEntry {
+  key: string;
+  /** 变量名的中文名（来自 facts.yaml 的 info_key_docs）；表里没有的键为空串 */
+  name?: string;
+  /** 该键在 ULog 里的类型（`char[40]` / `uint32_t`…），空串表示上游没给。
+   *  表格里不展示（列太多），留给报告接口 / 未来的 MCP 用 */
+  type?: string;
+  value: string;
+  /** 这个键是什么意思（同上）；表里没有的键为空串 */
+  desc?: string;
+}
+
 /** Multi Information（ULog 的 information_multiple）：键 → 多组值，没有时间戳 */
 export interface LogMultiInfo {
   key: string;
   /** 上游给的类型标记（多数为空） */
   type?: string;
-  /** 每组一次记录（pyulog 已把续行并进同一组，这里已拼成一行） */
+  /** 每组一次记录（pyulog 已把续行并进同一组，元素间用换行连接，保留原来的行结构） */
   values: string[];
+}
+
+/** Tagged Logged String（ULog 的 'C' 消息）：与 'L' 同形，多一个 tag = 消息来源 */
+export interface LogTaggedMessage extends LogMessage {
+  /** 消息来源标识（进程 / 线程 / 类），含义由机载系统自定义 */
+  tag: number;
+}
+
+/** ULog 的消息记录统计（引擎逐字节走文件得到；顺序与名字来自 facts.yaml） */
+export interface LogMsgTypeStat {
+  /** 单字母类型码：'B' 标志位 / 'I' 信息 / 'M' 多值信息 / 'P' 参数 / 'D' 数据 … */
+  code: string;
+  name: string;
+  en?: string;
+  desc?: string;
+  count: number;
 }
 
 /** np_log_info() 的返回：系统信息 / 事件 / 多值信息 / 丢包 / 参数 / 飞行阶段 */
 export interface LogInfo {
   sysInfo: Record<string, string>;
+  /** 'I' 消息的完整字典（sysInfo 是它按 facts.yaml 挑出来的子集） */
+  infoDict?: LogInfoEntry[];
+  /** ULog 各类消息的条数统计 */
+  msgTypeStats?: LogMsgTypeStat[];
+  /** 逐字节统计是否正好走到文件末尾；false 表示尾部有截断/追加段，统计只是"读到多少算多少" */
+  msgTypeWalkOk?: boolean;
   messages: LogMessage[];
+  /** **老存档专用**：'C' 消息。新数据的 'C' 与事件都已并进 messages（按 kind 区分），不再单独发这个字段 */
+  messagesTagged?: LogTaggedMessage[];
   /** Multi Information（固件 boot 日志、性能计数、被排除的话题等） */
   messagesMulti?: LogMultiInfo[];
   dropouts: Dropout[];
   params: Record<string, number | string>;
+  /** 与当前值不同的默认值（键 = 参数名）；日志无 Q 段时为空 */
+  defaultParams?: Record<string, ParamDefault>;
+  /** 日志是否带 Default Parameter 段。为 false 时「没记录」≠「未被修改」 */
+  defaultParamsKnown?: boolean;
   changedParams: ChangedParam[];
   phases: FlightPhase[];
 }
