@@ -517,14 +517,14 @@ function formatDuration(sec: number): string {
  */
 function GeneralInfo({ report }: { report: AnalysisReport }) {
   const g = report.facts;
-  type Row = { label: string; value: string; title?: string; mono?: boolean };
+  // 标签与取值同字号、同字体（不再给 UUID / 提交号之类套 font-mono：一处 12px 一处 14px 看着就是不齐）
+  type Row = { label: string; value: string; title?: string };
   const rows: Row[] = [];
 
   if (g?.uuid) {
     rows.push({
       label: "飞控 UUID",
       value: g.uuid,
-      mono: true,
       title: "飞控唯一 ID（sys_uuid / PX4GUID）",
     });
   }
@@ -536,7 +536,7 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
   const af = g?.airframeId;
   if (vt || af) {
     rows.push({
-      label: "机型（机架）",
+      label: "机型机架",
       value: vt && af ? `${vehicleTypeLabel(vt)}（${af}）` : vehicleTypeLabel(vt) || String(af),
       title:
         `PX4 机型分类 vehicle_status.vehicle_type = ${vt || "（无）"}` +
@@ -559,7 +559,7 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
     });
       if (report.facts?.armedDurationSec) {
     rows.push({
-      label: "本次飞行时长",
+      label: "飞行时长",
       value: formatDuration(report.facts.armedDurationSec),
       title: "本次日志里解锁（armed）的累计时长",
     });
@@ -574,7 +574,6 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
     rows.push({
       label: "软件版本",
       value: branch && hash ? `${branch}（${hash}）` : branch || hash,
-      mono: true,
       title: `构建分支 / 标签：${branch || "（日志里没有 ver_sw_branch）"} · git 提交：${hash || "（无 ver_sw）"}`,
     });
   }
@@ -588,7 +587,6 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
     rows.push({
       label: "硬件版本",
       value: hw ? `${hw}（${hwSub || "日志未写子型号"}）` : hwSub,
-      mono: true,
       title: `飞控板型号 ver_hw：${hw || "（无）"} · 硬件子型号 ver_hw_subtype：${hwSub || "（这份日志里没有这个键）"}`,
     });
   }
@@ -604,10 +602,10 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
         <tbody>
           {rows.map((r) => (
             <tr key={r.label}>
-              <td className="w-36 py-0.5 pr-3 align-top text-xs whitespace-nowrap text-muted" title={r.title}>
+              <td className="w-36 py-0.5 pr-3 align-top whitespace-nowrap text-muted" title={r.title}>
                 {r.label}
               </td>
-              <td className={`py-0.5 align-top break-all ${r.mono ? "font-mono text-xs" : ""} text-text`}>
+              <td className="py-0.5 align-top break-all text-text">
                 {r.value}
               </td>
             </tr>
@@ -616,7 +614,7 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
           {/* 异常标签 / 数据质量也归在这里：都是"这份日志是什么样"的客观描述 */}
           {tags.length > 0 && (
             <tr>
-              <td className="w-36 py-1 pr-3 align-top text-xs whitespace-nowrap text-muted" title="确定性引擎命中的异常标签（喂给故障知识库匹配）">
+              <td className="w-36 py-1 pr-3 align-top whitespace-nowrap text-muted" title="确定性引擎命中的异常标签（喂给故障知识库匹配）">
                 异常标签
               </td>
               <td className="flex flex-wrap gap-1 py-1 align-top">
@@ -630,7 +628,7 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
           )}
           {guards.length > 0 && (
             <tr>
-              <td className="w-36 py-1 pr-3 align-top text-xs whitespace-nowrap text-muted" title="数据质量标签：影响结论可信度">
+              <td className="w-36 py-1 pr-3 align-top whitespace-nowrap text-muted" title="数据质量标签：影响结论可信度">
                 数据质量
               </td>
               <td className="flex flex-wrap gap-1 py-1 align-top">
