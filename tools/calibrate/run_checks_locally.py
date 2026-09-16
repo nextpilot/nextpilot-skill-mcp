@@ -120,8 +120,13 @@ def probe_one(path: Path) -> dict:
     checks = {
         "topics": len(topics),
         "messages": len(info["messages"]),
+        "messagesEvent": sum(1 for m in info["messages"] if m.get("kind") == "event"),
+        "infoDict": len(info.get("infoDict") or []),
+        "messagesMulti": len(info.get("messagesMulti") or []),
         "phases": len(info["phases"]),
         "params": len(info["params"]),
+        "defaultParams": len(info.get("defaultParams") or {}),
+        "defaultParamsKnown": info.get("defaultParamsKnown"),
         "dropouts": len(info["dropouts"]),
         "sysInfoKeys": sorted(info["sysInfo"].keys()),
     }

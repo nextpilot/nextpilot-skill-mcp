@@ -94,6 +94,14 @@ async function getPyodide(): Promise<Pyodide> {
 
     post({ type: "stage", stage: "installing-parser", detail: "安装 pyulog…" });
     await pyodide.loadPackage(["micropip", "numpy"]);
+    // lzma（可加载包，约 100KB）：日志自带的事件定义 metadata_events 是 xz 压缩的，解 PX4 事件要用。
+    // 单独装且**允许失败**——拿不到就退化成"不解码事件"（日志里的旧格式事件文本仍在），
+    // 不能因为它把整个解析挡在门外。
+    try {
+      await pyodide.loadPackage(["lzma"]);
+    } catch (err) {
+      console.warn("lzma 加载失败，PX4 事件将不解码：", err);
+    }
     const micropip = pyodide.pyimport("micropip");
 
     // 装了自托管 wheel 就直接装它（不走 PyPI 索引）；否则回退到按包名装，重试 3 次

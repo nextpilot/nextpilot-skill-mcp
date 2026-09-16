@@ -55,11 +55,59 @@ nav_groups:
   - {phase: fw_cruise, codes: [3, 8]}
   - {phase: landing,   codes: [18, 20, 5, 12, 13]}
 
-# 报告页「系统信息」展示哪些字段（按显示顺序）
+# 报告页「系统消息」tab 的 sysInfo 子集：完整字典见 report_data.py 的 infoDict，这里只挑常用的
+# （sysInfo 供报告头 / 未来 MCP 取用；UI 展示的是整份 infoDict）
 sys_info_keys:
   [sys_name, ver_sw, ver_sw_release, ver_vendor_sw_release, ver_hw, ver_hw_subtype,
    sys_os_name, sys_os_ver, sys_toolchain, sys_toolchain_ver, sys_mcu, time_start_utc,
    duration, git_branch]
+
+# ── ULog 的消息类型码表（报告页「系统消息」tab 的记录统计按这个顺序与名字展示）──# 字母来自 ULog 文件格式规范，与 pyulog 的 ULog.MSG_TYPE_* 一致；统计由引擎**逐条走字节流**
+# 得到（[uint16 长度][uint8 类型] 序列），不走 pyulog 的解析结果——所以它同时是"文件里到底
+# 有多少条、有没有被截断"的旁证。数量对得上 pyulog 的两项可交叉验证：L = logged_messages、
+# D = 各话题采样点数之和。
+ulog_msg_types:
+  - {code: B, name: 标志位,         en: Flag Bits,         desc: 兼容性标志，只在文件开头出现}
+  - {code: I, name: 信息,           en: Information,       desc: 键 → 值，系统信息字典}
+  - {code: M, name: 多值信息,       en: Multi Information, desc: 键 → 多组值，无时间戳（一条长消息会拆成多行续写，故条数多于键数）}
+  - {code: F, name: 消息格式,       en: Format,            desc: 每个订阅话题的字段定义}
+  - {code: P, name: 参数,           en: Parameter,         desc: 日志开头的参数值；飞行中改参数也用它}
+  - {code: Q, name: 参数默认值,     en: Default Parameter, desc: 只记与当前值不同的默认值（一个参数可能写两条）}
+  - {code: A, name: 订阅话题,       en: Add Logged,        desc: 每个话题实例一条}
+  - {code: R, name: 取消订阅,       en: Remove Logged,     desc: 运行中停止记录某话题}
+  - {code: D, name: 数据,           en: Data,              desc: 日志主体：订阅话题的每一次采样}
+  - {code: L, name: 日志消息,       en: Logging,           desc: 带时间戳的日志行}
+  - {code: C, name: 带标签日志消息, en: Tagged Logging,    desc: 同上，另有来源 tag}
+  - {code: O, name: 丢包,           en: Dropout,           desc: 记录线程来不及时丢掉的时长}
+  - {code: S, name: 同步标记,       en: Sync,              desc: 每约 4 KB 一个，损坏后靠它重新对齐}
+
+# ── Information Message（'I'）各键的中文名与说明（报告页「系统信息」表格的两列）──
+# 上游没有这份对照表（PX4 只在源码里写死这些 key），所以是**人工维护**的一份；
+# 表里没有的键，中文名与说明都留空——不猜、不编。
+#   name  变量名旁边的中文名（短）
+#   desc  说明列（一句话，讲清这个值能拿来干什么）
+info_key_docs:
+  ver_sw: {name: 固件提交号, desc: 固件构建时的 git 提交，用来对上游源码}
+  ver_sw_branch: {name: 固件分支, desc: 构建所在的分支 / 标签}
+  ver_sw_release: {name: 固件版本号, desc: "打包成 major<<24 | minor<<16 | patch<<8 | 类型（1=release 等）"}
+  ver_vendor_sw_release: {name: 厂商版本号, desc: 厂商自定义版本；255 表示厂商未使用}
+  ver_hw: {name: 硬件型号, desc: 飞控板型号，判断引脚 / 传感器配置的入口}
+  ver_hw_subtype: {name: 硬件子型号, desc: 同型号的不同批次 / 变体}
+  ver_data_format: {name: 数据格式版本, desc: ULog 数据格式版本，与本站解析器看到的格式对应}
+  sys_name: {name: 系统名, desc: 固定为 PX4}
+  sys_os_name: {name: 操作系统, desc: NuttX（飞控本机）或 Linux（机载计算机）}
+  sys_os_ver: {name: OS 提交号, desc: 操作系统的 git 提交}
+  sys_os_ver_release: {name: OS 版本号, desc: 打包方式同固件版本号}
+  sys_toolchain: {name: 工具链, desc: 编译固件用的工具链}
+  sys_toolchain_ver: {name: 工具链版本, desc: 工具链的具体版本，排查"换个编译器行为就不一样"时用}
+  sys_mcu: {name: MCU, desc: 主控芯片型号与硅版本}
+  sys_uuid: {name: 飞控唯一 ID, desc: PX4GUID，出厂烧录；同型号不同板子也不同，可用来区分设备}
+  time_ref_utc: {name: UTC 时间参考, desc: 相对启动的偏移（秒）；0 表示这次飞行没对时}
+  time_start_utc: {name: 起始 UTC 时间, desc: 日志起始时刻（旧固件记录）}
+  boot_time_utc_us: {name: 启动时刻, desc: UTC 微秒；只有对过时才有意义}
+  duration: {name: 日志时长, desc: 秒（旧固件记录）}
+  git_branch: {name: 固件分支, desc: 旧固件的分支名字段}
+  metadata_events_sha256: {name: 事件元数据哈希, desc: 事件定义文件的 SHA-256，用来校验事件定义是否被改动}
 
 # ── 概览指标（结果页「关键数据」）──
 # 说明：这些数字大多由规则顺带产出（rules/*.yaml 的 emit.stats），但**规则 skip 时数字就没了**

@@ -23,6 +23,7 @@
  * 不引入额外依赖；YAML 只解析故障库用到的固定子集，出错即构建失败。
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readdirSync } from "node:fs";
@@ -504,8 +505,20 @@ if (!ruleEnginePy.includes("__FACTS__")) {
 // （宁可构建失败，也不要在浏览器里跑到某个码表是空的才发现）。
 const facts = parseYaml(read(FACTS_PATH));
 for (const key of ["slot_order", "bindings", "log_levels", "vehicle_types",
-                   "nav_state_names", "nav_groups", "sys_info_keys"]) {
+                   "nav_state_names", "nav_groups", "sys_info_keys", "ulog_msg_types",
+                   "info_key_docs"]) {
   if (facts[key] === undefined) throw new Error(`facts.yaml 缺少 ${key}`);
+}
+for (const [k, v] of Object.entries(facts.info_key_docs)) {
+  if (typeof v?.name !== "string" || typeof v?.desc !== "string") {
+    throw new Error(`facts.yaml 的 info_key_docs.${k} 必须是 {name, desc} 两个字符串`);
+  }
+}
+for (const t of facts.ulog_msg_types) {
+  // 一条消息类型的单字母码是引擎按字节流统计出来的键，缺了就会静默少一行
+  if (typeof t?.code !== "string" || t.code.length !== 1) {
+    throw new Error(`facts.yaml 的 ulog_msg_types 每项都要有单字母 code：${JSON.stringify(t)}`);
+  }
 }
 if (!facts.bindings?.vehicle_status) throw new Error("facts.yaml 缺少 bindings.vehicle_status");
 // metrics：概览指标的展示清单（key/label/unit + 可选的兜底取数）
@@ -636,6 +649,56 @@ emit(
     "export const PLOT_PRESETS = " +
     JSON.stringify(plots.map(({ order, ...rest }) => rest), null, 2) +
     " as const;\n",
+);
+
+// 4.6) 派生数据版本：**内容哈希**，不是手写常量——改了数据层就会出现新值，
+//      浏览器据此判断"这份存档的 info/曲线/轨迹是不是旧引擎生成的"，是就重解析一次。
+//      覆盖范围只放"决定派生数据形状"的源：data 层 Python、facts.yaml、曲线预设；
+//      规则（rules/*.yaml）不在其内——那影响的是结论文本，不该因为改个阈值就让所有历史重算。
+const versionSources = [
+  ["engine/report_data.py", PY_REPORT_DATA],
+  ["knowledge/px4/facts.yaml", FACTS_PATH],
+  ...plotFiles.map((f) => [`knowledge/px4/plot/${f}`, resolve(PLOT_DIR, f)]),
+];
+const derivedVersion = createHash("sha256");
+for (const [label, file] of versionSources) {
+  derivedVersion.update(label).update("\0").update(read(file)).update("\0");
+}
+const derivedVersionHex = derivedVersion.digest("hex").slice(0, 12);
+emit(
+  resolve(webRoot, "lib/knowledge/derived-version.generated.ts"),
+  banner +
+    "// 源：engine/report_data.py + knowledge/px4/{facts.yaml,plot/*.yml} 的内容哈希\n" +
+    "// 用途：存档里的派生数据（info / 曲线 / 轨迹）带的版本，与这里不一致就重新解析一次。\n" +
+    "export const DERIVED_DATA_VERSION = " +
+    JSON.stringify(derivedVersionHex) +
+    ";\n",
+);
+
+// 4.7) 飞控参数的范围与说明：knowledge/px4/meta/<tag>.json 的 parameters → 前端**按需拉取**的静态 JSON
+//      为什么放 public 而不是内联进 Pyodide：这份字典与具体日志无关，内联等于每份日志都要
+//      连它一起下载；放静态文件则浏览器缓存一次、只在打开「飞控参数」tab 时才要。
+//      只发 [min, max, desc] 三样（表格要的就是这三列），2656 条约 175 KB、gzip 33 KB。
+//      注意：目前只有 main 分支有参数元数据（PX4 release tag 不产出 parameters.json），
+//      所以老固件的日志只能拿这份"最新的"当参考——界面要如实说明来源。
+const PARAM_META = resolve(KN, "meta/main.json");
+const paramMeta = JSON.parse(read(PARAM_META)).parameters ?? {};
+const paramCompact = {};
+for (const [name, v] of Object.entries(paramMeta)) {
+  const min = typeof v?.min === "number" ? v.min : null;
+  const max = typeof v?.max === "number" ? v.max : null;
+  const desc = typeof v?.desc === "string" ? v.desc : "";
+  if (min === null && max === null && !desc) continue;
+  paramCompact[name] = [min, max, desc];
+}
+if (!CHECK) mkdirSync(resolve(webRoot, "public/params"), { recursive: true });
+emit(
+  resolve(webRoot, "public/params/px4-main.json"),
+  JSON.stringify({
+    source: "PX4 参数元数据（main 分支快照；release tag 不产出 parameters.json）",
+    count: Object.keys(paramCompact).length,
+    params: paramCompact,
+  }) + "\n",
 );
 
 // 5) 指南的「知识库」分组：规则清单页（规则改了页面就跟着变，不用谁记得手动同步）
