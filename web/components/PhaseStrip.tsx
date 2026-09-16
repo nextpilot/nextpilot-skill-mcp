@@ -64,8 +64,13 @@ export function PhaseStrip({ phases }: { phases: FlightPhase[] }) {
   return (
     <div className="mb-5 rounded-lg border border-border bg-surface-2 p-3">
       <div className="mb-2 flex items-center gap-3">
-        <span className="text-xs font-medium text-muted">飞行阶段</span>
-        <span className="text-[10px] text-faint">
+        <span
+          className="text-xs font-medium text-muted"
+          title="把整段日志按飞行阶段（由飞行模式归并而来）铺成一条时间轴：颜色 = 阶段，悬停任一段看起止时间。数据图表里的底色用的也是它。时间是**开机以来的秒数**（与 Flight Review 一致）"
+        >
+          飞行阶段
+        </span>
+        <span className="text-[10px] text-faint" title="开机以来的秒数（不是日志起点）">
           {secLabel(t0)}s – {secLabel(phases[phases.length - 1].endSec)}s
         </span>
         <div className="ml-auto flex flex-wrap gap-x-3 gap-y-1">

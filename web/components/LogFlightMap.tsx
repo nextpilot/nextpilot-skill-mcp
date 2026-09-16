@@ -191,7 +191,7 @@ export function LogFlightMap({
       )
       .addTo(map);
     // 比例尺：判断"飞了多远"比看经纬度直观
-    L.control.scale({ imperial: false, position: "bottomleft" }).addTo(map);
+    L.control.scale({ imperial: false, position: "bottomright" }).addTo(map);
 
     const alts = points.map((p) => p.alt);
     const minAlt = Math.min(...alts);
@@ -263,6 +263,29 @@ export function LogFlightMap({
           也救不回缩放级别。加载/错误状态改用浮层盖住。 */}
       <div className="relative">
         <div ref={containerRef} className="h-[380px] w-full overflow-hidden rounded-lg sm:h-[520px]" />
+        {/* 高度色带：竖着贴在地图左侧（颜色 = 轨迹那段的平均高度）。
+            从 top-20 起是为了让开 Leaflet 左上角的缩放按钮；pointer-events-none 保证不挡地图操作 */}
+        {state === "ready" && altRange && (
+          <div
+            className="pointer-events-none absolute top-20 bottom-6 left-3 flex flex-col items-center"
+            title="轨迹颜色对应的高度（米，海拔）—— 蓝低红高"
+          >
+            <span className="rounded bg-surface-2/85 px-1 text-[10px] text-muted">
+              {altRange[1].toFixed(0)} m
+            </span>
+            <span
+              className="my-1 w-3 flex-1 rounded-sm border border-border/60"
+              style={{
+                background:
+                  "linear-gradient(to top, hsl(220,70%,48%), hsl(180,70%,48%), hsl(120,70%,48%), hsl(60,70%,48%), hsl(0,70%,48%))",
+              }}
+            />
+            <span className="rounded bg-surface-2/85 px-1 text-[10px] text-muted">
+              {altRange[0].toFixed(0)} m
+            </span>
+          </div>
+        )}
+
         {state !== "ready" && (
           <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-surface-2 p-4 text-center text-xs text-muted">
             {state === "loading" ? (
@@ -283,21 +306,6 @@ export function LogFlightMap({
         </p>
       )}
 
-      {state === "ready" && altRange && (
-        <div className="mt-2 flex items-center gap-2 text-[11px] text-muted">
-          <span>高度</span>
-          <span
-            className="inline-block h-3 w-full max-w-[160px] rounded-sm"
-            style={{
-              background:
-                "linear-gradient(to right, hsl(220,70%,48%), hsl(180,70%,48%), hsl(120,70%,48%), hsl(60,70%,48%), hsl(0,70%,48%))",
-            }}
-          />
-          <span>{altRange[0].toFixed(1)} m</span>
-          <span>–</span>
-          <span>{altRange[1].toFixed(1)} m</span>
-        </div>
-      )}
     </div>
   );
 }
