@@ -18,6 +18,7 @@ import { CATEGORIES } from "@/lib/constants";
 import { SkillCard } from "@/components/SkillCard";
 import { McpCard } from "@/components/McpCard";
 import { LocalizedText } from "@/components/LocalizedText";
+import { HeroIllustration } from "@/components/HeroIllustration";
 
 const CHECKS: { name: string; en: string; field: string }[] = [
   { name: "振动与 IMU 削波", en: "Vibration & clipping", field: "vehicle_imu_status.accel_vibration_metric" },
@@ -179,54 +180,11 @@ export default function HomePage() {
               </ul>
             </div>
 
-            {/* 右：雷达装饰图 */}
+            {/* 右：站内主题插画（航迹 + 波形 + 检查结论卡，见 HeroIllustration） */}
             <div className="hidden items-center justify-center lg:flex">
               <div className="relative">
-                <div className="absolute inset-0 rounded-full bg-primary/[0.06] blur-3xl" />
-                <svg
-                  viewBox="0 0 300 300"
-                  className="relative h-64 w-64 text-primary/25 lg:h-72 lg:w-72"
-                  fill="none"
-                  stroke="currentColor"
-                  aria-hidden
-                >
-                  {[130, 100, 70, 40].map((r, i) => (
-                    <circle
-                      key={r}
-                      cx="150"
-                      cy="150"
-                      r={r}
-                      strokeWidth={0.5 + i * 0.25}
-                      opacity={0.25 + i * 0.12}
-                    />
-                  ))}
-                  <line x1="20" y1="150" x2="280" y2="150" strokeWidth="0.5" opacity="0.18" />
-                  <line x1="150" y1="20" x2="150" y2="280" strokeWidth="0.5" opacity="0.18" />
-                  <line x1="58" y1="58" x2="242" y2="242" strokeWidth="0.3" opacity="0.12" />
-                  <line x1="242" y1="58" x2="58" y2="242" strokeWidth="0.3" opacity="0.12" />
-                  <path
-                    d="M150,150 L150,20 A130,130 0 0,1 280,150 Z"
-                    fill="currentColor"
-                    opacity="0.06"
-                  />
-                  {[
-                    { cx: 195, cy: 105, r: 3.5 },
-                    { cx: 115, cy: 185, r: 3 },
-                    { cx: 230, cy: 175, r: 2.5 },
-                    { cx: 135, cy: 110, r: 2 },
-                  ].map((d, i) => (
-                    <circle
-                      key={i}
-                      cx={d.cx}
-                      cy={d.cy}
-                      r={d.r}
-                      fill="currentColor"
-                      opacity={0.45 - i * 0.06}
-                      stroke="none"
-                    />
-                  ))}
-                  <circle cx="150" cy="150" r="5" fill="currentColor" opacity="0.65" stroke="none" />
-                </svg>
+                <div className="absolute inset-0 rounded-full bg-primary/[0.07] blur-3xl" />
+                <HeroIllustration className="relative h-auto w-[300px] text-primary lg:w-[340px]" />
               </div>
             </div>
           </div>
