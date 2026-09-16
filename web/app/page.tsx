@@ -1,22 +1,22 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  BookOpen,
   Boxes,
   Check,
+  Database,
   FileSearch,
-  Layers,
+  ListChecks,
   MessageSquareText,
   Microscope,
-  Radar,
   ShieldCheck,
   Upload,
+  Wrench,
   Zap,
 } from "lucide-react";
 import { getSkillIndex } from "@/lib/skills";
-import { getMcpIndex } from "@/lib/mcp";
 import { CATEGORIES } from "@/lib/constants";
 import { SkillCard } from "@/components/SkillCard";
-import { HomeLeaderboards } from "@/components/HomeLeaderboards";
 import { LocalizedText } from "@/components/LocalizedText";
 
 const CHECKS: { name: string; en: string; field: string }[] = [
@@ -39,6 +39,38 @@ const COVERAGE: { label: string; value: string }[] = [
   { label: "支持固件", value: "PX4 1.15+ / 旧版字段自适应" },
 ];
 
+/** 「知识库」小节的四张卡：引擎背后的经验都在仓库 knowledge/ 下，一条经验一个文件 */
+const KNOWLEDGE: { icon: React.ReactNode; title: string; titleEn: string; desc: string; descEn: string }[] = [
+  {
+    icon: <ListChecks className="h-4 w-4" />,
+    title: "检查规则",
+    titleEn: "Check rules",
+    desc: "一条经验一个 YAML：阈值、适用固件与机架、判定表达式、官方文档出处都写在里面，可评审、可回归。",
+    descEn: "One YAML per piece of experience: thresholds, applicable firmware and airframe, the decision expression and the doc reference.",
+  },
+  {
+    icon: <BookOpen className="h-4 w-4" />,
+    title: "故障知识库",
+    titleEn: "Fault knowledge base",
+    desc: "命中的异常标签匹配到故障模式，直接给出可能根因与排查步骤，而不是只报一个越限的数字。",
+    descEn: "Matched tags map to fault patterns with likely root causes and troubleshooting steps — not just a number over a threshold.",
+  },
+  {
+    icon: <Wrench className="h-4 w-4" />,
+    title: "固件自适应",
+    titleEn: "Firmware-aware",
+    desc: "PX4 1.15 前后字段体系不同（如零偏拆成独立 topic），引擎按日志里的固件版本自动切换字段绑定。",
+    descEn: "Field layouts differ before and after PX4 1.15; the engine switches field bindings by the firmware version in the log.",
+  },
+  {
+    icon: <Database className="h-4 w-4" />,
+    title: "参数元数据",
+    titleEn: "Parameter metadata",
+    desc: "参数的范围、单位与说明按需拉取，与固件分支对应；界面如实标注来源，未知项不猜。",
+    descEn: "Parameter ranges, units and descriptions are fetched on demand for the matching firmware branch; unknown entries are left blank.",
+  },
+];
+
 const CATEGORY_EMOJI: Record<string, string> = {
   perception: "👁️",
   decision: "🧭",
@@ -55,10 +87,7 @@ const CATEGORY_ACCENT: Record<string, string> = {
 
 export default function HomePage() {
   const skills = getSkillIndex();
-  const mcps = getMcpIndex();
   const featured = skills.filter((s) => s.featured).slice(0, 6);
-  const totalSkills = skills.length;
-  const totalMcps = mcps.length;
 
   return (
     <div>
@@ -198,45 +227,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ============ 数据面板 ============ */}
-      <section className="border-b border-border bg-surface-2/60">
-        <div className="page-shell py-10">
-          <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
-            <StatItem
-              value={totalSkills}
-              labelZh="社区 Skill"
-              labelEn="Skills"
-              icon={<Layers className="h-4 w-4" />}
-            />
-            <StatItem
-              value={totalMcps}
-              labelZh="MCP 服务"
-              labelEn="MCP servers"
-              icon={<Radar className="h-4 w-4" />}
-            />
-            <StatItem
-              labelZh="支持平台"
-              labelEn="Platforms"
-              icon={<Boxes className="h-4 w-4" />}
-            >
-              <span className="text-2xl font-bold tracking-[-0.02em] sm:text-3xl">
-                PX4<span className="mx-0.5 text-muted">+</span>AP
-              </span>
-            </StatItem>
-            <StatItem
-              value={totalSkills + totalMcps}
-              labelZh="内容条目"
-              labelEn="Items"
-              icon={<Zap className="h-4 w-4" />}
-              suffix="+"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* ============ 分类卡片 ============ */}
+      {/* ============ 从想法到起飞 + 精选 Skill（原两个栏目合并） ============ */}
       <section className="border-b border-border">
-        <div className="page-shell py-16 lg:py-20">
+        <div className="page-shell py-12 lg:py-14">
           <div className="mb-10 text-center">
             <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">
               Explore the stack
@@ -293,15 +286,41 @@ export default function HomePage() {
               );
             })}
           </div>
+          {featured.length > 0 && (
+            <div className="mt-14 border-t border-border pt-10">
+              <div className="mb-8 flex items-end justify-between gap-4">
+                <div>
+                  <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">
+                    Selected skills
+                  </p>
+                  <h3 className="text-xl font-semibold tracking-[-0.01em]">
+                    <LocalizedText zh="精选 Skill" en="Selected skills" />
+                  </h3>
+                </div>
+                <Link
+                  href="/skills"
+                  className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                >
+                  <LocalizedText zh="查看全部" en="View all" />
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {featured.map((s) => (
+                  <SkillCard key={s.slug} skill={s} />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
-      {/* ============ How It Works ============ */}
+      {/* ============ 日志分析（原「三步读懂你的飞行」「日志里真正被检查的东西」「平台原则」「准备好分析了吗」四段合并） ============ */}
       <section className="border-b border-border">
-        <div className="page-shell py-16 lg:py-20">
-          <div className="mb-10 text-center">
+        <div className="page-shell py-12 lg:py-14">
+          <div className="mb-8 text-center">
             <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">
-              How it works
+              Log analysis
             </p>
             <h2 className="text-2xl font-semibold tracking-[-0.01em] sm:text-3xl">
               <LocalizedText zh="三步读懂你的飞行" en="Understand your flight in 3 steps" />
@@ -320,7 +339,7 @@ export default function HomePage() {
               icon={<Upload className="h-5 w-5" />}
               title="上传飞控日志"
               titleEn="Upload flight log"
-              desc="选择 PX4 .ulg 文件（ArduPilot .bin 后续支持），文件全程留在你的浏览器中，不上传服务器。"
+              desc="选择 PX4 .ulg 文件（ArduPilot .bin 后续支持），文件经 Pyodide 在本地浏览器中解析，原始日志不上传服务器，仅提交结构化检查结果。"
               descEn="Select your PX4 .ulg file (ArduPilot .bin coming soon). Files stay in your browser — never uploaded."
             />
             <StepCard
@@ -334,137 +353,153 @@ export default function HomePage() {
             <StepCard
               step="03"
               icon={<MessageSquareText className="h-5 w-5" />}
-              title="中文诊断报告"
-              titleEn="Diagnostic report"
-              desc="LLM 将结构化结果翻译为通俗中文，每条结论可回指到具体字段和官方文档，不编造数值。"
+              title="AI 诊断报告"
+              titleEn="AI diagnostic report"
+              desc="AI（DeepSeek）把结构化结果翻译成通俗中文，每条结论可回指到具体字段和官方文档，不编造数值。"
               descEn="LLM translates findings into plain language. Every conclusion traces back to a specific field and official docs."
             />
           </div>
-        </div>
-      </section>
 
-      {/* ============ 精选 Skill ============ */}
-      {featured.length > 0 && (
-        <section className="border-b border-border bg-surface-2/40">
-          <div className="page-shell py-16">
-            <div className="mb-8 flex items-end justify-between gap-4">
-              <div>
-                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">
-                  Selected skills
-                </p>
-                <h2 className="text-2xl font-semibold tracking-[-0.01em]">
-                  <LocalizedText zh="精选 Skill" en="Selected skills" />
-                </h2>
+          <SubSection
+            en="What gets checked"
+            zh="日志里真正被检查的东西"
+            note="每条结论都能回指到字段、阈值和官方文档"
+          >
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+                <div>
+                  <ul className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2">
+                    {CHECKS.map((c) => (
+                      <li key={c.name} className="bg-surface p-4 transition-colors hover:bg-surface-2/70">
+                        <p className="text-sm font-medium text-text">
+                          <LocalizedText zh={c.name} en={c.en} />
+                        </p>
+                        <p className="mt-1.5 font-mono text-[11px] leading-5 break-all text-faint">
+                          {c.field}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-3 text-xs leading-5 text-muted">
+                    <LocalizedText
+                      zh="解析与检查全部在你的浏览器里完成，服务端只收到结构化的检查结果。PX4 1.15 前后字段体系不同，引擎按固件版本自动切换字段。"
+                      en="Parsing and checking happen in your browser; the server only receives structured findings. Field names differ before/after PX4 1.15 and the engine switches by firmware version."
+                    />
+                  </p>
+                </div>
+                <div className="card flex flex-col p-5">
+                  <h3 className="text-sm font-semibold text-text">
+                    <LocalizedText zh="覆盖范围" en="Coverage" />
+                  </h3>
+                  <dl className="mt-4 space-y-3.5">
+                    {COVERAGE.map((s) => (
+                      <div key={s.label}>
+                        <dt className="text-xs text-muted">{s.label}</dt>
+                        <dd
+                          className={
+                            /^\d+$/.test(s.value)
+                              ? "mt-0.5 text-2xl font-semibold tracking-[-0.02em] text-text"
+                              : "mt-1 text-sm font-medium text-text"
+                          }
+                        >
+                          {s.value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
               </div>
-              <Link
-                href="/skills"
-                className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-              >
-                <LocalizedText zh="查看全部" en="View all" />
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {featured.map((s) => (
-                <SkillCard key={s.slug} skill={s} />
+          </SubSection>
+
+          <SubSection
+            en="Knowledge base"
+            zh="知识库"
+            note="规则、故障库、字段绑定与参数字典都在仓库里，可评审、可回归"
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              {KNOWLEDGE.map((k) => (
+                <div key={k.title} className="card flex gap-3 p-4">
+                  <span className="mt-0.5 shrink-0 text-primary">{k.icon}</span>
+                  <div>
+                    <p className="text-sm font-semibold text-text">
+                      <LocalizedText zh={k.title} en={k.titleEn} />
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-muted">
+                      <LocalizedText zh={k.desc} en={k.descEn} />
+                    </p>
+                  </div>
+                </div>
               ))}
             </div>
+          </SubSection>
+
+          <SubSection en="Principles" zh="原则">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Principle
+              icon={<ShieldCheck className="h-4 w-4" />}
+              title="确定性引擎是唯一真相来源"
+              titleEn="Deterministic engine as single source of truth"
+              desc="数值判断全部由规则引擎完成，每条结论可溯源到字段、阈值和官方文档，LLM 只做翻译。"
+              descEn="All numerical judgments are made by the rule engine. Every conclusion traces back to a field, threshold and official documentation. LLM only translates."
+            />
+            <Principle
+              icon={<FileSearch className="h-4 w-4" />}
+              title="日志在你的浏览器里解析"
+              titleEn="Logs parsed in your browser"
+              desc=".ulg 文件经 Pyodide 在本地解析，原始日志不上传服务器，仅提交结构化检查结果。"
+              descEn=".ulg files are parsed locally via Pyodide. Raw logs never leave your machine—only structured findings are submitted."
+            />
+            <Principle
+              icon={<Boxes className="h-4 w-4" />}
+              title="永不直接致动真实载具"
+              titleEn="Never actuate real vehicles"
+              desc="平台不提供 arm/disarm 等致动托管能力；相关内容仅以开源 Skill + 三重门禁形式存在。"
+              descEn="No arm/disarm or actuation hosting. Related content exists only as open-source Skills behind triple safety gates."
+            />
           </div>
-        </section>
-      )}
+          </SubSection>
 
-      {/* ============ 热门内容 ============ */}
-      <HomeLeaderboards
-        skills={skills.map((s) => ({ slug: s.slug, name: s.name, downloads: s.downloads }))}
-        mcps={mcps.map((m) => ({ slug: m.slug, name: m.name, downloads: m.downloads }))}
-      />
-
-      {/* ============ 日志分析覆盖 ============ */}
-      <section className="border-b border-border">
-        <div className="page-shell py-16">
-          <div className="mb-8 flex items-end justify-between gap-4">
-            <div>
-              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">
-                Deterministic checks
-              </p>
-              <h2 className="text-2xl font-semibold tracking-[-0.01em]">
-                <LocalizedText
-                  zh="日志里真正被检查的东西"
-                  en="What actually gets checked"
-                />
-              </h2>
-            </div>
-            <span className="hidden text-sm text-muted sm:block">
+          <div className="mt-10 border-t border-border pt-8 text-center">
+            <h3 className="text-2xl font-semibold tracking-[-0.01em] sm:text-3xl">
+              <LocalizedText zh="准备好分析你的飞行日志了吗？" en="Ready to analyze your flight log?" />
+            </h3>
+            <p className="mx-auto mt-4 max-w-lg text-[15px] leading-7 text-muted">
               <LocalizedText
-                zh="每条结论都能回指到字段、阈值和官方文档"
-                en="Every finding points back to a field, a threshold and a doc"
+                zh="匿名每天免费 3 次，登录后每天 10 次。上传 .ulg 文件，30 秒出 AI 诊断报告。"
+                en="3 free runs daily anonymously, 10 when signed in. Upload a .ulg file and get a diagnostic report in 30 seconds."
               />
-            </span>
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div>
-              <ul className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2">
-                {CHECKS.map((c) => (
-                  <li key={c.name} className="bg-surface p-4 transition-colors hover:bg-surface-2/70">
-                    <p className="text-sm font-medium text-text">
-                      <LocalizedText zh={c.name} en={c.en} />
-                    </p>
-                    <p className="mt-1.5 font-mono text-[11px] leading-5 break-all text-faint">
-                      {c.field}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-3 text-xs leading-5 text-muted">
-                <LocalizedText
-                  zh="解析与检查全部在你的浏览器里完成，服务端只收到结构化的检查结果。PX4 1.15 前后字段体系不同，引擎按固件版本自动切换字段。"
-                  en="Parsing and checking happen in your browser; the server only receives structured findings. Field names differ before/after PX4 1.15 and the engine switches by firmware version."
-                />
-              </p>
-            </div>
-
-            <div className="card flex flex-col p-5">
-              <h3 className="text-sm font-semibold text-text">
-                <LocalizedText zh="覆盖范围" en="Coverage" />
-              </h3>
-              <dl className="mt-4 space-y-3.5">
-                {COVERAGE.map((s) => (
-                  <div key={s.label}>
-                    <dt className="text-xs text-muted">{s.label}</dt>
-                    <dd
-                      className={
-                        /^\d+$/.test(s.value)
-                          ? "mt-0.5 text-2xl font-semibold tracking-[-0.02em] text-text"
-                          : "mt-1 text-sm font-medium text-text"
-                      }
-                    >
-                      {s.value}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-              <Link
-                href="/analyze"
-                className="btn-primary mt-6 w-full"
-              >
-                <FileSearch className="h-4 w-4" />
-                <LocalizedText zh="上传日志试试" en="Try it with a log" />
+            </p>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <Link href="/analyze" className="btn-primary px-6 py-3 text-[15px]">
+                <FileSearch className="h-[18px] w-[18px]" />
+                <LocalizedText zh="免费分析日志" en="Analyze for free" />
+                <ArrowRight className="h-4 w-4" />
               </Link>
-              <p className="mt-3 text-[11px] leading-5 text-faint">
-                <LocalizedText
-                  zh="匿名每日 3 次、登录后每日 10 次，全部免费。"
-                  en="3 free runs a day anonymously, 10 when signed in."
-                />
-              </p>
+              <Link href="/skills" className="btn-ghost px-6 py-3 text-[15px]">
+                <LocalizedText zh="浏览社区 Skill" en="Browse skills" />
+              </Link>
             </div>
+            <ul className="mt-6 flex flex-wrap justify-center gap-x-6 gap-y-2">
+              <li className="flex items-center gap-1.5 text-xs text-muted">
+                <Check className="h-3.5 w-3.5 text-ok" />
+                <LocalizedText zh="无需安装" en="No installation" />
+              </li>
+              <li className="flex items-center gap-1.5 text-xs text-muted">
+                <Check className="h-3.5 w-3.5 text-ok" />
+                <LocalizedText zh="数据不上传" en="Data stays local" />
+              </li>
+              <li className="flex items-center gap-1.5 text-xs text-muted">
+                <Check className="h-3.5 w-3.5 text-ok" />
+                <LocalizedText zh="30 秒出报告" en="Report in 30s" />
+              </li>
+            </ul>
           </div>
-        </div>
+          </div>
       </section>
+
 
       {/* ============ 应用场景 ============ */}
       <section className="border-b border-border bg-surface-2/40">
-        <div className="page-shell py-16">
+        <div className="page-shell py-12">
           <div className="mb-10 text-center">
             <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">
               Use cases
@@ -512,126 +547,38 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      {/* ============ CTA ============ */}
-      <section className="border-b border-border">
-        <div className="page-shell py-16 text-center">
-          <h2 className="text-2xl font-semibold tracking-[-0.01em] sm:text-3xl">
-            <LocalizedText zh="准备好分析你的飞行日志了吗？" en="Ready to analyze your flight log?" />
-          </h2>
-          <p className="mx-auto mt-4 max-w-lg text-[15px] leading-7 text-muted">
-            <LocalizedText
-              zh="匿名每天免费 3 次，登录后每天 10 次。上传 .ulg 文件，30 秒出中文诊断报告。"
-              en="3 free runs daily anonymously, 10 when signed in. Upload a .ulg file and get a diagnostic report in 30 seconds."
-            />
-          </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/analyze" className="btn-primary px-6 py-3 text-[15px]">
-              <FileSearch className="h-[18px] w-[18px]" />
-              <LocalizedText zh="免费分析日志" en="Analyze for free" />
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link href="/skills" className="btn-ghost px-6 py-3 text-[15px]">
-              <LocalizedText zh="浏览社区 Skill" en="Browse skills" />
-            </Link>
-          </div>
-          <ul className="mt-6 flex flex-wrap justify-center gap-x-6 gap-y-2">
-            <li className="flex items-center gap-1.5 text-xs text-muted">
-              <Check className="h-3.5 w-3.5 text-ok" />
-              <LocalizedText zh="无需安装" en="No installation" />
-            </li>
-            <li className="flex items-center gap-1.5 text-xs text-muted">
-              <Check className="h-3.5 w-3.5 text-ok" />
-              <LocalizedText zh="数据不上传" en="Data stays local" />
-            </li>
-            <li className="flex items-center gap-1.5 text-xs text-muted">
-              <Check className="h-3.5 w-3.5 text-ok" />
-              <LocalizedText zh="30 秒出报告" en="Report in 30s" />
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      {/* ============ 平台原则 ============ */}
-      <section className="bg-surface-2/40">
-        <div className="page-shell py-16">
-          <div className="mb-8 text-center">
-            <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">
-              Principles
-            </p>
-            <h2 className="text-2xl font-semibold tracking-[-0.01em]">
-              <LocalizedText zh="平台原则" en="Principles" />
-            </h2>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Principle
-              icon={<ShieldCheck className="h-4 w-4" />}
-              title="确定性引擎是唯一真相来源"
-              titleEn="Deterministic engine as single source of truth"
-              desc="数值判断全部由规则引擎完成，每条结论可溯源到字段、阈值和官方文档，LLM 只做翻译。"
-              descEn="All numerical judgments are made by the rule engine. Every conclusion traces back to a field, threshold and official documentation. LLM only translates."
-            />
-            <Principle
-              icon={<FileSearch className="h-4 w-4" />}
-              title="日志在你的浏览器里解析"
-              titleEn="Logs parsed in your browser"
-              desc=".ulg 文件经 Pyodide 在本地解析，原始日志不上传服务器，仅提交结构化检查结果。"
-              descEn=".ulg files are parsed locally via Pyodide. Raw logs never leave your machine—only structured findings are submitted."
-            />
-            <Principle
-              icon={<Boxes className="h-4 w-4" />}
-              title="永不直接致动真实载具"
-              titleEn="Never actuate real vehicles"
-              desc="平台不提供 arm/disarm 等致动托管能力；相关内容仅以开源 Skill + 三重门禁形式存在。"
-              descEn="No arm/disarm or actuation hosting. Related content exists only as open-source Skills behind triple safety gates."
-            />
-          </div>
-        </div>
-      </section>
     </div>
   );
 }
 
 /* ============ 辅助组件 ============ */
 
-function StatItem({
-  value,
-  labelZh,
-  labelEn,
-  icon,
-  suffix,
+/** 合并后的大段里的小节标题：一行英文小标 + 一行中文标题 +（可选）右侧说明，下面跟内容 */
+function SubSection({
+  en,
+  zh,
+  note,
   children,
 }: {
-  value?: string | number;
-  labelZh: string;
-  labelEn: string;
-  icon: React.ReactNode;
-  suffix?: string;
-  children?: React.ReactNode;
+  en: string;
+  zh: string;
+  note?: string;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-4 rounded-xl border border-border bg-surface p-4 sm:p-5">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-2 text-muted">
-        {icon}
-      </span>
-      <div>
-        <div className="text-2xl font-bold tracking-[-0.02em] text-text sm:text-3xl">
-          {children ?? (
-            <>
-              {value}
-              {suffix ? (
-                <span className="text-base font-medium text-muted">{suffix}</span>
-              ) : null}
-            </>
-          )}
+    <div className="mt-10 border-t border-border pt-8">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">{en}</p>
+          <h3 className="text-xl font-semibold tracking-[-0.01em]">{zh}</h3>
         </div>
-        <div className="mt-0.5 text-xs text-muted">
-          <LocalizedText zh={labelZh} en={labelEn} />
-        </div>
+        {note ? <span className="text-sm text-muted">{note}</span> : null}
       </div>
+      {children}
     </div>
   );
 }
+
 
 function StepCard({
   step,
