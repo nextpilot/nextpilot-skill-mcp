@@ -357,16 +357,17 @@ export function HistoryList({
             <thead>
               <tr className="text-center text-[11px] text-muted">
                 <th className="w-[72px] pb-2 pr-2 font-normal">轨迹</th>
-                <th className="w-[11%] pb-2 pr-2 font-normal">上传时间</th>
+                <th className="w-[10%] pb-2 pr-2 font-normal">上传时间</th>
                 <th className="pb-2 pr-2 font-normal">文件名</th>
                 <th className="w-[7%] pb-2 pr-2 font-normal">大小</th>
                 <th className="w-[8%] pb-2 pr-2 font-normal">机型</th>
-                <th className="w-[9%] pb-2 pr-2 font-normal">硬件</th>
-                <th className="w-[9%] pb-2 pr-2 font-normal">软件</th>
-                <th className="w-[11%] pb-2 pr-2 font-normal">启动时间</th>
+                <th className="w-[8%] pb-2 pr-2 font-normal">硬件</th>
+                <th className="w-[8%] pb-2 pr-2 font-normal">软件</th>
+                <th className="w-[10%] pb-2 pr-2 font-normal">启动时间</th>
                 <th className="w-[6%] pb-2 pr-2 font-normal">时长</th>
                 <th className="w-[8%] pb-2 pr-2 font-normal">飞行模式</th>
-                <th className="w-[10%] pb-2 font-normal">结论</th>
+                <th className="w-[9%] pb-2 pr-2 font-normal">结论</th>
+                <th className="w-[5%] pb-2 font-normal">来源</th>
               </tr>
             </thead>
             <tbody>
@@ -405,26 +406,14 @@ export function HistoryList({
                       {formatDateTime(r.analyzedAt)}
                     </td>
                     <td className="py-2 pr-2">
-                      <span className="flex items-start justify-center gap-1.5">
-                        <span
-                          className="mt-0.5 shrink-0"
-                          title={r.source === "cloud" ? "云端（跨设备可见）" : "仅本机"}
-                        >
-                          {r.source === "cloud" ? (
-                            <Cloud className="h-3.5 w-3.5 text-primary" />
-                          ) : (
-                            <HardDrive className="h-3.5 w-3.5 text-faint" />
-                          )}
-                        </span>
-                        {/* 文件名较长：整词换行（break-all），不截断 */}
-                        <Link
-                          href={href}
-                          className="min-w-0 font-medium break-all text-text hover:text-primary"
-                          title={r.fileName}
-                        >
-                          {r.fileName}
-                        </Link>
-                      </span>
+                      {/* 文件名较长：整词换行（break-all），不截断 */}
+                      <Link
+                        href={href}
+                        className="block font-medium break-all text-text hover:text-primary"
+                        title={r.fileName}
+                      >
+                        {r.fileName}
+                      </Link>
                     </td>
                     <td className="py-2 pr-2 text-center whitespace-nowrap text-text">{fmtSize(r.fileSize)}</td>
                     <td className="py-2 pr-2 text-center text-text">
@@ -456,6 +445,18 @@ export function HistoryList({
                       ) : (
                         <span className="text-xs text-muted">{total}</span>
                       )}
+                    </td>
+                    <td className="py-2 text-center">
+                      <span
+                        className="inline-flex justify-center"
+                        title={r.source === "cloud" ? "云端（跨设备可见，保留 7 天）" : "仅本机浏览器"}
+                      >
+                        {r.source === "cloud" ? (
+                          <Cloud className="h-3.5 w-3.5 text-primary" />
+                        ) : (
+                          <HardDrive className="h-3.5 w-3.5 text-muted" />
+                        )}
+                      </span>
                     </td>
                   </tr>
                 );
