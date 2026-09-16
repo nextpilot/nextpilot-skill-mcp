@@ -683,7 +683,7 @@ export function HistoryList({
                                 ? "删除这条云端记录（本机仍可重新分析）"
                                 : "删除这条本机记录（原始日志缓存保留，再次上传仍是秒开）"
                             }
-                            className="absolute top-1/2 right-0.5 -translate-y-1/2 text-faint opacity-0 transition-opacity group-hover/row:opacity-100 hover:text-critical"
+                            className="absolute top-1/2 right-0.5 -translate-y-1/2 text-faint opacity-0 transition-opacity group-hover/row:opacity-100 hover:text-critical pointer-coarse:opacity-100"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
