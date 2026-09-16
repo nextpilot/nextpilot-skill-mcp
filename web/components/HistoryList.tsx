@@ -19,17 +19,10 @@ import {
 } from "lucide-react";
 import type { SavedReport } from "@/lib/report-history";
 import { formatDateTime, formatFirmware } from "@/lib/format";
+import { vehicleTypeLabel } from "@/lib/vehicle-type";
 import { modeStyle } from "@/lib/phase-colors";
 import { wgs84ToGcj02 } from "@/lib/coord";
 import { AMAP_SATELLITE, TILE_SIZE, latToWorldY, lonToWorldX, tileUrl } from "@/lib/amap-tiles";
-
-const VEHICLE_TYPE_LABELS: Record<string, string> = {
-  rotary_wing: "旋翼",
-  fixed_wing: "固定翼",
-  rover: "Rover",
-  airship: "飞艇",
-  unknown: "未知机型",
-};
 
 const DURATION_OPTIONS = [
   { key: "", label: "全部时长" },
@@ -406,7 +399,7 @@ export function HistoryList({
             <SelectFilter value={vehicleFilter} onChange={setVehicleFilter} placeholder="全部机型">
               {uniqueVehicleTypes.map((vt) => (
                 <option key={vt} value={vt}>
-                  {VEHICLE_TYPE_LABELS[vt] ?? vt}
+                  {vehicleTypeLabel(vt)}
                 </option>
               ))}
             </SelectFilter>
@@ -478,14 +471,14 @@ export function HistoryList({
                       飞行模式 14% —— `悬停、手动、返回、定高、定点、起飞` 一行 ~154px；
                       机型 5% —— 两行都只有 `旋翼` / `4040`，多给是浪费（原来给了 9%）；
                       日志文件 / 硬件 9%、轨迹 6%、时长 5%、结论 8%、来源 4%。 */}
-                <th className="w-[6%] pb-2 pr-2 font-normal">轨迹</th>
+                <th className="w-[6%] pb-2 pr-2 font-normal">缩略图</th>
                 <th className="w-[14%] pb-2 pr-2 font-normal">上传时间</th>
                 <th className="w-[9%] pb-2 pr-2 font-normal">日志文件</th>
-                <th className="w-[5%] pb-2 pr-2 font-normal">机型</th>
-                <th className="w-[9%] pb-2 pr-2 font-normal">硬件</th>
-                <th className="w-[12%] pb-2 pr-2 font-normal">软件</th>
+                <th className="w-[5%] pb-2 pr-2 font-normal">机型机架</th>
+                <th className="w-[9%] pb-2 pr-2 font-normal">硬件版本</th>
+                <th className="w-[12%] pb-2 pr-2 font-normal">软件版本</th>
                 <th className="w-[14%] pb-2 pr-2 font-normal">启动时间</th>
-                <th className="w-[5%] pb-2 pr-2 font-normal">时长</th>
+                <th className="w-[5%] pb-2 pr-2 font-normal">飞行时长</th>
                 <th className="w-[14%] pb-2 pr-2 font-normal">飞行模式</th>
                 <th className="w-[8%] pb-2 pr-2 font-normal">结论</th>
                 <th className="w-[4%] pb-2 font-normal">来源</th>
@@ -545,7 +538,7 @@ export function HistoryList({
                     {/* 机型与机架（SYS_AUTOSTART）分两行，机架那行小一号——跟「日志文件 / 大小」同一种排法 */}
                     <td className="py-2 pr-2 text-center text-text">
                       <span className="block truncate">
-                        {r.vehicleType ? (VEHICLE_TYPE_LABELS[r.vehicleType] ?? r.vehicleType) : "—"}
+                        {vehicleTypeLabel(r.vehicleType)}
                       </span>
                       {r.facts?.airframeId ? (
                         <span

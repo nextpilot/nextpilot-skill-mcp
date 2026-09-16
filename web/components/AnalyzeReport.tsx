@@ -35,15 +35,8 @@ import { LogParamsMsg } from "./LogParamsMsg";
 import { LogSystemMsg } from "./LogSystemMsg";
 import { PhaseStrip } from "./PhaseStrip";
 import { formatDateTime } from "@/lib/format";
+import { vehicleTypeLabel } from "@/lib/vehicle-type";
 import { LogFlightMap } from "./LogFlightMap";
-
-const VEHICLE_TYPE_LABELS: Record<string, string> = {
-  rotary_wing: "旋翼",
-  fixed_wing: "固定翼",
-  rover: "Rover",
-  airship: "飞艇",
-  unknown: "未知机型",
-};
 
 const PHASE_LABELS: Record<string, string> = {
   takeoff: "起飞",
@@ -150,7 +143,7 @@ export function AnalyzeReport({
             {(report.fileSize / 1024 / 1024).toFixed(2)} MB
             {report.facts?.durationSec ? ` · 时长 ${Math.round(report.facts.durationSec)}s` : ""}
             {report.facts?.vehicleType
-              ? ` · ${VEHICLE_TYPE_LABELS[report.facts.vehicleType] ?? report.facts.vehicleType}`
+              ? ` · ${vehicleTypeLabel(report.facts.vehicleType)}`
               : ""}
           </p>
         </div>
@@ -515,9 +508,10 @@ function formatDuration(sec: number): string {
 }
 
 /**
- * 飞行概况（Flight Review 的 General 表口径）：
- *   Vehicle UUID / Vehicle Life（载具累计飞行时长）/ Flight Time（本次飞行时长）/ Logging Start
- *   + 软件版本（ver_sw_branch（ver_sw））/ 硬件版本（ver_hw（ver_hw_subtype））
+ * 飞行概况（字段口径对齐 Flight Review 的 General 表，标签用中文）：
+ *   Vehicle UUID / 机型（vehicle_status.vehicle_type）/ 机架（SYS_AUTOSTART）/
+ *   Vehicle Life（载具累计飞行时长）/ Flight Time（本次飞行时长）/ Logging Start /
+ *   软件版本（ver_sw_branch（ver_sw））/ 硬件版本（ver_hw（ver_hw_subtype））
  * 数据由引擎算好并随 report 存档（`report.facts`），历史卡片与这里同源；缺哪项就不显示哪行。
  * 标签列**不带图标**：一列小图标只会让人多扫一遍，字段名本身已经说清了。
  */
@@ -528,22 +522,42 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
 
   if (g?.uuid) {
     rows.push({
-      label: "Vehicle UUID",
+      label: "飞控 UUID",
       value: g.uuid,
       mono: true,
       title: "飞控唯一 ID（sys_uuid / PX4GUID）",
     });
   }
+  // 机型 / 机架：机型是 PX4 的四类之一（vehicle_status.vehicle_type），机架是参数
+  // SYS_AUTOSTART 的编号——编号对应的名字要查 PX4 的 airframes 表，本机没有那份表，
+  // 就如实只给编号（别编名字）
+  // （云端记录取回的也是完整 report，facts 齐全，不必另找退路）
+  const vt = g?.vehicleType;
+  if (vt) {
+    rows.push({
+      label: "机型",
+      value: vehicleTypeLabel(vt),
+      title: `PX4 机型分类（vehicle_status.vehicle_type = ${vt}）`,
+    });
+  }
+  if (g?.airframeId) {
+    rows.push({
+      label: "机架",
+      value: String(g.airframeId),
+      mono: true,
+      title: "PX4 机架编号（参数 SYS_AUTOSTART），如 4040 = 通用四旋翼；名称查 PX4 airframes 表",
+    });
+  }
   if (typeof g?.vehicleLifeS === "number") {
     rows.push({
-      label: "Vehicle Life",
+      label: "累计飞行",
       value: formatDuration(g.vehicleLifeS),
       title: "载具累计飞行时长（参数 LND_FLIGHT_T_HI/LO）",
     });
   }
   if (report.facts?.armedDurationSec) {
     rows.push({
-      label: "Flight Time",
+      label: "本次飞行时长",
       value: formatDuration(report.facts.armedDurationSec),
       title: "本次日志里解锁（armed）的累计时长",
     });
@@ -551,7 +565,7 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
   if (g?.startUtc) {
     const d = new Date(g.startUtc * 1000);
     rows.push({
-      label: "Logging Start",
+      label: "启动时间",
       value: formatDateTime(d),
       title: `记录起始时刻（本机时区）。UTC：${d.toISOString().replace("T", " ").slice(0, 19)}`,
     });
@@ -570,15 +584,17 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
     });
   }
 
-  // 硬件版本：板型（ver_hw）+ 同型号的批次 / 变体（ver_hw_subtype，不是每块板都有）
+  // 硬件版本：板型（ver_hw）+ 同型号的批次 / 变体（ver_hw_subtype）。
+  // 子型号显式写出来（哪怕是「日志未写」）——PX4 只给部分板子写这个键，
+  // 空着会被当成"没做"，写明了才知道是日志里确实没有（可在「系统信息」tab 的字典里核对）
   const hw = g?.hardware ?? "";
   const hwSub = g?.hardwareSubtype ?? "";
   if (hw || hwSub) {
     rows.push({
       label: "硬件版本",
-      value: hw && hwSub ? `${hw}（${hwSub}）` : hw || hwSub,
+      value: hw ? `${hw}（${hwSub || "日志未写子型号"}）` : hwSub,
       mono: true,
-      title: `飞控板型号：${hw || "（无 ver_hw）"} · 硬件子型号：${hwSub || "（该板没有 ver_hw_subtype）"}`,
+      title: `飞控板型号 ver_hw：${hw || "（无）"} · 硬件子型号 ver_hw_subtype：${hwSub || "（这份日志里没有这个键）"}`,
     });
   }
 
