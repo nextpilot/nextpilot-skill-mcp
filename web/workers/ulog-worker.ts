@@ -150,6 +150,16 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
 
     if (msg.type === "track") {
       try {
+        // Python 侧（规则 + 数据层）是每次 analyze 时 exec 出来的：没跑过分析时命名空间里
+        // 连 ulog 都没有，直接调 np_track() 会是 NameError。这里先探一下，给人话错误。
+        if (!pyodide.globals.get("ulog")) {
+          post({
+            type: "track",
+            reqId: msg.reqId,
+            data: { error: "这份日志还没在本机解析过，重新选择该 .ulg 文件即可恢复轨迹。" },
+          });
+          return;
+        }
         // 轨迹字段名与量纲随固件改过，候选与换算写在 facts.yaml 的 track 里（引擎侧解析）
         const data = await runJson(pyodide, "np_track()");
         post({ type: "track", reqId: msg.reqId, data });

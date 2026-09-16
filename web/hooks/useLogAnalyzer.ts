@@ -517,14 +517,18 @@ export function useLogAnalyzer() {
     /** 取派生数据并按需填充 UI；返回 true 表示"无需解析即可完整展示" */
     /** 读存档的派生数据并填充 UI；告诉调用方"参数/消息"与"曲线"各有没有 */
     const loadReportData = useCallback(
-        async (id: string): Promise<{ hasInfo: boolean; hasPlots: boolean; }> => {
+        async (id: string): Promise<{ hasInfo: boolean; hasPlots: boolean; hasTrack: boolean; }> => {
             const data = await getReportData(id);
-            if (!data) return { hasInfo: false, hasPlots: false };
+            if (!data) return { hasInfo: false, hasPlots: false, hasTrack: false };
             if (data.info) setInfo(data.info as LogInfo);
             const panels = data.plotPanels;
             if (panels?.length) setStoredPlots({ panels, series: data.plotSeries ?? {} });
             if (data.track && !data.track.error) setStoredTrack(data.track);
-            return { hasInfo: Boolean(data.info), hasPlots: Boolean(panels?.length) };
+            return {
+                hasInfo: Boolean(data.info),
+                hasPlots: Boolean(panels?.length),
+                hasTrack: Boolean(data.track && !data.track.error),
+            };
         },
         [],
     );
@@ -550,8 +554,9 @@ export function useLogAnalyzer() {
             viewSaved(saved);
             reportIdRef.current = saved.id;
             if (adoptLiveAnalysis(saved.id)) return true;
-            const { hasInfo, hasPlots } = await loadReportData(saved.id);
-            if (hasPlots) return true;
+            const { hasInfo, hasPlots, hasTrack } = await loadReportData(saved.id);
+            // 曲线与轨迹都齐了才算"不必解析"；缺任一项就用缓存字节补（补齐后会存下来）
+            if (hasPlots && hasTrack) return true;
             if (saved.logHash) {
                 const cached = await getCachedLog(saved.logHash);
                 if (cached) {

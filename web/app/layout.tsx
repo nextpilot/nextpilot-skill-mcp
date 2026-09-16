@@ -16,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN" data-theme="light">
+    <html lang="zh-CN" data-theme="light" data-scroll-behavior="smooth">
       <body className="min-h-screen font-sans">
         <LanguageProvider>
           <SessionProvider>
