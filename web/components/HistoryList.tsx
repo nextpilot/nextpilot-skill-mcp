@@ -20,7 +20,6 @@ import {
   X,
   Filter,
   RotateCcw,
-  ChevronRight,
 } from "lucide-react";
 import type { SavedReport } from "@/lib/report-history";
 import { formatDateTime } from "@/lib/format";
@@ -376,7 +375,7 @@ export function HistoryList({
                     )}
                   </span>
                 </div>
-                <p className="mt-1 truncate text-sm font-medium text-text" title={r.fileName}>
+                <p className="mt-1 truncate text-base font-medium text-text" title={r.fileName}>
                   {r.fileName}
                 </p>
                 <div className="mt-1.5 flex items-center gap-2">
@@ -388,10 +387,6 @@ export function HistoryList({
                     </span>
                   )}
                   {!c && <span className="text-xs text-muted">{total} 条检查结果</span>}
-                  <span className="ml-auto flex items-center gap-1 text-xs text-primary">
-                    查看
-                    <ChevronRight className="h-3 w-3" />
-                  </span>
                 </div>
                 </Link>
               </li>
