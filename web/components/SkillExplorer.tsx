@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Fuse from "fuse.js";
 import { Search } from "lucide-react";
 import type { SkillMeta } from "@/lib/types";
@@ -10,6 +10,9 @@ import { SkillCard } from "./SkillCard";
 import { applyDeltas, useLeaderboard } from "@/lib/community-stats";
 
 type SortKey = "hot" | "rating" | "newest";
+
+/** 与 lib/constants.ts 的 CATEGORIES 对齐；URL 里的分类名要先过这一关再进筛选 */
+const VALID_CATEGORIES = new Set<string>(["perception", "decision", "control", "toolchain"]);
 
 const SORT_LABELS: Record<SortKey, string> = {
   hot: "最热",
@@ -26,9 +29,15 @@ export function SkillExplorer({
 }) {
   const { language, t } = useLanguage();
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<CategoryKey | "all">(
-    initialCategory ?? "all",
-  );
+  const [category, setCategory] = useState<CategoryKey | "all">(initialCategory ?? "all");
+
+  // `?category=xxx`（首页的分类入口指向这里）在浏览器端读一次：
+  // 页面本身要保持静态、不能接 searchParams——那会变成按需渲染，而 Skill 清单是构建期读盘的。
+  useEffect(() => {
+    if (initialCategory) return;   // 服务端已给初值（旧的调用方式）就不覆盖
+    const c = new URLSearchParams(window.location.search).get("category");
+    if (c && VALID_CATEGORIES.has(c as CategoryKey)) setCategory(c as CategoryKey);
+  }, [initialCategory]);
   const [sort, setSort] = useState<SortKey>("hot");
   const board = useLeaderboard("skill");
 

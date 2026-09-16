@@ -276,8 +276,8 @@ function PanelChart({
 
     const fullscreenLayout = {
       ...cached.layout,
-      height: window.innerHeight - 52,
-      margin: { l: 52, r: 42, t: 22, b: 48 },
+      height: window.innerHeight - 64 - 44 - 12,
+      margin: { l: 52, r: 34, t: 22, b: 48 },
     };
 
     let cancelled = false;
@@ -465,8 +465,8 @@ function PanelChart({
   return (
     <div className="w-full min-w-0">
       <p className="mb-1 text-sm font-medium text-muted">{panel.title}</p>
-      <div className="flex items-start gap-1">
-        <div className="relative min-w-0 flex-1">
+      <div className="relative">
+        <div className="relative min-w-0">
           {state === "loading" && (
             <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-surface-1/80 text-sm text-muted">
               <Loader2 className="h-4 w-4 animate-spin" /> 正在抽取数据…
@@ -479,10 +479,11 @@ function PanelChart({
           )}
           <div ref={elRef} className="w-full" style={{ minHeight: "300px" }} />
         </div>
-        {/* 工具栏：竖排贴在图的右侧（原来挤在图右上角、和 Plotly 自带 modebar 叠在一起）。
-            按钮一律 28×28、间距固定，永远排成一列，不会互相压住。 */}
+        {/* 工具栏：浮在图的右上角、落在那圈**留给刻度标签的白边**里（layout 的 margin.r = 34），
+            所以既不压曲线也不离图远——中间那版把它放在容器外面，34+ 的空档看着就远。
+            竖排一列、固定间距，不存在互相重叠。 */}
         {state === "done" && (
-          <div className="flex w-7 shrink-0 flex-col items-center gap-1.5 pt-1">
+          <div className="absolute top-1 right-1 flex w-7 flex-col items-center gap-1 rounded-md bg-surface-1/85 py-1 backdrop-blur-sm">
             <button
               className="rounded p-1 text-muted transition hover:bg-surface-2 hover:text-text"
               onClick={resetAxes}
@@ -516,18 +517,38 @@ function PanelChart({
       {fullscreen &&
         mounted &&
         createPortal(
-          <div className="fixed inset-0 z-[1000] flex flex-col overflow-hidden bg-surface-1">
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-2">
+          // top-16：从站点导航栏下面开始，不再把关闭按钮压到导航栏上
+          <div className="fixed inset-x-0 top-16 bottom-0 z-[1000] flex flex-col overflow-hidden bg-surface-1">
+            <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-2">
               <span className="min-w-0 truncate text-sm font-semibold">{panel.title}</span>
-              <button
-                className="shrink-0 rounded p-1 text-muted transition hover:text-text"
-                onClick={() => setFullscreen(false)}
-                title="退出全屏"
-              >
-                <X className="h-5 w-5" />
-              </button>
             </div>
-            <div ref={fullscreenRef} className="w-full min-w-0 flex-1" />
+            <div className="relative min-h-0 flex-1 px-3 pt-2 pb-3">
+              <div ref={fullscreenRef} className="h-full w-full" />
+              {/* 与内联视图同一套：浮在图右上角的白边里，退出全屏也在其中 */}
+              <div className="absolute top-3 right-4 flex w-7 flex-col items-center gap-1 rounded-md bg-surface-1/85 py-1 backdrop-blur-sm">
+                <button
+                  className="rounded p-1 text-muted transition hover:bg-surface-2 hover:text-text"
+                  onClick={resetAxes}
+                  title="复位缩放"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </button>
+                <button
+                  className="rounded p-1 text-muted transition hover:bg-surface-2 hover:text-text"
+                  onClick={() => { void navigator.clipboard.writeText(window.location.href).catch(() => {}); }}
+                  title="复制链接"
+                >
+                  <Share2 className="h-4 w-4" />
+                </button>
+                <button
+                  className="rounded p-1 text-muted transition hover:bg-surface-2 hover:text-text"
+                  onClick={() => setFullscreen(false)}
+                  title="退出全屏"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
           </div>,
           document.body,
         )}
@@ -568,8 +589,8 @@ function buildLayout(
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: plotBg,
     font: { color: text, size: 11, family: "PingFang SC, Microsoft YaHei, sans-serif" },
-    // r 只留刻度标签的宽度：工具栏现在贴在容器右侧，右内边距留大了它就离图很远
-    margin: { l: 44, r: 14, t: 0, b: 40 },
+    // r=34：既容得下最后一个刻度标签，也正好给右上角那列工具栏当落脚处
+    margin: { l: 44, r: 34, t: 0, b: 40 },
     modebar: {
       orientation: "h",   // 横排（原来 "v" 竖排，按钮叠在面板标题那一行上）
       bgcolor: "rgba(0,0,0,0)",
