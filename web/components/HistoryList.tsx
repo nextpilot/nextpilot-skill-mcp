@@ -456,17 +456,17 @@ export function HistoryList({
             <thead>
               <tr className="text-center text-[11px] text-muted">
                 <th className="w-[72px] pb-2 pr-2 font-normal">轨迹</th>
-                <th className="w-[12%] pb-2 pr-2 font-normal">上传时间</th>
-                <th className="w-[13%] pb-2 pr-2 font-normal">文件名</th>
-                <th className="w-[7%] pb-2 pr-2 font-normal">大小</th>
+                <th className="w-[11%] pb-2 pr-2 font-normal">上传时间</th>
+                <th className="w-[7%] pb-2 pr-2 font-normal">文件名</th>
+                <th className="w-[6%] pb-2 pr-2 font-normal">大小</th>
                 <th className="w-[8%] pb-2 pr-2 font-normal">机型</th>
                 <th className="w-[8%] pb-2 pr-2 font-normal">硬件</th>
-                <th className="w-[8%] pb-2 pr-2 font-normal">软件</th>
-                <th className="w-[12%] pb-2 pr-2 font-normal">启动时间</th>
-                <th className="w-[6%] pb-2 pr-2 font-normal">时长</th>
-                <th className="w-[9%] pb-2 pr-2 font-normal">飞行模式</th>
-                <th className="w-[11%] pb-2 pr-2 font-normal">结论</th>
-                <th className="w-[5%] pb-2 font-normal">来源</th>
+                <th className="w-[9%] pb-2 pr-2 font-normal">软件</th>
+                <th className="w-[11%] pb-2 pr-2 font-normal">启动时间</th>
+                <th className="w-[5%] pb-2 pr-2 font-normal">时长</th>
+                <th className="w-[10%] pb-2 pr-2 font-normal">飞行模式</th>
+                <th className="w-[9%] pb-2 pr-2 font-normal">结论</th>
+                <th className="w-[4%] pb-2 font-normal">来源</th>
               </tr>
             </thead>
             <tbody>
