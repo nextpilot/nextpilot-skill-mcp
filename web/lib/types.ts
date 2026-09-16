@@ -121,6 +121,10 @@ export interface LogFacts {
   startUtc?: number;
   /** 固件分支 / 标签（msg_info_dict.ver_sw_branch，如 damiao_dm-fc01_v1.15.0）；旧固件没有 */
   verSwBranch?: string;
+  /** 固件 git 提交全串（ver_sw，40 位）；报告页「软件版本」显示 `分支（提交）` 用 */
+  verSw?: string;
+  /** 硬件子型号（ver_hw_subtype，如 V6C002002）；不是每块板都写 */
+  hardwareSubtype?: string;
   /** 主飞行模式：占样本最多的 nav_state（PX4 模式名，如 Position / Mission） */
   mainMode?: string;
   /** 这次日志出现过的全部模式，按占样本数从多到少（Flight Review browse 页也是列全量） */

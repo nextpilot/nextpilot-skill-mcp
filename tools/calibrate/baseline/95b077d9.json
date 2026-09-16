@@ -13,6 +13,7 @@
       "firmware": "1.17.0",
       "firmwareProfile": "px4-1.15+",
       "hardware": "PX4_FMU_V6X",
+      "hardwareSubtype": "V6X001",
       "modes": [
         "Mission",
         "Hold",
@@ -22,6 +23,7 @@
       "mainMode": "Mission",
       "firmwareDisplay": "v1.17.0",
       "fwReleaseType": 255,
+      "verSw": "d6f12ad1c4f70ad3230afd7d86e971421e02fef4",
       "uuid": "0006000000003736333130335109002c003b",
       "vehicleLifeS": 2657.3,
       "airframeId": 51000,

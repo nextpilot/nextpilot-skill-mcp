@@ -1456,6 +1456,10 @@ facts["firmware"] = FW_LABEL
 facts["firmwareProfile"] = FW_PROFILE
 if FW["hw"]:
     facts["hardware"] = FW["hw"]
+# 硬件子型号（同型号的不同批次 / 变体，不是每块板都有）：报告页「硬件版本」与 ver_hw 一起显示
+_hw_sub = str(_info.get("ver_hw_subtype", ""))
+if _hw_sub:
+    facts["hardwareSubtype"] = _hw_sub
 
 # ---------------- 飞行模式 ----------------
 # 这次日志里出现过的 nav_state 模式，按占样本数从多到少（名字取 facts.yaml 的 nav_state_names）——
@@ -1498,6 +1502,10 @@ else:
     facts["firmwareDisplay"] = _disp
 # 类型码另存一份：以后要再调口径，前端能凭它重算，不必重新解析日志
 facts["fwReleaseType"] = None if _rel is None else int(_rel) & 0xFF
+# 原始 git 提交（ver_sw）也留一份：报告页「软件版本」要显示 \`分支（提交）\`，
+# 不能只靠 report.verSw——那份是前端存摘要时截过的（20 字符）
+if _sw:
+    facts["verSw"] = _sw
 
 # ---------------- 载具身份与记录起始时刻 ----------------
 # 这几项与判定无关，但历史卡片与报告概况要用，且必须**随 report 存档**（派生数据 info 不进存档）。

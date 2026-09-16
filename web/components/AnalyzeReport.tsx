@@ -6,10 +6,6 @@ import remarkGfm from "remark-gfm";
 import {
   ShieldAlert,
   AlertTriangle,
-  Fingerprint,
-  CalendarClock,
-  Clock,
-  Timer,
   Activity,
   Info,
   FileCheck2,
@@ -521,20 +517,20 @@ function formatDuration(sec: number): string {
 /**
  * 飞行概况（Flight Review 的 General 表口径）：
  *   Vehicle UUID / Vehicle Life（载具累计飞行时长）/ Flight Time（本次飞行时长）/ Logging Start
+ *   + 软件版本（ver_sw_branch（ver_sw））/ 硬件版本（ver_hw（ver_hw_subtype））
  * 数据由引擎算好并随 report 存档（`report.facts`），历史卡片与这里同源；缺哪项就不显示哪行。
+ * 标签列**不带图标**：一列小图标只会让人多扫一遍，字段名本身已经说清了。
  */
 function GeneralInfo({ report }: { report: AnalysisReport }) {
   const g = report.facts;
-  type Row = { label: string; value: string; title?: string; mono?: boolean; icon: React.ReactNode };
+  type Row = { label: string; value: string; title?: string; mono?: boolean };
   const rows: Row[] = [];
-  const icon = "h-3.5 w-3.5 shrink-0 text-faint";
 
   if (g?.uuid) {
     rows.push({
       label: "Vehicle UUID",
       value: g.uuid,
       mono: true,
-      icon: <Fingerprint className={icon} />,
       title: "飞控唯一 ID（sys_uuid / PX4GUID）",
     });
   }
@@ -542,7 +538,6 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
     rows.push({
       label: "Vehicle Life",
       value: formatDuration(g.vehicleLifeS),
-      icon: <Timer className={icon} />,
       title: "载具累计飞行时长（参数 LND_FLIGHT_T_HI/LO）",
     });
   }
@@ -550,7 +545,6 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
     rows.push({
       label: "Flight Time",
       value: formatDuration(report.facts.armedDurationSec),
-      icon: <Clock className={icon} />,
       title: "本次日志里解锁（armed）的累计时长",
     });
   }
@@ -559,8 +553,32 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
     rows.push({
       label: "Logging Start",
       value: formatDateTime(d),
-      icon: <CalendarClock className={icon} />,
       title: `记录起始时刻（本机时区）。UTC：${d.toISOString().replace("T", " ").slice(0, 19)}`,
+    });
+  }
+
+  // 软件版本：分支 / 标签（ver_sw_branch）+ git 提交（ver_sw）。老固件没有 branch，
+  // 云端记录或极旧的存档可能没有 facts.verSw，退回报告记录上的 verSw（同源、截断过）
+  const branch = g?.verSwBranch ?? "";
+  const hash = g?.verSw || report.verSw || "";
+  if (branch || hash) {
+    rows.push({
+      label: "软件版本",
+      value: branch && hash ? `${branch}（${hash}）` : branch || hash,
+      mono: true,
+      title: `构建分支 / 标签：${branch || "（日志里没有 ver_sw_branch）"} · git 提交：${hash || "（无 ver_sw）"}`,
+    });
+  }
+
+  // 硬件版本：板型（ver_hw）+ 同型号的批次 / 变体（ver_hw_subtype，不是每块板都有）
+  const hw = g?.hardware ?? "";
+  const hwSub = g?.hardwareSubtype ?? "";
+  if (hw || hwSub) {
+    rows.push({
+      label: "硬件版本",
+      value: hw && hwSub ? `${hw}（${hwSub}）` : hw || hwSub,
+      mono: true,
+      title: `飞控板型号：${hw || "（无 ver_hw）"} · 硬件子型号：${hwSub || "（该板没有 ver_hw_subtype）"}`,
     });
   }
 
@@ -576,10 +594,7 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
           {rows.map((r) => (
             <tr key={r.label}>
               <td className="w-36 py-0.5 pr-3 align-top text-xs whitespace-nowrap text-muted" title={r.title}>
-                <span className="flex items-center gap-1.5">
-                  {r.icon}
-                  {r.label}
-                </span>
+                {r.label}
               </td>
               <td className={`py-0.5 align-top break-all ${r.mono ? "font-mono text-xs" : ""} text-text`}>
                 {r.value}
@@ -591,10 +606,7 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
           {tags.length > 0 && (
             <tr>
               <td className="w-36 py-1 pr-3 align-top text-xs whitespace-nowrap text-muted" title="确定性引擎命中的异常标签（喂给故障知识库匹配）">
-                <span className="flex items-center gap-1.5">
-                  <AlertTriangle className={icon} />
-                  异常标签
-                </span>
+                异常标签
               </td>
               <td className="flex flex-wrap gap-1 py-1 align-top">
                 {tags.map((t) => (
@@ -608,10 +620,7 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
           {guards.length > 0 && (
             <tr>
               <td className="w-36 py-1 pr-3 align-top text-xs whitespace-nowrap text-muted" title="数据质量标签：影响结论可信度">
-                <span className="flex items-center gap-1.5">
-                  <ShieldAlert className={icon} />
-                  数据质量
-                </span>
+                数据质量
               </td>
               <td className="flex flex-wrap gap-1 py-1 align-top">
                 {guards.map((g) => (

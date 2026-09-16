@@ -13,6 +13,7 @@
       "firmware": "1.17.0",
       "firmwareProfile": "px4-1.15+",
       "hardware": "PX4_FMU_V5",
+      "hardwareSubtype": "V5006000",
       "modes": [
         "Hold",
         "Return",
@@ -22,6 +23,7 @@
       "mainMode": "Hold",
       "firmwareDisplay": "v1.17.0-alpha",
       "fwReleaseType": 64,
+      "verSw": "c2fb48990aacebc938c4e9998c7d5348f858fd22",
       "uuid": "000200000000323335373233510100410023",
       "vehicleLifeS": 650.9,
       "airframeId": 2100,
