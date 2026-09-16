@@ -13,8 +13,10 @@ import {
   Zap,
 } from "lucide-react";
 import { getSkillIndex } from "@/lib/skills";
+import { getMcpIndex } from "@/lib/mcp";
 import { CATEGORIES } from "@/lib/constants";
 import { SkillCard } from "@/components/SkillCard";
+import { McpCard } from "@/components/McpCard";
 import { LocalizedText } from "@/components/LocalizedText";
 
 const CHECKS: { name: string; en: string; field: string }[] = [
@@ -85,7 +87,13 @@ const CATEGORY_ACCENT: Record<string, string> = {
 
 export default function HomePage() {
   const skills = getSkillIndex();
+  const mcps = getMcpIndex();
   const featured = skills.filter((s) => s.featured).slice(0, 6);
+  // 这一节叫「精选 Skill 和 MCP」，两类都要有：MCP 侧按 featured 取，没有标记就退化为评分最高的两个
+  const featuredMcp = (() => {
+    const marked = mcps.filter((m) => m.featured);
+    return (marked.length > 0 ? marked : mcps).slice(0, 3);
+  })();
 
   return (
     <div>
@@ -308,12 +316,41 @@ export default function HomePage() {
                   <SkillCard key={s.slug} skill={s} />
                 ))}
               </div>
+
+              {/* MCP 那组的抬头与「精选 Skill」同款（英文小标 + 中文标题 + 右侧入口），
+                  两个分组视觉上才是一对 */}
+              {featuredMcp.length > 0 && (
+                <div className="mt-10">
+                  <div className="mb-6 flex items-end justify-between gap-4">
+                    <div>
+                      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">
+                        Selected MCP servers
+                      </p>
+                      <h3 className="text-xl font-semibold tracking-[-0.01em]">
+                        <LocalizedText zh="精选 MCP" en="Selected MCP servers" />
+                      </h3>
+                    </div>
+                    <Link
+                      href="/mcp"
+                      className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                    >
+                      <LocalizedText zh="查看全部" en="View all" />
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {featuredMcp.map((m) => (
+                      <McpCard key={m.slug} server={m} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
       </section>
 
-      {/* ============ 日志分析（原「三步读懂你的飞行」「日志里真正被检查的东西」「平台原则」「准备好分析了吗」四段合并） ============ */}
+      {/* ============ 日志分析（原「三步读懂你的飞行」「日志里真正被检查的东西」「平台原则」合并；原则与收尾 CTA 已按要求去掉） ============ */}
       <section className="border-b border-border">
         <div className="page-shell py-12 lg:py-14">
           <div className="mb-8 text-center">
@@ -423,43 +460,7 @@ export default function HomePage() {
                 </div>
               </div>
           </SubSection>
-
-          <div className="mt-10 border-t border-border pt-8 text-center">
-            <h3 className="text-2xl font-semibold tracking-[-0.01em] sm:text-3xl">
-              <LocalizedText zh="准备好分析你的飞行日志了吗？" en="Ready to analyze your flight log?" />
-            </h3>
-            <p className="mx-auto mt-4 max-w-lg text-[15px] leading-7 text-muted">
-              <LocalizedText
-                zh="匿名每天免费 3 次，登录后每天 10 次。上传 .ulg 文件，30 秒出 AI 诊断报告。"
-                en="3 free runs daily anonymously, 10 when signed in. Upload a .ulg file and get a diagnostic report in 30 seconds."
-              />
-            </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Link href="/analyze" className="btn-primary px-6 py-3 text-[15px]">
-                <FileSearch className="h-[18px] w-[18px]" />
-                <LocalizedText zh="免费分析日志" en="Analyze for free" />
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link href="/skills" className="btn-ghost px-6 py-3 text-[15px]">
-                <LocalizedText zh="浏览社区 Skill" en="Browse skills" />
-              </Link>
-            </div>
-            <ul className="mt-6 flex flex-wrap justify-center gap-x-6 gap-y-2">
-              <li className="flex items-center gap-1.5 text-xs text-muted">
-                <Check className="h-3.5 w-3.5 text-ok" />
-                <LocalizedText zh="无需安装" en="No installation" />
-              </li>
-              <li className="flex items-center gap-1.5 text-xs text-muted">
-                <Check className="h-3.5 w-3.5 text-ok" />
-                <LocalizedText zh="数据不上传" en="Data stays local" />
-              </li>
-              <li className="flex items-center gap-1.5 text-xs text-muted">
-                <Check className="h-3.5 w-3.5 text-ok" />
-                <LocalizedText zh="30 秒出报告" en="Report in 30s" />
-              </li>
-            </ul>
-          </div>
-          </div>
+        </div>
       </section>
 
 
