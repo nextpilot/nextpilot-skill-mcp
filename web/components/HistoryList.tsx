@@ -15,6 +15,7 @@ import {
   Filter,
   RotateCcw,
   Cloud,
+  HardDrive,
 } from "lucide-react";
 import type { SavedReport } from "@/lib/report-history";
 import { formatDateTime, formatFirmware, formatLogTime } from "@/lib/format";
@@ -576,13 +577,19 @@ export function HistoryList({
                       >
                         {shortName(r.fileName)}
                       </Link>
+                      {/* 大小前面挂来源图标——**两种都画**，不然只有云端的行才有标记时，
+                          全是本机记录的话整张表一个图标都没有，"没图标"反而要靠猜 */}
                       <span className="flex items-center justify-center gap-1 text-[11px] leading-4 text-text">
-                        {r.source === "cloud" && (
+                        {r.source === "cloud" ? (
                           <span
                             className="inline-flex shrink-0"
                             title="云端记录：跨设备可见，保留 7 天；原始日志从未上传"
                           >
-                            <Cloud className="h-3 w-3 text-primary" />
+                            <Cloud className="h-3.5 w-3.5 text-primary" />
+                          </span>
+                        ) : (
+                          <span className="inline-flex shrink-0" title="只存在这台设备（IndexedDB），从不上传">
+                            <HardDrive className="h-3.5 w-3.5 text-faint" />
                           </span>
                         )}
                         <span className="truncate">{fmtSize(r.fileSize)}</span>
