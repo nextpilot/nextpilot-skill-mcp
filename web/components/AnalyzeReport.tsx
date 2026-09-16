@@ -509,7 +509,7 @@ function formatDuration(sec: number): string {
 
 /**
  * 飞行概况（字段口径对齐 Flight Review 的 General 表，标签用中文）：
- *   Vehicle UUID / 机型（vehicle_status.vehicle_type）/ 机架（SYS_AUTOSTART）/
+ *   Vehicle UUID / 机型（机架）（vehicle_status.vehicle_type + SYS_AUTOSTART）/
  *   Vehicle Life（载具累计飞行时长）/ Flight Time（本次飞行时长）/ Logging Start /
  *   软件版本（ver_sw_branch（ver_sw））/ 硬件版本（ver_hw（ver_hw_subtype））
  * 数据由引擎算好并随 report 存档（`report.facts`），历史卡片与这里同源；缺哪项就不显示哪行。
@@ -528,24 +528,19 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
       title: "飞控唯一 ID（sys_uuid / PX4GUID）",
     });
   }
-  // 机型 / 机架：机型是 PX4 的四类之一（vehicle_status.vehicle_type），机架是参数
+  // 机型（机架）：机型是 PX4 的四类之一（vehicle_status.vehicle_type），机架是参数
   // SYS_AUTOSTART 的编号——编号对应的名字要查 PX4 的 airframes 表，本机没有那份表，
-  // 就如实只给编号（别编名字）
+  // 就如实只给编号（别编名字）。两者合成一行：`旋翼（4040）`，只有一半时只显示那一半。
   // （云端记录取回的也是完整 report，facts 齐全，不必另找退路）
   const vt = g?.vehicleType;
-  if (vt) {
+  const af = g?.airframeId;
+  if (vt || af) {
     rows.push({
-      label: "机型",
-      value: vehicleTypeLabel(vt),
-      title: `PX4 机型分类（vehicle_status.vehicle_type = ${vt}）`,
-    });
-  }
-  if (g?.airframeId) {
-    rows.push({
-      label: "机架",
-      value: String(g.airframeId),
-      mono: true,
-      title: "PX4 机架编号（参数 SYS_AUTOSTART），如 4040 = 通用四旋翼；名称查 PX4 airframes 表",
+      label: "机型（机架）",
+      value: vt && af ? `${vehicleTypeLabel(vt)}（${af}）` : vehicleTypeLabel(vt) || String(af),
+      title:
+        `PX4 机型分类 vehicle_status.vehicle_type = ${vt || "（无）"}` +
+        ` · 机架编号 SYS_AUTOSTART = ${af || "（无）"}（名称查 PX4 airframes 表）`,
     });
   }
   if (typeof g?.vehicleLifeS === "number") {
