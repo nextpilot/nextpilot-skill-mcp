@@ -93,19 +93,28 @@ function fmtSize(bytes?: number): string {
  * 瓦片与折线用同一套像素换算，所以对齐；SVG 是矢量的，悬停放大不糊。
  * 坐标同样要先 WGS-84 → GCJ-02（高德是偏移坐标系），否则轨迹整体偏几百米。
  */
-function TrackThumb({ points }: { points?: [number, number][]; }) {
+function TrackThumb({ points, last }: { points?: [number, number][]; last?: boolean; }) {
   // 宽度跟着列走（w-full + 4:3 比例）：写成固定 64×48 的话，列比它宽一截时两侧就留白，
   // 比例仍按 4:3 保持——viewBox 是 100×75，且 preserveAspectRatio="none"，比例一歪轨迹就拉伸变形。
-  const box =
-    "block w-full aspect-[4/3] shrink-0 overflow-hidden rounded-md border border-border bg-surface-2 " +
-    "transition-transform duration-150 origin-left hover:z-20 hover:scale-[2.6] hover:border-primary hover:shadow-lg";
+  //
+  // 悬停放大的两个坑：
+  //   1. 放大后会被**下面几行的单元格盖住**——表格单元格按行序绘制，后面的行自然画在前面行的内容之上。
+  //      解法是让所在的 <td> 在悬停时 `relative z-30`（悬停子元素时祖先也匹配 :hover），
+  //      带 z-index 的定位元素会挪到"定位层"绘制，压过所有常规流内容；
+  //   2. 放大后可能被滚动容器（max-h-[560px] overflow-auto）裁掉——所以从**左上角**展开：
+  //      普通行向下展开，最后一行改为从下往上（下面没地方了）。
+  const base =
+    "block w-full aspect-[4/3] shrink-0 overflow-hidden rounded-md border border-border bg-surface-2";
+  const zoom =
+    "transition-transform duration-150 hover:scale-[2.6] hover:border-primary hover:shadow-lg " +
+    (last ? "origin-bottom-left" : "origin-top-left");
 
   const view = useMemo(() => buildThumbView(points), [points]);
 
   if (!view) {
     return (
       <span
-        className={`${box} flex items-center justify-center`}
+        className={`${base} flex items-center justify-center`}
         title="这份记录还没有轨迹缩略图——打开一次报告就会补上"
       >
         <MapPin className="h-4 w-4 text-faint" />
@@ -115,7 +124,7 @@ function TrackThumb({ points }: { points?: [number, number][]; }) {
 
   const { tiles, line, start: st, end: en } = view;
   return (
-    <span className={box} title={`轨迹缩略图（${points?.length ?? 0} 点）`}>
+    <span className={`${base} ${zoom}`} title={`轨迹缩略图（${points?.length ?? 0} 点）`}>
       <span className="relative block h-full w-full">
         {tiles.map((t) => (
           // 瓦片是纯展示，用原生 img 最省事（next/image 会给每种尺寸生成一张，得不偿失）
@@ -148,7 +157,7 @@ function TrackThumb({ points }: { points?: [number, number][]; }) {
   );
 }
 
-/** 缩略图盒子与 viewBox 比例（100×75 → 64×48 像素） */
+/** 缩略图盒子的 viewBox 尺寸（100×75，即 4:3，与盒子的 aspect-[4/3] 对齐） */
 const THUMB_VB_W = 100;
 const THUMB_VB_H = 75;
 
@@ -478,7 +487,7 @@ export function HistoryList({
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => {
+              {filtered.map((r, idx) => {
                 // 双保险：cloud item 用 findingCount，local item 用 findings 数组；
                 // 两者都缺失时（极旧的本地记录）按 0 处理，不渲染崩页面
                 const findings = Array.isArray(r.findings) ? r.findings : [];
@@ -504,9 +513,10 @@ export function HistoryList({
                     }}
                     className="cursor-pointer border-t border-border/30 hover:bg-surface-2"
                   >
-                    <td className="py-2 pr-2 align-middle">
+                    {/* relative + 悬停 z-30：缩略图放大后要压过下面几行的单元格（表格按行序绘制） */}
+                    <td className="relative py-2 pr-2 align-middle hover:z-30">
                       <div className="flex justify-center">
-                        <TrackThumb points={r.trackThumb} />
+                        <TrackThumb points={r.trackThumb} last={idx === filtered.length - 1} />
                       </div>
                     </td>
                     <td className="py-2 pr-2 text-center font-mono break-words text-text">
