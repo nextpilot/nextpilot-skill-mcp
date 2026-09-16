@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Loader2, LineChart, Maximize2, RotateCcw, Share2, X } from "lucide-react";
+import { modeStyle } from "@/lib/phase-colors";
 import type { FlightPhase, SeriesResponse, TopicManifest } from "@/lib/types";
 import {
   CHART_PRESETS,
@@ -12,27 +13,6 @@ import {
   type StoredPlotSeries,
   type SeriesRequest,
 } from "@/lib/chart-presets";
-
-// 模式配色（固定顺序，最多覆盖常见模式，其余归 "Other" 灰）
-const MODE_COLORS: Record<string, string> = {
-  Manual: "#3987e5",
-  Altitude: "#d95926",
-  Position: "#199e70",
-  Mission: "#c98500",
-  Hold: "#d55181",
-  Return: "#008300",
-  Offboard: "#9085e9",
-  Takeoff: "#e66767",
-  Land: "#5b8fb9",
-  Stabilized: "#b08050",
-  Acro: "#7f8ea3",
-  Descend: "#a06cd5",
-};
-const MODE_OTHER_COLOR = "#6b7280";
-
-function modeColor(mode: string): string {
-  return MODE_COLORS[mode] ?? MODE_OTHER_COLOR;
-}
 
 type PlotlyType = {
   react: (el: HTMLElement, data: unknown[], layout: Record<string, unknown>, cfg?: unknown) => Promise<unknown>;
@@ -122,9 +102,10 @@ export function LogCharts({
 }
 
 function PhaseStrip({ phases }: { phases: FlightPhase[] }) {
+  const dark = typeof document !== "undefined" && document.documentElement.getAttribute("data-theme") === "dark";
   const total = phases[phases.length - 1].endSec - phases[0].startSec || 1;
   const legend = new Map<string, string>();
-  for (const p of phases) legend.set(p.mode, modeColor(p.mode));
+  for (const p of phases) legend.set(p.mode, modeStyle(p.mode, dark).label);
   return (
     <div>
       <p className="mb-2 text-xs text-muted">飞行阶段（相对日志开始，浅色段为未解锁）</p>
@@ -132,20 +113,23 @@ function PhaseStrip({ phases }: { phases: FlightPhase[] }) {
         {phases.map((p, i) => (
           <div
             key={i}
-            title={`${p.mode} · ${p.startSec.toFixed(1)}–${p.endSec.toFixed(1)}s${p.armed ? " · 已解锁" : ""}`}
+            title={`${modeStyle(p.mode, dark).label}（${p.mode}） · ${p.startSec.toFixed(1)}–${p.endSec.toFixed(1)}s${p.armed ? " · 已解锁" : " · 未解锁"}`}
             style={{
               width: `${((p.endSec - p.startSec) / total) * 100}%`,
-              background: modeColor(p.mode),
+              background: modeStyle(p.mode, dark).color,
               opacity: p.armed ? 0.95 : 0.4,
             }}
           />
         ))}
       </div>
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-        {Array.from(legend.entries()).map(([mode, color]) => (
+        {Array.from(legend.entries()).map(([mode, label]) => (
           <span key={mode} className="flex items-center gap-1.5 text-xs text-muted">
-            <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: color }} />
-            {mode}
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-sm"
+              style={{ background: modeStyle(mode, dark).color }}
+            />
+            {label}
           </span>
         ))}
       </div>

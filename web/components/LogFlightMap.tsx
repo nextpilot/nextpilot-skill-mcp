@@ -264,10 +264,12 @@ export function LogFlightMap({
       <div className="relative">
         <div ref={containerRef} className="h-[380px] w-full overflow-hidden rounded-lg sm:h-[520px]" />
         {/* 高度色带：竖着贴在地图左侧（颜色 = 轨迹那段的平均高度）。
-            从 top-20 起是为了让开 Leaflet 左上角的缩放按钮；pointer-events-none 保证不挡地图操作 */}
+            从 top-20 起是为了让开 Leaflet 左上角的缩放按钮；pointer-events-none 不挡地图操作；
+            z-[700] 必须给——Leaflet 自己的 pane 是 z-index 200~800 的绝对定位层，
+            不给 z 就会被瓦片层（200）盖住 */}
         {state === "ready" && altRange && (
           <div
-            className="pointer-events-none absolute top-20 bottom-6 left-3 flex flex-col items-center"
+            className="pointer-events-none absolute top-20 bottom-6 left-3 z-[700] flex flex-col items-center"
             title="轨迹颜色对应的高度（米，海拔）—— 蓝低红高"
           >
             <span className="rounded bg-surface-2/85 px-1 text-[10px] text-muted">
