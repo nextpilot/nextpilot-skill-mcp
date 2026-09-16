@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { TrackData } from "@/lib/types";
 import { Loader2, MapPin } from "lucide-react";
 import { wgs84ToGcj02 } from "@/lib/coord";
+import "leaflet/dist/leaflet.css";
 
 interface GpsPoint {
   lat: number;
@@ -16,7 +17,9 @@ interface GpsPoint {
  * 代价是坐标系——高德是 GCJ-02，日志是 WGS-84，所以画之前统一换算（见 lib/coord.ts）。
  * 上线正式域名时建议换成带 key 的正式瓦片服务（高德 JS API 或天地图）。
  */
-const TILE_SUBDOMAINS = ["01", "02", "03", "04"];
+// ⚠️ 子域名是 ["1".."4"]，拼出来是 webrd01 / webst01 这类主机名——写成 "01" 会得到
+// webrd001.is.autonavi.com（**该域名不存在**，地图一片灰，实测 curl 直接 DNS 失败）
+const TILE_SUBDOMAINS = ["1", "2", "3", "4"];
 const AMAP_STREET = "https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}";
 const AMAP_SATELLITE = "https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}";
 const AMAP_SATELLITE_LABELS = "https://webst0{s}.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}";
@@ -34,9 +37,10 @@ type LeafletModule = typeof import("leaflet");
 
 async function getLeaflet(): Promise<LeafletModule> {
   const mod = await import("leaflet");
-  const L: LeafletModule = (mod as unknown as { default: LeafletModule }).default ?? mod;
-  await import("leaflet/dist/leaflet.css");
-  return L;
+  // 只动态引 JS（leaflet 本体约 150KB，不进首屏）；CSS 必须**静态 import**——
+  // 动态 import 样式在 Next 里不保证注入，样式没进来时图层面板失去定位锚点，
+  // 轨迹会画到页面别处、瓦片位置全乱
+  return (mod as unknown as { default: LeafletModule }).default ?? mod;
 }
 
 export function LogFlightMap({
@@ -47,12 +51,15 @@ export function LogFlightMap({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
+  const boundsRef = useRef<import("leaflet").LatLngBounds | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [altRange, setAltRange] = useState<[number, number] | null>(null);
   const [pointCount, setPointCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   /** "在高德地图打开起点"的链接（用换算后的 GCJ-02 坐标，点开就落在正确位置） */
   const [amapUrl, setAmapUrl] = useState<string | null>(null);
+  /** 底图瓦片加载失败（域名不通 / 被拦）：要说出来，不然只剩一片灰说不清 */
+  const [tileError, setTileError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,17 +125,22 @@ export function LogFlightMap({
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
+        boundsRef.current = null;
       }
     };
   }, []);
 
   useEffect(() => {
-    if (state === "ready" && mapRef.current) {
-      const timer = setTimeout(() => {
-        mapRef.current?.invalidateSize();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
+    if (state !== "ready" || !mapRef.current) return;
+    // 容器尺寸可能到下一帧才稳定：先让 Leaflet 重新量一次，再按同一组 bounds 重新 fit——
+    // 只 invalidateSize 不重 fit 的话，首帧量到 0×0 时会永远停在全球视野（比例尺显示 10000 km）
+    const timer = setTimeout(() => {
+      const map = mapRef.current;
+      if (!map) return;
+      map.invalidateSize();
+      if (boundsRef.current) map.fitBounds(boundsRef.current, { padding: [20, 20] });
+    }, 100);
+    return () => clearTimeout(timer);
   }, [state]);
 
   function buildMap(L: LeafletModule, points: GpsPoint[]) {
@@ -165,6 +177,9 @@ export function LogFlightMap({
     // 默认卫星影像 + 标注：一眼能看出飞在哪片地/哪个园区；街道图在同一控件里切换
     satellite.addTo(map);
     satelliteLabels.addTo(map);
+    // 瓦片挂了（域名不通 / 被拦）要说话：否则用户只看到一片灰，分不清"没轨迹"还是"没底图"
+    satellite.on("tileerror", () => setTileError(true));
+    map.on("tileload", () => setTileError(false));
     L.control
       .layers(
         { 卫星影像: satellite, 街道图: street },
@@ -215,6 +230,7 @@ export function LogFlightMap({
       .addTo(map);
 
     const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lon] as [number, number]));
+    boundsRef.current = bounds;
     map.fitBounds(bounds, { padding: [20, 20] });
   }
 
@@ -238,24 +254,30 @@ export function LogFlightMap({
         )}
       </h4>
 
-      {state === "loading" && (
-        <div className="flex items-center justify-center gap-2 rounded-lg py-10 text-xs text-muted">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          加载 GPS 轨迹…
-        </div>
-      )}
+      {/* 容器**始终可见**：Leaflet 建图时要拿到真实尺寸，曾经是 display:none 时建图 →
+          尺寸算成 0×0 → fitBounds 只能给到全球视野（比例尺 10000 km），事后 invalidateSize
+          也救不回缩放级别。加载/错误状态改用浮层盖住。 */}
+      <div className="relative">
+        <div ref={containerRef} className="h-[320px] w-full overflow-hidden rounded-lg" />
+        {state !== "ready" && (
+          <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-surface-2 p-4 text-center text-xs text-muted">
+            {state === "loading" ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                加载 GPS 轨迹…
+              </span>
+            ) : (
+              (errorMsg ?? "无法加载 GPS 轨迹数据")
+            )}
+          </div>
+        )}
+      </div>
 
-      {state === "error" && (
-        <p className="rounded-lg py-6 text-center text-xs text-muted">
-          {errorMsg ?? "无法加载 GPS 轨迹数据"}
+      {state === "ready" && tileError && (
+        <p className="mt-2 text-[11px] text-muted">
+          底图瓦片加载失败（网络不可达或被拦）——轨迹与起终点仍然有效，可切到右上角的「街道图」重试。
         </p>
       )}
-
-      <div
-        ref={containerRef}
-        className="h-[320px] w-full overflow-hidden rounded-lg"
-        style={{ display: state === "ready" ? "block" : "none" }}
-      />
 
       {state === "ready" && altRange && (
         <div className="mt-2 flex items-center gap-2 text-[11px] text-muted">
