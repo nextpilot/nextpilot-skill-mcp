@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -86,28 +86,40 @@ function fmtSize(bytes?: number): string {
  * 瓦片与折线用同一套像素换算，所以对齐；SVG 是矢量的，悬停放大不糊。
  * 坐标同样要先 WGS-84 → GCJ-02（高德是偏移坐标系），否则轨迹整体偏几百米。
  */
-function TrackThumb({ points, last }: { points?: [number, number][]; last?: boolean; }) {
+function TrackThumb({ points }: { points?: [number, number][]; }) {
   // 宽度跟着列走（w-full + 4:3 比例）：写成固定 64×48 的话，列比它宽一截时两侧就留白，
   // 比例仍按 4:3 保持——viewBox 是 100×75，且 preserveAspectRatio="none"，比例一歪轨迹就拉伸变形。
-  //
-  // 悬停放大的两个坑：
-  //   1. 放大后会被**下面几行的单元格盖住**——表格单元格按行序绘制，后面的行自然画在前面行的内容之上。
-  //      解法是让所在的 <td> 在悬停时 `relative z-30`（悬停子元素时祖先也匹配 :hover），
-  //      带 z-index 的定位元素会挪到"定位层"绘制，压过所有常规流内容；
-  //   2. 放大后可能被滚动容器（max-h-[560px] overflow-auto）裁掉——所以从**左上角**展开：
-  //      普通行向下展开，最后一行改为从下往上（下面没地方了）。
-  const base =
+  const box =
     "block w-full aspect-[4/3] shrink-0 overflow-hidden rounded-md border border-border bg-surface-2";
-  const zoom =
-    "transition-transform duration-150 hover:scale-[2.6] hover:border-primary hover:shadow-lg " +
-    (last ? "origin-bottom-left" : "origin-top-left");
-
   const view = useMemo(() => buildThumbView(points), [points]);
+
+  // 悬停放大用**固定定位的浮层**，而不是给这个盒子加 CSS scale：
+  //   1. 列表在 `max-h-[560px] overflow-auto` 里，scale 撑出去的部分会被**滚动容器裁掉**
+  //      （首行顶部、末行底部、右边界都会缺一块）；
+  //   2. 表格单元格按行序绘制，后面的行天然盖在前面行的内容之上，scale 出来的那层要跟
+  //      一格格的 td 抢绘制顺序（试过给 td 加 relative + z-30，仍然受裁剪）；
+  //   `position: fixed` 直接脱离滚动容器与堆叠上下文，位置按缩略图的屏幕坐标算，稳。
+  const ref = useRef<HTMLSpanElement>(null);
+  const [anchor, setAnchor] = useState<{ left: number; top: number; } | null>(null);
+
+  const showPreview = () => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r) return;
+    // 默认展在右边；右边放不下就翻到左边，上下同样夹在视口内（预览 320×240）
+    const W = 320;
+    const H = 240;
+    const gap = 8;
+    let left = r.right + gap;
+    if (left + W > window.innerWidth - gap) left = Math.max(gap, r.left - W - gap);
+    let top = r.top;
+    if (top + H > window.innerHeight - gap) top = Math.max(gap, window.innerHeight - H - gap);
+    setAnchor({ left, top });
+  };
 
   if (!view) {
     return (
       <span
-        className={`${base} flex items-center justify-center`}
+        className={`${box} flex items-center justify-center`}
         title="这份记录还没有轨迹缩略图——打开一次报告就会补上"
       >
         <MapPin className="h-4 w-4 text-faint" />
@@ -115,37 +127,63 @@ function TrackThumb({ points, last }: { points?: [number, number][]; last?: bool
     );
   }
 
+  return (
+    <>
+      <span
+        ref={ref}
+        className={`${box} transition-colors duration-150 hover:border-primary`}
+        title={`轨迹缩略图（${points?.length ?? 0} 点）`}
+        onMouseEnter={showPreview}
+        onMouseLeave={() => setAnchor(null)}
+      >
+        <ThumbContent view={view} />
+      </span>
+      {anchor && (
+        // pointer-events-none：浮层只是"看"，不能让鼠标移到它上面时把 hover 断掉或被它挡住点击
+        <span
+          className="pointer-events-none fixed z-50 block overflow-hidden rounded-md border border-primary bg-surface-2 shadow-xl"
+          style={{ left: anchor.left, top: anchor.top, width: 320, height: 240 }}
+        >
+          <ThumbContent view={view} />
+        </span>
+      )}
+    </>
+  );
+}
+
+/** 缩略图内容（瓦片 + 轨迹折线）：小格子与大预览共用一份，两者才严格对齐 */
+function ThumbContent({ view }: { view: ThumbView }) {
   const { tiles, line, start: st, end: en } = view;
   return (
-    <span className={`${base} ${zoom}`} title={`轨迹缩略图（${points?.length ?? 0} 点）`}>
-      <span className="relative block h-full w-full">
-        {tiles.map((t) => (
-          // 瓦片是纯展示，用原生 img 最省事（next/image 会给每种尺寸生成一张，得不偿失）
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            key={`${t.z}/${t.x}/${t.y}`}
-            src={t.url}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            className="absolute max-w-none select-none"
-            style={{ left: t.left, top: t.top, width: t.w, height: t.h }}
-          />
-        ))}
-        <svg viewBox="0 0 100 75" preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
-          <polyline
-            points={line}
-            fill="none"
-            stroke="#111827"
-            strokeOpacity={0.85}
-            strokeWidth={1.8}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
-          <circle cx={st[0]} cy={st[1]} r={2.6} fill="#22c55e" stroke="#fff" strokeWidth={0.8} />
-          <circle cx={en[0]} cy={en[1]} r={2.6} fill="#ef4444" stroke="#fff" strokeWidth={0.8} />
-        </svg>
-      </span>
+    <span className="relative block h-full w-full">
+      {tiles.map((t) => (
+        // 瓦片是纯展示，用原生 img 最省事（next/image 会给每种尺寸生成一张，得不偿失）
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={`${t.z}/${t.x}/${t.y}`}
+          src={t.url}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="absolute max-w-none select-none"
+          style={{ left: t.left, top: t.top, width: t.w, height: t.h }}
+        />
+      ))}
+      {/* non-scaling-stroke：盒子从 76px 放大到 320px 时线宽仍是 2px，不跟着变粗 */}
+      <svg viewBox="0 0 100 75" preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
+        <polyline
+          points={line}
+          fill="none"
+          stroke="#111827"
+          strokeOpacity={0.85}
+          strokeWidth={2}
+          vectorEffect="non-scaling-stroke"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        <circle cx={st[0]} cy={st[1]} r={2.6} fill="#22c55e" stroke="#fff" strokeWidth={0.8} />
+        <circle cx={en[0]} cy={en[1]} r={2.6} fill="#ef4444" stroke="#fff" strokeWidth={0.8} />
+      </svg>
     </span>
   );
 }
@@ -485,7 +523,7 @@ export function HistoryList({
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r, idx) => {
+              {filtered.map((r) => {
                 // 双保险：cloud item 用 findingCount，local item 用 findings 数组；
                 // 两者都缺失时（极旧的本地记录）按 0 处理，不渲染崩页面
                 const findings = Array.isArray(r.findings) ? r.findings : [];
@@ -511,10 +549,9 @@ export function HistoryList({
                     }}
                     className="cursor-pointer border-t border-border/30 hover:bg-surface-2"
                   >
-                    {/* relative + 悬停 z-30：缩略图放大后要压过下面几行的单元格（表格按行序绘制） */}
-                    <td className="relative py-2 pr-2 align-middle hover:z-30">
+                    <td className="py-2 pr-2 align-middle">
                       <div className="flex justify-center">
-                        <TrackThumb points={r.trackThumb} last={idx === filtered.length - 1} />
+                        <TrackThumb points={r.trackThumb} />
                       </div>
                     </td>
                     <td className="py-2 pr-2 text-center font-mono break-words text-text">

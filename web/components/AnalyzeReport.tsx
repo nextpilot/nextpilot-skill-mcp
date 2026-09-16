@@ -555,13 +555,6 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
       title: "载具累计飞行时长（参数 LND_FLIGHT_T_HI/LO）",
     });
   }
-  if (report.facts?.armedDurationSec) {
-    rows.push({
-      label: "本次飞行时长",
-      value: formatDuration(report.facts.armedDurationSec),
-      title: "本次日志里解锁（armed）的累计时长",
-    });
-  }
   if (g?.startUtc) {
     const d = new Date(g.startUtc * 1000);
     rows.push({
@@ -569,6 +562,13 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
       value: formatDateTime(d),
       title: `记录起始时刻（本机时区）。UTC：${d.toISOString().replace("T", " ").slice(0, 19)}`,
     });
+      if (report.facts?.armedDurationSec) {
+    rows.push({
+      label: "本次飞行时长",
+      value: formatDuration(report.facts.armedDurationSec),
+      title: "本次日志里解锁（armed）的累计时长",
+    });
+  }
   }
 
   // 软件版本：分支 / 标签（ver_sw_branch）+ git 提交（ver_sw）。老固件没有 branch，
