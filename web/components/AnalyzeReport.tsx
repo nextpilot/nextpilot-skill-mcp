@@ -473,11 +473,12 @@ function FindingCard({ finding }: { finding: Finding }) {
   );
 }
 
-/** 秒数 → `hh时mm分ss秒`（小时不封顶：累计飞行常是几百小时，不折成"天"） */
+/** 秒数 → `hh 时 mm 分 ss 秒`（小时不封顶：累计飞行常是几百小时，不折成"天"） */
 function formatHms(sec: number): string {
   const s = Math.max(0, Math.round(sec));
   const p = (n: number) => String(n).padStart(2, "0");
-  return `${p(Math.floor(s / 3600))}时${p(Math.floor((s % 3600) / 60))}分${p(s % 60)}秒`;
+  // 数字与单位之间留空格（与「1 分 24 秒」那种写法一致，挤在一起太密）
+  return `${p(Math.floor(s / 3600))} 时 ${p(Math.floor((s % 3600) / 60))} 分 ${p(s % 60)} 秒`;
 }
 
 /** 秒数 → "3 天 4 小时 21 分 8 秒"（不足一天的省略"天"） */
