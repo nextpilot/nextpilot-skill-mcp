@@ -94,10 +94,11 @@ export function AnalyzeEntryClient() {
       <h1 className="text-[24px] font-semibold tracking-[-0.02em]">
         <LocalizedText zh="PX4 飞行日志分析" en="PX4 flight log analysis" />
       </h1>
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+      {/* 占满容器宽度（原来 max-w-3xl 会在宽屏上提前折行，看着像半截的说明） */}
+      <p className="mt-2 text-sm leading-6 text-muted">
         <LocalizedText
-          zh="确定性引擎负责数值判断（解析 → 规则检查 → 故障知识库匹配），DeepSeek 只把结构化结果翻译成中文，不参与任何数值判断。"
-          en="The deterministic engine makes every numeric call (parse → rule checks → fault knowledge base); DeepSeek only translates the structured result into Chinese."
+          zh="判断与解释分得很开：**判断全在浏览器里由确定性引擎完成**——Pyodide（WASM Python）在 Web Worker 中跑 pyulog 解析 .ulg 的参数、信息字典、日志与事件、以及各路时间序列；算子做信号预处理（姿态、振动、功率、高度…），数据质量 guard 先标出样本不足 / 中途重启 / 丢包偏多 / 温度突变这类前提，再逐条跑 32 条检查规则（一条经验一个 YAML 文件，阈值、适用固件与机架、判定表达式、官方文档出处都可追溯），命中的异常标签再进故障知识库匹配出可能的根因与排查步骤。DeepSeek 拿到的只是这份结构化结果——不含原始日志、不含 GPS 坐标——按 GJB-841 的范式翻译成中文：它能解释、能组织语言、能按严重度排优先级，但不做任何数值判断，报告里的每个数字都能对回具体字段与阈值。原始日志始终留在这台设备上，从未上传。"
+          en="Judgement and explanation are strictly separated: every numeric call is made by the deterministic engine inside your browser — Pyodide (WASM Python) runs pyulog in a Web Worker to parse the .ulg (parameters, info dictionary, logged messages and events, plus every time series); operators do the signal preprocessing (attitude, vibration, power, altitude…), data-quality guards flag the premises first (too little data, mid-log restart, excessive dropouts, temperature swings), then 32 check rules run one by one (one YAML file per piece of experience, with thresholds, applicable firmware and airframe, the decision expression and the official doc reference all traceable), and the tags they hit are matched against the fault knowledge base for likely root causes and troubleshooting steps. DeepSeek only receives that structured result — no raw log, no GPS coordinates — and translates it into Chinese following the GJB-841 template: it may explain, phrase and rank by severity, but it makes no numeric judgement, and every number in the report maps back to a field and a threshold. The raw log never leaves this device."
         />
       </p>
 
