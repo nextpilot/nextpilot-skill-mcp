@@ -328,17 +328,17 @@ export function HistoryList({
                   title={`分析时间：${fmtTime(r.analyzedAt)}`}
                 >
                   <span className="flex items-center gap-1" title="飞行时间（日志记录的起始时刻）">
-                    <Clock className="h-3 w-3 shrink-0 text-faint" />
+                    <Clock className="h-3.5 w-3.5 shrink-0 text-muted" />
                     <span className="font-mono">
                       {r.facts?.startUtc ? fmtTime(new Date(r.facts.startUtc * 1000).toISOString()) : fmtTime(r.analyzedAt)}
                     </span>
                   </span>
                   <span className="flex items-center gap-1" title="日志文件大小">
-                    <FileText className="h-3 w-3 shrink-0 text-faint" />
+                    <FileText className="h-3.5 w-3.5 shrink-0 text-muted" />
                     {fmtSize(r.fileSize)}
                   </span>
                   <span className="flex items-center gap-1" title="日志时长">
-                    <Timer className="h-3 w-3 shrink-0 text-faint" />
+                    <Timer className="h-3.5 w-3.5 shrink-0 text-muted" />
                     {fmtDuration(r.durationSec ?? r.facts?.durationSec)}
                   </span>
                   {r.vehicleType && (
@@ -346,7 +346,7 @@ export function HistoryList({
                       className="flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] text-text"
                       title="机型与机架编号（SYS_AUTOSTART）"
                     >
-                      <Plane className="h-3 w-3 shrink-0" />
+                      <Plane className="h-3.5 w-3.5 shrink-0 text-text" />
                       {VEHICLE_TYPE_LABELS[r.vehicleType] ?? r.vehicleType}
                       {r.facts?.airframeId ? `（机架 ${r.facts.airframeId}）` : ""}
                     </span>
@@ -356,7 +356,7 @@ export function HistoryList({
                       className="flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] text-faint"
                       title="硬件版本（ver_hw）"
                     >
-                      <Cpu className="h-3 w-3 shrink-0" />
+                      <Cpu className="h-3.5 w-3.5 shrink-0 text-muted" />
                       {r.verHw}
                     </span>
                   )}
@@ -365,7 +365,7 @@ export function HistoryList({
                       className="flex items-center gap-1 rounded bg-surface-2 px-1.5 py-0.5 text-[11px] font-mono text-faint"
                       title={r.facts?.verSwBranch ? `固件分支（ver_sw_branch）；commit ${r.verSw ?? "?"}` : "固件 commit（ver_sw）"}
                     >
-                      <GitBranch className="h-3 w-3 shrink-0" />
+                      <GitBranch className="h-3.5 w-3.5 shrink-0 text-muted" />
                       {r.facts?.verSwBranch || r.verSw}
                     </span>
                   )}
