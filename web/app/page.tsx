@@ -115,7 +115,7 @@ export default function HomePage() {
           aria-hidden
         />
 
-        <div className="page-shell relative py-20 lg:py-28">
+        <div className="page-shell relative pt-20 pb-12 lg:pt-28 lg:pb-14">
           <div className="grid items-center gap-10 lg:grid-cols-[1fr_360px] lg:gap-16">
             {/* 左：文案 */}
             <div>
