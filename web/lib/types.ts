@@ -184,7 +184,10 @@ export interface TrackData {
   lat: number[];
   lon: number[];
   alt: number[];
+  /** 有效定位点总数（已剔除未定位的采样） */
   fullCount?: number;
+  /** 被剔除的未定位采样数（lat=lon=0 或 fix_type < 3）；>0 时界面要说明 */
+  dropped?: number;
   error?: string;
 }
 

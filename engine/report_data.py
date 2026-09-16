@@ -166,15 +166,36 @@ def np_track(max_points=None):
             return
 
     ts = np.asarray(d.data["timestamp"], dtype=np.int64)
+    lat = cols["lat"] * scales["lat"]
+    lon = cols["lon"] * scales["lon"]
     n = len(ts)
-    step = max(1, int(np.ceil(n / limit)))     # 轨迹用等距抽样：路径形状比峰值更需要均匀
-    idx = list(range(0, n, step))
+
+    # GPS 没定位时的采样必须剔掉：PX4 在拿到定位前会连着记 lat=lon=0（几内亚湾那个"空岛"），
+    # 一条直线就从那儿连到真正的航迹上——地图上看着完全不对（实测用户日志就是这样）。
+    # 判据：坐标在合法范围、不是 (0,0)、且（有 fix_type 时）fix_type ≥ 3 才算 3D 定位。
+    valid = np.isfinite(lat) & np.isfinite(lon)
+    valid &= (np.abs(lat) <= 90.0) & (np.abs(lon) <= 180.0)
+    valid &= ~((np.abs(lat) < 1e-7) & (np.abs(lon) < 1e-7))
+    fix = d.data.get("fix_type")
+    if fix is not None:
+        valid &= np.asarray(fix) >= 3
+    idx_valid = np.nonzero(valid)[0]
+    if len(idx_valid) < 2:
+        __result = json.dumps({"error": "这段日志没有有效的 GPS 定位点（未定位的采样已剔除）"})
+        return
+
+    dropped = int(n - len(idx_valid))
+    # 轨迹用等距抽样：路径形状比峰值更需要均匀（在有效点里抽，别把 invalid 又抽回来）
+    step = max(1, int(np.ceil(len(idx_valid) / limit)))
+    idx = [int(i) for i in idx_valid[::step]]
     __result = json.dumps({
         "t": [_since_boot(ts[i]) for i in idx],
-        "lat": [_clean(cols["lat"][i] * scales["lat"]) for i in idx],
-        "lon": [_clean(cols["lon"][i] * scales["lon"]) for i in idx],
+        "lat": [_clean(lat[i]) for i in idx],
+        "lon": [_clean(lon[i]) for i in idx],
         "alt": [_clean(cols["alt"][i] * scales["alt"]) for i in idx],
-        "fullCount": n,
+        "fullCount": len(idx_valid),
+        # 剔掉了多少未定位采样：界面据此说明"点数为什么比采样数少"
+        "dropped": dropped,
     }, ensure_ascii=False)
 
 

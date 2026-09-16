@@ -55,6 +55,8 @@ export function LogFlightMap({
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [altRange, setAltRange] = useState<[number, number] | null>(null);
   const [pointCount, setPointCount] = useState(0);
+  /** 被剔除的未定位采样数（GPS 没定位时 PX4 会记 lat=lon=0，画进来就是一条飞出非洲的直线） */
+  const [droppedCount, setDroppedCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   /** "在高德地图打开起点"的链接（用换算后的 GCJ-02 坐标，点开就落在正确位置） */
   const [amapUrl, setAmapUrl] = useState<string | null>(null);
@@ -96,6 +98,7 @@ export function LogFlightMap({
         const alts = points.map((p) => p.alt);
         setAltRange([Math.min(...alts), Math.max(...alts)]);
         setPointCount(points.length);
+        setDroppedCount(track.dropped ?? 0);
         // 底图是高德的 GCJ-02，日志是 WGS-84：画之前统一换算，否则轨迹整体偏几百米。
         // 只换算画图用的那份，"这份轨迹是 WGS-84" 的事实不被改写。
         const drawPoints = points.map((p) => {
@@ -239,6 +242,7 @@ export function LogFlightMap({
       <h4 className="mb-2 flex flex-wrap items-center gap-1.5 text-xs font-medium text-muted">
         <MapPin className="h-3.5 w-3.5" />
         GPS 轨迹 · {pointCount > 0 ? `${pointCount} 点` : ""}
+        {droppedCount > 0 ? `（已剔除 ${droppedCount} 个未定位采样）` : ""}
         <span className="text-faint">
           （底图高德，坐标已从 WGS-84 换算到 GCJ-02；右上角可切街道图）
         </span>
@@ -258,7 +262,7 @@ export function LogFlightMap({
           尺寸算成 0×0 → fitBounds 只能给到全球视野（比例尺 10000 km），事后 invalidateSize
           也救不回缩放级别。加载/错误状态改用浮层盖住。 */}
       <div className="relative">
-        <div ref={containerRef} className="h-[320px] w-full overflow-hidden rounded-lg" />
+        <div ref={containerRef} className="h-[380px] w-full overflow-hidden rounded-lg sm:h-[520px]" />
         {state !== "ready" && (
           <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-surface-2 p-4 text-center text-xs text-muted">
             {state === "loading" ? (
