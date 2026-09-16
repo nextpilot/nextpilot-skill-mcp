@@ -13,7 +13,14 @@
       "firmware": "1.17.0",
       "firmwareProfile": "px4-1.15+",
       "hardware": "PX4_FMU_V5",
+      "modes": [
+        "Hold",
+        "Return",
+        "Mission",
+        "Manual"
+      ],
       "mainMode": "Hold",
+      "firmwareDisplay": "v1.17.0-alpha",
       "uuid": "000200000000323335373233510100410023",
       "vehicleLifeS": 650.9,
       "airframeId": 2100,

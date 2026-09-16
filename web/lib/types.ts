@@ -123,6 +123,10 @@ export interface LogFacts {
   verSwBranch?: string;
   /** 主飞行模式：占样本最多的 nav_state（PX4 模式名，如 Position / Mission） */
   mainMode?: string;
+  /** 这次日志出现过的全部模式，按占样本数从多到少（Flight Review browse 页也是列全量） */
+  modes?: string[];
+  /** 软件版本的展示串（FR 口径：`v1.16.0` / `v1.15.0-beta (6ea3539)` / 无发布号时给短哈希） */
+  firmwareDisplay?: string;
 }
 
 /** 概览指标的一项：order/label/unit 由 knowledge/px4/facts.yaml 的 metrics 声明 */

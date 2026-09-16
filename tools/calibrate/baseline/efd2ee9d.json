@@ -13,7 +13,13 @@
       "firmware": "1.15.0",
       "firmwareProfile": "px4-1.15+",
       "hardware": "DAMIAO_DM_FC01",
+      "modes": [
+        "Position",
+        "Stabilized",
+        "Altitude"
+      ],
       "mainMode": "Position",
+      "firmwareDisplay": "v1.15.0 (479ee0)",
       "uuid": "0006000000003638373135335105003e0027",
       "verSwBranch": "damiao_dm-fc01_v1.15.0",
       "vehicleLifeS": 579.5,

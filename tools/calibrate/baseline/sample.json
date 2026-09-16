@@ -13,7 +13,11 @@
       "firmware": "未知（旧固件或无版本号）",
       "firmwareProfile": "px4-legacy",
       "hardware": "AUAV_X21",
+      "modes": [
+        "Manual"
+      ],
       "mainMode": "Manual",
+      "firmwareDisplay": "fd4833",
       "airframeId": 10020,
       "armedDurationSec": 0.0,
       "phases": [],

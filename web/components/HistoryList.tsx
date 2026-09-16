@@ -20,6 +20,8 @@ import {
 import type { SavedReport } from "@/lib/report-history";
 import { formatDateTime } from "@/lib/format";
 import { modeStyle } from "@/lib/phase-colors";
+import { wgs84ToGcj02 } from "@/lib/coord";
+import { AMAP_SATELLITE, TILE_SIZE, latToWorldY, lonToWorldX, tileUrl } from "@/lib/amap-tiles";
 
 const VEHICLE_TYPE_LABELS: Record<string, string> = {
   rotary_wing: "旋翼",
@@ -84,22 +86,21 @@ function fmtSize(bytes?: number): string {
 }
 
 /**
- * 轨迹缩略图：把降采样后的经纬点画成 SVG 折线（不加载地图瓦片——列表里几十张图，
- * 每张都起一个 Leaflet 实例既慢又费内存）。等距圆柱投影 + 保持纵横比，北向上。
- * 老记录没有缩略图（trackThumb 是后加的字段），打开一次报告就会补上。
+ * 轨迹缩略图：**高德瓦片当底 + 轨迹折线**（对齐 Flight Review browse 页的 Overview 那张地图）。
+ *
+ * 与报告页那张大地图的区别：这里不起 Leaflet 实例（列表里几十行，每行一个地图实例又慢又费内存），
+ * 而是自己算墨卡托像素：挑一个能把轨迹装进一张瓦片的层级 → 铺 1~4 张 <img> 瓦片 → 上面叠 SVG 折线。
+ * 瓦片与折线用同一套像素换算，所以对齐；SVG 是矢量的，悬停放大不糊。
+ * 坐标同样要先 WGS-84 → GCJ-02（高德是偏移坐标系），否则轨迹整体偏几百米。
  */
-/** 文件名只显示第一段（按 '-' 切）：UUID 命名的日志用后一段区分，列表里够用了 */
-function shortName(fileName: string): string {
-  const i = fileName.indexOf("-");
-  return i > 0 ? fileName.slice(0, i) : fileName;
-}
-
 function TrackThumb({ points }: { points?: [number, number][]; }) {
-  // 悬停放大成预览：SVG 是矢量的，放大不糊；transform 自带层叠上下文，z-20 能盖住右边的内容
   const box =
     "block h-12 w-16 shrink-0 overflow-hidden rounded-md border border-border bg-surface-2 " +
     "transition-transform duration-150 origin-left hover:z-20 hover:scale-[2.6] hover:border-primary hover:shadow-lg";
-  if (!points || points.length < 2) {
+
+  const view = useMemo(() => buildThumbView(points), [points]);
+
+  if (!view) {
     return (
       <span
         className={`${box} flex items-center justify-center`}
@@ -110,47 +111,137 @@ function TrackThumb({ points }: { points?: [number, number][]; }) {
     );
   }
 
-  const lats = points.map((p) => p[0]);
-  const lons = points.map((p) => p[1]);
+  const { tiles, line, start: st, end: en } = view;
+  return (
+    <span className={box} title={`轨迹缩略图（${points?.length ?? 0} 点）`}>
+      <span className="relative block h-full w-full">
+        {tiles.map((t) => (
+          // 瓦片是纯展示，用原生 img 最省事（next/image 会给每种尺寸生成一张，得不偿失）
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={`${t.z}/${t.x}/${t.y}`}
+            src={t.url}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="absolute max-w-none select-none"
+            style={{ left: t.left, top: t.top, width: t.w, height: t.h }}
+          />
+        ))}
+        <svg viewBox="0 0 100 75" preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
+          <polyline
+            points={line}
+            fill="none"
+            stroke="#111827"
+            strokeOpacity={0.85}
+            strokeWidth={1.8}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+          <circle cx={st[0]} cy={st[1]} r={2.6} fill="#22c55e" stroke="#fff" strokeWidth={0.8} />
+          <circle cx={en[0]} cy={en[1]} r={2.6} fill="#ef4444" stroke="#fff" strokeWidth={0.8} />
+        </svg>
+      </span>
+    </span>
+  );
+}
+
+/** 缩略图盒子与 viewBox 比例（100×75 → 64×48 像素） */
+const THUMB_VB_W = 100;
+const THUMB_VB_H = 75;
+
+type ThumbView = {
+  tiles: { url: string; x: number; y: number; z: number; left: string; top: string; w: string; h: string; }[];
+  line: string;
+  start: [number, number];
+  end: [number, number];
+};
+
+/** 算缩略图要铺哪些瓦片、折线画在哪（像素坐标直接给 CSS 用） */
+function buildThumbView(points?: [number, number][]): ThumbView | null {
+  if (!points || points.length < 2) return null;
+
+  // 先转到 GCJ-02（底图坐标系），否则轨迹与地图整体错位
+  const gcj = points.map(([lat, lon]) => wgs84ToGcj02(lat, lon));
+  const lats = gcj.map((p) => p[0]);
+  const lons = gcj.map((p) => p[1]);
   const minLat = Math.min(...lats);
   const maxLat = Math.max(...lats);
   const minLon = Math.min(...lons);
   const maxLon = Math.max(...lons);
-  // 经度按中心纬度收缩，形状才不会被横向拉长
-  const kx = Math.cos((((minLat + maxLat) / 2) * Math.PI) / 180);
-  const spanX = Math.max((maxLon - minLon) * kx, 1e-9);
-  const spanY = Math.max(maxLat - minLat, 1e-9);
-  const W = 100;
-  const H = 80;
-  const pad = 7;
-  const scale = Math.min((W - 2 * pad) / spanX, (H - 2 * pad) / spanY);
-  const ox = (W - spanX * scale) / 2;
-  const oy = (H - spanY * scale) / 2;
-  const xy = points.map(([lat, lon]) => {
-    const x = ox + (lon - minLon) * kx * scale;
-    const y = H - (oy + (lat - minLat) * scale); // 北向上
-    return [x, y] as const;
-  });
-  const [sx, sy] = xy[0];
-  const [ex, ey] = xy[xy.length - 1];
 
-  return (
-    <span className={box} title={`轨迹缩略图（${points.length} 点）`}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="h-full w-full" preserveAspectRatio="xMidYMid meet">
-        <polyline
-          points={xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ")}
-          fill="none"
-          stroke="currentColor"
-          className="text-primary"
-          strokeWidth={1.6}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-        <circle cx={sx} cy={sy} r={2.4} fill="#22c55e" />
-        <circle cx={ex} cy={ey} r={2.4} fill="#ef4444" />
-      </svg>
-    </span>
-  );
+  // 挑层级：让轨迹在瓦片像素里占 ~150px（一张 256 的瓦片装得下，四周还留边）
+  const spanLon = Math.max(maxLon - minLon, 1e-6);
+  const spanLat = Math.max(maxLat - minLat, 1e-6);
+  const targetPx = 150;
+  const zLon = Math.log2((targetPx * 360) / (spanLon * TILE_SIZE));
+  // 纬度方向按墨卡托近似（cos 修正后与经度同尺度）
+  const zLat = Math.log2((targetPx * 360) / (spanLat * (1 / Math.cos((((minLat + maxLat) / 2) * Math.PI) / 180)) * TILE_SIZE));
+  const z = Math.max(3, Math.min(17, Math.floor(Math.min(zLon, zLat))));
+
+  const xs = gcj.map((p) => lonToWorldX(p[1], z));
+  const ys = gcj.map((p) => latToWorldY(p[0], z));
+  const px0 = Math.min(...xs);
+  const px1 = Math.max(...xs);
+  const py0 = Math.min(...ys);
+  const py1 = Math.max(...ys);
+
+  // 轨迹在世界像素里的范围 + 留白 → 映射到 viewBox
+  const padPx = 12;
+  const worldW = Math.max(px1 - px0 + padPx * 2, 1);
+  const worldH = Math.max(py1 - py0 + padPx * 2, 1);
+  const scale = Math.min(THUMB_VB_W / worldW, THUMB_VB_H / worldH);
+  // 居中
+  const offX = (THUMB_VB_W - worldW * scale) / 2 - (px0 - padPx) * scale;
+  const offY = (THUMB_VB_H - worldH * scale) / 2 - (py0 - padPx) * scale;
+
+  const toVB = (wx: number, wy: number): [number, number] => [wx * scale + offX, wy * scale + offY];
+
+  // 瓦片网格：覆盖 viewBox 对应的世界像素范围（通常 1 张，轨迹跨越时 2~4 张）
+  const wx0 = (0 - offX) / scale;
+  const wy0 = (0 - offY) / scale;
+  const wx1 = (THUMB_VB_W - offX) / scale;
+  const wy1 = (THUMB_VB_H - offY) / scale;
+  const tx0 = Math.floor(wx0 / TILE_SIZE);
+  const tx1 = Math.floor(wx1 / TILE_SIZE);
+  const ty0 = Math.floor(wy0 / TILE_SIZE);
+  const ty1 = Math.floor(wy1 / TILE_SIZE);
+  const maxIndex = 2 ** z - 1;
+  const tiles: ThumbView["tiles"] = [];
+  let i = 0;
+  for (let tx = tx0; tx <= tx1; tx++) {
+    for (let ty = ty0; ty <= ty1; ty++) {
+      if (tx < 0 || ty < 0 || tx > maxIndex || ty > maxIndex) continue;
+      const [lx, ly] = toVB(tx * TILE_SIZE, ty * TILE_SIZE);
+      // left/width 的百分比相对盒宽（100 个 viewBox 单位），top/height 相对盒高（75 个）
+      const side = TILE_SIZE * scale;
+      tiles.push({
+        url: tileUrl(AMAP_SATELLITE, tx, ty, z, i++),
+        x: tx,
+        y: ty,
+        z,
+        left: `${((lx / THUMB_VB_W) * 100).toFixed(2)}%`,
+        top: `${((ly / THUMB_VB_H) * 100).toFixed(2)}%`,
+        w: `${((side / THUMB_VB_W) * 100).toFixed(2)}%`,
+        h: `${((side / THUMB_VB_H) * 100).toFixed(2)}%`,
+      });
+    }
+  }
+
+  const line = gcj
+    .map((_, idx) => toVB(xs[idx], ys[idx]))
+    .map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`)
+    .join(" ");
+  const start = toVB(xs[0], ys[0]);
+  const end = toVB(xs[xs.length - 1], ys[ys.length - 1]);
+
+  return { tiles, line, start, end };
+}
+
+/** 文件名只显示第一段（按 '-' 切）：UUID 命名的日志用后一段区分，列表里够用了 */
+function shortName(fileName: string): string {
+  const i = fileName.indexOf("-");
+  return i > 0 ? fileName.slice(0, i) : fileName;
 }
 
 export function HistoryList({
@@ -373,8 +464,8 @@ export function HistoryList({
                 <th className="w-[8%] pb-2 pr-2 font-normal">软件</th>
                 <th className="w-[12%] pb-2 pr-2 font-normal">启动时间</th>
                 <th className="w-[6%] pb-2 pr-2 font-normal">时长</th>
-                <th className="w-[8%] pb-2 pr-2 font-normal">飞行模式</th>
-                <th className="w-[12%] pb-2 pr-2 font-normal">结论</th>
+                <th className="w-[9%] pb-2 pr-2 font-normal">飞行模式</th>
+                <th className="w-[11%] pb-2 pr-2 font-normal">结论</th>
                 <th className="w-[5%] pb-2 font-normal">来源</th>
               </tr>
             </thead>
@@ -431,8 +522,11 @@ export function HistoryList({
                       ) : null}
                     </td>
                     <td className="py-2 pr-2 text-center font-mono break-words text-text">{r.verHw ?? "—"}</td>
-                    <td className="py-2 pr-2 text-center font-mono break-words text-text">
-                      {r.facts?.verSwBranch || r.verSw || "—"}
+                    <td
+                      className="py-2 pr-2 text-center font-mono break-words text-text"
+                      title={r.verSw ? `git ${r.verSw}` : undefined}
+                    >
+                      {r.facts?.firmwareDisplay || r.facts?.verSwBranch || r.verSw || "—"}
                     </td>
                     <td className="py-2 pr-2 text-center font-mono break-words text-text">
                       {r.facts?.startUtc ? formatDateTime(r.facts.startUtc * 1000) : "—"}
@@ -440,8 +534,15 @@ export function HistoryList({
                     <td className="py-2 pr-2 text-center whitespace-nowrap text-text">
                       {fmtDuration(r.durationSec ?? r.facts?.durationSec)}
                     </td>
-                    <td className="py-2 pr-2 text-center whitespace-nowrap text-text" title={r.facts?.mainMode}>
-                      {r.facts?.mainMode ? modeStyle(r.facts.mainMode).label : "—"}
+                    <td
+                      className="py-2 pr-2 text-center text-text"
+                      title={r.facts?.modes?.length ? r.facts.modes.join(", ") : undefined}
+                    >
+                      {r.facts?.modes?.length
+                        ? r.facts.modes.map((m) => modeStyle(m).label).join("、")
+                        : r.facts?.mainMode
+                          ? modeStyle(r.facts.mainMode).label
+                          : "—"}
                     </td>
                     <td className="py-2 text-center whitespace-nowrap">
                       {c ? (

@@ -4,6 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import type { TrackData } from "@/lib/types";
 import { Loader2, MapPin } from "lucide-react";
 import { wgs84ToGcj02 } from "@/lib/coord";
+import {
+  AMAP_ATTRIBUTION,
+  AMAP_SATELLITE,
+  AMAP_SATELLITE_LABELS,
+  AMAP_STREET,
+  FIT_MAX_ZOOM,
+  TILE_MAX_NATIVE_ZOOM,
+  TILE_SUBDOMAINS,
+} from "@/lib/amap-tiles";
 import "leaflet/dist/leaflet.css";
 
 interface GpsPoint {
@@ -17,20 +26,6 @@ interface GpsPoint {
  * 代价是坐标系——高德是 GCJ-02，日志是 WGS-84，所以画之前统一换算（见 lib/coord.ts）。
  * 上线正式域名时建议换成带 key 的正式瓦片服务（高德 JS API 或天地图）。
  */
-// ⚠️ 子域名是 ["1".."4"]，拼出来是 webrd01 / webst01 这类主机名——写成 "01" 会得到
-// webrd001.is.autonavi.com（**该域名不存在**，地图一片灰，实测 curl 直接 DNS 失败）
-const TILE_SUBDOMAINS = ["1", "2", "3", "4"];
-/** 高德瓦片的原生最高级别：再往上要求它没有的图，返回的是空白 → 地图看着"没有图层"。
- *  所以 maxNativeZoom 卡在 18（更高层级由 Leaflet 放大 18 级的瓦片），
- *  默认视野也用 FIT_MAX_ZOOM 卡住，别一进来就顶到没数据的地方 */
-const TILE_MAX_NATIVE_ZOOM = 18;
-const FIT_MAX_ZOOM = 18;
-const AMAP_STREET = "https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}";
-const AMAP_SATELLITE = "https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}";
-const AMAP_SATELLITE_LABELS = "https://webst0{s}.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}";
-const AMAP_ATTRIBUTION = '&copy; <a href="https://www.amap.com/">高德地图</a>';
-
-
 function altitudeColor(alt: number, minAlt: number, maxAlt: number): string {
   if (maxAlt <= minAlt) return "#4a8cf7";
   const t = Math.max(0, Math.min(1, (alt - minAlt) / (maxAlt - minAlt)));

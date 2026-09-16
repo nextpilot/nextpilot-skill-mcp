@@ -1405,6 +1405,7 @@ FW = detect_firmware(ulog)
 FW_MINOR = FW["minor"]
 FW_LABEL = ("%d.%d.%d" % (FW["major"], FW["minor"], FW["patch"])) if FW_MINOR is not None else "未知（旧固件或无版本号）"
 FW_PROFILE = "px4-1.15+" if (FW_MINOR is not None and FW_MINOR >= 15) else "px4-legacy"
+_info = getattr(ulog, "msg_info_dict", {})
 
 def pick_versioned(*candidates):
     """按固件版本优先取字段来源；版本未知时退化为“字段存在性”判定。
@@ -1456,8 +1457,9 @@ facts["firmwareProfile"] = FW_PROFILE
 if FW["hw"]:
     facts["hardware"] = FW["hw"]
 
-# ---------------- 主飞行模式 ----------------
-# 占样本最多的 nav_state 模式（名字取 facts.yaml 的 nav_state_names）——列表"飞行模式"列用一句话概括这次主要怎么飞的
+# ---------------- 飞行模式 ----------------
+# 这次日志里出现过的 nav_state 模式，按占样本数从多到少（名字取 facts.yaml 的 nav_state_names）——
+# 列表的"飞行模式"列按 Flight Review 的口径把**全部**模式列出来（它 browse 页就是逗号分隔的全量）
 _NAV_NAMES = {int(k): v for k, v in FACTS.get("nav_state_names", {}).items()}
 _vs_first = find_all(ulog, _VS["topic"])
 if _vs_first:
@@ -1467,12 +1469,27 @@ if _vs_first:
         for _code in _nav:
             _c = int(_code)
             _counts[_c] = _counts.get(_c, 0) + 1
-        _main = max(_counts, key=_counts.get)
-        facts["mainMode"] = str(_NAV_NAMES.get(_main, "Mode %d" % _main))
+        _ordered = sorted(_counts, key=lambda c: -_counts[c])
+        facts["modes"] = [str(_NAV_NAMES.get(c, "Mode %d" % c)) for c in _ordered]
+        facts["mainMode"] = facts["modes"][0]
+
+# 软件版本的展示串（对齐 Flight Review 的 browse：\`v1.16.0\` / \`v1.15.0-beta (6ea3539)\`）——
+# ver_sw_release 打包是 major<<24 | minor<<16 | patch<<8 | 类型，类型见 PX4 的发布类型码值
+_RELEASE_SUFFIX = {64: "-alpha", 128: "-beta", 192: "-rc", 255: ""}
+_rel = _info.get("ver_sw_release")
+if _rel is not None and FW_MINOR is not None:
+    _type = int(_rel) & 0xFF
+    _ver = "v%d.%d.%d%s" % (FW["major"], FW["minor"], FW["patch"], _RELEASE_SUFFIX.get(_type, ""))
+    _git = str(_info.get("ver_sw", ""))[:6]
+    # 打标签的正式版不带 commit（FR 同款）；开发构建才附短哈希便于对上游
+    facts["firmwareDisplay"] = _ver if _type in _RELEASE_SUFFIX and _type != 0 else (
+        "%s (%s)" % (_ver, _git) if _git else _ver)
+elif str(_info.get("ver_sw", "")):
+    facts["firmwareDisplay"] = str(_info["ver_sw"])[:6]
 
 # ---------------- 载具身份与记录起始时刻 ----------------
 # 这几项与判定无关，但历史卡片与报告概况要用，且必须**随 report 存档**（派生数据 info 不进存档）。
-_info = getattr(ulog, "msg_info_dict", {})
+
 uuid = str(_info.get("sys_uuid", ""))
 if uuid:
     facts["uuid"] = uuid
