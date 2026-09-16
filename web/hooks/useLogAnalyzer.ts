@@ -21,6 +21,8 @@ import {
     initReportStore,
     listReports,
     newReportId,
+    makeTrackThumb,
+    patchReport,
     saveReport,
     saveReportData,
     type SavedReport,
@@ -536,7 +538,11 @@ export function useLogAnalyzer() {
             if (data.info) setInfo(data.info as LogInfo);
             const panels = data.plotPanels;
             if (panels?.length) setStoredPlots({ panels, series: data.plotSeries ?? {} });
-            if (data.track && !data.track.error) setStoredTrack(data.track);
+            if (data.track && !data.track.error) {
+                setStoredTrack(data.track);
+                // 老记录没有轨迹缩略图：打开一次就补上（列表左边那格小图用）
+                void patchReport(id, { trackThumb: makeTrackThumb(data.track) });
+            }
             return {
                 hasInfo: Boolean(data.info),
                 hasPlots: Boolean(panels?.length),

@@ -58,7 +58,16 @@ export interface SavedReport {
   matchedFaults?: MatchedFault[];
   aiMarkdown: string | null;
   analyzedAt: string;
+  /** 轨迹缩略图（降采样后的 [lat, lon]）：历史卡片左边那格小图用 */
+  trackThumb?: TrackThumb;
 }
+
+/**
+ * 轨迹缩略图：降采样后的经纬点（约 40 个），只够画出形状。
+ * 为什么不直接读派生数据里的轨迹：那份记录里还塞着曲线（每份约 0.66MB），
+ * 列表里逐条读会把几十 MB 拉进内存；缩略图跟着结论记录走，读列表时顺手就拿到了。
+ */
+export type TrackThumb = [number, number][];
 
 /** 与结论分开存的**派生数据**：命中时直接给「消息 / 参数 / 图表」用，不必再解析原始日志 */
 export interface ReportData {
@@ -101,7 +110,39 @@ function normalize(raw: Partial<SavedReport> | null | undefined): SavedReport {
     matchedFaults: Array.isArray(r.matchedFaults) ? r.matchedFaults : undefined,
     aiMarkdown: typeof r.aiMarkdown === "string" ? r.aiMarkdown : null,
     analyzedAt: String(r.analyzedAt ?? ""),
+    trackThumb: Array.isArray(r.trackThumb) ? r.trackThumb : undefined,
   };
+}
+
+/** 从完整轨迹抽一份缩略图（等距抽样 + 保留末点） */
+export function makeTrackThumb(track: TrackData | null | undefined, maxPoints = 40): TrackThumb | undefined {
+  const lat = track?.lat;
+  const lon = track?.lon;
+  if (!lat?.length || !lon?.length) return undefined;
+  const push = (out: TrackThumb, i: number) => {
+    const la = lat[i];
+    const lo = lon[i];
+    if (typeof la === "number" && typeof lo === "number") {
+      out.push([Number(la.toFixed(5)), Number(lo.toFixed(5))]);
+    }
+  };
+  const out: TrackThumb = [];
+  const step = Math.max(1, Math.floor(lat.length / maxPoints));
+  for (let i = 0; i < lat.length; i += step) push(out, i);
+  push(out, lat.length - 1);          // 末点补上，形状才完整
+  return out.length >= 2 ? out : undefined;
+}
+
+/** 只补结论记录里的一两个字段（目前用于轨迹缩略图），内存镜像同步更新 */
+export async function patchReport(id: string, patch: Partial<SavedReport>): Promise<void> {
+  const idx = mirror.findIndex((r) => r.id === id);
+  if (idx >= 0) mirror[idx] = { ...mirror[idx], ...patch };
+  try {
+    const rec = await get<StoredReport>(STORE_REPORTS, id);
+    if (rec) await put(STORE_REPORTS, { ...rec, ...patch });
+  } catch {
+    // 补不上不影响已有记录
+  }
 }
 
 // ─────────────────────────── IndexedDB ───────────────────────────
@@ -310,6 +351,9 @@ export async function saveReportData(id: string, data: ReportData): Promise<void
     const prev = await get<ReportData & { id: string; }>(STORE_DATA, id);
     await put(STORE_DATA, { ...prev, id, ...data, savedAt: Date.now() });
     await pruneReportData();
+    // 顺手把轨迹缩略图补进结论记录（历史卡片要用；派生数据可能被淘汰，结论记录不会）
+    const thumb = makeTrackThumb(data.track);
+    if (thumb) await patchReport(id, { trackThumb: thumb });
   } catch {
     // 落库失败不阻断展示
   }

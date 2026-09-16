@@ -11,6 +11,7 @@ import {
   Plane,
   Cpu,
   GitBranch,
+  MapPin,
   Search,
   ShieldAlert,
   AlertTriangle,
@@ -84,6 +85,68 @@ function fmtDuration(sec?: number): string {
 function fmtSize(bytes?: number): string {
   if (!bytes) return "—";
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
+/**
+ * 轨迹缩略图：把降采样后的经纬点画成 SVG 折线（不加载地图瓦片——列表里几十张图，
+ * 每张都起一个 Leaflet 实例既慢又费内存）。等距圆柱投影 + 保持纵横比，北向上。
+ * 老记录没有缩略图（trackThumb 是后加的字段），打开一次报告就会补上。
+ */
+function TrackThumb({ points }: { points?: [number, number][]; }) {
+  const box =
+    "h-16 w-20 shrink-0 overflow-hidden rounded-md border border-border bg-surface-2";
+  if (!points || points.length < 2) {
+    return (
+      <span
+        className={`${box} flex items-center justify-center`}
+        title="这份记录还没有轨迹缩略图——打开一次报告就会补上"
+      >
+        <MapPin className="h-4 w-4 text-faint" />
+      </span>
+    );
+  }
+
+  const lats = points.map((p) => p[0]);
+  const lons = points.map((p) => p[1]);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons);
+  const maxLon = Math.max(...lons);
+  // 经度按中心纬度收缩，形状才不会被横向拉长
+  const kx = Math.cos((((minLat + maxLat) / 2) * Math.PI) / 180);
+  const spanX = Math.max((maxLon - minLon) * kx, 1e-9);
+  const spanY = Math.max(maxLat - minLat, 1e-9);
+  const W = 100;
+  const H = 80;
+  const pad = 7;
+  const scale = Math.min((W - 2 * pad) / spanX, (H - 2 * pad) / spanY);
+  const ox = (W - spanX * scale) / 2;
+  const oy = (H - spanY * scale) / 2;
+  const xy = points.map(([lat, lon]) => {
+    const x = ox + (lon - minLon) * kx * scale;
+    const y = H - (oy + (lat - minLat) * scale); // 北向上
+    return [x, y] as const;
+  });
+  const [sx, sy] = xy[0];
+  const [ex, ey] = xy[xy.length - 1];
+
+  return (
+    <span className={box} title={`轨迹缩略图（${points.length} 点）`}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="h-full w-full" preserveAspectRatio="xMidYMid meet">
+        <polyline
+          points={xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ")}
+          fill="none"
+          stroke="currentColor"
+          className="text-primary"
+          strokeWidth={1.6}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        <circle cx={sx} cy={sy} r={2.4} fill="#22c55e" />
+        <circle cx={ex} cy={ey} r={2.4} fill="#ef4444" />
+      </svg>
+    </span>
+  );
 }
 
 export function HistoryList({
@@ -314,8 +377,10 @@ export function HistoryList({
               <li key={`${r.source}-${r.id}`}>
                 <Link
                   href={`/analyze/${encodeURIComponent(r.id)}`}
-                  className="block rounded-lg px-2 py-2.5 transition-colors hover:bg-surface-2"
+                  className="flex gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-surface-2"
                 >
+                <TrackThumb points={r.trackThumb} />
+                <div className="min-w-0 flex-1">
                 {/* 元信息一行：飞行时间 · 文件尺寸 · 飞行时长 · 机型（机架）· 硬件版本 · 软件版本。
                     飞行时间取日志记录的起始时刻（facts.startUtc）；老存档没有这项就退回显示分析时间。 */}
                 <div
@@ -387,6 +452,7 @@ export function HistoryList({
                     </span>
                   )}
                   {!c && <span className="text-xs text-muted">{total} 条检查结果</span>}
+                </div>
                 </div>
                 </Link>
               </li>
