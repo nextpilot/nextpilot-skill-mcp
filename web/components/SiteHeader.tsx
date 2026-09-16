@@ -38,7 +38,7 @@ export function SiteHeader() {
         >
           <Radar className="h-5 w-5 shrink-0 text-primary" />
           <span className="truncate">
-            NextPilot <span className="text-primary">Skill MCP</span>
+            NextPilot <span className="text-primary">Skill</span>
           </span>
         </Link>
 
