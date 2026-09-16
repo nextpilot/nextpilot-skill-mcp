@@ -17,6 +17,8 @@ import {
   Sparkles,
   ExternalLink,
   Loader2,
+  CalendarClock,
+  HardDrive,
 } from "lucide-react";
 import type {
   AnalysisReport,
@@ -131,14 +133,18 @@ export function AnalyzeReport({
       {/* 概要 */}
       <div className="flex flex-wrap items-center gap-3 pb-5">
         <FileCheck2 className="h-5 w-5 text-ok" />
-        <div className="text-sm">
-          <p className="font-medium">{report.fileName}</p>
-          <p className="text-xs text-muted">
-            {(report.fileSize / 1024 / 1024).toFixed(2)} MB
-            {report.facts?.durationSec ? ` · 时长 ${Math.round(report.facts.durationSec)}s` : ""}
-            {report.facts?.vehicleType
-              ? ` · ${vehicleTypeLabel(report.facts.vehicleType)}`
-              : ""}
+        <div>
+          {/* 文件名调大一号；下面只留「上传日期 + 文件大小」，各带一个小图标 */}
+          <p className="text-base font-medium break-all">{report.fileName}</p>
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+            <span className="flex items-center gap-1" title="上传（分析）时间">
+              <CalendarClock className="h-3.5 w-3.5" />
+              {formatDateTime(report.analyzedAt)}
+            </span>
+            <span className="flex items-center gap-1" title="日志文件大小">
+              <HardDrive className="h-3.5 w-3.5" />
+              {(report.fileSize / 1024 / 1024).toFixed(2)} MB
+            </span>
           </p>
         </div>
       </div>
