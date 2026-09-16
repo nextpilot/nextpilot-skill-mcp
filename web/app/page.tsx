@@ -9,7 +9,6 @@ import {
 import { getSkillIndex } from "@/lib/skills";
 import { CATEGORIES } from "@/lib/constants";
 import { SkillCard } from "@/components/SkillCard";
-import { HomeUploadCard } from "@/components/HomeUploadCard";
 import { LocalizedText } from "@/components/LocalizedText";
 
 /**
@@ -45,7 +44,7 @@ export default function HomePage() {
     <div>
       {/* Hero：白底、紧排标题、无装饰光斑；强调色只出现在链接与小标记上 */}
       <section className="border-b border-border">
-        <div className="page-shell grid gap-12 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16 lg:py-20">
+        <div className="page-shell py-16 lg:py-20">
           <div>
             <p className="mb-5 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
               <LocalizedText zh="飞控 AI 技术交流 · Skill / MCP 平台" en="Flight AI community · Skill / MCP platform" />
@@ -83,7 +82,6 @@ export default function HomePage() {
             </ul>
           </div>
 
-          <HomeUploadCard />
         </div>
       </section>
 
