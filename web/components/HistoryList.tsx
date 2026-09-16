@@ -23,6 +23,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import type { SavedReport } from "@/lib/report-history";
+import { formatDateTime } from "@/lib/format";
 
 const VEHICLE_TYPE_LABELS: Record<string, string> = {
   rotary_wing: "旋翼",
@@ -71,12 +72,7 @@ export type HistoryItem = SavedReport & {
   findingCount?: number;
 };
 
-function fmtTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getMonth() + 1}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+
 
 function fmtDuration(sec?: number): string {
   if (!sec) return "—";
@@ -325,12 +321,12 @@ export function HistoryList({
                     飞行时间取日志记录的起始时刻（facts.startUtc）；老存档没有这项就退回显示分析时间。 */}
                 <div
                   className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted"
-                  title={`分析时间：${fmtTime(r.analyzedAt)}`}
+                  title={`分析时间：${formatDateTime(r.analyzedAt)}`}
                 >
                   <span className="flex items-center gap-1" title="飞行时间（日志记录的起始时刻）">
                     <Clock className="h-3.5 w-3.5 shrink-0 text-muted" />
                     <span className="font-mono">
-                      {r.facts?.startUtc ? fmtTime(new Date(r.facts.startUtc * 1000).toISOString()) : fmtTime(r.analyzedAt)}
+                      {formatDateTime(r.facts?.startUtc ? r.facts.startUtc * 1000 : r.analyzedAt)}
                     </span>
                   </span>
                   <span className="flex items-center gap-1" title="日志文件大小">

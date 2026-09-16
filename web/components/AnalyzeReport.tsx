@@ -38,6 +38,7 @@ import { LogEventsMsg } from "./LogEventsMsg";
 import { LogParamsMsg } from "./LogParamsMsg";
 import { LogSystemMsg } from "./LogSystemMsg";
 import { PhaseStrip } from "./PhaseStrip";
+import { formatDateTime } from "@/lib/format";
 import { LogFlightMap } from "./LogFlightMap";
 
 const VEHICLE_TYPE_LABELS: Record<string, string> = {
@@ -557,7 +558,7 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
     const d = new Date(g.startUtc * 1000);
     rows.push({
       label: "Logging Start",
-      value: d.toLocaleString(),
+      value: formatDateTime(d),
       icon: <CalendarClock className={icon} />,
       title: `记录起始时刻（本机时区）。UTC：${d.toISOString().replace("T", " ").slice(0, 19)}`,
     });
