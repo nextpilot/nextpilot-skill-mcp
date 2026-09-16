@@ -2,14 +2,12 @@ import Link from "next/link";
 import {
   ArrowRight,
   BookOpen,
-  Boxes,
   Check,
   Database,
   FileSearch,
   ListChecks,
   MessageSquareText,
   Microscope,
-  ShieldCheck,
   Upload,
   Wrench,
   Zap,
@@ -347,7 +345,7 @@ export default function HomePage() {
               icon={<Microscope className="h-5 w-5" />}
               title="确定性引擎分析"
               titleEn="Deterministic analysis"
-              desc="Pyodide (WASM Python) 在 Web Worker 中运行 pyulog 解析引擎，执行 15 项确定性检查，输出结构化 JSON。"
+              desc="执行 15 项确定性检查，输出结构化 JSON。数值判断全部由规则引擎完成，每条结论可溯源到字段、阈值和官方文档，LLM 只做翻译。"
               descEn="Pyodide runs pyulog in a Web Worker. 15 deterministic checks produce structured JSON findings."
             />
             <StepCard
@@ -430,32 +428,6 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
-          </SubSection>
-
-          <SubSection en="Principles" zh="原则">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Principle
-              icon={<ShieldCheck className="h-4 w-4" />}
-              title="确定性引擎是唯一真相来源"
-              titleEn="Deterministic engine as single source of truth"
-              desc="数值判断全部由规则引擎完成，每条结论可溯源到字段、阈值和官方文档，LLM 只做翻译。"
-              descEn="All numerical judgments are made by the rule engine. Every conclusion traces back to a field, threshold and official documentation. LLM only translates."
-            />
-            <Principle
-              icon={<FileSearch className="h-4 w-4" />}
-              title="日志在你的浏览器里解析"
-              titleEn="Logs parsed in your browser"
-              desc=".ulg 文件经 Pyodide 在本地解析，原始日志不上传服务器，仅提交结构化检查结果。"
-              descEn=".ulg files are parsed locally via Pyodide. Raw logs never leave your machine—only structured findings are submitted."
-            />
-            <Principle
-              icon={<Boxes className="h-4 w-4" />}
-              title="永不直接致动真实载具"
-              titleEn="Never actuate real vehicles"
-              desc="平台不提供 arm/disarm 等致动托管能力；相关内容仅以开源 Skill + 三重门禁形式存在。"
-              descEn="No arm/disarm or actuation hosting. Related content exists only as open-source Skills behind triple safety gates."
-            />
-          </div>
           </SubSection>
 
           <div className="mt-10 border-t border-border pt-8 text-center">
@@ -629,34 +601,6 @@ function ScenarioCard({
   return (
     <div className="card group p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
       <span className="text-[28px] leading-none">{emoji}</span>
-      <h3 className="mt-4 font-semibold text-text">
-        <LocalizedText zh={title} en={titleEn} />
-      </h3>
-      <p className="mt-2 text-sm leading-6 text-muted">
-        <LocalizedText zh={desc} en={descEn} />
-      </p>
-    </div>
-  );
-}
-
-function Principle({
-  icon,
-  title,
-  titleEn,
-  desc,
-  descEn,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  titleEn: string;
-  desc: string;
-  descEn: string;
-}) {
-  return (
-    <div className="card group p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-      <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface-2 text-muted">
-        {icon}
-      </span>
       <h3 className="mt-4 font-semibold text-text">
         <LocalizedText zh={title} en={titleEn} />
       </h3>
