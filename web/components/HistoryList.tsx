@@ -533,8 +533,11 @@ export function HistoryList({
                         {r.vehicleType ? (VEHICLE_TYPE_LABELS[r.vehicleType] ?? r.vehicleType) : "—"}
                       </span>
                       {r.facts?.airframeId ? (
-                        <span className="block truncate text-[11px] leading-4">
-                          机架 {r.facts.airframeId}
+                        <span
+                          className="block truncate text-[11px] leading-4"
+                          title="机架编号（SYS_AUTOSTART）"
+                        >
+                          {r.facts.airframeId}
                         </span>
                       ) : null}
                     </td>
