@@ -36,7 +36,8 @@
       "Bash(cp:*)",
       "Bash(mv:*)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(node scripts/build-knowledge.mjs)"
     ]
   },
   "hooks": {
