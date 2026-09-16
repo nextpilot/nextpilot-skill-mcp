@@ -547,13 +547,13 @@ export function HistoryList({
                         <TrackThumb points={r.trackThumb} />
                       </div>
                     </td>
-                    <td className="py-2 pr-2 text-center font-mono break-words text-text">
+                    <td className="py-2 align-middle pr-2 text-center font-mono break-words text-text">
                       {formatDateTime(r.analyzedAt)}
                     </td>
                     {/* 日志文件 + 大小挤在一格（分上下两行）：文件名只显示第一段（按 '-' 切，如 ce302d3b），
                         全名在悬停提示里；大小跟着走，省出一整列的宽度给别的字段。
                         大小那行字号小一号、颜色不变（表内不搞灰字），靠字号与字重区分主次。 */}
-                    <td className="py-2 pr-2 text-center">
+                    <td className="py-2 align-middle pr-2 text-center">
                       <Link
                         href={href}
                         className="block truncate font-medium text-text hover:text-primary"
@@ -565,15 +565,15 @@ export function HistoryList({
                         {fmtSize(r.fileSize)}
                       </span>
                     </td>
-                    <td className="py-2 pr-2 text-center font-mono break-words text-text">
+                    <td className="py-2 align-middle pr-2 text-center font-mono break-words text-text">
                       {r.facts?.startUtc ? formatDateTime(r.facts.startUtc * 1000) : "—"}
                     </td>
-                    <td className="py-2 pr-2 text-center whitespace-nowrap font-mono text-text">
+                    <td className="py-2 align-middle pr-2 text-center whitespace-nowrap font-mono text-text">
                       {/* 时长与日志内的时间同一写法：hh:MM:ss（超过 24 小时小时位自然变三位） */}
                       {durSec ? formatLogTime(durSec) : "—"}
                     </td>
                     {/* 机型与机架（SYS_AUTOSTART）分两行，机架那行小一号——跟「日志文件 / 大小」同一种排法 */}
-                    <td className="py-2 pr-2 text-center text-text">
+                    <td className="py-2 align-middle pr-2 text-center text-text">
                       <span className="block truncate">
                         {vehicleTypeLabel(r.vehicleType)}
                       </span>
@@ -586,9 +586,9 @@ export function HistoryList({
                         </span>
                       ) : null}
                     </td>
-                    <td className="py-2 pr-2 text-center font-mono break-words text-text">{r.verHw ?? "—"}</td>
+                    <td className="py-2 align-middle pr-2 text-center font-mono break-words text-text">{r.verHw ?? "—"}</td>
                     {/* 软件版本口径对齐 Flight Review browse：正式版 `v1.16.0`，其余给 git 短哈希 */}
-                    <td className="py-2 pr-2 text-center font-mono break-words text-text">
+                    <td className="py-2 align-middle pr-2 text-center font-mono break-words text-text">
                       <span
                         title={[
                           r.facts?.verSwBranch ? `分支 ${r.facts.verSwBranch}` : "",
@@ -601,7 +601,7 @@ export function HistoryList({
                       </span>
                     </td>
                     <td
-                      className="py-2 pr-2 text-center text-text"
+                      className="py-2 pr-2 align-middle text-center text-text"
                       title={r.facts?.modes?.length ? r.facts.modes.join(", ") : undefined}
                     >
                       {/* 每个模式名自己 nowrap：CJK 默认哪都能断，断在 `返` / `回` 中间太难读，
@@ -617,7 +617,7 @@ export function HistoryList({
                           ? modeStyle(r.facts.mainMode).label
                           : "—"}
                     </td>
-                    <td className="py-2 text-center whitespace-nowrap">
+                    <td className="py-2 align-middle text-center whitespace-nowrap">
                       {c ? (
                         <span className="flex items-center justify-center gap-1.5">
                           <Count icon={<ShieldAlert className="h-3 w-3" />} n={c.critical} tone="critical" />
