@@ -225,11 +225,9 @@ function PanelChart({
     }).catch(() => {});
   }, [onXRangeChange]);
 
-  // Resize chart after container becomes visible, and align modebar
+  // 容器可见后让 Plotly 重新量一次尺寸（tab 切换时容器宽度会变）
   useEffect(() => {
     if (state !== "done" || !elRef.current) return;
-    const modebar = elRef.current.querySelector(".modebar") as HTMLElement | null;
-    if (modebar) modebar.style.top = "0px";
     const timer = setTimeout(async () => {
       try {
         const Plotly = await getPlotly();

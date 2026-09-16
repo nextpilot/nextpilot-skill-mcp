@@ -21,6 +21,8 @@ export function SiteHeader() {
 
   // MCP Server 是与 Skill 并列的一类内容，不再作为 Skill 库的子分类跳转
   const links = [
+    // 图标本身是回首页的链接，但它不够显眼，菜单里再给一条明路
+    { href: "/", label: t("首页", "Home") },
     { href: "/analyze", label: t("日志分析", "Log analysis") },
     { href: "/skills", label: t("Skill 库", "Skill library") },
     { href: "/mcp", label: t("MCP Server", "MCP servers") },
@@ -96,7 +98,9 @@ export function SiteHeader() {
         >
           <ul className="page-shell py-2">
             {links.map((l) => {
-              const active = pathname === l.href || pathname.startsWith(`${l.href}/`);
+              // "/" 要精确匹配：否则 startsWith("/") 恒真，首页永远高亮
+              const active =
+                l.href === "/" ? pathname === "/" : pathname === l.href || pathname.startsWith(`${l.href}/`);
               return (
                 <li key={l.href} className="border-b border-border/60 last:border-0">
                   <Link
