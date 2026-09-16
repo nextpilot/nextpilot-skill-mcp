@@ -1,8 +1,8 @@
 ---
 title: 如何编写一条规则
 titleEn: Writing a rule
-description: 从必填字段到数据流节点、触发条件与输出，附算子目录与常见坑。
-descriptionEn: Required fields, data-flow nodes, triggers and outputs — plus the operator catalogue and pitfalls.
+description: 从必填字段到数据流表达式、触发条件与输出，附算子目录与常见坑。
+descriptionEn: Required fields, data-flow expressions, triggers and outputs — plus the operator catalogue and pitfalls.
 group: 知识库
 groupEn: Knowledge base
 order: 11
@@ -15,7 +15,7 @@ order: 11
 > **本页是这份文档的唯一一份**：原先在 `knowledge/px4/guides/writing-rules.md`，现搬到指南的
 > 内容目录，不再由构建生成（同组的「当前有哪些规则」才是构建生成的）。
 > 单一事实源是 `knowledge/px4/rules/*.yaml`；标了 `<!-- BEGIN/END -->` 的两张表由
-> `python tools/px4/gen-rule-reference.py` 从 `engine/operators.py` 与 `engine/rule_engine.py` 注入，
+> `python tools/px4/gen_rule_reference.py` 从 `engine/operators.py` 与 `engine/rule_engine.py` 注入，
 > 改完算子请重跑该脚本，标记之间不要手改，其余内容手维护。
 
 ## 0. 一条经验怎么跑起来
@@ -23,98 +23,105 @@ order: 11
 ```
 rules/<经验>.yaml     ──┐
 facts.yaml（数据绑定/   ──┤ 构建期校验（字段/算子/表达式/文案、
-  码表/slot 顺序）      ──┤   slot 是否登记、facts 键是否齐全）    ── 产物内联进 Python
+  码表/group 顺序）      ──┤   group 是否登记、facts 键是否齐全）  ── 产物内联进 Python
 engine/operators.py    ──┤
 engine/rule_engine.py  ──┘   ↓                                      ↓
                      web/workers/ulog-check-script.ts  →  Pyodide（浏览器）执行：
-                     事实层 → 按 slot 顺序跑经验 → 取字段/调算子/求值表达式 → 发射 finding
+                     事实层 → 按 group 顺序跑经验 → 取字段/调算子/求值表达式 → 发射 finding
 ```
 
 改完经验后的三步：
 
 ```bash
 node web/scripts/build-knowledge.mjs      # 构建（校验失败会直接报错）
-python tools/calibrate/compare-baseline.py  # 6 条真实日志与冻结基线逐字段比对
-python tools/calibrate/lint-rules.py        # 字段引用与版本错配检查
+python tools/calibrate/compare_baseline.py  # 6 条真实日志与冻结基线逐字段比对
+python tools/calibrate/lint_rules.py        # 字段引用与版本错配检查
 ```
 
 ## 1. 最小可用示例
 
 ```yaml
-id: px4-cpu-load                # 稳定标识，即 finding.ruleId
-slot: cpu                      # 执行位置（见 §3）
-order: 1                       # 同 slot 内的次序，缺省 100000
+id: px4-cpu-load               # 稳定标识，即 finding.ruleId
 name: CPU 负载
-version: 1.0.0
-category: system               # 分类：vibration/power/ekf/gps/...
-status: stable                 # draft | experimental | stable | deprecated
-author: {name: NextPilot 内置}  # 规则市场分成主体
-license: CC-BY-4.0
-changelog:
-  - {version: 1.0.0, date: "2026-09-15", note: 初版}
+group: cpu                    # 执行分组（见 §3）
+order: 1                      # 同 group 内的次序，缺省 100000
+version: 1.0.0                # 可省，缺省 1.0.0；偏离默认时才写（如 1.1.0）
 
-firmware: any                  # 适用范围轴①：固件（不限也必须显式写 any）
-airframe: any                  # 适用范围轴②：机架
+firmware: "True"              # 适用范围轴①：固件。**写 Python 表达式**，不限就写 True
+airframe: "True"              # 适用范围轴②：机架（不限写 True，如 is_fixed_wing）
 
-requires:
-  any_of: [cpuload]            # 依赖 topic；缺则不跑、留一条 skipped
-skip_reason: cpuload not in log
+skip:                         # 不适用就不跑；写了 reason → 报告里能看到原因，不写 → 静默
+  - {when: "not has_topic('cpuload')", reason: cpuload not in log}
 
-compute:                       # 数据流：逐个节点执行，输出命名进环境
-  - out: cpu_max
-    from: cpuload.load         # 取 topic.field（多实例会拼接）
-    op: max
+compute:                      # 数据流：一行一条表达式，右边是算式（见 §4）
+  - cpu_max = max(cpuload.load)     # 取 topic.field（多实例会拼接）
 
-triggers:                      # 自上而下，命中第一条即发射
-  - expr: "cpu_max >= 0.95"
-    severity: critical         # critical | warning | info
-    threshold: 0.95            # 写进 evidence.threshold
-    value: cpu_max             # 写进 evidence.value
-    round: 3
+triggers:                     # 自上而下，命中第一条即发射
+  - when: "cpu_max >= 0.95"
+    severity: critical        # critical | warning | info
+    threshold: 0.95           # 写进 evidence.threshold
+    value: f"{cpu_max:.3f}"   # 写进 evidence.value（表达式，f-string 管格式化）
     field: "cpuload.load(max)"
     title: "CPU 负载峰值 {cpu_max:.0%} 超阈值"
     suggestion: "CPU 长期接近满载会导致控制环丢步。"
 
 emit:
-  check: cpu_load              # checksRun / checksSkipped 里的名字
-  doc: https://docs.px4.io/main/en/log/flight_log_analysis.html
   stats:
     cpuLoadMax: {var: cpu_max, round: 3}   # 写进报告 stats 的键
 ```
+
+**没写的字段不等于没有**——下面这些由构建期从 `facts.yaml` 的 `rule_meta` 派生，
+规则里只在**确实偏离**时才写（见 §2）：
+
+| 派生字段 | 从哪来 |
+| --- | --- |
+| `category` | 该 `group` 的分类 |
+| `emit.check` | 缺省 = `group`（个别例子不同，显式写） |
+| `emit.doc` | 该 `group` 的官方文档链接 |
+| `version` `status` `license` `author` | 仓库级默认值 |
 
 ## 2. 规则级字段
 
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
 | `id` | ✅ | 唯一标识，即 `finding.ruleId`；也被故障库、白名单、报告引用 |
-| `slot` | ✅ | 执行位置（见 §3），必须与它所替换的检查位置一致 |
-| `order` | | 同 slot 内排序，缺省 100000；再按 `id` 兜底 |
 | `name` | ✅ | 人读名字 |
-| `version` `category` `status` `author` `license` `changelog` | | 归属与分发元数据（规则市场需要） |
-| `firmware` | ✅ | 适用范围轴①：`any` ｜ `">=1.15"` ｜ `"<1.15"` ｜ `">=1.14,<1.15"`（逗号=与） |
-| `airframe` | ✅ | 适用范围轴②：`any` ｜ `fixed_wing` ｜ `[rotary_wing, vtol]` |
-| `requires.any_of` | | 依赖 topic，**任一**存在即可（多版本同义 topic 场景） |
-| `requires.all_of` | | 依赖 topic，**必须全部**存在 |
-| `skip_reason` | | 依赖不满足时写进 `checksSkipped` 的原因文案 |
-| `not_applicable.when` | | 表达式为真 → 整条不适用，按 `not_applicable.skip_reason` 记一条 skipped |
-| `silent_when` | | 表达式为真 → **静默**跳过（既不 ran 也不 skipped） |
-| `skip_reason_axis` | | 机型/固件轴不匹配时若要留痕，写在这里（默认静默） |
-| `skip_reason_no_data` | | compute 中途数据不足时记一条 skipped（默认静默） |
+| `group` | ✅ | 执行分组（见 §3），必须与它所替换的检查位置一致 |
+| `order` | | 同 group 内排序，缺省 100000；再按 `id` 兜底 |
+| `firmware` | ✅ | 适用范围轴①：**Python 表达式**，在 compute 之前求值（只认内置变量）。不限写 `"True"` |
+| `airframe` | ✅ | 适用范围轴②：同上，如 `"is_fixed_wing"` / `"is_rotary_wing or is_vtol"` |
+| `skip` | | `[{when, reason?}]`：**按顺序**判，命中第一条即跳过本条。写了 `reason` → 记一条 skipped（报告里能看到"为什么没跑"）；**不写 `reason`** → **静默**跳过，用于"这本来就跟我无关"的场合（如非 VTOL 机谈不上转换段）。`when` 是与 compute 同一套 Python 子集 |
 | `ran_on_success` | | `true` 时把 `ran()` 推迟到 compute 成功之后（原实现把 ran 放在数据判定之后的情形） |
 | `ran_when` | | 表达式为真才记 `ran()`（如"机动段样本足够"才算跑过） |
-| `known_legacy` | | 已知遗留字段清单（如 `estimator_status.states`），供 `lint-rules.py` 免报 |
-| `compute` | ✅ | 数据流节点数组（guard 类经验可省，见 §7） |
+| `known_legacy` | | 已知遗留字段清单（如 `estimator_status.states`），供 `lint_rules.py` 免报 |
+| `compute` | ✅ | 数据流表达式数组（guard 类经验可省，见 §4 / §6.4） |
 | `foreach` | | 把事件列表展开成多条 finding，见 §6.3 |
 | `triggers` | ✅ | 触发条件数组（guard 类经验可省） |
-| `emit` | ✅ | 输出声明（见 §5） |
+| `emit` | | 输出声明（见 §5）。可整个省略 |
+| `category` `version` `status` `license` `author` `emit.check` `emit.doc` | | **可省**：从 `facts.yaml` 的 `rule_meta` 按 group 派生（见 §1 末尾的表）。只在**确实偏离**时才写——比如 `px4-cpu-load` 的 `group` 是 `cpu` 而 `emit.check` 要叫 `cpu_load`，那就显式写 |
+
+**"不适用"只有一个地方写**（早先分散在 `requires` / `not_applicable` / `silent_when` /
+`skip_reason_no_data` 四个字段里，现在合成 `skip` 一个列表）：
+
+```yaml
+skip:
+  - {when: "not has_topic('vehicle_imu_status')", reason: vehicle_imu_status not in log}
+  - {when: "airframe == 'unknown'", reason: 机型未知，无法判定固定翼巡航段}
+  - {when: "not has_topic('vehicle_attitude_setpoint')"}     # 不写 reason = 静默
+  - {when: "no_data", reason: 数据不足，没算出结论}
+```
+
+`no_data` 是内置变量：compute 算不出来时为真。所以"数据不足要记一条 skipped"也只是列表里的
+一条普通条件，不必再单设字段。求值分两轮——compute 之前一轮（`no_data` 为假），compute
+失败后再一轮（此时 `no_data` 为真）。
 
 **一个 YAML 可以装多条经验**（顶层写成数组），适合形态完全相同的兄弟经验：
 `rules/failsafe.yaml` 一个文件装了 6 条（5 个布尔事件 + 导航状态）。一般情况下仍是一条经验一个文件。
 
-## 3. slot：执行位置决定 finding 编号
+## 3. group：执行分组决定 finding 编号
 
-finding 的 `id`（F01、F02…）按**发射顺序**生成，所以每条经验的 `slot` 必须与它所替换的
-原检查位置一致，否则报告里的编号会整体错位。现有 slot（按执行顺序）：
+finding 的 `id`（F01、F02…）按**发射顺序**生成，所以每条经验的 `group` 必须与它所替换的
+原检查位置一致，否则报告里的编号会整体错位。现有 group（按执行顺序）：
 
 ```
 vibration → ekf_innovations → ekf_faults → battery → cpu → gps_health → failsafe
@@ -122,41 +129,72 @@ vibration → ekf_innovations → ekf_faults → battery → cpu → gps_health 
 → vtol_transition → wind_estimate → logged_messages → guards_early → guards
 ```
 
+一个 group 可以装多条经验，它们在报告里连着出现——比如 `vibration` 就有 3 条
+（`vibration` / `vibration-stddev` / `imu-clipping`），靠 `order` 决定组内次序。
+
 `guards_early` 在最前（`insufficient_data` 必须是第一个 guard 标签），`guards` 在最后
-（重启 / 缺 topic / 丢包）。**执行顺序写在 `facts.yaml` 的 `slot_order` 里**——新增一条经验时把它加进那个列表
-（或复用已有 slot）即可，不用改任何 Python；构建期会校验每条经验的 slot 是否都已登记。
+（重启 / 缺 topic / 丢包）。**执行顺序写在 `facts.yaml` 的 `group_order` 里**——新增一条经验时把它加进那个列表
+（或复用已有 group）即可，不用改任何 Python；构建期会校验每条经验的 group 是否都已登记。
 
-## 4. compute：数据流节点
+## 4. compute：表达式
 
-每个节点执行一次，输出命名进环境，后续节点与 `triggers` 都能引用。
-
-| 节点键 | 说明 |
-| --- | --- |
-| `op` | 算子名（必须在 `engine/operators.py` 注册，见 §4.3） |
-| `in` | 输入列表。每项可以是 `topic.field`、前序输出名、或字面量（数字/数组，如 `in: [step, 50.0]`、`in: [nav_at, [2,4,6,14,21]]`） |
-| `from` | 单输入的短写法（等价 `in: [x]`） |
-| `out` | 输出名；多输出写列表 `out: [a, b, c]`，数量必须与算子签名一致 |
-| `optional` | `true` 时允许输入/输出为 `None`（缺失沿数据流传播，而不是让整条中止） |
-| `per_instance` | 多实例 topic 按实例分组喂给算子（每个实例一组），配合 `worst_*` 类算子取"最差实例" |
-| `instance` | 只取第 N 个实例（对应原实现的 `xxx_list[0]`；不写则多实例**拼接**） |
-| `aliases` | 该引用的备用字段名（跨版本改名），如 `{vehicle_imu_status.stddev_accel_x_m_s2: [stddev_accel_x]}` |
-| `when_fw` | 节点级版本条件（如 `">=1.15"`）：不满足则跳过该节点、输出置 `None` |
-| 其它键 | 直接传给算子作为可调参数（`gt` / `p` / `factor` / `codes` / `labels` / `min_count` / `unit` …） |
-
-**断裂与中止**：算子返回 `None` 或输入含 `None` 时——非 `optional` 节点会让**整条经验中止**
-（不发 finding；若声明了 `skip_reason_no_data` 则记一条 skipped）；标了 `optional` 则继续，
-输出为 `None`，由后续 `coalesce` / `choose` / `value_if` 决定怎么用。
-
-**版本分支的标准写法**（同一物理量在不同固件换了 topic/字段名）：
+`compute` 是一串**表达式**，一行一条，按顺序求值；左边赋值、右边是算式，后面的行能用前面
+赋过的变量。写法与 `triggers.when`、`skip[].when` 都是同一套（Python 的子集）。
 
 ```yaml
 compute:
-  - {out: n_new, from: estimator_wind.windspeed_north, op: read, when_fw: ">=1.15", optional: true}
-  - {out: n_old, from: wind_estimate.windspeed_north,  op: read, when_fw: "<1.15",  optional: true}
-  - {out: wn, in: [n_new, n_old], op: coalesce, optional: true}
+  - vibe_mean, vibe_p95, vibe_max, imu_idx = worst_mean_stats(
+      ref("vehicle_imu_status.accel_vibration_metric", per_instance=True), min_mean=0)
+  - pct = vibe_mean / 9.81 * 100
+  - p99_stat = p99 if seg_n and seg_n > 50 else None
 ```
 
-### 4.3 算子目录
+| 写法 | 含义 |
+| --- | --- |
+| `a, b, c = f(x, kw=1)` | 赋值。多左值解包要求个数等于算子的输出数 |
+| `pct = frac * 100` | 算术：`+ - * / % **` |
+| `x if cond else y` | 三元（只求值被选中的那一支） |
+| `a and b` / `a or b` / `not a` | 逻辑 |
+| `x in S` / `x is None` | 比较 |
+| `topic.field` | **裸字段引用**——取数不带修饰时就用它（多实例会拼接） |
+| `ref("topic.field", …)` | **带修饰的取数**，见下 |
+| `_try(...)` | 容错求值：内层抛异常或得 `None` 时结果为 `None`，**而不是让整条中止** |
+| `worst_mean_stats(…)` | 算子调用，名字必须在 `engine/operators.py` 注册（目录见 §4.1） |
+
+### `ref(...)`：带修饰的取数
+
+裸写的 `topic.field` 后面挂不了东西，需要修饰时用 `ref`。第一个参数是**字段名字符串**
+（不能写成 `ref(topic.field)`——那样 Python 会先把字段读出来，修饰就来不及生效了）：
+
+| 修饰 | 含义 |
+| --- | --- |
+| `per_instance=True` | 按实例分组读（每实例一组），交给需要分组的算子（`worst_mean_stats` 等） |
+| `instance=0` | 只取第 N 个实例 |
+| `alias="clipping"` | 字段的备用命名（旧固件改过名），可给字符串或字符串列表 |
+| `when_fw=">=1.15"` | 固件版本不满足就返回 `None`，交给 `coalesce` 选另一支 |
+
+`vehicle_status.nav_state` 与 `ref("vehicle_status.nav_state")` 完全等价，所以**不需要修饰
+就别包 `ref`**。
+
+**什么会让整条经验中止**：表达式里拿到 `None` 再参与运算（`None >= 9.81`）会抛异常，
+引擎按"数据不足"处理——不发 finding，也不记 skipped（除非 `skip` 列表里有 `when: "no_data"`
+的一项）。要容错就用 `_try(...)`、`coalesce(...)` 或 `x if x is not None else y`。
+
+**版本分支**（同一物理量在不同固件换了 topic/字段名）用三元，注意必须判 `None`：
+
+```yaml
+compute:
+  - >-
+    wn = estimator_wind.windspeed_north if (fw_minor is None or fw_minor >= 15)
+         else wind_estimate.windspeed_north
+```
+
+`fw_minor` 只有"日志里写了固件版本"时才有值，老日志上是 `None`，而 `None >= 15` 会抛异常、
+让整条经验静默失效。**构建期会拦下漏写 `is None` 的写法**。另一种写法是
+`ref("...", when_fw=">=1.15")` 配 `coalesce`——版本未知时两个引用都算适用、取前一个，
+额外还兼做"该 topic 在这份日志里不存在"的兜底。
+
+### 4.1 算子目录
 
 <!-- BEGIN:operators -->
 **标量统计**
@@ -298,7 +336,7 @@ compute:
 | `gyro_bias_worst` | 5 | abs_max, abs_axis, drift, drift_axis | 三轴零偏在 armed 区间内逐轴取 |最大值| 与极差（漂移），回传各自最差的轴名 |
 | `max_temp_range` | 2 | 1 个值 | 两个温度来源各自取极差（样本 < 2 的来源忽略），返回较大者 |
 
-共 **74** 个算子。入参个数由算子签名强制校验（`in:`/`out:` 数量对不上则构建失败）；各算子的可调参数（如 `gt` / `p` / `factor` / `codes` / `labels` / `min_count`）写在节点的同层键上。
+共 **74** 个算子。输入个数与左值个数由算子签名强制校验（对不上则构建失败）；各算子的可调参数（如 `gt` / `p` / `factor` / `codes` / `labels` / `min_count`）写成算子调用的**关键字实参**（如 `percentile(w, p=95)`）；取数修饰（`per_instance` / `instance` / `alias` / `when_fw`）写在 `ref(...)` 上。
 <!-- END:operators -->
 
 ## 5. triggers 与 emit
@@ -307,26 +345,27 @@ compute:
 
 | 键 | 说明 |
 | --- | --- |
-| `expr` | 受限表达式（见下），求值为真即命中。支持 `and/or/not`、比较、`+ - * /`、括号、`in`，可用内置变量与 compute 输出（**不允许**属性访问/下标/函数调用/推导式） |
+| `when` | 条件表达式，求值为真即命中。与 `compute` / `skip` 同一套 Python 子集 |
 | `severity` | `critical` ｜ `warning` ｜ `info` |
 | `tag` | 异常标签（喂故障库匹配）；写 `null` 表示这条不进标签 |
-| `value` / `value_const` / `value_text` | 写进 `evidence.value`：变量名 / 常量 / 带占位符的文案（如 `"fault={fault_union},nan={nan_max}"`） |
-| `round` | 对 `value` 四舍五入到 n 位 |
-| `threshold` `unit` | 写进 `evidence.threshold` / `evidence.unit`（阈值显式声明，不从表达式猜） |
+| `value` | 写进 `evidence.value`，**是一个表达式**：写变量得原值（`value: vibe_mean`）、写 f-string 得格式化后的串（`value: f"{vibe_mean:.3f}"`）、写常量就得到常量（`value: f"missing"`） |
+| `threshold` `unit` | 写进 `evidence.threshold` / `evidence.unit`（阈值显式声明，不从表达式猜）。**阈值是"这条结论拿什么当参照"，不必等于触发点**——比如固定翼超调在 40° 触发、但参照的是标称门限 25° |
 | `field` | 写进 `evidence.field`，可含 `{var}` 占位符（如 `accel_clipping[{clip_axis}]`） |
 | `title` `suggestion` | 文案，可用 `{var}` / `{var:.1f}` / `{var:.0%}` 占位符 |
-| `guard_tag` | 命中时同时打一个数据质量标签 |
 | `evidence_extra` | `{证据键: 变量名}`，把额外证据挂到 finding 上（如日志消息原文 `samples`） |
+
+要"命中时顺带打一个数据质量标签"，用 `emit.guard_tags`（见 §5.2）——它不依赖哪条 trigger 命中，
+算得出来就带上，语义更准确。
 
 ### 5.2 输出与副作用
 
 | 键 | 说明 |
 | --- | --- |
-| `emit.check` | `checksRun`/`checksSkipped` 里的名字（guard 类经验可省） |
+| `emit.check` | `checksRun`/`checksSkipped` 里的名字。**缺省 = `group`**，只在例外时才写（如 `px4-cpu-load` 的 group 是 `cpu`、check 要叫 `cpu_load`）；guard 类经验不填 |
 | `emit.tag` | 默认异常标签（trigger 未写 `tag` 时用它） |
-| `emit.doc` | 官方文档链接（每条 finding 必须可溯源） |
+| `emit.doc` | 官方文档链接（每条 finding 必须可溯源）。**缺省按 `group` 派生**（见 `facts.yaml` 的 `rule_meta.by_group`），偏离时才写 |
 | `emit.stats` | `{键: {var: 变量名, round: n}}`；写进报告的 **`metrics`**（关键数据块）；值为 `None` 时该键不写入。**结果页里这项的名字/单位/顺序在 `../facts.yaml` 的 `metrics` 里声明**——键对不上就只显示键名 |
-| `emit.guard_tags` | `[{when: 表达式, tag: 标签}]`：条件成立就打数据质量标签，**不依赖是否发 finding**（如温度跨度大） |
+| `emit.guard_tags` | `[{when: 表达式, tag: 标签}]`：条件成立就打数据质量标签，**不依赖是否发 finding**（如"风速偏大"本身就是该进解读的背景） |
 
 ## 6. 内置变量、事件与进阶
 
@@ -353,9 +392,11 @@ compute:
 | `t0_us` | 日志起点时间戳（us），事件类算子算相对时刻用 |
 | `has_armed` | 是否存在 armed 段（布尔） |
 | `topics` | 本日志实际存在的 topic 名集合（如 `'vehicle_attitude' in topics`） |
+| `has_topic` | 日志里有没有这个 topic，如 `not has_topic('cpuload')`（比 `'cpuload' not in topics` 直白）；表达式里**唯一**允许的函数调用 |
 | `restart_detected` | 是否有 topic 时间戳回退（疑似中途重启） |
 | `dropout_ms` | 全日志丢包累计（毫秒） |
 | `messages` | 日志消息条目列表 `[{tSec, message, level, level_name}]` |
+| `no_data` | compute 是否算不出来：初值 False，compute 失败后置真（`skip` 列表里用它记一条 skipped） |
 <!-- END:builtins -->
 
 ### 6.2 模板占位符
@@ -371,12 +412,12 @@ compute:
 
 ```yaml
 compute:
-  - out: events
-    in: [vehicle_status.failsafe, vehicle_status.timestamp, armed_intervals, t0_us]
-    op: rising_edge_events
+  - >-
+    events = rising_edge_events(vehicle_status.failsafe, vehicle_status.timestamp,
+                                armed_intervals, t0_us)
 foreach: {var: events, keys: [t_s]}      # keys 声明事件键，供构建期校验占位符
 triggers:
-  - expr: "True"                          # 每个事件都发射
+  - when: "True"                          # 每个事件都发射
     severity: critical
     tag: failsafe
     value_text: "set at {t_s:.1f}s"
@@ -390,7 +431,10 @@ triggers:
 
 ```yaml
 id: px4-guard-restart
-slot: guards
+name: 中途重启
+group: guards
+firmware: "True"
+airframe: "True"
 emit:
   guard_tags:
     - {when: "restart_detected", tag: restart_detected}
@@ -398,21 +442,31 @@ emit:
 
 ## 7. 构建期会拒绝什么（越早发现越好）
 
-- 缺 `id`/`slot`/`name`/`firmware`/`airframe`/`compute`/`triggers`/`emit`（guard 类除外）
-- 算子未注册、`in`/`out` 数量与算子签名不符、`when_fw` 写法非法
-- 表达式或文案里引用了未声明的名字（内置变量/compute 输出/foreach 键之外）
-- `severity` 非法、trigger 缺 `expr`/`title`/`field`、guard_tag 条件写了错名字
-- `lint-rules.py` 另查字段引用：字段名拼错、或声明了 `firmware: ">=1.15"` 却引用只在
-  旧固件存在的字段（**版本错配**）
+- 缺 `id`/`group`/`name`/`firmware`/`airframe`（guard 类还要 `emit.guard_tags`；
+  普通经验要 `compute` + `triggers`）。`emit` 本身可省
+- `group` 没登记在 `facts.yaml` 的 `rule_meta.by_group`，或没登记在 `group_order` 里
+  ——**这类经验永远不会被执行**
+- 表达式里：算子未注册、输入个数/左值个数与算子签名不符、关键字实参名不是算子形参、
+  引用了未声明的名字、多输出算子嵌在表达式中间、`_try` 不在最外层
+- 字段引用写法不对（必须是 `topic.field` 两段小写名，可带 `[n]` 下标）；`ref(...)` 的修饰键
+  写错、`when_fw` 不是合法固件约束串
+- `fw_minor` / `fw_major` 做了大小比较却没先判 `None`（见 §4 末尾）
+- `firmware` / `airframe` / `skip` 的条件写成了非字符串、或引用了**非内置变量**
+  （它们在 compute 之前求值，拿不到 compute 的输出）
+- `severity` 非法、trigger 缺 `when`/`title`/`field`、guard_tags 条件写了错名字
+- `lint_rules.py` 另查字段引用：字段名拼错、或引用了只在别的固件版本存在的字段（**版本错配**）
+- 同一个 `group` 里两条规则派生出不同的 `category` / `doc`，或写了 `firmware: ">=1.15"`
+  却引用只在旧固件存在的字段
 
 ## 8. 常见坑
 
 | 坑 | 说明 |
 | --- | --- |
 | YAML 1.1 布尔陷阱 | 裸 `yes` / `no` / `on` / `off` 会被解析成布尔（PyYAML 与浏览器侧 `yaml` 库行为还不一致）。参数名与键都别用这几个词 |
-| flow 风格里的 `[` | `{from: topic.field[0], ...}` 会解析失败——flow 里的裸标量不能含 `[`，要写成 `{from: "topic.field[0]", ...}`（块风格里不需要引号） |
-| `optional` 漏写 | 节点只要有一支输入可能是 `None`（版本分支、缺失字段），不写 `optional` 会让整条经验中止——表现是"统计量凭空消失"，很难查 |
-| finding 顺序敏感 | 同一 slot 内多条经验的 `order` 变了，报告里的 F 编号就变了；`compare-baseline.py` 会因此失败 |
-| 多实例拼接 | 不写 `instance`/`per_instance` 时，多实例 topic 会被**拼接**成一条长序列（拼错了统计就全错，如 `estimator_sensor_bias` 每 IMU 一个实例） |
+| flow 风格里的 `[` | 带数组下标的字段在 flow 标量里要加引号：`{when: "a.q[0] > 0"}` 不写引号会解析失败（块风格里不需要） |
+| **`fw_minor` 忘了判 `None`** | 老固件日志里没有版本号，`fw_minor >= 15` 会抛异常 → **整条经验静默失效**（不报错、也不出结论）。写成 `(fw_minor is None or fw_minor >= 15)`；构建期会拦 |
+| `_try` 漏写 | 某条表达式可能拿不到数据（字段缺失、版本分支）时，不包 `_try(...)` 会让整条经验中止——表现是"统计量凭空消失"，很难查 |
+| finding 顺序敏感 | 同一 group 内多条经验的 `order` 变了，报告里的 F 编号就变了；`compare_baseline.py` 会因此失败 |
+| 多实例拼接 | 不写 `ref(..., per_instance=True)` 或用裸字段引用时，多实例 topic 会被**拼接**成一条长序列（拼错了统计就全错，如 `estimator_sensor_bias` 每 IMU 一个实例） |
 | 字典名 ≠ 日志 topic 名 | `meta/<tag>.json` 按上游 `.msg` **文件名**收录；日志里的 topic 名由固件发布决定。`sensor_gps`（原始 GPS）与 `vehicle_gps_position`（处理后的位置）是两个不同的东西，不是改名 |
-| 生成物不要手改 | `web/workers/*.ts`、`web/lib/knowledge/*.generated.js` 都是产物，改 `knowledge/` 后重新构建 |
+| 生成物不要手改 | `web/workers/*.ts`、`web/lib/knowledge/*.generated.js` 都是产物，改 `knowledge/` 后重新构建。本页 §4.1 与 §6.1 两张表由 `python tools/px4/gen_rule_reference.py` 注入，改完算子/内置变量请重跑它 |

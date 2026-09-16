@@ -19,6 +19,22 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 参数元数据的来源、**派生数据版本**让旧存档自动重解析。都在本文档下面的
 「报告页数据层」一节，改数据层前必读。
 
+**2026-09-17 追加：规则写法全面换成 Python 子集**（本文档下面那些「算子节点」的例子
+只代表**最初设计**，现状见这一段）：
+
+| 改了什么 | 前 | 后 |
+| --- | --- | --- |
+| `compute` | 算子节点链 `- {out: x, from: a.b, op: max}`，构建期编译成表达式 | **直接写表达式** `- x = max(a.b)`；节点写法已从构建期移除（写了会报错并提示改写）。85 个节点 → 70 条表达式 |
+| `requires` / `not_applicable` / `silent_when` / `skip_reason_no_data` | 四个字段各管一摊 | 合成 **一个 `skip` 列表** `[{when: 表达式, reason?: 文案}]`（**不写 `reason` = 静默**）；"数据不足"靠新增内置变量 `no_data` 表达 |
+| `firmware` / `airframe` | `any` ｜ `">=1.15"` ｜ `fixed_wing` 这类自造小语言 | **Python 表达式**（`"True"` / `"is_fixed_wing"`），在 compute 之前求值、只认内置变量 |
+| `slot` | 槽位（技术隐喻） | **`group`**；`facts.yaml` 的 `slot_order` → `group_order`，`nav_groups` → `nav_state_groups`（消歧义） |
+| `version`/`category`/`status`/`author`/`license`/`changelog`/`emit.check`/`emit.doc` | 每条规则各写一遍 | **按 `group` 从 `facts.yaml` 的 `rule_meta` 派生**，偏离时才显式写。每条规则顶层字段 17 → 10 |
+| `_run_rules` 的判定顺序 | 不适用声明 → 轴 → 依赖 | **轴先判**（"这台机器根本不适用"仍静默），再判 `skip` 映射；compute 失败后再判一轮（`no_data`） |
+
+验证口径没变：以上每一步都要求 `compare_baseline.py` 6 条日志逐字段一致，外加一次
+"派生的 `category/version/status/license/author/emit.check/emit.doc` 与改动前逐条相同"的核对
+（基线只覆盖 6 份日志，**在那上面没触发的规则比不到**，所以那次核对是必需的）。
+
 字段级权威参考（写经验时看这份）：站内 **[如何编写一条规则](/guide/knowledge-write-rule)**（源文件 `content/guide/knowledge-write-rule.md`）；
 经验索引（站内页面，构建时生成）：**[/guide/knowledge-rules](/guide/knowledge-rules)**；迁移过程中顺带修掉的 6 处
 真实缺陷见提交 `6a081d5` 的说明（最要紧的一条：日志消息级别判据按 ASCII 语义修正后，
@@ -55,10 +71,18 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 
 ```yaml
 compute:
-  - {out: n_new, from: estimator_wind.windspeed_north, op: read, when_fw: ">=1.15", optional: true}
-  - {out: n_old, from: wind_estimate.windspeed_north, op: read, when_fw: "<1.15",  optional: true}
-  - {out: wn, in: [n_new, n_old], op: coalesce, optional: true}
+  - >-
+    w_p95 = percentile(
+      hypot(coalesce(ref("estimator_wind.windspeed_north", when_fw=">=1.15"),
+                     ref("wind_estimate.windspeed_north", when_fw="<1.15")),
+            coalesce(ref("estimator_wind.windspeed_east", when_fw=">=1.15"),
+                     ref("wind_estimate.windspeed_east", when_fw="<1.15"))),
+      p=95)
 ```
+
+`when_fw` 只写在**取数**（`ref(...)`）上，不再是节点级选项；不满足条件的引用返回 `None`，
+由 `coalesce` 选另一支。另一种写法是三元（`a if fw_minor is None or fw_minor >= 15 else b`，
+`fw_minor` 必须判 `None`，构建期会拦漏写）。
 
 这样"哪个固件用哪个字段"就写在经验文件里，人可读、机器可查；需要算子内部处理更复杂
 版本差异时（如陀螺零偏的双固件取源、姿态指令 q_d 与 roll/pitch_body 的选源），
@@ -422,6 +446,12 @@ fixtures:
 
 ## 完整示例（一条经验的全文）
 
+> ⚠️ **这一节是最初设计的 7 层 schema**，里面的 `phase` / `min_samples` / `excludes_if` /
+> `confidence` / `safety` / `thresholds_source` / `calibration` / `fixtures` 都**没有落地**
+> （哪些落了、为什么没落见开头那张「与设计的落地差异」表）。**当前真实写法**看站内
+> [如何编写一条规则](/guide/knowledge-write-rule)，或直接读 `rules/vibration.yaml`——
+> 顶层字段只有 10 个，`compute` 是表达式，取数修饰写在 `ref(...)` 上。
+
 ```yaml
 # knowledge/px4/rules/vibration.yaml
 id: px4-vibration
@@ -542,6 +572,11 @@ fixtures:
 | `armed_intervals` | armed 区间列表（供 `in_armed()` 用） |
 
 **内置函数**（并入表达式白名单）：
+
+> ⚠️ **这一节也是最初设计**：`has_topic()` / `in_armed()` / `phase_at()` 与 `scope` / `filter` /
+> `excludes_if` **都没有落地**。现在的表达式里只能调**算子**（见 `engine/operators.py`）加
+> `ref(...)`（带修饰的取数）与 `_try(...)`（容错求值）；样本级筛选由算子自己的参数承担
+> （如 `masked_any_in` / `active_window_mask` 收 `armed_intervals` 与 `codes`）。
 
 | 函数 | 用途 |
 | --- | --- |
