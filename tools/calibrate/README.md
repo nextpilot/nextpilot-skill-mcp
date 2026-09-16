@@ -1,8 +1,8 @@
 # 日志规则校准脚本
 
-冲刺 2 用 10-20 个真实 `.ulg` 校准阈值（CLAUDE.md 4.3 / 8）的本地工具。
-它**直接跑 knowledge/px4 下的 Python 源与 TOML 阈值**，与浏览器端 Pyodide
-执行的是同一份规则源码、同一份数值——改完 `knowledge/` 无需 Node 构建即可回归。
+用真实 `.ulg` 校准阈值（CLAUDE.md 4.3 / 8）的本地工具。
+它**直接跑 engine/ 下的 Python 引擎与 knowledge/px4/rules/*.yaml 中的规则**，
+与浏览器端 Pyodide 执行的是同一份规则源码、同一套逻辑——改完 `knowledge/` 无需 Node 构建即可回归。
 
 - `run_checks_locally.py <file.ulg> ...`：输出完整 findings JSON（规则文档见
   [content/guide/knowledge-rules.md](../../content/guide/knowledge-rules.md)）。
@@ -22,6 +22,6 @@
   phases/checks*/matchedFaults）。退出码 0/1，任何差异（含 finding 的**顺序变化**，id 是按顺序分配的）
   都算回归。重构每一步都必须 `compare-baseline.py` 全绿。
 
-依赖：`pip install pyulog numpy`；Python **3.11+**（读 TOML 用标准库 `tomllib`）。
+依赖：`pip install pyulog numpy`；Python **3.11+**。
 
 `logs/` 存放校准用真实日志（含 GPS 轨迹，勿提交大文件 / 涉密日志）。

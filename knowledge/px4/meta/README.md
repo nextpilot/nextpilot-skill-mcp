@@ -23,11 +23,12 @@
 生成（不要手写）：
 
 ```bash
-python tools/topics/sync-px4-msg.py --tags v1.15.0,v1.16.0,main
-python tools/topics/sync-px4-msg.py --check     # 只比对不写入（CI）
+python tools/px4/sync-px4-msg.py --tags v1.15.0,v1.16.0,main
+python tools/px4/sync-px4-msg.py --check     # 只比对不写入（CI）
 ```
 
 上游：
+
 - `topics` ← PX4/PX4-Autopilot 各 tag 的 `msg/*.msg`
 - `parameters` ← PX4 构建系统发布的 `parameters.json`（px4-travis S3）。
   **实测**：release tag 下没有该文件（404），只有分支构建（`main`/`master`）有，

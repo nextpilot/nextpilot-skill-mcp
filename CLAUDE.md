@@ -7,7 +7,7 @@
 平台由两部分组成：
 
 1. **Skill / MCP 社区（Skill Hub）**：飞控 AI Skill 与 MCP 服务的提交、浏览、语义搜索、在线试用与评分分享，免费开放引流。
-2. **飞控日志分析服务（内置核心服务）**：平台自营的确定性日志诊断服务，**首发支持 PX4 `.ulg`，ArduPilot `.bin` 在第 3-4 周跟进**，输出结构化检查结果与 LLM 中文报告，是主要收费锚点。
+2. **飞控日志分析服务（内置核心服务）**：平台自营的确定性日志诊断服务，**首发支持 PX4 `.ulg`（已上线，32 条检查经验 + 74 个算子），ArduPilot `.bin` 待排期**，输出结构化检查结果与 LLM 中文报告，是主要收费锚点。
 
 内容与能力按 **感知 → 决策 → 控制 → 工具链** 四个维度组织。
 
@@ -28,16 +28,16 @@
 │  Skill Hub    │  日志分析服务（内置）│  平台 MCP 服务    │
 │  社区 / 免费  │  确定性引擎 + LLM 解 │  对外能力分发     │
 ├───────────────┴──────────────────────┴───────────────────┤
-│ 冲刺 1：EdgeOne 静态站 + Pages Functions；端侧 Pyodide   │
-│ 冲刺 2 起：EdgeOne Pages + KV（元数据）+ Blob（大对象）  │
+│ 当前：EdgeOne Pages + KV + Blob；端侧 Pyodide 解析        │
+│ 后续：轻量云服务器（FastAPI + SQLite + MCP 长连接）        │
 └──────────────────────────────────────────────────────────┘
 ```
 
-**MVP 范围（第 1-2 周，先跑通上线，再做体验与变现）：**
+**当前已上线：**
 
-- Next.js 静态站骨架（冲刺 2 再引入 EdgeOne KV、Auth.js 登录与配额；首发 GitHub + 邮箱登录，微信 / 手机号待企业资质后补）
-- Skill 列表 / 详情 + 提交，首发只做关键词搜索（语义搜索第 3-4 周补）
-- `.ulg` 日志上传 → 结构化报告 → LLM 中文解释闭环（复用 PX4 ULog Analyzer 开源引擎，只做 3 条基础规则）
+- Next.js 全栈站点（EdgeOne Pages）：Skill Hub + GitHub/邮箱登录 + EdgeOne KV
+- `.ulg` 日志端侧解析 → 结构化报告 → LLM 中文解释闭环（32 条检查经验覆盖 16 个维度）
+- Skill 列表 / 详情 + 关键词搜索（客户端 Fuse.js）
 
 在线试用、评分评论、`.bin`（ArduPilot）支持等均放在上线后迭代，详见第 8 节路线图。
 
@@ -161,23 +161,23 @@
 └─────────────────────────────────────┘
 ```
 
-端侧架构的额外收益：原始日志（含 GPS 轨迹）永不离开用户设备，隐私合规压力最小；服务端无解析算力成本，第 1 周不需要独立 Python 容器。大文件（如 50MB 以上）性能不足或需要批量 API 时，再把同一套引擎下沉为 FastAPI 服务（见 6.1）。
+端侧架构的额外收益：原始日志（含 GPS 轨迹）永不离开用户设备，隐私合规压力最小；服务端无解析算力成本。大文件（如 50MB 以上）性能不足或需要批量 API 时，再把同一套引擎下沉为 FastAPI 服务（见 6.1）。
 
 ### 4.3 实施步骤（首发 PX4 `.ulg`，浏览器端解析）
 
-1. 先做 PX4 `.ulg` 解析：用 **Pyodide 在 Web Worker 中运行 pyulog**（fork PX4 ULog Analyzer 的解析与检查器逻辑，改造成可被 Pyodide 加载的纯 Python 包），集成 **3 个基础检查规则**：振动 / IMU 削波、EKF 创新检验（`estimator_status`）、电源（电压跌落 / 欠压）。
-2. 解析与规则检查全部在浏览器本地完成，仅将结构化 findings（必要时附脱敏统计字段）POST 到服务端。
-3. LLM 解释层在服务端调用 DeepSeek（国内直连、中文报告质量好、成本低），prompt 层保持模型无关，必要时可切换 GLM / Qwen，把 findings 翻译成中文报告。
-4. 前端只做选择文件 + 本地解析进度 + 报告展示，先不做图表。
-5. 第 1 周先跑通 5-10 个日志，第 2 周扩到 10-20 个校准误报率，目标 < 10%；同时验证 Pyodide 在主流浏览器上对目标大小日志的解析耗时与内存。
-6. ArduPilot `.bin` 支持（pymavlink，复用 ardupilot-mcp 的检查套件，同样打包进 Pyodide）放在第 3-4 周跟进。
+1. PX4 `.ulg` 解析：用 **Pyodide 在 Web Worker 中运行 pyulog**，集成 **32 条自包含检查经验**（见 `knowledge/px4/rules/*.yaml`），覆盖振动/IMU 削波、EKF 创新检验、电源、GPS、姿态跟踪、电机平衡、失效保护、模式切换、固件消息等 16 个维度。
+2. 解析与规则检查全部在浏览器本地完成，仅将结构化 findings POST 到服务端。
+3. LLM 解释层在服务端调用 DeepSeek（国内直连、中文报告质量好、成本低），prompt 层保持模型无关，必要时可切换 GLM / Qwen，把 findings 翻译成中文报告（GJB-841 格式）。
+4. 前端：选择文件 + 本地解析进度 + 完整报告展示（含图表、飞行轨迹、事件消息、参数审计、AI 解读）。
+5. 6 条真实日志冻结基线回归，逐字段比对通过；构建期校验（字段名/算子名/表达式）保证错误不进浏览器。
+6. ArduPilot `.bin` 支持（pymavlink，复用 ardupilot-mcp 的检查套件，同样打包进 Pyodide）待排期。
 
 ### 4.4 参考实现与研究项目
 
 | 项目 | 作者 / 来源 | 借鉴点 |
 | --- | --- | --- |
-| **PX4 ULog Analyzer** ⭐首发底座 | robotto-xyz | PX4 `.ulg` 日志分析，"确定性工具解析 + LLM 只做解释"架构，**第 1 周直接 fork 起步**（pyulog 解析 + 检查器骨架） |
-| **ardupilot-mcp** | furkanisikay，MIT | ArduPilot `.bin` 诊断 MCP 服务，16 项检查（振动、EKF、电源、GPS、电机平衡、参数审计等），每条发现附带阈值来源（docs/SOURCES.md）与官方文档链接；40 个真实炸机日志验证；贡献指南开放。检查套件设计（analyze_log 返回严重度排序的 findings）是规则层的直接模板，第 3-4 周接入 `.bin` 时复用 |
+| **PX4 ULog Analyzer** ⭐首发底座 | robotto-xyz | PX4 `.ulg` 日志分析，"确定性工具解析 + LLM 只做解释"架构（pyulog 解析 + 检查器骨架） |
+| **ardupilot-mcp** | furkanisikay，MIT | ArduPilot `.bin` 诊断 MCP 服务，16 项检查（振动、EKF、电源、GPS、电机平衡、参数审计等），每条发现附带阈值来源（docs/SOURCES.md）与官方文档链接；40 个真实炸机日志验证；贡献指南开放。检查套件设计（analyze_log 返回严重度排序的 findings）是规则层的直接模板，接入 `.bin` 时复用 |
 | **ArduPilot 实时连接 MCP** | rmeadomavic，MIT | 通过 MAVLink 实时读状态、改参数、切模式、诊断无法解锁原因；**默认只读**，致动功能需显式传参启用，对真实载具有额外安全门禁——平台安全设计的参照 |
 | **PX4 SITL MCP** | — | 仅仿真环境，向 PX4 SITL 发送指令并带安全门禁 |
 | **UAV-Insight-Toolkit** | — | Streamlit + pymavlink + GLM-4.5 已跑通同类流程，可作为工程参考 |
@@ -235,17 +235,17 @@
 面向国内用户选型：
 
 - **前端 / 全栈**：Next.js + TypeScript + Tailwind CSS + shadcn/ui，**代码位于 `web/` 子目录**；校验用真实日志放 `tools/calibrate/logs/`（不入库，含 GPS 轨迹），校准脚本与冻结基线在 `tools/calibrate/`
-- **登录认证**：Auth.js（NextAuth）。**冲刺 2 仅支持 GitHub + 邮箱验证码 / Magic Link（零资质，个人开发者可直接上线）**；**微信扫码、手机号验证码待注册企业主体后再接入**（微信开放平台网站应用需企业资质 + 300 元认证，短信签名 / 模板需企业资质审核）
+- **登录认证**：Auth.js（NextAuth）。**当前支持 GitHub + 邮箱验证码 / Magic Link（零资质，个人开发者可直接上线）**；**微信扫码、手机号验证码待注册企业主体后再接入**（微信开放平台网站应用需企业资质 + 300 元认证，短信签名 / 模板需企业资质审核）
 - **数据存储（EdgeOne 内置两层）**：
-  - **EdgeOne KV**：小尺寸键值、读多写少，存元数据与索引——用户、配额计数、评论、报告元数据。**冲刺 1 不用**（Skill 是 MDX 静态文件，报告存 localStorage）；**冲刺 2 起随登录配额启用**，配额计数用唯一键 + 前缀列举避免竞态；注意最终一致，写后不立即回读。
+  - **EdgeOne KV**：已启用，小尺寸键值、读多写少，存元数据与索引——用户、配额计数、评论、报告元数据。配额计数用唯一键 + 前缀列举避免竞态；注意最终一致，写后不立即回读。
   - **EdgeOne Blob**：大对象与二进制——Pyodide 运行时 / 自定义 wheel、语义向量静态文件、报告分享页（HTML / PDF）、KV 定期导出的 JSON 备份，均通过 CDN 分发。原始日志默认仍不上传；未来云端留存 / MCP 文件直传时再放 Blob（需签名 URL 支持，以官方能力为准）。
-  - 语义搜索（冲刺 3）：Skill 数量小，embedding 文件放 Blob，浏览器 / Function 内暴力匹配，无需专用向量库。**向量来源：同一个 BGE 小模型（如 bge-small-zh）两端使用**——Skill 侧在构建时本机离线生成，随版本静态发布（DeepSeek 仅提供对话模型、无 embedding 接口）；用户查询侧在浏览器用 transformers.js / onnxruntime-web 实时生成。运行时零成本、零外部依赖；以后 Skill 频繁更新或需检索日志报告时，再改用云端 embedding API（阿里 text-embedding-v3 / 混元 embedding）。
+  - 语义搜索（待实现）：Skill 数量小，embedding 文件放 Blob，浏览器 / Function 内暴力匹配，无需专用向量库。**向量来源：同一个 BGE 小模型（如 bge-small-zh）两端使用**——Skill 侧在构建时本机离线生成，随版本静态发布（DeepSeek 仅提供对话模型、无 embedding 接口）；用户查询侧在浏览器用 transformers.js / onnxruntime-web 实时生成。运行时零成本、零外部依赖；以后 Skill 频繁更新或需检索日志报告时，再改用云端 embedding API（阿里 text-embedding-v3 / 混元 embedding）。
   - 不追求 SQL 能力。**存储演进顺序（写死，不提前采购）**：
-    1. **阶段一（冲刺 1-3 及以后一段时间）**：EdgeOne KV + Blob，零服务器、零外部存储费用，Blob 是唯一对象存储；
+    1. **阶段一（当前）**：EdgeOne KV + Blob，零服务器、零外部存储费用，Blob 是唯一对象存储；
     2. **阶段二（触发条件出现时）**：腾讯云轻量服务器，承载 SQLite + sqlite-vec / PostgreSQL 与 FastAPI + Redis 解析服务；备份仍继续写 Blob。
     从第一天起封装薄存储接口，实体字段对齐远期关系型表结构，控制阶段间迁移成本。
-- **日志解析（端侧优先）**：**Pyodide（WASM Python）运行在 Web Worker 中**，首发加载 pyulog（PX4 `.ulg`），第 3-4 周加载 pymavlink（ArduPilot `.bin`）；规则检查器与解析器为同一份纯 Python 包，浏览器与服务端共用。**blackbox_decode（Betaflight）推后**：它是 C 编译二进制、无法直接进 Pyodide，需 WASM 重写或等阶段二服务端引擎支持
-- **任务形态**：解析在端侧异步进行，无需服务端队列；第 1 周不部署独立 Python 服务。大文件（约 50MB 以上）或批量分析 API 阶段，再把同一套引擎下沉为 FastAPI + Redis（ARQ / BullMQ）常驻容器服务
+- **日志解析（端侧优先）**：**Pyodide（WASM Python）运行在 Web Worker 中**，首发加载 pyulog（PX4 `.ulg`），ArduPilot `.bin`（pymavlink）待排期；规则检查器与解析器为同一份纯 Python 包，浏览器与服务端共用。**blackbox_decode（Betaflight）推后**：它是 C 编译二进制、无法直接进 Pyodide，需 WASM 重写或等阶段二服务端引擎支持
+- **任务形态**：解析在端侧异步进行，无需服务端队列；当前不部署独立 Python 服务。大文件（约 50MB 以上）或批量分析 API 阶段，再把同一套引擎下沉为 FastAPI + Redis（ARQ / BullMQ）常驻容器服务
 - **LLM**：服务端调用 **DeepSeek** 首选，prompt 保持模型无关，GLM-4.5-flash / qwen-turbo 作为备选；仅接收结构化 findings，不接触原始日志；配合 prompt 缓存与报告缓存，单份报告成本控制在 ¥0.1 以内
 - **MCP 服务**：TypeScript MCP SDK，独立小服务；**上线时间后移到阶段二**（购买轻量云服务器后）——MCP 为 SSE / 长连接，无状态、有超时的边缘 Functions 不适合承载
 
@@ -253,21 +253,21 @@
 
 - 前端 / 边缘：腾讯 EdgeOne Pages，**使用境外节点、无需 ICP 备案即可绑定自定义域名**（代价：大陆用户访问延迟略高于国内备案节点；产品成熟、主体齐备后再备案切国内节点）；**持久化与大对象全部使用 EdgeOne 内置的 KV 与 Blob，不另购对象存储**
 - 对象存储：**EdgeOne Blob 为唯一对象存储**（Pyodide 资源、向量文件、分享报告、各阶段备份），全周期不引入外部对象存储服务
-- 计算 / 服务器：**冲刺 1-3 全程不买服务器**——站点与 Pages Functions 部署在 EdgeOne。**阶段二采购腾讯云轻量服务器的触发条件**：出现复杂多表统计 / 后台需求、团队空间、需要关系型数据库（SQLite + sqlite-vec / PostgreSQL），或大文件 / 批量 API 需要 FastAPI + Redis 日志解析服务
+- 计算 / 服务器：**当前不买服务器**——站点与 Pages Functions 部署在 EdgeOne。**阶段二采购腾讯云轻量服务器的触发条件**：出现复杂多表统计 / 后台需求、团队空间、需要关系型数据库（SQLite + sqlite-vec / PostgreSQL），或大文件 / 批量 API 需要 FastAPI + Redis 日志解析服务
 - 收款：**微信支付 + 支付宝**（订阅制；个人开发阶段可先用虎皮椒 / Payjs 等聚合支付过渡）
 
 > 实施前需以 EdgeOne 官方文档核实：KV / Blob 的免费额度与上限（读写次数、单对象大小、总存储）、Functions 是否可直接写 Blob、CDN 流出流量计费口径、Blob 是否支持签名 / 私有 URL 与对象列举。
 
 ### 6.3 数据模型（EdgeOne KV + Blob）
 
-冲刺 1 无持久化（Skill 即仓库 MDX，报告在 localStorage）。冲刺 2 起按"KV 存元数据、Blob 存大对象"分工，实体字段保持与远期关系型表结构一致，便于迁移：
+当前按"KV 存元数据、Blob 存大对象"分工，实体字段保持与远期关系型表结构一致，便于迁移：
 
 **KV 键设计：**
 
 | KV 键模式 | 内容 |
 | --- | --- |
 | `user:{id}` / `user:wx:{openid}` 等索引键 | 用户资料、贡献者等级（对应远期 `profiles`） |
-| `skill:{slug}` | Skill 元数据：name / description / prompt / examples / platform_tags / model_tags / category / status / downloads_count / rating；冲刺 1-2 仍以 MDX 为唯一数据源，KV 仅在支持在线提交后启用（对应远期 `skills`） |
+| `skill:{slug}` | Skill 元数据：name / description / prompt / examples / platform_tags / model_tags / category / status / downloads_count / rating；当前仍以 MDX 为唯一数据源，KV 仅在支持在线提交后启用（对应远期 `skills`） |
 | `review:{skillSlug}:{userId}` | 评分 + 评论 + 实测用例结果，按前缀列举（对应远期 `reviews`） |
 | `report:{id}` | 报告元数据与结构化结果摘要（findings JSON + LLM 解释，控制单值大小）；完整 HTML / PDF 放 Blob；**原始日志不入库、不上传，仅存在于用户浏览器**（对应远期 `analysis_reports`） |
 | `share:{id}` | 报告分享索引：→ Blob 公开 URL、所属用户、时间、严重度统计 |
@@ -278,9 +278,9 @@
 
 | Blob 路径模式 | 内容 |
 | --- | --- |
-| `runtime/pyodide/`、`wheels/*.whl` | Pyodide 运行时与自定义 pyulog 检查器 wheel，长缓存（冲刺 1 即启用） |
-| `embeddings/skills-{version}.json` | Skill 联合 embedding 静态文件，供语义搜索内存匹配（冲刺 3） |
-| `reports/{id}.html` / `.pdf` | 可分享的完整报告，公开 / 签名 URL 访问（冲刺 2） |
+| `runtime/pyodide/`、`wheels/*.whl` | Pyodide 运行时与自定义 pyulog 检查器 wheel，长缓存（已启用） |
+| `embeddings/skills-{version}.json` | Skill 联合 embedding 静态文件，供语义搜索内存匹配（待实现） |
+| `reports/{id}.html` / `.pdf` | 可分享的完整报告，公开 / 签名 URL 访问（已启用） |
 | `backups/kv-{日期}.json` | KV 定期导出备份 |
 | `logs/{userId}/{reportId}.ulg`（远期） | 用户主动要求云端留存、或 MCP 文件直传时的原始日志；默认功能不启用，需签名 URL 与隐私提示 |
 
@@ -313,8 +313,8 @@
 | Web Worker 入口 | kebab-case + `-worker.ts` | `ulog-worker.ts` |
 | Worker 内嵌脚本 / helper | kebab-case + `-script.ts` | 现由 `build-knowledge.mjs` **生成**，不手改 |
 | Next.js 路由 | `page.tsx` / `route.ts` / `layout.tsx`（目录即路由） | `app/analyze/page.tsx`、`app/api/explain/route.ts` |
-| Python 模块 | snake_case + `.py` | `engine/ulog_checks.py` |
-| 知识 / 经验文件 | 见 `knowledge/README.md`；阈值 `*.toml`、故障库 `*.yaml` | `px4-thresholds.toml`、`px4-fault-kb.yaml` |
+| Python 模块 | snake_case + `.py` | `engine/rule_engine.py`、`engine/operators.py`、`engine/report_data.py` |
+| 知识 / 经验文件 | 见 `knowledge/README.md`；规则 `rules/*.yaml`、故障库 `px4-fault-kb.yaml` | `rules/vibration.yaml`、`px4-fault-kb.yaml` |
 | 文档 | kebab-case + `.md` | `llm/gjb841-system-prompt.md` |
 
 > 注意：Worker 相关文件统一用连字符（`ulog-worker.ts`），不要用点号（❌ `ulog.worker.ts`）。
@@ -357,14 +357,14 @@
 
 ---
 
-## 8. 开发路线图（2026-09 调整：按产品板块切分冲刺）
+## 8. 开发路线图（按产品板块切分冲刺）
 
-| 阶段 | 目标 |
-| --- | --- |
-| 冲刺 1：Skill/MCP 社区网站 | 网站基础框架与内容：预制 Skill（8-10 个种子）+ MCP 专区 + 使用指南；**登录与账号体系（GitHub + 邮箱验证码，微信/手机号待企业资质）**；EdgeOne KV 持久化；**社区指标：真实下载/获取次数（设备+IP 每日去重的 KV 事件计数，不是写死的 frontmatter）、1-5 星评分（同设备可改）、更新时间展示、按下载/评分/更新排序、热门排行榜**；**语义搜索**（BGE 端侧 embedding 暴力匹配）；关键词搜索。详情页参考腾讯 SkillHub（skillhub.cloud.tencent.com）：头部元信息、复制提示词/安装命令、评分与获取入口、版本/许可证/更新时间。日志分析此阶段保留页面入口，不作为交付重点。 |
-| 冲刺 2：日志分析（核心收费锚点） | **确定性日志诊断引擎 + 所有用户免费试用**：匿名 3 次/天（按设备 ID + IP 日上限防刷），登录 10 次/天，每日重置，仅作成本闸门不是会员墙；匿名报告只存本机 localStorage，登录后同步云端 7 天。PX4 `.ulg` 先行，规则补到 16+；四层架构（pyulog 解析 → 信号预处理/特征/数据质量 guard → 故障知识库确定性匹配 → LLM 按 GJB-841 组装），吸收 PX4 ULog Analyzer 与 Flight Review 经验；**接入 ArduPilot `.bin`（pymavlink + ardupilot-mcp 检查套件，同样打包进 Pyodide）**；10-20 个真实日志校准误报率 < 10%；报告趋势对比。 |
-| 冲刺 3：会员与社区商业化 | **会员/付费体系**（免费/Pro/团队，微信支付+支付宝），在线试用（不跳转就能跑）；规则/故障知识包贡献与 **70/30 分成**；Skill 组合编排；LLM 自动实测评分；报告趋势对比完善；**微信 / 手机号登录（取得企业资质后）**。 |
-| 冲刺 4：轻量服务器 → 平台 MCP 服务 | **先解决承载，再对外分发**。见下方分步说明。 |
+| 阶段 | 状态 | 目标 |
+| --- | --- | --- |
+| 冲刺 1：Skill/MCP 社区网站 | ✅ 已上线 | 网站基础框架与内容：预制 Skill（8 个种子）+ MCP 专区 + 使用指南；**登录与账号体系（GitHub + 邮箱验证码，微信/手机号待企业资质）**；EdgeOne KV 持久化；**社区指标：真实下载/获取次数（设备+IP 每日去重的 KV 事件计数）、1-5 星评分、按下载/评分/更新排序、热门排行榜**；关键词搜索（客户端 Fuse.js）。语义搜索（BGE 端侧 embedding）待补。详情页：头部元信息、复制提示词/安装命令、评分与获取入口、版本/许可证/更新时间。 |
+| 冲刺 2：日志分析（核心收费锚点） | ✅ 核心已上线（.bin 待排期） | **确定性日志诊断引擎 + 所有用户免费试用**。PX4 `.ulg`：32 条检查经验覆盖 16 个维度，六条真实日志冻结基线回归；四层架构（pyulog 解析 → rule_engine/operators → 规则匹配 → LLM 按 GJB-841 组装输出中文报告）。**ArduPilot `.bin` 待排期**（pymavlink + ardupilot-mcp 检查套件，同样打包进 Pyodide）。多日志趋势对比与误报率精细校准待后续迭代。 |
+| 冲刺 3：会员与社区商业化 | ⏳ 待启动 | **会员/付费体系**（免费/Pro/团队，微信支付+支付宝），在线试用（不跳转就能跑）；规则/故障知识包贡献与 **70/30 分成**；Skill 组合编排；LLM 自动实测评分；语义搜索；**微信 / 手机号登录（取得企业资质后）**。 |
+| 冲刺 4：轻量服务器 → 平台 MCP 服务 | ⏳ 待启动 | **先解决承载，再对外分发**。见下方分步说明。 |
 
 **冲刺 4 的三步顺序（不可颠倒）：**
 
@@ -383,10 +383,10 @@
 
 ### 提速取舍（明确不做的事）
 
-- 冲刺 1 完成前，日志分析不做在线试用、图表增强、趋势对比——先保证社区网站与账号闭环。
+- 日志分析在线试用、多日志趋势对比等体验增强需求，在与会员体系同步推进。
 - **不租用独立日志服务器**：解析全部放在浏览器（Pyodide + Web Worker），零解析算力成本；等大文件 / 批量 API 需求出现后再下沉。
-- **冲刺 1-3 零服务器**：持久化用 EdgeOne 内置 KV / Blob，无需 CVM / 数据库实例 / 外部对象存储。KV 最终一致、写后不回读；配额用唯一键 + 前缀计数；定期导出 JSON 备份。
-- 解析引擎与基础规则**复用开源**（PX4 侧：官方 pyulog + 借鉴 PX4 ULog Analyzer 的 `diagnose_flight` 与 Flight Review 阈值/阶段经验；ArduPilot 侧：fork ardupilot-mcp 检查套件），自有精力集中在规则校准、故障知识库、LLM 解释层和前端体验。
+- **当前零服务器**：持久化用 EdgeOne 内置 KV / Blob，无需 CVM / 数据库实例 / 外部对象存储。KV 最终一致、写后不回读；配额用唯一键 + 前缀计数；定期导出 JSON 备份。
+- 解析引擎与规则**复用开源**（PX4 侧：官方 pyulog + 借鉴 PX4 ULog Analyzer 的 `diagnose_flight` 与 Flight Review 阈值/阶段经验；ArduPilot 侧：fork ardupilot-mcp 检查套件），自有精力集中在规则校准、故障知识库、LLM 解释层和前端体验。
 
 ---
 

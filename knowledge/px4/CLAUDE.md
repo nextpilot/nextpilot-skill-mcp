@@ -8,7 +8,7 @@
 
 ## 实施状态（2026-09-15：已实施）
 
-**已完成**：15 组过程式检查（`ulog_checks.py` 1095 行）→ **32 条自包含经验**（含 4 条数据质量
+**已完成**：15 组过程式检查（原 `engine/ulog_checks.py` 1095 行，已迁移为 `engine/rule_engine.py`）→ **32 条自包含经验**（含 4 条数据质量
 guard），**73 个通用算子**；`px4-thresholds.toml` 已退场（阈值随各自经验内联）。引擎侧每个
 检查块只剩一行 `_run_rules("<slot>")`。6 条真实日志的冻结基线逐字段一致；生成产物真实执行
 通过；构建期护栏生效（算子名/入参数量、表达式与文案里的未声明名字、缺 `firmware`/`airframe`、
@@ -173,7 +173,7 @@ load_crit = 0.95
 ```
 
 裸数字飘在 TOML 里，看不出属于哪条经验、读哪个 topic 的哪个字段、什么条件下成立。
-同时 15 组检查 / 39 个告警点写在 `ulog_checks.py`（1095 行），阈值与实现分离，
+同时原 15 组检查 / 39 个告警点写在 `engine/ulog_checks.py`（已迁移为 `engine/rule_engine.py`，1095 行），阈值与实现分离，
 「暂定」只存在于注释里，「误报率 <10%」只存在于文档里。
 
 目标：**一条经验 = 一个自包含、可评审、可验证、可分发的完整单元**。
@@ -189,13 +189,13 @@ load_crit = 0.95
 ```text
 构建期（Node，web/scripts/build-knowledge.mjs）
   knowledge/px4/rules/*.yaml      ─┐
-  knowledge/px4/guards/*.yaml     ─┤ 解析 + 校验（必填/算子白名单/表达式合法性）
-  knowledge/px4/facts.yaml        ─┤ 数据绑定与码表（字段名/码值/阶段分组/slot 顺序）
+  knowledge/px4/facts.yaml        ─┤ 解析 + 校验（必填/算子白名单/表达式合法性）
   knowledge/px4/meta/** 与 topic-overrides.yaml   ─┤
   engine/operators.py             ─┤
-  engine/ulog_checks.py           ─┘
+  engine/rule_engine.py           ─┤
+  engine/report_data.py           ─┘
         ↓ 生成的产物（提交进仓库）
-  web/workers/ulog-check-script.ts   ← Python 源码，内联 __RULES__/__GUARDS__/__TOPICS__ 的 JSON 字面量
+  web/workers/ulog-check-script.ts   ← Python 源码，内联 __RULES__/__FACTS__/__TOPICS__ 的 JSON 字面量
   web/workers/fault-kb.generated.json
         ↓ 浏览器运行时
   Web Worker + Pyodide  →  执行 Python：基础事实层 → 匹配 firmware/airframe → 取字段
@@ -204,8 +204,7 @@ load_crit = 0.95
 
 关键点：
 
-1. **浏览器里不存在 YAML 解析器**。YAML/TOML 在构建期被转成 JSON 字面量内联进 Python
-   （和现在 `__FAULT_KB__` / `__THRESHOLDS__` 完全同一机制），所以：零额外依赖、
+1. **浏览器里不存在 YAML 解析器**。YAML 在构建期被转成 JSON 字面量内联进 Python，所以：零额外依赖、
    零运行时解析开销、离线也能跑。
 2. **表达式求值全在浏览器端**，但只用 Python 标准库 `ast` 做白名单求值——Pyodide 自带，
    不需要新 wheel。
@@ -750,10 +749,10 @@ fields:
 
 ```bash
 # 拉取指定 release tag 的 msg 与 parameters.json，生成/更新 meta/<tag>.json
-python tools/topics/sync-px4-msg.py --tags v1.13.3,v1.14.4,v1.15.0,v1.16.0,main
+python tools/px4/sync-px4-msg.py --tags v1.13.3,v1.14.4,v1.15.0,v1.16.0,main
 
 # CI / 本地校验：只比对不写入，若上游已变则非零退出
-python tools/topics/sync-px4-msg.py --check
+python tools/px4/sync-px4-msg.py --check
 ```
 
 **落盘结构：缓存与产物都按 tag 组织**——一个 tag 一个文件夹，里面的东西都属于该版本。
@@ -847,7 +846,7 @@ units:                       # 单位修正（上游注释缺失或不准时）
 
 | 文件 | 性质 | 内容 |
 | --- | --- | --- |
-| `knowledge/px4/meta/<tag>.json` | **生成物**（提交进仓库） | 该版本字段字典 + 参数字典（一份文件里两块）|
+| `knowledge/px4/meta/<tag>.json` | **生成物**（提交进仓库） | 该版本字段字典 + 参数字典（一份文件里两块） |
 | `knowledge/px4/topic-overrides.yaml` | **人工维护** | 上游没有的语义：`groups`（如 `hover_ish`、`critical_union`）、单位修正、`invalid` 标记（如 `remaining = -1`）、补充 `note` |
 | `.cache/px4/<tag>/` | 本地缓存，不入库 | 一个 tag 一个文件夹：`msg/` + `parameters.json` |
 
@@ -894,8 +893,8 @@ knowledge/px4/
     v1.15.0.yaml ...
   tags.yaml      # tag 顺序与版本映射
   topic-overrides.yaml  # 跨 tag 人工语义层：aliases 别名、groups 命名集合、invalid、单位修正
-  operators.py   # 预定函数（白名单注册表）
-  ulog_checks.py # 瘦身为框架：基础事实层 + 加载经验 + 取数 + 算子 + 表达式求值 + 发射
+  engine/operators.py   # 预定函数（白名单注册表）
+  engine/rule_engine.py # 瘦身为框架：基础事实层 + 加载经验 + 取数 + 算子 + 表达式求值 + 发射（原 ulog_checks.py）
   px4-fault-kb.yaml
   px4-ulog-rules.md
 ```
@@ -915,14 +914,14 @@ knowledge/px4/
 
 - **阶段 0 冻结基线**：`tools/calibrate/dump-baseline.py` 把 5 个日志的完整输出冻结成
   `tools/calibrate/baseline/*.json` 提交（findings 全字段 + tags/guards/phases/checks*）
-- **阶段 0.5 同步字段与参数字典**：`tools/topics/sync-px4-msg.py` 按 tag（v1.13.3 / v1.14.4 /
+- **阶段 0.5 同步字段与参数字典**：`tools/px4/sync-px4-msg.py` 按 tag（v1.13.3 / v1.14.4 /
   v1.15.0 / v1.16.0 / main）各建一个文件夹，下载 `msg/` 与 `parameters.json`，生成
   `meta/<tag>.json`（该版本字段字典 + 参数字典）；
   人工补 `topic-overrides.yaml` 的 `aliases` / `groups` / `invalid`
 - **阶段 1**：`operators.py` + 框架改造 + 12 条标准型 + 全部 guard 迁移 + `meta/<tag>.json` +
   `build-knowledge.mjs` 必填/表达式校验 + **删掉已无用的 TOML 解析器**（统一 YAML 后只剩一个）；
   `compare-baseline.py` 验等价
-- **阶段 2**：补时序/掩码类 9 个函数，迁剩余 10 个告警点，`ulog_checks.py` 瘦到约 200 行
+- **阶段 2（已完成）**：补时序/掩码类 9 个函数，迁剩余 10 个告警点，引擎侧改为 `engine/rule_engine.py`，原 `ulog_checks.py` 已删除
 - **阶段 3（可选）**：`fixtures` 跑通后，回归从"比对整体基线"升级为"每条经验自带正反例"
 
 ## 验证
