@@ -88,6 +88,12 @@ function fmtSize(bytes?: number): string {
  * 每张都起一个 Leaflet 实例既慢又费内存）。等距圆柱投影 + 保持纵横比，北向上。
  * 老记录没有缩略图（trackThumb 是后加的字段），打开一次报告就会补上。
  */
+/** 文件名只显示第一段（按 '-' 切）：UUID 命名的日志用后一段区分，列表里够用了 */
+function shortName(fileName: string): string {
+  const i = fileName.indexOf("-");
+  return i > 0 ? fileName.slice(0, i) : fileName;
+}
+
 function TrackThumb({ points }: { points?: [number, number][]; }) {
   const box =
     "block h-12 w-16 shrink-0 overflow-hidden rounded-md border border-border bg-surface-2";
@@ -357,16 +363,16 @@ export function HistoryList({
             <thead>
               <tr className="text-center text-[11px] text-muted">
                 <th className="w-[72px] pb-2 pr-2 font-normal">轨迹</th>
-                <th className="w-[10%] pb-2 pr-2 font-normal">上传时间</th>
-                <th className="pb-2 pr-2 font-normal">文件名</th>
+                <th className="w-[12%] pb-2 pr-2 font-normal">上传时间</th>
+                <th className="w-[13%] pb-2 pr-2 font-normal">文件名</th>
                 <th className="w-[7%] pb-2 pr-2 font-normal">大小</th>
                 <th className="w-[8%] pb-2 pr-2 font-normal">机型</th>
                 <th className="w-[8%] pb-2 pr-2 font-normal">硬件</th>
                 <th className="w-[8%] pb-2 pr-2 font-normal">软件</th>
-                <th className="w-[10%] pb-2 pr-2 font-normal">启动时间</th>
+                <th className="w-[12%] pb-2 pr-2 font-normal">启动时间</th>
                 <th className="w-[6%] pb-2 pr-2 font-normal">时长</th>
                 <th className="w-[8%] pb-2 pr-2 font-normal">飞行模式</th>
-                <th className="w-[9%] pb-2 pr-2 font-normal">结论</th>
+                <th className="w-[12%] pb-2 pr-2 font-normal">结论</th>
                 <th className="w-[5%] pb-2 font-normal">来源</th>
               </tr>
             </thead>
@@ -406,13 +412,13 @@ export function HistoryList({
                       {formatDateTime(r.analyzedAt)}
                     </td>
                     <td className="py-2 pr-2">
-                      {/* 文件名较长：整词换行（break-all），不截断 */}
+                      {/* 只显示第一段（按 '-' 切，如 ce302d3b），全名在悬停提示里 */}
                       <Link
                         href={href}
-                        className="block font-medium break-all text-text hover:text-primary"
+                        className="block truncate font-medium text-text hover:text-primary"
                         title={r.fileName}
                       >
-                        {r.fileName}
+                        {shortName(r.fileName)}
                       </Link>
                     </td>
                     <td className="py-2 pr-2 text-center whitespace-nowrap text-text">{fmtSize(r.fileSize)}</td>
