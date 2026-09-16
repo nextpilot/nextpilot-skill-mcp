@@ -17,6 +17,7 @@ import {
 } from "@/lib/chart-presets";
 import {
     clearReports,
+    deleteReport,
     getReportData,
     initReportStore,
     listReports,
@@ -691,6 +692,26 @@ export function useLogAnalyzer() {
         setHistory([]);
     }, []);
 
+    /** 删单条**本机**记录：结论与派生数据一起删；原始日志缓存（nextpilot-cache）保留，
+     *  下次再上传同一份日志仍是秒开（缓存上限与淘汰见 log-cache.ts） */
+    const deleteLocal = useCallback((id: string) => {
+        deleteReport(id);
+        setHistory(listReports());
+    }, []);
+
+    /** 删单条**云端**记录：调 /api/reports/:id（服务端只允许删自己前缀下的键），删完重拉列表 */
+    const deleteCloud = useCallback(
+        async (id: string) => {
+            try {
+                await fetch(`/api/reports/${encodeURIComponent(id)}`, { method: "DELETE" });
+            } catch {
+                // 网络失败就保持列表不动，用户还能再试
+            }
+            await refreshCloud();
+        },
+        [refreshCloud],
+    );
+
     const busy = stage !== "idle" && stage !== "done";
 
     return {
@@ -734,6 +755,8 @@ export function useLogAnalyzer() {
         loadReportData,
         handleFile,
         clearLocal,
+        deleteLocal,
+        deleteCloud,
         parseBytes,
     };
 }

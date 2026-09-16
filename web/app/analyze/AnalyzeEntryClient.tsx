@@ -39,6 +39,8 @@ export function AnalyzeEntryClient() {
     busy,
     handleFile,
     clearLocal,
+    deleteLocal,
+    deleteCloud,
     reportIdRef,
   } = useLogAnalyzer();
 
@@ -179,6 +181,8 @@ export function AnalyzeEntryClient() {
             cachedHashes={cachedHashes}
             cacheInfo={cacheInfo}
             onClearLocal={clearLocal}
+            onDeleteLocal={deleteLocal}
+            onDeleteCloud={deleteCloud}
           />
         </div>
       </div>

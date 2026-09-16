@@ -14,6 +14,7 @@ import {
   X,
   Filter,
   RotateCcw,
+  Cloud,
 } from "lucide-react";
 import type { SavedReport } from "@/lib/report-history";
 import { formatDateTime, formatFirmware, formatLogTime } from "@/lib/format";
@@ -283,6 +284,8 @@ export function HistoryList({
   cachedHashes,
   cacheInfo,
   onClearLocal,
+  onDeleteLocal,
+  onDeleteCloud,
   headerRight,
 }: {
   items: HistoryItem[];
@@ -291,12 +294,18 @@ export function HistoryList({
   cachedHashes: Set<string>;
   cacheInfo: { entries: number; bytes: number };
   onClearLocal: () => void;
+  /** 删单条本机记录（结论 + 派生数据；原始日志缓存保留） */
+  onDeleteLocal: (id: string) => void;
+  /** 删单条云端记录（调 /api/reports/:id，服务端只允许删本人前缀下的键） */
+  onDeleteCloud: (id: string) => void;
   /** 可选：标题栏右侧插槽（如折叠按钮） */
   headerRight?: React.ReactNode;
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [confirmingClear, setConfirmingClear] = useState(false);
+  /** 正在等二次确认的那条记录 id（删单条要两段确认，整行可点进报告，误删代价大） */
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [vehicleFilter, setVehicleFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [durationFilter, setDurationFilter] = useState("");
@@ -339,6 +348,12 @@ export function HistoryList({
     setDurationFilter("");
     setVerSwFilter("");
     setVerHwFilter("");
+  };
+
+  const deleteItem = (r: HistoryItem) => {
+    if (r.source === "cloud") onDeleteCloud(r.id);
+    else onDeleteLocal(r.id);
+    setConfirmingId(null);
   };
 
   const fmtMB = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MB`;
@@ -540,7 +555,7 @@ export function HistoryList({
                       if ((e.target as HTMLElement).closest("a")) return;
                       router.push(href);
                     }}
-                    className="cursor-pointer border-t border-border/30 hover:bg-surface-2"
+                    className="group/row cursor-pointer border-t border-border/30 hover:bg-surface-2"
                   >
                     <td className="py-2 pr-2 align-middle">
                       <div className="flex justify-center">
@@ -561,8 +576,16 @@ export function HistoryList({
                       >
                         {shortName(r.fileName)}
                       </Link>
-                      <span className="block truncate text-[11px] leading-4 text-text">
-                        {fmtSize(r.fileSize)}
+                      <span className="flex items-center justify-center gap-1 text-[11px] leading-4 text-text">
+                        {r.source === "cloud" && (
+                          <span
+                            className="inline-flex shrink-0"
+                            title="云端记录：跨设备可见，保留 7 天；原始日志从未上传"
+                          >
+                            <Cloud className="h-3 w-3 text-primary" />
+                          </span>
+                        )}
+                        <span className="truncate">{fmtSize(r.fileSize)}</span>
                       </span>
                     </td>
                     <td className="py-2 align-middle pr-2 text-center font-mono break-words text-text">
@@ -617,15 +640,54 @@ export function HistoryList({
                           ? modeStyle(r.facts.mainMode).label
                           : "—"}
                     </td>
-                    <td className="py-2 align-middle text-center whitespace-nowrap">
-                      {c ? (
-                        <span className="flex items-center justify-center gap-1.5">
-                          <Count icon={<ShieldAlert className="h-3 w-3" />} n={c.critical} tone="critical" />
-                          <Count icon={<AlertTriangle className="h-3 w-3" />} n={c.warning} tone="warning" />
-                          <Count icon={<Info className="h-3 w-3" />} n={c.info} tone="info" />
+                    {/* 结论格兼作操作位（不再单开一列）：整行悬停时右端浮出删除按钮；
+                        点一下把三档计数换成「确认删除 / 取消」——整行可点进报告，误删代价大。
+                        stopPropagation 免得点击穿到行的 onClick 跳走 */}
+                    <td
+                      className="relative py-2 pr-6 align-middle text-center whitespace-nowrap"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {confirmingId === r.id ? (
+                        <span className="flex items-center justify-center gap-1 text-[11px]">
+                          <button
+                            type="button"
+                            onClick={() => deleteItem(r)}
+                            className="rounded-md bg-critical/15 px-1.5 py-0.5 text-critical hover:bg-critical/25"
+                          >
+                            确认删除
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmingId(null)}
+                            className="rounded-md px-1 py-0.5 text-muted hover:bg-surface-2"
+                          >
+                            取消
+                          </button>
                         </span>
                       ) : (
-                        <span className="text-muted">{total}</span>
+                        <>
+                          {c ? (
+                            <span className="flex items-center justify-center gap-1.5">
+                              <Count icon={<ShieldAlert className="h-3 w-3" />} n={c.critical} tone="critical" />
+                              <Count icon={<AlertTriangle className="h-3 w-3" />} n={c.warning} tone="warning" />
+                              <Count icon={<Info className="h-3 w-3" />} n={c.info} tone="info" />
+                            </span>
+                          ) : (
+                            <span className="text-muted">{total}</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setConfirmingId(r.id)}
+                            title={
+                              r.source === "cloud"
+                                ? "删除这条云端记录（本机仍可重新分析）"
+                                : "删除这条本机记录（原始日志缓存保留，再次上传仍是秒开）"
+                            }
+                            className="absolute top-1/2 right-0.5 -translate-y-1/2 text-faint opacity-0 transition-opacity group-hover/row:opacity-100 hover:text-critical"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>
