@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { SessionProvider } from "@/components/SessionProvider";
+import { RuntimeCacheRegistrar } from "@/components/RuntimeCacheRegistrar";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
 import "./globals.css";
 
@@ -18,6 +19,8 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" data-theme="light" data-scroll-behavior="smooth">
       <body className="min-h-screen font-sans">
+        {/* 让解析运行时只下载一次（见 public/sw.js） */}
+        <RuntimeCacheRegistrar />
         <LanguageProvider>
           <SessionProvider>
             <SiteHeader />
