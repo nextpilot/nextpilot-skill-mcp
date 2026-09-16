@@ -264,7 +264,10 @@ export function LogFlightMap({
       {/* 容器**始终可见**：Leaflet 建图时要拿到真实尺寸，曾经是 display:none 时建图 →
           尺寸算成 0×0 → fitBounds 只能给到全球视野（比例尺 10000 km），事后 invalidateSize
           也救不回缩放级别。加载/错误状态改用浮层盖住。 */}
-      <div className="relative">
+      {/* isolate：给地图单独开一个层叠上下文。Leaflet 自己的面板 / 控件用的是 z-index 400~1000
+          （.leaflet-pane / .leaflet-top），不隔离的话它们会盖过站点的 sticky 顶栏（z-40）——
+          滚动时地图糊在导航栏上面。隔离后这些 z-index 只在这个容器内比较。 */}
+      <div className="relative isolate">
         <div ref={containerRef} className="h-[380px] w-full overflow-hidden rounded-lg sm:h-[520px]" />
         {/* 高度色带：竖着贴在地图左侧（颜色 = 轨迹那段的平均高度）。
             从 top-20 起是为了让开 Leaflet 左上角的缩放按钮；pointer-events-none 不挡地图操作；
