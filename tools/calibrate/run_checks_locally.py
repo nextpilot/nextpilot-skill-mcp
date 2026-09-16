@@ -4,18 +4,16 @@
   python tools/calibrate/run_checks_locally.py <file.ulg> [more.ulg ...]
   python tools/calibrate/run_checks_locally.py --probe-data <file.ulg> ...
 
-规则与阈值在 knowledge/px4/（rules/*.yaml、故障库 YAML），引擎实现在 engine/。
-本脚本用 tomllib（Python 3.11+）读阈值、解析故障库 YAML 的产物 JSON，
-不依赖 Node 构建，因此改完 knowledge 即可在此回归。
+引擎实现在 engine/（本脚本直接读源码，改完即可跑）；**规则读构建产物**
+（web/workers/ulog-check-script.ts 的 `const rules = [...]`）。
+为什么不直接读 rules/*.yaml：compute 的老节点写法要编译成表达式，而那份编译器只有构建期
+一份（web/scripts/lib/rule-expr.mjs）——Python 侧不再重复实现（两份一定漂移）。
+所以**改了 rules/ 要先 `cd web && pnpm build:kb` 再回归**，脚本会检查产物是否陈旧。
 """
 import json
+import re
 import sys
 from pathlib import Path
-
-try:
-    import tomllib  # Python 3.11+
-except ModuleNotFoundError:  # pragma: no cover
-    tomllib = None
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -29,31 +27,25 @@ REPORT_DATA_PY = ENGINE / "report_data.py"
 RULES_DIR = KN_PX4 / "rules"
 FACTS_YAML = KN_PX4 / "facts.yaml"          # 事实层的数据绑定与码表
 FAULT_KB_JSON = REPO_ROOT / "web" / "workers" / "fault-kb.generated.json"
+CHECK_SCRIPT = REPO_ROOT / "web" / "workers" / "ulog-check-script.ts"
 
 
 def _load_rules() -> list:
-    """rules/*.yaml → 列表；与构建脚本同一份源（本地回归不依赖 Node）。"""
-    try:
-        import yaml
-    except ImportError:
-        raise RuntimeError("需要 PyYAML 读 rules/*.yaml：pip install pyyaml")
-
-    # PyYAML 默认把 2026-09-15 解析成 datetime.date，而构建脚本用的 JS yaml 库保持字符串；
-    # 两个加载器必须一致，否则本地与线上注入的规则 JSON 不同。这里去掉 timestamp 解析器。
-    class _Loader(yaml.SafeLoader):
-        pass
-
-    _Loader.yaml_implicit_resolvers = {
-        ch: [(tag, regexp) for tag, regexp in pairs if tag != "tag:yaml.org,2002:timestamp"]
-        for ch, pairs in yaml.SafeLoader.yaml_implicit_resolvers.items()
-    }
-
-    rules = []
-    for f in sorted(RULES_DIR.glob("*.yaml")):
-        loaded = yaml.load(f.read_text(encoding="utf-8"), Loader=_Loader)
-        # 一个 YAML 可以装多条经验（顶层写成数组），与构建脚本保持一致
-        rules.extend(loaded if isinstance(loaded, list) else [loaded])
-    return rules
+    """从构建产物里取规则（compute 已是表达式形态，老节点写法在构建期被编译掉了）。"""
+    if not CHECK_SCRIPT.exists():
+        raise RuntimeError("还没有构建产物，先 cd web && pnpm build:kb")
+    stale = [f.name for f in RULES_DIR.glob("*.yaml")
+             if f.stat().st_mtime > CHECK_SCRIPT.stat().st_mtime]
+    if stale:
+        raise RuntimeError(
+            "构建产物比规则陈旧（%s 改过），先 cd web && pnpm build:kb 再回归"
+            % "、".join(sorted(stale)[:5])
+        )
+    src = CHECK_SCRIPT.read_text(encoding="utf-8")
+    m = re.search(r"^const rules = (.*?);$", src, re.M | re.S)
+    if not m:
+        raise RuntimeError("产物里找不到 `const rules = ...`，先 cd web && pnpm build:kb")
+    return json.loads(m.group(1))
 
 
 def _load_checks() -> str:

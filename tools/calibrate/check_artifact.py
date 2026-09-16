@@ -79,6 +79,23 @@ def main() -> int:
     rules = extract_json_const(src, "rules")
     print(f"产物语法检查通过：{len(final.splitlines())} 行，含 {len(rules)} 条经验规则")
 
+    # compute 表达式是**构建期用 JS 校验**（web/scripts/lib/rule-expr.mjs）、**运行期用 Python
+    # ast 求值**的。两侧是两套实现，中间就有缝：JS 放行而 Python 解析不了的写法会构建通过、
+    # 到用户浏览器里才炸。这里用 Python 自己把每条表达式解析一遍，把缝焊上。
+    n_expr = 0
+    for r in rules:
+        for expr in r.get("compute") or []:
+            n_expr += 1
+            try:
+                tree = ast.parse(expr, mode="exec")
+            except SyntaxError as e:
+                print(f"规则 {r['id']} 的 compute 表达式不是合法 Python：{e}\n    {expr}")
+                return 1
+            if len(tree.body) != 1 or not isinstance(tree.body[0], ast.Assign):
+                print(f"规则 {r['id']} 的 compute 不是一条赋值：{expr}")
+                return 1
+    print(f"compute 表达式检查通过：{n_expr} 条，Python 侧都能解析")
+
     # 仅语法检查不够：NameError / KeyError 这类只有**真执行**才暴露
     # （曾漏掉"operators.py 没被内联"导致 Pyodide 里 OPERATORS 未定义）。
     data_ts = (REPO_ROOT / "web" / "workers" / "ulog-data-script.ts").read_text(encoding="utf-8")

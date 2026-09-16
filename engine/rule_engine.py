@@ -14,11 +14,11 @@ RULES = json.loads(r'''__RULES__''')
 # 引擎只提供机制：字段名、码值、执行顺序都在 YAML 里，改数据不用碰 Python。
 FACTS = __FACTS__
 _VS = FACTS["bindings"]["vehicle_status"]
-_NAV_GROUPS = [(g["phase"], set(int(c) for c in g["codes"])) for g in FACTS["nav_groups"]]
+_NAV_GROUPS = [(g["phase"], set(int(c) for c in g["codes"])) for g in FACTS["nav_state_groups"]]
 
-# 同一 slot 内多条规则按 order 字段排序（缺省 100000，再按 id 兜底）。
-# **跨 slot 的顺序不在这里决定**：由 facts.yaml 的 slot_order 决定（见文件末尾的执行循环），
-# 而 finding 的 id（F01、F02…）按发射顺序生成，所以改 slot_order 会改报告里的编号。
+# 同一 group 内多条规则按 order 字段排序（缺省 100000，再按 id 兜底）。
+# **跨 group 的顺序不在这里决定**：由 facts.yaml 的 group_order 决定（见文件末尾的执行循环），
+# 而 finding 的 id（F01、F02…）按发射顺序生成，所以改 group_order 会改报告里的编号。
 RULES.sort(key=lambda r: (r.get("order", 100000), r.get("id", "")))
 
 # 阈值不再集中存放：每条经验的判定阈值都写在它自己的 rules/*.yaml 里
@@ -92,6 +92,15 @@ def edge_indices(arr):
 
 buf = io.BytesIO(bytes(ulog_bytes))
 ulog = ULog(buf)
+
+# 本日志实际录到的 topic 名集合（`_rule_env` 的 `topics` 与 `has_topic()` 共用一份）
+_TOPIC_NAMES = set(d.name for d in ulog.data_list)
+
+
+def has_topic(name):
+    """日志里有没有这个 topic。经验里写 `not has_topic('cpuload')`，比 `'cpuload' not in topics`
+    直白——读的人不必知道 `topics` 是个集合。"""
+    return name in _TOPIC_NAMES
 
 # ---------------- 固件版本识别（PX4 1.15 起 topic 与字段名有破坏性变化）----------------
 # ver_sw_release 打包格式：major<<24 | minor<<16 | patch<<8 | type
@@ -328,32 +337,53 @@ _ALLOWED_NODES = (
     ast.Is, ast.IsNot,
     ast.BinOp, ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Mod,
     ast.Name, ast.Load, ast.Constant, ast.List, ast.Tuple, ast.Set,
+    # f-string（证据值用：`value: f"{vibe_mean:.3f}"`）。它的占位符里还是普通表达式，
+    # 求值仍在同一个空 __builtins__ 环境下，没有新能力。
+    ast.JoinedStr, ast.FormattedValue,
 )
+
+# 表达式里**唯一**放行的函数调用。`has_topic('x')` 比 `'x' in topics` 直白
+# （读的人不必知道 topics 是个集合），但把它做成函数就意味着要开"允许调用"这个口子，
+# 所以白名单只此一项、且要求实参是字符串字面量。其余能力（属性/下标/推导式）一律不给。
+_EXPR_CALLABLE = {"has_topic"}
 
 
 def _eval_expr(expr, env):
     """受限表达式求值：先按白名单遍历 AST，再在空 __builtins__ 下求值。
 
-    绝不 eval 用户可控代码：不允许属性访问、下标、函数调用、推导式等。
+    绝不 eval 用户可控代码：不允许属性访问、下标、推导式；函数调用只放行
+    `_EXPR_CALLABLE` 里的那几个，且实参必须是字符串字面量。
     """
     tree = ast.parse(expr, mode="eval")
     for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            ok = isinstance(node.func, ast.Name) and node.func.id in _EXPR_CALLABLE
+            arg_ok = len(node.args) == 1 and isinstance(node.args[0], ast.Constant) \
+                and isinstance(node.args[0].value, str)
+            if not (ok and arg_ok and not node.keywords):
+                raise ValueError(
+                    "表达式里只允许 %s('字符串')：%s"
+                    % ("/".join(sorted(_EXPR_CALLABLE)), expr))
+            continue
         if not isinstance(node, _ALLOWED_NODES):
             raise ValueError("表达式含不允许的语法 %s：%s" % (type(node).__name__, expr))
     return eval(compile(tree, "<rule>", "eval"), {"__builtins__": {}}, env)
 
 
-def _read_field_ref(ref):
+def _read_field_ref(ref, aliases=None):
     """'topic.field' → 该字段在各实例上的值（多实例拼接）；topic/字段缺失返回 None。
 
     数组字段（如 float32[14] voltage_cell_v）pyulog 按 'field[i]' 暴露，
     直接 getf(field) 拿不到，这里尝试下标 0..31，返回**每元素一列的列表**；
     缺的元素位置为 None。
+
+    aliases 是该字段的备用命名（旧固件改过名，如 stddev_accel_x ↔ stddev_accel_x_m_s2）。
     """
     topic, _, field = ref.partition(".")
     ds = find_all(ulog, topic)
     if not ds:
         return None
+    aliases = list(aliases or [])
 
     def gather(get_one):
         vals = []
@@ -365,12 +395,14 @@ def _read_field_ref(ref):
             return None
         return np.concatenate(vals) if len(vals) > 1 else vals[0]
 
-    direct = gather(lambda d: getf(d, field))
+    direct = gather(lambda d: getf(d, field, *aliases))
     if direct is not None:
         return direct
     def gather_cell(idx):
         # pyulog 对定长数组通常暴露为 'field[0]'，个别构建为 'field_0'
-        return gather(lambda d: getf(d, f"{field}[{idx}]", f"{field}_{idx}"))
+        return gather(lambda d: next(
+            (v for v in (getf(d, f"{stem}[{idx}]", f"{stem}_{idx}") for stem in [field] + aliases)
+             if v is not None), None))
 
     col0 = gather_cell(0)
     if col0 is None:
@@ -415,6 +447,146 @@ def _read_field_ref_grouped(ref, aliases=None):
             cols.pop()
         groups.append(cols if cols else None)
     return groups
+
+
+# ---------------- compute 表达式求值（rules/*.yaml 的 compute 是表达式，不再是节点链）----------------
+# 产物里存的**就是作者写的原文**（老写法在构建期被 rule-expr.mjs 编译成等价表达式）：
+#   vibe_mean, vibe_p95, ..., imu_idx = worst_mean_stats(ref("...", per_instance=True), min_mean=0)
+#   pct = frac * 100
+#   p99_stat = p99 if seg_n > 50 else None
+#   w_p95 = percentile(hypot(coalesce(ref("estimator_wind.windspeed_north", when_fw=">=1.15"), ...), p=95)
+#
+# 求值用 Python 自带的 ast，**不 eval 作者原文**：先按白名单遍历、把 topic.field 重写成
+# 取数调用，再在空 __builtins__ 下 exec。构建期（web/scripts/lib/rule-expr.mjs）已经把
+# 算子名/入参/变量声明校验过一遍，这里再查一遍是为了防"构建期放行、运行期能执行任意代码"
+# 这类缝——两道关卡的判据不同，不能只留一道。
+
+# 比 _ALLOWED_NODES 多出：赋值语句、调用、属性（字段引用）、三元、字典（算子选项）
+_ALLOWED_COMPUTE = _ALLOWED_NODES + (
+    ast.Module, ast.Assign, ast.Expr, ast.Store,
+    ast.Call, ast.Attribute, ast.keyword, ast.IfExp, ast.Dict,
+)
+
+
+class _ComputeRefs(ast.NodeTransformer):
+    """把表达式里裸写的 `topic.field` 重写成 `ref("topic.field")`。
+
+    只接受 `Name.attr` 形态，且这个 Name **不能是已声明的变量**——否则 `变量.属性` 会去
+    访问对象属性（那是任意能力，白名单不给）。构建期已经拦过一遍，这里是运行期的那道。
+    """
+
+    def __init__(self, env_keys):
+        self.env_keys = env_keys
+
+    def visit_Attribute(self, node):
+        if not isinstance(node.value, ast.Name):
+            raise ValueError("字段引用必须是 topic.field 形式")
+        if node.value.id in self.env_keys:
+            raise ValueError("%s 是变量名，不能当 topic 用" % node.value.id)
+        return ast.copy_location(
+            ast.Call(func=ast.Name(id="ref", ctx=ast.Load()),
+                     args=[ast.Constant(value="%s.%s" % (node.value.id, node.attr))],
+                     keywords=[]),
+            node,
+        )
+
+
+def _compile_compute(stmt, env_keys):
+    """一条 compute 表达式 → (code, guarded, targets)。校验不通过就抛异常。"""
+    try:
+        tree = ast.parse(stmt, mode="exec")
+    except SyntaxError as err:
+        raise ValueError("compute 表达式语法错误：%s" % err)
+    if len(tree.body) != 1 or not isinstance(tree.body[0], ast.Assign):
+        raise ValueError("compute 必须是一条赋值")
+    for node in ast.walk(tree):
+        if not isinstance(node, _ALLOWED_COMPUTE):
+            raise ValueError("compute 表达式含不允许的语法 %s" % type(node).__name__)
+        if isinstance(node, ast.Call):
+            if not isinstance(node.func, ast.Name):
+                raise ValueError("compute 只允许直接调用算子")
+            if node.func.id not in OPERATORS and node.func.id not in ("ref", "_try", "has_topic"):
+                raise ValueError("compute 调用了未注册的算子 %s" % node.func.id)
+
+    assign = tree.body[0]
+    if not isinstance(assign.targets[0], ast.Tuple):
+        if not isinstance(assign.targets[0], ast.Name):
+            raise ValueError("compute 的赋值目标只能是变量名")
+        targets = [assign.targets[0].id]
+    else:
+        if not all(isinstance(e, ast.Name) for e in assign.targets[0].elts):
+            raise ValueError("compute 的赋值目标只能是变量名")
+        targets = [e.id for e in assign.targets[0].elts]
+
+    # _try(...)：容错求值，等价于老节点的 optional: true——内层出错就整个赋 None，
+    # 而不是中止整条规则。
+    guarded = False
+    val = assign.value
+    if isinstance(val, ast.Call) and isinstance(val.func, ast.Name) and val.func.id == "_try":
+        if len(val.args) != 1 or val.keywords:
+            raise ValueError("_try() 只接受一个参数")
+        guarded = True
+        assign.value = val.args[0]
+
+    tree = _ComputeRefs(set(env_keys)).visit(tree)
+    ast.fix_missing_locations(tree)
+    return compile(tree, "<compute>", "exec"), guarded, targets
+
+
+# 表达式求值的名字表：算子按注册名直接可调用，另加 ref（取数）。
+# __builtins__ 置空——表达式里不该有任何 Python 内置能力。
+_COMPUTE_GLOBALS = {"__builtins__": {}, "ref": None}
+_COMPUTE_GLOBALS.update(OPERATORS)
+
+
+def _eval_compute(stmt, env):
+    """求值一条 compute 表达式，结果写进 env。
+
+    空值语义（与老节点链的唯一差别，**有意为之**）：
+      老写法里 `optional: false` 的节点拿到 None 就整条规则中止，`optional: true` 的才允许
+      None 继续传播。表达式写法里只有一条规则：**None 是值，照常传播**；要中止就让异常发生
+      （拿 None 去比较/四则会抛 TypeError）。老写法靠 `_try(...)` 保留"允许 None"的那半边，
+      另一半（无谓的中止）不保留——因为它只是让同样的结论晚一步消失，而"None 传播"更好读。
+
+      实际影响面很窄：只有当某个表达式产出 None、而**下游又把这个 None 变成了别的值**
+      （coalesce / choose / 三元）时才会看到差别；现有规则里这类位置都带 _try 守卫
+      （6 条日志的冻结基线逐字段比对可证）。新写规则时若真的依赖"缺失即中止"，
+      就显式写 `require_true(is_not_none(x))`——那正是它的用途。
+    """
+    code, guarded, targets = _compile_compute(stmt, env)
+    try:
+        exec(code, _COMPUTE_GLOBALS, env)
+    except Exception:
+        if not guarded:
+            raise
+        for name in targets:
+            env[name] = None
+
+
+def _ref(name, per_instance=False, instance=None, alias=None, when_fw=None):
+    """字段取数：表达式里的 `ref("topic.field", ...)` 与裸写的 `topic.field` 都走这里。
+
+    修饰与老节点上的同名选项一一对应，只是作用域从「整个节点」收窄到「这一个引用」：
+      per_instance —— 按实例分组读（每实例一组），交给需要分组的算子
+      instance     —— 只取第 N 个实例
+      alias        —— 字段的备用命名（旧固件改过名）
+      when_fw      —— 固件版本不满足就返回 None（交给 coalesce 选另一个分支）
+    """
+    if when_fw is not None and not _match_firmware(when_fw):
+        return None
+    aliases = None
+    if alias is not None:
+        aliases = [alias] if isinstance(alias, str) else list(alias)
+    if per_instance or instance is not None:
+        groups = _read_field_ref_grouped(name, aliases)
+        if instance is not None:
+            return groups[instance] if groups and len(groups) > instance else None
+        return groups
+    return _read_field_ref(name, aliases)
+
+
+_COMPUTE_GLOBALS["ref"] = _ref
+_COMPUTE_GLOBALS["has_topic"] = has_topic
 
 
 def _collect_log_messages():
@@ -462,17 +634,25 @@ def _rule_env():
         # 是否有 armed 段（原过程式大量用 `if armed_intervals:` 做外层门控）
         "has_armed": bool(armed_intervals),
         # 本日志实际存在的 topic 名集合（表达式里可写 "'xxx' in topics"）
-        "topics": set(d.name for d in ulog.data_list),
+        "topics": _TOPIC_NAMES,
+        # 同一件事的函数写法（更直白，见 has_topic 的定义）
+        "has_topic": has_topic,
         # 数据质量事实（guards 类经验用）
         "restart_detected": restart_topics > 0,
         "dropout_ms": dropout_total_ms,
         # 日志消息（ulog.logged_messages）：供「日志消息聚合」类经验按级别筛选
         "messages": _collect_log_messages(),
+        # compute 是否算不出来。初值 False；compute 失败后置真，再判一轮 `skip` 列表。
+        # 于是"数据不足要记一条 skipped"不必再单设一个字段——它就是 skip 里的一条普通条件。
+        "no_data": False,
     }
 
 
 def _match_firmware(spec):
-    """适用范围轴①：固件版本。any / ">=1.15" / "<1.15" / ">=1.14,<1.15"（逗号=与）。"""
+    """固件版本约束串：any / ">=1.15" / "<1.15" / ">=1.14,<1.15"（逗号=与）。
+
+    只给 `ref(..., when_fw=)` 用（规则级的适用范围轴已经改成表达式了）。
+    """
     if not spec or spec == "any":
         return True
     if FW_MINOR is None:
@@ -491,29 +671,43 @@ def _match_firmware(spec):
     return True
 
 
-def _match_airframe(spec):
-    """适用范围轴②：机架。any / rotary_wing / [fixed_wing, vtol]；vtol 按子串匹配。"""
-    if not spec or spec == "any":
+def _rule_skipped(rule, checks, env):
+    """按顺序走规则的 `skip` 列表；命中第一条就返回 True（并视情况记一条 skipped）。
+
+    每一项是 `{when: <Python 表达式>, reason?: <文案>}`——表达式与 `compute` / `triggers`
+    同一套语法。写了 `reason` 就记一条 skipped（报告里能看到"为什么没跑"），**不写则静默**
+    跳过（既不 ran 也不 skipped，用于"这本来就跟我无关"的场合）。
+
+    会被调**两轮**：compute 之前一轮（此时 `no_data` 为假），compute 失败后再一轮
+    （`env["no_data"]` 已置真）。所以"数据不足"也只是列表里的一条普通条件，
+    不必再单设一个字段。
+    """
+    for spec in (rule.get("skip") or []):
+        when = spec.get("when")
+        if when is None:
+            raise ValueError("规则 %s 的 skip 项缺少 when" % rule.get("id"))
+        try:
+            hit = bool(_eval_expr(when, env))
+        except Exception:
+            hit = False
+        if not hit:
+            continue
+        if spec.get("reason"):
+            for check in checks:
+                skipped(check, spec["reason"])
         return True
-    wanted = spec if isinstance(spec, (list, tuple)) else [spec]
-    for w in wanted:
-        w = str(w)
-        if w == "vtol" and "vtol" in vehicle_type:
-            return True
-        if w == vehicle_type:
-            return True
     return False
 
 
-def _run_rules(slot):
-    """执行声明了该 slot 的经验规则。
+def _run_rules(group):
+    """执行声明了该 group 的经验规则。
 
-    finding 的 id 是按发射顺序（F01、F02…）生成的，所以每条规则的 slot **必须与
+    finding 的 id 是按发射顺序（F01、F02…）生成的，所以每条规则的 group **必须与
     它所替换的原过程式检查的位置一致**（vibration → ekf → power → cpu → gps →
-    failsafe → mode_thrash …）；同一 slot 内按 rules/*.yaml 的文件名顺序执行。
+    failsafe → mode_thrash …）；同一 group 内按 order / id 排序执行。
     """
     for _rule in RULES:
-        if _rule.get("slot") != slot:
+        if _rule.get("group") != group:
             continue
         _rid = _rule["id"]
         _checks = (_rule.get("emit") or {}).get("check")
@@ -521,26 +715,21 @@ def _run_rules(slot):
             _checks = []            # guards 类经验没有 check 名（不记 ran/skipped）
         elif not isinstance(_checks, list):
             _checks = [_checks]
-        # not_applicable.when：声明式表达“该经验对本日志不适用”（如机型未知）。
-        # 必须在 firmware/airframe 轴判定**之前**：轴不匹配是静默的，而这里要留下
-        # skip 记录（如机型未知要写明原因，机型是旋翼却什么都不记——与原实现一致）。
-        _na = _rule.get("not_applicable") or {}
-        if _na.get("when") and _eval_expr(_na["when"], _rule_env()):
-            for _check in _checks:
-                skipped(_check, _na.get("skip_reason") or "不适用")
+        _env = _rule_env()
+        # 适用范围两轴先判：固件 / 机架。**写成表达式**（不限就写 True），与 compute /
+        # triggers 同一套语法——不再另设 "any" / ">=1.15" 这类小语言。
+        # 不匹配则静默：既不 ran 也不 skipped（这是最外层的门，"这条经验根本不属于本机"
+        # 不值得在报告里刷一条）。要留痕就把它写进 skip 映射。
+        try:
+            _axis_ok = bool(_eval_expr(_rule["firmware"], _env)) and \
+                       bool(_eval_expr(_rule["airframe"], _env))
+        except Exception:
+            _axis_ok = False
+        if not _axis_ok:
             continue
-        # silent_when：静默不适用——既不 ran 也不 skipped（对应原过程式“外层 if 不成立”）
-        _sw = _rule.get("silent_when")
-        if _sw and _eval_expr(_sw, _rule_env()):
-            continue
-        # 适用范围三轴：固件 / 机架（不适用则默认静默——既不 ran 也不 skipped，
-        # 与原过程式“外层 if 不成立”一致；确需留痕时用 skip_reason_axis 单独声明，
-        # 不要复用 not_applicable.skip_reason：那是给 not_applicable.when 用的，
-        # 两者混用会让“机型不匹配”也带上“机型未知”的原因。）
-        if not _match_firmware(_rule.get("firmware")) or not _match_airframe(_rule.get("airframe")):
-            if _rule.get("skip_reason_axis"):
-                for _check in _checks:
-                    skipped(_check, _rule["skip_reason_axis"])
+        # 再判「不适用」声明（机型未知、无 armed 段、缺某 topic …）：命中即跳过本条。
+        # 写了文案的记一条 skipped——报告里能看到"为什么没跑"；写 null 的静默。
+        if _rule_skipped(_rule, _checks, _env):
             continue
         # requires.any_of / all_of：分别表示“任一存在即可”与“必须都存在”的依赖 topic
         # （多版本同义 topic 用 any_of，如 estimator_wind / wind_estimate）。缺则 skipped。
@@ -552,7 +741,7 @@ def _run_rules(slot):
         if _missing:
             _need_txt = list(_need_any) + list(_need_all)
             for _check in _checks:
-                skipped(_check, _rule.get("skip_reason") or ("缺少依赖 topic：%s" % ", ".join(_need_txt)))
+                skipped(_check, _req.get("reason") or ("缺少依赖 topic：%s" % ", ".join(_need_txt)))
             continue
         # topic 在就 ran（与原过程式块一致：ran() 在块首，数据不足只代表不发射 finding）。
         # ran_on_success：原实现把 ran() 放在数据判定**之后**（如 motor_balance 只在
@@ -562,68 +751,21 @@ def _run_rules(slot):
             for _check in _checks:
                 ran(_check)
 
-        _env = _rule_env()
         _ok = True
-        for _node in (_rule.get("compute") or []):
-            # 归一化：单输入可用短写法 from:（字符串或列表），单输出可直接写 out: 名字
-            _ins = _node.get("in")
-            if _ins is None:
-                _ins = _node["from"] if isinstance(_node["from"], list) else [_node["from"]]
-            _outs = _node["out"] if isinstance(_node["out"], list) else [_node["out"]]
-            # when_fw：节点级版本条件（如 when_fw: ">=1.15"）。不满足就跳过该节点、
-            # 输出置 None，交给后续 coalesce/choose 选另一版本的分支 —— 于是"同一字段
-            # 在不同固件里换了名字/topic"这件事在经验文件里是显式可读、可校验的。
-            _wf = _node.get("when_fw")
-            if _wf is not None and not _match_firmware(_wf):
-                for _name in _outs:
-                    _env[_name] = None
-                continue
-            _args = []
-            _per_inst = bool(_node.get("per_instance"))
-            _node_aliases = _node.get("aliases") or {}
-            for _ref in _ins:
-                if not isinstance(_ref, str):
-                    _args.append(_ref)          # YAML 字面量（数字/布尔），直接作为算子入参
-                elif _ref in _env:
-                    _args.append(_env[_ref])
-                elif _node.get("instance") is not None:
-                    # instance: N —— 只取第 N 个实例（对应原过程式的 xxx_list[0]；
-                    # 多实例 topic（如每 IMU 一个 estimator_sensor_bias）必须显式指定，
-                    # 否则默认读取会把各实例拼接起来，语义就变了
-                    _grp = _read_field_ref_grouped(_ref, _node_aliases.get(_ref))
-                    _idx = int(_node["instance"])
-                    _args.append(_grp[_idx] if _grp and len(_grp) > _idx else None)
-                elif _per_inst:
-                    _args.append(_read_field_ref_grouped(_ref, _node_aliases.get(_ref)))
-                else:
-                    _args.append(_read_field_ref(_ref))
-            # optional: true 的节点允许 None 输入与 None 输出（缺失沿数据流显式传播）
-            if any(_a is None for _a in _args) and not _node.get("optional"):
-                _ok = False
-                break
+        for _stmt in (_rule.get("compute") or []):
+            # compute 是**表达式**（构建期把老节点写法编译成等价表达式，产物里只有这一种形态）。
+            # 求值出来的名字进 _env，供后面的表达式与 triggers / emit 引用。
             try:
-                _res = OPERATORS[_node["op"]](*_args, **_node)
+                _eval_compute(_stmt, _env)
             except Exception:
-                # 算子内部异常（脏数据/字段形态意外）不该中断整份日志：按“数据不足”中止本条规则
+                # 数据不足（或该表达式在这份日志上求不出来）：按"数据不足"中止本条规则，
+                # 与原节点链一致——不发射 finding
                 _ok = False
                 break
-            if _res is None and not _node.get("optional"):
-                _ok = False
-                break
-            if _res is None:
-                for _name in _outs:
-                    _env[_name] = None
-                continue
-            if not isinstance(_res, tuple):
-                _res = (_res,)
-            for _name, _v in zip(_outs, _res):
-                _env[_name] = _v
         if not _ok:
-            # 数据不足：默认不发射、不补 skipped（与原过程式语义一致）；规则显式声明
-            # skip_reason_no_data 时额外记一条（如 airspeed 的“无固定翼巡航段”）
-            if _rule.get("skip_reason_no_data"):
-                for _check in _checks:
-                    skipped(_check, _rule["skip_reason_no_data"])
+            # 数据不足也要能留痕：把 no_data 置真再判一轮 skip（原 skip_reason_no_data 的职责）
+            _env["no_data"] = True
+            _rule_skipped(_rule, _checks, _env)
             continue
         if _ran_late:
             # 原实现把 ran() 放在数据判定**之后**（如 motor_balance 只在活跃通道 >= 4 时
@@ -676,25 +818,20 @@ def _run_rules(slot):
                 # 单条触发条件出错（例如表达式把缺失值 None 与数值比较）不应让整份日志
                 # 的分析崩掉：视为未命中，继续下一条。这类错误应当在基线回归里暴露。
                 try:
-                    _hit = _eval_expr(_trig["expr"], _tenv)
+                    _hit = _eval_expr(_trig["when"], _tenv)
                 except Exception:
                     _hit = False
                 if not _hit:
                     continue
-                # 数据质量标签副作用（如强风 wind_strong）：必须在 add() 之前追加，
-                # 顺序与原过程式代码一致（guardTags 数组顺序也参与基线比对）
-                _gt = _trig.get("guard_tag", _emit.get("guard_tag"))
-                if _gt and _gt not in guard_tags:
-                    guard_tags.append(_gt)
-                if "value_const" in _trig:
-                    _val = _trig["value_const"]
-                elif "value_text" in _trig:
-                    # 证据值本身是带占位符的文案（如 "fault=1024,nan=0"、"set at 25.6s"）
-                    _val = _trig["value_text"].format_map(_tenv)
-                else:
-                    _val = _tenv.get(_trig["value"]) if _trig.get("value") else None
-                    if _val is not None and _trig.get("round") is not None:
-                        _val = round(float(_val), int(_trig["round"]))
+                # 证据值就是一个**表达式**：写变量得原值、写 f"{x:.3f}" 得格式化后的串、
+                # 写常量就得到常量。原先的 value / value_const / value_text 三个字段
+                # 加一个 round 开关，收成了这一个。
+                _val = None
+                if _trig.get("value") is not None:
+                    try:
+                        _val = _eval_expr(str(_trig["value"]), _tenv)
+                    except Exception:
+                        _val = None
                 _field = _trig["field"]
                 if "{" in _field:
                     _field = _field.format_map(_tenv)
@@ -716,13 +853,13 @@ def _run_rules(slot):
 
 
 # guards_early：必须在其它规则之前跑，保证 insufficient_data 是第一个 guard 标签
-# ---------------- 按 facts.yaml 的 slot_order 顺序执行各 slot ----------------
+# ---------------- 按 facts.yaml 的 group_order 顺序执行各 group ----------------
 # 顺序即 finding 编号（F01、F02…）的生成顺序，也决定 guard 标签的先后
 # （guards_early 排第一，insufficient_data 才会是第一个 guard 标签）。
-# 新增经验只需把 slot 写进 knowledge/px4/facts.yaml 的 slot_order（或复用已有 slot）
-# 并让经验里的 slot 对上——**不用改这个文件**；构建期会校验 slot 是否都已登记。
-for _slot in FACTS["slot_order"]:
-    _run_rules(_slot)
+# 新增经验只需把 group 写进 knowledge/px4/facts.yaml 的 group_order（或复用已有 group）
+# 并让经验里的 group 对上——**不用改这个文件**；构建期会校验 group 是否都已登记。
+for _group in FACTS["group_order"]:
+    _run_rules(_group)
 
 # ---------------- 第三层：故障知识库确定性匹配 ----------------
 def match_fault_kb():

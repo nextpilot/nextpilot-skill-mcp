@@ -75,9 +75,11 @@ def operator_catalog() -> str:
         for name, in_a, outs, doc in sorted(rows[sec]):
             out.append("| `%s` | %d | %s | %s |" % (name, in_a, outs, doc))
     total = sum(len(v) for v in rows.values())
-    out.append("\n共 **%d** 个算子。入参个数由算子签名强制校验（`in:`/`out:` 数量对不上则构建失败）；"
+    out.append("\n共 **%d** 个算子。输入个数与左值个数由算子签名强制校验（对不上则构建失败）；"
                "各算子的可调参数（如 `gt` / `p` / `factor` / `codes` / `labels` / `min_count`）"
-               "写在节点的同层键上。" % total)
+               "写成算子调用的**关键字实参**（如 `percentile(w, p=95)`）；"
+               "取数修饰（`per_instance` / `instance` / `alias` / `when_fw`）写在 `ref(...)` 上。"
+               % total)
     return "\n".join(out)
 
 
@@ -109,6 +111,8 @@ def builtin_table() -> str:
         "restart_detected": "是否有 topic 时间戳回退（疑似中途重启）",
         "dropout_ms": "全日志丢包累计（毫秒）",
         "messages": "日志消息条目列表 `[{tSec, message, level, level_name}]`",
+        "no_data": "compute 是否算不出来：初值 False，compute 失败后置真（`skip` 列表里用它记一条 skipped）",
+        "has_topic": "日志里有没有这个 topic，如 `not has_topic('cpuload')`（比 `'cpuload' not in topics` 直白）；表达式里**唯一**允许的函数调用",
     }
     rows = ["| 变量 | 含义 |", "| --- | --- |"]
     for k in keys:

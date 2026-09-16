@@ -28,6 +28,7 @@ import { dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readdirSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
+import { normalizeCompute, validateComputeList } from "./lib/rule-expr.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
@@ -161,6 +162,7 @@ const BUILTIN_VARS = new Set([
   "airframe", "is_rotary_wing", "is_fixed_wing", "is_vtol", "is_rover",
   "duration_s", "armed_s", "phases", "tags", "guard_tags", "armed_intervals",
   "t0_us", "has_armed", "topics", "messages", "restart_detected", "dropout_ms",
+  "no_data", "has_topic",
 ]);
 
 /** 表达式里允许出现、但不是变量名的关键字/字面量（校验标识符时跳过） */
@@ -171,6 +173,18 @@ const EXPR_KEYWORDS = new Set([
 /** 扫标识符前先去掉字符串字面量（如 'vehicle_status' not in topics 里的 topic 名） */
 const stripStrings = (s) =>
   String(s).replace(/'[^']*'/g, " ").replace(/"[^"]*"/g, " ");
+
+/** 这条表达式只能引用内置变量（用于 compute 之前求值的场合：适用范围轴、skip 条件） */
+function checkBuiltinOnly(expr, where, what) {
+  for (const name of stripStrings(expr).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
+    if (EXPR_KEYWORDS.has(name)) continue;
+    if (!BUILTIN_VARS.has(name)) {
+      throw new Error(
+        `${where}: ${what} 引用了非内置变量 ${name}——它在 compute 之前求值，拿不到 compute 的输出`,
+      );
+    }
+  }
+}
 
 /** 从 operators.py 解析算子签名（本文件由我们维护，格式固定；解析不到即构建失败） */
 function parseOperatorSignatures(py) {
@@ -185,26 +199,44 @@ function parseOperatorSignatures(py) {
       return mm ? Number(mm[1]) : 1;
     };
     const names = rest.match(/out_names\s*=\s*\[([^\]]*)\]/);
+    // 紧跟装饰器的 def 的形参名：用来校验**关键字实参名**。
+    // node 上的额外键是 `**kw` 直通给算子的，名字写错不会报错、算子会用默认值算出错的结果，
+    // 所以必须在这里拦住。形参里的 **kw / * 会被下面的正则过滤掉。
+    const dm = /def\s+[A-Za-z_][A-Za-z0-9_]*\s*\(([\s\S]*?)\)\s*:/.exec(py.slice(re.lastIndex));
+    const params = dm
+      ? dm[1].split(",").map((s) => s.trim().split("=")[0].trim())
+          .filter((s) => /^[a-z_][a-z0-9_]*$/.test(s))
+      : [];
     sigs[name] = {
       in_arity: num("in_arity"),
       out_arity: num("out_arity"),
       out_names: names ? names[1].split(",").map((x) => x.trim().replace(/["']/g, "")).filter(Boolean) : [],
+      params,
     };
   }
   return sigs;
 }
 
 /** 校验并加载 rules/*.yaml；任何不完整都构建失败（杜绝"空洞经验"） */
-function loadRules(dir, signatures) {
+function loadRules(dir, signatures, ruleMeta) {
   const files = readdirSync(dir).filter((f) => f.endsWith(".yaml")).sort();
   if (files.length === 0) throw new Error("rules/ 下没有规则文件");
   const rules = [];
   const sources = [];   // 与 rules 一一对应的来源文件名（规则清单页要显示）
   const seen = new Set();
-  for (const file of files) {
-    const parsed = parseYaml(readFileSync(resolve(dir, file), "utf8"));
-    // 一个 YAML 可以装多条经验（顶层写成数组）；一般情况下仍是一条经验一个文件
-    const items = Array.isArray(parsed) ? parsed : [parsed];
+  const byGroup = ruleMeta.by_group ?? {};
+  const metaDefaults = ruleMeta.defaults ?? {};
+  // 同一个 group 的多条规则，派生的 category/doc 必须一致——不一致就逼作者显式写，
+  // 而不是静默取第一个（否则"改了派生表、却只有一条规则跟着变"没人会发现）。
+  const seenMeta = new Map();
+
+  // 先整读一遍：一个 YAML 可以装多条经验（顶层写成数组），一般情况下仍是一条经验一个文件
+  const loaded = files.map((file) => {
+    const p = parseYaml(readFileSync(resolve(dir, file), "utf8"));
+    return { file, items: Array.isArray(p) ? p : [p] };
+  });
+
+  for (const { file, items } of loaded) {
     for (const raw of items) {
     const where = `rules/${file}` + (items.length > 1 ? `#${(raw && raw.id) || "?"}` : "");
     // guards 类经验（只产 guard 标签、不发 finding）没有 compute/triggers/check，
@@ -215,41 +247,103 @@ function loadRules(dir, signatures) {
     const hasCompute = Array.isArray(raw.compute) && raw.compute.length > 0;
     const hasTriggers = Array.isArray(raw.triggers) && raw.triggers.length > 0;
     const isGuardRule = Array.isArray(guardTags) && guardTags.length > 0 && !hasCompute && !hasTriggers;
-    // 必填项：即使不限也必须显式写 any（隐式豁免正是空洞条目的入口）
+    // 必填项：即使不限也必须显式写 any（隐式豁免正是空洞条目的入口）。
+    // 不含 emit——check / doc 现在都是派生的，没有 tag/stats 的规则确实没什么可声明。
     const requiredKeys = isGuardRule
-      ? ["id", "slot", "name", "firmware", "airframe", "emit"]
-      : ["id", "slot", "name", "firmware", "airframe", "compute", "triggers", "emit"];
+      ? ["id", "group", "name", "firmware", "airframe"]
+      : ["id", "group", "name", "firmware", "airframe", "compute", "triggers"];
+    if (!isGuardRule === false) { /* noop：保持下面结构简单 */ }
     for (const key of requiredKeys) {
       if (raw[key] === undefined || raw[key] === null || raw[key] === "") {
         throw new Error(`${where}: 缺少必填字段 ${key}`);
       }
     }
+    if (raw.emit !== undefined && (typeof raw.emit !== "object" || raw.emit === null || Array.isArray(raw.emit))) {
+      throw new Error(`${where}: emit 必须是对象`);
+    }
+    // 适用范围两轴与 skip 都是**表达式**（与 compute / triggers 同一套语法，不再是
+    // "any" / ">=1.15" 这类自造小语言）。它们在 compute **之前**求值，所以只认得内置变量。
+    for (const axis of ["firmware", "airframe"]) {
+      if (typeof raw[axis] !== "string" || !raw[axis].trim()) {
+        throw new Error(`${where}: ${axis} 必须是表达式字符串（不限就写 "True"）`);
+      }
+    }
+    if (raw.skip !== undefined) {
+      if (!Array.isArray(raw.skip)) {
+        throw new Error(`${where}: skip 必须是数组：[{when: 表达式, reason: 文案?}, …]`);
+      }
+      for (const s of raw.skip) {
+        if (!s || typeof s.when !== "string" || !s.when.trim()) {
+          throw new Error(`${where}: skip 每一项都要有 when（Python 表达式）`);
+        }
+        if (s.reason !== undefined && typeof s.reason !== "string") {
+          throw new Error(`${where}: skip 的 reason 必须是字符串（不写该键 = 静默跳过）`);
+        }
+        for (const k of Object.keys(s)) {
+          if (!["when", "reason"].includes(k)) {
+            throw new Error(`${where}: skip 项里有未知键 ${k}（可用：when / reason）`);
+          }
+        }
+        checkBuiltinOnly(s.when, where, `skip 条件「${s.when}」`);
+      }
+    }
+    for (const axis of ["firmware", "airframe"]) {
+      checkBuiltinOnly(raw[axis], where, `${axis}「${raw[axis]}」`);
+    }
     if (seen.has(raw.id)) throw new Error(`${where}: 规则 id 重复 ${raw.id}`);
     seen.add(raw.id);
+
+    // ── 从 facts.yaml 的 rule_meta 派生那些"每条规则各写一遍纯属重复"的字段 ──
+    // 身份块：规则里写了就以规则里的为准（个别规则确实会偏离默认）
+    for (const [k, v] of Object.entries(metaDefaults)) {
+      if (raw[k] === undefined) raw[k] = v;
+    }
+    if (byGroup[raw.group] === undefined) {
+      throw new Error(
+        `${where}: group「${raw.group}」未登记在 knowledge/px4/facts.yaml 的 rule_meta.by_group`,
+      );
+    }
+    const gm = byGroup[raw.group];
+    if (raw.category === undefined) raw.category = gm.category;
+    // emit.check 缺省 = group；guard 类经验不填（它本来就不记 ran/skipped）
+    raw.emit = raw.emit ?? {};
+    if (raw.emit.check === undefined && !isGuardRule) raw.emit.check = raw.group;
+    if (raw.emit.check !== undefined && raw.emit.check !== raw.group) {
+      // 允许例外，但要说一声——免得例外悄悄变多
+      console.log(`  · ${raw.id}: emit.check「${raw.emit.check}」与 group「${raw.group}」不同（显式例外）`);
+    }
+    if (raw.emit.doc === undefined && gm.doc !== undefined) raw.emit.doc = gm.doc;
+    // 同 group 的多条规则必须派生出同样的 category/doc
+    for (const [field, val] of [["category", raw.category], ["emit.doc", raw.emit.doc]]) {
+      const prev = seenMeta.get(`${raw.group} ${field}`);
+      if (prev !== undefined && prev !== val) {
+        throw new Error(
+          `${where}: group「${raw.group}」里 ${field} 与同组其它规则不一致` +
+            `（${JSON.stringify(prev)} vs ${JSON.stringify(val)}）——要么统一 facts.yaml 的 rule_meta，` +
+            `要么在本规则里显式写死`,
+        );
+      }
+      seenMeta.set(`${raw.group} ${field}`, val);
+    }
 
     const declared = new Set();
     if (!isGuardRule && (!Array.isArray(raw.compute) || raw.compute.length === 0)) {
       throw new Error(`${where}: compute 必须是非空数组`);
     }
-    for (const node of raw.compute || []) {
-      const sig = signatures[node.op];
-      if (!sig) throw new Error(`${where}: 未注册的算子 op=${node.op}`);
-      // when_fw：节点级版本条件（如 ">=1.15" / "<1.15" / ">=1.14,<1.15"）
-      if (node.when_fw !== undefined) {
-        const ok = typeof node.when_fw === "string"
-          && /^\s*(>=|<=|==|>|<)?\s*\d+(\.\d+)?\s*(,\s*(>=|<=|==|>|<)?\s*\d+(\.\d+)?\s*)*$/.test(node.when_fw);
-        if (!ok) throw new Error(`${where}: 算子 ${node.op} 的 when_fw 约束写法非法：${node.when_fw}`);
+    // compute 是一串**字符串表达式**（与 triggers.when / skip.when 同一套 Python 子集）；
+    // **算子节点**（旧）。旧写法在这里编译成等价表达式，于是产物里只有一种形态、
+    // 也只有一套校验（不写第二套）。运行期由 engine/rule_engine.py 的 _eval_compute 求值。
+    const compute = (raw.compute ?? []).map((item) => normalizeCompute(item, where));
+    if (compute.length > 0) {
+      let types;
+      try {
+        types = validateComputeList(compute, { signatures, builtinVars: BUILTIN_VARS });
+      } catch (err) {
+        throw new Error(`${where}: ${err.message}`);
       }
-      const ins = node.in ?? (node.from !== undefined ? [].concat(node.from) : null);
-      const outs = [].concat(node.out ?? []);
-      if (!ins || ins.length !== sig.in_arity) {
-        throw new Error(`${where}: 算子 ${node.op} 需要 ${sig.in_arity} 个输入，实际 ${ins ? ins.length : 0}`);
-      }
-      if (outs.length !== sig.out_arity) {
-        throw new Error(`${where}: 算子 ${node.op} 需要 ${sig.out_arity} 个输出，实际 ${outs.length}`);
-      }
-      for (const o of outs) declared.add(o);
+      for (const name of types.keys()) declared.add(name);
     }
+    raw.compute = compute;
     // emit.guard_tags：数据质量标签的产生条件（普通经验也会用，如陀螺零偏的温度跨度）。
     // 条件里的名字必须是内置变量或 compute 输出，避免写错变量名却默默不打标签。
     if (Array.isArray(guardTags)) {
@@ -283,17 +377,30 @@ function loadRules(dir, signatures) {
       for (const k of fe.keys || []) eventKeys.add(k);
     }
     for (const t of raw.triggers || []) {
-      if (typeof t.expr !== "string") throw new Error(`${where}: trigger 缺 expr（须为字符串，注意加引号）`);
+      if (typeof t.when !== "string") throw new Error(`${where}: trigger 缺 when（须为字符串，注意加引号）`);
       if (!["critical", "warning", "info"].includes(t.severity)) {
         throw new Error(`${where}: trigger severity 非法：${t.severity}`);
       }
       if (typeof t.title !== "string") throw new Error(`${where}: trigger 缺 title`);
       if (typeof t.field !== "string") throw new Error(`${where}: trigger 缺 field（evidence.field）`);
       // 表达式里的标识符必须已声明（内置变量 / compute 输出 / foreach 事件键）
-      for (const name of stripStrings(t.expr).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
+      for (const name of stripStrings(t.when).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
         if (EXPR_KEYWORDS.has(name)) continue;
         if (!declared.has(name) && !BUILTIN_VARS.has(name) && !eventKeys.has(name)) {
-          throw new Error(`${where}: 表达式引用了未声明的名字 ${name}（expr: ${t.expr}）`);
+          throw new Error(`${where}: 表达式引用了未声明的名字 ${name}（when: ${t.when}）`);
+        }
+      }
+      // 证据值是一个**表达式**（与 when 同一套语法）：写变量得原值、写 f"{x:.3f}" 得
+      // 格式化后的串、写常量就得到常量。名字必须是已声明的。
+      if (t.value !== undefined && typeof t.value !== "string") {
+        throw new Error(`${where}: trigger 的 value 必须是字符串表达式（如 value: p99_stat）`);
+      }
+      if (typeof t.value === "string") {
+        for (const name of stripStrings(t.value).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
+          if (EXPR_KEYWORDS.has(name) || name === "f") continue;   // f"..." 的 f 前缀
+          if (!declared.has(name) && !BUILTIN_VARS.has(name) && !eventKeys.has(name)) {
+            throw new Error(`${where}: value 引用了未声明的名字 ${name}（value: ${t.value}）`);
+          }
         }
       }
       // 标题里的占位符同理
@@ -302,8 +409,8 @@ function loadRules(dir, signatures) {
           throw new Error(`${where}: 标题引用了未声明的名字 ${m[1]}`);
         }
       }
-      // 证据值/建议里的占位符同样校验（证据文案与 suggestion 也允许模板）
-      for (const txt of [t.value_text, t.suggestion, t.field]) {
+      // 证据文案/建议里的占位符同样校验（value 的 f-string 与 suggestion 都允许模板）
+      for (const txt of [t.value, t.suggestion, t.field]) {
         if (typeof txt !== "string") continue;
         for (const m of txt.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)(:[^}]*)?\}/g)) {
           if (!declared.has(m[1]) && !BUILTIN_VARS.has(m[1]) && !eventKeys.has(m[1])) {
@@ -354,27 +461,21 @@ const listOr = (v, fallback) =>
   Array.isArray(v) ? v.join(",") : v === undefined || v === null ? fallback : String(v);
 
 function fmtApplicability(raw) {
-  const parts = [`firmware ${listOr(raw.firmware, "any")}`, `airframe ${listOr(raw.airframe, "any")}`];
-  const req = raw.requires || {};
-  if (req.all_of) parts.push("依赖(全部) " + req.all_of.join(", "));
-  if (req.any_of) parts.push("依赖(任一) " + req.any_of.join(", "));
-  if (raw.not_applicable?.when) parts.push("不适用当 " + raw.not_applicable.when);
-  if (raw.silent_when) parts.push("静默当 " + raw.silent_when);
-  return parts.join(" ｜ ");
+  const parts = [];
+  // 适用范围两轴现在是表达式（不限写 "True"）
+  if (raw.firmware !== "True") parts.push("固件 " + raw.firmware);
+  if (raw.airframe !== "True") parts.push("机架 " + raw.airframe);
+  // skip 列表：写了 reason 的记一条 skipped，不写 reason 的静默跳过
+  for (const s of raw.skip ?? []) {
+    parts.push((s.reason ? "不适用当 " : "静默当 ") + s.when);
+  }
+  return parts.join(" ｜ ") || "总是适用";
 }
 
 function fmtCompute(raw) {
   const lines = [];
-  for (const node of raw.compute || []) {
-    const ins = node.in ?? (node.from !== undefined ? [].concat(node.from) : []);
-    const opts = Object.entries(node)
-      .filter(([k]) => !["in", "from", "out", "op", "optional"].includes(k))
-      .map(([k, v]) => `${k}=${pyRepr(v)}`);
-    const optsTxt = opts.length ? " " + opts.join(", ") : "";
-    const outs = [].concat(node.out ?? []);
-    lines.push(`- \`${node.op}\`${optsTxt} → **${outs.join(", ")}**`);
-    // 嵌套列表（而不是续行缩进）：续行在 HTML 里会与上一行折成同一段，输入列就糊在算子后面
-    lines.push(`    - 输入：${ins.map((i) => `\`${i}\``).join(", ")}`);
+  for (const expr of raw.compute || []) {
+    lines.push(`- \`${expr}\``);
   }
   return lines.join("\n") || "- （无 compute）";
 }
@@ -382,7 +483,7 @@ function fmtCompute(raw) {
 function fmtTriggers(raw) {
   const lines = [];
   for (const t of raw.triggers || []) {
-    const bits = [`**${t.severity}**`, `\`${t.expr}\``];
+    const bits = [`**${t.severity}**`, `\`${t.when}\``];
     if (t.threshold !== undefined && t.threshold !== null) bits.push(`阈值 ${t.threshold}`);
     if (t.unit) bits.push(`单位 ${t.unit}`);
     bits.push(`标题「${t.title}」`);
@@ -412,26 +513,26 @@ const SLOT_LABEL = {
 
 function renderCatalogue(rules, sources) {
   // 按码点比较而非 localeCompare：后者的结果随机器 ICU 语言环境变化，
-  // 生成产物必须逐字节可复现（槽位名都是 ASCII，码点序就是稳定序）
+  // 生成产物必须逐字节可复现（group 名都是 ASCII，码点序就是稳定序）
   const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
   const bySlot = rules
     .map((raw, i) => ({ file: sources[i], raw }))
     .sort(
       (a, b) =>
-        cmp(String(a.raw.slot ?? ""), String(b.raw.slot ?? "")) ||
+        cmp(String(a.raw.group ?? ""), String(b.raw.group ?? "")) ||
         Number(a.raw.order ?? 100000) - Number(b.raw.order ?? 100000),
     );
 
   const body = [];
   let current = null;
   for (const { file, raw } of bySlot) {
-    const slot = raw.slot ?? "";
+    const slot = raw.group ?? "";
     if (slot !== current) {
       current = slot;
-      body.push(`\n## ${SLOT_LABEL[slot] ?? slot}（slot: \`${slot}\`）\n`);
+      body.push(`\n## ${SLOT_LABEL[slot] ?? slot}（group: \`${slot}\`）\n`);
     }
     body.push(`### ${raw.id} — ${raw.name ?? ""}\n`);
-    body.push(`- 文件：\`rules/${file}\` ｜ 位置：slot \`${slot}\` #${raw.order ?? "—"}`);
+    body.push(`- 文件：\`rules/${file}\` ｜ 位置：group \`${slot}\` #${raw.order ?? "—"}`);
     body.push(`- 适用：${fmtApplicability(raw)}`);
     body.push(`- 取值：\n${fmtCompute(raw)}`);
     body.push(`- 判定：\n${fmtTriggers(raw)}`);
@@ -488,7 +589,9 @@ emit(
 const operatorsPy = read(OPERATORS_PY);
 const signatures = parseOperatorSignatures(operatorsPy);
 if (Object.keys(signatures).length === 0) throw new Error("operators.py 里没解析到任何算子签名");
-const { rules, sources } = loadRules(RULES_DIR, signatures);
+// facts.yaml 要在规则校验**之前**读：规则的 category / doc / 身份块默认值都在 rule_meta 里
+const facts = parseYaml(read(FACTS_PATH));
+const { rules, sources } = loadRules(RULES_DIR, signatures, facts.rule_meta ?? {});
 // guards 类经验没有 compute（其判定在 emit.guard_tags），逐条校验已在 loadRules 里做
 
 const ruleEnginePy = read(PY_RULE_ENGINE);
@@ -503,10 +606,9 @@ if (!ruleEnginePy.includes("__FACTS__")) {
 }
 // facts.yaml：事实层的数据绑定与码表。键名是引擎约定的，缺一个就构建失败
 // （宁可构建失败，也不要在浏览器里跑到某个码表是空的才发现）。
-const facts = parseYaml(read(FACTS_PATH));
-for (const key of ["slot_order", "bindings", "log_levels", "vehicle_types",
-                   "nav_state_names", "nav_groups", "sys_info_keys", "ulog_msg_types",
-                   "info_key_docs"]) {
+for (const key of ["group_order", "bindings", "log_levels", "vehicle_types",
+                   "nav_state_names", "nav_state_groups", "sys_info_keys", "ulog_msg_types",
+                   "info_key_docs", "rule_meta"]) {
   if (facts[key] === undefined) throw new Error(`facts.yaml 缺少 ${key}`);
 }
 for (const [k, v] of Object.entries(facts.info_key_docs)) {
@@ -538,16 +640,16 @@ for (const m of facts.metrics ?? []) {
     }
   }
 }
-if (!Array.isArray(facts.slot_order) || facts.slot_order.length === 0) {
-  throw new Error("facts.yaml 的 slot_order 不能为空");
+if (!Array.isArray(facts.group_order) || facts.group_order.length === 0) {
+  throw new Error("facts.yaml 的 group_order 不能为空");
 }
 
-// 经验声明的 slot 必须已登记在 facts.yaml 的 slot_order 里——否则那条经验**永远不会被执行**
-// （引擎按 slot_order 逐个 slot 跑），且失败是静默的。宁可构建失败。
-const knownSlots = new Set(facts.slot_order);
+// 经验声明的 group 必须已登记在 facts.yaml 的 group_order 里——否则那条经验**永远不会被执行**
+// （引擎按 group_order 逐个 group 跑），且失败是静默的。宁可构建失败。
+const knownGroups = new Set(facts.group_order);
 for (const r of rules) {
-  if (!knownSlots.has(r.slot)) {
-    throw new Error(`规则 ${r.id} 的 slot「${r.slot}」未登记在 knowledge/px4/facts.yaml 的 slot_order`);
+  if (!knownGroups.has(r.group)) {
+    throw new Error(`规则 ${r.id} 的 group「${r.group}」未登记在 knowledge/px4/facts.yaml 的 group_order`);
   }
 }
 // 算子定义必须在框架之前执行（框架用它按名字调用）

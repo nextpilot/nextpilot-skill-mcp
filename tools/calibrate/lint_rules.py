@@ -1,7 +1,9 @@
-"""经验字段引用 lint：查 rules/*.yaml 里引用的 `topic.field` 在该经验的版本范围内是否真的存在。
+"""经验字段引用 lint：查规则里引用的 `topic.field` 在该经验的版本范围内是否真的存在。
 
 为什么需要它：字段名写错、或字段只存在于别的固件版本时，引擎都不会报错，
 只是取到 None → 那条经验静默不生效，没有任何告警。
+（构建期 `pnpm build:kb` 只能校验表达式的形状与算子/变量，**查不了字段存在性**——
+那要按固件版本比日志实测字段与上游字典，是这里的事。）
 
 判据是**版本感知**的（每条经验都声明了 `firmware`，就按它的版本范围去查对应来源）：
   1. 回归日志实测字段：每条日志按基线里的 firmware 归类，只与经验版本范围相符的才算数
@@ -9,20 +11,25 @@
 任一命中即算存在。分类：
   OK            在适用版本里能找到
   version-gap   适用版本里没有、但别的版本里有 → 该经验在现代/旧固件上其实不生效，
-                要改 firmware 范围、补版本分支（算子 pick_newer 或复合算子的 fw_minor 入参），
-                或改用新字段名
-  legacy        aliases / known_legacy 已声明，只汇总
+                要改 firmware 范围、补版本分支（ref(..., when_fw=)），或改用新字段名
+  legacy        alias / known_legacy 已声明，只汇总
   suspicious    哪里都没有 → 大概率拼错
 
-用法：python tools/calibrate/lint-rules.py [--strict]
+规则取自**构建产物**（compute 已是表达式，老节点写法在构建期被编译掉了）。
+
+用法：python tools/calibrate/lint_rules.py [--strict]
     --strict 时 version-gap 与 suspicious 都算失败（默认只报告、返回 0）
 """
 from __future__ import annotations
 
+import ast
 import json
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import run_checks_locally as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RULES_DIR = REPO_ROOT / "knowledge" / "px4" / "rules"
@@ -114,31 +121,49 @@ def bases(name: str) -> set[str]:
 
 # ─────────────────────────── 规则里的引用 ───────────────────────────
 
+def field_refs(expr: str) -> list[tuple[str, str | None, bool]]:
+    """从一条 compute 表达式里取出字段引用。
+
+    返回 [(字段名, 引用级版本约束 or None, 是否用 alias 声明了遗留)]：
+      - ref("topic.field", when_fw=">=1.15", alias="old_name") → 带约束、已声明遗留
+      - 裸写的 topic.field                                     → 无约束
+    """
+    out: list[tuple[str, str | None, bool]] = []
+    for node in ast.walk(ast.parse(expr, mode="exec")):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "ref":
+            if not node.args or not isinstance(node.args[0], ast.Constant):
+                continue
+            name = node.args[0].value
+            when_fw = None
+            aliased = False
+            for kw in node.keywords:
+                if kw.arg == "when_fw" and isinstance(kw.value, ast.Constant):
+                    when_fw = kw.value.value
+                elif kw.arg == "alias":
+                    aliased = True
+            out.append((str(name), when_fw, aliased))
+        elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+            out.append(("%s.%s" % (node.value.id, node.attr), None, False))
+    return out
+
+
 def rule_refs() -> list[tuple[str, str, str, bool, list]]:
     """(规则 id, topic, field, 是否已声明遗留, 生效的版本约束列表)。
 
-    版本约束取「规则级 firmware」与「节点级 when_fw」的交集（两者都要满足）；
-    节点级条件正是"同一字段在不同固件换了名字"时用来分流的写法。
+    规则来自构建产物（compute 已是表达式）。版本约束取「规则级 firmware」与
+    「引用级 when_fw」的交集（两者都要满足）；引用级条件正是"同一字段在不同固件
+    换了名字/topic"时用来分流的写法。
     """
-    import yaml
-
     out = []
-    for f in sorted(RULES_DIR.glob("*.yaml")):
-        loaded = yaml.safe_load(f.read_text(encoding="utf-8"))
-        for raw in (loaded if isinstance(loaded, list) else [loaded]):
-            known = set(raw.get("known_legacy") or [])
-            rule_fw = raw.get("firmware")
-            for node in raw.get("compute") or []:
-                ins = node.get("in")
-                if ins is None:
-                    fr = node.get("from")
-                    ins = fr if isinstance(fr, list) else [fr]
-                aliases = node.get("aliases") or {}
-                constraints = [c for c in (rule_fw, node.get("when_fw")) if c]
-                for ref in ins:
-                    if isinstance(ref, str) and "." in ref:
-                        topic, _, fld = ref.partition(".")
-                        out.append((raw["id"], topic, fld, ref in aliases or ref in known, constraints))
+    for raw in runner._load_rules():
+        known = set(raw.get("known_legacy") or [])
+        rule_fw = raw.get("firmware")
+        for expr in raw.get("compute") or []:
+            for ref, when_fw, aliased in field_refs(expr):
+                topic, _, fld = ref.partition(".")
+                constraints = [c for c in (rule_fw, when_fw) if c]
+                declared = aliased or ref in known
+                out.append((raw["id"], topic, fld, declared, constraints))
     return out
 
 
