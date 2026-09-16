@@ -241,6 +241,16 @@ export interface LogInfoEntry {
   desc?: string;
 }
 
+/** 飞行概况：载具身份 + 累计/本次时长 + 记录起始时刻（见 engine/report_data.py 的 general） */
+export interface LogGeneral {
+  /** 飞控唯一 ID（sys_uuid / PX4GUID）；SITL 等没有就是空串 */
+  uuid?: string;
+  /** 载具**累计**飞行时长（秒），来自参数 LND_FLIGHT_T_HI/LO */
+  vehicleLifeS?: number;
+  /** 记录起始的 UTC 时刻（unix 秒），取 GPS 首次给出有效时间的那一刻 */
+  loggingStartUtc?: number;
+}
+
 /** Multi Information（ULog 的 information_multiple）：键 → 多组值，没有时间戳 */
 export interface LogMultiInfo {
   key: string;
@@ -271,6 +281,8 @@ export interface LogInfo {
   sysInfo: Record<string, string>;
   /** 'I' 消息的完整字典（sysInfo 是它按 facts.yaml 挑出来的子集） */
   infoDict?: LogInfoEntry[];
+  /** 飞行概况（对齐 Flight Review 的 General 表）：载具身份与时间戳，字段由引擎算好 */
+  general?: LogGeneral;
   /** ULog 各类消息的条数统计 */
   msgTypeStats?: LogMsgTypeStat[];
   /** 逐字节统计是否正好走到文件末尾；false 表示尾部有截断/追加段，统计只是"读到多少算多少" */

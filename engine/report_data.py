@@ -405,6 +405,26 @@ def np_log_info():
             for key, val in (get_defaults(bit) or {}).items():
                 default_params.setdefault(str(key), {})[field] = _clean(val)
 
+    # 飞行概况（对齐 Flight Review 的 General 表）——字段名与算法都留在这里，前端只排版：
+    #   · Vehicle UUID  —— sys_uuid（出厂烧录的 PX4GUID）
+    #   · Vehicle Life  —— 参数 LND_FLIGHT_T_HI/LO 拼出的 64 位 µs 计数器，载具**累计**飞行时长
+    #   · Logging Start —— GPS 首次给出有效 UTC 的那一刻（比 boot_time_utc_us 可靠，后者要飞控对过时）
+    general = {"uuid": str(info.get("sys_uuid", ""))}
+    hi = ulog.initial_parameters.get("LND_FLIGHT_T_HI")
+    lo = ulog.initial_parameters.get("LND_FLIGHT_T_LO")
+    if hi is not None and lo is not None:
+        # 两个都是 int32，可能被读成负数：按无符号补回来再拼（Flight Review 同款处理）
+        general["vehicleLifeS"] = round(
+            (((int(hi) & 0xFFFFFFFF) << 32) | (int(lo) & 0xFFFFFFFF)) / 1e6, 1)
+    gps_topic = str((FACTS.get("track") or {}).get("topic", ""))
+    gps = _np_find(gps_topic, 0) if gps_topic else None
+    utc_us = gps.data.get("time_utc_usec") if gps is not None else None
+    if utc_us is not None:
+        t_utc = np.asarray(utc_us, dtype=np.int64)
+        nonzero = np.nonzero(t_utc > 0)[0]
+        if len(nonzero):
+            general["loggingStartUtc"] = int(t_utc[nonzero[0]] // 1000000)
+
     changed = []
     cp = getattr(ulog, "changed_parameters", None)
     if cp is None:
@@ -437,6 +457,7 @@ def np_log_info():
     __result = json.dumps({
         "sysInfo": sys_info,
         "infoDict": info_dict,
+        "general": general,
         "msgTypeStats": msg_type_stats,
         # 逐字节统计有没有正好走到文件末尾：false = 尾部有截断/追加段，类型统计只是"读到多少算多少"
         "msgTypeWalkOk": bool(walked_to_end),

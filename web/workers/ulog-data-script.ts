@@ -167,15 +167,36 @@ def np_track(max_points=None):
             return
 
     ts = np.asarray(d.data["timestamp"], dtype=np.int64)
+    lat = cols["lat"] * scales["lat"]
+    lon = cols["lon"] * scales["lon"]
     n = len(ts)
-    step = max(1, int(np.ceil(n / limit)))     # 轨迹用等距抽样：路径形状比峰值更需要均匀
-    idx = list(range(0, n, step))
+
+    # GPS 没定位时的采样必须剔掉：PX4 在拿到定位前会连着记 lat=lon=0（几内亚湾那个"空岛"），
+    # 一条直线就从那儿连到真正的航迹上——地图上看着完全不对（实测用户日志就是这样）。
+    # 判据：坐标在合法范围、不是 (0,0)、且（有 fix_type 时）fix_type ≥ 3 才算 3D 定位。
+    valid = np.isfinite(lat) & np.isfinite(lon)
+    valid &= (np.abs(lat) <= 90.0) & (np.abs(lon) <= 180.0)
+    valid &= ~((np.abs(lat) < 1e-7) & (np.abs(lon) < 1e-7))
+    fix = d.data.get("fix_type")
+    if fix is not None:
+        valid &= np.asarray(fix) >= 3
+    idx_valid = np.nonzero(valid)[0]
+    if len(idx_valid) < 2:
+        __result = json.dumps({"error": "这段日志没有有效的 GPS 定位点（未定位的采样已剔除）"})
+        return
+
+    dropped = int(n - len(idx_valid))
+    # 轨迹用等距抽样：路径形状比峰值更需要均匀（在有效点里抽，别把 invalid 又抽回来）
+    step = max(1, int(np.ceil(len(idx_valid) / limit)))
+    idx = [int(i) for i in idx_valid[::step]]
     __result = json.dumps({
         "t": [_since_boot(ts[i]) for i in idx],
-        "lat": [_clean(cols["lat"][i] * scales["lat"]) for i in idx],
-        "lon": [_clean(cols["lon"][i] * scales["lon"]) for i in idx],
+        "lat": [_clean(lat[i]) for i in idx],
+        "lon": [_clean(lon[i]) for i in idx],
         "alt": [_clean(cols["alt"][i] * scales["alt"]) for i in idx],
-        "fullCount": n,
+        "fullCount": len(idx_valid),
+        # 剔掉了多少未定位采样：界面据此说明"点数为什么比采样数少"
+        "dropped": dropped,
     }, ensure_ascii=False)
 
 
@@ -385,6 +406,26 @@ def np_log_info():
             for key, val in (get_defaults(bit) or {}).items():
                 default_params.setdefault(str(key), {})[field] = _clean(val)
 
+    # 飞行概况（对齐 Flight Review 的 General 表）——字段名与算法都留在这里，前端只排版：
+    #   · Vehicle UUID  —— sys_uuid（出厂烧录的 PX4GUID）
+    #   · Vehicle Life  —— 参数 LND_FLIGHT_T_HI/LO 拼出的 64 位 µs 计数器，载具**累计**飞行时长
+    #   · Logging Start —— GPS 首次给出有效 UTC 的那一刻（比 boot_time_utc_us 可靠，后者要飞控对过时）
+    general = {"uuid": str(info.get("sys_uuid", ""))}
+    hi = ulog.initial_parameters.get("LND_FLIGHT_T_HI")
+    lo = ulog.initial_parameters.get("LND_FLIGHT_T_LO")
+    if hi is not None and lo is not None:
+        # 两个都是 int32，可能被读成负数：按无符号补回来再拼（Flight Review 同款处理）
+        general["vehicleLifeS"] = round(
+            (((int(hi) & 0xFFFFFFFF) << 32) | (int(lo) & 0xFFFFFFFF)) / 1e6, 1)
+    gps_topic = str((FACTS.get("track") or {}).get("topic", ""))
+    gps = _np_find(gps_topic, 0) if gps_topic else None
+    utc_us = gps.data.get("time_utc_usec") if gps is not None else None
+    if utc_us is not None:
+        t_utc = np.asarray(utc_us, dtype=np.int64)
+        nonzero = np.nonzero(t_utc > 0)[0]
+        if len(nonzero):
+            general["loggingStartUtc"] = int(t_utc[nonzero[0]] // 1000000)
+
     changed = []
     cp = getattr(ulog, "changed_parameters", None)
     if cp is None:
@@ -417,6 +458,7 @@ def np_log_info():
     __result = json.dumps({
         "sysInfo": sys_info,
         "infoDict": info_dict,
+        "general": general,
         "msgTypeStats": msg_type_stats,
         # 逐字节统计有没有正好走到文件末尾：false = 尾部有截断/追加段，类型统计只是"读到多少算多少"
         "msgTypeWalkOk": bool(walked_to_end),

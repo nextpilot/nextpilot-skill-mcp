@@ -175,6 +175,9 @@ export function AnalyzeReport({
         </div>
       </div>
 
+      {/* 飞行概况：载具身份 + 时长 + 记录起始时刻（对齐 Flight Review 的 General 表） */}
+      <GeneralInfo info={info} report={report} />
+
       {/* 异常标签 / 数据质量 guard */}
       {(report.guardTags?.length || report.tags?.length) && (
         <div className="mb-5 space-y-2.5">
@@ -515,6 +518,72 @@ function FindingCard({ finding }: { finding: Finding }) {
           官方文档 <ExternalLink className="h-3 w-3" />
         </a>
       )}
+    </div>
+  );
+}
+
+/** 秒数 → "3 天 4 小时 21 分 8 秒"（不足一天的省略"天"） */
+function formatDuration(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  const parts: string[] = [];
+  const days = Math.floor(s / 86400);
+  const hours = Math.floor((s % 86400) / 3600);
+  const minutes = Math.floor((s % 3600) / 60);
+  const seconds = s % 60;
+  if (days > 0) parts.push(`${days} 天`);
+  if (days > 0 || hours > 0) parts.push(`${hours} 小时`);
+  if (days > 0 || hours > 0 || minutes > 0) parts.push(`${minutes} 分`);
+  parts.push(`${seconds} 秒`);
+  return parts.join(" ");
+}
+
+/**
+ * 飞行概况（Flight Review 的 General 表口径）：
+ *   Vehicle UUID / Vehicle Life（载具累计飞行时长）/ Flight Time（本次飞行时长）/ Logging Start
+ * 数据由引擎算好（`info.general` 与 `report.facts`），这里只排版；缺哪项就不显示哪行。
+ */
+function GeneralInfo({ info, report }: { info: LogInfo | null; report: AnalysisReport }) {
+  const g = info?.general;
+  const rows: { label: string; value: string; title?: string; mono?: boolean }[] = [];
+
+  if (g?.uuid) rows.push({ label: "Vehicle UUID", value: g.uuid, mono: true });
+  if (typeof g?.vehicleLifeS === "number") {
+    rows.push({ label: "Vehicle Life", value: formatDuration(g.vehicleLifeS), title: "载具累计飞行时长（参数 LND_FLIGHT_T_HI/LO）" });
+  }
+  if (report.facts?.armedDurationSec) {
+    rows.push({
+      label: "Flight Time",
+      value: formatDuration(report.facts.armedDurationSec),
+      title: "本次日志里解锁（armed）的累计时长",
+    });
+  }
+  if (g?.loggingStartUtc) {
+    const d = new Date(g.loggingStartUtc * 1000);
+    rows.push({
+      label: "Logging Start",
+      value: d.toLocaleString(),
+      title: `记录起始时刻（本机时区）。UTC：${d.toISOString().replace("T", " ").slice(0, 19)}`,
+    });
+  }
+
+  if (rows.length === 0) return null;
+  return (
+    <div className="mb-5 rounded-lg border border-border bg-surface-2 p-3">
+      <h3 className="mb-2 text-sm font-semibold">飞行概况</h3>
+      <table className="text-sm">
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.label}>
+              <td className="w-32 py-0.5 pr-3 align-top text-xs whitespace-nowrap text-muted" title={r.title}>
+                {r.label}
+              </td>
+              <td className={`py-0.5 align-top break-all ${r.mono ? "font-mono text-xs" : ""} text-text`}>
+                {r.value}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
