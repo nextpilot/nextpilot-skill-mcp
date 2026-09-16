@@ -1,0 +1,21 @@
+order: 4          # 页面里这组图的先后
+id: ekf
+title: EKF 创新检验
+description: 创新值与检验门限之比（≥1 表示该路观测被 EKF 拒绝），参考线 1.0。
+panels:
+  - title: "estimator_status #{instance}"
+    yLabel: ratio
+    topic: estimator_status
+    instance: first
+    fields:
+      - {label: 速度,     fields: [vel_test_ratio]}
+      - {label: 水平位置, fields: [pos_test_ratio]}
+      - {label: 垂直高度, fields: [hgt_test_ratio]}
+      - {label: 航向,     fields: [hdg_test_ratio]}
+      # 老固件没有 hdg_test_ratio，退回磁罗盘创新比
+      - {label: 磁罗盘,   fields: [mag_test_ratio], only_when_missing: hdg_test_ratio}
+      - {label: 空速,     fields: [tas_test_ratio]}
+      - {label: 离地高度, fields: [hagl_test_ratio]}
+      - {label: 侧滑,     fields: [beta_test_ratio]}
+    hlines:
+      - {value: 1.0, level: critical, label: "1.0 (拒绝)"}

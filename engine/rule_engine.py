@@ -139,7 +139,11 @@ for d in ulog.data_list:
         t_max = b if t_max is None else max(t_max, b)
 t0 = int(getattr(ulog, "start_timestamp", 0) or (t_min or 0))
 duration_s = round((t_max - t_min) / 1e6, 1) if t_min is not None else None
-stats = {"durationSec": duration_s if duration_s is not None else 0}
+# 事实层的产出分两块（都进 report，见文件末尾）：
+#   facts   —— 日志客观"是什么"：机型 / 固件 / 时长 / armed / 阶段 / 丢包。离散、驱动判定
+#   metrics —— 给人和 AI 看的**数字**：事实层的概览指标（facts.yaml 的 metrics）+ 各经验的 emit.stats
+facts = {"durationSec": duration_s if duration_s is not None else 0}
+metrics = {}
 
 # ---------------- 机型识别 ----------------
 VEHICLE_TYPES = {int(k): v for k, v in FACTS["vehicle_types"].items()}
@@ -154,11 +158,11 @@ if vs is not None:
         rw = getf(vs, _VS["is_rotary_wing"])
         if rw is not None and len(rw) > 0:
             vehicle_type = "rotary_wing" if int(rw[-1]) else "fixed_wing"
-stats["vehicleType"] = vehicle_type
-stats["firmware"] = FW_LABEL
-stats["firmwareProfile"] = FW_PROFILE
+facts["vehicleType"] = vehicle_type
+facts["firmware"] = FW_LABEL
+facts["firmwareProfile"] = FW_PROFILE
 if FW["hw"]:
-    stats["hardware"] = FW["hw"]
+    facts["hardware"] = FW["hw"]
 
 # ---------------- 飞行阶段识别（第二层，用于故障库 phase 匹配）----------------
 # nav_state 码值 → 飞行阶段的分组写在 facts.yaml 的 nav_groups（_NAV_GROUPS 已按它构建）
@@ -207,8 +211,8 @@ if vs is not None and trans_mode is not None:
     if int(np.max(np.asarray(trans_mode))) > 0:
         phases_present.add("vtol_transition")
 # 无 armed 段时，短日志 guard 之外不做任何故障库匹配
-stats["armedDurationSec"] = armed_duration_s
-stats["phases"] = sorted(phases_present)
+facts["armedDurationSec"] = armed_duration_s
+facts["phases"] = sorted(phases_present)
 
 # 短日志 guard 的标签由 rules/guard-short-log.yaml 给出；调用放在框架定义之后
 # （见下方 _run_rules("guards_early")），以保证它是第一个 guard 标签。
@@ -224,7 +228,7 @@ for _d in ulog.data_list:
             restart_topics += 1
 # 日志丢包累计
 dropout_total_ms = int(sum(getattr(d, "duration", 0) for d in getattr(ulog, "dropouts", [])))
-stats["dropoutTotalMs"] = dropout_total_ms
+facts["dropoutTotalMs"] = dropout_total_ms
 
 def in_armed(ts_us):
     for s, e in armed_intervals:
@@ -566,7 +570,7 @@ def _run_rules(slot):
             _v = _env.get(_spec["var"])
             if _v is None:
                 continue
-            stats[_key] = round(float(_v), int(_spec["round"])) if "round" in _spec else _v
+            metrics[_key] = round(float(_v), int(_spec["round"])) if "round" in _spec else _v
 
         # foreach: 把一条规则算出的「事件列表」展开成多条 finding（如 failsafe 的每次边沿）。
         # 事件 dict 的键会叠加进模板环境，所以文案仍写在经验文件里；
@@ -668,18 +672,93 @@ def match_fault_kb():
 short_log = "insufficient_data" in guard_tags
 matched_faults = [] if short_log else match_fault_kb()
 
+# ---------------- 概览指标（knowledge/px4/facts.yaml 的 metrics）----------------
+# 规则顺带产出的实测值优先（更贴合判定口径）；规则没跑（缺字段 / 机型不适用）时按声明兜底现算，
+# 这样用户在「关键数据」里始终看得到数，不会因为某条规则 skip 就凭空少几项。
+_M_RESERVED = {"key", "label", "unit", "topic", "field", "fields", "op", "pick", "scale", "round"}
+
+
+def _metric_fallback(m):
+    """按声明现算一个概览指标；任何一步缺失都返回 None（这一项就不显示）"""
+    try:
+        topic = m.get("topic")
+        if not topic:
+            return None
+        d_list = find_all(ulog, topic)
+        if not d_list:
+            return None
+        fields = m.get("fields") or ([m["field"]] if m.get("field") is not None else [])
+        if not isinstance(fields, list):
+            fields = [fields]
+        args = []
+        for cand in fields:
+            names = cand if isinstance(cand, list) else [cand]   # 候选字段名：取第一个存在的
+            col = None
+            for n in names:
+                col = getf(d_list[0], n)
+                if col is not None:
+                    break
+            if col is None:
+                return None
+            args.append(np.asarray(col, dtype=float))
+        name = m.get("op")
+        if name not in OPERATORS:
+            return None
+        res = OPERATORS[name](*args, **{k: v for k, v in m.items() if k not in _M_RESERVED})
+        if res is None:
+            return None
+        pick = m.get("pick")
+        if pick:
+            outs = list(res) if isinstance(res, tuple) else [res]
+            out_names = SIGNATURES.get(name, {}).get("out_names") or []
+            if pick not in out_names:
+                return None
+            res = outs[out_names.index(pick)]
+        val = float(res)
+        if m.get("scale") is not None:
+            val = val * float(m["scale"])
+        if "round" in m:
+            _r = int(m["round"])
+            val = round(val, _r)
+            return int(val) if _r == 0 else val   # round(x, 0) 仍是 float，整数量要转回 int
+        return val
+    except Exception:
+        return None
+
+
+_metric_entries = []
+_declared = set()
+for _m in FACTS.get("metrics", []):
+    _key = _m.get("key")
+    if not _key:
+        continue
+    _declared.add(_key)
+    _val = metrics.get(_key)
+    if _val is None:
+        _val = _metric_fallback(_m)
+    if _val is None:
+        continue
+    _entry = {"key": _key, "label": _m.get("label", _key), "value": _val}
+    if _m.get("unit"):
+        _entry["unit"] = _m["unit"]
+    _metric_entries.append(_entry)
+# 规则产出、但没在 facts.yaml 里声明的（别丢，直接用键名当名字）
+for _key, _val in metrics.items():
+    if _key not in _declared:
+        _metric_entries.append({"key": _key, "label": _key, "value": _val})
+
 order = {"critical": 0, "warning": 1, "info": 2}
 findings.sort(key=lambda f: order.get(f["severity"], 9))
 
 __result = json.dumps({
     "platform": "PX4",
-    "vehicleType": vehicle_type,
     "parserVersion": "pyulog/pyodide-0.3.0",
-    "durationSec": duration_s,
-    "stats": stats,
+    # 事实层产出：facts=日志是什么（离散，驱动判定）；metrics=关键数字（有序，带中文名与单位）
+    "facts": facts,
+    "metrics": _metric_entries,
+    # 判定层产出（规则与故障库）
     "tags": tags,
     "guardTags": guard_tags,
-    "phases": sorted(phases_present),
     "checksRun": checks_run,
     "checksSkipped": checks_skipped,
     "matchedFaults": matched_faults,

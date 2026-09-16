@@ -6,10 +6,8 @@
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
     "platform": "PX4",
-    "vehicleType": "rotary_wing",
     "parserVersion": "pyulog/pyodide-0.3.0",
-    "durationSec": 181.5,
-    "stats": {
+    "facts": {
       "durationSec": 181.5,
       "vehicleType": "rotary_wing",
       "firmware": "未知（旧固件或无版本号）",
@@ -17,15 +15,26 @@
       "hardware": "AUAV_X21",
       "armedDurationSec": 0.0,
       "phases": [],
-      "dropoutTotalMs": 119,
-      "cpuLoadMax": 0.833,
-      "navStateChanges": 0
+      "dropoutTotalMs": 119
     },
+    "metrics": [
+      {
+        "key": "cpuLoadMax",
+        "label": "CPU 峰值",
+        "value": 0.833,
+        "unit": "0..1"
+      },
+      {
+        "key": "navStateChanges",
+        "label": "模式切换次数",
+        "value": 0,
+        "unit": "次"
+      }
+    ],
     "tags": [],
     "guardTags": [
       "topic_missing:battery_status"
     ],
-    "phases": [],
     "checksRun": [
       "ekf_innovations",
       "ekf_faults",

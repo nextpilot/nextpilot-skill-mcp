@@ -45,6 +45,20 @@ def main() -> int:
     if missing:
         raise SystemExit(f"生成产物的 .replace 链缺占位符：{sorted(missing)}")
 
+    # .replace 链里引用的名字必须已在产物里声明（const X = ... / import X from ...）。
+    # 踩过：加了 .replace("__FACTS__", JSON.stringify(facts)) 却忘了 const facts = ...，
+    # 语法检查与"复现替换"都发现不了（这里自己代填占位符），但浏览器一加载就 ReferenceError。
+    declared = set(re.findall(r"^\s*(?:const|let|var)\s+([A-Za-z_$][\w$]*)", src, re.M))
+    declared |= set(re.findall(r"^\s*import\s+([A-Za-z_$][\w$]*)\s+from", src, re.M))
+    used: set[str] = set()
+    for arg in re.findall(r'\.replace\("[A-Z_]+__",\s*([^)]+)\)', src):
+        # 去掉属性访问（faultKbJson.entries → 只留 faultKbJson），否则把属性名当变量名
+        head = re.sub(r"\.\s*[A-Za-z_$][\w$]*", "", arg)
+        used |= set(re.findall(r"[A-Za-z_$][\w$]*", head)) - {"JSON", "stringify"}
+    missing_names = sorted(used - declared)
+    if missing_names:
+        raise SystemExit(f"生成产物的 .replace 链引用了未声明的名字：{missing_names}")
+
     # 用真实取值复现最终 Python 源码
     final = body
     final = final.replace("__FAULT_KB__", repr(json.loads(FAULT_KB.read_text(encoding="utf-8"))["entries"]))

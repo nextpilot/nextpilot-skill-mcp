@@ -219,6 +219,7 @@ compute:
 | `keep_gt` | 1 | 1 个值 | 只保留有限且 > gt 的样本（如排除 eph<=0 的无效值），返回序列 |
 | `masked_any_in` | 3 | 1 个值 | 时间轴上的“区间内取值为集合之一”判定：在 intervals（us 区间列表）内是否存在取值落在 codes 中的样本 |
 | `percentile` | 1 | 1 个值 | 有限值的第 p 百分位（如 p=95） |
+| `quat_to_euler` | 4 | roll, pitch, yaw | 四元数四列（w, x, y, z）→ 欧拉角（度） |
 | `ratio_equal` | 1 | 1 个值 | 取值为 value 的样本占比（如无效标志 == 0 的比例） |
 | `read` | 1 | 1 个值 | 显式取数/透传：把字段原样放进环境（供 coalesce 等后续节点使用） |
 | `require_true` | 1 | 1 个值 | 门控：条件为真返回 True，否则 None（使数据流在此中止，等效于原 if 分支） |
@@ -297,7 +298,7 @@ compute:
 | `gyro_bias_worst` | 5 | abs_max, abs_axis, drift, drift_axis | 三轴零偏在 armed 区间内逐轴取 |最大值| 与极差（漂移），回传各自最差的轴名 |
 | `max_temp_range` | 2 | 1 个值 | 两个温度来源各自取极差（样本 < 2 的来源忽略），返回较大者 |
 
-共 **73** 个算子。入参个数由算子签名强制校验（`in:`/`out:` 数量对不上则构建失败）；各算子的可调参数（如 `gt` / `p` / `factor` / `codes` / `labels` / `min_count`）写在节点的同层键上。
+共 **74** 个算子。入参个数由算子签名强制校验（`in:`/`out:` 数量对不上则构建失败）；各算子的可调参数（如 `gt` / `p` / `factor` / `codes` / `labels` / `min_count`）写在节点的同层键上。
 <!-- END:operators -->
 
 ## 5. triggers 与 emit
@@ -324,7 +325,7 @@ compute:
 | `emit.check` | `checksRun`/`checksSkipped` 里的名字（guard 类经验可省） |
 | `emit.tag` | 默认异常标签（trigger 未写 `tag` 时用它） |
 | `emit.doc` | 官方文档链接（每条 finding 必须可溯源） |
-| `emit.stats` | `{stats 键: {var: 变量名, round: n}}`；值为 `None` 时该键不写入 |
+| `emit.stats` | `{键: {var: 变量名, round: n}}`；写进报告的 **`metrics`**（关键数据块）；值为 `None` 时该键不写入。**结果页里这项的名字/单位/顺序在 `../facts.yaml` 的 `metrics` 里声明**——键对不上就只显示键名 |
 | `emit.guard_tags` | `[{when: 表达式, tag: 标签}]`：条件成立就打数据质量标签，**不依赖是否发 finding**（如温度跨度大） |
 
 ## 6. 内置变量、事件与进阶

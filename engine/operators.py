@@ -490,6 +490,29 @@ def op_hypot(a, b, **kw):
     return np.sqrt(np.asarray(a, dtype=float) ** 2 + np.asarray(b, dtype=float) ** 2)
 
 
+@operator(
+    "quat_to_euler",
+    in_arity=4,
+    out_arity=3,
+    out_names=["roll", "pitch", "yaw"],
+    doc="四元数四列（w, x, y, z）→ 欧拉角（度）；图上的姿态换算走这个，别在前端写",
+)
+def op_quat_to_euler(w, x, y, z, **kw):
+    import numpy as np
+
+    if w is None or x is None or y is None or z is None:
+        return None, None, None
+    w, x, y, z = (np.asarray(v, dtype=float) for v in (w, x, y, z))
+    # 归一化：日志里的四元数可能因插值/截断略偏离单位长度，不归一化会放大 atan2 误差
+    n = np.sqrt(w * w + x * x + y * y + z * z)
+    n = np.where(n > 0, n, np.nan)
+    w, x, y, z = w / n, x / n, y / n, z / n
+    roll = np.degrees(np.arctan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y)))
+    pitch = np.degrees(np.arcsin(np.clip(2 * (w * y - z * x), -1.0, 1.0)))
+    yaw = np.degrees(np.arctan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z)))
+    return roll, pitch, yaw
+
+
 @operator("ratio_equal", doc="取值为 value 的样本占比（如无效标志 == 0 的比例）；分母为全部样本")
 def op_ratio_equal(values, value=0.0, **kw):
     import numpy as np

@@ -65,9 +65,16 @@ def np_manifest():
     __result = json.dumps({"topics": items}, ensure_ascii=False)
 
 # ============ np_series：按需抽取 + LTTB 降采样 ============
-def np_series(topic, instance, fields_json, max_points=3000):
+def np_series(topic, instance, fields_json, max_points=3000, op_json=None):
+    """按需抽取时序并 LTTB 降采样。
+
+    op_json：图上要做换算时的**预处理算子**（如 {"name": "quat_to_euler"}），
+    与经验用的同一套算子；给了 op 就只返回算子的输出（键为算子的 out_names），
+    换算在引擎侧做，前端只画。
+    """
     global __result
     fields = json.loads(fields_json)
+    op = json.loads(op_json) if op_json else None
     d = _np_find(topic, int(instance))
     if d is None:
         __result = json.dumps({"error": "topic not found: %s#%d" % (topic, instance)})
@@ -81,6 +88,40 @@ def np_series(topic, instance, fields_json, max_points=3000):
             break
     idx = _lttb_indices(n, int(max_points), ref)
     t0 = int(ulog.start_timestamp) if getattr(ulog, "start_timestamp", 0) else int(ts[0])
+
+    if op:
+        name = op.get("name")
+        if name not in OPERATORS:
+            __result = json.dumps({"error": "未注册的预处理算子：%s" % name})
+            return
+        args = [np.asarray(d.data[f], dtype=float) if f in d.data else None for f in fields]
+        if any(a is None for a in args):
+            __result = json.dumps({"error": "预处理算子 %s 的输入字段缺失" % name})
+            return
+        opts = {k: v for k, v in op.items() if k not in ("name", "labels")}
+        res = OPERATORS[name](*args, **opts)
+        if res is None:
+            __result = json.dumps({"error": "预处理算子 %s 无结果（数据不足）" % name})
+            return
+        outs = list(res) if isinstance(res, tuple) else [res]
+        names = SIGNATURES.get(name, {}).get("out_names") or [
+            "out%d" % i for i in range(len(outs))
+        ]
+        out = {
+            "topic": topic,
+            "instance": int(instance),
+            "t0us": t0,
+            "t": [round((int(ts[i]) - t0) / 1e6, 3) for i in idx],
+            "series": {
+                names[i]: [_clean(np.asarray(o, dtype=float)[j]) for j in idx]
+                for i, o in enumerate(outs)
+            },
+            "fullCount": n,
+            "op": name,
+        }
+        __result = json.dumps(out, ensure_ascii=False)
+        return
+
     out = {
         "topic": topic, "instance": int(instance),
         "t0us": t0,
@@ -96,6 +137,44 @@ def np_series(topic, instance, fields_json, max_points=3000):
         else:
             out["series"][f] = None
     __result = json.dumps(out, ensure_ascii=False)
+
+# ============ np_track：GPS 轨迹（地图用，字段候选与量纲写在 facts.yaml 的 track）============
+def np_track(max_points=None):
+    global __result
+    cfg = FACTS.get("track") or {}
+    topic = cfg.get("topic")
+    d = _np_find(topic, int(cfg.get("instance", 0))) if topic else None
+    if d is None:
+        __result = json.dumps({"error": "日志里没有 %s 话题" % topic})
+        return
+    limit = int(max_points or cfg.get("max_points") or 1500)
+
+    cols = {}
+    scales = {}
+    for name in ("lat", "lon", "alt"):
+        for cand in cfg.get(name) or []:
+            col = d.data.get(cand.get("field"))
+            if col is not None:
+                cols[name] = np.asarray(col, dtype=float)
+                scales[name] = float(cand.get("scale", 1))
+                break
+        if name not in cols:
+            __result = json.dumps({"error": "轨迹缺少 %s（候选字段都不在日志里）" % name})
+            return
+
+    ts = np.asarray(d.data["timestamp"], dtype=np.int64)
+    n = len(ts)
+    step = max(1, int(np.ceil(n / limit)))     # 轨迹用等距抽样：路径形状比峰值更需要均匀
+    idx = list(range(0, n, step))
+    t0 = int(ulog.start_timestamp) if getattr(ulog, "start_timestamp", 0) else int(ts[0])
+    __result = json.dumps({
+        "t": [round((int(ts[i]) - t0) / 1e6, 2) for i in idx],
+        "lat": [_clean(cols["lat"][i] * scales["lat"]) for i in idx],
+        "lon": [_clean(cols["lon"][i] * scales["lon"]) for i in idx],
+        "alt": [_clean(cols["alt"][i] * scales["alt"]) for i in idx],
+        "fullCount": n,
+    }, ensure_ascii=False)
+
 
 # ============ 飞行模式枚举（数据在 knowledge/px4/facts.yaml）============
 # 码表都在 facts.yaml（引擎只提供机制）：改名字/加码值不用动 Python。
@@ -161,6 +240,30 @@ def np_log_info():
     dropouts = [{"tSec": round((int(d.timestamp) - t0) / 1e6, 2), "durationMs": int(d.duration)}
                 for d in ulog.dropouts]
 
+    # Multi Information（pyulog 的 msg_info_multiple_dict）：键 → 多组值，没有时间戳。
+    # 每组是一次记录（is_continued 的续行已在 pyulog 里并进同一组），这里把组内拼成一行。
+    multi_src = getattr(ulog, "msg_info_multiple_dict", None) or {}
+    multi_types = getattr(ulog, "msg_info_multiple_dict_types", None) or {}
+
+    def _fmt(v):
+        # metadata_events 之类是原始字节，别把 b'ý7zXZ...' 当文本铺出来
+        if isinstance(v, (bytes, bytearray)):
+            return "（二进制数据 %d 字节）" % len(v)
+        return str(v)
+
+    messages_multi = []
+    for key in sorted(multi_src):
+        groups = multi_src[key] or []
+        values = [
+            " ".join(_fmt(x) for x in grp) if isinstance(grp, list) else _fmt(grp)
+            for grp in groups
+        ]
+        messages_multi.append({
+            "key": str(key),
+            "type": str(multi_types.get(key, "")),
+            "values": values,
+        })
+
     params = {str(k): _clean(np.asarray(v).reshape(-1)[0]) if hasattr(v, "reshape") else _clean(v)
               for k, v in ulog.initial_parameters.items()}
 
@@ -179,6 +282,7 @@ def np_log_info():
     __result = json.dumps({
         "sysInfo": sys_info,
         "messages": messages,
+        "messagesMulti": messages_multi,
         "dropouts": dropouts,
         "params": params,
         "changedParams": changed,

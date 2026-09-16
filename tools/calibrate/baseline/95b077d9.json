@@ -6,10 +6,8 @@
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
     "platform": "PX4",
-    "vehicleType": "rover",
     "parserVersion": "pyulog/pyodide-0.3.0",
-    "durationSec": 73.2,
-    "stats": {
+    "facts": {
       "durationSec": 73.2,
       "vehicleType": "rover",
       "firmware": "1.17.0",
@@ -21,30 +19,88 @@
         "hover",
         "maneuver"
       ],
-      "dropoutTotalMs": 0,
-      "imuAccelVibrationMean": 3.73,
-      "imuAccelVibrationP95": 5.857,
-      "imuAccelVibrationMax": 6.558,
-      "cpuLoadMax": 0.375,
-      "gpsEphP95M": 0.0,
-      "gpsEphMaxM": 0.0,
-      "gpsSatellitesMin": 15,
-      "gpsJumpCount": 0,
-      "navStateChanges": 3,
-      "gyroBiasMaxRadS": 0.001,
-      "gyroBiasDriftRadS": 0.0007,
-      "gyroBiasSource": "estimator_sensor_bias.gyro_bias[]",
-      "imuTempRangeC": 0.2
+      "dropoutTotalMs": 0
     },
+    "metrics": [
+      {
+        "key": "imuAccelVibrationMax",
+        "label": "最大振动",
+        "value": 6.558,
+        "unit": "m/s²"
+      },
+      {
+        "key": "gpsSatellitesMin",
+        "label": "最少搜星",
+        "value": 15,
+        "unit": "颗"
+      },
+      {
+        "key": "gpsEphMaxM",
+        "label": "最大定位误差",
+        "value": 0.0,
+        "unit": "m"
+      },
+      {
+        "key": "cpuLoadMax",
+        "label": "CPU 峰值",
+        "value": 0.375,
+        "unit": "0..1"
+      },
+      {
+        "key": "imuTempRangeC",
+        "label": "IMU 温度跨度",
+        "value": 0.2,
+        "unit": "°C"
+      },
+      {
+        "key": "gyroBiasMaxRadS",
+        "label": "陀螺零偏最大",
+        "value": 0.001,
+        "unit": "rad/s"
+      },
+      {
+        "key": "gyroBiasDriftRadS",
+        "label": "陀螺零偏漂移",
+        "value": 0.0007,
+        "unit": "rad/s"
+      },
+      {
+        "key": "gpsJumpCount",
+        "label": "GPS 跳变次数",
+        "value": 0,
+        "unit": "次"
+      },
+      {
+        "key": "navStateChanges",
+        "label": "模式切换次数",
+        "value": 3,
+        "unit": "次"
+      },
+      {
+        "key": "imuAccelVibrationMean",
+        "label": "imuAccelVibrationMean",
+        "value": 3.73
+      },
+      {
+        "key": "imuAccelVibrationP95",
+        "label": "imuAccelVibrationP95",
+        "value": 5.857
+      },
+      {
+        "key": "gpsEphP95M",
+        "label": "gpsEphP95M",
+        "value": 0.0
+      },
+      {
+        "key": "gyroBiasSource",
+        "label": "gyroBiasSource",
+        "value": "estimator_sensor_bias.gyro_bias[]"
+      }
+    ],
     "tags": [],
     "guardTags": [
       "insufficient_data",
       "topic_missing:battery_status"
-    ],
-    "phases": [
-      "fw_cruise",
-      "hover",
-      "maneuver"
     ],
     "checksRun": [
       "vibration",

@@ -1,0 +1,16 @@
+order: 6          # 页面里这组图的先后
+id: gps
+title: GPS
+description: 卫星数与定位精度（HDOP/EPH/EPV）。
+panels:
+  - title: 卫星数
+    yLabel: count
+    topic: vehicle_gps_position
+    instance: first
+    fields:
+      - {fields: [satellites_used, satellites_visible]}   # 不给 label：图例就用实际字段名
+  - title: 定位精度
+    yLabel: m
+    topic: vehicle_gps_position
+    instance: first
+    fields: [eph, epv, hdop]

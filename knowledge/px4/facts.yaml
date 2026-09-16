@@ -60,3 +60,57 @@ sys_info_keys:
   [sys_name, ver_sw, ver_sw_release, ver_vendor_sw_release, ver_hw, ver_hw_subtype,
    sys_os_name, sys_os_ver, sys_toolchain, sys_toolchain_ver, sys_mcu, time_start_utc,
    duration, git_branch]
+
+# ── 概览指标（结果页「关键数据」）──
+# 说明：这些数字大多由规则顺带产出（rules/*.yaml 的 emit.stats），但**规则 skip 时数字就没了**
+# （缺字段、机型不适用…），所以这里为重要的几项声明"兜底取数"：规则跑过就用规则的值（更贴合判定），
+# 没跑就按这里的 topic/field/op 现算。label/unit/顺序只看这张表，改它不用碰 Python。
+#   key   报告的键（与规则 emit.stats 的键一致才能合并；撞名时**规则值优先**）
+#   op    兜底算子（必须已在 engine/operators.py 注册）；多输出的复合算子用 pick: <输出名>
+#   scale 兜底值再乘的系数（单位换算，如 eph 是 mm → m 用 0.001）
+metrics:
+  - {key: imuAccelVibrationMax, label: 最大振动,        unit: m/s², topic: vehicle_imu_status, field: accel_vibration_metric, op: max, round: 2}
+  - {key: batteryVoltageMin,   label: 最低电压,        unit: V,    topic: battery_status, field: voltage_v, op: min, round: 2}
+  - {key: batteryCellVoltageMin, label: 最低电芯电压,  unit: V,    topic: battery_status,
+     fields: [voltage_cell_v, voltage_v, voltage_filtered_v, cell_count], op: cell_voltage_min, pick: vmin, round: 3}
+  - {key: currentMax,          label: 最大电流,        unit: A,    topic: battery_status, field: current_a, op: max, round: 2}
+  - {key: batteryRemainingMin, label: 最低剩余电量,    unit: "0..1", topic: battery_status, field: remaining, op: min_ge, ge: 0, round: 3}
+  - {key: gpsSatellitesMin,    label: 最少搜星,        unit: 颗,   topic: vehicle_gps_position, field: [satellites_used, satellites_visible], op: min, round: 0}
+  - {key: gpsEphMaxM,          label: 最大定位误差,    unit: m,    topic: vehicle_gps_position, field: eph, op: max, scale: 0.001, round: 2}
+  - {key: cpuLoadMax,          label: CPU 峰值,        unit: "0..1", topic: cpuload, field: load, op: max, round: 3}
+
+  # 以下只声明展示名与顺序（取数依赖跨 topic 对齐或时序，交由规则产出；规则没跑则不显示）
+  - {key: imuAccelClippingCountMax, label: 加速度计削波计数, unit: 次}
+  - {key: imuTempRangeC,       label: IMU 温度跨度,    unit: °C}
+  - {key: ekfRejectRatioPct,   label: EKF 拒绝占比,    unit: 比例}
+  - {key: attitudeErrDegP99,   label: 姿态误差 p99,    unit: °}
+  - {key: attitudeOscHz,       label: 姿态振荡频率,    unit: Hz}
+  - {key: motorControlSpread,  label: 电机输出离散度}
+  - {key: motorCountActive,    label: 活跃电机数,      unit: 个}
+  - {key: gyroBiasMaxRadS,     label: 陀螺零偏最大,    unit: rad/s}
+  - {key: gyroBiasDriftRadS,   label: 陀螺零偏漂移,    unit: rad/s}
+  - {key: windSpeedP95M,       label: 风速 p95,        unit: m/s}
+  - {key: airspeedMinM,        label: 最低空速,        unit: m/s}
+  - {key: airspeedInvalidRatio, label: 空速无效占比,   unit: 比例}
+  - {key: gpsJumpCount,        label: GPS 跳变次数,    unit: 次}
+  - {key: navStateChanges,     label: 模式切换次数,    unit: 次}
+  - {key: vtolTransitionSamples, label: VTOL 转换样本数, unit: 个}
+  - {key: batteryCellCount,    label: 电芯数,          unit: 个}
+
+# ── 地图轨迹 ──
+# 取 GPS 的经纬高画轨迹。字段名与量纲都随固件改过（1.15 起 lat/lon/alt →
+# latitude_deg/longitude_deg/altitude_msl_m，且 degE7→deg、mm→m），所以**每个字段给候选**，
+# 按顺序取第一个存在的，并按各自的 scale 换算——这正是不把字段名写死在代码里的原因。
+track:
+  topic: vehicle_gps_position
+  instance: 0
+  lat:
+    - {field: latitude_deg, scale: 1}       # 1.15+：直接是度
+    - {field: lat,          scale: 1.0e-7}  # 旧固件：degE7
+  lon:
+    - {field: longitude_deg, scale: 1}
+    - {field: lon,           scale: 1.0e-7}
+  alt:
+    - {field: altitude_msl_m, scale: 1}     # 1.15+：米
+    - {field: alt,            scale: 0.001} # 旧固件：毫米
+  max_points: 1500

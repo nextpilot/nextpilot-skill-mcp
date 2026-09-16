@@ -6,10 +6,8 @@
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
     "platform": "PX4",
-    "vehicleType": "fixed_wing",
     "parserVersion": "pyulog/pyodide-0.3.0",
-    "durationSec": 203.4,
-    "stats": {
+    "facts": {
       "durationSec": 203.4,
       "vehicleType": "fixed_wing",
       "firmware": "1.16.0",
@@ -20,27 +18,120 @@
         "fw_cruise",
         "maneuver"
       ],
-      "dropoutTotalMs": 0,
-      "imuAccelVibrationMean": 4.985,
-      "imuAccelVibrationP95": 9.254,
-      "imuAccelVibrationMax": 17.92,
-      "imuAccelClippingCountMax": 120,
-      "ekfRejectRatioPct": 0.48,
-      "cpuLoadMax": 0.289,
-      "gpsEphP95M": 0.0,
-      "gpsEphMaxM": 0.0,
-      "gpsSatellitesMin": 31,
-      "gpsJumpCount": 0,
-      "navStateChanges": 1,
-      "gyroBiasMaxRadS": 0.0044,
-      "gyroBiasDriftRadS": 0.003,
-      "gyroBiasSource": "estimator_sensor_bias.gyro_bias[]",
-      "imuTempRangeC": 0.0,
-      "attitudeErrDegP99": 27.5,
-      "attitudeOscHz": 1.52,
-      "airspeedInvalidRatio": 1.0,
-      "windSpeedP95M": 3.7
+      "dropoutTotalMs": 0
     },
+    "metrics": [
+      {
+        "key": "imuAccelVibrationMax",
+        "label": "最大振动",
+        "value": 17.92,
+        "unit": "m/s²"
+      },
+      {
+        "key": "gpsSatellitesMin",
+        "label": "最少搜星",
+        "value": 31,
+        "unit": "颗"
+      },
+      {
+        "key": "gpsEphMaxM",
+        "label": "最大定位误差",
+        "value": 0.0,
+        "unit": "m"
+      },
+      {
+        "key": "cpuLoadMax",
+        "label": "CPU 峰值",
+        "value": 0.289,
+        "unit": "0..1"
+      },
+      {
+        "key": "imuAccelClippingCountMax",
+        "label": "加速度计削波计数",
+        "value": 120,
+        "unit": "次"
+      },
+      {
+        "key": "imuTempRangeC",
+        "label": "IMU 温度跨度",
+        "value": 0.0,
+        "unit": "°C"
+      },
+      {
+        "key": "ekfRejectRatioPct",
+        "label": "EKF 拒绝占比",
+        "value": 0.48,
+        "unit": "比例"
+      },
+      {
+        "key": "attitudeErrDegP99",
+        "label": "姿态误差 p99",
+        "value": 27.5,
+        "unit": "°"
+      },
+      {
+        "key": "attitudeOscHz",
+        "label": "姿态振荡频率",
+        "value": 1.52,
+        "unit": "Hz"
+      },
+      {
+        "key": "gyroBiasMaxRadS",
+        "label": "陀螺零偏最大",
+        "value": 0.0044,
+        "unit": "rad/s"
+      },
+      {
+        "key": "gyroBiasDriftRadS",
+        "label": "陀螺零偏漂移",
+        "value": 0.003,
+        "unit": "rad/s"
+      },
+      {
+        "key": "windSpeedP95M",
+        "label": "风速 p95",
+        "value": 3.7,
+        "unit": "m/s"
+      },
+      {
+        "key": "airspeedInvalidRatio",
+        "label": "空速无效占比",
+        "value": 1.0,
+        "unit": "比例"
+      },
+      {
+        "key": "gpsJumpCount",
+        "label": "GPS 跳变次数",
+        "value": 0,
+        "unit": "次"
+      },
+      {
+        "key": "navStateChanges",
+        "label": "模式切换次数",
+        "value": 1,
+        "unit": "次"
+      },
+      {
+        "key": "imuAccelVibrationMean",
+        "label": "imuAccelVibrationMean",
+        "value": 4.985
+      },
+      {
+        "key": "imuAccelVibrationP95",
+        "label": "imuAccelVibrationP95",
+        "value": 9.254
+      },
+      {
+        "key": "gpsEphP95M",
+        "label": "gpsEphP95M",
+        "value": 0.0
+      },
+      {
+        "key": "gyroBiasSource",
+        "label": "gyroBiasSource",
+        "value": "estimator_sensor_bias.gyro_bias[]"
+      }
+    ],
     "tags": [
       "high_vibration",
       "attitude_overshoot",
@@ -48,10 +139,6 @@
     ],
     "guardTags": [
       "topic_missing:battery_status"
-    ],
-    "phases": [
-      "fw_cruise",
-      "maneuver"
     ],
     "checksRun": [
       "vibration",

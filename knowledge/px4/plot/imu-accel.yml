@@ -1,0 +1,10 @@
+order: 2          # 页面里这组图的先后
+id: imu-accel
+title: IMU 原始加速度
+description: 三轴加速度（m/s²）。旧固件可能未记录该话题。
+panels:
+  - title: "IMU 加速度（{topic}#{instance}）"
+    yLabel: m/s²
+    topics: [sensor_combined, sensor_accel]   # 取第一个存在的（sensor_combined 只存在于新固件）
+    instance: first
+    fields: ["accelerometer_m_s2[0]", "accelerometer_m_s2[1]", "accelerometer_m_s2[2]"]

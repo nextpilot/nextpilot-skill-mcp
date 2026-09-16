@@ -6,10 +6,8 @@
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
     "platform": "PX4",
-    "vehicleType": "rotary_wing",
     "parserVersion": "pyulog/pyodide-0.3.0",
-    "durationSec": 213.0,
-    "stats": {
+    "facts": {
       "durationSec": 213.0,
       "vehicleType": "rotary_wing",
       "firmware": "1.15.0",
@@ -19,31 +17,112 @@
       "phases": [
         "hover"
       ],
-      "dropoutTotalMs": 0,
-      "imuAccelVibrationMean": 2.806,
-      "imuAccelVibrationP95": 3.621,
-      "imuAccelVibrationMax": 3.728,
-      "batteryVoltageMin": 21.35,
-      "batteryCellCount": 6,
-      "batteryCellVoltageMin": 3.559,
-      "batteryRemainingMin": 0.039,
-      "cpuLoadMax": 0.789,
-      "navStateChanges": 2,
-      "motorControlSpread": 0.021,
-      "motorCountActive": 4,
-      "gyroBiasMaxRadS": 0.0051,
-      "gyroBiasDriftRadS": 0.0003,
-      "gyroBiasSource": "estimator_sensor_bias.gyro_bias[]",
-      "attitudeErrDegP99": 1.4,
-      "attitudeOscHz": 3.02
+      "dropoutTotalMs": 0
     },
+    "metrics": [
+      {
+        "key": "imuAccelVibrationMax",
+        "label": "最大振动",
+        "value": 3.728,
+        "unit": "m/s²"
+      },
+      {
+        "key": "batteryVoltageMin",
+        "label": "最低电压",
+        "value": 21.35,
+        "unit": "V"
+      },
+      {
+        "key": "batteryCellVoltageMin",
+        "label": "最低电芯电压",
+        "value": 3.559,
+        "unit": "V"
+      },
+      {
+        "key": "currentMax",
+        "label": "最大电流",
+        "value": 11.77,
+        "unit": "A"
+      },
+      {
+        "key": "batteryRemainingMin",
+        "label": "最低剩余电量",
+        "value": 0.039,
+        "unit": "0..1"
+      },
+      {
+        "key": "cpuLoadMax",
+        "label": "CPU 峰值",
+        "value": 0.789,
+        "unit": "0..1"
+      },
+      {
+        "key": "attitudeErrDegP99",
+        "label": "姿态误差 p99",
+        "value": 1.4,
+        "unit": "°"
+      },
+      {
+        "key": "attitudeOscHz",
+        "label": "姿态振荡频率",
+        "value": 3.02,
+        "unit": "Hz"
+      },
+      {
+        "key": "motorControlSpread",
+        "label": "电机输出离散度",
+        "value": 0.021
+      },
+      {
+        "key": "motorCountActive",
+        "label": "活跃电机数",
+        "value": 4,
+        "unit": "个"
+      },
+      {
+        "key": "gyroBiasMaxRadS",
+        "label": "陀螺零偏最大",
+        "value": 0.0051,
+        "unit": "rad/s"
+      },
+      {
+        "key": "gyroBiasDriftRadS",
+        "label": "陀螺零偏漂移",
+        "value": 0.0003,
+        "unit": "rad/s"
+      },
+      {
+        "key": "navStateChanges",
+        "label": "模式切换次数",
+        "value": 2,
+        "unit": "次"
+      },
+      {
+        "key": "batteryCellCount",
+        "label": "电芯数",
+        "value": 6,
+        "unit": "个"
+      },
+      {
+        "key": "imuAccelVibrationMean",
+        "label": "imuAccelVibrationMean",
+        "value": 2.806
+      },
+      {
+        "key": "imuAccelVibrationP95",
+        "label": "imuAccelVibrationP95",
+        "value": 3.621
+      },
+      {
+        "key": "gyroBiasSource",
+        "label": "gyroBiasSource",
+        "value": "estimator_sensor_bias.gyro_bias[]"
+      }
+    ],
     "tags": [
       "battery_voltage_drop"
     ],
     "guardTags": [],
-    "phases": [
-      "hover"
-    ],
     "checksRun": [
       "vibration",
       "ekf_innovations",

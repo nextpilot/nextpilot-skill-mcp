@@ -13,7 +13,8 @@ px4/
   rules/*.yaml          检查经验：一条经验一个 YAML，判定阈值就写在各自经验里
                         （32 条经验；failsafe.yaml 一个文件装了 6 条同构经验）
   px4-fault-kb.yaml     故障树：标签 → 根因 / 排查步骤 / 禁忌 / 风险等级
-  facts.yaml            事实层的数据绑定与码表：字段名 / 码值 / 飞行阶段分组 / slot 执行顺序
+  facts.yaml            事实层的数据声明：字段名 / 码值 / 飞行阶段分组 / slot 执行顺序，
+                        以及「关键数据」的展示清单（中文名 / 单位 / 顺序）与兜底取数
   meta/<tag>.json       固件元数据（生成物）：字段字典 + 参数字典（见 meta/README.md）
 
   ── 文档（按受众分）──
@@ -46,7 +47,7 @@ px4/
 | 查现在有哪些规则、各自读什么字段、什么条件触发 | 网站 `/guide/knowledge-rules`（构建时从 `rules/*.yaml` 生成，仓库里不留拷贝） |
 | **只是想"用网页看"这些内容** | 站点 `/guide` 的「知识库」分组（怎么写规则 / 现有规则两页） |
 | 调一条阈值 | 直接改 `px4/rules/<那条经验>.yaml` 的 `threshold` 与 `triggers[].expr` |
-| 改字段绑定 / 码值 / 阶段分组 / slot 执行顺序 | `px4/facts.yaml`（引擎不含业务数据，全在这里） |
+| 改字段绑定 / 码值 / 阶段分组 / slot 执行顺序 / 关键数据的名字与顺序 | `px4/facts.yaml`（引擎不含业务数据，全在这里） |
 | 加一条故障模式（根因 / 排查步骤） | `px4/px4-fault-kb.yaml`（trigger_tags 必须是引擎会产出的标签） |
 | 加一个可复用计算步骤 | `engine/operators.py`（`@operator` 声明 in/out arity），再在经验的 `compute` 里引用 |
 | 改 AI 报告口径 | `px4/llm/*.md` |

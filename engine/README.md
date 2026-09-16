@@ -8,7 +8,7 @@
 
 | 文件 | 内容 |
 | --- | --- |
-| `operators.py` | 算子注册表（73 个通用算子，`@operator` 声明 in/out arity）。**不认识任何具体字段**——字段名、阈值、文案都由经验 YAML 传入 |
+| `operators.py` | 算子注册表（当前 74 个通用算子，`@operator` 声明 in/out arity；权威清单见指南页「算子目录」）。**不认识任何具体字段**——字段名、阈值、文案都由经验与 plot 声明传入 |
 | `rule_engine.py` | pyulog 解析 + 事实层 + 规则框架（slot 调度 / 取数 / 受限 AST 表达式求值 / foreach 展开 / 发射 finding） |
 | `report_data.py` | 报告页数据层 helpers（图表序列 / 事件 / 参数） |
 
@@ -22,6 +22,16 @@
 | 阶段二服务端 / MCP（未实现） | 把本目录包成可 `import` 的 `nextpilot_engine`（parsers / models / rules 三层），规则仍从 `knowledge/` 加载，不另存一份 |
 
 注意：**构建期不执行这些代码**，只是搬运。改了它们必须重新 `cd web && pnpm build:kb`，否则浏览器里跑的还是旧的一份。
+
+## 报告结构（引擎的输出）
+
+`rule_engine.py` 的产物是一份 JSON，分三块，别混：
+
+| 块 | 是什么 | 谁写 |
+| --- | --- | --- |
+| `facts` | 日志客观"是什么"：机型 / 固件 / 时长 / armed / 阶段 / 丢包——离散、驱动判定 | 引擎（取数方式由 `knowledge/px4/facts.yaml` 的 `bindings`/码表决定） |
+| `metrics` | **关键数字**：有序数组，每项带中文名与单位（结果页「关键数据」直接渲染）。规则产出的实测值优先，规则没跑就按 `facts.yaml` 的声明兜底现算 | 引擎（清单在 `facts.yaml` 的 `metrics`，实测值来自 `rules/*.yaml`） |
+| `findings` / `tags` / `guardTags` / `matchedFaults` / `checksRun` / `checksSkipped` | 判定层产出：结论、标签、命中的故障库条目 | 规则与故障库匹配 |
 
 ## 与 knowledge/ 的边界（别混）
 

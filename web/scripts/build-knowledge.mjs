@@ -42,6 +42,7 @@ const OPERATORS_PY = resolve(ENGINE, "operators.py");
 const PROMPT_PATH = resolve(KN, "llm/gjb841-system-prompt.md");
 const EMPTY_PATH = resolve(KN, "llm/report-empty.md");
 const GUIDES_DIR = resolve(webRoot, "../content/guide");   // 站点内容在仓库根 content/
+const PLOT_DIR = resolve(KN, "plot");                    // 结果页曲线预设（纯前端，不经 Pyodide）
 
 const read = (p) => readFileSync(p, "utf8");
 
@@ -507,6 +508,23 @@ for (const key of ["slot_order", "bindings", "log_levels", "vehicle_types",
   if (facts[key] === undefined) throw new Error(`facts.yaml 缺少 ${key}`);
 }
 if (!facts.bindings?.vehicle_status) throw new Error("facts.yaml 缺少 bindings.vehicle_status");
+// metrics：概览指标的展示清单（key/label/unit + 可选的兜底取数）
+const metricKeys = new Set();
+for (const m of facts.metrics ?? []) {
+  if (!m?.key) throw new Error("facts.yaml 的 metrics 每项都要有 key");
+  if (metricKeys.has(m.key)) throw new Error(`facts.yaml 的 metrics 键重复：${m.key}`);
+  metricKeys.add(m.key);
+  if (m.op !== undefined) {
+    if (!signatures[m.op]) throw new Error(`facts.yaml 的 metric ${m.key} 引用了未注册的算子 ${m.op}`);
+    if (!m.topic) throw new Error(`facts.yaml 的 metric ${m.key} 有 op 就必须给 topic`);
+    if (m.field === undefined && m.fields === undefined) {
+      throw new Error(`facts.yaml 的 metric ${m.key} 有 op 就必须给 field/fields`);
+    }
+    if (m.pick !== undefined && !(signatures[m.op].out_names ?? []).includes(m.pick)) {
+      throw new Error(`facts.yaml 的 metric ${m.key} 的 pick=${m.pick} 不在 ${m.op} 的输出里`);
+    }
+  }
+}
 if (!Array.isArray(facts.slot_order) || facts.slot_order.length === 0) {
   throw new Error("facts.yaml 的 slot_order 不能为空");
 }
@@ -527,6 +545,10 @@ emit(
     "import faultKbJson from \"./fault-kb.generated.json\";\n\n" +
     "const rules = " +
     JSON.stringify(rules) +
+    ";\n" +
+    // facts 也必须在此声明：下面的 .replace 链在模块加载时求值，缺声明就是 ReferenceError
+    "const facts = " +
+    JSON.stringify(facts) +
     ";\n\n" +
     "export const PY_ULG_CHECKS = String.raw`" +
     toRawTemplate(pyWithOperators) +
@@ -560,6 +582,60 @@ emit(
     "export const EMPTY_FINDINGS_MARKDOWN = " +
     JSON.stringify(emptyMd) +
     ";\n",
+);
+
+// 4.5) 结果页曲线预设：knowledge/px4/plot/*.yml → web/lib/knowledge/plots.generated.ts
+// 与引擎产物不同，这一份是**纯前端**渲染用（不进 Pyodide），所以单独生成一个 ESM 文件。
+const plotFiles = readdirSync(PLOT_DIR).filter((f) => f.endsWith(".yml")).sort();
+if (plotFiles.length === 0) throw new Error("knowledge/px4/plot/ 下没有曲线预设文件");
+const plots = plotFiles.map((file) => {
+  const spec = parseYaml(read(resolve(PLOT_DIR, file)));
+  const where = `plot/${file}`;
+  for (const key of ["id", "title", "description", "panels"]) {
+    if (spec[key] === undefined) throw new Error(`${where}: 缺少必填字段 ${key}`);
+  }
+  if (!Array.isArray(spec.panels) || spec.panels.length === 0) {
+    throw new Error(`${where}: panels 必须是非空数组`);
+  }
+  for (const panel of spec.panels) {
+    if (!panel.title || !panel.yLabel) throw new Error(`${where}: panel 缺少 title / yLabel`);
+    if (!panel.topic && !panel.topics) throw new Error(`${where}: panel 需要 topic 或 topics`);
+    if (!Array.isArray(panel.fields) || panel.fields.length === 0) {
+      throw new Error(`${where}: panel 的 fields 不能为空`);
+    }
+    if (panel.instance !== undefined && !["first", "all"].includes(panel.instance)) {
+      throw new Error(`${where}: panel.instance 只能是 first / all`);
+    }
+    // op：预处理算子（图上要先换算时用）。名字必须能在 engine/operators.py 里找到，
+    // 否则运行期才报错——这里先拦住。
+    if (panel.op !== undefined) {
+      if (!panel.op?.name) throw new Error(`${where}: panel.op 需要 name`);
+      if (!signatures[panel.op.name]) {
+        throw new Error(`${where}: panel.op 引用了未注册的算子 ${panel.op.name}`);
+      }
+    }
+    for (const h of panel.hlines ?? []) {
+      if (typeof h.value !== "number" || !h.label) throw new Error(`${where}: hlines 每项要有 value 与 label`);
+      if (!["ok", "warning", "critical"].includes(h.level)) {
+        throw new Error(`${where}: hlines.level 只能是 ok / warning / critical`);
+      }
+    }
+  }
+  return { order: Number(spec.order ?? 999), ...spec };
+});
+plots.sort((a, b) => a.order - b.order);
+const seenPlotIds = new Set();
+for (const p of plots) {
+  if (seenPlotIds.has(p.id)) throw new Error(`plot 的 id 重复：${p.id}`);
+  seenPlotIds.add(p.id);
+}
+emit(
+  resolve(webRoot, "lib/knowledge/plots.generated.ts"),
+  banner +
+    "// 源：knowledge/px4/plot/*.yml（改图请改那边）\n" +
+    "export const PLOT_PRESETS = " +
+    JSON.stringify(plots.map(({ order, ...rest }) => rest), null, 2) +
+    " as const;\n",
 );
 
 // 5) 指南的「知识库」分组：规则清单页（规则改了页面就跟着变，不用谁记得手动同步）
