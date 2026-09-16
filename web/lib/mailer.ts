@@ -29,14 +29,14 @@ export function isMailConfigured(): boolean {
 
 export async function sendOtpEmail(to: string, code: string): Promise<void> {
   const from = process.env.SMTP_FROM ?? process.env.SMTP_USER;
-  const displayName = "NextPilot Skill MCP";
+  const displayName = "NextPilot Skill";
   await getTransporter().sendMail({
     from: `${displayName} <${from}>`,
     to,
     subject: `【NextPilot】登录验证码 ${code}`,
     text: `您的登录验证码是：${code}\n\n10 分钟内有效，请勿泄露给他人。如非本人操作，请忽略本邮件。`,
     html: `<div style="font-family:-apple-system,'Segoe UI',Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px">
-  <h2 style="margin:0 0 16px">NextPilot Skill MCP 登录</h2>
+  <h2 style="margin:0 0 16px">NextPilot Skill 登录</h2>
   <p style="color:#444">您的验证码是：</p>
   <p style="font-size:32px;font-weight:700;letter-spacing:8px;margin:12px 0">${code}</p>
   <p style="color:#888;font-size:13px">10 分钟内有效，请勿泄露给他人。如非本人操作，请忽略本邮件。</p>

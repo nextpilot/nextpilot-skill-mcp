@@ -155,7 +155,7 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-border/80 py-8 text-sm text-muted">
       <div className="page-shell flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p>NextPilot Skill MCP · {t("让无人机更智能", "Making aircraft smarter")}</p>
+        <p>NextPilot Skill · {t("让无人机更智能", "Making aircraft smarter")}</p>
         <p className="text-xs">
           {t("分析结果为辅助判读，不替代人工排查 · 平台永不直接致动真实载具", "Analysis supports, but does not replace, human review · No direct actuation")}
         </p>

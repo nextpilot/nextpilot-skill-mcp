@@ -47,7 +47,7 @@ export default function HomePage() {
         <div className="page-shell py-16 lg:py-20">
           <div>
             <p className="mb-5 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
-              <LocalizedText zh="飞控 AI 技术交流 · Skill / MCP 平台" en="Flight AI community · Skill / MCP platform" />
+              <LocalizedText zh="NextPilot AI 技术社区 · 专为飞控系统优化的 Skill / MCP 平台" en="Flight AI community · Skill / MCP platform" />
             </p>
             <h1 className="max-w-2xl text-[32px] leading-[1.15] font-semibold tracking-[-0.02em] text-text sm:text-[44px]">
               <LocalizedText zh="让飞行器理解世界。" en="Help aircraft understand the world." />

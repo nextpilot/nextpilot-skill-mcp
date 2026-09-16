@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { LoginForm } from "@/components/LoginForm";
 
 export const metadata: Metadata = {
-  title: "登录 · NextPilot Skill MCP",
+  title: "登录 · NextPilot Skill",
 };
 
 export default async function LoginPage({

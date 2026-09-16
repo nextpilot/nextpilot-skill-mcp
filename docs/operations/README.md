@@ -67,7 +67,7 @@ openssl rand -hex 24      # AUTH_INTERNAL_SECRET
 
 1. 打开 <https://github.com/settings/developers> → **OAuth Apps** → **New OAuth App**（个人设置路径：右上头像 → Settings → 最下面 Developer settings）。
 2. 填写：
-   - **Application name**：`NextPilot Skill MCP`（任意）
+   - **Application name**：`NextPilot Skill`（任意）
    - **Homepage URL**：`https://skill.nextpilot.org`
    - **Application description**：可留空
    - **Authorization callback URL**：`https://skill.nextpilot.org/api/auth/callback/github`

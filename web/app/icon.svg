@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="NextPilot Skill MCP">
-  <title>NextPilot Skill MCP</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="NextPilot Skill">
+  <title>NextPilot Skill</title>
   <!--
     favicon 的形状预算：浏览器标签页只给 16px。试过并否掉的几版——
     外环 + 扫描线 → 16px 下读成 ⊘（禁止符号）；四分之一扇形 → 读成饼图；

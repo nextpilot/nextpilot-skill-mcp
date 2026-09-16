@@ -6,7 +6,7 @@ import { LocalizedText } from "@/components/LocalizedText";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export const metadata: Metadata = {
-  title: "MCP Server · NextPilot Skill MCP",
+  title: "MCP Server · NextPilot Skill",
   description: "飞控方向的 MCP Server 目录：可被 Claude / Cursor 等客户端直接调用的工具集。",
 };
 
