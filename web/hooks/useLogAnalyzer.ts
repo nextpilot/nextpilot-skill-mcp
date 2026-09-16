@@ -667,7 +667,11 @@ export function useLogAnalyzer() {
                     return existing.id;
                 }
 
-                const reportId = newReportId();
+                // 报告 id 直接用**日志内容指纹**（SHA-256）：地址栏 /analyze/<hash> 与 .ulg 一一对应，
+                // 同一份日志在任何设备、任何浏览器上都是同一个链接，也不会再出现"同一份日志两条历史"。
+                // 非安全上下文（局域网 http）拿不到内容哈希时，退化为大小+时间+文件名，仍是确定的，
+                // 真的都没有才用随机 id。
+                const reportId = hash || newReportId();
                 parseBytes(bytes, {
                     name: file.name,
                     size: file.size,
