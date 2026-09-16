@@ -18,7 +18,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import type { SavedReport } from "@/lib/report-history";
-import { formatDateTime, formatFirmware } from "@/lib/format";
+import { formatDateTime, formatFirmware, formatLogTime } from "@/lib/format";
 import { vehicleTypeLabel } from "@/lib/vehicle-type";
 import { modeStyle } from "@/lib/phase-colors";
 import { wgs84ToGcj02 } from "@/lib/coord";
@@ -64,13 +64,6 @@ export type HistoryItem = SavedReport & {
 };
 
 
-
-function fmtDuration(sec?: number): string {
-  if (!sec) return "—";
-  const m = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
-  return m > 0 ? `${m}m${s}s` : `${s}s`;
-}
 
 /** 文件尺寸：与报告页概要同一写法（MB，两位小数） */
 function fmtSize(bytes?: number): string {
@@ -537,6 +530,7 @@ export function HistoryList({
                     }
                   : null;
                 const href = `/analyze/${encodeURIComponent(r.id)}`;
+                const durSec = r.durationSec ?? r.facts?.durationSec;
                 return (
                   // 整行可点（表格里没法把 <a> 套在 <tr> 上）：文件名那格仍是真链接，
                   // 于是新标签页打开 / 复制链接这些浏览器行为都还在
@@ -575,8 +569,9 @@ export function HistoryList({
                     <td className="py-2 pr-2 text-center font-mono break-words text-text">
                       {r.facts?.startUtc ? formatDateTime(r.facts.startUtc * 1000) : "—"}
                     </td>
-                    <td className="py-2 pr-2 text-center whitespace-nowrap text-text">
-                      {fmtDuration(r.durationSec ?? r.facts?.durationSec)}
+                    <td className="py-2 pr-2 text-center whitespace-nowrap font-mono text-text">
+                      {/* 时长与日志内的时间同一写法：hh:MM:ss（超过 24 小时小时位自然变三位） */}
+                      {durSec ? formatLogTime(durSec) : "—"}
                     </td>
                     <td className="py-2 pr-2 text-center font-mono break-words text-text">{r.verHw ?? "—"}</td>
                     {/* 软件版本口径对齐 Flight Review browse：正式版 `v1.16.0`，其余给 git 短哈希 */}
