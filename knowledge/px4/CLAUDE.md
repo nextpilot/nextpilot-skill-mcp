@@ -109,6 +109,19 @@ compute:
 | 参数「默认值」靠 **'Q' 消息的语义**推出来，不依赖外部字典 | PX4 只记录**与当前值不同**的默认值（`logger.cpp: write_parameter_defaults`）→ 没记录就说明当前值等于默认值。于是每一行都能给出具体数字，不需要"一致 / 已改"这类占位文字。取法：机架默认 → 固件默认 → 当前值 |
 | 参数「最小值 / 最大值 / 说明」来自 `knowledge/px4/meta/main.json` → `web/public/params/px4-main.json`（按需拉取，175 KB / gzip 33 KB） | 上游**只有 main 分支**产出 `parameters.json`（release tag 没有，见 `meta/v1.15.0.json` 的 `parametersNote`），所以这是"最新分支快照"，与老固件可能有出入——界面必须如实标注来源。放 `public/` 而不是内联进 Pyodide：这份字典与具体日志无关，内联等于每份日志都要多下它一遍 |
 
+### 「软件版本」的展示口径（`engine/rule_engine.py` 的 `facts.firmwareDisplay`）
+
+**只认正式版**：`ver_sw_release` 的类型码（`& 0xFF`）== **255** 才显示 `v1.16.0`；
+alpha(64) / beta(128) / RC(192) / 开发版(0) **一律退回 `ver_sw[:6]` 的 git 短哈希**。
+
+这就是 FR `tornado_handlers/browse.py` 的全部逻辑（`if release_type == 255: ver_sw = release_split[0]`，
+此前 `len(ver_sw) > 10` 才截 6 位）。**别自作聪明加 `-beta` 后缀或括注 `(c2fb48)`**——那是我方
+发明的写法，一比就发现跟 FR 对不上（实测 ce302d3b 一份 1.17.0-alpha 的日志：FR 显示 `c2fb48`）。
+
+前端 `lib/format.ts` 的 `formatFirmware()` 按同一规则再判一次（`vX.Y.Z` 才认作发布号，否则取哈希前 6 位），
+于是**本机存档里旧口径写下的 `v1.17.0-alpha (c2fb48)` 也会就地收敛成 `c2fb48`**，不必重新分析。
+历史列表的「软件版本」筛选下拉也用这个函数取值，避免"列里是 `v1.16.0`、下拉里是裸哈希"。
+
 ### 派生数据版本：改了数据层，旧存档自动重解析
 
 `web/scripts/build-knowledge.mjs` 对 `engine/report_data.py` + `knowledge/px4/facts.yaml` + `plot/*.yml`

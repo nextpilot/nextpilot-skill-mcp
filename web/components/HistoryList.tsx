@@ -18,7 +18,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import type { SavedReport } from "@/lib/report-history";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatFirmware } from "@/lib/format";
 import { modeStyle } from "@/lib/phase-colors";
 import { wgs84ToGcj02 } from "@/lib/coord";
 import { AMAP_SATELLITE, TILE_SIZE, latToWorldY, lonToWorldX, tileUrl } from "@/lib/amap-tiles";
@@ -94,8 +94,10 @@ function fmtSize(bytes?: number): string {
  * 坐标同样要先 WGS-84 → GCJ-02（高德是偏移坐标系），否则轨迹整体偏几百米。
  */
 function TrackThumb({ points }: { points?: [number, number][]; }) {
+  // 宽度跟着列走（w-full + 4:3 比例）：写成固定 64×48 的话，列比它宽一截时两侧就留白，
+  // 比例仍按 4:3 保持——viewBox 是 100×75，且 preserveAspectRatio="none"，比例一歪轨迹就拉伸变形。
   const box =
-    "block h-12 w-16 shrink-0 overflow-hidden rounded-md border border-border bg-surface-2 " +
+    "block w-full aspect-[4/3] shrink-0 overflow-hidden rounded-md border border-border bg-surface-2 " +
     "transition-transform duration-150 origin-left hover:z-20 hover:scale-[2.6] hover:border-primary hover:shadow-lg";
 
   const view = useMemo(() => buildThumbView(points), [points]);
@@ -294,7 +296,7 @@ export function HistoryList({
       const since = parseDateFilter(dateFilter);
       if (since) result = result.filter((r) => new Date(r.analyzedAt) >= since);
     }
-    if (verSwFilter) result = result.filter((r) => r.verSw === verSwFilter);
+    if (verSwFilter) result = result.filter((r) => formatFirmware(r.facts, r.verSw) === verSwFilter);
     if (verHwFilter) result = result.filter((r) => r.verHw === verHwFilter);
     return result;
   }, [items, search, vehicleFilter, dateFilter, durationFilter, verSwFilter, verHwFilter]);
@@ -316,8 +318,10 @@ export function HistoryList({
   }, [items]);
 
   const uniqueVerSw = useMemo(() => {
-    const set = new Set(items.map((r) => r.verSw).filter(Boolean)) as Set<string>;
-    return [...set];
+    // 筛选项用**与表格同一口径**的展示串（formatFirmware），否则下拉里是一串裸哈希、
+    // 列里却是 `v1.16.0`，对不上号
+    const set = new Set(items.map((r) => formatFirmware(r.facts, r.verSw)).filter((v) => v !== "—"));
+    return [...set].sort();
   }, [items]);
 
   const uniqueVerHw = useMemo(() => {
@@ -455,18 +459,22 @@ export function HistoryList({
           <table className="w-full table-fixed text-sm">
             <thead>
               <tr className="text-center text-[11px] text-muted">
-                <th className="w-[72px] pb-2 pr-2 font-normal">轨迹</th>
-                <th className="w-[11%] pb-2 pr-2 font-normal">上传时间</th>
-                <th className="w-[7%] pb-2 pr-2 font-normal">文件名</th>
-                <th className="w-[6%] pb-2 pr-2 font-normal">大小</th>
-                <th className="w-[8%] pb-2 pr-2 font-normal">机型</th>
-                <th className="w-[8%] pb-2 pr-2 font-normal">硬件</th>
-                <th className="w-[9%] pb-2 pr-2 font-normal">软件</th>
-                <th className="w-[11%] pb-2 pr-2 font-normal">启动时间</th>
+                {/* 全部用百分比（不用 px 列）且合计正好 100%：table-fixed 下只要合计不是 100%，
+                    多出来的宽度会被**按比例摊回各列**——轨迹那列本来只有缩略图宽，一摊就宽出一大截，
+                    于是缩略图两侧留白。顺带让缩略图随列宽伸缩（见 TrackThumb），一点空白都不留。
+                    宽度按内容定：两个时间戳列最长（`2026-09-16 13:29:41`），给它俩 13%；
+                    软件只剩 `v1.16.0` / `c2fb48` 这种 6~7 字符，6% 够；时长 `10m33s` 给 5%。 */}
+                <th className="w-[6%] pb-2 pr-2 font-normal">轨迹</th>
+                <th className="w-[13%] pb-2 pr-2 font-normal">上传时间</th>
+                <th className="w-[10%] pb-2 pr-2 font-normal">日志文件</th>
+                <th className="w-[10%] pb-2 pr-2 font-normal">机型</th>
+                <th className="w-[10%] pb-2 pr-2 font-normal">硬件</th>
+                <th className="w-[6%] pb-2 pr-2 font-normal">软件</th>
+                <th className="w-[13%] pb-2 pr-2 font-normal">启动时间</th>
                 <th className="w-[5%] pb-2 pr-2 font-normal">时长</th>
-                <th className="w-[10%] pb-2 pr-2 font-normal">飞行模式</th>
-                <th className="w-[9%] pb-2 pr-2 font-normal">结论</th>
-                <th className="w-[4%] pb-2 font-normal">来源</th>
+                <th className="w-[12%] pb-2 pr-2 font-normal">飞行模式</th>
+                <th className="w-[10%] pb-2 pr-2 font-normal">结论</th>
+                <th className="w-[5%] pb-2 font-normal">来源</th>
               </tr>
             </thead>
             <tbody>
@@ -504,8 +512,10 @@ export function HistoryList({
                     <td className="py-2 pr-2 text-center font-mono break-words text-text">
                       {formatDateTime(r.analyzedAt)}
                     </td>
-                    <td className="py-2 pr-2">
-                      {/* 只显示第一段（按 '-' 切，如 ce302d3b），全名在悬停提示里 */}
+                    {/* 日志文件 + 大小挤在一格（分上下两行）：文件名只显示第一段（按 '-' 切，如 ce302d3b），
+                        全名在悬停提示里；大小跟着走，省出一整列的宽度给别的字段。
+                        大小那行字号小一号、颜色不变（表内不搞灰字），靠字号与字重区分主次。 */}
+                    <td className="py-2 pr-2 text-center">
                       <Link
                         href={href}
                         className="block truncate font-medium text-text hover:text-primary"
@@ -513,8 +523,10 @@ export function HistoryList({
                       >
                         {shortName(r.fileName)}
                       </Link>
+                      <span className="block truncate text-[11px] leading-4 text-text">
+                        {fmtSize(r.fileSize)}
+                      </span>
                     </td>
-                    <td className="py-2 pr-2 text-center whitespace-nowrap text-text">{fmtSize(r.fileSize)}</td>
                     <td className="py-2 pr-2 text-center text-text">
                       {r.vehicleType ? (VEHICLE_TYPE_LABELS[r.vehicleType] ?? r.vehicleType) : "—"}
                       {r.facts?.airframeId ? (
@@ -522,11 +534,18 @@ export function HistoryList({
                       ) : null}
                     </td>
                     <td className="py-2 pr-2 text-center font-mono break-words text-text">{r.verHw ?? "—"}</td>
-                    <td
-                      className="py-2 pr-2 text-center font-mono break-words text-text"
-                      title={r.verSw ? `git ${r.verSw}` : undefined}
-                    >
-                      {r.facts?.firmwareDisplay || r.facts?.verSwBranch || r.verSw || "—"}
+                    {/* 软件版本口径对齐 Flight Review browse：正式版 `v1.16.0`，其余给 git 短哈希 */}
+                    <td className="py-2 pr-2 text-center font-mono break-words text-text">
+                      <span
+                        title={[
+                          r.facts?.verSwBranch ? `分支 ${r.facts.verSwBranch}` : "",
+                          r.verSw ? `git ${r.verSw}` : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" · ") || undefined}
+                      >
+                        {formatFirmware(r.facts, r.verSw)}
+                      </span>
                     </td>
                     <td className="py-2 pr-2 text-center font-mono break-words text-text">
                       {r.facts?.startUtc ? formatDateTime(r.facts.startUtc * 1000) : "—"}

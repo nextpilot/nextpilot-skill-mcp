@@ -181,19 +181,18 @@ if _vs_first:
         facts["modes"] = [str(_NAV_NAMES.get(c, "Mode %d" % c)) for c in _ordered]
         facts["mainMode"] = facts["modes"][0]
 
-# 软件版本的展示串（对齐 Flight Review 的 browse：`v1.16.0` / `v1.15.0-beta (6ea3539)`）——
-# ver_sw_release 打包是 major<<24 | minor<<16 | patch<<8 | 类型，类型见 PX4 的发布类型码值
-_RELEASE_SUFFIX = {64: "-alpha", 128: "-beta", 192: "-rc", 255: ""}
-_rel = _info.get("ver_sw_release")
-if _rel is not None and FW_MINOR is not None:
-    _type = int(_rel) & 0xFF
-    _ver = "v%d.%d.%d%s" % (FW["major"], FW["minor"], FW["patch"], _RELEASE_SUFFIX.get(_type, ""))
-    _git = str(_info.get("ver_sw", ""))[:6]
-    # 打标签的正式版不带 commit（FR 同款）；开发构建才附短哈希便于对上游
-    facts["firmwareDisplay"] = _ver if _type in _RELEASE_SUFFIX and _type != 0 else (
-        "%s (%s)" % (_ver, _git) if _git else _ver)
-elif str(_info.get("ver_sw", "")):
-    facts["firmwareDisplay"] = str(_info["ver_sw"])[:6]
+# 软件版本的展示串（严格对齐 Flight Review browse）。
+# FR 的口径很窄：**只有正式版**（ver_sw_release 的类型码 == 255）才换成 `v1.16.0`，
+# alpha(64) / beta(128) / RC(192) / 开发版(0) 一律退回 `ver_sw[:6]` 的 git 短哈希
+# （browse.py：`if release_type == 255: ver_sw = release_split[0]`，此前 `len > 10` 才截 6 位）。
+# 所以别加 `-beta` 后缀、也别括注哈希——那是我们自己发明的写法，跟 FR 对不上。
+# ver_sw_release 打包是 major<<24 | minor<<16 | patch<<8 | 类型。
+_sw = str(_info.get("ver_sw", ""))
+_rel_type = (int(FW["release"]) & 0xFF) if FW["release"] is not None else None
+if FW_MINOR is not None and _rel_type == 255:
+    facts["firmwareDisplay"] = "v%d.%d.%d" % (FW["major"], FW["minor"], FW["patch"])
+elif _sw:
+    facts["firmwareDisplay"] = _sw[:6] if len(_sw) > 10 else _sw
 
 # ---------------- 载具身份与记录起始时刻 ----------------
 # 这几项与判定无关，但历史卡片与报告概况要用，且必须**随 report 存档**（派生数据 info 不进存档）。
