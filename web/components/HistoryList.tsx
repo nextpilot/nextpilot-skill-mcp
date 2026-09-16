@@ -527,10 +527,15 @@ export function HistoryList({
                         {fmtSize(r.fileSize)}
                       </span>
                     </td>
+                    {/* 机型与机架（SYS_AUTOSTART）分两行，机架那行小一号——跟「日志文件 / 大小」同一种排法 */}
                     <td className="py-2 pr-2 text-center text-text">
-                      {r.vehicleType ? (VEHICLE_TYPE_LABELS[r.vehicleType] ?? r.vehicleType) : "—"}
+                      <span className="block truncate">
+                        {r.vehicleType ? (VEHICLE_TYPE_LABELS[r.vehicleType] ?? r.vehicleType) : "—"}
+                      </span>
                       {r.facts?.airframeId ? (
-                        <span className="text-text">（{r.facts.airframeId}）</span>
+                        <span className="block truncate text-[11px] leading-4">
+                          机架 {r.facts.airframeId}
+                        </span>
                       ) : null}
                     </td>
                     <td className="py-2 pr-2 text-center font-mono break-words text-text">{r.verHw ?? "—"}</td>
