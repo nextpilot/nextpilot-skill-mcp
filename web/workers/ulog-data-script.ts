@@ -85,7 +85,7 @@ def np_report():
 # ============ np_manifest：话题清单（驱动前端预设可用性）============
 def np_manifest():
     global __result
-    items = provider.messages()
+    items = provider.get_topic_meta()
     __result = json.dumps({"topics": items}, ensure_ascii=False)
 
 
@@ -100,7 +100,7 @@ def np_series(topic, instance, fields_json, max_points=3000, op_json=None):
     global __result
     fields = json.loads(fields_json)
     op = json.loads(op_json) if op_json else None
-    cols = provider.columns(topic, int(instance))
+    cols = provider.get_topic_data(topic, int(instance))
     if cols is None:
         __result = json.dumps({"error": "topic not found: %s#%d" % (topic, instance)})
         return
@@ -165,15 +165,15 @@ def np_series(topic, instance, fields_json, max_points=3000, op_json=None):
 # 由 provider 提供（见 providers/api.py 的可选能力表）。
 def np_track(max_points=None):
     global __result
-    data = provider.track(max_points)
+    data = provider.get_flight_track(max_points)
     __result = json.dumps(data, ensure_ascii=False)
 
 
 # ============ np_log_info：系统信息 / 事件 / 丢包 / 参数 / 阶段 ============
 # 这一块全是"某种日志的消息形态"的展示（'I' 信息字典、事件与文本消息合并、
 # 'M' 多值信息怎么拼、'Q' 默认值怎么推、逐字节的消息类型统计），换格式就是另一套，
-# 所以整块由 provider 的 log_info() 提供（可选能力）。
+# 所以整块由 provider 的 report_materials() 提供（可选能力）。
 def np_log_info():
     global __result
-    __result = json.dumps(provider.log_info(), ensure_ascii=False)
+    __result = json.dumps(provider.report_materials(), ensure_ascii=False)
 `;

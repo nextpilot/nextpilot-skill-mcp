@@ -1,7 +1,7 @@
 """把「算子目录」与「内置变量表」生成进 content/guide/knowledge-write-rule.md。
 
 为什么用生成：这两张表的事实源分别在 engine/operators.py（算子注册表）与
-engine/providers/api.py 的 SEMANTICS（内置变量 = 适配器契约的一部分），手写必然漂移。
+engine/providers/api.py 的 BUILTIN_VARIABLES（内置变量 = 适配器契约的一部分），手写必然漂移。
 参考文档里用标记圈出生成区，本脚本只重写标记之间的内容，
 其余（字段说明、示例）保持人工维护。
 
@@ -86,14 +86,14 @@ def operator_catalog() -> str:
 
 
 def builtin_table() -> str:
-    """从 engine/providers/api.py 的 SEMANTICS 抄出内置变量。
+    """从 engine/providers/api.py 的 BUILTIN_VARIABLES 抄出内置变量。
 
     为什么是那里：内置变量由 **provider 契约**定义（哪种日志都得给这几个），
     它同时是构建期（build-knowledge.mjs 派生 BUILTIN_VARS）与运行期自检
     （check_provider）的输入——一处定义、三处使用，手抄必然漂移。
     """
     src = PROVIDER_API.read_text(encoding="utf-8")
-    m = re.search(r"^SEMANTICS = \{(.*?)^\}", src, re.S | re.M)
+    m = re.search(r"^BUILTIN_VARIABLES = \{(.*?)^\}", src, re.S | re.M)
     body = m.group(1) if m else ""
     keys = re.findall(r'^\s{4}"([A-Za-z_0-9]+)":', body, re.M)
     note = {

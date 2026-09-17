@@ -42,7 +42,7 @@
 
 | 块 | 是什么 | 谁写 |
 | --- | --- | --- |
-| `facts` | 日志客观"是什么"：机型 / 固件 / 时长 / armed / 阶段 / 丢包——离散、驱动判定 | provider 的 `facts()`（PX4 那份在 `providers/px4.py`） |
+| `facts` | 日志客观"是什么"：机型 / 固件 / 时长 / armed / 阶段 / 丢包——离散、驱动判定 | provider 的 `get_report_facts()`（PX4 那份在 `providers/px4.py`） |
 | `metrics` | **关键数字**：有序数组，每项带中文名与单位（结果页「关键数据」直接渲染）。规则产出的实测值优先，规则没跑就按 `facts.yaml` 的声明兜底现算 | 引擎（清单在 `facts.yaml` 的 `metrics`，实测值来自 `rules/*.yaml`） |
 | `findings` / `tags` / `guardTags` / `matchedFaults` / `checksRun` / `checksSkipped` | 判定层产出：结论、标签、命中的故障库条目 | 规则与故障库匹配 |
 

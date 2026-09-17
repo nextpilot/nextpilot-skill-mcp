@@ -58,7 +58,7 @@ def load_facts_payload() -> dict:
 
     **这条装配规则构建期也有一份**（web/scripts/build-knowledge.mjs 里同样两行）——
     改了要一起改。两边不一致时，本地回归与浏览器会拿到不同的配置，而本地的表现是
-    "轨迹取数声明丢了"（track() 返回 error）——这次就是这么踩到的，所以单独抽成函数，
+    "轨迹取数声明丢了"（get_flight_track() 返回 error）——这次就是这么踩到的，所以单独抽成函数，
     别再各写各的。
     """
     import yaml as _yaml

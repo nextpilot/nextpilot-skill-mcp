@@ -30,9 +30,9 @@
 
 | 那道 | 在哪 | 查什么 | 查不了什么 |
 | --- | --- | --- | --- |
-| 构建期 | `web/scripts/build-knowledge.mjs` | 每个适配器**定义了**契约要求的方法吗；`semantics()` 的字典字面量键齐不齐 | 方法体里的事 |
-| 运行期自检 | `api.py` 的 `check_provider()`，`open_log()` 里立刻调 | 名字取得出来吗、`semantics()` 的类型对吗、每次是不是新 dict | 值对不对 |
-| 契约测试 | `tools/calibrate/check_provider.py` | **语义**：取不到必须返回 `None`、`messages()` 与 `series()` 自洽、`armed_intervals` 的形状、`facts()` 与 `semantics()` 不矛盾、`match_firmware` 的边界与非法串…… | — |
+| 构建期 | `web/scripts/build-knowledge.mjs` | 每个适配器**定义了**契约要求的方法吗；`builtin_variables()` 的字典字面量键齐不齐 | 方法体里的事 |
+| 运行期自检 | `api.py` 的 `check_provider()`，`open_log()` 里立刻调 | 名字取得出来吗、`builtin_variables()` 的类型对吗、每次是不是新 dict | 值对不对 |
+| 契约测试 | `tools/calibrate/check_provider.py` | **语义**：取不到必须返回 `None`、`get_topic_meta()` 与 `get_series()` 自洽、`armed_intervals` 的形状、`get_report_facts()` 与 `builtin_variables()` 不矛盾、`match_version` 的边界与非法串…… | — |
 
 为什么不写 `typing.Protocol` 靠 mypy 查：**两端都没有类型检查器**——构建期不执行 `engine/` 下的
 Python（只当文本搬运，见 `../README.md`），Pyodide 里也没有 mypy。写注解只会"看着有约束、
@@ -42,7 +42,7 @@ Python（只当文本搬运，见 `../README.md`），Pyodide 里也没有 mypy�
 
 - **取不到一律返回 `None`，不抛异常**。引擎把 `None` 当"数据不足"（那条规则静默不出结论）；
   抛异常会顺着 `_eval_compute` 的兜底变成同一种静默，但更难查。这条是契约测试第一个查的。
-- **`semantics()` 每次返回新 dict**：引擎会把 compute 的输出直接写进它。
+- **`builtin_variables()` 每次返回新 dict**：引擎会把 compute 的输出直接写进它。
 - **`no_data` / `has_topic` 不在这里**：前者由框架置（compute 失败后为真），
   后者是框架给 `provider.has` 起的别名（表达式里唯一放行的函数调用）。
 - **别把取数逻辑搬回 YAML**：候选字段、异常回退、位解码、按版本挑分支——这些是逻辑，

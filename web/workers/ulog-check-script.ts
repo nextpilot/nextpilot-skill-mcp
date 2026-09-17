@@ -1303,17 +1303,17 @@ def op_cell_voltage_min(cell_cols, volt_v, volt_filtered, cell_count, **kw):
 #
 # 三道检查（分工是"构建期挡住漏写、运行期挡住类型与缺席、测试挡住语义"）：
 #   1. 构建期：web/scripts/build-knowledge.mjs 用 ast 解析 providers/*.py，
-#      查 REQUIRED 的方法有没有定义、semantics() 返回的字典字面量键齐不齐
+#      查 REQUIRED 的方法有没有定义、builtin_variables() 返回的字典字面量键齐不齐
 #   2. 运行期：下面的 check_provider()，引擎建好 provider 之后立刻跑一次
 #   3. 契约测试：tools/calibrate/check_provider.py，对每个 provider 跑同一套断言
-#      （失败语义、messages() 与 series() 自洽、armed_intervals 的形状……）
+#      （失败语义、get_topic_meta() 与 get_series() 自洽、armed_intervals 的形状……）
 #
 # 加一个适配器（如 ardupilot.py）要做的事：实现 REQUIRED，按需实现 OPTIONAL，
 # 把工厂追加进 FORMATS，然后跑通 check_provider.py —— 引擎一行都不用改。
 
 # ---------------- 必需能力：规则与曲线会直接依赖 ----------------
 REQUIRED = {
-    "fmt": {
+    "log_type": {
         "kind": "attr",
         "doc": "格式标识（如 px4-ulog），进报告与错误信息",
     },
@@ -1324,54 +1324,54 @@ REQUIRED = {
                "写死就等于把某个格式的名字钉进了格式无关层。"
                "浏览器里解析器版本不受本站控制（PyPI 当时的最新版），所以它必须如实记录",
     },
-    "messages": {
+    "get_topic_meta": {
         "kind": "method", "sig": "() -> list[dict]",
         "doc": "有哪些消息/话题：[{name, instance, n, fields:[{name, dtype}]}]。"
                "驱动 np_manifest（曲线可用性）与契约测试的自洽校验",
     },
-    "columns": {
+    "get_topic_data": {
         "kind": "method", "sig": "(topic, instance=0) -> dict|None",
         "doc": "某个 topic 某实例的**原样列** {列名: 数组}（含 'field[0]' 这种数组列）。"
                "报告页抽时序、概览指标兜底取数用它。取不到返回 None",
     },
-    "column": {
+    "get_first_existing_column": {
         "kind": "method", "sig": "(topic, names) -> array|None",
         "doc": "只取第一个实例、按候选名取第一个存在的原样列（概览指标兜底取数）"
                "—— 取不到返回 None",
     },
-    "series": {
+    "get_series": {
         "kind": "method",
         "sig": "(ref, instance=None, alias=None, per_instance=False)",
         "doc": "按 'topic.field' 取一条序列（1-D 数组 / 每实例一组 / 定长数组按列）。"
                "**取不到一律返回 None，不抛异常**——引擎按'数据不足'处理",
     },
-    "has": {
+    "has_topic": {
         "kind": "method", "sig": "(name) -> bool",
         "doc": "有没有这个消息/话题。表达式里的 has_topic('x') 直接指向它",
     },
-    "match_firmware": {
+    "match_version": {
         "kind": "method", "sig": "(spec) -> bool",
         "doc": "固件约束串是否满足（ref(..., when_fw='>=1.15') 用）。"
                "约束串的语法由格式自己定，引擎不解释",
     },
-    "info": {
+    "get_logged_information": {
         "kind": "method", "sig": "() -> dict",
         "doc": "日志自带的键值信息（PX4 是 Information Message）。没有就返回 {}",
     },
-    "params": {
+    "get_initial_parameters": {
         "kind": "method", "sig": "() -> dict",
         "doc": "初始参数表。没有就返回 {}",
     },
-    "logged_messages": {
+    "get_logged_messages": {
         "kind": "method", "sig": "() -> list[dict]",
         "doc": "[{tSec, message, level, level_name}]：日志消息条目（tSec 是相对日志起点的秒数）",
     },
-    "semantics": {
+    "builtin_variables": {
         "kind": "method", "sig": "() -> dict",
         "doc": "内置变量表，**每次调用返回一个新 dict**（引擎会往里写 compute 的输出）。"
-               "键必须覆盖下面的 SEMANTICS",
+               "键必须覆盖下面的 BUILTIN_VARIABLES",
     },
-    "facts": {
+    "get_report_facts": {
         "kind": "method", "sig": "() -> dict",
         "doc": "报告头的离散事实：机型 / 固件 / 时长 / 模式 / 载具身份……键名见各 provider",
     },
@@ -1381,29 +1381,29 @@ REQUIRED = {
 # 不同格式能给的东西本来就不一样（PX4 的 ULog 有事件解码与逐字节消息统计，
 # ArduPilot 的 .bin 是另一套消息流），所以可选能力由格式自己决定。
 OPTIONAL = {
-    "phases": {"sig": "() -> list[dict]",
+    "get_flight_phases": {"sig": "() -> list[dict]",
                "doc": "连续飞行阶段（报告页阶段条）。缺席则该条不显示"},
-    "dropouts": {"sig": "() -> list[dict]",
+    "get_logged_dropouts": {"sig": "() -> list[dict]",
                  "doc": "[{tSec, durationMs}] 丢包记录"},
-    "frames": {"sig": "() -> dict | None",
+    "get_message_type_counts": {"sig": "() -> dict | None",
                "doc": "逐字节的消息类型统计（**只对能按帧走的格式有意义**）+ 走到文件末尾没有"},
-    "events": {"sig": "() -> list[dict] | None",
+    "get_decoded_events": {"sig": "() -> list[dict] | None",
                "doc": "事件解码（PX4 靠日志自带的 metadata_events）。None = 这份日志解不出"},
-    "log_info": {"sig": "() -> dict",
+    "report_materials": {"sig": "() -> dict",
                  "doc": "报告页要的几块原料的打包——**不是某一个 tab 的 payload**："
                         "infoDict/msgTypeStats 给「系统消息」、messages/messagesMulti 给「事件消息」、"
                         "params/defaultParams/changedParams 给「飞控参数」、phases 给阶段条，"
                         "四个 tab 各取所需。边界是「该格式能提供哪些原料」，"
                         "而原料的形态是格式专有的（合并事件与文本、多值信息怎么拼……），"
                         "换格式就是另一套，所以由格式提供而不是数据层拼"},
-    "track": {"sig": "(...) -> dict | None",
+    "get_flight_track": {"sig": "(...) -> dict | None",
               "doc": "地图轨迹（取数字段候选与量纲也是格式专有）"},
 }
 
-# ---------------- semantics() 必须给的键（= 规则与 plot 能引用的内置变量）----------------
+# ---------------- builtin_variables() 必须给的键（= 规则与 plot 能引用的内置变量）----------------
 # 这份表就是"作者能引用什么"的权威清单，站内指南的内置变量表由 tools/px4/gen_rule_reference.py
 # 从这里生成。加名字 = 改契约；删名字 = 破坏兼容（老规则会构建失败，这是有意的）。
-SEMANTICS = {
+BUILTIN_VARIABLES = {
     "fw_minor": {"type": "int|None",
                  "doc": "固件次版本号。**版本分支唯一常用的量**；None = 这份日志没写版本号"},
     "airframe": {"type": "str",
@@ -1423,10 +1423,8 @@ SEMANTICS = {
 
 # 框架自己往 env 里补的名字（**不属于** provider）：
 #   no_data     —— compute 失败后置真（"数据不足"也是 skip 里的一条普通条件）
-#   has_topic() —— 表达式里唯一放行的函数调用，指向 provider.has
+#   has_topic() —— 表达式里唯一放行的函数调用，指向 provider.has_topic
 
-# 表达式里唯一放行的函数调用名（白名单只此一项，见 rule_engine._EXPR_CALLABLE）
-EXPR_FUNCS = ("has_topic",)
 
 
 # ---------------- 格式注册表 ----------------
@@ -1453,7 +1451,7 @@ def open_log(raw, facts_cfg=None):
         "不认识的日志格式：本站目前只支持 %s。扩展名不作数，判据是文件头 magic" % known)
 
 
-def _type_ok(value, spec):
+def _type_matches_spec(value, spec):
     want = spec.get("type")
     if want is None:
         return True
@@ -1471,32 +1469,32 @@ def check_provider(provider, where="provider"):
     """运行期自检：契约里要求的东西，这个 provider 真的给了吗、类型对吗。
 
     为什么还要这一道（构建期不是已经查过 AST 了吗）：AST 只看"有没有定义"，
-    看不了"跑起来给的是什么"——比如 semantics() 少返回一个键、fw_minor 给了字符串。
+    看不了"跑起来给的是什么"——比如 builtin_variables() 少返回一个键、fw_minor 给了字符串。
     这类问题如果放过，表现是**静默失效**（规则算不出数据 → 不发射 finding），很难查。
     """
     for name, spec in REQUIRED.items():
         if not hasattr(provider, name):
             raise ValueError("%s 缺少契约要求的能力：%s（%s）" % (where, name, spec["doc"]))
 
-    sem = provider.semantics()
+    sem = provider.builtin_variables()
     if not isinstance(sem, dict):
         raise ValueError("%s.semantics() 必须返回 dict" % where)
-    for key, spec in SEMANTICS.items():
+    for key, spec in BUILTIN_VARIABLES.items():
         if key not in sem:
             raise ValueError(
                 "%s.semantics() 缺少内置变量 %s（%s）—— 规则里引用它会静默算不出数据"
                 % (where, key, spec["doc"]))
-        if not _type_ok(sem[key], spec):
+        if not _type_matches_spec(sem[key], spec):
             raise ValueError("%s.semantics()[%s] 类型不对：期望 %s，得到 %r"
                              % (where, key, spec["type"], sem[key]))
     # 每个 provider 都要能独立喂给多个规则：返回的必须是新 dict（引擎会往里写 compute 输出）
-    sem2 = provider.semantics()
+    sem2 = provider.builtin_variables()
     if sem2 is sem:
         raise ValueError("%s.semantics() 每次都必须返回新的 dict（引擎会往里写变量）" % where)
 
-    if not isinstance(provider.facts(), dict):
+    if not isinstance(provider.get_report_facts(), dict):
         raise ValueError("%s.facts() 必须返回 dict" % where)
-    if not isinstance(provider.messages(), list):
+    if not isinstance(provider.get_topic_meta(), list):
         raise ValueError("%s.messages() 必须返回 list" % where)
     if not isinstance(provider.parser_version(), str):
         raise ValueError("%s.parser_version() 必须返回 str" % where)
@@ -1537,14 +1535,14 @@ _RELEASE_TYPE_SUFFIX = {64: "-alpha", 128: "-beta", 192: "-rc", 255: ""}
 # 地图轨迹的取数**声明**（读哪个 topic 的哪几列、各按什么量纲换算）在
 # knowledge/px4/plot/track.yml —— 它按「要画什么、从哪几列画」归在 plot/ 下，
 # 构建期并进 __FACTS__，这里从 \`self._cfg["track"]\` 读。
-# **解析逻辑留在本文件**（track()）：按顺序取第一个存在的候选、剔未定位点、等距抽样——
+# **解析逻辑留在本文件**（get_flight_track()）：按顺序取第一个存在的候选、剔未定位点、等距抽样——
 # 这些是分支，写进 YAML 只能再造一门小语言（见 track.yml 的说明）。
 
 
 class Px4Provider:
     """PX4 .ulg 适配器。契约见 providers/api.py。"""
 
-    fmt = "px4-ulog"
+    log_type = "px4-ulog"
 
     def __init__(self, raw, facts_cfg):
         self._cfg = facts_cfg or {}
@@ -1561,17 +1559,17 @@ class Px4Provider:
         self._topics = set(d.name for d in self.ulog.data_list)
 
         # 按 pyulog 的**数据来源**分组读：各段只读自己那一种来源，都只往 self 上放结果、
-        # 不碰 facts。顺序有一处硬约束——\`_read_messages()\` 要用 \`_read_topics()\` 算出的
+        # 不碰 facts。顺序有一处硬约束——\`_read_logged_messages()\` 要用 \`_read_data_list()\` 算出的
         # \`t0_us\` 把消息时间换成**相对日志起点**的秒数，所以它必须排最后；其余互不依赖。
-        #   ulog.msg_info_dict      → \`_read_msg_info()\`：版本、载具身份
-        #   ulog.initial_parameters → \`_read_params()\`：参数里的事实（累计飞行、机架编号）
-        #   ulog.data_list          → \`_read_topics()\`：基准 topic（机型/模式/armed/阶段）
+        #   ulog.msg_info_dict      → \`_read_msg_info_dict()\`：版本、载具身份
+        #   ulog.initial_parameters → \`_read_initial_parameters()\`：参数里的事实（累计飞行、机架编号）
+        #   ulog.data_list          → \`_read_data_list()\`：基准 topic（机型/模式/armed/阶段）
         #                             与全量扫描（时长、轨迹起点、重启、丢包）
-        #   ulog.logged_messages    → \`_read_messages()\`：日志消息（含警告/错误级别）
-        self._read_msg_info()
-        self._read_params()
-        self._read_topics()
-        self._read_messages()
+        #   ulog.logged_messages    → \`_read_logged_messages()\`：日志消息（含警告/错误级别）
+        self._read_msg_info_dict()
+        self._read_initial_parameters()
+        self._read_data_list()
+        self._read_logged_messages()
 
     # ================= 数据访问层 =================
 
@@ -1579,7 +1577,7 @@ class Px4Provider:
         """解析这份日志用的解析器版本（见 \`_read_versions\`）。"""
         return self.parser_version_str
 
-    def messages(self):
+    def get_topic_meta(self):
         """[{name, instance, n, fields:[{name, dtype}]}]（驱动 np_manifest 与曲线可用性）"""
         out = []
         for d in self.ulog.data_list:
@@ -1592,7 +1590,7 @@ class Px4Provider:
             })
         return out
 
-    def columns(self, topic, instance=0):
+    def get_topic_data(self, topic, instance=0):
         """某个 topic 某个实例的**原样列**：{列名: 数组}（含 'field[0]' 这种数组列）。
 
         取不到返回 None（不抛异常——契约要求）。
@@ -1600,7 +1598,7 @@ class Px4Provider:
         d = self._find_topic(topic, instance)
         return d.data if d is not None else None
 
-    def series(self, ref, instance=None, alias=None, per_instance=False):
+    def get_series(self, ref, instance=None, alias=None, per_instance=False):
         """按 \`"topic.field"\` 取一条序列（与规则里写的引用形一致）。
 
         **取不到或字段不存在一律返回 None，不抛异常。** 形态：
@@ -1622,9 +1620,9 @@ class Px4Provider:
             return groups
         return self._read_concat(ref, aliases)
 
-    def column(self, topic, names):
+    def get_first_existing_column(self, topic, names):
         """只取第一个实例、按候选名取第一个存在的**原样列**（概览指标兜底取数用）。"""
-        cols = self.columns(topic, 0)
+        cols = self.get_topic_data(topic, 0)
         if not cols:
             return None
         for n in names if isinstance(names, (list, tuple)) else [names]:
@@ -1632,11 +1630,11 @@ class Px4Provider:
                 return cols[n]
         return None
 
-    def has(self, name):
+    def has_topic(self, name):
         """日志里有没有这个 topic（表达式里写成 has_topic('x')）。"""
         return name in self._topics
 
-    def match_firmware(self, spec):
+    def match_version(self, spec):
         """固件约束串：any / ">=1.15" / "<1.15" / ">=1.14,<1.15"（逗号=与）。
 
         只给 \`ref(..., when_fw=)\` 用（规则级的适用范围轴已经是表达式了）。
@@ -1661,21 +1659,21 @@ class Px4Provider:
                 return False
         return True
 
-    def info(self):
+    def get_logged_information(self):
         return dict(self.ulog.msg_info_dict)
 
-    def params(self):
+    def get_initial_parameters(self):
         return getattr(self.ulog, "initial_parameters", {}) or {}
 
-    def logged_messages(self):
+    def get_logged_messages(self):
         """[{tSec, message, level, level_name}]（tSec = 相对日志起点的秒数）。
 
-        内容在构造时由 \`_read_messages()\` 算好一次——\`semantics()\` 每条规则都要它，
+        内容在构造时由 \`_read_logged_messages()\` 算好一次——\`builtin_variables()\` 每条规则都要它，
         每次重建纯属白干。这里返回逐条复制的新 dict：调用方拿到的不能是内部状态。
         """
         return [dict(m) for m in self._logged_messages]
 
-    def semantics(self):
+    def builtin_variables(self):
         """内置变量表。**每次返回新 dict**（引擎会往里写 compute 的输出）。"""
         return {
             "fw_minor": self.fw_minor,
@@ -1692,28 +1690,28 @@ class Px4Provider:
             "restart_detected": self.restart_topics > 0,
             "dropout_ms": self.dropout_total_ms,
             # 日志消息：供「日志消息聚合」类经验按级别筛选
-            "messages": self.logged_messages(),
+            "messages": self.get_logged_messages(),
         }
 
-    def facts(self):
+    def get_report_facts(self):
         """报告头的离散事实（机型 / 固件 / 时长 / 模式 / 载具身份……）。"""
         return self._collect_facts()
 
     # ================= 可选能力 =================
 
-    def phases(self):
+    def get_flight_phases(self):
         """连续的飞行阶段区间（报告页阶段条用）：按 nav_state 变化切段。
 
-        数据在 \`_read_topics()\` 里就一起算好了（同一批数组），这里只交出去。
+        数据在 \`_read_data_list()\` 里就一起算好了（同一批数组），这里只交出去。
         返回逐段复制的新 dict：调用方拿到的不能是 provider 的内部状态。
         """
         return [dict(seg) for seg in self.phase_intervals]
 
-    def dropouts(self):
+    def get_logged_dropouts(self):
         return [{"tSec": round(int(d.timestamp) / 1e6, 2), "durationMs": int(d.duration)}
                 for d in getattr(self.ulog, "dropouts", [])]
 
-    def frames(self):
+    def get_message_type_counts(self):
         """逐条走 ULog 的 [uint16 消息长度][uint8 消息类型] 序列，统计每类消息的条数。
 
         刻意不走 pyulog 的解析结果：pyulog 只留它认得的东西（把 M 的续行并进同一组、
@@ -1732,7 +1730,7 @@ class Px4Provider:
             off += 3 + size
         return counts, off == n, off, n
 
-    def events(self):
+    def get_decoded_events(self):
         """PX4 事件（\`event\` topic）解码。解不出返回 None。
 
         pyulog 的 PX4Events 用**日志自带**的 metadata_events（那个 xz blob 就是这份固件的
@@ -1759,12 +1757,12 @@ class Px4Provider:
         except Exception:
             return None
 
-    def track(self, max_points=None):
+    def get_flight_track(self, max_points=None):
         """地图轨迹：按字段候选取数、按各自 scale 换算，剔除未定位的采样。"""
         cfg = self._cfg.get("track")
         if not cfg or not cfg.get("topic"):
             return {"error": "这份格式没有声明轨迹取数来源（knowledge/px4/plot/track.yml）"}
-        cols = self.columns(cfg["topic"], int(cfg.get("instance", 0)))
+        cols = self.get_topic_data(cfg["topic"], int(cfg.get("instance", 0)))
         if not cols:
             return {"error": "日志里没有 %s 话题" % cfg["topic"]}
         limit = int(max_points or cfg.get("max_points") or 1500)
@@ -1812,7 +1810,7 @@ class Px4Provider:
             "dropped": int(n - len(idx_valid)),
         }
 
-    def log_info(self):
+    def report_materials(self):
         """报告页要的几块原料（**不是某一个 tab 的 payload**，四个 tab 各取所需）。
 
         系统消息取 infoDict / msgTypeStats / msgTypeWalkOk；事件消息取 messages / messagesMulti；
@@ -1823,7 +1821,7 @@ class Px4Provider:
         'M' 多值信息怎么拼回文本、'Q' 默认值怎么推、逐字节的消息类型统计……换一种日志格式
         就是另一套。
         """
-        info = self.info()          # 走契约能力取，别再直读 self.ulog（同一份数据两处知识）
+        info = self.get_logged_information()          # 走契约能力取，别再直读 self.ulog（同一份数据两处知识）
         cfgsys = self._cfg.get("sys_info_keys") or []
         info_types = getattr(self.ulog, "_msg_info_dict_types", None) or {}
         info_docs = self._cfg.get("info_key_docs") or {}
@@ -1851,7 +1849,7 @@ class Px4Provider:
                     "kind": "log", "message": text.strip()}
             (legacy_dupes if text.endswith("\t") else messages).append(item)
 
-        events = self.events() or []
+        events = self.get_decoded_events() or []
 
         # Tagged Logged String（'C'）：与 'L' 同形，多一个 tag = 消息来源（进程/线程/类），
         # 由机载系统自己定义含义（PX4 主线固件一般不写）。按时间并入同一时间轴，tag 原样带上。
@@ -1900,7 +1898,7 @@ class Px4Provider:
                           for k in sorted(multi_src)]
 
         params = {str(k): (clean(np.asarray(v).reshape(-1)[0]) if hasattr(v, "reshape") else clean(v))
-                  for k, v in self.params().items()}
+                  for k, v in self.get_initial_parameters().items()}
 
         # Parameter Default（ULog 的 'Q' 消息）。PX4 的 logger 逐参数比较「当前值 / 机架默认 /
         # 固件默认」三者，**只写与当前值不同的那个**（logger.cpp: write_parameter_defaults）
@@ -1925,7 +1923,7 @@ class Px4Provider:
                             "value": clean(getattr(p, "value", None))})
 
         # ULog 消息类型统计：顺序与名字来自 facts.yaml 的 ulog_msg_types，没出现过的类型计 0
-        counts, walked_to_end, walked_off, file_size = self.frames()
+        counts, walked_to_end, walked_off, file_size = self.get_message_type_counts()
         msg_types = self._cfg.get("ulog_msg_types") or []
         known = {str(t["code"]) for t in msg_types}
         msg_type_stats = [{"code": str(t["code"]), "name": str(t.get("name", "")),
@@ -1949,14 +1947,14 @@ class Px4Provider:
             # 事件解码结果、文本消息、带 tag 的消息已经并成一条时间轴（按 kind 区分来源）
             "messages": all_messages,
             "messagesMulti": messages_multi,
-            "dropouts": self.dropouts(),
+            "dropouts": self.get_logged_dropouts(),
             "params": params,
             "defaultParams": default_params,
             # 老固件没设 DEFAULT_PARAMETERS compat flag 时整段缺失：此时「没记录」不能当成
             # 「与默认一致」，前端要区别对待，不能替它下结论。
             "defaultParamsKnown": bool(getattr(self.ulog, "has_default_parameters", False)),
             "changedParams": changed,
-            "phases": self.phases(),
+            "phases": self.get_flight_phases(),
         }
 
     # ================= 内部：解析与事实 =================
@@ -2057,7 +2055,7 @@ class Px4Provider:
         except Exception:
             return self._level_names.get(lvl, "LEVEL %d" % lvl)
 
-    def _read_msg_info(self):
+    def _read_msg_info_dict(self):
         """从 \`ulog.msg_info_dict\`（PX4 的 Information Message）读版本与载具身份。
 
         ver_sw_release 的打包：major<<24 | minor<<16 | patch<<8 | 类型。
@@ -2105,7 +2103,7 @@ class Px4Provider:
         self.uuid = str(info.get("sys_uuid", ""))
         self.ver_sw_branch = str(info.get("ver_sw_branch", ""))
 
-    def _read_params(self):
+    def _read_initial_parameters(self):
         """从 \`ulog.initial_parameters\` 读参数里的事实。"""
         p = getattr(self.ulog, "initial_parameters", {}) or {}
         # 载具累计飞行时长：LND_FLIGHT_T_HI/LO 拼成的 64 位 µs 计数器
@@ -2118,12 +2116,12 @@ class Px4Provider:
         af = p.get("SYS_AUTOSTART")
         self.airframe_id = int(af) if af is not None else None
 
-    def _read_topics(self):
+    def _read_data_list(self):
         """读 \`ulog.data_list\`（各 topic 的时序）与 \`ulog.dropouts\`，得出报告头的离散量。
 
         分两部分：先读**基准 topic** \`vehicle_status\`（机型 / 模式 / armed 区间 / 飞行阶段），
         再**扫全局**（总时长与时间基准、记录起始 UTC、数据质量）。这个 topic 只读这一处，
-        需要切段的都在同一批数组上算完——原先 \`phases()\` 要为此把整份 dataset 留到运行期再切。
+        需要切段的都在同一批数组上算完——原先 \`get_flight_phases()\` 要为此把整份 dataset 留到运行期再切。
         条件值（这份日志没有的）统一用 None / "" 表示，由 \`_collect_facts()\` 决定给不给键。
         """
         ulog = self.ulog
@@ -2241,7 +2239,7 @@ class Px4Provider:
 
         # ---- 扫全局：记录起始的 UTC 时刻 ----
         # 取 GPS 首次给出有效时间的那一刻（比 boot_time_utc_us 可靠，后者要飞控对过时）。
-        # 实例按 plot/track.yml 的声明取，与 track() 同一口径——两处都只认那一个实例，
+        # 实例按 plot/track.yml 的声明取，与 get_flight_track() 同一口径——两处都只认那一个实例，
         # 别一处取"第一个"、一处取 instance 0
         self.start_utc = None
         track_cfg = self._cfg.get("track") or {}
@@ -2267,11 +2265,11 @@ class Px4Provider:
         self.dropout_total_ms = int(sum(getattr(d, "duration", 0)
                                         for d in getattr(ulog, "dropouts", [])))
 
-    def _read_messages(self):
+    def _read_logged_messages(self):
         """读 \`ulog.logged_messages\`：日志消息（PX4 的 \`[模块] 文案\`，含警告 / 错误级别）。
 
-        **必须排在 \`_read_topics()\` 之后**：tSec 是相对日志起点的秒数，要用它算出的 \`t0_us\`。
-        为什么在构造期算而不是每次现算：\`semantics()\` 里就有 \`messages\`，而 \`semantics()\`
+        **必须排在 \`_read_data_list()\` 之后**：tSec 是相对日志起点的秒数，要用它算出的 \`t0_us\`。
+        为什么在构造期算而不是每次现算：\`builtin_variables()\` 里就有 \`messages\`，而 \`builtin_variables()\`
         被 \`_rule_env()\` **每条规则各调一次**——不缓存就是每条规则重建一遍同一份列表。
 
         level 是 ULog 里的原始字节，PX4 填的是 **ASCII 数字**（'3'=51 才是 ERROR），
@@ -2367,8 +2365,9 @@ FORMATS.append((_is_ulog, _make_px4, "PX4 ULog（.ulg）"))
 # 之类的名字（tools/calibrate/lint_rules.py 有一条检查盯着）。
 #
 # 数据从哪来：providers/api.py 的契约。provider 由 open_log() 按文件头挑出来，
-# 本文件只调它的 messages/columns/series/has/match_firmware/info/params/logged_messages/
-# semantics/facts 与可选能力，不碰 pyulog 对象。
+# 本文件只调它的 get_topic_meta/get_topic_data/get_series/has_topic/match_version/
+# get_logged_information/get_initial_parameters/get_logged_messages/
+# builtin_variables/get_report_facts 与可选能力，不碰 pyulog 对象。
 # ============================================================================
 
 import json, ast
@@ -2492,9 +2491,9 @@ def _ref(name, per_instance=False, instance=None, alias=None, when_fw=None):
 
     取数本身由 provider 实现（契约：取不到返回 None，不抛异常）。
     """
-    if when_fw is not None and not provider.match_firmware(when_fw):
+    if when_fw is not None and not provider.match_version(when_fw):
         return None
-    return provider.series(name, instance=instance, alias=alias, per_instance=per_instance)
+    return provider.get_series(name, instance=instance, alias=alias, per_instance=per_instance)
 
 
 # ---------------- compute 表达式求值 ----------------
@@ -2611,7 +2610,7 @@ def _eval_compute(stmt, env):
 
 
 _COMPUTE_GLOBALS["ref"] = _ref
-_COMPUTE_GLOBALS["has_topic"] = provider.has
+_COMPUTE_GLOBALS["has_topic"] = provider.has_topic
 
 
 def _rule_env():
@@ -2620,10 +2619,10 @@ def _rule_env():
     每次都要新的一份：compute 的输出直接写进这个 dict。
       no_data     —— compute 是否算不出来。初值 False；compute 失败后置真，再判一轮 \`skip\`。
                      于是"数据不足要记一条 skipped"不必再单设字段。
-      has_topic() —— 表达式里唯一放行的函数调用，指向 provider.has
+      has_topic() —— 表达式里唯一放行的函数调用，指向 provider.has_topic
     """
-    env = provider.semantics()
-    env["has_topic"] = provider.has
+    env = provider.builtin_variables()
+    env["has_topic"] = provider.has_topic
     env["no_data"] = False
     return env
 
@@ -2816,7 +2815,7 @@ def _metric_fallback(m):
         args = []
         for cand in fields:
             names = cand if isinstance(cand, list) else [cand]   # 候选字段名：取第一个存在的
-            col = provider.column(topic, names)
+            col = provider.get_first_existing_column(topic, names)
             if col is None:
                 return None
             args.append(np.asarray(col, dtype=float))
@@ -2892,7 +2891,7 @@ def run_all():
     _fid = [0]
     metrics = {}
     # 阶段集合来自 provider（故障库按 flight_phase 匹配用它）
-    phases_present = set(provider.facts().get("phases") or [])
+    phases_present = set(provider.get_report_facts().get("phases") or [])
 
     # guards_early：必须在其它规则之前跑，保证 insufficient_data 是第一个 guard 标签
     # ---------------- 按 group_order 顺序执行各 group ----------------
@@ -2935,7 +2934,7 @@ def run_all():
         "platform": "PX4",
         "parserVersion": provider.parser_version(),
         # 事实层产出：facts=日志是什么（离散，驱动判定）；metrics=关键数字（有序，带中文名与单位）
-        "facts": provider.facts(),
+        "facts": provider.get_report_facts(),
         "metrics": _metric_entries,
         # 判定层产出（规则与故障库）
         "tags": tags,

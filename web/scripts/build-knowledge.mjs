@@ -167,13 +167,13 @@ function toRawTemplate(text) {
 const FRAMEWORK_VARS = ["no_data", "has_topic"];
 
 /**
- * 规则表达式能引用的内置变量 = provider 契约的 SEMANTICS + 框架补的两个。
+ * 规则表达式能引用的内置变量 = provider 契约的 BUILTIN_VARIABLES + 框架补的两个。
  *
  * **从 engine/providers/api.py 派生，不手抄**：这份名字以前是手维护的副本，
  * 与引擎漂移时表现为"构建期放行、运行期 NameError"——引擎按"数据不足"静默处理，
  * 那条规则从此不出结论，没有任何提示（`no_data` 当初就是这么漏的）。
  */
-const BUILTIN_VARS = new Set([...parseProviderApi(read(PY_PROVIDER_API)).semantics,
+const BUILTIN_VARS = new Set([...parseProviderApi(read(PY_PROVIDER_API)).builtinVariables,
                               ...FRAMEWORK_VARS]);
 
 /** 表达式里允许出现、但不是变量名的关键字/字面量（校验标识符时跳过） */
@@ -239,14 +239,14 @@ function parseProviderApi(py) {
   const block = (name) => {
     const m = new RegExp(`^${name} = \\{([\\s\\S]*?)^\\}`, "m").exec(py);
     if (!m) throw new Error(`engine/providers/api.py 里解析不到 ${name} 常量表`);
-    const keys = [...m[1].matchAll(/^\s{4}"([a-z_0-9]+)":/gm)].map((x) => x[1]);
+    const keys = [...m[1].matchAll(/^\s{4}"([A-Za-z_0-9]+)":/gm)].map((x) => x[1]);
     if (keys.length === 0) throw new Error(`engine/providers/api.py 的 ${name} 是空的`);
     return keys;
   };
   return {
     required: block("REQUIRED"),
     optional: block("OPTIONAL"),
-    semantics: block("SEMANTICS"),
+    builtinVariables: block("BUILTIN_VARIABLES"),
   };
 }
 
@@ -696,7 +696,7 @@ for (const r of rules) {
 }
 // ---------------- provider 契约：构建期查"漏写" ----------------
 // 契约的事实源是 engine/providers/api.py 的两张常量表。这里查每个适配器是否**定义了**
-// 契约要求的能力、semantics() 的字典字面量键是否齐全。
+// 契约要求的能力、builtin_variables() 的字典字面量键是否齐全。
 // 查不了运行时行为（类型、失败语义）——那两道在引擎的运行期自检与
 // tools/calibrate/check_provider.py 里，三道合起来才是完整的一道关。
 const providerApi = parseProviderApi(read(PY_PROVIDER_API));
@@ -705,20 +705,20 @@ for (const f of providerFiles) {
   const where = `engine/providers/${f}`;
   if (!/^class\s+\w+/m.test(src)) throw new Error(`${where}: 里没有定义适配器类`);
   for (const name of providerApi.required) {
-    const ok = name === "fmt"
-      ? /^\s+fmt\s*=/m.test(src)
+    const ok = name === "log_type"
+      ? /^\s+log_type\s*=/m.test(src)
       : new RegExp(`^\\s+def ${name}\\(`, "m").test(src);
     if (!ok) {
       throw new Error(`${where}: 缺少契约要求的能力 ${name}（见 engine/providers/api.py 的 REQUIRED）`);
     }
   }
-  // semantics() 必须给出契约里列的每一个内置变量——少一个，引用它的规则会**静默**算不出数据
-  const body = src.slice(src.indexOf("def semantics("));
+  // builtin_variables() 必须给出契约里列的每一个内置变量——少一个，引用它的规则会**静默**算不出数据
+  const body = src.slice(src.indexOf("def builtin_variables("));
   const cut = body.indexOf("\n    def ", 10);
   const sem = cut === -1 ? body : body.slice(0, cut);
-  for (const key of providerApi.semantics) {
+  for (const key of providerApi.builtinVariables) {
     if (!sem.includes(`"${key}"`)) {
-      throw new Error(`${where}: semantics() 缺少内置变量 ${key}（见 api.py 的 SEMANTICS）`);
+      throw new Error(`${where}: builtin_variables() 缺少内置变量 ${key}（见 api.py 的 BUILTIN_VARIABLES）`);
     }
   }
 }

@@ -8,8 +8,9 @@
 # 之类的名字（tools/calibrate/lint_rules.py 有一条检查盯着）。
 #
 # 数据从哪来：providers/api.py 的契约。provider 由 open_log() 按文件头挑出来，
-# 本文件只调它的 messages/columns/series/has/match_firmware/info/params/logged_messages/
-# semantics/facts 与可选能力，不碰 pyulog 对象。
+# 本文件只调它的 get_topic_meta/get_topic_data/get_series/has_topic/match_version/
+# get_logged_information/get_initial_parameters/get_logged_messages/
+# builtin_variables/get_report_facts 与可选能力，不碰 pyulog 对象。
 # ============================================================================
 
 import json, ast
@@ -133,9 +134,9 @@ def _ref(name, per_instance=False, instance=None, alias=None, when_fw=None):
 
     取数本身由 provider 实现（契约：取不到返回 None，不抛异常）。
     """
-    if when_fw is not None and not provider.match_firmware(when_fw):
+    if when_fw is not None and not provider.match_version(when_fw):
         return None
-    return provider.series(name, instance=instance, alias=alias, per_instance=per_instance)
+    return provider.get_series(name, instance=instance, alias=alias, per_instance=per_instance)
 
 
 # ---------------- compute 表达式求值 ----------------
@@ -252,7 +253,7 @@ def _eval_compute(stmt, env):
 
 
 _COMPUTE_GLOBALS["ref"] = _ref
-_COMPUTE_GLOBALS["has_topic"] = provider.has
+_COMPUTE_GLOBALS["has_topic"] = provider.has_topic
 
 
 def _rule_env():
@@ -261,10 +262,10 @@ def _rule_env():
     每次都要新的一份：compute 的输出直接写进这个 dict。
       no_data     —— compute 是否算不出来。初值 False；compute 失败后置真，再判一轮 `skip`。
                      于是"数据不足要记一条 skipped"不必再单设字段。
-      has_topic() —— 表达式里唯一放行的函数调用，指向 provider.has
+      has_topic() —— 表达式里唯一放行的函数调用，指向 provider.has_topic
     """
-    env = provider.semantics()
-    env["has_topic"] = provider.has
+    env = provider.builtin_variables()
+    env["has_topic"] = provider.has_topic
     env["no_data"] = False
     return env
 
@@ -457,7 +458,7 @@ def _metric_fallback(m):
         args = []
         for cand in fields:
             names = cand if isinstance(cand, list) else [cand]   # 候选字段名：取第一个存在的
-            col = provider.column(topic, names)
+            col = provider.get_first_existing_column(topic, names)
             if col is None:
                 return None
             args.append(np.asarray(col, dtype=float))
@@ -533,7 +534,7 @@ def run_all():
     _fid = [0]
     metrics = {}
     # 阶段集合来自 provider（故障库按 flight_phase 匹配用它）
-    phases_present = set(provider.facts().get("phases") or [])
+    phases_present = set(provider.get_report_facts().get("phases") or [])
 
     # guards_early：必须在其它规则之前跑，保证 insufficient_data 是第一个 guard 标签
     # ---------------- 按 group_order 顺序执行各 group ----------------
@@ -576,7 +577,7 @@ def run_all():
         "platform": "PX4",
         "parserVersion": provider.parser_version(),
         # 事实层产出：facts=日志是什么（离散，驱动判定）；metrics=关键数字（有序，带中文名与单位）
-        "facts": provider.facts(),
+        "facts": provider.get_report_facts(),
         "metrics": _metric_entries,
         # 判定层产出（规则与故障库）
         "tags": tags,

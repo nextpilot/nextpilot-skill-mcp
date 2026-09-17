@@ -59,36 +59,36 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 **2026-09-17 追加（第三段）：provider 初始化按「数据来源」分组 + 解析器版本改由 provider 给**
 
 - **`Px4Provider.__init__` 按 pyulog 的「数据来源」分组读 + 一处汇总**：
-  `_read_msg_info()`（`ulog.msg_info_dict`：版本、载具身份）→ `_read_params()`
-  （`ulog.initial_parameters`：累计飞行、机架编号）→ `_read_topics()`
+  `_read_msg_info_dict()`（`ulog.msg_info_dict`：版本、载具身份）→ `_read_initial_parameters()`
+  （`ulog.initial_parameters`：累计飞行、机架编号）→ `_read_data_list()`
   （`ulog.data_list` + `ulog.dropouts`：先读**基准 topic** `vehicle_status` 得到机型 / 模式 /
   armed 区间 / 阶段，再**全量扫描**得到时长、轨迹起点、重启、丢包）→
-  `_read_messages()`（`ulog.logged_messages`：日志消息，含警告 / 错误级别）。
+  `_read_logged_messages()`（`ulog.logged_messages`：日志消息，含警告 / 错误级别）。
   四段**只往 `self` 上放结果**；最后由 `_collect_facts()` 一处建出 facts dict。
   原先这些全挤在 165 行的 `_build()` 里，而且各段各写各的 `facts["..."]`，等于把"报告头
   有哪些字段"拆散在四处。现在**键名只在 `_collect_facts` 出现**，条件键（这份日志没有
   就不给）由属性为 `None` / `""` 表示——读日志与"报告头叫什么名字"分开。
   两个附带结论：
-  - **只有一处顺序约束**：`_read_messages()` 必须最后跑——tSec 是**相对日志起点**的秒数，
-    要用 `_read_topics()` 算出的 `t0_us`。除此之外各段互不依赖。
+  - **只有一处顺序约束**：`_read_logged_messages()` 必须最后跑——tSec 是**相对日志起点**的秒数，
+    要用 `_read_data_list()` 算出的 `t0_us`。除此之外各段互不依赖。
     先前以为"版本必须最先读、后面每步都按版本挑分支"——在 provider 内部**不成立**：
-    `self.fw` / `fw_minor` 只被 `match_firmware()`、`semantics()`、`_collect_facts()` 用到，
+    `self.fw` / `fw_minor` 只被 `match_version()`、`builtin_variables()`、`_collect_facts()` 用到，
     没有一处 `data_list` 的读取按版本分支（版本分支在**规则层**的 `when_fw`，经
-    `match_firmware()` 求值）。
-  - `logged_messages` 改在构造期算一次并缓存。**不是**"也许用得上所以先存"：`semantics()`
+    `match_version()` 求值）。
+  - `logged_messages` 改在构造期算一次并缓存。**不是**"也许用得上所以先存"：`builtin_variables()`
     里就有 `messages`，而 `_rule_env()` 在 `for _rule in RULES:` 循环体内
-    （`rule_engine.py:305/314`），即**每条规则各调一次 `semantics()`**——不缓存就是每条
-    规则把同一份列表重建一遍。契约方法 `logged_messages()` 现在返回逐条复制的副本。
-- **`vehicle_status` 只读一次**，需要切段的东西在 `_read_topics()` 里用同一批数组
+    （`rule_engine.py:305/314`），即**每条规则各调一次 `builtin_variables()`**——不缓存就是每条
+    规则把同一份列表重建一遍。契约方法 `get_logged_messages()` 现在返回逐条复制的副本。
+- **`vehicle_status` 只读一次**，需要切段的东西在 `_read_data_list()` 里用同一批数组
   一次算完：armed 区间（`self.armed_intervals`）、出现过的阶段集合（`self.phases_present`，
   喂故障库）、连续阶段区间（`self.phase_intervals`，报告页阶段条）。
-  原先这两件事分在两处（`_build` 里取一次、`phases()` 自己再取一次），而且 `phases()`
+  原先这两件事分在两处（`_build` 里取一次、`get_flight_phases()` 自己再取一次），而且 `get_flight_phases()`
   为此要把整份 dataset 留到运行期再切一次——**留的是结果，不留 dataset**。
   顺带把"只取第一个"的写法都换成按 `instance` 取（`_find_topic`）：原先 `_find_topic_all(...)[0]`
   与 `_find_topic(topic, 0)` 混着用，前者是"列表第 0 个"、后者才是"某个实例"。
   两者在 PX4 的单实例 `vehicle_status` 上等价，已用数据层前后对照验证
   （`np_manifest` / `np_track` / `np_log_info` 逐字节一致——**基线盖不到数据层**，
-  它只比 result JSON，所以动 `phases()` 必须另做这个对照）。
+  它只比 result JSON，所以动 `get_flight_phases()` 必须另做这个对照）。
 - **新增契约能力 `parser_version()`**（REQUIRED）：`rule_engine.py` 原先把
   `"parserVersion": "pyulog/pyodide-0.3.0"` 写死——一个与实际装的解析器无关的假版本串，
   而且把 `pyulog` 这个名字钉进了**格式无关层**（正是上面「机制 / 数据 / 格式」三分要避免的）。
@@ -404,7 +404,7 @@ def eval_expr(expr, env):
 
 # ── 框架主循环 ──
 for rule in RULES + GUARDS:
-    if not match_firmware(rule["firmware"], FW) or not match_airframe(rule["airframe"], vehicle_type):
+    if not match_version(rule["firmware"], FW) or not match_airframe(rule["airframe"], vehicle_type):
         continue
     if rule.get("requires") and not has_topics(rule["requires"]):
         skipped(rule["id"], "缺少依赖 topic"); continue
