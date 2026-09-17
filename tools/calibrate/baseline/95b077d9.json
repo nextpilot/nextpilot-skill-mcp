@@ -6,14 +6,24 @@
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
     "platform": "PX4",
-    "parserVersion": "pyulog/pyodide-0.3.0",
+    "parserVersion": "pyulog/1.1.0",
     "facts": {
       "durationSec": 73.2,
       "vehicleType": "rover",
       "firmware": "1.17.0",
       "firmwareProfile": "px4-1.15+",
+      "firmwareDisplay": "v1.17.0",
+      "fwReleaseType": 255,
+      "armedDurationSec": 42.5,
+      "phases": [
+        "fw_cruise",
+        "hover",
+        "maneuver"
+      ],
+      "dropoutTotalMs": 0,
       "hardware": "PX4_FMU_V6X",
       "hardwareSubtype": "V6X001",
+      "verSw": "d6f12ad1c4f70ad3230afd7d86e971421e02fef4",
       "modes": [
         "Mission",
         "Hold",
@@ -21,20 +31,10 @@
         "Manual"
       ],
       "mainMode": "Mission",
-      "firmwareDisplay": "v1.17.0",
-      "fwReleaseType": 255,
-      "verSw": "d6f12ad1c4f70ad3230afd7d86e971421e02fef4",
       "uuid": "0006000000003736333130335109002c003b",
       "vehicleLifeS": 2657.3,
       "airframeId": 51000,
-      "startUtc": 1789048759,
-      "armedDurationSec": 42.5,
-      "phases": [
-        "fw_cruise",
-        "hover",
-        "maneuver"
-      ],
-      "dropoutTotalMs": 0
+      "startUtc": 1789048759
     },
     "metrics": [
       {

@@ -6,24 +6,24 @@
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
     "platform": "PX4",
-    "parserVersion": "pyulog/pyodide-0.3.0",
+    "parserVersion": "pyulog/1.1.0",
     "facts": {
       "durationSec": 181.5,
       "vehicleType": "rotary_wing",
       "firmware": "未知（旧固件或无版本号）",
       "firmwareProfile": "px4-legacy",
+      "firmwareDisplay": "fd4833",
+      "fwReleaseType": null,
+      "armedDurationSec": 0.0,
+      "phases": [],
+      "dropoutTotalMs": 119,
       "hardware": "AUAV_X21",
+      "verSw": "fd483321a5cf50ead91164356d15aa474643aa73",
       "modes": [
         "Manual"
       ],
       "mainMode": "Manual",
-      "firmwareDisplay": "fd4833",
-      "fwReleaseType": null,
-      "verSw": "fd483321a5cf50ead91164356d15aa474643aa73",
-      "airframeId": 10020,
-      "armedDurationSec": 0.0,
-      "phases": [],
-      "dropoutTotalMs": 119
+      "airframeId": 10020
     },
     "metrics": [
       {

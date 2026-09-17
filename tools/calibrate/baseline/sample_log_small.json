@@ -6,30 +6,30 @@
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
     "platform": "PX4",
-    "parserVersion": "pyulog/pyodide-0.3.0",
+    "parserVersion": "pyulog/1.1.0",
     "facts": {
       "durationSec": 7.4,
       "vehicleType": "rotary_wing",
       "firmware": "1.11.2",
       "firmwareProfile": "px4-legacy",
-      "hardware": "CUBEPILOT_CUBEORANGE",
-      "modes": [
-        "Manual"
-      ],
-      "mainMode": "Manual",
       "firmwareDisplay": "v1.11.2 (8583f1)",
       "fwReleaseType": 0,
-      "verSw": "8583f1da30b63154d6ba0bc187d86135dfe33cf9",
-      "uuid": "000600000000383638393239510d0035002d",
-      "verSwBranch": "v1.11.2_w_rc_sysid",
-      "vehicleLifeS": 22035.4,
-      "airframeId": 13014,
-      "startUtc": 1618986658,
       "armedDurationSec": 5.6,
       "phases": [
         "maneuver"
       ],
-      "dropoutTotalMs": 30
+      "dropoutTotalMs": 30,
+      "hardware": "CUBEPILOT_CUBEORANGE",
+      "verSw": "8583f1da30b63154d6ba0bc187d86135dfe33cf9",
+      "modes": [
+        "Manual"
+      ],
+      "mainMode": "Manual",
+      "uuid": "000600000000383638393239510d0035002d",
+      "verSwBranch": "v1.11.2_w_rc_sysid",
+      "vehicleLifeS": 22035.4,
+      "airframeId": 13014,
+      "startUtc": 1618986658
     },
     "metrics": [
       {

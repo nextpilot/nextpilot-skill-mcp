@@ -6,32 +6,32 @@
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
     "platform": "PX4",
-    "parserVersion": "pyulog/pyodide-0.3.0",
+    "parserVersion": "pyulog/1.1.0",
     "facts": {
       "durationSec": 203.4,
       "vehicleType": "fixed_wing",
       "firmware": "1.16.0",
       "firmwareProfile": "px4-1.15+",
-      "hardware": "PX4_FMU_V6C",
-      "hardwareSubtype": "V6C002002",
-      "modes": [
-        "Mission",
-        "Manual"
-      ],
-      "mainMode": "Mission",
       "firmwareDisplay": "v1.16.0",
       "fwReleaseType": 255,
-      "verSw": "6ea3539157ca358c70a515878b77077af7d4611d",
-      "uuid": "0006000000003132343830345115001e0023",
-      "vehicleLifeS": 695.3,
-      "airframeId": 2100,
-      "startUtc": 1789283671,
       "armedDurationSec": 181.7,
       "phases": [
         "fw_cruise",
         "maneuver"
       ],
-      "dropoutTotalMs": 0
+      "dropoutTotalMs": 0,
+      "hardware": "PX4_FMU_V6C",
+      "hardwareSubtype": "V6C002002",
+      "verSw": "6ea3539157ca358c70a515878b77077af7d4611d",
+      "modes": [
+        "Mission",
+        "Manual"
+      ],
+      "mainMode": "Mission",
+      "uuid": "0006000000003132343830345115001e0023",
+      "vehicleLifeS": 695.3,
+      "airframeId": 2100,
+      "startUtc": 1789283671
     },
     "metrics": [
       {

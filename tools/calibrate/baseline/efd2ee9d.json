@@ -6,31 +6,31 @@
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
     "platform": "PX4",
-    "parserVersion": "pyulog/pyodide-0.3.0",
+    "parserVersion": "pyulog/1.1.0",
     "facts": {
       "durationSec": 213.0,
       "vehicleType": "rotary_wing",
       "firmware": "1.15.0",
       "firmwareProfile": "px4-1.15+",
+      "firmwareDisplay": "v1.15.0 (479ee0)",
+      "fwReleaseType": 0,
+      "armedDurationSec": 74.5,
+      "phases": [
+        "hover"
+      ],
+      "dropoutTotalMs": 0,
       "hardware": "DAMIAO_DM_FC01",
+      "verSw": "479ee0e4de8e79f6a5babee12013caf5c830031a",
       "modes": [
         "Position",
         "Stabilized",
         "Altitude"
       ],
       "mainMode": "Position",
-      "firmwareDisplay": "v1.15.0 (479ee0)",
-      "fwReleaseType": 0,
-      "verSw": "479ee0e4de8e79f6a5babee12013caf5c830031a",
       "uuid": "0006000000003638373135335105003e0027",
       "verSwBranch": "damiao_dm-fc01_v1.15.0",
       "vehicleLifeS": 579.5,
-      "airframeId": 4001,
-      "armedDurationSec": 74.5,
-      "phases": [
-        "hover"
-      ],
-      "dropoutTotalMs": 0
+      "airframeId": 4001
     },
     "metrics": [
       {
