@@ -107,7 +107,13 @@ def check_provider(ns: dict, path: Path) -> None:
     if "phases" in facts:
         check(isinstance(facts["phases"], list), "%s: facts().phases 应当是 list" % where)
 
-    # ---- 5. match_firmware：any / 边界 / 非法串 ----
+    # ---- 5. parser_version：进报告头的解析器版本，必须是非空字符串 ----
+    # 之所以要测：它在浏览器里取的是 Pyodide 当时装的解析器版本，取不到时会退化成
+    # 一个看着像版本号的占位串——报告里记了个假版本，比记 "unknown" 更坏。
+    pv = p.parser_version()
+    check(isinstance(pv, str) and pv.strip(), "%s: parser_version() 应当给出非空字符串" % where)
+
+    # ---- 6. match_firmware：any / 边界 / 非法串 ----
     # 版本未知（老日志没写版本号）时约定"不因版本排除任何东西"，所以下面两条的期望值
     # 随 fw_minor 是否为 None 而不同——这正是契约要写清楚的地方。
     unknown_fw = sem["fw_minor"] is None
@@ -126,7 +132,7 @@ def check_provider(ns: dict, path: Path) -> None:
     except Exception as exc:
         check(False, "%s: 非法约束串抛了 %r，应当是 ValueError" % (where, exc))
 
-    # ---- 6. 可选能力：定义了就要能用（缺席合法，所以先问有没有）----
+    # ---- 7. 可选能力：定义了就要能用（缺席合法，所以先问有没有）----
     if hasattr(p, "phases"):
         ph = p.phases()
         check(isinstance(ph, list), "%s: phases() 应当返回 list" % where)
@@ -140,7 +146,7 @@ def check_provider(ns: dict, path: Path) -> None:
         check(isinstance(tr, dict) and ("lat" in tr or "error" in tr),
               "%s: track() 要么给 lat/lon/alt，要么给 error" % where)
 
-    # ---- 7. 报告页的两块整体数据能取到且是 dict ----
+    # ---- 8. 报告页的两块整体数据能取到且是 dict ----
     li = p.log_info()
     check(isinstance(li, dict), "%s: log_info() 应当返回 dict" % where)
     for key in ("sysInfo", "infoDict", "messages", "params", "phases"):

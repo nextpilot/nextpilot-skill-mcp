@@ -1317,6 +1317,13 @@ REQUIRED = {
         "kind": "attr",
         "doc": "格式标识（如 px4-ulog），进报告与错误信息",
     },
+    "parser_version": {
+        "kind": "method", "sig": "() -> str",
+        "doc": "解析这一份日志用的解析器版本串（如 pyulog/1.1.0），进报告头的 parserVersion。"
+               "**为什么由 provider 给而不是引擎写死**：引擎不认识任何一种日志的解析器，"
+               "写死就等于把某个格式的名字钉进了格式无关层。"
+               "浏览器里解析器版本不受本站控制（PyPI 当时的最新版），所以它必须如实记录",
+    },
     "messages": {
         "kind": "method", "sig": "() -> list[dict]",
         "doc": "有哪些消息/话题：[{name, instance, n, fields:[{name, dtype}]}]。"
@@ -1487,6 +1494,8 @@ def check_provider(provider, where="provider"):
         raise ValueError("%s.facts() 必须返回 dict" % where)
     if not isinstance(provider.messages(), list):
         raise ValueError("%s.messages() 必须返回 list" % where)
+    if not isinstance(provider.parser_version(), str):
+        raise ValueError("%s.parser_version() 必须返回 str" % where)
     return provider
 
 # PX4 .ulg（ULog）适配器 —— **本项目唯一认识 PX4 的地方**
@@ -1507,6 +1516,7 @@ import io as _io
 import re as _re
 
 import numpy as np
+import pyulog
 from pyulog import ULog
 
 # 解锁判定的码值：PX4 vehicle_status.arming_state 的 ARMING_STATE_ARMED
@@ -1552,10 +1562,24 @@ class Px4Provider:
         # 本日志实际录到的 topic 名集合
         self._topics = set(d.name for d in self.ulog.data_list)
 
-        self._detect_firmware()
-        self._build()
+        # 按 pyulog 的**数据来源**分组读：各段只读自己那一种来源，都只往 self 上放结果、
+        # 不碰 facts。顺序有一处硬约束——\`_read_messages()\` 要用 \`_read_topics()\` 算出的
+        # \`t0_us\` 把消息时间换成**相对日志起点**的秒数，所以它必须排最后；其余互不依赖。
+        #   ulog.msg_info_dict      → \`_read_msg_info()\`：版本、载具身份
+        #   ulog.initial_parameters → \`_read_params()\`：参数里的事实（累计飞行、机架编号）
+        #   ulog.data_list          → \`_read_topics()\`：基准 topic（机型/模式/armed/阶段）
+        #                             与全量扫描（时长、轨迹起点、重启、丢包）
+        #   ulog.logged_messages    → \`_read_messages()\`：日志消息（含警告/错误级别）
+        self._read_msg_info()
+        self._read_params()
+        self._read_topics()
+        self._read_messages()
 
     # ================= 数据访问层 =================
+
+    def parser_version(self):
+        """解析这份日志用的解析器版本（见 \`_read_versions\`）。"""
+        return self.parser_version_str
 
     def messages(self):
         """[{name, instance, n, fields:[{name, dtype}]}]（驱动 np_manifest 与曲线可用性）"""
@@ -1575,7 +1599,7 @@ class Px4Provider:
 
         取不到返回 None（不抛异常——契约要求）。
         """
-        d = self._find(topic, instance)
+        d = self._find_topic(topic, instance)
         return d.data if d is not None else None
 
     def series(self, ref, instance=None, alias=None, per_instance=False):
@@ -1648,24 +1672,10 @@ class Px4Provider:
     def logged_messages(self):
         """[{tSec, message, level, level_name}]（tSec = 相对日志起点的秒数）。
 
-        level 是 ULog 里的原始字节，PX4 填的是 **ASCII 数字**（'3'=51 才是 ERROR），
-        与 pyulog 的 Message.log_level_str() 一致；因此经验文件按 level_name 判定，
-        不要直接和 3/4 这种数字比（迁移前就是这么比错的，导致消息类经验从不命中）。
+        内容在构造时由 \`_read_messages()\` 算好一次——\`semantics()\` 每条规则都要它，
+        每次重建纯属白干。这里返回逐条复制的新 dict：调用方拿到的不能是内部状态。
         """
-        out = []
-        for m in getattr(self.ulog, "logged_messages", []):
-            try:
-                ts_s = round((int(m.timestamp) - self.t0_us) / 1e6, 2)
-            except Exception:
-                ts_s = None
-            lvl = int(getattr(m, "log_level", ord("6")))
-            out.append({
-                "tSec": ts_s,
-                "message": str(m.message).strip(),
-                "level": lvl,
-                "level_name": self._level_names.get(lvl, "UNKNOWN"),
-            })
-        return out
+        return [dict(m) for m in self._logged_messages]
 
     def semantics(self):
         """内置变量表。**每次返回新 dict**（引擎会往里写 compute 的输出）。"""
@@ -1689,41 +1699,17 @@ class Px4Provider:
 
     def facts(self):
         """报告头的离散事实（机型 / 固件 / 时长 / 模式 / 载具身份……）。"""
-        return dict(self._report_facts)
+        return self._collect_facts()
 
     # ================= 可选能力 =================
 
     def phases(self):
-        """连续的飞行阶段区间（报告页阶段条用）：按 nav_state 变化切段。"""
-        d = self._find("vehicle_status", 0)
-        if d is None:
-            return []
-        ts = np.asarray(d.data["timestamp"], dtype=np.int64)
-        nav = d.data.get("nav_state")
-        arm = d.data.get("arming_state")
-        if nav is None:
-            return []
-        nav = np.asarray(nav)
-        arm = np.asarray(arm) if arm is not None else None
-        runs = []
-        start = 0
-        for i in range(1, len(nav)):
-            if int(nav[i]) != int(nav[start]):
-                runs.append((start, i - 1))
-                start = i
-        runs.append((start, len(nav) - 1))
-        out = []
-        for a, b in runs:
-            code = int(nav[a])
-            seg_arm = int(np.median(arm[a:b + 1])) if arm is not None else None
-            out.append({
-                "startSec": round(int(ts[a]) / 1e6, 2),
-                "endSec": round(int(ts[b]) / 1e6, 2),
-                "navState": code,
-                "mode": self._nav_names.get(code, "Mode %d" % code),
-                "armed": seg_arm == _ARMING_STATE_ARMED,
-            })
-        return out
+        """连续的飞行阶段区间（报告页阶段条用）：按 nav_state 变化切段。
+
+        数据在 \`_read_topics()\` 里就一起算好了（同一批数组），这里只交出去。
+        返回逐段复制的新 dict：调用方拿到的不能是 provider 的内部状态。
+        """
+        return [dict(seg) for seg in self.phase_intervals]
 
     def dropouts(self):
         return [{"tSec": round(int(d.timestamp) / 1e6, 2), "durationMs": int(d.duration)}
@@ -1971,30 +1957,38 @@ class Px4Provider:
 
     # ================= 内部：解析与事实 =================
 
-    def _find(self, topic, instance):
+    def _find_topic(self, topic, instance):
+        """该 topic 该实例那份数据；没有就 None。"""
         for d in self.ulog.data_list:
             if d.name == topic and d.multi_id == instance:
                 return d
         return None
 
-    def _find_all(self, name):
-        return [d for d in self.ulog.data_list if d.name == name]
+    def _find_topic_all(self, topic):
+        """该 topic 的**全部实例**（多实例拼接用）。"""
+        return [d for d in self.ulog.data_list if d.name == topic]
 
     @staticmethod
-    def _getf(ds, *names):
+    def _first_field(ds, *names):
+        """按 names 的顺序取**第一个存在**的字段（旧固件改过名时靠它回退）。
+
+        取不到（名字不在这份日志里）返回 None，不抛异常——契约要求"取不到一律 None"，
+        引擎按"数据不足"处理。**只咽 KeyError**：静默留给"数据缺失"，不留给编程错误
+        （传了个 None 的 dataset 之类该当场炸，否则表现成"这条经验静默不生效"，最难查）。
+        """
         for n in names:
             try:
                 v = ds.data[n]
-                if v is not None:
-                    return v
-            except Exception:
-                pass
+            except KeyError:
+                continue
+            if v is not None:
+                return v
         return None
 
     def _read_concat(self, ref, aliases):
         """'topic.field' → 该字段在各实例上的值（多实例拼接）；topic/字段缺失返回 None。"""
         topic, _, field = ref.partition(".")
-        ds = self._find_all(topic)
+        ds = self._find_topic_all(topic)
         if not ds:
             return None
         aliases = list(aliases or [])
@@ -2009,14 +2003,14 @@ class Px4Provider:
                 return None
             return np.concatenate(vals) if len(vals) > 1 else vals[0]
 
-        direct = gather(lambda d: self._getf(d, field, *aliases))
+        direct = gather(lambda d: self._first_field(d, field, *aliases))
         if direct is not None:
             return direct
 
         def gather_cell(idx):
             # pyulog 对定长数组通常暴露为 'field[0]'，个别构建为 'field_0'
             return gather(lambda d: next(
-                (v for v in (self._getf(d, f"{stem}[{idx}]", f"{stem}_{idx}")
+                (v for v in (self._first_field(d, f"{stem}[{idx}]", f"{stem}_{idx}")
                              for stem in [field] + aliases) if v is not None), None))
 
         if gather_cell(0) is None:
@@ -2029,13 +2023,13 @@ class Px4Provider:
     def _read_grouped(self, ref, aliases):
         """per_instance 取数：返回「每个 topic 实例一组」的列表（不跨实例拼接）。"""
         topic, _, field = ref.partition(".")
-        ds = self._find_all(topic)
+        ds = self._find_topic_all(topic)
         if not ds:
             return None
         aliases = list(aliases or [])
         groups = []
         for d in ds:
-            direct = self._getf(d, field, *aliases)
+            direct = self._first_field(d, field, *aliases)
             if direct is not None and len(direct):
                 groups.append(np.asarray(direct, dtype=float))
                 continue
@@ -2043,7 +2037,7 @@ class Px4Provider:
             for idx in range(32):
                 col = None
                 for stem in [field] + aliases:
-                    v = self._getf(d, f"{stem}[{idx}]", f"{stem}_{idx}")
+                    v = self._first_field(d, f"{stem}[{idx}]", f"{stem}_{idx}")
                     if v is not None and len(v):
                         col = np.asarray(v, dtype=float)
                         break
@@ -2059,11 +2053,13 @@ class Px4Provider:
         except Exception:
             return self._level_names.get(lvl, "LEVEL %d" % lvl)
 
-    def _detect_firmware(self):
-        """固件版本识别（PX4 1.15 起 topic 与字段名有破坏性变化）。
+    def _read_msg_info(self):
+        """从 \`ulog.msg_info_dict\`（PX4 的 Information Message）读版本与载具身份。
 
         ver_sw_release 的打包：major<<24 | minor<<16 | patch<<8 | 类型。
         """
+        self.parser_version_str = "pyulog/%s" % getattr(pyulog, "__version__", "unknown")
+
         info = self.ulog.msg_info_dict
         rel = info.get("ver_sw_release")
         fw = {"release": None, "major": None, "minor": None, "patch": None,
@@ -2080,125 +2076,101 @@ class Px4Provider:
         self.fw_label = ("%d.%d.%d" % (fw["major"], fw["minor"], fw["patch"])
                          if fw["minor"] is not None else "未知（旧固件或无版本号）")
 
-    def _build(self):
-        """把日志读成一份离散事实 + 规则要用的语义量。"""
-        ulog, facts = self.ulog, {}
-        info = ulog.msg_info_dict
+        self.hw_subtype = str(info.get("ver_hw_subtype", ""))
 
-        # ---- 总时长与时间基准 ----
-        # 时间基准是**开机以来的秒数**（PX4 时间戳本身就是开机起的微秒），这里不换算，
-        # 只记录起点供事件类算子算相对时刻。
-        t_min, t_max = None, None
-        for d in ulog.data_list:
-            t = self._getf(d, "timestamp")
-            if t is not None and len(t) > 1:
-                a, b = float(t[0]), float(t[-1])
-                t_min = a if t_min is None else min(t_min, a)
-                t_max = b if t_max is None else max(t_max, b)
-        self.t0_us = int(getattr(ulog, "start_timestamp", 0) or (t_min or 0))
-        self.duration_s = round((t_max - t_min) / 1e6, 1) if t_min is not None else None
-        facts["durationSec"] = self.duration_s if self.duration_s is not None else 0
+        # 软件版本的展示串：对齐 Flight Review 的 \`_format_sw_version\`（见 _RELEASE_TYPE_SUFFIX
+        # 的注释：只有未打标签的开发版才附 git 短哈希）。类型码另存一份，前端能凭它重算。
+        # 用 fw["release"]（已 int 化）而不是 info 里的原值：解析不出数字时它才是 None。
+        self.ver_sw = str(info.get("ver_sw", ""))
+        short_sw = self.ver_sw[:6] if len(self.ver_sw) > 10 else self.ver_sw
+        rel = fw["release"]
+        self.fw_release_type = None if rel is None else int(rel) & 0xFF
+        if rel is None:
+            self.fw_display = short_sw
+        else:
+            rtype = int(rel) & 0xFF
+            disp = "v%d.%d.%d%s" % (fw["major"], fw["minor"], fw["patch"],
+                                    _RELEASE_TYPE_SUFFIX.get(rtype, ""))
+            if rtype not in _RELEASE_TYPE_SUFFIX and self.ver_sw:   # 未打标签的开发版：附短哈希
+                disp += " (%s)" % short_sw
+            self.fw_display = disp
+
+        # 载具身份：与判定无关，但历史卡片与报告概况要用，且必须**随 report 存档**
+        # （派生数据 info 不进存档）。用**分支/标签**（如 damiao_dm-fc01_v1.15.0）比 commit
+        # 号可读；新固件才有这个键
+        self.uuid = str(info.get("sys_uuid", ""))
+        self.ver_sw_branch = str(info.get("ver_sw_branch", ""))
+
+    def _read_params(self):
+        """从 \`ulog.initial_parameters\` 读参数里的事实。"""
+        p = getattr(self.ulog, "initial_parameters", {}) or {}
+        # 载具累计飞行时长：LND_FLIGHT_T_HI/LO 拼成的 64 位 µs 计数器
+        # （两个都是 int32，可能读成负数）
+        hi, lo = p.get("LND_FLIGHT_T_HI"), p.get("LND_FLIGHT_T_LO")
+        self.vehicle_life_s = (
+            round((((int(hi) & 0xFFFFFFFF) << 32) | (int(lo) & 0xFFFFFFFF)) / 1e6, 1)
+            if hi is not None and lo is not None else None)
+        # 机架编号（SYS_AUTOSTART，如 4040）——机型之外再给一个可查的标识
+        af = p.get("SYS_AUTOSTART")
+        self.airframe_id = int(af) if af is not None else None
+
+    def _read_topics(self):
+        """读 \`ulog.data_list\`（各 topic 的时序）与 \`ulog.dropouts\`，得出报告头的离散量。
+
+        分两部分：先读**基准 topic** \`vehicle_status\`（机型 / 模式 / armed 区间 / 飞行阶段），
+        再**扫全局**（总时长与时间基准、记录起始 UTC、数据质量）。这个 topic 只读这一处，
+        需要切段的都在同一批数组上算完——原先 \`phases()\` 要为此把整份 dataset 留到运行期再切。
+        条件值（这份日志没有的）统一用 None / "" 表示，由 \`_collect_facts()\` 决定给不给键。
+        """
+        ulog = self.ulog
+
+        # ---- 基准 topic：vehicle_status ----
+        vs = self._find_topic("vehicle_status", 0)
 
         # ---- 机型识别 ----
         vehicle_type = "unknown"
-        vs_list = self._find_all("vehicle_status")
-        vs = vs_list[0] if vs_list else None
         if vs is not None:
-            vt = self._getf(vs, "vehicle_type")
+            vt = self._first_field(vs, "vehicle_type")
             if vt is not None and len(vt) > 0:
                 vehicle_type = self._vehicle_types.get(int(vt[-1]), "unknown(%d)" % int(vt[-1]))
             else:
-                rw = self._getf(vs, "is_rotary_wing")
+                rw = self._first_field(vs, "is_rotary_wing")
                 if rw is not None and len(rw) > 0:
                     vehicle_type = "rotary_wing" if int(rw[-1]) else "fixed_wing"
         self.vehicle_type = vehicle_type
-        facts["vehicleType"] = vehicle_type
-        facts["firmware"] = self.fw_label
-        facts["firmwareProfile"] = ("px4-1.15+" if (self.fw_minor is not None
-                                                   and self.fw_minor >= 15) else "px4-legacy")
-        if self.fw["hw"]:
-            facts["hardware"] = self.fw["hw"]
-        hw_sub = str(info.get("ver_hw_subtype", ""))
-        if hw_sub:
-            facts["hardwareSubtype"] = hw_sub
 
         # ---- 飞行模式 ----
         # 这次日志里出现过的 nav_state 模式，按占样本数从多到少（名字取 facts.yaml 的
         # nav_state_names）——列表的"飞行模式"列按 Flight Review 的口径列出**全部**模式。
-        if vs_list:
-            nav = self._getf(vs_list[0], "nav_state")
+        self.modes = None
+        if vs is not None:
+            nav = self._first_field(vs, "nav_state")
             if nav is not None and len(nav) > 0:
                 counts = {}
                 for code in nav:
                     counts[int(code)] = counts.get(int(code), 0) + 1
                 ordered = sorted(counts, key=lambda c: -counts[c])
-                facts["modes"] = [str(self._nav_names.get(c, "Mode %d" % c)) for c in ordered]
-                facts["mainMode"] = facts["modes"][0]
-
-        # ---- 软件版本的展示串 ----
-        # 对齐 Flight Review 的 \`_format_sw_version\`（见 _RELEASE_TYPE_SUFFIX 的注释：
-        # 只有未打标签的开发版才附 git 短哈希）。类型码另存一份，前端能凭它重算。
-        sw = str(info.get("ver_sw", ""))
-        short_sw = sw[:6] if len(sw) > 10 else sw
-        rel = self.fw["release"]
-        if rel is None:
-            facts["firmwareDisplay"] = short_sw
-        else:
-            rtype = int(rel) & 0xFF
-            disp = "v%d.%d.%d%s" % (self.fw["major"], self.fw["minor"], self.fw["patch"],
-                                    _RELEASE_TYPE_SUFFIX.get(rtype, ""))
-            if rtype not in _RELEASE_TYPE_SUFFIX and sw:   # 未打标签的开发版：附短哈希
-                disp += " (%s)" % short_sw
-            facts["firmwareDisplay"] = disp
-        facts["fwReleaseType"] = None if rel is None else int(rel) & 0xFF
-        if sw:
-            facts["verSw"] = sw
-
-        # ---- 载具身份与记录起始时刻 ----
-        # 与判定无关，但历史卡片与报告概况要用，且必须**随 report 存档**（派生数据 info 不进存档）。
-        uuid = str(info.get("sys_uuid", ""))
-        if uuid:
-            facts["uuid"] = uuid
-        # 用**分支/标签**（如 damiao_dm-fc01_v1.15.0）比 commit 号可读；新固件才有这个键
-        branch = str(info.get("ver_sw_branch", ""))
-        if branch:
-            facts["verSwBranch"] = branch
-        # 载具累计飞行时长：参数 LND_FLIGHT_T_HI/LO 拼成的 64 位 µs 计数器
-        # （两个都是 int32，可能读成负数）
-        p = getattr(ulog, "initial_parameters", {}) or {}
-        hi, lo = p.get("LND_FLIGHT_T_HI"), p.get("LND_FLIGHT_T_LO")
-        if hi is not None and lo is not None:
-            facts["vehicleLifeS"] = round(
-                (((int(hi) & 0xFFFFFFFF) << 32) | (int(lo) & 0xFFFFFFFF)) / 1e6, 1)
-        # 机架编号（SYS_AUTOSTART，如 4040）——机型之外再给一个可查的标识
-        af = p.get("SYS_AUTOSTART")
-        if af is not None:
-            facts["airframeId"] = int(af)
-
-        # 记录起始的 UTC 时刻：取 GPS 首次给出有效时间的那一刻
-        # （比 boot_time_utc_us 可靠，后者要飞控对过时）
-        gps_list = self._find_all(_TRACK["topic"])
-        if gps_list and "time_utc_usec" in gps_list[0].data:
-            t = np.asarray(gps_list[0].data["time_utc_usec"], dtype=np.int64)
-            nz = np.nonzero(t > 0)[0]
-            if len(nz):
-                facts["startUtc"] = int(t[nz[0]] // 1000000)
+                self.modes = [str(self._nav_names.get(c, "Mode %d" % c)) for c in ordered]
 
         # ---- armed 区间与飞行阶段 ----
-        armed_intervals, phases_present, armed_duration_s = [], set(), 0.0
+        # 三样东西都从同一批数组切出来：armed 区间（时序算子按它切窗）、这次日志出现过的
+        # 阶段集合（喂故障库）、连续阶段区间（报告页阶段条）。一起算，同一批数据不必切两遍。
+        armed_intervals, phases_present, phase_intervals = [], set(), []
+        armed_duration_s = 0.0
         if vs is not None:
-            nav = self._getf(vs, "nav_state")
-            arm = self._getf(vs, "arming_state")
-            vts = np.asarray(self._getf(vs, "timestamp"), dtype=np.int64)
+            nav = self._first_field(vs, "nav_state")
+            nav_arr = np.asarray(nav) if nav is not None else None
+            arm = self._first_field(vs, "arming_state")
+            arm_arr = np.asarray(arm) if arm is not None else None
+            vts = np.asarray(self._first_field(vs, "timestamp"), dtype=np.int64)
 
             # armed 区间（failsafe 失联只在 armed 区间内才报）
-            if arm is not None:
-                a = np.asarray(arm)
+            if arm_arr is not None:
                 start_i = None
-                for i in range(len(a)):
-                    if int(a[i]) == _ARMING_STATE_ARMED and start_i is None:
+                for i in range(len(arm_arr)):
+                    if int(arm_arr[i]) == _ARMING_STATE_ARMED and start_i is None:
                         start_i = i
-                    elif int(a[i]) != _ARMING_STATE_ARMED and start_i is not None:
+                    elif int(arm_arr[i]) != _ARMING_STATE_ARMED and start_i is not None:
                         armed_intervals.append((int(vts[start_i]), int(vts[i])))
                         start_i = None
                 if start_i is not None:
@@ -2207,9 +2179,7 @@ class Px4Provider:
                                for s, e in armed_intervals)
                 armed_duration_s = round(total_us / 1e6, 1)
 
-            trans_mode = self._getf(vs, "vtol_in_trans_mode")
-            if nav is not None:
-                nav_arr = np.asarray(nav)
+            if nav_arr is not None:
                 # 只统计 armed 段内的状态；未解锁的地面操作不产生飞行阶段
                 if armed_intervals:
                     amask = np.zeros(len(nav_arr), dtype=bool)
@@ -2221,20 +2191,67 @@ class Px4Provider:
                     for phase, phase_codes in self._nav_groups:
                         if codes & phase_codes:
                             phases_present.add(phase)
+
+                # 连续阶段区间：按 nav_state 变化切段，每段取段内 arming_state 的中位数
+                # 判"这段算不算在飞"。与上面那个集合不是一回事：那个答"出现过哪些阶段"，
+                # 这个答"几点到几点在哪个阶段"。
+                runs, run_start = [], 0
+                for i in range(1, len(nav_arr)):
+                    if int(nav_arr[i]) != int(nav_arr[run_start]):
+                        runs.append((run_start, i - 1))
+                        run_start = i
+                runs.append((run_start, len(nav_arr) - 1))
+                for lo_i, hi_i in runs:
+                    code = int(nav_arr[lo_i])
+                    seg_arm = (int(np.median(arm_arr[lo_i:hi_i + 1]))
+                               if arm_arr is not None else None)
+                    phase_intervals.append({
+                        "startSec": round(int(vts[lo_i]) / 1e6, 2),
+                        "endSec": round(int(vts[hi_i]) / 1e6, 2),
+                        "navState": code,
+                        "mode": self._nav_names.get(code, "Mode %d" % code),
+                        "armed": seg_arm == _ARMING_STATE_ARMED,
+                    })
+
+            trans_mode = self._first_field(vs, "vtol_in_trans_mode")
             if trans_mode is not None and int(np.max(np.asarray(trans_mode))) > 0:
                 phases_present.add("vtol_transition")
 
         self.armed_intervals = armed_intervals
         self.armed_duration_s = armed_duration_s
         self.phases_present = phases_present
-        facts["armedDurationSec"] = armed_duration_s
-        facts["phases"] = sorted(phases_present)
+        self.phase_intervals = phase_intervals
 
-        # ---- 数据质量事实 ----
+        # ---- 扫全局：总时长与时间基准 ----
+        # 时间基准是**开机以来的秒数**（PX4 时间戳本身就是开机起的微秒），这里不换算，
+        # 只记录起点供事件类算子算相对时刻。
+        t_min, t_max = None, None
+        for d in ulog.data_list:
+            t = self._first_field(d, "timestamp")
+            if t is not None and len(t) > 1:
+                a, b = float(t[0]), float(t[-1])
+                t_min = a if t_min is None else min(t_min, a)
+                t_max = b if t_max is None else max(t_max, b)
+        self.t0_us = int(getattr(ulog, "start_timestamp", 0) or (t_min or 0))
+        self.duration_s = round((t_max - t_min) / 1e6, 1) if t_min is not None else None
+
+        # ---- 扫全局：记录起始的 UTC 时刻 ----
+        # 取 GPS 首次给出有效时间的那一刻（比 boot_time_utc_us 可靠，后者要飞控对过时）。
+        # 实例按 _TRACK 的声明取，与 track() 同一口径——两处都只认那一个实例，
+        # 别一处取"第一个"、一处取 instance 0
+        self.start_utc = None
+        gps = self._find_topic(_TRACK["topic"], int(_TRACK.get("instance", 0)))
+        if gps is not None and "time_utc_usec" in gps.data:
+            t = np.asarray(gps.data["time_utc_usec"], dtype=np.int64)
+            nz = np.nonzero(t > 0)[0]
+            if len(nz):
+                self.start_utc = int(t[nz[0]] // 1000000)
+
+        # ---- 扫全局：数据质量事实 ----
         # 中途重启：同一 topic 时间戳出现回退（样本 > 10 才算）
         restart = 0
         for d in ulog.data_list:
-            t = self._getf(d, "timestamp")
+            t = self._first_field(d, "timestamp")
             if t is not None and len(t) > 10:
                 a = np.asarray(t, dtype=np.int64)
                 if int(np.count_nonzero(np.diff(a) < 0)) > 0:
@@ -2243,9 +2260,76 @@ class Px4Provider:
         # 丢包累计
         self.dropout_total_ms = int(sum(getattr(d, "duration", 0)
                                         for d in getattr(ulog, "dropouts", [])))
-        facts["dropoutTotalMs"] = self.dropout_total_ms
 
-        self._report_facts = facts
+    def _read_messages(self):
+        """读 \`ulog.logged_messages\`：日志消息（PX4 的 \`[模块] 文案\`，含警告 / 错误级别）。
+
+        **必须排在 \`_read_topics()\` 之后**：tSec 是相对日志起点的秒数，要用它算出的 \`t0_us\`。
+        为什么在构造期算而不是每次现算：\`semantics()\` 里就有 \`messages\`，而 \`semantics()\`
+        被 \`_rule_env()\` **每条规则各调一次**——不缓存就是每条规则重建一遍同一份列表。
+
+        level 是 ULog 里的原始字节，PX4 填的是 **ASCII 数字**（'3'=51 才是 ERROR），
+        与 pyulog 的 Message.log_level_str() 一致；因此经验文件按 level_name 判定，
+        不要直接和 3/4 这种数字比（迁移前就是这么比错的，导致消息类经验从不命中）。
+        """
+        out = []
+        for m in getattr(self.ulog, "logged_messages", []):
+            try:
+                ts_s = round((int(m.timestamp) - self.t0_us) / 1e6, 2)
+            except (AttributeError, TypeError, ValueError):
+                # 这条消息没有可用的 timestamp（pyulog 各版本给的东西不一致）：只丢相对时刻，
+                # 消息本身照留。**不写 except Exception**——\`t0_us\` 要是设错了，那是 bug，
+                # 应该炸出来，而不是让全部消息悄悄变成 tSec=None。
+                ts_s = None
+            lvl = int(getattr(m, "log_level", ord("6")))
+            out.append({
+                "tSec": ts_s,
+                "message": str(m.message).strip(),
+                "level": lvl,
+                "level_name": self._level_names.get(lvl, "UNKNOWN"),
+            })
+        self._logged_messages = out
+
+    def _collect_facts(self):
+        """把三段读到的量汇成报告头的离散事实。
+
+        **facts 的键名只在这一个地方出现**：三段各管"从日志里读什么"（只往 self 上放），
+        这里管"报告头叫什么名字"（含"有才给"的条件键）。分开的好处是改键名不必翻三段代码，
+        也能一眼看全报告头到底有哪些字段。
+        """
+        facts = {
+            "durationSec": self.duration_s if self.duration_s is not None else 0,
+            "vehicleType": self.vehicle_type,
+            "firmware": self.fw_label,
+            "firmwareProfile": ("px4-1.15+" if (self.fw_minor is not None
+                                               and self.fw_minor >= 15) else "px4-legacy"),
+            "firmwareDisplay": self.fw_display,
+            "fwReleaseType": self.fw_release_type,
+            "armedDurationSec": self.armed_duration_s,
+            "phases": sorted(self.phases_present),
+            "dropoutTotalMs": self.dropout_total_ms,
+        }
+        # 条件键：这份日志没有的就不给（前端按"缺哪项不显示哪行"处理）
+        if self.fw["hw"]:
+            facts["hardware"] = self.fw["hw"]
+        if self.hw_subtype:
+            facts["hardwareSubtype"] = self.hw_subtype
+        if self.ver_sw:
+            facts["verSw"] = self.ver_sw
+        if self.modes:
+            facts["modes"] = list(self.modes)
+            facts["mainMode"] = self.modes[0]     # 已按占样本数排序，第一个就是主模式
+        if self.uuid:
+            facts["uuid"] = self.uuid
+        if self.ver_sw_branch:
+            facts["verSwBranch"] = self.ver_sw_branch
+        if self.vehicle_life_s is not None:
+            facts["vehicleLifeS"] = self.vehicle_life_s
+        if self.airframe_id is not None:
+            facts["airframeId"] = self.airframe_id
+        if self.start_utc is not None:
+            facts["startUtc"] = self.start_utc
+        return facts
 
 
 def _json_clean(v):
@@ -2818,7 +2902,7 @@ findings.sort(key=lambda f: order.get(f["severity"], 9))
 
 __result = json.dumps({
     "platform": "PX4",
-    "parserVersion": "pyulog/pyodide-0.3.0",
+    "parserVersion": provider.parser_version(),
     # 事实层产出：facts=日志是什么（离散，驱动判定）；metrics=关键数字（有序，带中文名与单位）
     "facts": provider.facts(),
     "metrics": _metric_entries,

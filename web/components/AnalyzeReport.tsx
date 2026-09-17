@@ -36,7 +36,7 @@ import { LogEventsMsg } from "./LogEventsMsg";
 import { LogParamsMsg } from "./LogParamsMsg";
 import { LogSystemMsg } from "./LogSystemMsg";
 import { PhaseStrip } from "./PhaseStrip";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatFirmware } from "@/lib/format";
 import { vehicleTypeLabel } from "@/lib/vehicle-type";
 import { isDarkTheme, modeStyle } from "@/lib/phase-colors";
 import { LogFlightMap } from "./LogFlightMap";
@@ -562,15 +562,22 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
       title: "载具累计飞行时长（参数 LND_FLIGHT_T_HI/LO）",
     });
   }
-  // 软件版本：分支 / 标签（ver_sw_branch）+ git 提交（ver_sw）。老固件没有 branch，
-  // 云端记录或极旧的存档可能没有 facts.verSw，退回报告记录上的 verSw（同源、截断过）
+  // 软件版本：展示串与历史卡片同一口径（`formatFirmware`，对齐 Flight Review 的
+  // `_format_sw_version`：正式版 `v1.16.0`、alpha/beta/RC 带后缀、未打标签的开发版附短哈希）。
+  // 分支 / 标签（ver_sw_branch）与 git 提交（ver_sw）放 title——它们是展示串的原料，
+  // 摆在行里会跟展示串重复。老固件没有 branch；云端记录或极旧的存档可能没有 facts.verSw，
+  // 退回报告记录上的 verSw（同源、截断过）
   const branch = g?.verSwBranch ?? "";
   const hash = g?.verSw || report.verSw || "";
-  if (branch || hash) {
+  const fwText = formatFirmware(g, hash);
+  if (fwText !== "—" || branch) {
     rows.push({
       label: "软件版本",
-      value: branch && hash ? `${branch}（${hash}）` : branch || hash,
-      title: `构建分支 / 标签：${branch || "（日志里没有 ver_sw_branch）"} · git 提交：${hash || "（无 ver_sw）"}`,
+      value: fwText !== "—" ? fwText : branch,
+      title: [
+        branch ? `构建分支 / 标签 ver_sw_branch：${branch}` : "构建分支 / 标签：本份日志未写",
+        hash ? `git 提交 ver_sw：${hash}` : "git 提交：无 ver_sw",
+      ].join(" · "),
     });
   }
 

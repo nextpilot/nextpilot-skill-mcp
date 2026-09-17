@@ -21,6 +21,13 @@ REQUIRED = {
         "kind": "attr",
         "doc": "格式标识（如 px4-ulog），进报告与错误信息",
     },
+    "parser_version": {
+        "kind": "method", "sig": "() -> str",
+        "doc": "解析这一份日志用的解析器版本串（如 pyulog/1.1.0），进报告头的 parserVersion。"
+               "**为什么由 provider 给而不是引擎写死**：引擎不认识任何一种日志的解析器，"
+               "写死就等于把某个格式的名字钉进了格式无关层。"
+               "浏览器里解析器版本不受本站控制（PyPI 当时的最新版），所以它必须如实记录",
+    },
     "messages": {
         "kind": "method", "sig": "() -> list[dict]",
         "doc": "有哪些消息/话题：[{name, instance, n, fields:[{name, dtype}]}]。"
@@ -191,4 +198,6 @@ def check_provider(provider, where="provider"):
         raise ValueError("%s.facts() 必须返回 dict" % where)
     if not isinstance(provider.messages(), list):
         raise ValueError("%s.messages() 必须返回 list" % where)
+    if not isinstance(provider.parser_version(), str):
+        raise ValueError("%s.parser_version() 必须返回 str" % where)
     return provider

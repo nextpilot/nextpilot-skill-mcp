@@ -549,7 +549,7 @@ findings.sort(key=lambda f: order.get(f["severity"], 9))
 
 __result = json.dumps({
     "platform": "PX4",
-    "parserVersion": "pyulog/pyodide-0.3.0",
+    "parserVersion": provider.parser_version(),
     # 事实层产出：facts=日志是什么（离散，驱动判定）；metrics=关键数字（有序，带中文名与单位）
     "facts": provider.facts(),
     "metrics": _metric_entries,

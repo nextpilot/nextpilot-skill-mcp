@@ -56,6 +56,61 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 验证口径同前：`compare_baseline.py` 6 条日志**逐字段零差异**（这次是纯搬家，
 出现任何差异都说明搬错了），外加新增的 `check_provider.py`（契约测试）。
 
+**2026-09-17 追加（第三段）：provider 初始化按「数据来源」分组 + 解析器版本改由 provider 给**
+
+- **`Px4Provider.__init__` 按 pyulog 的「数据来源」分组读 + 一处汇总**：
+  `_read_msg_info()`（`ulog.msg_info_dict`：版本、载具身份）→ `_read_params()`
+  （`ulog.initial_parameters`：累计飞行、机架编号）→ `_read_topics()`
+  （`ulog.data_list` + `ulog.dropouts`：先读**基准 topic** `vehicle_status` 得到机型 / 模式 /
+  armed 区间 / 阶段，再**全量扫描**得到时长、轨迹起点、重启、丢包）→
+  `_read_messages()`（`ulog.logged_messages`：日志消息，含警告 / 错误级别）。
+  四段**只往 `self` 上放结果**；最后由 `_collect_facts()` 一处建出 facts dict。
+  原先这些全挤在 165 行的 `_build()` 里，而且各段各写各的 `facts["..."]`，等于把"报告头
+  有哪些字段"拆散在四处。现在**键名只在 `_collect_facts` 出现**，条件键（这份日志没有
+  就不给）由属性为 `None` / `""` 表示——读日志与"报告头叫什么名字"分开。
+  两个附带结论：
+  - **只有一处顺序约束**：`_read_messages()` 必须最后跑——tSec 是**相对日志起点**的秒数，
+    要用 `_read_topics()` 算出的 `t0_us`。除此之外各段互不依赖。
+    先前以为"版本必须最先读、后面每步都按版本挑分支"——在 provider 内部**不成立**：
+    `self.fw` / `fw_minor` 只被 `match_firmware()`、`semantics()`、`_collect_facts()` 用到，
+    没有一处 `data_list` 的读取按版本分支（版本分支在**规则层**的 `when_fw`，经
+    `match_firmware()` 求值）。
+  - `logged_messages` 改在构造期算一次并缓存。**不是**"也许用得上所以先存"：`semantics()`
+    里就有 `messages`，而 `_rule_env()` 在 `for _rule in RULES:` 循环体内
+    （`rule_engine.py:305/314`），即**每条规则各调一次 `semantics()`**——不缓存就是每条
+    规则把同一份列表重建一遍。契约方法 `logged_messages()` 现在返回逐条复制的副本。
+- **`vehicle_status` 只读一次**，需要切段的东西在 `_read_topics()` 里用同一批数组
+  一次算完：armed 区间（`self.armed_intervals`）、出现过的阶段集合（`self.phases_present`，
+  喂故障库）、连续阶段区间（`self.phase_intervals`，报告页阶段条）。
+  原先这两件事分在两处（`_build` 里取一次、`phases()` 自己再取一次），而且 `phases()`
+  为此要把整份 dataset 留到运行期再切一次——**留的是结果，不留 dataset**。
+  顺带把"只取第一个"的写法都换成按 `instance` 取（`_find_topic`）：原先 `_find_topic_all(...)[0]`
+  与 `_find_topic(topic, 0)` 混着用，前者是"列表第 0 个"、后者才是"某个实例"。
+  两者在 PX4 的单实例 `vehicle_status` 上等价，已用数据层前后对照验证
+  （`np_manifest` / `np_track` / `np_log_info` 逐字节一致——**基线盖不到数据层**，
+  它只比 result JSON，所以动 `phases()` 必须另做这个对照）。
+- **新增契约能力 `parser_version()`**（REQUIRED）：`rule_engine.py` 原先把
+  `"parserVersion": "pyulog/pyodide-0.3.0"` 写死——一个与实际装的解析器无关的假版本串，
+  而且把 `pyulog` 这个名字钉进了**格式无关层**（正是上面「机制 / 数据 / 格式」三分要避免的）。
+  现在由 provider 给真值（`pyulog.__version__`）。构建期查漏实现、运行期 `check_provider()`
+  查类型、`check_provider.py` 契约测试查非空，三道都跟着 REQUIRED 表自动生效
+  （`build-knowledge.mjs` 的 `parseProviderApi` 从表里派生，**不用改构建脚本**）。
+- 浏览器里解析器版本**不受本站控制**：worker 用 `micropip.install("pyulog")` 装的是
+  PyPI 当时的最新版（除非配了 `NEXT_PUBLIC_PYULOG_WHEEL` 自托管）。所以报告里记的这个值
+  是"当时确实用了哪个版本"，本地校准工具与浏览器可能不同——这是如实记录，不是 bug。
+  值得单独决定的是要不要把浏览器侧的 pyulog 版本钉死。
+- **基线已单独重新冻结**（`chore` 提交）：`facts` 的键按来源分组重排，值全同；
+  `parserVersion` 从占位串变成 `pyulog/1.1.0`。`compare_baseline.py` 对 dict 做 `sorted`
+  后比较，所以**键序变化不算差异**，重冻结前它报的正是"每条日志恰好 1 处差异 = parserVersion"，
+  这就是"除版本外没动别的"的证据。重冻结后回到零差异。
+- **同一类越界还剩一处，本次没动**：`rule_engine.py` 的 `"platform": "PX4"` 也是格式名
+  写进格式无关层（`fmt` 契约项本就是干这个的）。改它要动基线里 `platform` 的值，
+  另开一笔。
+- 报告页「软件版本」行原先显示的是**原料**（`ver_sw_branch（ver_sw 全文）`），
+  而存档里的 `firmwareDisplay` / `fwReleaseType`（`v1.17.0-alpha` 这种展示串）从不显示，
+  只有历史卡片用 `lib/format.ts` 的 `formatFirmware()` 显示。现已统一到同一个
+  `formatFirmware()`，分支与 git 提交移入 title——与历史卡片同口径。
+
 **2026-09-17 追加：规则写法全面换成 Python 子集**（本文档下面那些「算子节点」的例子
 只代表**最初设计**，现状见这一段）：
 
