@@ -132,10 +132,7 @@ def np_series(topic, instance, fields_json, max_points=3000, op_json=None):
             "topic": topic,
             "instance": int(instance),
             "t": [_since_boot(ts[i], 3) for i in idx],
-            "series": {
-                names[i]: [_clean(np.asarray(o, dtype=float)[j]) for j in idx]
-                for i, o in enumerate(outs)
-            },
+            "series": {names[i]: [_clean(np.asarray(o, dtype=float)[j]) for j in idx] for i, o in enumerate(outs)},
             "fullCount": n,
             "op": name,
         }
