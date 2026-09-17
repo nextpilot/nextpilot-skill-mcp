@@ -30,17 +30,11 @@ _MAGIC = b"ULog"
 # **别凭直觉改**：只有类型码 0（未打标签的开发版）才附 git 短哈希，alpha/beta/RC 不附。
 _RELEASE_TYPE_SUFFIX = {64: "-alpha", 128: "-beta", 192: "-rc", 255: ""}
 
-# 轨迹取数：字段名与量纲随固件改过（1.15 起 lat/lon/alt → latitude_deg/longitude_deg/
-# altitude_msl_m，且 degE7→deg、mm→m），所以每个字段给候选、按顺序取第一个存在的，
-# 各按自己的 scale 换算。（原先在 facts.yaml 的 track 一节）
-_TRACK = {
-    "topic": "vehicle_gps_position",
-    "instance": 0,
-    "max_points": 1500,
-    "lat": [{"field": "latitude_deg", "scale": 1}, {"field": "lat", "scale": 1.0e-7}],
-    "lon": [{"field": "longitude_deg", "scale": 1}, {"field": "lon", "scale": 1.0e-7}],
-    "alt": [{"field": "altitude_msl_m", "scale": 1}, {"field": "alt", "scale": 0.001}],
-}
+# 地图轨迹的取数**声明**（读哪个 topic 的哪几列、各按什么量纲换算）在
+# knowledge/px4/plot/track.yml —— 它按「要画什么、从哪几列画」归在 plot/ 下，
+# 构建期并进 __FACTS__，这里从 `self._cfg["track"]` 读。
+# **解析逻辑留在本文件**（track()）：按顺序取第一个存在的候选、剔未定位点、等距抽样——
+# 这些是分支，写进 YAML 只能再造一门小语言（见 track.yml 的说明）。
 
 
 class Px4Provider:
@@ -263,7 +257,9 @@ class Px4Provider:
 
     def track(self, max_points=None):
         """地图轨迹：按字段候选取数、按各自 scale 换算，剔除未定位的采样。"""
-        cfg = _TRACK
+        cfg = self._cfg.get("track")
+        if not cfg or not cfg.get("topic"):
+            return {"error": "这份格式没有声明轨迹取数来源（knowledge/px4/plot/track.yml）"}
         cols = self.columns(cfg["topic"], int(cfg.get("instance", 0)))
         if not cols:
             return {"error": "日志里没有 %s 话题" % cfg["topic"]}
@@ -741,10 +737,12 @@ class Px4Provider:
 
         # ---- 扫全局：记录起始的 UTC 时刻 ----
         # 取 GPS 首次给出有效时间的那一刻（比 boot_time_utc_us 可靠，后者要飞控对过时）。
-        # 实例按 _TRACK 的声明取，与 track() 同一口径——两处都只认那一个实例，
+        # 实例按 plot/track.yml 的声明取，与 track() 同一口径——两处都只认那一个实例，
         # 别一处取"第一个"、一处取 instance 0
         self.start_utc = None
-        gps = self._find_topic(_TRACK["topic"], int(_TRACK.get("instance", 0)))
+        track_cfg = self._cfg.get("track") or {}
+        gps = (self._find_topic(track_cfg["topic"], int(track_cfg.get("instance", 0)))
+               if track_cfg.get("topic") else None)
         if gps is not None and "time_utc_usec" in gps.data:
             t = np.asarray(gps.data["time_utc_usec"], dtype=np.int64)
             nz = np.nonzero(t > 0)[0]

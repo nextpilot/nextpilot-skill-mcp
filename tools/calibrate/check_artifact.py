@@ -12,12 +12,17 @@ from __future__ import annotations
 import ast
 import json
 import re
+import sys
 from pathlib import Path
+
+# 数据配置的装配规则与本地回归共用一处（facts.yaml + plot/track.yml）——
+# 别在这里再手写一遍，两边不一致时本地跑得出、浏览器跑不出。
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import run_checks_locally as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TS = REPO_ROOT / "web" / "workers" / "ulog-check-script.ts"
 FAULT_KB = REPO_ROOT / "web" / "workers" / "fault-kb.generated.json"
-FACTS_YAML = REPO_ROOT / "knowledge" / "px4" / "facts.yaml"
 
 
 def extract_json_const(src: str, name: str):
@@ -62,11 +67,8 @@ def main() -> int:
     final = body
     final = final.replace("__FAULT_KB__", repr(json.loads(FAULT_KB.read_text(encoding="utf-8"))["entries"]))
     final = final.replace("__RULES__", json.dumps(extract_json_const(src, "rules"), ensure_ascii=False))
-    # facts 同样在 .replace 链里（数据源 knowledge/px4/facts.yaml，与构建期同一份）
-    import yaml as _yaml
-
-    facts = _yaml.safe_load(FACTS_YAML.read_text(encoding="utf-8"))
-    final = final.replace("__FACTS__", json.dumps(facts, ensure_ascii=False))
+    # 数据配置同样在 .replace 链里；它的装配规则（facts.yaml + plot/track.yml）与本地回归共用一处
+    final = final.replace("__FACTS__", json.dumps(runner.load_facts_payload(), ensure_ascii=False))
 
     try:
         ast.parse(final)

@@ -624,6 +624,14 @@ const signatures = parseOperatorSignatures(operatorsPy);
 if (Object.keys(signatures).length === 0) throw new Error("operators.py 里没解析到任何算子签名");
 // facts.yaml 要在规则校验**之前**读：规则的 category / doc / 身份块默认值都在 rule_meta 里
 const facts = parseYaml(read(FACTS_PATH));
+// plot/track.yml 的取数声明并进 facts：**它的消费者是 provider**（轨迹在引擎侧取数、换算、
+// 抽稀），而它按"要画什么、从哪几列画"归在 plot/ 下——曲线预设进前端，这一份进 Python。
+// 两者都是纯数据，差别只在消费者，构建期在这里合流。见 knowledge/px4/plot/track.yml 的说明。
+const plotTrack = parseYaml(read(resolve(PLOT_DIR, "track.yml"))).track;
+if (!plotTrack || !plotTrack.topic) {
+  throw new Error("knowledge/px4/plot/track.yml 缺少 track.topic");
+}
+facts.track = plotTrack;
 const { rules, sources } = loadRules(RULES_DIR, signatures, facts.rule_meta ?? {});
 // guards 类经验没有 compute（其判定在 emit.guard_tags），逐条校验已在 loadRules 里做
 
@@ -768,8 +776,11 @@ emit(
 // 4.5) 结果页曲线预设：knowledge/px4/plot/*.yml → web/lib/knowledge/plots.generated.ts
 // 与引擎产物不同，这一份是**纯前端**渲染用（不进 Pyodide），所以单独生成一个 ESM 文件。
 const plotFiles = readdirSync(PLOT_DIR).filter((f) => f.endsWith(".yml")).sort();
-if (plotFiles.length === 0) throw new Error("knowledge/px4/plot/ 下没有曲线预设文件");
-const plots = plotFiles.map((file) => {
+// track.yml 是**取数声明**（provider 读，见上面并进 facts 的那段），不是曲线预设——它没有 panels，
+// 进不了下面的预设校验。其余文件才是预设。两者都留在 plotFiles 里参与派生版本的哈希。
+const presetFiles = plotFiles.filter((f) => f !== "track.yml");
+if (presetFiles.length === 0) throw new Error("knowledge/px4/plot/ 下没有曲线预设文件");
+const plots = presetFiles.map((file) => {
   const spec = parseYaml(read(resolve(PLOT_DIR, file)));
   const where = `plot/${file}`;
   for (const key of ["id", "title", "description", "panels"]) {

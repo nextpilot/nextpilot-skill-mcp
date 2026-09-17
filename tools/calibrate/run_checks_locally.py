@@ -50,6 +50,24 @@ def _load_rules() -> list:
     return json.loads(m.group(1))
 
 
+def load_facts_payload() -> dict:
+    """provider 拿到的那份数据配置 —— **facts.yaml + plot/track.yml**。
+
+    轨迹的取数声明按「要画什么、从哪几列画」归在 plot/ 下，但它的消费者是 provider
+    （轨迹在引擎侧取数、换算、抽稀），所以并进 facts 一起送进去。
+
+    **这条装配规则构建期也有一份**（web/scripts/build-knowledge.mjs 里同样两行）——
+    改了要一起改。两边不一致时，本地回归与浏览器会拿到不同的配置，而本地的表现是
+    "轨迹取数声明丢了"（track() 返回 error）——这次就是这么踩到的，所以单独抽成函数，
+    别再各写各的。
+    """
+    import yaml as _yaml
+    facts = _yaml.safe_load(FACTS_YAML.read_text(encoding="utf-8"))
+    track_yml = KN_PX4 / "plot" / "track.yml"
+    facts["track"] = _yaml.safe_load(track_yml.read_text(encoding="utf-8"))["track"]
+    return facts
+
+
 def _load_checks() -> str:
     body = RULE_ENGINE_PY.read_text(encoding="utf-8")
 
@@ -59,10 +77,8 @@ def _load_checks() -> str:
     # 阈值已随经验内联（px4-thresholds.toml 退场），无需再注入
     body = body.replace("__RULES__", json.dumps(_load_rules(), ensure_ascii=False))
 
-    # 事实层的数据绑定与码表（facts.yaml），与构建期内联的是同一份
-    import yaml as _yaml
-    facts = _yaml.safe_load(FACTS_YAML.read_text(encoding="utf-8"))
-    body = body.replace("__FACTS__", json.dumps(facts, ensure_ascii=False))
+    # 数据配置（facts.yaml + plot/track.yml），与构建期内联的是同一份
+    body = body.replace("__FACTS__", json.dumps(load_facts_payload(), ensure_ascii=False))
     return body
 
 
