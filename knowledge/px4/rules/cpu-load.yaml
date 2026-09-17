@@ -20,6 +20,13 @@ skip:
 compute:
   # 实测里 cpuload 通常只有一个实例，默认合并后统计（与原 max over instances 等价）
   - cpu_max = max(cpuload.load)
+
+# ── 输出：溯源与副作用 ──
+outputs:
+  check: cpu_load                                   # checksRun / checksSkipped 里的名字
+  stats:
+    cpuLoadMax: {var: cpu_max, round: 3}             # 写入 stats 的键
+
 # ── 触发：自上而下，命中第一条 ──
 triggers:
   - when: "cpu_max >= 0.95"
@@ -36,9 +43,3 @@ triggers:
     field: "cpuload.load(max)"
     title: "CPU 负载峰值 {cpu_max:.0%} 偏高"
     suggestion: "关注 CPU 余量，必要时降低消息发布率。"
-
-# ── 输出：溯源与副作用 ──
-emit:
-  check: cpu_load                                   # checksRun / checksSkipped 里的名字
-  stats:
-    cpuLoadMax: {var: cpu_max, round: 3}             # 写入 stats 的键

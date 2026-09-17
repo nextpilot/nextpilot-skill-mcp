@@ -26,6 +26,11 @@ compute:
       ref("vehicle_imu_status.stddev_accel_z_m_s2", per_instance=True, alias="stddev_accel_z"),
       min_mean=0)
 
+outputs:
+  tag: high_vibration
+  stats:
+    imuStddevAccelRssMax: {var: stddev_rss, round: 3}
+
 triggers:
   - when: "stddev_rss >= 1.0"
     severity: critical
@@ -43,8 +48,3 @@ triggers:
     field: "vehicle_imu_status.stddev_accel_*_m_s2(RSS 均值)"
     title: "IMU 加速度标准差偏大（IMU #{stddev_idx}）"
     suggestion: "关注桨叶损伤、电机动平衡与 IMU 减震。"
-
-emit:
-  tag: high_vibration
-  stats:
-    imuStddevAccelRssMax: {var: stddev_rss, round: 3}

@@ -23,6 +23,12 @@ compute:
   - e_p95 = percentile(eph_m, p=95)
   - e_max = max(eph_m)
 
+outputs:
+  tag: gps_eph_high
+  stats:
+    gpsEphP95M: {var: e_p95, round: 2}
+    gpsEphMaxM: {var: e_max, round: 2}
+
 triggers:
   - when: "e_p95 >= 10.0"
     severity: warning
@@ -42,9 +48,3 @@ triggers:
     field: "vehicle_gps_position.eph(armed p95)"
     title: "GPS 水平位置误差偶发偏大（p95 {e_p95:.1f} m）"
     suggestion: "关注天线安装位置与遮挡。"
-
-emit:
-  tag: gps_eph_high
-  stats:
-    gpsEphP95M: {var: e_p95, round: 2}
-    gpsEphMaxM: {var: e_max, round: 2}

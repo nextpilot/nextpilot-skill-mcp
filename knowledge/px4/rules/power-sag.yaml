@@ -24,6 +24,12 @@ compute:
   - >-
       drop, tail = head_tail_median_drop(cell_min_t, battery_status.timestamp,
       armed_intervals, skip_first_s=5, min_seg=20)
+
+outputs:
+  tag: battery_voltage_drop
+  stats:
+    batteryCellSagFlight: {var: drop, round: 3}
+
 # 阈值 [暂定]：drop >= 0.30 V 且尾段中位已低于单电芯告警线 3.70 V
 triggers:
   - when: "drop >= 0.30 and tail < 3.70"
@@ -34,8 +40,3 @@ triggers:
     field: "battery_status.voltage_cell_v[] armed 段趋势"
     title: "飞行中单电芯持续压降 {drop:.2f} V（尾段中位 {tail:.2f} V）"
     suggestion: "持续压降区别于大机动瞬时压降：排查电芯老化内阻、插头虚接、线缆线径与负载匹配。"
-
-emit:
-  tag: battery_voltage_drop
-  stats:
-    batteryCellSagFlight: {var: drop, round: 3}

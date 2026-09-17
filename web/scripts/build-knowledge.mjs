@@ -61,7 +61,7 @@ const read = (p) => readFileSync(p, "utf8");
  */
 const CHECK = process.argv.includes("--check");
 const drifted = [];
-function emit(path, content) {
+function writeArtifact(path, content) {
   if (CHECK) {
     if (!existsSync(path) || readFileSync(path, "utf8") !== content) drifted.push(relative(webRoot, path));
     return;
@@ -273,15 +273,15 @@ function loadRules(dir, signatures, ruleMeta) {
     for (const raw of items) {
     const where = `rules/${file}` + (items.length > 1 ? `#${(raw && raw.id) || "?"}` : "");
     // guards 类经验（只产 guard 标签、不发 finding）没有 compute/triggers/check，
-    // 它的“实质”在 emit.guard_tags 的条件里；其余经验仍要求完整六件套。
-    // 注意：普通经验也可以用 emit.guard_tags（如陀螺零偏的温度跨度标签），
+    // 它的“实质”在 outputs.guard_tags 的条件里；其余经验仍要求完整六件套。
+    // 注意：普通经验也可以用 outputs.guard_tags（如陀螺零偏的温度跨度标签），
     // 所以“是不是 guard 类经验”要看有没有 compute/triggers，而不是有没有 guard_tags。
-    const guardTags = raw.emit?.guard_tags;
+    const guardTags = raw.outputs?.guard_tags;
     const hasCompute = Array.isArray(raw.compute) && raw.compute.length > 0;
     const hasTriggers = Array.isArray(raw.triggers) && raw.triggers.length > 0;
     const isGuardRule = Array.isArray(guardTags) && guardTags.length > 0 && !hasCompute && !hasTriggers;
     // 必填项：即使不限也必须显式写 any（隐式豁免正是空洞条目的入口）。
-    // 不含 emit——check / doc 现在都是派生的，没有 tag/stats 的规则确实没什么可声明。
+    // 不含 outputs——check / doc 现在都是派生的，没有 tag/stats 的规则确实没什么可声明。
     const requiredKeys = isGuardRule
       ? ["id", "group", "name", "firmware", "airframe"]
       : ["id", "group", "name", "firmware", "airframe", "compute", "triggers"];
@@ -291,8 +291,8 @@ function loadRules(dir, signatures, ruleMeta) {
         throw new Error(`${where}: 缺少必填字段 ${key}`);
       }
     }
-    if (raw.emit !== undefined && (typeof raw.emit !== "object" || raw.emit === null || Array.isArray(raw.emit))) {
-      throw new Error(`${where}: emit 必须是对象`);
+    if (raw.outputs !== undefined && (typeof raw.outputs !== "object" || raw.outputs === null || Array.isArray(raw.outputs))) {
+      throw new Error(`${where}: outputs 必须是对象`);
     }
     // 适用范围两轴与 skip 都是**表达式**（与 compute / triggers 同一套语法，不再是
     // "any" / ">=1.15" 这类自造小语言）。它们在 compute **之前**求值，所以只认得内置变量。
@@ -338,16 +338,17 @@ function loadRules(dir, signatures, ruleMeta) {
     }
     const gm = byGroup[raw.group];
     if (raw.category === undefined) raw.category = gm.category;
-    // emit.check 缺省 = group；guard 类经验不填（它本来就不记 ran/skipped）
-    raw.emit = raw.emit ?? {};
-    if (raw.emit.check === undefined && !isGuardRule) raw.emit.check = raw.group;
-    if (raw.emit.check !== undefined && raw.emit.check !== raw.group) {
+    // outputs.check 缺省 = group；guard 类经验不填（它本来就不记 ran/skipped）
+    raw.outputs = raw.outputs ?? {};
+    if (raw.outputs.check === undefined && !isGuardRule) raw.outputs.check = raw.group;
+    if (raw.outputs.check !== undefined && raw.outputs.check !== raw.group) {
       // 允许例外，但要说一声——免得例外悄悄变多
-      console.log(`  · ${raw.id}: emit.check「${raw.emit.check}」与 group「${raw.group}」不同（显式例外）`);
+      console.log(`  · ${raw.id}: outputs.check「${raw.outputs.check}」与 group「${raw.group}」不同（显式例外）`);
     }
-    if (raw.emit.doc === undefined && gm.doc !== undefined) raw.emit.doc = gm.doc;
+    // doc 是**整条规则**的官方文档链接（不是 outputs 的一部分）：按 group 派生的规则级字段
+    if (raw.doc === undefined && gm.doc !== undefined) raw.doc = gm.doc;
     // 同 group 的多条规则必须派生出同样的 category/doc
-    for (const [field, val] of [["category", raw.category], ["emit.doc", raw.emit.doc]]) {
+    for (const [field, val] of [["category", raw.category], ["doc", raw.doc]]) {
       const prev = seenMeta.get(`${raw.group} ${field}`);
       if (prev !== undefined && prev !== val) {
         throw new Error(
@@ -377,12 +378,12 @@ function loadRules(dir, signatures, ruleMeta) {
       for (const name of types.keys()) declared.add(name);
     }
     raw.compute = compute;
-    // emit.guard_tags：数据质量标签的产生条件（普通经验也会用，如陀螺零偏的温度跨度）。
+    // outputs.guard_tags：数据质量标签的产生条件（普通经验也会用，如陀螺零偏的温度跨度）。
     // 条件里的名字必须是内置变量或 compute 输出，避免写错变量名却默默不打标签。
     if (Array.isArray(guardTags)) {
       for (const g of guardTags) {
         if (typeof g.when !== "string" || !g.tag) {
-          throw new Error(`${where}: emit.guard_tags 每项都要有 when 与 tag`);
+          throw new Error(`${where}: outputs.guard_tags 每项都要有 when 与 tag`);
         }
         for (const name of stripStrings(g.when).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
           if (EXPR_KEYWORDS.has(name)) continue;
@@ -452,8 +453,8 @@ function loadRules(dir, signatures, ruleMeta) {
         }
       }
     }
-    if (!isGuardRule && !raw.emit.check) {
-      throw new Error(`${where}: emit.check 必填（ran/skipped 用）`);
+    if (!isGuardRule && !raw.outputs.check) {
+      throw new Error(`${where}: outputs.check 必填（ran/skipped 用）`);
     }
     rules.push(raw);
     sources.push(file);
@@ -522,19 +523,19 @@ function fmtTriggers(raw) {
     bits.push(`标题「${t.title}」`);
     lines.push("- " + bits.join(" ｜ "));
   }
-  for (const g of raw.emit?.guard_tags || []) {
+  for (const g of raw.outputs?.guard_tags || []) {
     lines.push(`- guard：当 \`${g.when}\` 时打标签 \`${g.tag}\``);
   }
   return lines.join("\n") || "- （只产 guard 标签，不发 finding）";
 }
 
-function fmtEmit(raw) {
-  const emit = raw.emit || {};
+function fmtOutputs(raw) {
+  const outputs = raw.outputs || {};
   const bits = [];
-  if (emit.check) bits.push(`check=${emit.check}`);
-  if (emit.tag) bits.push(`tag=${emit.tag}`);
-  if (emit.stats) {
-    bits.push("stats=" + Object.entries(emit.stats).map(([k, v]) => `${k}(round ${v?.round ?? "-"})`).join(", "));
+  if (outputs.check) bits.push(`check=${outputs.check}`);
+  if (outputs.tag) bits.push(`tag=${outputs.tag}`);
+  if (outputs.stats) {
+    bits.push("stats=" + Object.entries(outputs.stats).map(([k, v]) => `${k}(round ${v?.round ?? "-"})`).join(", "));
   }
   return bits.join("，") || "—";
 }
@@ -569,7 +570,7 @@ function renderCatalogue(rules, sources) {
     body.push(`- 适用：${fmtApplicability(raw)}`);
     body.push(`- 取值：\n${fmtCompute(raw)}`);
     body.push(`- 判定：\n${fmtTriggers(raw)}`);
-    body.push(`- 产出：${fmtEmit(raw)}\n`);
+    body.push(`- 产出：${fmtOutputs(raw)}\n`);
   }
   return body.join("\n");
 }
@@ -611,7 +612,7 @@ if (kb.length === 0) throw new Error("故障知识库解析为 0 条，终止");
 
 const outWorkers = resolve(webRoot, "workers");
 mkdirSync(outWorkers, { recursive: true });
-emit(
+writeArtifact(
   resolve(outWorkers, "fault-kb.generated.json"),
   // 不写 generatedAt：时间戳会让产物每次构建都产生 diff（而它没有任何消费者），
   // 产物应当可复现 —— 同样的 knowledge/ 输入必须得到逐字节相同的输出。
@@ -633,7 +634,7 @@ if (!plotTrack || !plotTrack.topic) {
 }
 facts.track = plotTrack;
 const { rules, sources } = loadRules(RULES_DIR, signatures, facts.rule_meta ?? {});
-// guards 类经验没有 compute（其判定在 emit.guard_tags），逐条校验已在 loadRules 里做
+// guards 类经验没有 compute（其判定在 outputs.guard_tags），逐条校验已在 loadRules 里做
 
 const ruleEnginePy = read(PY_RULE_ENGINE);
 if (!ruleEnginePy.includes("__FAULT_KB__")) {
@@ -728,7 +729,7 @@ const pyWithOperators = [
   ...providerFiles.map((f) => read(resolve(PROVIDER_DIR, f))),
   ruleEnginePy,
 ].join("\n");
-emit(
+writeArtifact(
   resolve(outWorkers, "ulog-check-script.ts"),
   banner +
     "import faultKbJson from \"./fault-kb.generated.json\";\n\n" +
@@ -749,7 +750,7 @@ emit(
 
 // 3) 数据层 .ts
 const reportDataPy = read(PY_REPORT_DATA);
-emit(
+writeArtifact(
   resolve(outWorkers, "ulog-data-script.ts"),
   banner +
     "export const PY_ULG_DATA_HELPERS = String.raw`" +
@@ -762,7 +763,7 @@ const prompt = read(PROMPT_PATH).replace(/\s+$/, "\n");
 const emptyMd = read(EMPTY_PATH).trim();
 const outLib = resolve(webRoot, "lib/knowledge");
 mkdirSync(outLib, { recursive: true });
-emit(
+writeArtifact(
   resolve(outLib, "prompts.generated.js"),
   "// ⚠️ 自动生成，源：knowledge/px4/llm/。请勿手改。\n" +
     "export const GJB841_SYSTEM_PROMPT = " +
@@ -821,7 +822,7 @@ for (const p of plots) {
   if (seenPlotIds.has(p.id)) throw new Error(`plot 的 id 重复：${p.id}`);
   seenPlotIds.add(p.id);
 }
-emit(
+writeArtifact(
   resolve(webRoot, "lib/knowledge/plots.generated.ts"),
   banner +
     "// 源：knowledge/px4/plot/*.yml（改图请改那边）\n" +
@@ -849,7 +850,7 @@ for (const [label, file] of versionSources) {
   derivedVersion.update(label).update("\0").update(read(file)).update("\0");
 }
 const derivedVersionHex = derivedVersion.digest("hex").slice(0, 12);
-emit(
+writeArtifact(
   resolve(webRoot, "lib/knowledge/derived-version.generated.ts"),
   banner +
     "// 源：engine/{report_data,rule_engine}.py + engine/providers/*.py + " +
@@ -877,7 +878,7 @@ for (const [name, v] of Object.entries(paramMeta)) {
   paramCompact[name] = [min, max, desc];
 }
 if (!CHECK) mkdirSync(resolve(webRoot, "public/params"), { recursive: true });
-emit(
+writeArtifact(
   resolve(webRoot, "public/params/px4-main.json"),
   JSON.stringify({
     source: "PX4 参数元数据（main 分支快照；release tag 不产出 parameters.json）",
@@ -888,7 +889,7 @@ emit(
 
 // 5) 指南的「知识库」分组：规则清单页（规则改了页面就跟着变，不用谁记得手动同步）
 if (!CHECK) mkdirSync(GUIDES_DIR, { recursive: true });
-emit(resolve(GUIDES_DIR, "knowledge-rules.md"), renderCataloguePage(rules, sources));
+writeArtifact(resolve(GUIDES_DIR, "knowledge-rules.md"), renderCataloguePage(rules, sources));
 
 if (CHECK) {
   if (drifted.length > 0) {

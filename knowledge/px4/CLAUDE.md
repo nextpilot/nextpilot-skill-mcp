@@ -120,17 +120,50 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 | `requires` / `not_applicable` / `silent_when` / `skip_reason_no_data` | 四个字段各管一摊 | 合成 **一个 `skip` 列表** `[{when: 表达式, reason?: 文案}]`（**不写 `reason` = 静默**）；"数据不足"靠新增内置变量 `no_data` 表达 |
 | `firmware` / `airframe` | `any` ｜ `">=1.15"` ｜ `fixed_wing` 这类自造小语言 | **Python 表达式**（`"True"` / `"is_fixed_wing"`），在 compute 之前求值、只认内置变量 |
 | `slot` | 槽位（技术隐喻） | **`group`**；`facts.yaml` 的 `slot_order` → `group_order`，`nav_groups` → `nav_state_groups`（消歧义） |
-| `version`/`category`/`status`/`author`/`license`/`changelog`/`emit.check`/`emit.doc` | 每条规则各写一遍 | **按 `group` 从 `facts.yaml` 的 `rule_meta` 派生**，偏离时才显式写。每条规则顶层字段 17 → 10 |
+| `version`/`category`/`status`/`author`/`license`/`changelog`/`outputs.check`/`doc` | 每条规则各写一遍 | **按 `group` 从 `facts.yaml` 的 `rule_meta` 派生**，偏离时才显式写。每条规则顶层字段 17 → 10 |
 | `_run_rules` 的判定顺序 | 不适用声明 → 轴 → 依赖 | **轴先判**（"这台机器根本不适用"仍静默），再判 `skip` 映射；compute 失败后再判一轮（`no_data`） |
 
 验证口径没变：以上每一步都要求 `compare_baseline.py` 6 条日志逐字段一致，外加一次
-"派生的 `category/version/status/license/author/emit.check/emit.doc` 与改动前逐条相同"的核对
+"派生的 `category/version/status/license/author/outputs.check/doc` 与改动前逐条相同"的核对
 （基线只覆盖 6 份日志，**在那上面没触发的规则比不到**，所以那次核对是必需的）。
 
 字段级权威参考（写经验时看这份）：站内 **[如何编写一条规则](/guide/knowledge-write-rule)**（源文件 `content/guide/knowledge-write-rule.md`）；
 经验索引（站内页面，构建时生成）：**[/guide/knowledge-rules](/guide/knowledge-rules)**；迁移过程中顺带修掉的 6 处
 真实缺陷见提交 `6a081d5` 的说明（最要紧的一条：日志消息级别判据按 ASCII 语义修正后，
 `Kill engaged / Flight termination active`、`no barometer found` 这类"冒烟的枪"才浮出来）。
+
+**2026-09-17 追加（第四段）：规则块改名 `emit` → `outputs`、`doc` 提到顶层、顺序对到执行顺序**
+
+- **改名的理由**：`emit` 的名字暗示"发出 finding"，但 finding 全部由 `triggers` 经 `add()` 发出，
+  `emit` 一个 finding 都不发——它实际是**规则的页脚**。而它装的每个键最终都落进结果 JSON
+  （`check`→`checksRun`/`checksSkipped`、`tag`→`finding`、`stats`→`metrics`、
+  `guard_tags`→`guardTags`），所以 `outputs` 名实相符，也与指南页 §5.2 的标题「输出与副作用」对齐。
+  改动范围：24 个规则文件 + `engine/rule_engine.py`（局部变量 `_emit` → `_out`）+
+  `tools/calibrate/probe_rule.py` + `web/scripts/build-knowledge.mjs` + 指南页 + `engine/README.md` +
+  `facts.yaml` 注释。
+- **顺带消掉一处同名**：`build-knowledge.mjs` 里本来就有个**写产物的辅助函数** `emit(path, content)`，
+  与规则键同名。规则键改叫 `outputs` 后它更刺眼，已一并改名 `writeArtifact()`（纯内部函数，9 个调用点）。
+- **顺序对到执行顺序**：`outputs` 块原先都写在 `triggers` 之后，而引擎是**先跑 outputs 后跑 triggers**
+  （`triggers` 还要读它的 `tag`）——文件读起来和执行顺序相反，正是"这俩什么关系看不懂"的根源。
+  20 个规则文件改为 `compute → outputs → triggers`
+  （4 个 guard 文件没有 `triggers`、`failsafe.yaml` 是没有 `outputs` 的数组、
+  `logged-errors.yaml` / `logged-warnings.yaml` 无显式块，都不涉及）。
+- **`triggers` 与 `outputs` 的连接只剩一根线**：只有 `tag`（trigger 未写 `tag` 时回退到
+  `outputs.tag`）。`check` / `stats` / `guard_tags` 与 `triggers` **无关**，是规则自己的记账与副产品。
+- **`doc` 从 `outputs` 提到规则顶层**：它是**整条规则**的官方文档链接（写进 `finding.docUrl`），
+  不是"产出"，放在 `outputs` 里名不副实。它本来就 100% 从 `facts.yaml` 的
+  `rule_meta.by_group[group].doc` 派生、**没有任何规则显式写过**，所以规则文件一个都没改——
+  只动了引擎（`_rule.get("doc")`）、构建脚本（`raw.doc` 与同 group 一致性校验）和文档。
+  将来要显式写就写在**顶层**（与 `id`/`name`/`group` 同级），别再写进 `outputs`。
+- **验证**：`compare_baseline.py` 6 条日志零差异（它逐字段比 finding 的
+  `id/ruleId/severity/tag/title/evidence/docUrl/suggestion`，**覆盖 `docUrl`**）；
+  构建产物解析成对象后逐条与改名前**相等**（只有 key 顺序变了）；
+  `check_artifact.py` / `check_provider.py` / `build:kb --check` 全过。
+  **`derived-version` 会变**（`rule_engine.py` 在哈希里），用户存档打开时自动重解析一次；
+  `rules/*.yaml` 仍**不进**哈希，所以改名 / 改阈值不会让历史结论重算。
+- **本文档里的历史段没有跟着改**：下面「执行链路」「完整示例（一条经验的全文）」「必填 vs 可选」
+  「故障库与规则的分工」等节里的 `emit` / `emit.fault_tags` / `emit.related_faults` 是**最初设计**的
+  记录（那些字段多数从未落地）。**当前实际键名一律是 `outputs`**，别照着历史段写规则。
 
 **与设计的落地差异**（都是有原因的选择，不是遗漏）：
 
@@ -274,7 +307,7 @@ compute:
 | ① 量化阈值（振动多大算异常） | `rules/*.yaml` 的 `compute` + `triggers[].threshold` | 确定性引擎判定，产出标签 |
 | ② 故障树（多条件耦合、排查优先级、禁忌） | `px4-fault-kb.yaml` 条目（字段定义见该文件头注释） | 引擎按 标签 / 阶段 / 排除标签 匹配，只把命中条目喂 LLM |
 | ③ 推理逻辑（工程师怎么想） | `llm/gjb841-system-prompt.md` | LLM 遵守 |
-| ④ 边界 / 禁忌（什么情况下不许下结论） | `rules/*.yaml` 的 `emit.guard_tags` → guard 标签（如 `insufficient_data`） | 引擎先拦（命中即可短路），Prompt 兜底 |
+| ④ 边界 / 禁忌（什么情况下不许下结论） | `rules/*.yaml` 的 `outputs.guard_tags` → guard 标签（如 `insufficient_data`） | 引擎先拦（命中即可短路），Prompt 兜底 |
 
 "我这块经验该写成什么"按这张表判断；"我想做 X 去看哪个文件"见 `../README.md` 的导航表。
 

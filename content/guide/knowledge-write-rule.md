@@ -61,7 +61,11 @@ skip:                         # 不适用就不跑；写了 reason → 报告里
 compute:                      # 数据流：一行一条表达式，右边是算式（见 §4）
   - cpu_max = max(cpuload.load)     # 取 topic.field（多实例会拼接）
 
-triggers:                     # 自上而下，命中第一条即发射
+outputs:                      # 规则自己的记账与副产品（见 §5.2）；可整个省略
+  stats:
+    cpuLoadMax: {var: cpu_max, round: 3}   # 写进报告 stats 的键
+
+triggers:                     # 自上而下，命中第一条即发射一条 finding（见 §5.1）
   - when: "cpu_max >= 0.95"
     severity: critical        # critical | warning | info
     threshold: 0.95           # 写进 evidence.threshold
@@ -69,10 +73,6 @@ triggers:                     # 自上而下，命中第一条即发射
     field: "cpuload.load(max)"
     title: "CPU 负载峰值 {cpu_max:.0%} 超阈值"
     suggestion: "CPU 长期接近满载会导致控制环丢步。"
-
-emit:
-  stats:
-    cpuLoadMax: {var: cpu_max, round: 3}   # 写进报告 stats 的键
 ```
 
 **没写的字段不等于没有**——下面这些由构建期从 `facts.yaml` 的 `rule_meta` 派生，
@@ -81,8 +81,8 @@ emit:
 | 派生字段 | 从哪来 |
 | --- | --- |
 | `category` | 该 `group` 的分类 |
-| `emit.check` | 缺省 = `group`（个别例子不同，显式写） |
-| `emit.doc` | 该 `group` 的官方文档链接 |
+| `outputs.check` | 缺省 = `group`（个别例子不同，显式写） |
+| `doc` | 该 `group` 的官方文档链接（**规则级**字段，不是 `outputs` 的一部分） |
 | `version` `status` `license` `author` | 仓库级默认值 |
 
 ## 2. 规则级字段
@@ -102,8 +102,9 @@ emit:
 | `compute` | ✅ | 数据流表达式数组（guard 类经验可省，见 §4 / §6.4） |
 | `foreach` | | 把事件列表展开成多条 finding，见 §6.3 |
 | `triggers` | ✅ | 触发条件数组（guard 类经验可省） |
-| `emit` | | 输出声明（见 §5）。可整个省略 |
-| `category` `version` `status` `license` `author` `emit.check` `emit.doc` | | **可省**：从 `facts.yaml` 的 `rule_meta` 按 group 派生（见 §1 末尾的表）。只在**确实偏离**时才写——比如 `px4-cpu-load` 的 `group` 是 `cpu` 而 `emit.check` 要叫 `cpu_load`，那就显式写 |
+| `outputs` | | 规则自己的记账与副产品（见 §5.2）。可整个省略 |
+| `doc` | | 官方文档链接，写进 `finding.docUrl`（CLAUDE.md 红线：每条 finding 必须可溯源）。**可省**：按 `group` 从 `facts.yaml` 的 `rule_meta` 派生，偏离时才写 |
+| `category` `version` `status` `license` `author` `outputs.check` | | **可省**：从 `facts.yaml` 的 `rule_meta` 按 group 派生（见 §1 末尾的表）。只在**确实偏离**时才写——比如 `px4-cpu-load` 的 `group` 是 `cpu` 而 `outputs.check` 要叫 `cpu_load`，那就显式写 |
 
 **"不适用"只有一个地方写**（早先分散在 `requires` / `not_applicable` / `silent_when` /
 `skip_reason_no_data` 四个字段里，现在合成 `skip` 一个列表）：
@@ -344,7 +345,7 @@ compute:
 共 **74** 个算子。输入个数与左值个数由算子签名强制校验（对不上则构建失败）；各算子的可调参数（如 `gt` / `p` / `factor` / `codes` / `labels` / `min_count`）写成算子调用的**关键字实参**（如 `percentile(w, p=95)`）；取数修饰（`per_instance` / `instance` / `alias` / `when_fw`）写在 `ref(...)` 上。
 <!-- END:operators -->
 
-## 5. triggers 与 emit
+## 5. triggers 与 outputs
 
 ### 5.1 触发条件（自上而下，命中第一条即发射一条 finding）
 
@@ -359,18 +360,20 @@ compute:
 | `title` `suggestion` | 文案，可用 `{var}` / `{var:.1f}` / `{var:.0%}` 占位符 |
 | `evidence_extra` | `{证据键: 变量名}`，把额外证据挂到 finding 上（如日志消息原文 `samples`） |
 
-要"命中时顺带打一个数据质量标签"，用 `emit.guard_tags`（见 §5.2）——它不依赖哪条 trigger 命中，
+要"命中时顺带打一个数据质量标签"，用 `outputs.guard_tags`（见 §5.2）——它不依赖哪条 trigger 命中，
 算得出来就带上，语义更准确。
 
 ### 5.2 输出与副作用
 
 | 键 | 说明 |
 | --- | --- |
-| `emit.check` | `checksRun`/`checksSkipped` 里的名字。**缺省 = `group`**，只在例外时才写（如 `px4-cpu-load` 的 group 是 `cpu`、check 要叫 `cpu_load`）；guard 类经验不填 |
-| `emit.tag` | 默认异常标签（trigger 未写 `tag` 时用它） |
-| `emit.doc` | 官方文档链接（每条 finding 必须可溯源）。**缺省按 `group` 派生**（见 `facts.yaml` 的 `rule_meta.by_group`），偏离时才写 |
-| `emit.stats` | `{键: {var: 变量名, round: n}}`；写进报告的 **`metrics`**（关键数据块）；值为 `None` 时该键不写入。**结果页里这项的名字/单位/顺序在 `../facts.yaml` 的 `metrics` 里声明**——键对不上就只显示键名 |
-| `emit.guard_tags` | `[{when: 表达式, tag: 标签}]`：条件成立就打数据质量标签，**不依赖是否发 finding**（如"风速偏大"本身就是该进解读的背景） |
+| `outputs.check` | `checksRun`/`checksSkipped` 里的名字。**缺省 = `group`**，只在例外时才写（如 `px4-cpu-load` 的 group 是 `cpu`、check 要叫 `cpu_load`）；guard 类经验不填 |
+| `outputs.tag` | 默认异常标签（trigger 未写 `tag` 时用它） |
+| `outputs.stats` | `{键: {var: 变量名, round: n}}`；写进报告的 **`metrics`**（关键数据块）；值为 `None` 时该键不写入。**结果页里这项的名字/单位/顺序在 `../facts.yaml` 的 `metrics` 里声明**——键对不上就只显示键名 |
+| `outputs.guard_tags` | `[{when: 表达式, tag: 标签}]`：条件成立就打数据质量标签，**不依赖是否发 finding**（如"风速偏大"本身就是该进解读的背景） |
+
+> `doc` **不在这里**——它是**整条规则**的官方文档链接（写进 `finding.docUrl`），所以是顶层字段，见 §2。
+> 同理，`outputs` 里装的是"这条规则自己的记账与副产品"，`triggers` 才是发射 finding 的地方。
 
 ## 6. 内置变量、事件与进阶
 
@@ -422,7 +425,7 @@ triggers:
 
 ### 6.4 guard 类经验（只打数据质量标签）
 
-没有 `compute` / `triggers` / `emit.check`，判定全在 `emit.guard_tags` 里：
+没有 `compute` / `triggers` / `outputs.check`，判定全在 `outputs.guard_tags` 里：
 
 ```yaml
 id: px4-guard-restart
@@ -430,15 +433,15 @@ name: 中途重启
 group: guards
 firmware: "True"
 airframe: "True"
-emit:
+outputs:
   guard_tags:
     - {when: "restart_detected", tag: restart_detected}
 ```
 
 ## 7. 构建期会拒绝什么（越早发现越好）
 
-- 缺 `id`/`group`/`name`/`firmware`/`airframe`（guard 类还要 `emit.guard_tags`；
-  普通经验要 `compute` + `triggers`）。`emit` 本身可省
+- 缺 `id`/`group`/`name`/`firmware`/`airframe`（guard 类还要 `outputs.guard_tags`；
+  普通经验要 `compute` + `triggers`）。`outputs` 本身可省
 - `group` 没登记在 `facts.yaml` 的 `rule_meta.by_group`，或没登记在 `group_order` 里
   ——**这类经验永远不会被执行**
 - 表达式里：算子未注册、输入个数/左值个数与算子签名不符、关键字实参名不是算子形参、

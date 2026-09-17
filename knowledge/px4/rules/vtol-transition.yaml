@@ -38,6 +38,12 @@ compute:
   - has_tilt = tilt_max is not None
   - tilt_stat = _try(tilt_max if enough else None)
 
+outputs:
+  tag: vtol_convert_attitude_over
+  stats:
+    vtolTransitionSamples: {var: trans_n_i}
+    vtolTransitionMaxTiltDeg: {var: tilt_stat, round: 1}
+
 triggers:
   - when: "has_tilt and enough and tilt_max > 8.0"
     severity: warning
@@ -48,9 +54,3 @@ triggers:
     field: "vehicle_attitude（vtol_in_trans_mode 段）"
     title: "VTOL 转换阶段姿态越限（最大 {tilt_max:.1f}°，限值 8°）"
     suggestion: "结合故障库 F003：复盘转换时序与推力匹配，强风环境优先归因环境扰动。"
-
-emit:
-  tag: vtol_convert_attitude_over
-  stats:
-    vtolTransitionSamples: {var: trans_n_i}
-    vtolTransitionMaxTiltDeg: {var: tilt_stat, round: 1}

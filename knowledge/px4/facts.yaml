@@ -140,10 +140,10 @@ info_key_docs:
   metadata_events_sha256: {name: 事件元数据哈希, desc: 事件定义文件的 SHA-256，用来校验事件定义是否被改动}
 
 # ── 概览指标（结果页「关键数据」）──
-# 说明：这些数字大多由规则顺带产出（rules/*.yaml 的 emit.stats），但**规则 skip 时数字就没了**
+# 说明：这些数字大多由规则顺带产出（rules/*.yaml 的 outputs.stats），但**规则 skip 时数字就没了**
 # （缺字段、机型不适用…），所以这里为重要的几项声明"兜底取数"：规则跑过就用规则的值（更贴合判定），
 # 没跑就按这里的 topic/field/op 现算。label/unit/顺序只看这张表，改它不用碰 Python。
-#   key   报告的键（与规则 emit.stats 的键一致才能合并；撞名时**规则值优先**）
+#   key   报告的键（与规则 outputs.stats 的键一致才能合并；撞名时**规则值优先**）
 #   op    兜底算子（必须已在 engine/operators.py 注册）；多输出的复合算子用 pick: <输出名>
 #   scale 兜底值再乘的系数（单位换算，如 eph 是 mm → m 用 0.001）
 metrics:

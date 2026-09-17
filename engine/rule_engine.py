@@ -310,7 +310,7 @@ def _run_rules(group):
         if _rule.get("group") != group:
             continue
         _rid = _rule["id"]
-        _checks = (_rule.get("emit") or {}).get("check")
+        _checks = (_rule.get("outputs") or {}).get("check")
         if _checks is None:
             _checks = []            # guards 类经验没有 check 名（不记 ran/skipped）
         elif not isinstance(_checks, list):
@@ -341,7 +341,7 @@ def _run_rules(group):
 
         _ok = True
         for _stmt in (_rule.get("compute") or []):
-            # compute 是**表达式**，求值出来的名字进 _env，供后面的表达式与 triggers / emit 引用。
+            # compute 是**表达式**，求值出来的名字进 _env，供后面的表达式与 triggers / outputs 引用。
             try:
                 _eval_compute(_stmt, _env)
             except Exception:
@@ -367,17 +367,17 @@ def _run_rules(group):
                 for _check in _checks:
                     ran(_check)
 
-        _emit = _rule["emit"]
-        # emit.guard_tags：按条件产生的数据质量标签（等价于原过程式的 guard_tags.append，
+        _out = _rule["outputs"]
+        # outputs.guard_tags：按条件产生的数据质量标签（等价于原过程式的 guard_tags.append，
         # 不依赖是否发出 finding——如陀螺零偏的“温度变化大”）
-        for _gspec in (_emit.get("guard_tags") or []):
+        for _gspec in (_out.get("guard_tags") or []):
             try:
                 _g_hit = _eval_expr(_gspec["when"], _env)
             except Exception:
                 _g_hit = False
             if _g_hit and _gspec.get("tag") and _gspec["tag"] not in guard_tags:
                 guard_tags.append(_gspec["tag"])
-        for _key, _spec in (_emit.get("stats") or {}).items():
+        for _key, _spec in (_out.get("stats") or {}).items():
             _v = _env.get(_spec["var"])
             if _v is None:
                 continue
@@ -425,10 +425,10 @@ def _run_rules(group):
                 _sugg = _trig.get("suggestion")
                 if _sugg and "{" in _sugg:
                     _sugg = _sugg.format_map(_tenv)
-                add(_trig["severity"], _rid, _trig.get("tag", _emit.get("tag")),
+                add(_trig["severity"], _rid, _trig.get("tag", _out.get("tag")),
                     _trig["title"].format_map(_tenv), _field, _val,
                     _trig.get("threshold"), _trig.get("unit"),
-                    _emit.get("doc"), _sugg)
+                    _rule.get("doc"), _sugg)
                 # evidence_extra: {evidence 键: 变量名}，把额外证据挂到刚发出的 finding 上
                 # （如日志消息的 samples 原文列表）
                 for _ek, _evn in (_trig.get("evidence_extra") or {}).items():

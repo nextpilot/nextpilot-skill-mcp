@@ -42,6 +42,11 @@ compute:
       fallback_label="未知通道")
   - pct = frac * 100           # 证据里换算成 %
 
+outputs:
+  tag: ekf_innovation_failure
+  stats:
+    ekfRejectRatioPct: {var: pct, round: 2}
+
 triggers:
   - when: "pct >= 5.0"
     severity: critical
@@ -59,8 +64,3 @@ triggers:
     field: "estimator_status 创新检验拒绝样本占比"
     title: "EKF 创新检验偶发失败（estimator #{inst}：{names}）"
     suggestion: "涉及：{names}。关注 GPS 卫星数、磁罗盘干扰、振动与气压计异常。"
-
-emit:
-  tag: ekf_innovation_failure
-  stats:
-    ekfRejectRatioPct: {var: pct, round: 2}

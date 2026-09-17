@@ -13,6 +13,6 @@ firmware: "True"
 
 airframe: "True"
 
-emit:
+outputs:
   guard_tags:
     - {when: "dropout_ms > 1000", tag: log_dropouts_high}

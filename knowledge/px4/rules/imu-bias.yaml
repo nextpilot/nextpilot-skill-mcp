@@ -52,6 +52,17 @@ compute:
       ref("vehicle_air_data.ambient_temperature", instance=0)))
   - bias_stat = _try(larger(worst_abs, worst_drift))
 
+outputs:
+  tag: imu_bias_drift
+  stats:
+    gyroBiasMaxRadS: {var: worst_abs, round: 4}
+    gyroBiasDriftRadS: {var: worst_drift, round: 4}
+    gyroBiasSource: {var: src_text}
+    imuTempRangeC: {var: temp_range, round: 1}
+  # 温度跨度大：作为背景信息打 guard 标签（与原过程式一致，不依赖是否发 finding）
+  guard_tags:
+    - {when: "temp_range >= 15", tag: temperature_change_large}
+
 triggers:
   - when: "worst_abs >= 0.05 or worst_drift >= 0.05"
     severity: critical
@@ -71,14 +82,3 @@ triggers:
     field: "{src_text}"
     title: "陀螺零偏异常（轴 {worst_axis}：绝对值 {worst_abs:.4f} rad/s，漂移 {worst_drift:.4f} rad/s）"
     suggestion: "结合故障库 F005：检查 IMU 安装紧固、执行陀螺/加计标定；若温度跨度大，优先按温度漂移解释。"
-
-emit:
-  tag: imu_bias_drift
-  stats:
-    gyroBiasMaxRadS: {var: worst_abs, round: 4}
-    gyroBiasDriftRadS: {var: worst_drift, round: 4}
-    gyroBiasSource: {var: src_text}
-    imuTempRangeC: {var: temp_range, round: 1}
-  # 温度跨度大：作为背景信息打 guard 标签（与原过程式一致，不依赖是否发 finding）
-  guard_tags:
-    - {when: "temp_range >= 15", tag: temperature_change_large}

@@ -54,7 +54,7 @@
 | `engine/providers/` | *怎么从某一种日志里把数据取出来*——唯一认识 topic 名、字段名、码值的地方 |
 | `knowledge/px4/facts.yaml` | 那一种格式的**纯数据**：码表、文案、展示口径、规则元数据、执行顺序 |
 | `knowledge/px4/rules/` | *算完怎么判定*——阈值与触发条件 |
-| `knowledge/px4/px4-fault-kb.yaml` | 故障根因 / 排查步骤（规则只留 `emit.tag` 指向它） |
+| `knowledge/px4/px4-fault-kb.yaml` | 故障根因 / 排查步骤（规则只留 `outputs.tag` 指向它） |
 | `knowledge/px4/meta/` | 上游固件字典（字段与参数，按固件 tag 生成） |
 | `knowledge/px4/plot/` | 结果页曲线预设（纯前端渲染，不进 Pyodide 的规则侧） |
 

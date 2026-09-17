@@ -32,6 +32,9 @@ compute:
   - nan_max = _try(to_int(coalesce(nan_raw, 0)))
   - crit_bits = _try(has_bits(fault_union, 63))
 
+outputs:
+  tag: ekf_innovation_failure
+
 triggers:
   - when: "nan_max > 0 or crit_bits"
     severity: critical
@@ -49,6 +52,3 @@ triggers:
     field: "estimator_status.filter_fault_flags"
     title: "EKF 报告非核心辅助传感器融合拒绝（filter_fault_flags={fault_union}，常见为未使用视觉/光流）"
     suggestion: "若该机确实未启用视觉/光流定位，此位可忽略；否则检查对应传感器。"
-
-emit:
-  tag: ekf_innovation_failure

@@ -1,5 +1,5 @@
 # 数据质量 guard：中途重启（同一 topic 时间戳回退）。只打 guard 标签，不产 finding。
-# guards 类经验没有 check 名，也不写 compute/triggers —— 判定全在 emit.guard_tags 里。
+# guards 类经验没有 check 名，也不写 compute/triggers —— 判定全在 outputs.guard_tags 里。
 
 id: px4-guard-restart
 
@@ -13,6 +13,6 @@ firmware: "True"
 
 airframe: "True"
 
-emit:
+outputs:
   guard_tags:
     - {when: "restart_detected", tag: restart_detected}

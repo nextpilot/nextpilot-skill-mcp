@@ -82,7 +82,7 @@ def main(argv):
         print("找不到规则 %s；现有：%s" % (rule_id, ", ".join(r["id"] for r in ns["RULES"])))
         return 2
     env = ns["_rule_env"]()
-    print("rule %s  group=%s  checks=%s" % (rule_id, rule.get("group"), (rule.get("emit") or {}).get("check")))
+    print("rule %s  group=%s  checks=%s" % (rule_id, rule.get("group"), (rule.get("outputs") or {}).get("check")))
     print("  firmware=%s airframe=%s skip=%s"
           % (rule.get("firmware"), rule.get("airframe"), rule.get("skip")))
     declared = []

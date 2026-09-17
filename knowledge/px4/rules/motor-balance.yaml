@@ -32,6 +32,12 @@ compute:
       spread, busiest, idlest, n_active = column_spread_stats(
       cols, seg, min_mean=0.01, min_channels=4)
 
+outputs:
+  tag: motor_output_unbalance
+  stats:
+    motorControlSpread: {var: spread, round: 3}
+    motorCountActive: {var: n_active}
+
 triggers:
   - when: "spread >= 0.15"
     severity: critical
@@ -49,9 +55,3 @@ triggers:
     field: "actuator_motors.control[](悬停段均值极差)"
     title: "电机输出差异偏大（通道 {busiest} 与 {idlest} 差 {spread:.3f}）"
     suggestion: "结合故障库 F008 排查动力一致性；偶发差异可先观察。"
-
-emit:
-  tag: motor_output_unbalance
-  stats:
-    motorControlSpread: {var: spread, round: 3}
-    motorCountActive: {var: n_active}

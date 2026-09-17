@@ -31,6 +31,15 @@ compute:
                      ref("wind_estimate.windspeed_east", when_fw="<1.15"))),
       p=95)
 
+outputs:
+  tag: wind_disturb
+  # 风速偏大本身就是个事实（该进解读的背景），所以用 guard_tags 而不是 trigger 上的标记：
+  # 不依赖哪条 trigger 命中，算出来就带上
+  guard_tags:
+    - {when: "w_p95 >= 8.0", tag: wind_strong}
+  stats:
+    windSpeedP95M: {var: w_p95, round: 1}
+
 triggers:
   - when: "w_p95 >= 12.0"
     severity: warning
@@ -50,12 +59,3 @@ triggers:
     field: "estimator_wind.windspeed_north/east"
     title: "估计风速偏大（p95 {w_p95:.1f} m/s）"
     suggestion: "解释姿态类异常时需考虑风扰因素。"
-
-emit:
-  tag: wind_disturb
-  # 风速偏大本身就是个事实（该进解读的背景），所以用 guard_tags 而不是 trigger 上的标记：
-  # 不依赖哪条 trigger 命中，算出来就带上
-  guard_tags:
-    - {when: "w_p95 >= 8.0", tag: wind_strong}
-  stats:
-    windSpeedP95M: {var: w_p95, round: 1}

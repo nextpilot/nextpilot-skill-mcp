@@ -34,6 +34,11 @@ compute:
   - step = _try(coalesce(step_new, step_old))
   - njump = _try(to_int(count_above(step, gt=50.0)))
 
+outputs:
+  tag: gps_jump
+  stats:
+    gpsJumpCount: {var: njump}
+
 triggers:
   - when: "njump >= 3"
     severity: warning
@@ -44,8 +49,3 @@ triggers:
     field: "vehicle_gps_position lat/lon 相邻差分"
     title: "GPS 位置出现 {njump} 次异常跳变（>50 m/s）"
     suggestion: "结合故障库 F002：排查多路径、馈线与电磁干扰；室内跳变为正常现象。"
-
-emit:
-  tag: gps_jump
-  stats:
-    gpsJumpCount: {var: njump}

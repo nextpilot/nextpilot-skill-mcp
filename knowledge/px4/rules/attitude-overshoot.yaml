@@ -44,6 +44,12 @@ compute:
   - p99_stat = p99 if seg_ok else None
   - osc_stat = osc_hz if seg_ok else None
 
+outputs:
+  tag: attitude_overshoot
+  stats:
+    attitudeErrDegP99: {var: p99_stat, round: 1}
+    attitudeOscHz: {var: osc_stat, round: 2}
+
 triggers:
   - when: "p99_stat >= 40.0 and is_fixed_wing"
     severity: critical
@@ -81,9 +87,3 @@ triggers:
     field: "vehicle_attitude vs vehicle_attitude_setpoint（机动段）"
     title: "姿态跟踪误差偏大（p99 {p99_stat:.1f}°）"
     suggestion: "结合故障库 F006 排查；大风环境下优先归因环境扰动。"
-
-emit:
-  tag: attitude_overshoot
-  stats:
-    attitudeErrDegP99: {var: p99_stat, round: 1}
-    attitudeOscHz: {var: osc_stat, round: 2}

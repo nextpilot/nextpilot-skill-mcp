@@ -13,7 +13,7 @@ firmware: "True"
 
 airframe: "True"
 
-emit:
+outputs:
   guard_tags:
     - {when: "not has_topic('vehicle_status')", tag: "topic_missing:vehicle_status"}
     - {when: "not has_topic('battery_status')", tag: "topic_missing:battery_status"}

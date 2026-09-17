@@ -19,6 +19,11 @@ compute:
   - rem = min_ge(battery_status.remaining, ge=0)      # remaining ∈ [0,1]，-1 = 未知，滤掉
   - rem_pct = rem * 100
 
+outputs:
+  tag: battery_voltage_drop
+  stats:
+    batteryRemainingMin: {var: rem, round: 3}
+
 triggers:
   - when: "rem <= 0.10"
     severity: critical
@@ -34,8 +39,3 @@ triggers:
     field: "battery_status.remaining(min)"
     title: "电池剩余电量偏低（{rem_pct:.0f}%）"
     suggestion: "剩余电量低于 20%，注意返航裕度。"
-
-emit:
-  tag: battery_voltage_drop
-  stats:
-    batteryRemainingMin: {var: rem, round: 3}

@@ -24,6 +24,13 @@ compute:
     vibe_mean, vibe_p95, vibe_max, imu_idx = worst_mean_stats(
       ref("vehicle_imu_status.accel_vibration_metric", per_instance=True), min_mean=0)
 
+outputs:
+  tag: high_vibration
+  stats:
+    imuAccelVibrationMean: {var: vibe_mean, round: 3}
+    imuAccelVibrationP95: {var: vibe_p95, round: 3}
+    imuAccelVibrationMax: {var: vibe_max, round: 3}
+
 triggers:
   - when: "vibe_mean >= 9.81"
     severity: critical
@@ -41,10 +48,3 @@ triggers:
     field: "vehicle_imu_status.accel_vibration_metric(均值)"
     title: "高频振动偏大（IMU #{imu_idx}）"
     suggestion: "Flight Review 橙色区间（4.905~9.81 m/s^2）。结合故障库条目排查桨叶动平衡/电机/IMU 减震。"
-
-emit:
-  tag: high_vibration
-  stats:
-    imuAccelVibrationMean: {var: vibe_mean, round: 3}
-    imuAccelVibrationP95: {var: vibe_p95, round: 3}
-    imuAccelVibrationMax: {var: vibe_max, round: 3}

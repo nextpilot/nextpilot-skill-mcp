@@ -36,6 +36,12 @@ compute:
   - has_invalid = invalid_frac is not None
   - tas_min = _try(min(airspeed_validated.true_airspeed_m_s))
 
+outputs:
+  tag: low_airspeed
+  stats:
+    airspeedInvalidRatio: {var: invalid_frac, round: 3}
+    airspeedMinM: {var: tas_min, round: 1}
+
 triggers:
   - when: "has_invalid and invalid_frac >= 0.50"
     severity: critical
@@ -53,9 +59,3 @@ triggers:
     field: "airspeed_validated.airspeed_sensor_measurement_valid"
     title: "空速传感器间歇无效（{invalid_frac:.0%} 样本）"
     suggestion: "结合故障库 F009 检查空速管与管路密封。"
-
-emit:
-  tag: low_airspeed
-  stats:
-    airspeedInvalidRatio: {var: invalid_frac, round: 3}
-    airspeedMinM: {var: tas_min, round: 1}

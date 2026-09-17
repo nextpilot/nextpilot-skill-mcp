@@ -41,6 +41,12 @@ compute:
   - p99_stat = p99 if seg_ok else None
   - osc_stat = osc_hz if seg_ok else None
 
+outputs:
+  tag: attitude_overshoot
+  stats:
+    attitudeErrDegP99: {var: p99_stat, round: 1}
+    attitudeOscHz: {var: osc_stat, round: 2}
+
 triggers:
   - when: "osc_stat >= 4.0 and p99_stat >= 25.0 and is_fixed_wing"
     severity: warning
@@ -60,9 +66,3 @@ triggers:
     field: "姿态跟踪误差符号翻转频率"
     title: "姿态误差高频振荡（约 {osc_stat:.1f} Hz）"
     suggestion: "振荡多与控制增益/机架共振相关，禁用大幅调参，先做频响检查。"
-
-emit:
-  tag: attitude_overshoot
-  stats:
-    attitudeErrDegP99: {var: p99_stat, round: 1}
-    attitudeOscHz: {var: osc_stat, round: 2}
