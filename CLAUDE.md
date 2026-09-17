@@ -330,6 +330,12 @@
 > 它是给 AI 与维护者的上下文，不发布到网站。**报告页数据层**（`engine/report_data.py`）的硬规则
 > 也在那一份里（时间基准、事件解码、多值信息拼接、参数默认值怎么来、派生数据版本）。
 >
+> **Python（`engine/` 与 `tools/`）的风格约定**：格式化的唯一权威是 `ruff format`，配置在仓库根
+> `pyproject.toml`（行长 100、双引号），工具版本钉在 `requirements-dev.txt`。改完自查
+> `python -m ruff format --check . && python -m ruff check .`。**别跑 `ruff check --fix`、别开编辑器
+> 的"保存时自动修复"**：`engine/` 下的文件是拼接片段，那样会误删东西（清单见 `engine/README.md`）。
+> 这条约定的由来：在它之前每个编辑器各按自己的默认格式化器改文件，有一轮提交里混进了 500 行纯格式改动。
+>
 > 派生数据版本（`web/lib/knowledge/derived-version.generated.ts`，构建期算的引擎源文件哈希）：
 > 改了 `engine/report_data.py` / `engine/rule_engine.py` / `facts.yaml` / `plot/*.yml`，用户本机存档
 > 会在打开时**自动重解析一次**（facts / findings 一并刷新，AI 报告保留），不用挨个提醒重新上传。

@@ -58,6 +58,41 @@
 | `knowledge/px4/meta/` | 上游固件字典（字段与参数，按固件 tag 生成） |
 | `knowledge/px4/plot/` | 结果页曲线预设（纯前端渲染，不进 Pyodide 的规则侧） |
 
+## Python 风格约定
+
+格式化的**唯一权威**是 `ruff format`（配置在仓库根 `pyproject.toml`：行长 100、双引号），
+本目录与 `tools/` 一视同仁，人不与格式化器争论。工具装法见仓库根 `requirements-dev.txt`
+（版本钉死——ruff 的小版本会改格式）。
+
+```bash
+python -m ruff format --check . && python -m ruff check .
+```
+
+**别在本目录跑 `ruff check --fix`，也别在编辑器里开"保存时自动修复"**：下一节的拼接会让它在
+单文件视角下删掉"看起来没用"的导入与名字（`# noqa` 同理，见 `pyproject.toml` 的 per-file-ignores）。
+
+## 拼接顺序与桥接名字（lint 报的 F821 就是这些）
+
+构建期按这个顺序把片段拼成**一份**脚本再执行（浏览器与本地工具同一份源码）：
+
+```text
+operators.py → providers/api.py → providers/*.py → rule_engine.py → report_data.py
+```
+
+所以每个片段**单看都不是完整模块**，"未定义"的名字来自别处：
+
+| 名字 | 谁提供 |
+| --- | --- |
+| `__FAULT_KB__` `__RULES__` `__FACTS__` | 构建期替换的占位符（`web/scripts/build-knowledge.mjs`） |
+| `__FAULT_KB__` 之外，`OPERATORS` / `SIGNATURES` | `operators.py`（最先拼） |
+| `open_log` / `REQUIRED` / `OPTIONAL` / `BUILTIN_VARIABLES` / `FORMATS` | `providers/api.py` |
+| `provider` / `run_all` | `rule_engine.py`（`report_data.py` 直接用那边建好的 `provider`） |
+| `ulog_bytes` | 运行期注入（浏览器 worker / `run_checks_locally.py`） |
+
+因此 `pyproject.toml` 对 `rule_engine.py` / `report_data.py` / `providers/px4.py` 关掉了
+**F821（未定义名）**——**只关这一个规则，且只关这三个文件**；`tools/` 下 F821 仍然生效
+（它刚抓到过 `download_px4_logs.py` 里 `ulog_path` 拼错这类真 bug）。
+
 ## 跑一遍
 
 ```bash
@@ -65,4 +100,6 @@ cd web && pnpm build:kb                      # 内联进浏览器产物 + 生成
 python tools/calibrate/check_provider.py tools/calibrate/logs/*.ulg   # 适配器契约测试
 python tools/calibrate/compare_baseline.py   # 6 条真实日志与冻结基线逐字段比对
 python tools/calibrate/lint_rules.py         # 字段引用与版本错配
+
+python -m ruff format --check . && python -m ruff check .   # Python 风格（见上一节）
 ```

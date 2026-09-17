@@ -1,3 +1,15 @@
 {
-    "python-envs.defaultEnvManager": "ms-python.python:system"
+  "python-envs.defaultEnvManager": "ms-python.python:system",
+
+  // Python 风格：格式化的**唯一权威**是 ruff（配置见仓库根 pyproject.toml）。
+  // 这里把编辑器指到同一个工具，否则保存时各自按默认格式化器改文件，
+  // 同一份代码在不同机器上反复漂移（曾经一轮提交里混进 500 行纯格式改动）。
+  // 需要装扩展 charliermarsh.ruff。
+  //
+  // 只开"保存时格式化"，**不开** codeActionsOnSave 的 fixAll：engine/ 下的文件是
+  // 拼接片段，自动修复会在单文件视角下删掉"看起来没用"的导入与名字。
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true
+  }
 }

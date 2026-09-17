@@ -1,0 +1,8 @@
+# 开发机上的 Python 工具（**不进 Pyodide、不影响运行期**）
+#
+# 装：python -m pip install -r requirements-dev.txt
+# 用：见仓库根 pyproject.toml 的 [tool.ruff]
+#
+# 为什么钉死版本：风格约定只有在"所有人跑同一版"时才成立——ruff 的小版本会改格式
+# （举一个已经发生的例子：引号风格与 magic-comma 行为在版本间变过）。
+ruff==0.16.7
