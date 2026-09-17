@@ -3,11 +3,8 @@
 # 阈值 [暂定] px4-thresholds.toml [airspeed]：invalid_ratio_warn=0.10 / crit=0.50。
 
 id: px4-airspeed-invalid
-
 name: 空速健康
-
 group: airspeed
-
 order: 1
 
 firmware: "True"
@@ -17,7 +14,6 @@ firmware: "True"
 airframe: "is_fixed_wing or airframe == 'unknown'"
 # 机型未知时给一条 skip 记录（与原实现的 elif 分支一致）
 # 原外层条件还要求存在 vehicle_attitude_setpoint，缺失时静默
-
 skip:
   - {when: "airframe == 'unknown'", reason: 机型未知，无法判定固定翼巡航段}
   - {when: "not has_topic('vehicle_attitude_setpoint')"}

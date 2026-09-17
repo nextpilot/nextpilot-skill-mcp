@@ -2,15 +2,11 @@
 # 只打 guard 标签，不产 finding；顺序与原实现一致（数组顺序参与比对）。
 
 id: px4-guard-topic-missing
-
 name: 数据质量-关键 topic 缺失
-
 group: guards
-
 order: 2
 
 firmware: "True"
-
 airframe: "True"
 
 outputs:

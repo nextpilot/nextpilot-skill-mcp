@@ -3,17 +3,12 @@
 # 阈值 [暂定]（px4-thresholds.toml [vibration] stddev_warn/stddev_crit）。
 
 id: px4-vibration-stddev
-
 name: IMU 加速度标准差
-
 group: vibration
-
 order: 2
 
 firmware: "True"
-
 airframe: "True"
-
 skip:
   - {when: "not has_topic('vehicle_imu_status')", reason: vehicle_imu_status not in log}
 

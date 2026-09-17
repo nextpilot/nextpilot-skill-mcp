@@ -1,17 +1,12 @@
 # 电池剩余电量（robotto）：armed 全程最低值，-1 表示未知需过滤
 
 id: px4-power-remaining
-
 name: 电池剩余电量
-
 group: battery
-
 order: 3                 # battery group 内的次序：cell-voltage=1, sag=2, remaining=3
 
 firmware: "True"
-
 airframe: "True"
-
 skip:
   - {when: "not has_topic('battery_status')", reason: battery_status not in log}
 

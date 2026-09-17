@@ -3,15 +3,11 @@
 # 阈值 60s 原先在 px4-thresholds.toml [guard] min_flight_sec，现随本经验自包含。
 
 id: px4-guard-short-log
-
 name: 数据质量-短日志
-
 group: guards_early           # 在原过程式位置执行：尽早打标签，且要排在其它 guard 之前
-
 order: 1
 
 firmware: "True"
-
 airframe: "True"
 
 outputs:

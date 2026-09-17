@@ -4,17 +4,12 @@
 # 命中即打 guard 标签 wind_strong：解释姿态类异常时优先归因环境扰动。
 
 id: px4-wind-estimate
-
 name: 风扰估计
-
 group: wind_estimate
-
 order: 1
 
 firmware: "True"
-
 airframe: "True"
-
 skip:
   - {when: "not has_topic('estimator_wind') and not has_topic('wind_estimate')", reason: estimator_wind / wind_estimate not in log}
 

@@ -2,17 +2,12 @@
 # 阈值 [暂定] px4-thresholds.toml [gps]：eph_warn=5.0 / eph_crit=10.0（m）。
 
 id: px4-gps-eph
-
 name: GPS 水平位置误差
-
 group: gps_health
-
 order: 1                 # gps_health group 内次序：eph=1, sats=2, jump=3
 
 firmware: "True"
-
 airframe: "True"
-
 skip:
   - {when: "not has_topic('vehicle_gps_position')", reason: vehicle_gps_position not in log}
 

@@ -7,17 +7,12 @@
 # 阈值 px4-thresholds.toml [messages]：max_examples=5 / clip=200。
 
 id: px4-log-errors
-
 name: 日志错误消息
-
 group: logged_messages
-
 order: 1
-
 version: 1.0.1
 
 firmware: "True"
-
 airframe: "True"
 
 compute:

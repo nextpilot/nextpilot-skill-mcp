@@ -2,15 +2,11 @@
 # guards 类经验没有 check 名，也不写 compute/triggers —— 判定全在 outputs.guard_tags 里。
 
 id: px4-guard-restart
-
 name: 数据质量-中途重启
-
 group: guards
-
 order: 1
 
 firmware: "True"
-
 airframe: "True"
 
 outputs:

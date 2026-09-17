@@ -6,17 +6,12 @@
 # 边界：姿态或指令字段缺失时本经验静默不适用（原实现会留一条 skip；该路径未被基线覆盖）。
 
 id: px4-attitude-overshoot
-
 name: 姿态跟踪超调
-
 group: attitude_tracking
-
 order: 1
-
 version: 1.1.0
 
 firmware: "True"
-
 airframe: "True"
 # 原外层条件：两个 topic 齐备且存在 armed 段，否则记一条 skip
 skip:

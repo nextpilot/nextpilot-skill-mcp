@@ -3,19 +3,13 @@
 # 字段名、阈值与文案仍由本文件给出。
 
 id: px4-power-cell-voltage
-
 name: 单电芯电压
-
 group: battery
-
 order: 1                 # battery group 内次序：cell-voltage=1, sag=2, remaining=3
-
 version: 1.1.0
 
 firmware: "True"
-
 airframe: "True"
-
 skip:
   - {when: "not has_topic('battery_status')", reason: battery_status not in log}
 

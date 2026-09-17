@@ -3,19 +3,13 @@
 # 掩码与逐通道均值都收在复合算子里；阈值 [暂定]：spread_warn=0.08 / spread_crit=0.15。
 
 id: px4-motor-unbalance
-
 name: 电机输出不平衡
-
 group: motor_balance
-
 order: 1
-
 version: 1.1.0
 
 firmware: "True"
-
 airframe: "True"
-
 skip:
   - {when: "no_data", reason: active motor channels < 4 (非多旋翼或未记录全部电机)}
   - {when: "not has_topic('actuator_motors')", reason: actuator_motors not in log}

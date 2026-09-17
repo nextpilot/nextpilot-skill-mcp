@@ -5,17 +5,12 @@
 # 阈值 [暂定] px4-thresholds.toml [ekf]：reject_ratio_warn=0.01 / crit=0.05，证据里换算成 %。
 
 id: px4-ekf-innovation
-
 name: EKF 创新检验
-
 group: ekf_innovations
-
 order: 1
 
 firmware: "True"
-
 airframe: "True"
-
 skip:
   - {when: "not has_topic('estimator_status')", reason: estimator_status not in log}
 

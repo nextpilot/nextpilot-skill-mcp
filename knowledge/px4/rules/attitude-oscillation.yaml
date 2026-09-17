@@ -3,23 +3,16 @@
 # 说明：与超调共用同一个复合算子（对齐/掩码/统计都在里面），只是触发条件与文案不同。
 
 id: px4-attitude-oscillation
-
 name: 姿态误差高频振荡
-
 group: attitude_tracking
-
 order: 2
-
 version: 1.1.0
 
 firmware: "True"
-
 airframe: "True"
-
 skip:
   - {when: "not has_armed", reason: vehicle_attitude(_setpoint) 或 armed 段缺失}
   - {when: "not has_topic('vehicle_attitude') or not has_topic('vehicle_attitude_setpoint')", reason: vehicle_attitude(_setpoint) 或 armed 段缺失}
-
 ran_when: "seg_ok"
 
 compute:

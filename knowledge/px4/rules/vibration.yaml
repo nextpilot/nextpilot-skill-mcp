@@ -2,17 +2,12 @@
 # 阈值 [来源] Flight Review 振动色带 0.5g / 1g（与 px4-thresholds.toml [vibration] 一致）。
 
 id: px4-vibration
-
 name: 高频振动
-
 group: vibration
-
 order: 1                 # vibration group 内次序：vibration=1, stddev=2, clipping=3
 
 firmware: "True"
-
 airframe: "True"
-
 skip:
   - {when: "not has_topic('vehicle_imu_status')", reason: vehicle_imu_status not in log}
 

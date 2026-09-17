@@ -2,17 +2,12 @@
 # 累计削波次数；跨 IMU 实例与轴向取最大者。阈值 [暂定] 100 / 1000 次，1~99 次报 info。
 
 id: px4-imu-clipping
-
 name: 加速度计削波
-
 group: vibration
-
 order: 3
 
 firmware: "True"
-
 airframe: "True"
-
 skip:
   - {when: "not has_topic('vehicle_imu_status')", reason: vehicle_imu_status not in log}
 

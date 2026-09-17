@@ -3,17 +3,12 @@
 # bit 10（视觉速度融合拒绝）在未用 VIO 的飞机上属正常 → 只报 info，避免误报。
 
 id: px4-ekf-fault
-
 name: EKF 融合硬故障
-
 group: ekf_faults
-
 order: 1
 
 firmware: "True"
-
 airframe: "True"
-
 skip:
   - {when: "not has_topic('estimator_status')", reason: estimator_status not in log}
 # nan_flags 是很早期的字段（1.11 起的日志与 1.15+ 字典里都没有），属已知遗留：

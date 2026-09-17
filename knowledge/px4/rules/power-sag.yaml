@@ -3,17 +3,12 @@
 # 对任意 (序列, 时间戳, 区间) 计算头/尾中位数落差。
 
 id: px4-power-sag
-
 name: 飞行中持续压降
-
 group: battery
-
 order: 2
 
 firmware: "True"
-
 airframe: "True"
-
 skip:
   - {when: "not has_topic('battery_status')", reason: battery_status not in log}
 
