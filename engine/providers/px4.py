@@ -313,13 +313,17 @@ class Px4Provider:
         }
 
     def log_info(self):
-        """报告页「系统消息」tab 的整份数据。
+        """报告页要的几块原料（**不是某一个 tab 的 payload**，四个 tab 各取所需）。
 
-        为什么由格式提供而不是数据层拼：这里全是对 ULog 消息形态的解读——
-        'I' 信息字典、'L' 文本消息与 event 解码结果合并成一条时间轴、'M' 多值信息怎么拼回文本、
-        'Q' 默认值怎么推、逐字节的消息类型统计……换一种日志格式就是另一套。
+        系统消息取 infoDict / msgTypeStats / msgTypeWalkOk；事件消息取 messages / messagesMulti；
+        飞控参数取 params / defaultParams / changedParams；阶段条取 phases。
+
+        所以这个方法的边界是「该格式能提供哪些原料」，由前端按 tab 取用。为什么不由数据层拼：
+        原料的形态是格式专有的——'I' 信息字典、'L' 文本消息与 event 解码结果合并成一条时间轴、
+        'M' 多值信息怎么拼回文本、'Q' 默认值怎么推、逐字节的消息类型统计……换一种日志格式
+        就是另一套。
         """
-        info = self.ulog.msg_info_dict
+        info = self.info()          # 走契约能力取，别再直读 self.ulog（同一份数据两处知识）
         cfgsys = self._cfg.get("sys_info_keys") or []
         info_types = getattr(self.ulog, "_msg_info_dict_types", None) or {}
         info_docs = self._cfg.get("info_key_docs") or {}
@@ -396,7 +400,7 @@ class Px4Provider:
                           for k in sorted(multi_src)]
 
         params = {str(k): (clean(np.asarray(v).reshape(-1)[0]) if hasattr(v, "reshape") else clean(v))
-                  for k, v in (getattr(self.ulog, "initial_parameters", {}) or {}).items()}
+                  for k, v in self.params().items()}
 
         # Parameter Default（ULog 的 'Q' 消息）。PX4 的 logger 逐参数比较「当前值 / 机架默认 /
         # 固件默认」三者，**只写与当前值不同的那个**（logger.cpp: write_parameter_defaults）

@@ -94,8 +94,12 @@ OPTIONAL = {
     "events": {"sig": "() -> list[dict] | None",
                "doc": "事件解码（PX4 靠日志自带的 metadata_events）。None = 这份日志解不出"},
     "log_info": {"sig": "() -> dict",
-                 "doc": "报告页「系统消息」tab 的整份数据。它是该格式的消息形态的展示"
-                        "（合并事件与文本、多值信息怎么拼……），换格式就是另一套，所以由格式提供"},
+                 "doc": "报告页要的几块原料的打包——**不是某一个 tab 的 payload**："
+                        "infoDict/msgTypeStats 给「系统消息」、messages/messagesMulti 给「事件消息」、"
+                        "params/defaultParams/changedParams 给「飞控参数」、phases 给阶段条，"
+                        "四个 tab 各取所需。边界是「该格式能提供哪些原料」，"
+                        "而原料的形态是格式专有的（合并事件与文本、多值信息怎么拼……），"
+                        "换格式就是另一套，所以由格式提供而不是数据层拼"},
     "track": {"sig": "(...) -> dict | None",
               "doc": "地图轨迹（取数字段候选与量纲也是格式专有）"},
 }
