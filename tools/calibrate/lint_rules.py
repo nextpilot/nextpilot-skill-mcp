@@ -91,7 +91,14 @@ def fields_by_version_from_logs() -> dict[tuple[int, int], dict[str, set[str]]]:
             d = json.loads(f.read_text(encoding="utf-8"))
         except Exception:  # noqa: BLE001
             continue
-        label = str((d.get("result", {}).get("stats") or {}).get("firmware") or "")
+        # 固件版本在 result.facts.firmware。**别写成 result.stats.firmware**：
+        # 引擎从来不产出 stats（那是更早的输出形态），取不到就静默退化成 ""，
+        # 于是这条日志被判为"版本未知"而整条跳过 —— 结果是本函数的**日志侧字段源一直空转**，
+        # 上面那行只会显示"日志实测 0 个版本"（很容易划过去）。
+        # 后果很严重且不报错：所有字段判定只剩上游字典（1.15/1.16/main）一个来源，
+        # 于是日志里明明存在的旧固件字段（vehicle_gps_position.*、estimator_wind.* 等）
+        # 全被报成"可疑引用，多半是拼错"——实测 18 条全是假阳性。
+        label = str((d.get("result", {}).get("facts") or {}).get("firmware") or "")
         m = re.match(r"(\d+)\.(\d+)", label)
         if m and d.get("log"):
             log_fw[d["log"]] = (int(m.group(1)), int(m.group(2)))
@@ -186,6 +193,15 @@ def main(argv: list[str]) -> int:
     meta = fields_by_version_from_meta()
     versions = sorted(set(logs) | set(meta))
     print("来源版本：%s（日志实测 %d 个版本，字典 %d 个版本）" % (", ".join(fmt(v) for v in versions), len(logs), len(meta)))
+    if not logs:
+        # 别让这一行被划过去：日志侧一旦空转，判定就只剩上游字典一个来源，
+        # 日志里真实存在的旧固件字段会被整片误报成"可疑"（假阳性），
+        # 而报告看起来跟"真查出问题"一模一样。曾因固件版本取错路径踩过：
+        # 6 份日志在，18 条可疑全是假的。
+        print(
+            "警告：日志侧字段源为空 —— 上面那些'可疑引用'会大量假阳性，先确认\n"
+            "      %s 下有 .ulg、且 baseline/*.json 的 result.facts.firmware 有值。" % LOG_DIR
+        )
 
     ok = gaps = legacy = suspicious = 0
     gap_rows: list[tuple[str, str, str, str, list[str]]] = []
