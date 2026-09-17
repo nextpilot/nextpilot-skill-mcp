@@ -45,23 +45,27 @@ def _finite(values):
 
 # ─────────────────────────── 标量统计 ───────────────────────────
 
+
 @operator("max", doc="最大值（忽略 NaN）")
 def op_max(values, **kw):
-    if values is None: return None
+    if values is None:
+        return None
     a = _finite(values)
     return float(a.max()) if a.size else None
 
 
 @operator("min", doc="最小值（忽略 NaN）")
 def op_min(values, **kw):
-    if values is None: return None
+    if values is None:
+        return None
     a = _finite(values)
     return float(a.min()) if a.size else None
 
 
 @operator("min_ge", doc="有限且 >= ge 的最小值（排除无效值，如 remaining=-1 表示未知）")
 def op_min_ge(values, ge=None, **kw):
-    if values is None: return None
+    if values is None:
+        return None
     a = _finite(values)
     if ge is not None:
         a = a[a >= float(ge)]
@@ -75,12 +79,14 @@ def op_scale(x, factor=1.0, **kw):
 
 @operator("mean", doc="均值（忽略 NaN）")
 def op_mean(values, **kw):
-    if values is None: return None
+    if values is None:
+        return None
     a = _finite(values)
     return float(a.mean()) if a.size else None
 
 
 # ─────────────────────────── 空值 / 逻辑 / 算术（通用积木）───────────────────────────
+
 
 @operator("is_none", doc="值是否为 None（数据缺失在数据流里显式传播，而不是断链）")
 def op_is_none(x, **kw):
@@ -114,7 +120,9 @@ def op_value_if(cond, x, **kw):
     return x if cond else None
 
 
-@operator("div", in_arity=2, doc="a / b；b 为 0 或任一输入缺失返回 None；require_positive 时要求两者 >0")
+@operator(
+    "div", in_arity=2, doc="a / b；b 为 0 或任一输入缺失返回 None；require_positive 时要求两者 >0"
+)
 def op_div(a, b, require_positive=False, **kw):
     if a is None or b is None or float(b) == 0:
         return None
@@ -124,6 +132,7 @@ def op_div(a, b, require_positive=False, **kw):
 
 
 # ─────────────────────────── 定长数组字段（任意 float32[n] 时间序列列集合）───────────────────────────
+
 
 def _as_columns(matrix):
     """数组字段经 _read_field_ref 收集后是“每元素一列”的列表（各列为等长时间序列）；
@@ -183,8 +192,9 @@ def op_rows_aggregate(matrix, agg="min", gt=None, ge=None, **kw):
     out_names=["drop", "tail_median"],
     doc="第一个区间内（跳过前 skip_first_s 秒）头段中位数 - 尾段中位数；任意 (序列, 时间戳, 区间) 通用",
 )
-def op_head_tail_median_drop(x, vts, intervals, skip_first_s=5, min_seg=20,
-                             head_frac=0.1, tail_frac=0.2, **kw):
+def op_head_tail_median_drop(
+    x, vts, intervals, skip_first_s=5, min_seg=20, head_frac=0.1, tail_frac=0.2, **kw
+):
     """intervals 为 (start_us, end_us) 列表，只取第一个；seg 长度须 > min_seg。
     返回 (落差, 尾段中位数)，数据不足返回 None。"""
     import numpy as np
@@ -201,7 +211,7 @@ def op_head_tail_median_drop(x, vts, intervals, skip_first_s=5, min_seg=20,
     seg = seg[np.isfinite(seg)]
     if len(seg) <= int(min_seg):
         return None
-    tail = float(np.median(seg[-max(5, int(len(seg) * float(tail_frac))):]))
+    tail = float(np.median(seg[-max(5, int(len(seg) * float(tail_frac))) :]))
     head = float(np.median(seg[: max(5, int(len(seg) * float(head_frac)))]))
     return float(head - tail), tail
 
@@ -210,6 +220,7 @@ def op_head_tail_median_drop(x, vts, intervals, skip_first_s=5, min_seg=20,
 # 这类算子的输入是「每个传感器实例一组数据」的列表（框架对 per_instance 节点按
 # topic dataset 分组喂入）。数组字段（如 float32[3]）每组是「每元素一列」的列表。
 # 全部通用：不认识任何具体 topic/字段，只做跨实例归约，取「最差实例」并回传其序号。
+
 
 def _groups(groups):
     return [g for g in (groups or []) if g is not None]
@@ -237,7 +248,7 @@ def _pick(lst, i):
     out_arity=4,
     out_names=["mean", "p95", "vmax", "instance"],
     doc="每个实例一条标量序列：取均值最大的实例，回传其均值/p95/最大值/实例序号；"
-        "均值不超过 min_mean 的实例视作无效（缺省 0，即要求确有有效样本）",
+    "均值不超过 min_mean 的实例视作无效（缺省 0，即要求确有有效样本）",
 )
 def op_worst_mean_stats(groups, min_mean=0.0, **kw):
     import numpy as np
@@ -252,9 +263,9 @@ def op_worst_mean_stats(groups, min_mean=0.0, **kw):
         m = float(a.mean())
         if m <= float(min_mean):
             continue
-        if best is None or m > best[0]:      # 严格大于：并列时保留首个实例
+        if best is None or m > best[0]:  # 严格大于：并列时保留首个实例
             best = (m, float(np.percentile(a, 95)), float(a.max()), i)
-    return best                                # 无有效实例时返回 None
+    return best  # 无有效实例时返回 None
 
 
 @operator(
@@ -263,7 +274,7 @@ def op_worst_mean_stats(groups, min_mean=0.0, **kw):
     out_arity=2,
     out_names=["rss", "instance"],
     doc="每个实例三轴序列：mean(sqrt(x^2+y^2+z^2))，取 RSS 最大的实例及序号；"
-        "不超过 min_mean 的实例视作无效（缺省 0，与迁移前初值 0 的严格比较大一致）",
+    "不超过 min_mean 的实例视作无效（缺省 0，与迁移前初值 0 的严格比较大一致）",
 )
 def op_worst_rss_mean(gx, gy, gz, min_mean=0.0, **kw):
     import numpy as np
@@ -274,10 +285,21 @@ def op_worst_rss_mean(gx, gy, gz, min_mean=0.0, **kw):
         x, y, z = _pick(xs, i), _pick(ys, i), _pick(zs, i)
         if x is None or y is None or z is None:
             continue
-        if isinstance(x, (list, tuple)) or isinstance(y, (list, tuple)) or isinstance(z, (list, tuple)):
+        if (
+            isinstance(x, (list, tuple))
+            or isinstance(y, (list, tuple))
+            or isinstance(z, (list, tuple))
+        ):
             continue
-        rss = float(np.mean(np.sqrt(
-            np.asarray(x, float) ** 2 + np.asarray(y, float) ** 2 + np.asarray(z, float) ** 2)))
+        rss = float(
+            np.mean(
+                np.sqrt(
+                    np.asarray(x, float) ** 2
+                    + np.asarray(y, float) ** 2
+                    + np.asarray(z, float) ** 2
+                )
+            )
+        )
         if rss <= float(min_mean):
             continue
         if best is None or rss > best[0]:
@@ -309,7 +331,10 @@ def op_worst_column_delta(groups, **kw):
 
 # ─────────────────────────── 位掩码 / 跨实例归约（通用）───────────────────────────
 
-@operator("has_bits", in_arity=2, doc="value 是否置起了 mask 中的任意一位（mask 传 -1 表示“任意位非零”）")
+
+@operator(
+    "has_bits", in_arity=2, doc="value 是否置起了 mask 中的任意一位（mask 传 -1 表示“任意位非零”）"
+)
 def op_has_bits(value, mask, **kw):
     if value is None or mask is None:
         return None
@@ -354,12 +379,27 @@ def op_max_of_max(groups, **kw):
     out_arity=3,
     out_names=["frac", "names", "instance"],
     doc="按实例扫描“拒绝占比”：主信号（位掩码，如创新检验标志）非空时用它（非零样本占比、"
-        "按位或展开位名），否则逐一比较候选通道（有限样本中 >= ge 的占比，需 >= channel_min 个）；"
-        "取全局最大占比，返回占比/命中名称/实例序号。字段名与标签全部由经验文件提供。",
+    "按位或展开位名），否则逐一比较候选通道（有限样本中 >= ge 的占比，需 >= channel_min 个）；"
+    "取全局最大占比，返回占比/命中名称/实例序号。字段名与标签全部由经验文件提供。",
 )
-def op_worst_reject_ratio(primary, ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7,
-                          primary_min=3, primary_names=None, ge=1.0, channel_min=3,
-                          channel_labels=None, fallback_label="未知通道", **kw):
+def op_worst_reject_ratio(
+    primary,
+    ch0,
+    ch1,
+    ch2,
+    ch3,
+    ch4,
+    ch5,
+    ch6,
+    ch7,
+    primary_min=3,
+    primary_names=None,
+    ge=1.0,
+    channel_min=3,
+    channel_labels=None,
+    fallback_label="未知通道",
+    **kw,
+):
     import numpy as np
 
     bit_names = list(primary_names or [])
@@ -377,7 +417,7 @@ def op_worst_reject_ratio(primary, ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7,
             if bad < int(primary_min):
                 continue
             union = 0
-            for v in np.asarray(g):          # 不转 float：位掩码必须按位精确
+            for v in np.asarray(g):  # 不转 float：位掩码必须按位精确
                 union |= int(v)
             fired = "、".join(bit_names[b] for b in range(len(bit_names)) if union & (1 << b))
             frac = bad / float(len(g))
@@ -401,6 +441,7 @@ def op_worst_reject_ratio(primary, ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7,
 
 
 # ─────────────────────────── 序列统计 / 边沿 / 地理（通用）───────────────────────────
+
 
 @operator("percentile", doc="有限值的第 p 百分位（如 p=95）；无有效值则 None")
 def op_percentile(values, p=95, **kw):
@@ -461,8 +502,8 @@ def op_scale_series(values, factor=1.0, **kw):
     "adjacent_speed_mps",
     in_arity=3,
     doc="经纬度与时间戳（us）→ 相邻样本地面速度序列（m/s）；等距柱状近似。"
-        "unit 说明经纬度口径：degE7（旧字段 lat/lon 的 1e7 度）或 deg（新字段 latitude_deg），"
-        "由经验文件按固件版本给出",
+    "unit 说明经纬度口径：degE7（旧字段 lat/lon 的 1e7 度）或 deg（新字段 latitude_deg），"
+    "由经验文件按固件版本给出",
 )
 def op_adjacent_speed_mps(lat_in, lon_in, ts_us, unit="degE7", **kw):
     import numpy as np
@@ -477,7 +518,7 @@ def op_adjacent_speed_mps(lat_in, lon_in, ts_us, unit="degE7", **kw):
     dt = np.diff(np.asarray(ts_us, dtype=float)) / 1e6
     dlat = np.diff(lat) * 6371000.0
     dlon = np.diff(lon) * 6371000.0 * np.cos(lat[:-1])
-    return np.sqrt(dlat ** 2 + dlon ** 2) / np.maximum(dt, 1e-3)
+    return np.sqrt(dlat**2 + dlon**2) / np.maximum(dt, 1e-3)
 
 
 @operator("read", doc="显式取数/透传：把字段原样放进环境（供 coalesce 等后续节点使用）")
@@ -539,7 +580,7 @@ def op_ratio_equal(values, value=0.0, **kw):
     "masked_any_in",
     in_arity=3,
     doc="时间轴上的“区间内取值为集合之一”判定：在 intervals（us 区间列表）内是否存在取值"
-        "落在 codes 中的样本；codes 由经验文件给出，任意状态字段通用",
+    "落在 codes 中的样本；codes 由经验文件给出，任意状态字段通用",
 )
 def op_masked_any_in(values, ts_us, intervals, codes=None, **kw):
     import numpy as np
@@ -560,7 +601,9 @@ def op_masked_any_in(values, ts_us, intervals, codes=None, **kw):
     return bool(np.any(np.isin(vals[mask], list(codes))))
 
 
-@operator("require_true", doc="门控：条件为真返回 True，否则 None（使数据流在此中止，等效于原 if 分支）")
+@operator(
+    "require_true", doc="门控：条件为真返回 True，否则 None（使数据流在此中止，等效于原 if 分支）"
+)
 def op_require_true(cond, **kw):
     if cond is None:
         return None
@@ -571,11 +614,12 @@ def op_require_true(cond, **kw):
 # 返回「事件列表」（每项一个 dict）。配合规则级 \`foreach:\`：框架对每个事件按同一套
 # trigger 模板发一条 finding，因此文案仍写在经验文件里，算子只负责找事件。
 
+
 @operator(
     "rising_edge_events",
     in_arity=4,
     doc="上升沿事件（前一拍 != 1 且当前 == 1）且落在 intervals 内："
-        "返回 [{t_s: 相对日志起点秒数}, ...]；t0_us 一般传内置变量 t0_us",
+    "返回 [{t_s: 相对日志起点秒数}, ...]；t0_us 一般传内置变量 t0_us",
 )
 def op_rising_edge_events(values, ts_us, intervals, t0_us, **kw):
     import numpy as np
@@ -602,7 +646,7 @@ def op_rising_edge_events(values, ts_us, intervals, t0_us, **kw):
     "step_into_events",
     in_arity=4,
     doc="状态切换到 codes 集合内的取值、且落在 intervals 内的事件："
-        "返回 [{t_s, code, name}, ...]，codes 形如 {5: AUTO_RTL}（名称由经验文件给出）",
+    "返回 [{t_s, code, name}, ...]，codes 形如 {5: AUTO_RTL}（名称由经验文件给出）",
 )
 def op_step_into_events(values, ts_us, intervals, t0_us, codes=None, **kw):
     import numpy as np
@@ -629,18 +673,22 @@ def op_step_into_events(values, ts_us, intervals, t0_us, codes=None, **kw):
 
 # ─────────────────────────── 结构化条目列表（日志消息等）───────────────────────────
 
+
 def _item_hit(it, key, eq, lte, gte, in_list):
     if not isinstance(it, dict):
         return False
     if eq is None and lte is None and gte is None and in_list is None:
-        return True                      # 无条件 = 全选（可当计数器用）
+        return True  # 无条件 = 全选（可当计数器用）
     v = it.get(key)
     if v is None:
         return False
     if in_list is not None:
         return v in list(in_list)
-    return (eq is not None and v == eq) or (lte is not None and v <= lte) \
+    return (
+        (eq is not None and v == eq)
+        or (lte is not None and v <= lte)
         or (gte is not None and v >= gte)
+    )
 
 
 @operator("count_items", doc="条目列表里满足条件的条数：按 key 字段判定，in_list / eq / lte / gte")
@@ -650,16 +698,28 @@ def op_count_items(items, key="level", eq=None, lte=None, gte=None, in_list=None
     return sum(1 for it in items if _item_hit(it, key, eq, lte, gte, in_list))
 
 
-@operator("take_items", doc="条目列表里满足条件的前 limit 条（drop 可去掉辅助键；clip 可按字段截断文本）")
-def op_take_items(items, key="level", eq=None, lte=None, gte=None, in_list=None,
-                  limit=5, drop=None, clip=None, **kw):
+@operator(
+    "take_items", doc="条目列表里满足条件的前 limit 条（drop 可去掉辅助键；clip 可按字段截断文本）"
+)
+def op_take_items(
+    items,
+    key="level",
+    eq=None,
+    lte=None,
+    gte=None,
+    in_list=None,
+    limit=5,
+    drop=None,
+    clip=None,
+    **kw,
+):
     out = []
     clips = {str(k): int(v) for k, v in dict(clip or {}).items()}
-    for it in (items or []):
+    for it in items or []:
         if not _item_hit(it, key, eq, lte, gte, in_list):
             continue
         item = dict(it)
-        for k in (drop if isinstance(drop, (list, tuple)) else [drop] if drop else []):
+        for k in drop if isinstance(drop, (list, tuple)) else [drop] if drop else []:
             item.pop(k, None)
         for k, n in clips.items():
             if isinstance(item.get(k), str):
@@ -671,6 +731,7 @@ def op_take_items(items, key="level", eq=None, lte=None, gte=None, in_list=None,
 
 
 # ─────────────────────────── 姿态 / 时间轴（通用）───────────────────────────
+
 
 @operator(
     "interp_to",
@@ -687,7 +748,7 @@ def op_interp_to(values, src_ts, dst_ts, **kw):
     d = np.asarray(dst_ts, dtype=np.int64)
     if v.size < 2 or s.size != v.size or not d.size:
         return None
-    return np.interp(d, s[:v.size], v)
+    return np.interp(d, s[: v.size], v)
 
 
 @operator(
@@ -752,6 +813,7 @@ def op_count_true(mask, **kw):
 
 # ─────────────────────────── 掩码 / 多通道（通用）───────────────────────────
 
+
 @operator("interval_mask", in_arity=2, doc="时间戳落在 intervals 内的布尔掩码（armed 段等）")
 def op_interval_mask(ts_us, intervals, **kw):
     import numpy as np
@@ -801,7 +863,7 @@ def op_count_columns(matrix, **kw):
     "active_column_means",
     in_arity=2,
     doc="掩码内逐通道均值，只保留均值 > min_mean 的通道（未接/未用通道均值≈0，排除）；"
-        "返回 [{index, mean}, ...]；列长与掩码不一致时退化为前 N 个样本",
+    "返回 [{index, mean}, ...]；列长与掩码不一致时退化为前 N 个样本",
 )
 def op_active_column_means(matrix, mask, min_mean=0.01, **kw):
     import numpy as np
@@ -818,7 +880,7 @@ def op_active_column_means(matrix, mask, min_mean=0.01, **kw):
         if v.size == m.size:
             v = v[m]
         else:
-            v = v[:n_on]                 # 与原实现一致：长度不匹配时取前 N 个
+            v = v[:n_on]  # 与原实现一致：长度不匹配时取前 N 个
         v = v[np.isfinite(v)]
         if v.size and float(np.mean(v)) > float(min_mean):
             out.append({"index": i, "mean": float(np.mean(v))})
@@ -844,6 +906,7 @@ def op_items_spread(items, value_key="mean", index_key="index", **kw):
 
 
 # ─────────────────────────── 多轴传感器（通用）───────────────────────────
+
 
 @operator("apply_mask", in_arity=2, doc="按布尔掩码筛选序列（如只保留 armed 段样本），返回新序列")
 def op_apply_mask(values, mask, **kw):
@@ -872,8 +935,8 @@ def op_range_of(values, **kw):
     out_arity=2,
     out_names=["value", "name"],
     doc="三路序列各做一次归约（reduce: absmax | range | max | min | mean），"
-        "回传归约值最大的一路及名称（labels 由经验文件给出）；"
-        "样本数 < min_count 或归约值不超过 min_value 的路不参与（严格大于）",
+    "回传归约值最大的一路及名称（labels 由经验文件给出）；"
+    "样本数 < min_count 或归约值不超过 min_value 的路不参与（严格大于）",
 )
 def op_worst_named(a, b, c, reduce="absmax", labels=None, min_value=0.0, min_count=10, **kw):
     import numpy as np
@@ -902,13 +965,14 @@ def op_worst_named(a, b, c, reduce="absmax", labels=None, min_value=0.0, min_cou
 @operator(
     "label_if",
     doc="cond 为真取 label_true，否则取 label_false（文案以节点选项给出；缺省 None，便于 coalesce 串联）。"
-        "注意参数名不用 yes/no：YAML 1.1 会把裸 yes/no 解析成布尔，PyYAML 与浏览器侧 yaml 库行为不一致。",
+    "注意参数名不用 yes/no：YAML 1.1 会把裸 yes/no 解析成布尔，PyYAML 与浏览器侧 yaml 库行为不一致。",
 )
 def op_label_if(cond, label_true=None, label_false=None, **kw):
     return label_true if cond else label_false
 
 
 # ─────────────────────────── 逐样本数组运算（通用）───────────────────────────
+
 
 @operator("either", in_arity=2, doc="逻辑或（None 视作假）")
 def op_either(a, b, **kw):
@@ -990,7 +1054,7 @@ def op_smaller(a, b, **kw):
 @operator(
     "zero_cross_hz",
     doc="相对中位数符号翻转频率（Hz）：翻转次数 / 2 / (样本数 / sample_rate)；"
-        "样本 < 3 时 None。用于判定“误差高频振荡”",
+    "样本 < 3 时 None。用于判定“误差高频振荡”",
 )
 def op_zero_cross_hz(values, sample_rate=50.0, **kw):
     import numpy as np
@@ -1014,19 +1078,31 @@ def op_zero_cross_hz(values, sample_rate=50.0, **kw):
 # 掩码 → 统计」的固定套路可以收成一个算子：输入仍是 YAML 里写明的字段引用（算子不认识
 # 具体 topic/字段），参数（阈值/最少样本/采样率）也来自 YAML。
 
+
 @operator(
     "att_tracking_stats",
     in_arity=8,
     out_arity=3,
     out_names=["p99", "osc_hz", "seg_n"],
     doc="姿态跟踪统计：把姿态与姿态指令在时间轴上对齐（取较短长度、指令线性插值到姿态时间轴），"
-        "只在 armed 且非悬停（指令倾角 > tilt_min_deg）样本上算跟踪误差，输出 p99（度）、"
-        "误差过零频率（Hz）、参与统计的样本数。指令源在 q_d 四元数与 roll/pitch_body 之间自动选择"
-        "（fw_minor >= 15 或有四元数而无 body 字段时用四元数）。核心数据缺失返回 None。",
+    "只在 armed 且非悬停（指令倾角 > tilt_min_deg）样本上算跟踪误差，输出 p99（度）、"
+    "误差过零频率（Hz）、参与统计的样本数。指令源在 q_d 四元数与 roll/pitch_body 之间自动选择"
+    "（fw_minor >= 15 或有四元数而无 body 字段时用四元数）。核心数据缺失返回 None。",
 )
-def op_att_tracking_stats(att_q, sp_q, sp_roll, sp_pitch, att_ts, sp_ts, intervals,
-                          fw_minor=None, tilt_min_deg=10.0, min_samples=50,
-                          sample_rate=50.0, **kw):
+def op_att_tracking_stats(
+    att_q,
+    sp_q,
+    sp_roll,
+    sp_pitch,
+    att_ts,
+    sp_ts,
+    intervals,
+    fw_minor=None,
+    tilt_min_deg=10.0,
+    min_samples=50,
+    sample_rate=50.0,
+    **kw,
+):
     import numpy as np
 
     q = _as_columns(att_q)
@@ -1038,7 +1114,7 @@ def op_att_tracking_stats(att_q, sp_q, sp_roll, sp_pitch, att_ts, sp_ts, interva
     w, x, y, z = (np.asarray(c, dtype=float) for c in q[:4])
     n_q = min(len(w), len(x), len(y), len(z))
     w, x, y, z = w[:n_q], x[:n_q], y[:n_q], z[:n_q]
-    roll = np.arctan2(2 * (w * x + y * z), 1 - 2 * (x ** 2 + y ** 2))          # 弧度
+    roll = np.arctan2(2 * (w * x + y * z), 1 - 2 * (x**2 + y**2))  # 弧度
     pitch = np.arcsin(np.clip(2 * (w * y - z * x), -1, 1))
 
     # 指令源：1.15+ 只记四元数；旧固件记 roll/pitch_body（弧度）
@@ -1046,26 +1122,27 @@ def op_att_tracking_stats(att_q, sp_q, sp_roll, sp_pitch, att_ts, sp_ts, interva
     has_qd = len(qd) >= 4
     use_q = has_qd and (sp_roll is None or fw_minor is None or int(fw_minor) >= 15)
     if not use_q and sp_roll is None and has_qd:
-        use_q = True                       # 定制固件容错
+        use_q = True  # 定制固件容错
     if use_q:
         d0, d1, d2, d3 = (np.asarray(c, dtype=float) for c in qd[:4])
         ns = min(len(d0), len(d1), len(d2), len(d3))
         d0, d1, d2, d3 = d0[:ns], d1[:ns], d2[:ns], d3[:ns]
-        r_sp_raw = np.arctan2(2 * (d0 * d1 + d2 * d3), 1 - 2 * (d1 ** 2 + d2 ** 2))
+        r_sp_raw = np.arctan2(2 * (d0 * d1 + d2 * d3), 1 - 2 * (d1**2 + d2**2))
         p_sp_raw = np.arcsin(np.clip(2 * (d0 * d2 - d3 * d1), -1, 1))
     else:
         if sp_roll is None:
             return None
         r_sp_raw = np.asarray(sp_roll, dtype=float)
-        p_sp_raw = (np.asarray(sp_pitch, dtype=float) if sp_pitch is not None
-                    else np.zeros(len(r_sp_raw)))
+        p_sp_raw = (
+            np.asarray(sp_pitch, dtype=float) if sp_pitch is not None else np.zeros(len(r_sp_raw))
+        )
 
     n = min(n_q, len(r_sp_raw), len(p_sp_raw))
     if n < 1:
         return None
     ts_n = ts[:n]
-    r_sp = np.interp(ts_n, sp_ts[:len(r_sp_raw)], r_sp_raw)
-    p_sp = np.interp(ts_n, sp_ts[:len(p_sp_raw)], p_sp_raw)
+    r_sp = np.interp(ts_n, sp_ts[: len(r_sp_raw)], r_sp_raw)
+    p_sp = np.interp(ts_n, sp_ts[: len(p_sp_raw)], p_sp_raw)
     err = np.degrees(np.maximum(np.abs(roll[:n] - r_sp), np.abs(pitch[:n] - p_sp)))
 
     amask = np.zeros(n, dtype=bool)
@@ -1076,7 +1153,7 @@ def op_att_tracking_stats(att_q, sp_q, sp_roll, sp_pitch, att_ts, sp_ts, interva
     active = amask & (np.degrees(np.abs(r_sp)) + np.degrees(np.abs(p_sp)) > float(tilt_min_deg))
     seg = err[active] if int(np.count_nonzero(active)) > int(min_samples) else err[amask]
     if seg.size <= int(min_samples):
-        return (None, None, int(seg.size))      # 样本不足：不出结论，但把样本数带出去
+        return (None, None, int(seg.size))  # 样本不足：不出结论，但把样本数带出去
 
     p99 = float(np.percentile(seg, 99))
     sign = np.sign(seg - np.median(seg))
@@ -1092,13 +1169,22 @@ def op_att_tracking_stats(att_q, sp_q, sp_roll, sp_pitch, att_ts, sp_ts, interva
     out_arity=5,
     out_names=["bx", "by", "bz", "bts", "src_text"],
     doc="零偏取源（三取一）：① 直读零偏列（fw_minor >= 15 时优先）② 状态槽 A ③ 状态槽 A 缺失"
-        "时用状态槽 B。输入都是「数组字段的多列」或 None。"
-        "返回 三轴序列 + 时间戳 + 数据来源说明（用于 evidence.field）；主数据缺失返回 None。"
-        "来源说明是**展示文案**，由调用方用 sources=[直读, 槽A, 槽B] 给出——算子不认识字段名。",
+    "时用状态槽 B。输入都是「数组字段的多列」或 None。"
+    "返回 三轴序列 + 时间戳 + 数据来源说明（用于 evidence.field）；主数据缺失返回 None。"
+    "来源说明是**展示文案**，由调用方用 sources=[直读, 槽A, 槽B] 给出——算子不认识字段名。",
 )
-def op_gyro_bias_series(new_cols, new_ts, states_a_cols, states_a_ts,
-                        states_b_cols, states_b_ts, fw_minor, slot=10,
-                        sources=None, **kw):
+def op_gyro_bias_series(
+    new_cols,
+    new_ts,
+    states_a_cols,
+    states_a_ts,
+    states_b_cols,
+    states_b_ts,
+    fw_minor,
+    slot=10,
+    sources=None,
+    **kw,
+):
     nb = _as_columns(new_cols)
     la = _as_columns(states_a_cols)
     lb = _as_columns(states_b_cols)
@@ -1112,7 +1198,7 @@ def op_gyro_bias_series(new_cols, new_ts, states_a_cols, states_a_ts,
     leg_a, leg_b = pick3(la), pick3(lb)
     use_new = len(nb) >= 3 and new_ts is not None and (fw_minor is None or int(fw_minor) >= 15)
     if not use_new and leg_a is None and leg_b is None and len(nb) >= 3:
-        use_new = True                       # 定制固件容错：没有旧槽就用直读
+        use_new = True  # 定制固件容错：没有旧槽就用直读
     if use_new:
         return (nb[0], nb[1], nb[2], new_ts, names[0])
     if leg_a is not None and states_a_ts is not None:
@@ -1128,7 +1214,7 @@ def op_gyro_bias_series(new_cols, new_ts, states_a_cols, states_a_ts,
     out_arity=4,
     out_names=["abs_max", "abs_axis", "drift", "drift_axis"],
     doc="三轴零偏在 armed 区间内逐轴取 |最大值| 与极差（漂移），回传各自最差的轴名。"
-        "样本 < min_count 的轴不参与；|零偏| 严格 > 0 才算有效；轴名由经验文件给出。",
+    "样本 < min_count 的轴不参与；|零偏| 严格 > 0 才算有效；轴名由经验文件给出。",
 )
 def op_gyro_bias_worst(bx, by, bz, bts, intervals, labels=None, min_count=10, **kw):
     import numpy as np
@@ -1183,7 +1269,7 @@ def op_max_temp_range(t_a, t_b, **kw):
     "active_window_mask",
     in_arity=4,
     doc="活动窗口掩码：armed 区间 ∩ 状态取值落在 codes 内的样本；若交集样本 <= min_active，"
-        "退回整个 armed 区间（原实现“悬停样本太少就退用 armed 段”）。任意状态字段通用。",
+    "退回整个 armed 区间（原实现“悬停样本太少就退用 armed 段”）。任意状态字段通用。",
 )
 def op_active_window_mask(ts_us, intervals, values, values_ts, codes=None, min_active=20, **kw):
     import numpy as np
@@ -1213,7 +1299,7 @@ def op_active_window_mask(ts_us, intervals, values, values_ts, codes=None, min_a
     out_arity=4,
     out_names=["spread", "busiest", "idlest", "n_active"],
     doc="多通道均值极差：掩码内逐通道求均值，只保留均值 > min_mean 的通道（排除未接/未用），"
-        "活跃通道数不足 min_channels 时返回 None；回传 极差 / 最大通道号 / 最小通道号 / 活跃数。",
+    "活跃通道数不足 min_channels 时返回 None；回传 极差 / 最大通道号 / 最小通道号 / 活跃数。",
 )
 def op_column_spread_stats(matrix, mask, min_mean=0.01, min_channels=4, **kw):
     means = op_active_column_means(matrix, mask, min_mean=min_mean)
@@ -1234,8 +1320,8 @@ def op_column_spread_stats(matrix, mask, min_mean=0.01, min_channels=4, **kw):
     out_arity=6,
     out_names=["vmin", "cell_min", "cells", "have_measured", "have_fallback", "no_cell"],
     doc="单电芯最低电压：优先 voltage_cell_v[] 实测（各列 > 0 的最小值中的最小值），"
-        "缺失时回退 总压最小值 / 电芯数（两者都 > 0 才成立）；两者都没有但有总压 → no_cell 为真。"
-        "cells 只在回退路径给出（与迁移前一致）。",
+    "缺失时回退 总压最小值 / 电芯数（两者都 > 0 才成立）；两者都没有但有总压 → no_cell 为真。"
+    "cells 只在回退路径给出（与迁移前一致）。",
 )
 def op_cell_voltage_min(cell_cols, volt_v, volt_filtered, cell_count, **kw):
     import numpy as np
@@ -1264,7 +1350,7 @@ def op_cell_voltage_min(cell_cols, volt_v, volt_filtered, cell_count, **kw):
     have_measured = measured is not None
     have_fallback = fallback is not None
     cell_min = measured if have_measured else fallback
-    no_cell = (not have_measured and not have_fallback and vmin is not None)
+    no_cell = not have_measured and not have_fallback and vmin is not None
     return (vmin, cell_min, cells, have_measured, have_fallback, no_cell)
 
 # 日志适配器（provider）契约 —— 引擎唯一认识的"日志"长相
@@ -1291,61 +1377,71 @@ REQUIRED = {
         "doc": "格式标识（如 px4-ulog），进报告与错误信息",
     },
     "parser_version": {
-        "kind": "method", "sig": "() -> str",
+        "kind": "method",
+        "sig": "() -> str",
         "doc": "解析这一份日志用的解析器版本串（如 pyulog/1.1.0），进报告头的 parserVersion。"
-               "**为什么由 provider 给而不是引擎写死**：引擎不认识任何一种日志的解析器，"
-               "写死就等于把某个格式的名字钉进了格式无关层。"
-               "浏览器里解析器版本不受本站控制（PyPI 当时的最新版），所以它必须如实记录",
+        "**为什么由 provider 给而不是引擎写死**：引擎不认识任何一种日志的解析器，"
+        "写死就等于把某个格式的名字钉进了格式无关层。"
+        "浏览器里解析器版本不受本站控制（PyPI 当时的最新版），所以它必须如实记录",
     },
     "get_topic_meta": {
-        "kind": "method", "sig": "() -> list[dict]",
+        "kind": "method",
+        "sig": "() -> list[dict]",
         "doc": "有哪些消息/话题：[{name, instance, n, fields:[{name, dtype}]}]。"
-               "驱动 np_manifest（曲线可用性）与契约测试的自洽校验",
+        "驱动 np_manifest（曲线可用性）与契约测试的自洽校验",
     },
     "get_topic_data": {
-        "kind": "method", "sig": "(topic, instance=0) -> dict|None",
+        "kind": "method",
+        "sig": "(topic, instance=0) -> dict|None",
         "doc": "某个 topic 某实例的**原样列** {列名: 数组}（含 'field[0]' 这种数组列）。"
-               "报告页抽时序、概览指标兜底取数用它。取不到返回 None",
+        "报告页抽时序、概览指标兜底取数用它。取不到返回 None",
     },
     "get_first_existing_column": {
-        "kind": "method", "sig": "(topic, names) -> array|None",
-        "doc": "只取第一个实例、按候选名取第一个存在的原样列（概览指标兜底取数）"
-               "—— 取不到返回 None",
+        "kind": "method",
+        "sig": "(topic, names) -> array|None",
+        "doc": "只取第一个实例、按候选名取第一个存在的原样列（概览指标兜底取数）—— 取不到返回 None",
     },
     "get_series": {
         "kind": "method",
         "sig": "(ref, instance=None, alias=None, per_instance=False)",
         "doc": "按 'topic.field' 取一条序列（1-D 数组 / 每实例一组 / 定长数组按列）。"
-               "**取不到一律返回 None，不抛异常**——引擎按'数据不足'处理",
+        "**取不到一律返回 None，不抛异常**——引擎按'数据不足'处理",
     },
     "has_topic": {
-        "kind": "method", "sig": "(name) -> bool",
+        "kind": "method",
+        "sig": "(name) -> bool",
         "doc": "有没有这个消息/话题。表达式里的 has_topic('x') 直接指向它",
     },
     "match_version": {
-        "kind": "method", "sig": "(spec) -> bool",
+        "kind": "method",
+        "sig": "(spec) -> bool",
         "doc": "固件约束串是否满足（ref(..., when_fw='>=1.15') 用）。"
-               "约束串的语法由格式自己定，引擎不解释",
+        "约束串的语法由格式自己定，引擎不解释",
     },
     "get_logged_information": {
-        "kind": "method", "sig": "() -> dict",
+        "kind": "method",
+        "sig": "() -> dict",
         "doc": "日志自带的键值信息（PX4 是 Information Message）。没有就返回 {}",
     },
     "get_initial_parameters": {
-        "kind": "method", "sig": "() -> dict",
+        "kind": "method",
+        "sig": "() -> dict",
         "doc": "初始参数表。没有就返回 {}",
     },
     "get_logged_messages": {
-        "kind": "method", "sig": "() -> list[dict]",
+        "kind": "method",
+        "sig": "() -> list[dict]",
         "doc": "[{tSec, message, level, level_name}]：日志消息条目（tSec 是相对日志起点的秒数）",
     },
     "builtin_variables": {
-        "kind": "method", "sig": "() -> dict",
+        "kind": "method",
+        "sig": "() -> dict",
         "doc": "内置变量表，**每次调用返回一个新 dict**（引擎会往里写 compute 的输出）。"
-               "键必须覆盖下面的 BUILTIN_VARIABLES",
+        "键必须覆盖下面的 BUILTIN_VARIABLES",
     },
     "get_report_facts": {
-        "kind": "method", "sig": "() -> dict",
+        "kind": "method",
+        "sig": "() -> dict",
         "doc": "报告头的离散事实：机型 / 固件 / 时长 / 模式 / 载具身份……键名见各 provider",
     },
 }
@@ -1354,39 +1450,53 @@ REQUIRED = {
 # 不同格式能给的东西本来就不一样（PX4 的 ULog 有事件解码与逐字节消息统计，
 # ArduPilot 的 .bin 是另一套消息流），所以可选能力由格式自己决定。
 OPTIONAL = {
-    "get_flight_phases": {"sig": "() -> list[dict]",
-               "doc": "连续飞行阶段（报告页阶段条）。缺席则该条不显示"},
-    "get_logged_dropouts": {"sig": "() -> list[dict]",
-                 "doc": "[{tSec, durationMs}] 丢包记录"},
-    "get_message_type_counts": {"sig": "() -> dict | None",
-               "doc": "逐字节的消息类型统计（**只对能按帧走的格式有意义**）+ 走到文件末尾没有"},
-    "get_decoded_events": {"sig": "() -> list[dict] | None",
-               "doc": "事件解码（PX4 靠日志自带的 metadata_events）。None = 这份日志解不出"},
-    "report_materials": {"sig": "() -> dict",
-                 "doc": "报告页要的几块原料的打包——**不是某一个 tab 的 payload**："
-                        "infoDict/msgTypeStats 给「系统消息」、messages/messagesMulti 给「事件消息」、"
-                        "params/defaultParams/changedParams 给「飞控参数」、phases 给阶段条，"
-                        "四个 tab 各取所需。边界是「该格式能提供哪些原料」，"
-                        "而原料的形态是格式专有的（合并事件与文本、多值信息怎么拼……），"
-                        "换格式就是另一套，所以由格式提供而不是数据层拼"},
-    "get_flight_track": {"sig": "(...) -> dict | None",
-              "doc": "地图轨迹（取数字段候选与量纲也是格式专有）"},
+    "get_flight_phases": {
+        "sig": "() -> list[dict]",
+        "doc": "连续飞行阶段（报告页阶段条）。缺席则该条不显示",
+    },
+    "get_logged_dropouts": {"sig": "() -> list[dict]", "doc": "[{tSec, durationMs}] 丢包记录"},
+    "get_message_type_counts": {
+        "sig": "() -> dict | None",
+        "doc": "逐字节的消息类型统计（**只对能按帧走的格式有意义**）+ 走到文件末尾没有",
+    },
+    "get_decoded_events": {
+        "sig": "() -> list[dict] | None",
+        "doc": "事件解码（PX4 靠日志自带的 metadata_events）。None = 这份日志解不出",
+    },
+    "report_materials": {
+        "sig": "() -> dict",
+        "doc": "报告页要的几块原料的打包——**不是某一个 tab 的 payload**："
+        "infoDict/msgTypeStats 给「系统消息」、messages/messagesMulti 给「事件消息」、"
+        "params/defaultParams/changedParams 给「飞控参数」、phases 给阶段条，"
+        "四个 tab 各取所需。边界是「该格式能提供哪些原料」，"
+        "而原料的形态是格式专有的（合并事件与文本、多值信息怎么拼……），"
+        "换格式就是另一套，所以由格式提供而不是数据层拼",
+    },
+    "get_flight_track": {
+        "sig": "(...) -> dict | None",
+        "doc": "地图轨迹（取数字段候选与量纲也是格式专有）",
+    },
 }
 
 # ---------------- builtin_variables() 必须给的键（= 规则与 plot 能引用的内置变量）----------------
 # 这份表就是"作者能引用什么"的权威清单，站内指南的内置变量表由 tools/px4/gen_rule_reference.py
 # 从这里生成。加名字 = 改契约；删名字 = 破坏兼容（老规则会构建失败，这是有意的）。
 BUILTIN_VARIABLES = {
-    "fw_minor": {"type": "int|None",
-                 "doc": "固件次版本号。**版本分支唯一常用的量**；None = 这份日志没写版本号"},
-    "airframe": {"type": "str",
-                 "doc": "机型：rotary_wing / fixed_wing / rover / airship / unknown"},
+    "fw_minor": {
+        "type": "int|None",
+        "doc": "固件次版本号。**版本分支唯一常用的量**；None = 这份日志没写版本号",
+    },
+    "airframe": {
+        "type": "str",
+        "doc": "机型：rotary_wing / fixed_wing / rover / airship / unknown",
+    },
     "is_fixed_wing": {"type": "bool", "doc": "机型别名（比 airframe == 'fixed_wing' 好读）"},
     "duration_s": {"type": "float", "doc": "日志总时长（秒）"},
     "armed_s": {"type": "float", "doc": "armed 总时长（秒）"},
-    "armed_intervals": {"type": "list[(us,us)]",
-                        "doc": "armed 区间，升序不重叠；end=None 表示持续到日志结束。"
-                               "时序算子按它切窗"},
+    "armed_intervals": {
+        "type": "list[(us,us)]",
+        "doc": "armed 区间，升序不重叠；end=None 表示持续到日志结束。时序算子按它切窗",
+    },
     "t0_us": {"type": "int", "doc": "日志起点时间戳（us），事件类算子算相对时刻的基准"},
     "has_armed": {"type": "bool", "doc": "是否存在 armed 段"},
     "restart_detected": {"type": "bool", "doc": "是否有 topic 时间戳回退（疑似中途重启）"},
@@ -1399,7 +1509,6 @@ BUILTIN_VARIABLES = {
 #   has_topic() —— 表达式里唯一放行的函数调用，指向 provider.has_topic
 
 
-
 # ---------------- 格式注册表 ----------------
 # 各 providers/<格式>.py 在文件末尾把 (探测器, 工厂, 说明) 追加进来。探测靠文件头 magic，
 # 不靠扩展名（用户上传的文件名不可信）。
@@ -1409,8 +1518,12 @@ BUILTIN_VARIABLES = {
 FORMATS = []
 
 _VALUE_TYPES = {
-    "int": (int,), "float": (int, float), "bool": (bool,), "str": (str,),
-    "list": (list, tuple), "dict": (dict,),
+    "int": (int,),
+    "float": (int, float),
+    "bool": (bool,),
+    "str": (str,),
+    "list": (list, tuple),
+    "dict": (dict,),
 }
 
 
@@ -1421,7 +1534,8 @@ def open_log(raw, facts_cfg=None):
             return check_provider(make(raw, facts_cfg), label)
     known = "、".join(label for _, _, label in FORMATS) or "（无）"
     raise ValueError(
-        "不认识的日志格式：本站目前只支持 %s。扩展名不作数，判据是文件头 magic" % known)
+        "不认识的日志格式：本站目前只支持 %s。扩展名不作数，判据是文件头 magic" % known
+    )
 
 
 def _type_matches_spec(value, spec):
@@ -1429,7 +1543,7 @@ def _type_matches_spec(value, spec):
     if want is None:
         return True
     if value is None:
-        return "None" in want          # 只有写明允许 None 的才接受 None
+        return "None" in want  # 只有写明允许 None 的才接受 None
     for part in want.replace("|None", "").split("|"):
         part = part.strip()
         base = part.split("[")[0]
@@ -1456,10 +1570,13 @@ def check_provider(provider, where="provider"):
         if key not in sem:
             raise ValueError(
                 "%s.semantics() 缺少内置变量 %s（%s）—— 规则里引用它会静默算不出数据"
-                % (where, key, spec["doc"]))
+                % (where, key, spec["doc"])
+            )
         if not _type_matches_spec(sem[key], spec):
-            raise ValueError("%s.semantics()[%s] 类型不对：期望 %s，得到 %r"
-                             % (where, key, spec["type"], sem[key]))
+            raise ValueError(
+                "%s.semantics()[%s] 类型不对：期望 %s，得到 %r"
+                % (where, key, spec["type"], sem[key])
+            )
     # 每个 provider 都要能独立喂给多个规则：返回的必须是新 dict（引擎会往里写 compute 输出）
     sem2 = provider.builtin_variables()
     if sem2 is sem:
@@ -1524,8 +1641,10 @@ class Px4Provider:
 
         self._level_names = {int(k): v for k, v in (self._cfg.get("log_levels") or {}).items()}
         self._nav_names = {int(k): v for k, v in (self._cfg.get("nav_state_names") or {}).items()}
-        self._nav_groups = [(g["phase"], set(int(c) for c in g["codes"]))
-                            for g in (self._cfg.get("nav_state_groups") or [])]
+        self._nav_groups = [
+            (g["phase"], set(int(c) for c in g["codes"]))
+            for g in (self._cfg.get("nav_state_groups") or [])
+        ]
         self._vehicle_types = {int(k): v for k, v in (self._cfg.get("vehicle_types") or {}).items()}
 
         # 本日志实际录到的 topic 名集合
@@ -1554,13 +1673,18 @@ class Px4Provider:
         """[{name, instance, n, fields:[{name, dtype}]}]（驱动 np_manifest 与曲线可用性）"""
         out = []
         for d in self.ulog.data_list:
-            out.append({
-                "topic": d.name,
-                "instance": int(d.multi_id),
-                "n": int(len(d.data["timestamp"])),
-                "fields": [{"name": k, "dtype": str(getattr(v, "dtype", type(v).__name__))}
-                           for k, v in d.data.items() if k != "timestamp"],
-            })
+            out.append(
+                {
+                    "topic": d.name,
+                    "instance": int(d.multi_id),
+                    "n": int(len(d.data["timestamp"])),
+                    "fields": [
+                        {"name": k, "dtype": str(getattr(v, "dtype", type(v).__name__))}
+                        for k, v in d.data.items()
+                        if k != "timestamp"
+                    ],
+                }
+            )
         return out
 
     def get_topic_data(self, topic, instance=0):
@@ -1627,8 +1751,13 @@ class Px4Provider:
             return True
         cur = (self.fw["major"] if self.fw["major"] is not None else 0, self.fw_minor)
         for op, want in conds:
-            if not {">=": cur >= want, "<=": cur <= want, "==": cur == want,
-                    ">": cur > want, "<": cur < want}[op]:
+            if not {
+                ">=": cur >= want,
+                "<=": cur <= want,
+                "==": cur == want,
+                ">": cur > want,
+                "<": cur < want,
+            }[op]:
                 return False
         return True
 
@@ -1681,8 +1810,10 @@ class Px4Provider:
         return [dict(seg) for seg in self.phase_intervals]
 
     def get_logged_dropouts(self):
-        return [{"tSec": round(int(d.timestamp) / 1e6, 2), "durationMs": int(d.duration)}
-                for d in getattr(self.ulog, "dropouts", [])]
+        return [
+            {"tSec": round(int(d.timestamp) / 1e6, 2), "durationMs": int(d.duration)}
+            for d in getattr(self.ulog, "dropouts", [])
+        ]
 
     def get_message_type_counts(self):
         """逐条走 ULog 的 [uint16 消息长度][uint8 消息类型] 序列，统计每类消息的条数。
@@ -1693,7 +1824,7 @@ class Px4Provider:
         """
         raw, n = self.raw, len(self.raw)
         counts = {}
-        off = 16            # 16 字节文件头：magic 'ULog' + 版本号 + 起始时间戳
+        off = 16  # 16 字节文件头：magic 'ULog' + 版本号 + 起始时间戳
         while off + 3 <= n:
             size = raw[off] | (raw[off + 1] << 8)
             if off + 3 + size > n:
@@ -1713,19 +1844,22 @@ class Px4Provider:
         """
         try:
             from pyulog.px4_events import PX4Events
+
             event_parser = PX4Events()
             # 不外网兜底：日志没带事件定义时宁可不解码，也不去悄悄下载一份"最新的"定义
             event_parser.set_default_json_definitions_cb(lambda _already_has_default: None)
             name_to_lvl = {v: k for k, v in self._level_names.items()}
             out = []
             for t_us, level_str, text in event_parser.get_logged_events(self.ulog):
-                out.append({
-                    "tSec": round(int(t_us) / 1e6, 2),
-                    "level": name_to_lvl.get(str(level_str), 6),
-                    "levelStr": str(level_str),
-                    "kind": "event",
-                    "message": str(text).strip(),
-                })
+                out.append(
+                    {
+                        "tSec": round(int(t_us) / 1e6, 2),
+                        "level": name_to_lvl.get(str(level_str), 6),
+                        "levelStr": str(level_str),
+                        "kind": "event",
+                        "message": str(text).strip(),
+                    }
+                )
             return out
         except Exception:
             return None
@@ -1794,22 +1928,30 @@ class Px4Provider:
         'M' 多值信息怎么拼回文本、'Q' 默认值怎么推、逐字节的消息类型统计……换一种日志格式
         就是另一套。
         """
-        info = self.get_logged_information()          # 走契约能力取，别再直读 self.ulog（同一份数据两处知识）
+        info = (
+            self.get_logged_information()
+        )  # 走契约能力取，别再直读 self.ulog（同一份数据两处知识）
         cfgsys = self._cfg.get("sys_info_keys") or []
         info_types = getattr(self.ulog, "_msg_info_dict_types", None) or {}
         info_docs = self._cfg.get("info_key_docs") or {}
         clean = _json_clean
-        boot = lambda t_us: round(int(t_us) / 1e6, 2)
+
+        def boot(t_us):
+            return round(int(t_us) / 1e6, 2)
 
         sys_info = {k: str(info[k]) for k in cfgsys if k in info}
         info_dict = []
         for k, v in sorted(info.items()):
             doc = info_docs.get(k) or {}
-            info_dict.append({
-                "key": str(k), "name": str(doc.get("name", "")),
-                "type": str(info_types.get(k, "")), "value": str(v),
-                "desc": str(doc.get("desc", "")),
-            })
+            info_dict.append(
+                {
+                    "key": str(k),
+                    "name": str(doc.get("name", "")),
+                    "type": str(info_types.get(k, "")),
+                    "value": str(v),
+                    "desc": str(doc.get("desc", "")),
+                }
+            )
 
         # Logged String Message（'L'）。PX4 对**事件**会同时写两样：一条事件（二进制，进
         # \`event\` topic）和一条等价的旧格式文本（以 \t 结尾）。先分开收，等解码出事件后再决定
@@ -1818,8 +1960,13 @@ class Px4Provider:
         for m in getattr(self.ulog, "logged_messages", []):
             lvl = int(getattr(m, "log_level", 6))
             text = str(m.message)
-            item = {"tSec": boot(m.timestamp), "level": lvl, "levelStr": self._level_str(m, lvl),
-                    "kind": "log", "message": text.strip()}
+            item = {
+                "tSec": boot(m.timestamp),
+                "level": lvl,
+                "levelStr": self._level_str(m, lvl),
+                "kind": "log",
+                "message": text.strip(),
+            }
             (legacy_dupes if text.endswith("\t") else messages).append(item)
 
         events = self.get_decoded_events() or []
@@ -1831,9 +1978,16 @@ class Px4Provider:
         for tag, msgs in tagged_src.items():
             for m in msgs:
                 lvl = int(getattr(m, "log_level", 6))
-                messages_tagged.append({
-                    "tSec": boot(m.timestamp), "level": lvl, "levelStr": self._level_str(m, lvl),
-                    "kind": "log", "tag": int(tag), "message": str(m.message).strip()})
+                messages_tagged.append(
+                    {
+                        "tSec": boot(m.timestamp),
+                        "level": lvl,
+                        "levelStr": self._level_str(m, lvl),
+                        "kind": "log",
+                        "tag": int(tag),
+                        "message": str(m.message).strip(),
+                    }
+                )
         messages_tagged.sort(key=lambda m: m["tSec"])
 
         # 解码出事件了：那些 \t 结尾的旧格式文本就是同一件事的另一种说法，丢掉（FR 也如此）。
@@ -1866,12 +2020,19 @@ class Px4Provider:
             texts = [_fmt(x) for x in grp]
             return "".join(texts) if any("\n" in t for t in texts) else "\n".join(texts)
 
-        messages_multi = [{"key": str(k), "type": str(multi_types.get(k, "")),
-                           "values": [_fmt_group(g) for g in (multi_src[k] or [])]}
-                          for k in sorted(multi_src)]
+        messages_multi = [
+            {
+                "key": str(k),
+                "type": str(multi_types.get(k, "")),
+                "values": [_fmt_group(g) for g in (multi_src[k] or [])],
+            }
+            for k in sorted(multi_src)
+        ]
 
-        params = {str(k): (clean(np.asarray(v).reshape(-1)[0]) if hasattr(v, "reshape") else clean(v))
-                  for k, v in self.get_initial_parameters().items()}
+        params = {
+            str(k): (clean(np.asarray(v).reshape(-1)[0]) if hasattr(v, "reshape") else clean(v))
+            for k, v in self.get_initial_parameters().items()
+        }
 
         # Parameter Default（ULog 的 'Q' 消息）。PX4 的 logger 逐参数比较「当前值 / 机架默认 /
         # 固件默认」三者，**只写与当前值不同的那个**（logger.cpp: write_parameter_defaults）
@@ -1891,23 +2052,39 @@ class Px4Provider:
         if cp is None:
             cp = getattr(self.ulog, "_changed_parameters", [])
         for p in cp:
-            changed.append({"tSec": boot(getattr(p, "timestamp", 0) or 0),
-                            "name": str(getattr(p, "name", "")),
-                            "value": clean(getattr(p, "value", None))})
+            changed.append(
+                {
+                    "tSec": boot(getattr(p, "timestamp", 0) or 0),
+                    "name": str(getattr(p, "name", "")),
+                    "value": clean(getattr(p, "value", None)),
+                }
+            )
 
         # ULog 消息类型统计：顺序与名字来自 facts.yaml 的 ulog_msg_types，没出现过的类型计 0
         counts, walked_to_end, walked_off, file_size = self.get_message_type_counts()
         msg_types = self._cfg.get("ulog_msg_types") or []
         known = {str(t["code"]) for t in msg_types}
-        msg_type_stats = [{"code": str(t["code"]), "name": str(t.get("name", "")),
-                           "en": str(t.get("en", "")), "desc": str(t.get("desc", "")),
-                           "count": int(counts.get(str(t["code"]), 0))} for t in msg_types]
+        msg_type_stats = [
+            {
+                "code": str(t["code"]),
+                "name": str(t.get("name", "")),
+                "en": str(t.get("en", "")),
+                "desc": str(t.get("desc", "")),
+                "count": int(counts.get(str(t["code"]), 0)),
+            }
+            for t in msg_types
+        ]
         unknown = sum(c for k, c in counts.items() if k not in known)
         if unknown:
-            msg_type_stats.append({
-                "code": "?", "name": "不在码表里的类型", "en": "Unknown", "count": int(unknown),
-                "desc": "固件比本站的码表新，或文件被改过",
-            })
+            msg_type_stats.append(
+                {
+                    "code": "?",
+                    "name": "不在码表里的类型",
+                    "en": "Unknown",
+                    "count": int(unknown),
+                    "desc": "固件比本站的码表新，或文件被改过",
+                }
+            )
 
         return {
             "sysInfo": sys_info,
@@ -1984,9 +2161,19 @@ class Px4Provider:
 
         def gather_cell(idx):
             # pyulog 对定长数组通常暴露为 'field[0]'，个别构建为 'field_0'
-            return gather(lambda d: next(
-                (v for v in (self._first_field(d, f"{stem}[{idx}]", f"{stem}_{idx}")
-                             for stem in [field] + aliases) if v is not None), None))
+            return gather(
+                lambda d: next(
+                    (
+                        v
+                        for v in (
+                            self._first_field(d, f"{stem}[{idx}]", f"{stem}_{idx}")
+                            for stem in [field] + aliases
+                        )
+                        if v is not None
+                    ),
+                    None,
+                )
+            )
 
         if gather_cell(0) is None:
             return None
@@ -2037,19 +2224,34 @@ class Px4Provider:
 
         info = self.ulog.msg_info_dict
         rel = info.get("ver_sw_release")
-        fw = {"release": None, "major": None, "minor": None, "patch": None,
-              "git": str(info.get("ver_sw", ""))[:12], "hw": str(info.get("ver_hw", ""))}
+        fw = {
+            "release": None,
+            "major": None,
+            "minor": None,
+            "patch": None,
+            "git": str(info.get("ver_sw", ""))[:12],
+            "hw": str(info.get("ver_hw", "")),
+        }
         if rel is not None:
             try:
                 v = int(rel)
-                fw.update({"release": v, "major": (v >> 24) & 0xFF,
-                           "minor": (v >> 16) & 0xFF, "patch": (v >> 8) & 0xFF})
+                fw.update(
+                    {
+                        "release": v,
+                        "major": (v >> 24) & 0xFF,
+                        "minor": (v >> 16) & 0xFF,
+                        "patch": (v >> 8) & 0xFF,
+                    }
+                )
             except Exception:
                 pass
         self.fw = fw
         self.fw_minor = fw["minor"]
-        self.fw_label = ("%d.%d.%d" % (fw["major"], fw["minor"], fw["patch"])
-                         if fw["minor"] is not None else "未知（旧固件或无版本号）")
+        self.fw_label = (
+            "%d.%d.%d" % (fw["major"], fw["minor"], fw["patch"])
+            if fw["minor"] is not None
+            else "未知（旧固件或无版本号）"
+        )
 
         self.hw_subtype = str(info.get("ver_hw_subtype", ""))
 
@@ -2064,9 +2266,13 @@ class Px4Provider:
             self.fw_display = short_sw
         else:
             rtype = int(rel) & 0xFF
-            disp = "v%d.%d.%d%s" % (fw["major"], fw["minor"], fw["patch"],
-                                    _RELEASE_TYPE_SUFFIX.get(rtype, ""))
-            if rtype not in _RELEASE_TYPE_SUFFIX and self.ver_sw:   # 未打标签的开发版：附短哈希
+            disp = "v%d.%d.%d%s" % (
+                fw["major"],
+                fw["minor"],
+                fw["patch"],
+                _RELEASE_TYPE_SUFFIX.get(rtype, ""),
+            )
+            if rtype not in _RELEASE_TYPE_SUFFIX and self.ver_sw:  # 未打标签的开发版：附短哈希
                 disp += " (%s)" % short_sw
             self.fw_display = disp
 
@@ -2084,7 +2290,9 @@ class Px4Provider:
         hi, lo = p.get("LND_FLIGHT_T_HI"), p.get("LND_FLIGHT_T_LO")
         self.vehicle_life_s = (
             round((((int(hi) & 0xFFFFFFFF) << 32) | (int(lo) & 0xFFFFFFFF)) / 1e6, 1)
-            if hi is not None and lo is not None else None)
+            if hi is not None and lo is not None
+            else None
+        )
         # 机架编号（SYS_AUTOSTART，如 4040）——机型之外再给一个可查的标识
         af = p.get("SYS_AUTOSTART")
         self.airframe_id = int(af) if af is not None else None
@@ -2150,8 +2358,9 @@ class Px4Provider:
                         start_i = None
                 if start_i is not None:
                     armed_intervals.append((int(vts[start_i]), None))
-                total_us = sum(((e if e is not None else int(vts[-1])) - s)
-                               for s, e in armed_intervals)
+                total_us = sum(
+                    ((e if e is not None else int(vts[-1])) - s) for s, e in armed_intervals
+                )
                 armed_duration_s = round(total_us / 1e6, 1)
 
             if nav_arr is not None:
@@ -2178,15 +2387,18 @@ class Px4Provider:
                 runs.append((run_start, len(nav_arr) - 1))
                 for lo_i, hi_i in runs:
                     code = int(nav_arr[lo_i])
-                    seg_arm = (int(np.median(arm_arr[lo_i:hi_i + 1]))
-                               if arm_arr is not None else None)
-                    phase_intervals.append({
-                        "startSec": round(int(vts[lo_i]) / 1e6, 2),
-                        "endSec": round(int(vts[hi_i]) / 1e6, 2),
-                        "navState": code,
-                        "mode": self._nav_names.get(code, "Mode %d" % code),
-                        "armed": seg_arm == _ARMING_STATE_ARMED,
-                    })
+                    seg_arm = (
+                        int(np.median(arm_arr[lo_i : hi_i + 1])) if arm_arr is not None else None
+                    )
+                    phase_intervals.append(
+                        {
+                            "startSec": round(int(vts[lo_i]) / 1e6, 2),
+                            "endSec": round(int(vts[hi_i]) / 1e6, 2),
+                            "navState": code,
+                            "mode": self._nav_names.get(code, "Mode %d" % code),
+                            "armed": seg_arm == _ARMING_STATE_ARMED,
+                        }
+                    )
 
             trans_mode = self._first_field(vs, "vtol_in_trans_mode")
             if trans_mode is not None and int(np.max(np.asarray(trans_mode))) > 0:
@@ -2216,8 +2428,11 @@ class Px4Provider:
         # 别一处取"第一个"、一处取 instance 0
         self.start_utc = None
         track_cfg = self._cfg.get("track") or {}
-        gps = (self._find_topic(track_cfg["topic"], int(track_cfg.get("instance", 0)))
-               if track_cfg.get("topic") else None)
+        gps = (
+            self._find_topic(track_cfg["topic"], int(track_cfg.get("instance", 0)))
+            if track_cfg.get("topic")
+            else None
+        )
         if gps is not None and "time_utc_usec" in gps.data:
             t = np.asarray(gps.data["time_utc_usec"], dtype=np.int64)
             nz = np.nonzero(t > 0)[0]
@@ -2235,8 +2450,9 @@ class Px4Provider:
                     restart += 1
         self.restart_topics = restart
         # 丢包累计
-        self.dropout_total_ms = int(sum(getattr(d, "duration", 0)
-                                        for d in getattr(ulog, "dropouts", [])))
+        self.dropout_total_ms = int(
+            sum(getattr(d, "duration", 0) for d in getattr(ulog, "dropouts", []))
+        )
 
     def _read_logged_messages(self):
         """读 \`ulog.logged_messages\`：日志消息（PX4 的 \`[模块] 文案\`，含警告 / 错误级别）。
@@ -2259,12 +2475,14 @@ class Px4Provider:
                 # 应该炸出来，而不是让全部消息悄悄变成 tSec=None。
                 ts_s = None
             lvl = int(getattr(m, "log_level", ord("6")))
-            out.append({
-                "tSec": ts_s,
-                "message": str(m.message).strip(),
-                "level": lvl,
-                "level_name": self._level_names.get(lvl, "UNKNOWN"),
-            })
+            out.append(
+                {
+                    "tSec": ts_s,
+                    "message": str(m.message).strip(),
+                    "level": lvl,
+                    "level_name": self._level_names.get(lvl, "UNKNOWN"),
+                }
+            )
         self._logged_messages = out
 
     def _collect_facts(self):
@@ -2278,8 +2496,9 @@ class Px4Provider:
             "durationSec": self.duration_s if self.duration_s is not None else 0,
             "vehicleType": self.vehicle_type,
             "firmware": self.fw_label,
-            "firmwareProfile": ("px4-1.15+" if (self.fw_minor is not None
-                                               and self.fw_minor >= 15) else "px4-legacy"),
+            "firmwareProfile": (
+                "px4-1.15+" if (self.fw_minor is not None and self.fw_minor >= 15) else "px4-legacy"
+            ),
             "firmwareDisplay": self.fw_display,
             "fwReleaseType": self.fw_release_type,
             "armedDurationSec": self.armed_duration_s,
@@ -2295,7 +2514,7 @@ class Px4Provider:
             facts["verSw"] = self.ver_sw
         if self.modes:
             facts["modes"] = list(self.modes)
-            facts["mainMode"] = self.modes[0]     # 已按占样本数排序，第一个就是主模式
+            facts["mainMode"] = self.modes[0]  # 已按占样本数排序，第一个就是主模式
         if self.uuid:
             facts["uuid"] = self.uuid
         if self.ver_sw_branch:
@@ -2328,7 +2547,6 @@ def _make_px4(raw, facts_cfg):
 
 FORMATS.append((_is_ulog, _make_px4, "PX4 ULog（.ulg）"))
 
-
 # ============================================================================
 # 规则框架 —— **与日志格式无关**
 #
@@ -2343,7 +2561,8 @@ FORMATS.append((_is_ulog, _make_px4, "PX4 ULog（.ulg）"))
 # builtin_variables/get_report_facts 与可选能力，不碰 pyulog 对象。
 # ============================================================================
 
-import json, ast
+import json
+import ast
 import numpy as np
 
 
@@ -2351,7 +2570,7 @@ import numpy as np
 FAULT_KB = __FAULT_KB__
 
 # ---------------- 经验规则（rules/*.yaml 编译而来）----------------
-RULES = json.loads(r'''__RULES__''')
+RULES = json.loads(r"""__RULES__""")
 
 # ---------------- 那一份数据文件（knowledge/<格式>/facts.yaml 编译而来）----------------
 # 码表、文案、展示口径、规则元数据、执行顺序都在里面；引擎只提供机制。
@@ -2375,8 +2594,8 @@ provider = open_log(bytes(ulog_bytes), FACTS)
 findings = []
 checks_run = []
 checks_skipped = []
-tags = []          # 第二层异常标签（喂给第三层故障库匹配）
-guard_tags = []    # 数据质量/边界标签
+tags = []  # 第二层异常标签（喂给第三层故障库匹配）
+guard_tags = []  # 数据质量/边界标签
 _fid = [0]
 # 阶段集合来自 provider（故障库按 flight_phase 匹配用它）——在 run_all() 里填充
 phases_present = set()
@@ -2388,25 +2607,50 @@ def add_tag(t):
     if t not in tags:
         tags.append(t)
 
-def add(severity, rule_id, tag, title, field, value, threshold=None, unit=None,
-        doc=None, suggestion=None, tags_extra=None):
+
+def add(
+    severity,
+    rule_id,
+    tag,
+    title,
+    field,
+    value,
+    threshold=None,
+    unit=None,
+    doc=None,
+    suggestion=None,
+    tags_extra=None,
+):
     _fid[0] += 1
     ev = {"field": field, "value": value}
-    if threshold is not None: ev["threshold"] = threshold
-    if unit is not None: ev["unit"] = unit
-    f = {"id": "F%02d" % _fid[0], "severity": severity, "ruleId": rule_id,
-         "tag": tag, "title": title, "evidence": ev}
-    if doc: f["docUrl"] = doc
-    if suggestion: f["suggestion"] = suggestion
+    if threshold is not None:
+        ev["threshold"] = threshold
+    if unit is not None:
+        ev["unit"] = unit
+    f = {
+        "id": "F%02d" % _fid[0],
+        "severity": severity,
+        "ruleId": rule_id,
+        "tag": tag,
+        "title": title,
+        "evidence": ev,
+    }
+    if doc:
+        f["docUrl"] = doc
+    if suggestion:
+        f["suggestion"] = suggestion
     findings.append(f)
-    if tag: add_tag(tag)
-    for te in (tags_extra or []):
+    if tag:
+        add_tag(tag)
+    for te in tags_extra or []:
         add_tag(te)
+
 
 def skipped(check, reason):
     item = {"check": check, "reason": reason}
     if item not in checks_skipped:
         checks_skipped.append(item)
+
 
 def ran(check):
     if check not in checks_run:
@@ -2415,14 +2659,40 @@ def ran(check):
 
 # ---------------- 受限表达式求值 ----------------
 _ALLOWED_NODES = (
-    ast.Expression, ast.BoolOp, ast.And, ast.Or, ast.UnaryOp, ast.Not, ast.USub,
-    ast.Compare, ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.Eq, ast.NotEq, ast.In, ast.NotIn,
-    ast.Is, ast.IsNot,
-    ast.BinOp, ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Mod,
-    ast.Name, ast.Load, ast.Constant, ast.List, ast.Tuple, ast.Set,
+    ast.Expression,
+    ast.BoolOp,
+    ast.And,
+    ast.Or,
+    ast.UnaryOp,
+    ast.Not,
+    ast.USub,
+    ast.Compare,
+    ast.Lt,
+    ast.LtE,
+    ast.Gt,
+    ast.GtE,
+    ast.Eq,
+    ast.NotEq,
+    ast.In,
+    ast.NotIn,
+    ast.Is,
+    ast.IsNot,
+    ast.BinOp,
+    ast.Add,
+    ast.Sub,
+    ast.Mult,
+    ast.Div,
+    ast.Mod,
+    ast.Name,
+    ast.Load,
+    ast.Constant,
+    ast.List,
+    ast.Tuple,
+    ast.Set,
     # f-string（证据值用：\`value: f"{vibe_mean:.3f}"\`）。它的占位符里还是普通表达式，
     # 求值仍在同一个空 __builtins__ 环境下，没有新能力。
-    ast.JoinedStr, ast.FormattedValue,
+    ast.JoinedStr,
+    ast.FormattedValue,
 )
 
 # 表达式里**唯一**放行的函数调用。\`has_topic('x')\` 比 \`'x' in topics\` 直白，
@@ -2441,12 +2711,15 @@ def _eval_expr(expr, env):
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):
             ok = isinstance(node.func, ast.Name) and node.func.id in _EXPR_CALLABLE
-            arg_ok = len(node.args) == 1 and isinstance(node.args[0], ast.Constant) \
+            arg_ok = (
+                len(node.args) == 1
+                and isinstance(node.args[0], ast.Constant)
                 and isinstance(node.args[0].value, str)
+            )
             if not (ok and arg_ok and not node.keywords):
                 raise ValueError(
-                    "表达式里只允许 %s('字符串')：%s"
-                    % ("/".join(sorted(_EXPR_CALLABLE)), expr))
+                    "表达式里只允许 %s('字符串')：%s" % ("/".join(sorted(_EXPR_CALLABLE)), expr)
+                )
             continue
         if not isinstance(node, _ALLOWED_NODES):
             raise ValueError("表达式含不允许的语法 %s：%s" % (type(node).__name__, expr))
@@ -2482,8 +2755,15 @@ def _ref(name, per_instance=False, instance=None, alias=None, when_fw=None):
 
 # 比 _ALLOWED_NODES 多出：赋值语句、调用、属性（字段引用）、三元、字典（算子选项）
 _ALLOWED_COMPUTE = _ALLOWED_NODES + (
-    ast.Module, ast.Assign, ast.Expr, ast.Store,
-    ast.Call, ast.Attribute, ast.keyword, ast.IfExp, ast.Dict,
+    ast.Module,
+    ast.Assign,
+    ast.Expr,
+    ast.Store,
+    ast.Call,
+    ast.Attribute,
+    ast.keyword,
+    ast.IfExp,
+    ast.Dict,
 )
 
 
@@ -2503,9 +2783,11 @@ class _ComputeRefs(ast.NodeTransformer):
         if node.value.id in self.env_keys:
             raise ValueError("%s 是变量名，不能当 topic 用" % node.value.id)
         return ast.copy_location(
-            ast.Call(func=ast.Name(id="ref", ctx=ast.Load()),
-                     args=[ast.Constant(value="%s.%s" % (node.value.id, node.attr))],
-                     keywords=[]),
+            ast.Call(
+                func=ast.Name(id="ref", ctx=ast.Load()),
+                args=[ast.Constant(value="%s.%s" % (node.value.id, node.attr))],
+                keywords=[],
+            ),
             node,
         )
 
@@ -2613,7 +2895,7 @@ def _rule_skipped(rule, checks, env):
 
     返回 True 表示本条规则不该继续跑。
     """
-    for spec in (rule.get("skip") or []):
+    for spec in rule.get("skip") or []:
         when = spec.get("when")
         if not when:
             continue
@@ -2643,7 +2925,7 @@ def _run_rules(group):
         _rid = _rule["id"]
         _checks = (_rule.get("outputs") or {}).get("check")
         if _checks is None:
-            _checks = []            # guards 类经验没有 check 名（不记 ran/skipped）
+            _checks = []  # guards 类经验没有 check 名（不记 ran/skipped）
         elif not isinstance(_checks, list):
             _checks = [_checks]
         _env = _rule_env()
@@ -2652,8 +2934,9 @@ def _run_rules(group):
         # 不匹配则静默：既不 ran 也不 skipped（这是最外层的门，"这条经验根本不属于本机"
         # 不值得在报告里刷一条）。要留痕就把它写进 skip 列表。
         try:
-            _axis_ok = bool(_eval_expr(_rule["firmware"], _env)) and \
-                       bool(_eval_expr(_rule["airframe"], _env))
+            _axis_ok = bool(_eval_expr(_rule["firmware"], _env)) and bool(
+                _eval_expr(_rule["airframe"], _env)
+            )
         except Exception:
             _axis_ok = False
         if not _axis_ok:
@@ -2671,7 +2954,7 @@ def _run_rules(group):
                 ran(_check)
 
         _ok = True
-        for _stmt in (_rule.get("compute") or []):
+        for _stmt in _rule.get("compute") or []:
             # compute 是**表达式**，求值出来的名字进 _env，供后面的表达式与 triggers / outputs 引用。
             try:
                 _eval_compute(_stmt, _env)
@@ -2701,7 +2984,7 @@ def _run_rules(group):
         _out = _rule["outputs"]
         # outputs.guard_tags：按条件产生的数据质量标签（等价于原过程式的 guard_tags.append，
         # 不依赖是否发出 finding——如陀螺零偏的“温度变化大”）
-        for _gspec in (_out.get("guard_tags") or []):
+        for _gspec in _out.get("guard_tags") or []:
             try:
                 _g_hit = _eval_expr(_gspec["when"], _env)
             except Exception:
@@ -2732,7 +3015,7 @@ def _run_rules(group):
                     continue
                 _tenv = dict(_env)
                 _tenv.update(_item)
-            for _trig in (_rule.get("triggers") or []):
+            for _trig in _rule.get("triggers") or []:
                 # 单条触发条件出错（例如表达式把缺失值 None 与数值比较）不应让整份日志
                 # 的分析崩掉：视为未命中，继续下一条。这类错误应当在基线回归里暴露。
                 try:
@@ -2756,10 +3039,18 @@ def _run_rules(group):
                 _sugg = _trig.get("suggestion")
                 if _sugg and "{" in _sugg:
                     _sugg = _sugg.format_map(_tenv)
-                add(_trig["severity"], _rid, _trig.get("tag", _out.get("tag")),
-                    _trig["title"].format_map(_tenv), _field, _val,
-                    _trig.get("threshold"), _trig.get("unit"),
-                    _rule.get("doc"), _sugg)
+                add(
+                    _trig["severity"],
+                    _rid,
+                    _trig.get("tag", _out.get("tag")),
+                    _trig["title"].format_map(_tenv),
+                    _field,
+                    _val,
+                    _trig.get("threshold"),
+                    _trig.get("unit"),
+                    _rule.get("doc"),
+                    _sugg,
+                )
                 # evidence_extra: {evidence 键: 变量名}，把额外证据挂到刚发出的 finding 上
                 # （如日志消息的 samples 原文列表）
                 for _ek, _evn in (_trig.get("evidence_extra") or {}).items():
@@ -2787,7 +3078,7 @@ def _metric_fallback(m):
             fields = [fields]
         args = []
         for cand in fields:
-            names = cand if isinstance(cand, list) else [cand]   # 候选字段名：取第一个存在的
+            names = cand if isinstance(cand, list) else [cand]  # 候选字段名：取第一个存在的
             col = provider.get_first_existing_column(topic, names)
             if col is None:
                 return None
@@ -2811,7 +3102,7 @@ def _metric_fallback(m):
         if "round" in m:
             _r = int(m["round"])
             val = round(val, _r)
-            return int(val) if _r == 0 else val   # round(x, 0) 仍是 float，整数量要转回 int
+            return int(val) if _r == 0 else val  # round(x, 0) 仍是 float，整数量要转回 int
         return val
     except Exception:
         return None
@@ -2833,15 +3124,17 @@ def match_fault_kb():
         if "all" not in e_phases:
             if not any(p in phases for p in e_phases):
                 continue
-        matched.append({
-            "faultId": e["fault_id"],
-            "faultTag": e["fault_tag"],
-            "riskLevel": e.get("risk_level", ""),
-            "possibleRootCause": e.get("possible_root_cause", []),
-            "troubleshootingSteps": e.get("troubleshooting_steps", []),
-            "note": e.get("note", ""),
-            "matchedPhases": [p for p in e_phases if p == "all" or p in phases],
-        })
+        matched.append(
+            {
+                "faultId": e["fault_id"],
+                "faultTag": e["fault_tag"],
+                "riskLevel": e.get("risk_level", ""),
+                "possibleRootCause": e.get("possible_root_cause", []),
+                "troubleshootingSteps": e.get("troubleshooting_steps", []),
+                "note": e.get("note", ""),
+                "matchedPhases": [p for p in e_phases if p == "all" or p in phases],
+            }
+        )
     return matched
 
 

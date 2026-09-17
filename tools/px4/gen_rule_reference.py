@@ -7,6 +7,7 @@ engine/providers/api.py 的 BUILTIN_VARIABLES（内置变量 = 适配器契约�
 
 用法：python tools/px4/gen_rule_reference.py
 """
+
 from pathlib import Path
 import ast
 import re
@@ -45,8 +46,14 @@ def operator_catalog() -> str:
     for node in tree.body:
         if not isinstance(node, ast.FunctionDef):
             continue
-        deco = next((d for d in node.decorator_list
-                     if isinstance(d, ast.Call) and getattr(d.func, "id", "") == "operator"), None)
+        deco = next(
+            (
+                d
+                for d in node.decorator_list
+                if isinstance(d, ast.Call) and getattr(d.func, "id", "") == "operator"
+            ),
+            None,
+        )
         if deco is None:
             continue
         name = deco.args[0].value
@@ -65,9 +72,12 @@ def operator_catalog() -> str:
         in_a, out_a = val("in_arity", 1), val("out_arity", 1)
         out_names = val("out_names", []) or []
         doc = val("doc", "") or (ast.get_docstring(node) or "").strip().split("\n")[0]
-        outs = ", ".join(out_names) if out_names else ("1 个值" if out_a == 1 else "%d 个值" % out_a)
+        outs = (
+            ", ".join(out_names) if out_names else ("1 个值" if out_a == 1 else "%d 个值" % out_a)
+        )
         rows.setdefault(section_of.get(node.lineno, "其它"), []).append(
-            (name, in_a, outs, doc.split("。")[0].split("；")[0].strip()))
+            (name, in_a, outs, doc.split("。")[0].split("；")[0].strip())
+        )
 
     out = []
     for sec in [x for x in order if x in rows] + [x for x in rows if x not in order]:
@@ -77,11 +87,12 @@ def operator_catalog() -> str:
         for name, in_a, outs, doc in sorted(rows[sec]):
             out.append("| `%s` | %d | %s | %s |" % (name, in_a, outs, doc))
     total = sum(len(v) for v in rows.values())
-    out.append("\n共 **%d** 个算子。输入个数与左值个数由算子签名强制校验（对不上则构建失败）；"
-               "各算子的可调参数（如 `gt` / `p` / `factor` / `codes` / `labels` / `min_count`）"
-               "写成算子调用的**关键字实参**（如 `percentile(w, p=95)`）；"
-               "取数修饰（`per_instance` / `instance` / `alias` / `when_fw`）写在 `ref(...)` 上。"
-               % total)
+    out.append(
+        "\n共 **%d** 个算子。输入个数与左值个数由算子签名强制校验（对不上则构建失败）；"
+        "各算子的可调参数（如 `gt` / `p` / `factor` / `codes` / `labels` / `min_count`）"
+        "写成算子调用的**关键字实参**（如 `percentile(w, p=95)`）；"
+        "取数修饰（`per_instance` / `instance` / `alias` / `when_fw`）写在 `ref(...)` 上。" % total
+    )
     return "\n".join(out)
 
 
@@ -103,7 +114,7 @@ def builtin_table() -> str:
         "duration_s": "日志总时长（秒）",
         "armed_s": "armed 总时长（秒）",
         "armed_intervals": "armed 区间列表 `[(start_us, end_us)]`，升序不重叠；"
-                           "`end=None` 表示持续到日志结束。时序算子按它切窗",
+        "`end=None` 表示持续到日志结束。时序算子按它切窗",
         "t0_us": "日志起点时间戳（us），事件类算子算相对时刻用",
         "has_armed": "是否存在 armed 段（布尔）",
         "restart_detected": "是否有 topic 时间戳回退（疑似中途重启）",
@@ -114,10 +125,14 @@ def builtin_table() -> str:
     for k in keys:
         rows.append("| `%s` | %s |" % (k, note.get(k, "—")))
     # 框架自己补的两个（不属于 provider，但同样可以直接引用）
-    rows.append("| `no_data` | compute 是否算不出来：初值 False，compute 失败后置真"
-                "（`skip` 列表里用它记一条 skipped） |")
-    rows.append("| `has_topic('x')` | 日志里有没有这个 topic，如 `not has_topic('cpuload')`；"
-                "表达式里**唯一**允许的函数调用（其余函数一律不给） |")
+    rows.append(
+        "| `no_data` | compute 是否算不出来：初值 False，compute 失败后置真"
+        "（`skip` 列表里用它记一条 skipped） |"
+    )
+    rows.append(
+        "| `has_topic('x')` | 日志里有没有这个 topic，如 `not has_topic('cpuload')`；"
+        "表达式里**唯一**允许的函数调用（其余函数一律不给） |"
+    )
     return "\n".join(rows)
 
 

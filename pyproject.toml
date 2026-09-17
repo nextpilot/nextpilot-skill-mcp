@@ -16,6 +16,13 @@
 line-length = 100
 target-version = "py311"
 
+# **只认 .py**。默认还会去格式化 Markdown 里嵌入的 Python 代码块，而本仓 .md 里的那些块是
+# 示意图与「最初设计」的历史记录（比如 `def fn_mean(vals, **kw):  ...` 这种占位省略号、
+# 已经不存在的 `__GUARDS__` / `__TOPICS__` 占位符），重排它们只是把文档改花，
+# 还会让文档与它记录的当时形态对不上。发现过程：`ruff format .` 把 CLAUDE.md 的
+# 「执行链路」一节整段重排了。
+include = ["*.py"]
+
 [tool.ruff.lint]
 # 刻意**不开**这些（不是遗漏，是设计决定，改之前先读这段）：
 #   UP031  printf 风格 → f-string：本仓 .py 一律用 %-格式化，107 处，改了没有任何收益

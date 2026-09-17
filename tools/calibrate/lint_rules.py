@@ -20,6 +20,7 @@
 用法：python tools/calibrate/lint_rules.py [--strict]
     --strict 时 version-gap 与 suspicious 都算失败（默认只报告、返回 0）
 """
+
 from __future__ import annotations
 
 import ast
@@ -34,13 +35,14 @@ import run_checks_locally as runner  # noqa: E402
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RULES_DIR = REPO_ROOT / "knowledge" / "px4" / "rules"
 META_DIR = REPO_ROOT / "knowledge" / "px4" / "meta"
-LOG_DIR = Path(__file__).resolve().parent / "logs"   # 校准用真实日志（不入库，需自备）
+LOG_DIR = Path(__file__).resolve().parent / "logs"  # 校准用真实日志（不入库，需自备）
 BASELINE_DIR = Path(__file__).resolve().parent / "baseline"
 ARRAY_SUFFIX = re.compile(r"\[\d+\]$")
-MAIN_VERSION = (99, 0)          # main = 开发主干，当作最新
+MAIN_VERSION = (99, 0)  # main = 开发主干，当作最新
 
 
 # ─────────────────────────── 版本 ───────────────────────────
+
 
 def tag_version(tag: str) -> tuple[int, int]:
     m = re.match(r"v?(\d+)\.(\d+)", tag)
@@ -57,8 +59,13 @@ def fw_matches(spec, version) -> bool:
             return True
         op, maj, mi = m.group(1) or "==", int(m.group(2)), int(m.group(3) or 0)
         want = (maj, mi)
-        if not {">=": version >= want, "<=": version <= want, ">": version > want,
-                "<": version < want, "==": version == want}[op]:
+        if not {
+            ">=": version >= want,
+            "<=": version <= want,
+            ">": version > want,
+            "<": version < want,
+            "==": version == want,
+        }[op]:
             return False
     return True
 
@@ -68,6 +75,7 @@ def fmt(v) -> str:
 
 
 # ─────────────────────────── 字段来源 ───────────────────────────
+
 
 def fields_by_version_from_logs() -> dict[tuple[int, int], dict[str, set[str]]]:
     """{版本: {topic: {field}}}——来自回归日志的实测字段（引擎真正能读到的）。"""
@@ -92,7 +100,7 @@ def fields_by_version_from_logs() -> dict[tuple[int, int], dict[str, set[str]]]:
     for path in sorted(LOG_DIR.glob("*.ulg")):
         ver = log_fw.get(path.name)
         if ver is None:
-            continue                       # 版本未知的日志不参与版本判定
+            continue  # 版本未知的日志不参与版本判定
         try:
             ulog = ULog(str(path))
         except Exception as exc:  # noqa: BLE001
@@ -120,6 +128,7 @@ def bases(name: str) -> set[str]:
 
 
 # ─────────────────────────── 规则里的引用 ───────────────────────────
+
 
 def field_refs(expr: str) -> list[tuple[str, str | None, bool]]:
     """从一条 compute 表达式里取出字段引用。
@@ -176,21 +185,25 @@ def main(argv: list[str]) -> int:
     logs = fields_by_version_from_logs()
     meta = fields_by_version_from_meta()
     versions = sorted(set(logs) | set(meta))
-    print("来源版本：%s（日志实测 %d 个版本，字典 %d 个版本）"
-          % (", ".join(fmt(v) for v in versions), len(logs), len(meta)))
+    print(
+        "来源版本：%s（日志实测 %d 个版本，字典 %d 个版本）"
+        % (", ".join(fmt(v) for v in versions), len(logs), len(meta))
+    )
 
     ok = gaps = legacy = suspicious = 0
     gap_rows: list[tuple[str, str, str, str, list[str]]] = []
     legacy_rows: list[tuple[str, str, str]] = []
     bad_rows: list[tuple[str, str, str]] = []
     for rid, topic, fld, declared, constraints in rule_refs():
-        applicable = [v for v in versions
-                      if all(fw_matches(c, v) for c in constraints)]
+        applicable = [v for v in versions if all(fw_matches(c, v) for c in constraints)]
         if any(found_in(logs, v, topic, fld) or found_in(meta, v, topic, fld) for v in applicable):
             ok += 1
             continue
-        elsewhere = [fmt(v) for v in versions
-                     if found_in(logs, v, topic, fld) or found_in(meta, v, topic, fld)]
+        elsewhere = [
+            fmt(v)
+            for v in versions
+            if found_in(logs, v, topic, fld) or found_in(meta, v, topic, fld)
+        ]
         if declared:
             legacy += 1
             legacy_rows.append((rid, topic, fld))
@@ -201,8 +214,10 @@ def main(argv: list[str]) -> int:
             suspicious += 1
             bad_rows.append((rid, topic, fld))
 
-    print("\n字段引用 %d 处：适用版本内命中 %d ｜ 版本错配 %d ｜ 已声明遗留 %d ｜ 可疑 %d"
-          % (ok + gaps + legacy + suspicious, ok, gaps, legacy, suspicious))
+    print(
+        "\n字段引用 %d 处：适用版本内命中 %d ｜ 版本错配 %d ｜ 已声明遗留 %d ｜ 可疑 %d"
+        % (ok + gaps + legacy + suspicious, ok, gaps, legacy, suspicious)
+    )
 
     if legacy_rows:
         print("\n已声明 aliases / known_legacy 的遗留字段（只汇总）：")
@@ -210,10 +225,14 @@ def main(argv: list[str]) -> int:
             print("   %-28s %s.%s" % (rid, topic, fld))
     if gap_rows:
         print("\n版本错配：声明的 firmware 范围内找不到这些字段（该经验在这些固件上不会生效）")
-        print("    修法：改 firmware 范围 / 用 pick_newer 或带 fw_minor 入参的算子补版本分支 / 改用新字段名")
+        print(
+            "    修法：改 firmware 范围 / 用 pick_newer 或带 fw_minor 入参的算子补版本分支 / 改用新字段名"
+        )
         for rid, topic, fld, fw, elsewhere in gap_rows:
-            print("   %-28s %-42s firmware=%s ｜ 仅存在于 %s"
-                  % (rid, "%s.%s" % (topic, fld), fw, ", ".join(elsewhere)))
+            print(
+                "   %-28s %-42s firmware=%s ｜ 仅存在于 %s"
+                % (rid, "%s.%s" % (topic, fld), fw, ", ".join(elsewhere))
+            )
     if bad_rows:
         print("\n可疑引用（哪里都没找到，多半是拼错）：")
         for rid, topic, fld in bad_rows:

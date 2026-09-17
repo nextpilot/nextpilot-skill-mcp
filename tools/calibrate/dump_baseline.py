@@ -10,6 +10,7 @@ guardTags、phases、checksRun/checksSkipped、matchedFaults）冻结到 baselin
 
 产物是**冻结的快照**：重构规则时不允许改基线（除非有明确理由并单独提交）。
 """
+
 from __future__ import annotations
 
 import json
@@ -21,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import run_checks_locally as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-LOG_DIR = Path(__file__).resolve().parent / "logs"   # 校准用真实日志（不入库，需自备）
+LOG_DIR = Path(__file__).resolve().parent / "logs"  # 校准用真实日志（不入库，需自备）
 BASELINE_DIR = Path(__file__).resolve().parent / "baseline"
 
 
@@ -42,8 +43,10 @@ def source_of(path: Path) -> str:
     stem = path.stem
     first = stem.split("-")[0]
     if len(first) == 8 and all(c in "0123456789abcdef" for c in first):
-        return ("logs.px4.io 公开日志：GET https://logs.px4.io/download?log=%s"
-                "（或 python tools/px4/download_px4_logs.py）" % stem)
+        return (
+            "logs.px4.io 公开日志：GET https://logs.px4.io/download?log=%s"
+            "（或 python tools/px4/download_px4_logs.py）" % stem
+        )
     return "本仓库自带（tools/calibrate/logs/，未入库，需自备）"
 
 
@@ -62,7 +65,9 @@ def dump_one(path: Path) -> Path:
     out.write_text(json.dumps(envelope, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     n_findings = len(result.get("findings", []))
     n_faults = len(result.get("matchedFaults", []))
-    print(f"  {envelope['slug']:14} ← {path.name}  findings={n_findings} faults={n_faults}  → {out.name}")
+    print(
+        f"  {envelope['slug']:14} ← {path.name}  findings={n_findings} faults={n_faults}  → {out.name}"
+    )
     return out
 
 

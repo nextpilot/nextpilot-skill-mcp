@@ -7,6 +7,7 @@
 
 用法：python tools/calibrate/check-artifact.py
 """
+
 from __future__ import annotations
 
 import ast
@@ -65,8 +66,12 @@ def main() -> int:
 
     # 用真实取值复现最终 Python 源码
     final = body
-    final = final.replace("__FAULT_KB__", repr(json.loads(FAULT_KB.read_text(encoding="utf-8"))["entries"]))
-    final = final.replace("__RULES__", json.dumps(extract_json_const(src, "rules"), ensure_ascii=False))
+    final = final.replace(
+        "__FAULT_KB__", repr(json.loads(FAULT_KB.read_text(encoding="utf-8"))["entries"])
+    )
+    final = final.replace(
+        "__RULES__", json.dumps(extract_json_const(src, "rules"), ensure_ascii=False)
+    )
     # 数据配置同样在 .replace 链里；它的装配规则（facts.yaml + plot/track.yml）与本地回归共用一处
     final = final.replace("__FACTS__", json.dumps(runner.load_facts_payload(), ensure_ascii=False))
 
@@ -74,7 +79,10 @@ def main() -> int:
         ast.parse(final)
     except SyntaxError as e:
         print(f"生成产物不是合法 Python：{e}")
-        print("  " + "\n  ".join(final.splitlines()[max(0, (e.lineno or 1) - 2) : (e.lineno or 1) + 1]))
+        print(
+            "  "
+            + "\n  ".join(final.splitlines()[max(0, (e.lineno or 1) - 2) : (e.lineno or 1) + 1])
+        )
         return 1
 
     rules = extract_json_const(src, "rules")
@@ -103,7 +111,9 @@ def main() -> int:
     m2 = re.search(r"String\.raw`(.*)`;", data_ts, re.S)
     if not m2:
         raise SystemExit("数据层产物里找不到 String.raw 模板")
-    logs = sorted((Path(__file__).resolve().parent / "logs").glob("*.ulg"), key=lambda p: p.stat().st_size)
+    logs = sorted(
+        (Path(__file__).resolve().parent / "logs").glob("*.ulg"), key=lambda p: p.stat().st_size
+    )
     if not logs:
         print("（没有回归日志，跳过执行检查）")
         return 0

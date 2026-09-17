@@ -1,6 +1,5 @@
 // ⚠️ 自动生成，请勿手改。源文件在 engine/ 与 knowledge/px4/，改完跑 `pnpm build:kb`（dev/build 自动执行）。
-export const PY_ULG_DATA_HELPERS = String.raw`
-# ============================================================================
+export const PY_ULG_DATA_HELPERS = String.raw`# ============================================================================
 # 报告页数据层 —— 与日志格式无关
 #
 # 只做三件事：按需抽时序（+ LTTB 降采样）、交给前端、把格式专有的整块内容转出去。
@@ -51,7 +50,8 @@ def _lttb_indices(n, max_points, ref=None):
     for i in range(max_points - 2):
         ts = int(np.floor((i + 1) * bucket))
         te = int(np.floor((i + 2) * bucket))
-        ts = min(ts, n - 1); te = min(te, n)
+        ts = min(ts, n - 1)
+        te = min(te, n)
         if te <= ts:
             te = ts + 1
         # 下一桶均值点
@@ -59,8 +59,7 @@ def _lttb_indices(n, max_points, ref=None):
         ny = float(np.mean(r[ts:te])) if te > ts else float(r[ts])
         best, best_d = ts, -1.0
         for j in range(ts, te):
-            area = abs((a - nx) * (float(r[j]) - float(r[a])) -
-                       (a - j) * (ny - float(r[a])))
+            area = abs((a - nx) * (float(r[j]) - float(r[a])) - (a - j) * (ny - float(r[a])))
             if area > best_d:
                 best, best_d = j, area
         idx.append(best)
@@ -128,9 +127,7 @@ def np_series(topic, instance, fields_json, max_points=3000, op_json=None):
             __result = json.dumps({"error": "预处理算子 %s 无结果（数据不足）" % name})
             return
         outs = list(res) if isinstance(res, tuple) else [res]
-        names = SIGNATURES.get(name, {}).get("out_names") or [
-            "out%d" % i for i in range(len(outs))
-        ]
+        names = SIGNATURES.get(name, {}).get("out_names") or ["out%d" % i for i in range(len(outs))]
         out = {
             "topic": topic,
             "instance": int(instance),
@@ -146,7 +143,8 @@ def np_series(topic, instance, fields_json, max_points=3000, op_json=None):
         return
 
     out = {
-        "topic": topic, "instance": int(instance),
+        "topic": topic,
+        "instance": int(instance),
         "t": [_since_boot(ts[i], 3) for i in idx],
         "series": {},
         "fullCount": n,

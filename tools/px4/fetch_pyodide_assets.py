@@ -22,6 +22,7 @@ CDN 上，一次下载、长期缓存（配合 NEXT_PUBLIC_PYULOG_WHEEL 连索�
 
 依赖：仅标准库。
 """
+
 from __future__ import annotations
 
 import argparse
@@ -61,8 +62,14 @@ def save(path: pathlib.Path, data: bytes) -> None:
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--pyodide", default="v0.27.7", help="Pyodide 版本（要与 web/workers/ulog-worker.ts 的默认值一致）")
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument(
+        "--pyodide",
+        default="v0.27.7",
+        help="Pyodide 版本（要与 web/workers/ulog-worker.ts 的默认值一致）",
+    )
     args = ap.parse_args(argv[1:])
 
     base = CDN.format(ver=args.pyodide)

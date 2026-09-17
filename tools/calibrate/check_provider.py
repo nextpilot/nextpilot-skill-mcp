@@ -12,6 +12,7 @@
   python tools/calibrate/check_provider.py --list          # 列出已注册的格式
 日志文件的格式由**文件头**判定（适配器自己探测），所以不用告诉它用哪个 provider。
 """
+
 from __future__ import annotations
 
 import sys
@@ -39,7 +40,10 @@ def check_provider(ns: dict, path: Path) -> None:
         ("series 不存在的字段", lambda: p.get_series("vehicle_status.no_such_field")),
         ("series 不存在的实例", lambda: p.get_series("vehicle_status.timestamp", instance=99)),
         ("columns 不存在的 topic", lambda: p.get_topic_data("no_such_topic", 0)),
-        ("column 不存在的字段名", lambda: p.get_first_existing_column("vehicle_status", ["no_such_field"])),
+        (
+            "column 不存在的字段名",
+            lambda: p.get_first_existing_column("vehicle_status", ["no_such_field"]),
+        ),
     ):
         try:
             check(call() is None, "%s: %s 应当返回 None" % (where, name))
@@ -57,16 +61,21 @@ def check_provider(ns: dict, path: Path) -> None:
             continue
         check("timestamp" in cols, "%s: %s#%s 没有 timestamp 列" % (where, t, inst))
         for f in m["fields"]:
-            check(f["name"] in cols, "%s: get_topic_meta() 列了 %s.%s，get_topic_data() 里却没有"
-                  % (where, t, f["name"]))
+            check(
+                f["name"] in cols,
+                "%s: get_topic_meta() 列了 %s.%s，get_topic_data() 里却没有"
+                % (where, t, f["name"]),
+            )
         # 抽第一个字段验 get_series() 与 get_topic_data() 同源（同一个实例上）
         if m["fields"]:
             fname = m["fields"][0]["name"]
             got = p.get_series("%s.%s" % (t, fname), instance=inst)
             if got is not None and not isinstance(got, list):
-                check(len(got) == len(cols[fname]),
-                      "%s: series(%s.%s, instance=%d) 与 get_topic_data() 长度不一致"
-                      % (where, t, fname, inst))
+                check(
+                    len(got) == len(cols[fname]),
+                    "%s: series(%s.%s, instance=%d) 与 get_topic_data() 长度不一致"
+                    % (where, t, fname, inst),
+                )
 
     # ---- 3. armed_intervals 的形状：升序、不重叠、只有最后一段可以开口 ----
     sem = p.builtin_variables()
@@ -74,8 +83,10 @@ def check_provider(ns: dict, path: Path) -> None:
     check(isinstance(iv, list), "%s: armed_intervals 应当是 list" % where)
     last_end = None
     for i, seg in enumerate(iv):
-        if not check(isinstance(seg, (list, tuple)) and len(seg) == 2,
-                     "%s: armed_intervals[%d] 不是 (start, end)" % (where, i)):
+        if not check(
+            isinstance(seg, (list, tuple)) and len(seg) == 2,
+            "%s: armed_intervals[%d] 不是 (start, end)" % (where, i),
+        ):
             continue
         s, e = seg
         check(isinstance(s, int), "%s: armed_intervals[%d].start 不是 int" % (where, i))
@@ -83,29 +94,39 @@ def check_provider(ns: dict, path: Path) -> None:
             check(i == len(iv) - 1, "%s: 只有最后一段可以是开口区间（end=None）" % where)
         else:
             check(e > s, "%s: armed_intervals[%d] 的 end 不大于 start" % (where, i))
-            check(last_end is None or s >= last_end,
-                  "%s: armed_intervals 不是升序/有重叠（第 %d 段）" % (where, i))
+            check(
+                last_end is None or s >= last_end,
+                "%s: armed_intervals 不是升序/有重叠（第 %d 段）" % (where, i),
+            )
             last_end = e
     # 各段时长加起来应当等于 armed_s（开口段按最后一段的起点兜底，只求量级对得上）
     if iv:
         ends = [e for _s, e in iv if e is not None]
         fallback = max(ends) if ends else iv[-1][0]
         total = sum(((e if e is not None else fallback) - s) for s, e in iv)
-        check(abs(total / 1e6 - sem["armed_s"]) < 0.2,
-              "%s: armed_s=%s 与 armed_intervals 加起来的秒数对不上" % (where, sem["armed_s"]))
+        check(
+            abs(total / 1e6 - sem["armed_s"]) < 0.2,
+            "%s: armed_s=%s 与 armed_intervals 加起来的秒数对不上" % (where, sem["armed_s"]),
+        )
     check(sem["has_armed"] == bool(iv), "%s: has_armed 与 armed_intervals 矛盾" % where)
 
     # ---- 4. get_report_facts() 与 builtin_variables() 不矛盾 ----
     facts = p.get_report_facts()
     check(isinstance(facts, dict) and facts, "%s: get_report_facts() 为空" % where)
     if "vehicleType" in facts:
-        check(facts["vehicleType"] == sem["airframe"],
-              "%s: get_report_facts().vehicleType 与 builtin_variables().airframe 不一致（%r vs %r）"
-              % (where, facts["vehicleType"], sem["airframe"]))
-    check(facts.get("armedDurationSec", sem["armed_s"]) == sem["armed_s"],
-          "%s: get_report_facts().armedDurationSec 与 builtin_variables().armed_s 不一致" % where)
+        check(
+            facts["vehicleType"] == sem["airframe"],
+            "%s: get_report_facts().vehicleType 与 builtin_variables().airframe 不一致（%r vs %r）"
+            % (where, facts["vehicleType"], sem["airframe"]),
+        )
+    check(
+        facts.get("armedDurationSec", sem["armed_s"]) == sem["armed_s"],
+        "%s: get_report_facts().armedDurationSec 与 builtin_variables().armed_s 不一致" % where,
+    )
     if "phases" in facts:
-        check(isinstance(facts["phases"], list), "%s: get_report_facts().phases 应当是 list" % where)
+        check(
+            isinstance(facts["phases"], list), "%s: get_report_facts().phases 应当是 list" % where
+        )
 
     # ---- 5. parser_version：进报告头的解析器版本，必须是非空字符串 ----
     # 之所以要测：它在浏览器里取的是 Pyodide 当时装的解析器版本，取不到时会退化成
@@ -119,9 +140,11 @@ def check_provider(ns: dict, path: Path) -> None:
     unknown_fw = sem["fw_minor"] is None
     check(p.match_version("any") is True, "%s: match_version('any') 应当为真" % where)
     check(p.match_version("") is True, "%s: match_version('') 应当为真" % where)
-    check(p.match_version("<0.0") is unknown_fw,
-          "%s: match_version('<0.0') 期望 %s（版本%s）"
-          % (where, unknown_fw, "未知→不排除" if unknown_fw else "已知→应当为假"))
+    check(
+        p.match_version("<0.0") is unknown_fw,
+        "%s: match_version('<0.0') 期望 %s（版本%s）"
+        % (where, unknown_fw, "未知→不排除" if unknown_fw else "已知→应当为假"),
+    )
     if not unknown_fw:
         check(p.match_version(">=0.1,<99.0") is True, "%s: 区间约束判定不对" % where)
     try:
@@ -137,14 +160,21 @@ def check_provider(ns: dict, path: Path) -> None:
         ph = p.get_flight_phases()
         check(isinstance(ph, list), "%s: get_flight_phases() 应当返回 list" % where)
         for seg in ph:
-            check({"startSec", "endSec", "navState", "mode", "armed"} <= set(seg),
-                  "%s: get_flight_phases() 的每段要有 startSec/endSec/navState/mode/armed" % where)
+            check(
+                {"startSec", "endSec", "navState", "mode", "armed"} <= set(seg),
+                "%s: get_flight_phases() 的每段要有 startSec/endSec/navState/mode/armed" % where,
+            )
     if hasattr(p, "dropouts"):
-        check(isinstance(p.get_logged_dropouts(), list), "%s: get_logged_dropouts() 应当返回 list" % where)
+        check(
+            isinstance(p.get_logged_dropouts(), list),
+            "%s: get_logged_dropouts() 应当返回 list" % where,
+        )
     if hasattr(p, "track"):
         tr = p.get_flight_track()
-        check(isinstance(tr, dict) and ("lat" in tr or "error" in tr),
-              "%s: get_flight_track() 要么给 lat/lon/alt，要么给 error" % where)
+        check(
+            isinstance(tr, dict) and ("lat" in tr or "error" in tr),
+            "%s: get_flight_track() 要么给 lat/lon/alt，要么给 error" % where,
+        )
 
     # ---- 8. 报告页的两块整体数据能取到且是 dict ----
     li = p.report_materials()

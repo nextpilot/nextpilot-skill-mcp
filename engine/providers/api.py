@@ -22,61 +22,71 @@ REQUIRED = {
         "doc": "格式标识（如 px4-ulog），进报告与错误信息",
     },
     "parser_version": {
-        "kind": "method", "sig": "() -> str",
+        "kind": "method",
+        "sig": "() -> str",
         "doc": "解析这一份日志用的解析器版本串（如 pyulog/1.1.0），进报告头的 parserVersion。"
-               "**为什么由 provider 给而不是引擎写死**：引擎不认识任何一种日志的解析器，"
-               "写死就等于把某个格式的名字钉进了格式无关层。"
-               "浏览器里解析器版本不受本站控制（PyPI 当时的最新版），所以它必须如实记录",
+        "**为什么由 provider 给而不是引擎写死**：引擎不认识任何一种日志的解析器，"
+        "写死就等于把某个格式的名字钉进了格式无关层。"
+        "浏览器里解析器版本不受本站控制（PyPI 当时的最新版），所以它必须如实记录",
     },
     "get_topic_meta": {
-        "kind": "method", "sig": "() -> list[dict]",
+        "kind": "method",
+        "sig": "() -> list[dict]",
         "doc": "有哪些消息/话题：[{name, instance, n, fields:[{name, dtype}]}]。"
-               "驱动 np_manifest（曲线可用性）与契约测试的自洽校验",
+        "驱动 np_manifest（曲线可用性）与契约测试的自洽校验",
     },
     "get_topic_data": {
-        "kind": "method", "sig": "(topic, instance=0) -> dict|None",
+        "kind": "method",
+        "sig": "(topic, instance=0) -> dict|None",
         "doc": "某个 topic 某实例的**原样列** {列名: 数组}（含 'field[0]' 这种数组列）。"
-               "报告页抽时序、概览指标兜底取数用它。取不到返回 None",
+        "报告页抽时序、概览指标兜底取数用它。取不到返回 None",
     },
     "get_first_existing_column": {
-        "kind": "method", "sig": "(topic, names) -> array|None",
-        "doc": "只取第一个实例、按候选名取第一个存在的原样列（概览指标兜底取数）"
-               "—— 取不到返回 None",
+        "kind": "method",
+        "sig": "(topic, names) -> array|None",
+        "doc": "只取第一个实例、按候选名取第一个存在的原样列（概览指标兜底取数）—— 取不到返回 None",
     },
     "get_series": {
         "kind": "method",
         "sig": "(ref, instance=None, alias=None, per_instance=False)",
         "doc": "按 'topic.field' 取一条序列（1-D 数组 / 每实例一组 / 定长数组按列）。"
-               "**取不到一律返回 None，不抛异常**——引擎按'数据不足'处理",
+        "**取不到一律返回 None，不抛异常**——引擎按'数据不足'处理",
     },
     "has_topic": {
-        "kind": "method", "sig": "(name) -> bool",
+        "kind": "method",
+        "sig": "(name) -> bool",
         "doc": "有没有这个消息/话题。表达式里的 has_topic('x') 直接指向它",
     },
     "match_version": {
-        "kind": "method", "sig": "(spec) -> bool",
+        "kind": "method",
+        "sig": "(spec) -> bool",
         "doc": "固件约束串是否满足（ref(..., when_fw='>=1.15') 用）。"
-               "约束串的语法由格式自己定，引擎不解释",
+        "约束串的语法由格式自己定，引擎不解释",
     },
     "get_logged_information": {
-        "kind": "method", "sig": "() -> dict",
+        "kind": "method",
+        "sig": "() -> dict",
         "doc": "日志自带的键值信息（PX4 是 Information Message）。没有就返回 {}",
     },
     "get_initial_parameters": {
-        "kind": "method", "sig": "() -> dict",
+        "kind": "method",
+        "sig": "() -> dict",
         "doc": "初始参数表。没有就返回 {}",
     },
     "get_logged_messages": {
-        "kind": "method", "sig": "() -> list[dict]",
+        "kind": "method",
+        "sig": "() -> list[dict]",
         "doc": "[{tSec, message, level, level_name}]：日志消息条目（tSec 是相对日志起点的秒数）",
     },
     "builtin_variables": {
-        "kind": "method", "sig": "() -> dict",
+        "kind": "method",
+        "sig": "() -> dict",
         "doc": "内置变量表，**每次调用返回一个新 dict**（引擎会往里写 compute 的输出）。"
-               "键必须覆盖下面的 BUILTIN_VARIABLES",
+        "键必须覆盖下面的 BUILTIN_VARIABLES",
     },
     "get_report_facts": {
-        "kind": "method", "sig": "() -> dict",
+        "kind": "method",
+        "sig": "() -> dict",
         "doc": "报告头的离散事实：机型 / 固件 / 时长 / 模式 / 载具身份……键名见各 provider",
     },
 }
@@ -85,39 +95,53 @@ REQUIRED = {
 # 不同格式能给的东西本来就不一样（PX4 的 ULog 有事件解码与逐字节消息统计，
 # ArduPilot 的 .bin 是另一套消息流），所以可选能力由格式自己决定。
 OPTIONAL = {
-    "get_flight_phases": {"sig": "() -> list[dict]",
-               "doc": "连续飞行阶段（报告页阶段条）。缺席则该条不显示"},
-    "get_logged_dropouts": {"sig": "() -> list[dict]",
-                 "doc": "[{tSec, durationMs}] 丢包记录"},
-    "get_message_type_counts": {"sig": "() -> dict | None",
-               "doc": "逐字节的消息类型统计（**只对能按帧走的格式有意义**）+ 走到文件末尾没有"},
-    "get_decoded_events": {"sig": "() -> list[dict] | None",
-               "doc": "事件解码（PX4 靠日志自带的 metadata_events）。None = 这份日志解不出"},
-    "report_materials": {"sig": "() -> dict",
-                 "doc": "报告页要的几块原料的打包——**不是某一个 tab 的 payload**："
-                        "infoDict/msgTypeStats 给「系统消息」、messages/messagesMulti 给「事件消息」、"
-                        "params/defaultParams/changedParams 给「飞控参数」、phases 给阶段条，"
-                        "四个 tab 各取所需。边界是「该格式能提供哪些原料」，"
-                        "而原料的形态是格式专有的（合并事件与文本、多值信息怎么拼……），"
-                        "换格式就是另一套，所以由格式提供而不是数据层拼"},
-    "get_flight_track": {"sig": "(...) -> dict | None",
-              "doc": "地图轨迹（取数字段候选与量纲也是格式专有）"},
+    "get_flight_phases": {
+        "sig": "() -> list[dict]",
+        "doc": "连续飞行阶段（报告页阶段条）。缺席则该条不显示",
+    },
+    "get_logged_dropouts": {"sig": "() -> list[dict]", "doc": "[{tSec, durationMs}] 丢包记录"},
+    "get_message_type_counts": {
+        "sig": "() -> dict | None",
+        "doc": "逐字节的消息类型统计（**只对能按帧走的格式有意义**）+ 走到文件末尾没有",
+    },
+    "get_decoded_events": {
+        "sig": "() -> list[dict] | None",
+        "doc": "事件解码（PX4 靠日志自带的 metadata_events）。None = 这份日志解不出",
+    },
+    "report_materials": {
+        "sig": "() -> dict",
+        "doc": "报告页要的几块原料的打包——**不是某一个 tab 的 payload**："
+        "infoDict/msgTypeStats 给「系统消息」、messages/messagesMulti 给「事件消息」、"
+        "params/defaultParams/changedParams 给「飞控参数」、phases 给阶段条，"
+        "四个 tab 各取所需。边界是「该格式能提供哪些原料」，"
+        "而原料的形态是格式专有的（合并事件与文本、多值信息怎么拼……），"
+        "换格式就是另一套，所以由格式提供而不是数据层拼",
+    },
+    "get_flight_track": {
+        "sig": "(...) -> dict | None",
+        "doc": "地图轨迹（取数字段候选与量纲也是格式专有）",
+    },
 }
 
 # ---------------- builtin_variables() 必须给的键（= 规则与 plot 能引用的内置变量）----------------
 # 这份表就是"作者能引用什么"的权威清单，站内指南的内置变量表由 tools/px4/gen_rule_reference.py
 # 从这里生成。加名字 = 改契约；删名字 = 破坏兼容（老规则会构建失败，这是有意的）。
 BUILTIN_VARIABLES = {
-    "fw_minor": {"type": "int|None",
-                 "doc": "固件次版本号。**版本分支唯一常用的量**；None = 这份日志没写版本号"},
-    "airframe": {"type": "str",
-                 "doc": "机型：rotary_wing / fixed_wing / rover / airship / unknown"},
+    "fw_minor": {
+        "type": "int|None",
+        "doc": "固件次版本号。**版本分支唯一常用的量**；None = 这份日志没写版本号",
+    },
+    "airframe": {
+        "type": "str",
+        "doc": "机型：rotary_wing / fixed_wing / rover / airship / unknown",
+    },
     "is_fixed_wing": {"type": "bool", "doc": "机型别名（比 airframe == 'fixed_wing' 好读）"},
     "duration_s": {"type": "float", "doc": "日志总时长（秒）"},
     "armed_s": {"type": "float", "doc": "armed 总时长（秒）"},
-    "armed_intervals": {"type": "list[(us,us)]",
-                        "doc": "armed 区间，升序不重叠；end=None 表示持续到日志结束。"
-                               "时序算子按它切窗"},
+    "armed_intervals": {
+        "type": "list[(us,us)]",
+        "doc": "armed 区间，升序不重叠；end=None 表示持续到日志结束。时序算子按它切窗",
+    },
     "t0_us": {"type": "int", "doc": "日志起点时间戳（us），事件类算子算相对时刻的基准"},
     "has_armed": {"type": "bool", "doc": "是否存在 armed 段"},
     "restart_detected": {"type": "bool", "doc": "是否有 topic 时间戳回退（疑似中途重启）"},
@@ -130,7 +154,6 @@ BUILTIN_VARIABLES = {
 #   has_topic() —— 表达式里唯一放行的函数调用，指向 provider.has_topic
 
 
-
 # ---------------- 格式注册表 ----------------
 # 各 providers/<格式>.py 在文件末尾把 (探测器, 工厂, 说明) 追加进来。探测靠文件头 magic，
 # 不靠扩展名（用户上传的文件名不可信）。
@@ -140,8 +163,12 @@ BUILTIN_VARIABLES = {
 FORMATS = []
 
 _VALUE_TYPES = {
-    "int": (int,), "float": (int, float), "bool": (bool,), "str": (str,),
-    "list": (list, tuple), "dict": (dict,),
+    "int": (int,),
+    "float": (int, float),
+    "bool": (bool,),
+    "str": (str,),
+    "list": (list, tuple),
+    "dict": (dict,),
 }
 
 
@@ -152,7 +179,8 @@ def open_log(raw, facts_cfg=None):
             return check_provider(make(raw, facts_cfg), label)
     known = "、".join(label for _, _, label in FORMATS) or "（无）"
     raise ValueError(
-        "不认识的日志格式：本站目前只支持 %s。扩展名不作数，判据是文件头 magic" % known)
+        "不认识的日志格式：本站目前只支持 %s。扩展名不作数，判据是文件头 magic" % known
+    )
 
 
 def _type_matches_spec(value, spec):
@@ -160,7 +188,7 @@ def _type_matches_spec(value, spec):
     if want is None:
         return True
     if value is None:
-        return "None" in want          # 只有写明允许 None 的才接受 None
+        return "None" in want  # 只有写明允许 None 的才接受 None
     for part in want.replace("|None", "").split("|"):
         part = part.strip()
         base = part.split("[")[0]
@@ -187,10 +215,13 @@ def check_provider(provider, where="provider"):
         if key not in sem:
             raise ValueError(
                 "%s.semantics() 缺少内置变量 %s（%s）—— 规则里引用它会静默算不出数据"
-                % (where, key, spec["doc"]))
+                % (where, key, spec["doc"])
+            )
         if not _type_matches_spec(sem[key], spec):
-            raise ValueError("%s.semantics()[%s] 类型不对：期望 %s，得到 %r"
-                             % (where, key, spec["type"], sem[key]))
+            raise ValueError(
+                "%s.semantics()[%s] 类型不对：期望 %s，得到 %r"
+                % (where, key, spec["type"], sem[key])
+            )
     # 每个 provider 都要能独立喂给多个规则：返回的必须是新 dict（引擎会往里写 compute 输出）
     sem2 = provider.builtin_variables()
     if sem2 is sem:

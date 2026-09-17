@@ -15,6 +15,7 @@
 
 依赖：仅标准库（urllib + tarfile + json）；无需 pip install。
 """
+
 from __future__ import annotations
 
 import argparse
@@ -29,21 +30,24 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CACHE_DIR = REPO_ROOT / ".cache" / "px4"
 OUT_ROOT = REPO_ROOT / "knowledge" / "px4"
-META_OUT = OUT_ROOT / "meta"       # meta/<tag>.json（一 tag 一份：topics + parameters）
+META_OUT = OUT_ROOT / "meta"  # meta/<tag>.json（一 tag 一份：topics + parameters）
 
 GITHUB_ARCHIVE = "https://github.com/PX4/PX4-Autopilot/archive/refs/{kind}/{ref}.tar.gz"
-DEFAULT_PARAMS_URL = (
-    "https://px4-travis.s3.amazonaws.com/Firmware/main/_general/parameters.json"
-)
+DEFAULT_PARAMS_URL = "https://px4-travis.s3.amazonaws.com/Firmware/main/_general/parameters.json"
 
 # uORB 基本类型 → 简化类型名（够规则层用；不追求覆盖 msgdef 全部特性）
 TYPE_MAP = {
     "bool": "bool",
-    "uint8_t": "uint8", "int8_t": "int8",
-    "uint16_t": "uint16", "int16_t": "int16",
-    "uint32_t": "uint32", "int32_t": "int32",
-    "uint64_t": "uint64", "int64_t": "int64",
-    "float": "float32", "double": "float64",
+    "uint8_t": "uint8",
+    "int8_t": "int8",
+    "uint16_t": "uint16",
+    "int16_t": "int16",
+    "uint32_t": "uint32",
+    "int32_t": "int32",
+    "uint64_t": "uint64",
+    "int64_t": "int64",
+    "float": "float32",
+    "double": "float64",
     "char": "char",
 }
 # 类型 → 是否按位掩码/枚举候选处理（由常量前缀进一步判断）
@@ -51,6 +55,7 @@ TIME_TYPES = {"uint64"}
 
 
 # ─────────────────────────── 下载与缓存 ───────────────────────────
+
 
 def _download(url: str, timeout: int = 120) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": "nextpilot-knowledge-sync"})
@@ -67,7 +72,9 @@ def fetch_msg_dir(tag: str, base_url: str | None) -> dict[str, str]:
     """返回 {PascalCase 文件名(去.msg): 文本}。命中缓存则不解压。"""
     cache = CACHE_DIR / tag / "msg"
     if cache.exists() and any(cache.glob("*.msg")):
-        return {p.stem: p.read_text(encoding="utf-8", errors="replace") for p in cache.glob("*.msg")}
+        return {
+            p.stem: p.read_text(encoding="utf-8", errors="replace") for p in cache.glob("*.msg")
+        }
 
     url = (base_url or archive_url(tag)).format(tag=tag) if base_url else archive_url(tag)
     data = _download(url)
@@ -77,7 +84,12 @@ def fetch_msg_dir(tag: str, base_url: str | None) -> dict[str, str]:
         for member in tf.getmembers():
             # 归档内顶层目录形如 PX4-Autopilot-<ref>/
             parts = member.name.split("/")
-            if len(parts) >= 2 and parts[1] == "msg" and member.isfile() and member.name.endswith(".msg"):
+            if (
+                len(parts) >= 2
+                and parts[1] == "msg"
+                and member.isfile()
+                and member.name.endswith(".msg")
+            ):
                 stem = Path(member.name).stem
                 f = tf.extractfile(member)
                 if f is None:
@@ -147,10 +159,7 @@ def _const_owner(fields: dict, cname: str) -> str | None:
         ftoks = _tokens(fname)
         if not ftoks or len(ftoks) > len(ctoks):
             continue
-        ok = all(
-            ct == ft or (len(ft) >= 3 and ct.startswith(ft))
-            for ct, ft in zip(ctoks, ftoks)
-        )
+        ok = all(ct == ft or (len(ft) >= 3 and ct.startswith(ft)) for ct, ft in zip(ctoks, ftoks))
         # 至少两个有意义的词元对上才算（STATE 单词太短，易误命中）
         if ok and sum(len(t) for t in ftoks) >= 6:
             if best is None or len(fname) > len(best):
@@ -186,7 +195,7 @@ def parse_msg(stem: str, text: str) -> dict:
         if not m:
             continue
         ftype, type_arr, fname, name_arr, comment = m.groups()
-        arr_len = type_arr or name_arr          # 两种写法都认（PX4 用类型上那种）
+        arr_len = type_arr or name_arr  # 两种写法都认（PX4 用类型上那种）
         if fname in fields:
             continue
         if fname in ("timestamp", "timestamp_sample"):
@@ -213,7 +222,7 @@ def parse_msg(stem: str, text: str) -> dict:
         if not owner:
             continue
         spec = fields[owner]
-        label = cname.rsplit("_", 1)[-1]   # NAVIGATION_STATE_AUTO_RTL → AUTO_RTL
+        label = cname.rsplit("_", 1)[-1]  # NAVIGATION_STATE_AUTO_RTL → AUTO_RTL
         spec.setdefault("values", {})[str(cval)] = label
         if "kind" not in spec:
             if any(t in owner.upper() for t in ("FLAGS", "MASK", "BITS")):
@@ -226,11 +235,13 @@ def parse_msg(stem: str, text: str) -> dict:
 
 def _order_values(values: dict) -> dict:
     """枚举/位掩码的键按数值排序（否则字符串序会变成 0,1,10,11,…,2,20）。"""
+
     def key(k: str):
         try:
             return (0, int(k))
         except (TypeError, ValueError):
             return (1, 0, str(k))
+
     return {k: values[k] for k in sorted(values, key=key)}
 
 
@@ -241,6 +252,7 @@ def render_meta_json(tag: str, topics: dict[str, dict], params: dict | None) -> 
     同属一个 tag 就该是一份文件；分开成两个目录只会让"取某个版本的全部元数据"
     变成两处查找。
     """
+
     # 不用 json.dumps(sort_keys=True)：那会把枚举键按字符串排（0,1,10,11,…,2）。
     # 这里显式构造顺序：topic 名字母序、字段名字母序、枚举值数值序 —— 输出确定且可读。
     def fix_fields(spec: dict) -> dict:
@@ -312,7 +324,10 @@ def normalize_params(payload: dict) -> dict[str, dict]:
 
 # ─────────────────────────── 主流程 ───────────────────────────
 
-def sync(tags: list[str], params_url: str, params_tag: str, check: bool, base_url: str | None) -> int:
+
+def sync(
+    tags: list[str], params_url: str, params_tag: str, check: bool, base_url: str | None
+) -> int:
     changed = False
 
     # 参数元数据只对 params_tag 生效（PX4 只发布分支构建的 parameters.json）
@@ -320,7 +335,9 @@ def sync(tags: list[str], params_url: str, params_tag: str, check: bool, base_ur
 
     for tag in tags:
         msgs = fetch_msg_dir(tag, base_url)
-        topics = {parse_msg(stem, text)["topic"]: parse_msg(stem, text) for stem, text in msgs.items()}
+        topics = {
+            parse_msg(stem, text)["topic"]: parse_msg(stem, text) for stem, text in msgs.items()
+        }
         content = render_meta_json(tag, topics, params if tag == params_tag else None)
         out_file = META_OUT / f"{tag}.json"
         label = f"meta/{tag}.json"
@@ -334,7 +351,9 @@ def sync(tags: list[str], params_url: str, params_tag: str, check: bool, base_ur
         else:
             out_file.parent.mkdir(parents=True, exist_ok=True)
             out_file.write_text(content, encoding="utf-8")
-            print(f"META_WRITTEN {tag} topics={len(topics)} params={len(params) if tag == params_tag else 0}")
+            print(
+                f"META_WRITTEN {tag} topics={len(topics)} params={len(params) if tag == params_tag else 0}"
+            )
 
     if not check:
         # 清理历史形态：topics/<tag>/*.yaml、topics/<tag>.json、params/<tag>.json、params/<tag>.yaml
@@ -354,13 +373,17 @@ def sync(tags: list[str], params_url: str, params_tag: str, check: bool, base_ur
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--tags", default="v1.15.0,v1.16.0,main",
-                    help="逗号分隔的 release tag（main 取主干）")
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument(
+        "--tags", default="v1.15.0,v1.16.0,main", help="逗号分隔的 release tag（main 取主干）"
+    )
     ap.add_argument("--params-url", default=DEFAULT_PARAMS_URL, help="parameters.json 地址")
     ap.add_argument("--params-tag", default="main", help="参数输出文件名（params/<tag>.yaml）")
-    ap.add_argument("--base-url", default=None,
-                    help="自定义归档 URL 模板（含 {tag} 占位），用于镜像")
+    ap.add_argument(
+        "--base-url", default=None, help="自定义归档 URL 模板（含 {tag} 占位），用于镜像"
+    )
     ap.add_argument("--check", action="store_true", help="只比对不写入")
     args = ap.parse_args(argv[1:])
     tags = [t.strip() for t in args.tags.split(",") if t.strip()]

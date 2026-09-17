@@ -49,8 +49,10 @@ class Px4Provider:
 
         self._level_names = {int(k): v for k, v in (self._cfg.get("log_levels") or {}).items()}
         self._nav_names = {int(k): v for k, v in (self._cfg.get("nav_state_names") or {}).items()}
-        self._nav_groups = [(g["phase"], set(int(c) for c in g["codes"]))
-                            for g in (self._cfg.get("nav_state_groups") or [])]
+        self._nav_groups = [
+            (g["phase"], set(int(c) for c in g["codes"]))
+            for g in (self._cfg.get("nav_state_groups") or [])
+        ]
         self._vehicle_types = {int(k): v for k, v in (self._cfg.get("vehicle_types") or {}).items()}
 
         # 本日志实际录到的 topic 名集合
@@ -79,13 +81,18 @@ class Px4Provider:
         """[{name, instance, n, fields:[{name, dtype}]}]（驱动 np_manifest 与曲线可用性）"""
         out = []
         for d in self.ulog.data_list:
-            out.append({
-                "topic": d.name,
-                "instance": int(d.multi_id),
-                "n": int(len(d.data["timestamp"])),
-                "fields": [{"name": k, "dtype": str(getattr(v, "dtype", type(v).__name__))}
-                           for k, v in d.data.items() if k != "timestamp"],
-            })
+            out.append(
+                {
+                    "topic": d.name,
+                    "instance": int(d.multi_id),
+                    "n": int(len(d.data["timestamp"])),
+                    "fields": [
+                        {"name": k, "dtype": str(getattr(v, "dtype", type(v).__name__))}
+                        for k, v in d.data.items()
+                        if k != "timestamp"
+                    ],
+                }
+            )
         return out
 
     def get_topic_data(self, topic, instance=0):
@@ -152,8 +159,13 @@ class Px4Provider:
             return True
         cur = (self.fw["major"] if self.fw["major"] is not None else 0, self.fw_minor)
         for op, want in conds:
-            if not {">=": cur >= want, "<=": cur <= want, "==": cur == want,
-                    ">": cur > want, "<": cur < want}[op]:
+            if not {
+                ">=": cur >= want,
+                "<=": cur <= want,
+                "==": cur == want,
+                ">": cur > want,
+                "<": cur < want,
+            }[op]:
                 return False
         return True
 
@@ -206,8 +218,10 @@ class Px4Provider:
         return [dict(seg) for seg in self.phase_intervals]
 
     def get_logged_dropouts(self):
-        return [{"tSec": round(int(d.timestamp) / 1e6, 2), "durationMs": int(d.duration)}
-                for d in getattr(self.ulog, "dropouts", [])]
+        return [
+            {"tSec": round(int(d.timestamp) / 1e6, 2), "durationMs": int(d.duration)}
+            for d in getattr(self.ulog, "dropouts", [])
+        ]
 
     def get_message_type_counts(self):
         """逐条走 ULog 的 [uint16 消息长度][uint8 消息类型] 序列，统计每类消息的条数。
@@ -218,7 +232,7 @@ class Px4Provider:
         """
         raw, n = self.raw, len(self.raw)
         counts = {}
-        off = 16            # 16 字节文件头：magic 'ULog' + 版本号 + 起始时间戳
+        off = 16  # 16 字节文件头：magic 'ULog' + 版本号 + 起始时间戳
         while off + 3 <= n:
             size = raw[off] | (raw[off + 1] << 8)
             if off + 3 + size > n:
@@ -238,19 +252,22 @@ class Px4Provider:
         """
         try:
             from pyulog.px4_events import PX4Events
+
             event_parser = PX4Events()
             # 不外网兜底：日志没带事件定义时宁可不解码，也不去悄悄下载一份"最新的"定义
             event_parser.set_default_json_definitions_cb(lambda _already_has_default: None)
             name_to_lvl = {v: k for k, v in self._level_names.items()}
             out = []
             for t_us, level_str, text in event_parser.get_logged_events(self.ulog):
-                out.append({
-                    "tSec": round(int(t_us) / 1e6, 2),
-                    "level": name_to_lvl.get(str(level_str), 6),
-                    "levelStr": str(level_str),
-                    "kind": "event",
-                    "message": str(text).strip(),
-                })
+                out.append(
+                    {
+                        "tSec": round(int(t_us) / 1e6, 2),
+                        "level": name_to_lvl.get(str(level_str), 6),
+                        "levelStr": str(level_str),
+                        "kind": "event",
+                        "message": str(text).strip(),
+                    }
+                )
             return out
         except Exception:
             return None
@@ -319,22 +336,30 @@ class Px4Provider:
         'M' 多值信息怎么拼回文本、'Q' 默认值怎么推、逐字节的消息类型统计……换一种日志格式
         就是另一套。
         """
-        info = self.get_logged_information()          # 走契约能力取，别再直读 self.ulog（同一份数据两处知识）
+        info = (
+            self.get_logged_information()
+        )  # 走契约能力取，别再直读 self.ulog（同一份数据两处知识）
         cfgsys = self._cfg.get("sys_info_keys") or []
         info_types = getattr(self.ulog, "_msg_info_dict_types", None) or {}
         info_docs = self._cfg.get("info_key_docs") or {}
         clean = _json_clean
-        boot = lambda t_us: round(int(t_us) / 1e6, 2)
+
+        def boot(t_us):
+            return round(int(t_us) / 1e6, 2)
 
         sys_info = {k: str(info[k]) for k in cfgsys if k in info}
         info_dict = []
         for k, v in sorted(info.items()):
             doc = info_docs.get(k) or {}
-            info_dict.append({
-                "key": str(k), "name": str(doc.get("name", "")),
-                "type": str(info_types.get(k, "")), "value": str(v),
-                "desc": str(doc.get("desc", "")),
-            })
+            info_dict.append(
+                {
+                    "key": str(k),
+                    "name": str(doc.get("name", "")),
+                    "type": str(info_types.get(k, "")),
+                    "value": str(v),
+                    "desc": str(doc.get("desc", "")),
+                }
+            )
 
         # Logged String Message（'L'）。PX4 对**事件**会同时写两样：一条事件（二进制，进
         # `event` topic）和一条等价的旧格式文本（以 \t 结尾）。先分开收，等解码出事件后再决定
@@ -343,8 +368,13 @@ class Px4Provider:
         for m in getattr(self.ulog, "logged_messages", []):
             lvl = int(getattr(m, "log_level", 6))
             text = str(m.message)
-            item = {"tSec": boot(m.timestamp), "level": lvl, "levelStr": self._level_str(m, lvl),
-                    "kind": "log", "message": text.strip()}
+            item = {
+                "tSec": boot(m.timestamp),
+                "level": lvl,
+                "levelStr": self._level_str(m, lvl),
+                "kind": "log",
+                "message": text.strip(),
+            }
             (legacy_dupes if text.endswith("\t") else messages).append(item)
 
         events = self.get_decoded_events() or []
@@ -356,9 +386,16 @@ class Px4Provider:
         for tag, msgs in tagged_src.items():
             for m in msgs:
                 lvl = int(getattr(m, "log_level", 6))
-                messages_tagged.append({
-                    "tSec": boot(m.timestamp), "level": lvl, "levelStr": self._level_str(m, lvl),
-                    "kind": "log", "tag": int(tag), "message": str(m.message).strip()})
+                messages_tagged.append(
+                    {
+                        "tSec": boot(m.timestamp),
+                        "level": lvl,
+                        "levelStr": self._level_str(m, lvl),
+                        "kind": "log",
+                        "tag": int(tag),
+                        "message": str(m.message).strip(),
+                    }
+                )
         messages_tagged.sort(key=lambda m: m["tSec"])
 
         # 解码出事件了：那些 \t 结尾的旧格式文本就是同一件事的另一种说法，丢掉（FR 也如此）。
@@ -391,12 +428,19 @@ class Px4Provider:
             texts = [_fmt(x) for x in grp]
             return "".join(texts) if any("\n" in t for t in texts) else "\n".join(texts)
 
-        messages_multi = [{"key": str(k), "type": str(multi_types.get(k, "")),
-                           "values": [_fmt_group(g) for g in (multi_src[k] or [])]}
-                          for k in sorted(multi_src)]
+        messages_multi = [
+            {
+                "key": str(k),
+                "type": str(multi_types.get(k, "")),
+                "values": [_fmt_group(g) for g in (multi_src[k] or [])],
+            }
+            for k in sorted(multi_src)
+        ]
 
-        params = {str(k): (clean(np.asarray(v).reshape(-1)[0]) if hasattr(v, "reshape") else clean(v))
-                  for k, v in self.get_initial_parameters().items()}
+        params = {
+            str(k): (clean(np.asarray(v).reshape(-1)[0]) if hasattr(v, "reshape") else clean(v))
+            for k, v in self.get_initial_parameters().items()
+        }
 
         # Parameter Default（ULog 的 'Q' 消息）。PX4 的 logger 逐参数比较「当前值 / 机架默认 /
         # 固件默认」三者，**只写与当前值不同的那个**（logger.cpp: write_parameter_defaults）
@@ -416,23 +460,39 @@ class Px4Provider:
         if cp is None:
             cp = getattr(self.ulog, "_changed_parameters", [])
         for p in cp:
-            changed.append({"tSec": boot(getattr(p, "timestamp", 0) or 0),
-                            "name": str(getattr(p, "name", "")),
-                            "value": clean(getattr(p, "value", None))})
+            changed.append(
+                {
+                    "tSec": boot(getattr(p, "timestamp", 0) or 0),
+                    "name": str(getattr(p, "name", "")),
+                    "value": clean(getattr(p, "value", None)),
+                }
+            )
 
         # ULog 消息类型统计：顺序与名字来自 facts.yaml 的 ulog_msg_types，没出现过的类型计 0
         counts, walked_to_end, walked_off, file_size = self.get_message_type_counts()
         msg_types = self._cfg.get("ulog_msg_types") or []
         known = {str(t["code"]) for t in msg_types}
-        msg_type_stats = [{"code": str(t["code"]), "name": str(t.get("name", "")),
-                           "en": str(t.get("en", "")), "desc": str(t.get("desc", "")),
-                           "count": int(counts.get(str(t["code"]), 0))} for t in msg_types]
+        msg_type_stats = [
+            {
+                "code": str(t["code"]),
+                "name": str(t.get("name", "")),
+                "en": str(t.get("en", "")),
+                "desc": str(t.get("desc", "")),
+                "count": int(counts.get(str(t["code"]), 0)),
+            }
+            for t in msg_types
+        ]
         unknown = sum(c for k, c in counts.items() if k not in known)
         if unknown:
-            msg_type_stats.append({
-                "code": "?", "name": "不在码表里的类型", "en": "Unknown", "count": int(unknown),
-                "desc": "固件比本站的码表新，或文件被改过",
-            })
+            msg_type_stats.append(
+                {
+                    "code": "?",
+                    "name": "不在码表里的类型",
+                    "en": "Unknown",
+                    "count": int(unknown),
+                    "desc": "固件比本站的码表新，或文件被改过",
+                }
+            )
 
         return {
             "sysInfo": sys_info,
@@ -509,9 +569,19 @@ class Px4Provider:
 
         def gather_cell(idx):
             # pyulog 对定长数组通常暴露为 'field[0]'，个别构建为 'field_0'
-            return gather(lambda d: next(
-                (v for v in (self._first_field(d, f"{stem}[{idx}]", f"{stem}_{idx}")
-                             for stem in [field] + aliases) if v is not None), None))
+            return gather(
+                lambda d: next(
+                    (
+                        v
+                        for v in (
+                            self._first_field(d, f"{stem}[{idx}]", f"{stem}_{idx}")
+                            for stem in [field] + aliases
+                        )
+                        if v is not None
+                    ),
+                    None,
+                )
+            )
 
         if gather_cell(0) is None:
             return None
@@ -562,19 +632,34 @@ class Px4Provider:
 
         info = self.ulog.msg_info_dict
         rel = info.get("ver_sw_release")
-        fw = {"release": None, "major": None, "minor": None, "patch": None,
-              "git": str(info.get("ver_sw", ""))[:12], "hw": str(info.get("ver_hw", ""))}
+        fw = {
+            "release": None,
+            "major": None,
+            "minor": None,
+            "patch": None,
+            "git": str(info.get("ver_sw", ""))[:12],
+            "hw": str(info.get("ver_hw", "")),
+        }
         if rel is not None:
             try:
                 v = int(rel)
-                fw.update({"release": v, "major": (v >> 24) & 0xFF,
-                           "minor": (v >> 16) & 0xFF, "patch": (v >> 8) & 0xFF})
+                fw.update(
+                    {
+                        "release": v,
+                        "major": (v >> 24) & 0xFF,
+                        "minor": (v >> 16) & 0xFF,
+                        "patch": (v >> 8) & 0xFF,
+                    }
+                )
             except Exception:
                 pass
         self.fw = fw
         self.fw_minor = fw["minor"]
-        self.fw_label = ("%d.%d.%d" % (fw["major"], fw["minor"], fw["patch"])
-                         if fw["minor"] is not None else "未知（旧固件或无版本号）")
+        self.fw_label = (
+            "%d.%d.%d" % (fw["major"], fw["minor"], fw["patch"])
+            if fw["minor"] is not None
+            else "未知（旧固件或无版本号）"
+        )
 
         self.hw_subtype = str(info.get("ver_hw_subtype", ""))
 
@@ -589,9 +674,13 @@ class Px4Provider:
             self.fw_display = short_sw
         else:
             rtype = int(rel) & 0xFF
-            disp = "v%d.%d.%d%s" % (fw["major"], fw["minor"], fw["patch"],
-                                    _RELEASE_TYPE_SUFFIX.get(rtype, ""))
-            if rtype not in _RELEASE_TYPE_SUFFIX and self.ver_sw:   # 未打标签的开发版：附短哈希
+            disp = "v%d.%d.%d%s" % (
+                fw["major"],
+                fw["minor"],
+                fw["patch"],
+                _RELEASE_TYPE_SUFFIX.get(rtype, ""),
+            )
+            if rtype not in _RELEASE_TYPE_SUFFIX and self.ver_sw:  # 未打标签的开发版：附短哈希
                 disp += " (%s)" % short_sw
             self.fw_display = disp
 
@@ -609,7 +698,9 @@ class Px4Provider:
         hi, lo = p.get("LND_FLIGHT_T_HI"), p.get("LND_FLIGHT_T_LO")
         self.vehicle_life_s = (
             round((((int(hi) & 0xFFFFFFFF) << 32) | (int(lo) & 0xFFFFFFFF)) / 1e6, 1)
-            if hi is not None and lo is not None else None)
+            if hi is not None and lo is not None
+            else None
+        )
         # 机架编号（SYS_AUTOSTART，如 4040）——机型之外再给一个可查的标识
         af = p.get("SYS_AUTOSTART")
         self.airframe_id = int(af) if af is not None else None
@@ -675,8 +766,9 @@ class Px4Provider:
                         start_i = None
                 if start_i is not None:
                     armed_intervals.append((int(vts[start_i]), None))
-                total_us = sum(((e if e is not None else int(vts[-1])) - s)
-                               for s, e in armed_intervals)
+                total_us = sum(
+                    ((e if e is not None else int(vts[-1])) - s) for s, e in armed_intervals
+                )
                 armed_duration_s = round(total_us / 1e6, 1)
 
             if nav_arr is not None:
@@ -703,15 +795,18 @@ class Px4Provider:
                 runs.append((run_start, len(nav_arr) - 1))
                 for lo_i, hi_i in runs:
                     code = int(nav_arr[lo_i])
-                    seg_arm = (int(np.median(arm_arr[lo_i:hi_i + 1]))
-                               if arm_arr is not None else None)
-                    phase_intervals.append({
-                        "startSec": round(int(vts[lo_i]) / 1e6, 2),
-                        "endSec": round(int(vts[hi_i]) / 1e6, 2),
-                        "navState": code,
-                        "mode": self._nav_names.get(code, "Mode %d" % code),
-                        "armed": seg_arm == _ARMING_STATE_ARMED,
-                    })
+                    seg_arm = (
+                        int(np.median(arm_arr[lo_i : hi_i + 1])) if arm_arr is not None else None
+                    )
+                    phase_intervals.append(
+                        {
+                            "startSec": round(int(vts[lo_i]) / 1e6, 2),
+                            "endSec": round(int(vts[hi_i]) / 1e6, 2),
+                            "navState": code,
+                            "mode": self._nav_names.get(code, "Mode %d" % code),
+                            "armed": seg_arm == _ARMING_STATE_ARMED,
+                        }
+                    )
 
             trans_mode = self._first_field(vs, "vtol_in_trans_mode")
             if trans_mode is not None and int(np.max(np.asarray(trans_mode))) > 0:
@@ -741,8 +836,11 @@ class Px4Provider:
         # 别一处取"第一个"、一处取 instance 0
         self.start_utc = None
         track_cfg = self._cfg.get("track") or {}
-        gps = (self._find_topic(track_cfg["topic"], int(track_cfg.get("instance", 0)))
-               if track_cfg.get("topic") else None)
+        gps = (
+            self._find_topic(track_cfg["topic"], int(track_cfg.get("instance", 0)))
+            if track_cfg.get("topic")
+            else None
+        )
         if gps is not None and "time_utc_usec" in gps.data:
             t = np.asarray(gps.data["time_utc_usec"], dtype=np.int64)
             nz = np.nonzero(t > 0)[0]
@@ -760,8 +858,9 @@ class Px4Provider:
                     restart += 1
         self.restart_topics = restart
         # 丢包累计
-        self.dropout_total_ms = int(sum(getattr(d, "duration", 0)
-                                        for d in getattr(ulog, "dropouts", [])))
+        self.dropout_total_ms = int(
+            sum(getattr(d, "duration", 0) for d in getattr(ulog, "dropouts", []))
+        )
 
     def _read_logged_messages(self):
         """读 `ulog.logged_messages`：日志消息（PX4 的 `[模块] 文案`，含警告 / 错误级别）。
@@ -784,12 +883,14 @@ class Px4Provider:
                 # 应该炸出来，而不是让全部消息悄悄变成 tSec=None。
                 ts_s = None
             lvl = int(getattr(m, "log_level", ord("6")))
-            out.append({
-                "tSec": ts_s,
-                "message": str(m.message).strip(),
-                "level": lvl,
-                "level_name": self._level_names.get(lvl, "UNKNOWN"),
-            })
+            out.append(
+                {
+                    "tSec": ts_s,
+                    "message": str(m.message).strip(),
+                    "level": lvl,
+                    "level_name": self._level_names.get(lvl, "UNKNOWN"),
+                }
+            )
         self._logged_messages = out
 
     def _collect_facts(self):
@@ -803,8 +904,9 @@ class Px4Provider:
             "durationSec": self.duration_s if self.duration_s is not None else 0,
             "vehicleType": self.vehicle_type,
             "firmware": self.fw_label,
-            "firmwareProfile": ("px4-1.15+" if (self.fw_minor is not None
-                                               and self.fw_minor >= 15) else "px4-legacy"),
+            "firmwareProfile": (
+                "px4-1.15+" if (self.fw_minor is not None and self.fw_minor >= 15) else "px4-legacy"
+            ),
             "firmwareDisplay": self.fw_display,
             "fwReleaseType": self.fw_release_type,
             "armedDurationSec": self.armed_duration_s,
@@ -820,7 +922,7 @@ class Px4Provider:
             facts["verSw"] = self.ver_sw
         if self.modes:
             facts["modes"] = list(self.modes)
-            facts["mainMode"] = self.modes[0]     # 已按占样本数排序，第一个就是主模式
+            facts["mainMode"] = self.modes[0]  # 已按占样本数排序，第一个就是主模式
         if self.uuid:
             facts["uuid"] = self.uuid
         if self.ver_sw_branch:

@@ -1,4 +1,3 @@
-
 # ============================================================================
 # 规则框架 —— **与日志格式无关**
 #
@@ -13,7 +12,8 @@
 # builtin_variables/get_report_facts 与可选能力，不碰 pyulog 对象。
 # ============================================================================
 
-import json, ast
+import json
+import ast
 import numpy as np
 
 
@@ -21,7 +21,7 @@ import numpy as np
 FAULT_KB = __FAULT_KB__
 
 # ---------------- 经验规则（rules/*.yaml 编译而来）----------------
-RULES = json.loads(r'''__RULES__''')
+RULES = json.loads(r"""__RULES__""")
 
 # ---------------- 那一份数据文件（knowledge/<格式>/facts.yaml 编译而来）----------------
 # 码表、文案、展示口径、规则元数据、执行顺序都在里面；引擎只提供机制。
@@ -45,8 +45,8 @@ provider = open_log(bytes(ulog_bytes), FACTS)
 findings = []
 checks_run = []
 checks_skipped = []
-tags = []          # 第二层异常标签（喂给第三层故障库匹配）
-guard_tags = []    # 数据质量/边界标签
+tags = []  # 第二层异常标签（喂给第三层故障库匹配）
+guard_tags = []  # 数据质量/边界标签
 _fid = [0]
 # 阶段集合来自 provider（故障库按 flight_phase 匹配用它）——在 run_all() 里填充
 phases_present = set()
@@ -58,25 +58,50 @@ def add_tag(t):
     if t not in tags:
         tags.append(t)
 
-def add(severity, rule_id, tag, title, field, value, threshold=None, unit=None,
-        doc=None, suggestion=None, tags_extra=None):
+
+def add(
+    severity,
+    rule_id,
+    tag,
+    title,
+    field,
+    value,
+    threshold=None,
+    unit=None,
+    doc=None,
+    suggestion=None,
+    tags_extra=None,
+):
     _fid[0] += 1
     ev = {"field": field, "value": value}
-    if threshold is not None: ev["threshold"] = threshold
-    if unit is not None: ev["unit"] = unit
-    f = {"id": "F%02d" % _fid[0], "severity": severity, "ruleId": rule_id,
-         "tag": tag, "title": title, "evidence": ev}
-    if doc: f["docUrl"] = doc
-    if suggestion: f["suggestion"] = suggestion
+    if threshold is not None:
+        ev["threshold"] = threshold
+    if unit is not None:
+        ev["unit"] = unit
+    f = {
+        "id": "F%02d" % _fid[0],
+        "severity": severity,
+        "ruleId": rule_id,
+        "tag": tag,
+        "title": title,
+        "evidence": ev,
+    }
+    if doc:
+        f["docUrl"] = doc
+    if suggestion:
+        f["suggestion"] = suggestion
     findings.append(f)
-    if tag: add_tag(tag)
-    for te in (tags_extra or []):
+    if tag:
+        add_tag(tag)
+    for te in tags_extra or []:
         add_tag(te)
+
 
 def skipped(check, reason):
     item = {"check": check, "reason": reason}
     if item not in checks_skipped:
         checks_skipped.append(item)
+
 
 def ran(check):
     if check not in checks_run:
@@ -85,14 +110,40 @@ def ran(check):
 
 # ---------------- 受限表达式求值 ----------------
 _ALLOWED_NODES = (
-    ast.Expression, ast.BoolOp, ast.And, ast.Or, ast.UnaryOp, ast.Not, ast.USub,
-    ast.Compare, ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.Eq, ast.NotEq, ast.In, ast.NotIn,
-    ast.Is, ast.IsNot,
-    ast.BinOp, ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Mod,
-    ast.Name, ast.Load, ast.Constant, ast.List, ast.Tuple, ast.Set,
+    ast.Expression,
+    ast.BoolOp,
+    ast.And,
+    ast.Or,
+    ast.UnaryOp,
+    ast.Not,
+    ast.USub,
+    ast.Compare,
+    ast.Lt,
+    ast.LtE,
+    ast.Gt,
+    ast.GtE,
+    ast.Eq,
+    ast.NotEq,
+    ast.In,
+    ast.NotIn,
+    ast.Is,
+    ast.IsNot,
+    ast.BinOp,
+    ast.Add,
+    ast.Sub,
+    ast.Mult,
+    ast.Div,
+    ast.Mod,
+    ast.Name,
+    ast.Load,
+    ast.Constant,
+    ast.List,
+    ast.Tuple,
+    ast.Set,
     # f-string（证据值用：`value: f"{vibe_mean:.3f}"`）。它的占位符里还是普通表达式，
     # 求值仍在同一个空 __builtins__ 环境下，没有新能力。
-    ast.JoinedStr, ast.FormattedValue,
+    ast.JoinedStr,
+    ast.FormattedValue,
 )
 
 # 表达式里**唯一**放行的函数调用。`has_topic('x')` 比 `'x' in topics` 直白，
@@ -111,12 +162,15 @@ def _eval_expr(expr, env):
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):
             ok = isinstance(node.func, ast.Name) and node.func.id in _EXPR_CALLABLE
-            arg_ok = len(node.args) == 1 and isinstance(node.args[0], ast.Constant) \
+            arg_ok = (
+                len(node.args) == 1
+                and isinstance(node.args[0], ast.Constant)
                 and isinstance(node.args[0].value, str)
+            )
             if not (ok and arg_ok and not node.keywords):
                 raise ValueError(
-                    "表达式里只允许 %s('字符串')：%s"
-                    % ("/".join(sorted(_EXPR_CALLABLE)), expr))
+                    "表达式里只允许 %s('字符串')：%s" % ("/".join(sorted(_EXPR_CALLABLE)), expr)
+                )
             continue
         if not isinstance(node, _ALLOWED_NODES):
             raise ValueError("表达式含不允许的语法 %s：%s" % (type(node).__name__, expr))
@@ -152,8 +206,15 @@ def _ref(name, per_instance=False, instance=None, alias=None, when_fw=None):
 
 # 比 _ALLOWED_NODES 多出：赋值语句、调用、属性（字段引用）、三元、字典（算子选项）
 _ALLOWED_COMPUTE = _ALLOWED_NODES + (
-    ast.Module, ast.Assign, ast.Expr, ast.Store,
-    ast.Call, ast.Attribute, ast.keyword, ast.IfExp, ast.Dict,
+    ast.Module,
+    ast.Assign,
+    ast.Expr,
+    ast.Store,
+    ast.Call,
+    ast.Attribute,
+    ast.keyword,
+    ast.IfExp,
+    ast.Dict,
 )
 
 
@@ -173,9 +234,11 @@ class _ComputeRefs(ast.NodeTransformer):
         if node.value.id in self.env_keys:
             raise ValueError("%s 是变量名，不能当 topic 用" % node.value.id)
         return ast.copy_location(
-            ast.Call(func=ast.Name(id="ref", ctx=ast.Load()),
-                     args=[ast.Constant(value="%s.%s" % (node.value.id, node.attr))],
-                     keywords=[]),
+            ast.Call(
+                func=ast.Name(id="ref", ctx=ast.Load()),
+                args=[ast.Constant(value="%s.%s" % (node.value.id, node.attr))],
+                keywords=[],
+            ),
             node,
         )
 
@@ -283,7 +346,7 @@ def _rule_skipped(rule, checks, env):
 
     返回 True 表示本条规则不该继续跑。
     """
-    for spec in (rule.get("skip") or []):
+    for spec in rule.get("skip") or []:
         when = spec.get("when")
         if not when:
             continue
@@ -313,7 +376,7 @@ def _run_rules(group):
         _rid = _rule["id"]
         _checks = (_rule.get("outputs") or {}).get("check")
         if _checks is None:
-            _checks = []            # guards 类经验没有 check 名（不记 ran/skipped）
+            _checks = []  # guards 类经验没有 check 名（不记 ran/skipped）
         elif not isinstance(_checks, list):
             _checks = [_checks]
         _env = _rule_env()
@@ -322,8 +385,9 @@ def _run_rules(group):
         # 不匹配则静默：既不 ran 也不 skipped（这是最外层的门，"这条经验根本不属于本机"
         # 不值得在报告里刷一条）。要留痕就把它写进 skip 列表。
         try:
-            _axis_ok = bool(_eval_expr(_rule["firmware"], _env)) and \
-                       bool(_eval_expr(_rule["airframe"], _env))
+            _axis_ok = bool(_eval_expr(_rule["firmware"], _env)) and bool(
+                _eval_expr(_rule["airframe"], _env)
+            )
         except Exception:
             _axis_ok = False
         if not _axis_ok:
@@ -341,7 +405,7 @@ def _run_rules(group):
                 ran(_check)
 
         _ok = True
-        for _stmt in (_rule.get("compute") or []):
+        for _stmt in _rule.get("compute") or []:
             # compute 是**表达式**，求值出来的名字进 _env，供后面的表达式与 triggers / outputs 引用。
             try:
                 _eval_compute(_stmt, _env)
@@ -371,7 +435,7 @@ def _run_rules(group):
         _out = _rule["outputs"]
         # outputs.guard_tags：按条件产生的数据质量标签（等价于原过程式的 guard_tags.append，
         # 不依赖是否发出 finding——如陀螺零偏的“温度变化大”）
-        for _gspec in (_out.get("guard_tags") or []):
+        for _gspec in _out.get("guard_tags") or []:
             try:
                 _g_hit = _eval_expr(_gspec["when"], _env)
             except Exception:
@@ -402,7 +466,7 @@ def _run_rules(group):
                     continue
                 _tenv = dict(_env)
                 _tenv.update(_item)
-            for _trig in (_rule.get("triggers") or []):
+            for _trig in _rule.get("triggers") or []:
                 # 单条触发条件出错（例如表达式把缺失值 None 与数值比较）不应让整份日志
                 # 的分析崩掉：视为未命中，继续下一条。这类错误应当在基线回归里暴露。
                 try:
@@ -426,10 +490,18 @@ def _run_rules(group):
                 _sugg = _trig.get("suggestion")
                 if _sugg and "{" in _sugg:
                     _sugg = _sugg.format_map(_tenv)
-                add(_trig["severity"], _rid, _trig.get("tag", _out.get("tag")),
-                    _trig["title"].format_map(_tenv), _field, _val,
-                    _trig.get("threshold"), _trig.get("unit"),
-                    _rule.get("doc"), _sugg)
+                add(
+                    _trig["severity"],
+                    _rid,
+                    _trig.get("tag", _out.get("tag")),
+                    _trig["title"].format_map(_tenv),
+                    _field,
+                    _val,
+                    _trig.get("threshold"),
+                    _trig.get("unit"),
+                    _rule.get("doc"),
+                    _sugg,
+                )
                 # evidence_extra: {evidence 键: 变量名}，把额外证据挂到刚发出的 finding 上
                 # （如日志消息的 samples 原文列表）
                 for _ek, _evn in (_trig.get("evidence_extra") or {}).items():
@@ -457,7 +529,7 @@ def _metric_fallback(m):
             fields = [fields]
         args = []
         for cand in fields:
-            names = cand if isinstance(cand, list) else [cand]   # 候选字段名：取第一个存在的
+            names = cand if isinstance(cand, list) else [cand]  # 候选字段名：取第一个存在的
             col = provider.get_first_existing_column(topic, names)
             if col is None:
                 return None
@@ -481,7 +553,7 @@ def _metric_fallback(m):
         if "round" in m:
             _r = int(m["round"])
             val = round(val, _r)
-            return int(val) if _r == 0 else val   # round(x, 0) 仍是 float，整数量要转回 int
+            return int(val) if _r == 0 else val  # round(x, 0) 仍是 float，整数量要转回 int
         return val
     except Exception:
         return None
@@ -503,15 +575,17 @@ def match_fault_kb():
         if "all" not in e_phases:
             if not any(p in phases for p in e_phases):
                 continue
-        matched.append({
-            "faultId": e["fault_id"],
-            "faultTag": e["fault_tag"],
-            "riskLevel": e.get("risk_level", ""),
-            "possibleRootCause": e.get("possible_root_cause", []),
-            "troubleshootingSteps": e.get("troubleshooting_steps", []),
-            "note": e.get("note", ""),
-            "matchedPhases": [p for p in e_phases if p == "all" or p in phases],
-        })
+        matched.append(
+            {
+                "faultId": e["fault_id"],
+                "faultTag": e["fault_tag"],
+                "riskLevel": e.get("risk_level", ""),
+                "possibleRootCause": e.get("possible_root_cause", []),
+                "troubleshootingSteps": e.get("troubleshooting_steps", []),
+                "note": e.get("note", ""),
+                "matchedPhases": [p for p in e_phases if p == "all" or p in phases],
+            }
+        )
     return matched
 
 

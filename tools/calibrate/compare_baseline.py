@@ -10,6 +10,7 @@ guardTags、phases、checksRun/checksSkipped、matchedFaults 不一致都算回�
 
 退出码：全部一致 0；有差异 1（差异以统一 diff 形式列出）。
 """
+
 from __future__ import annotations
 
 import json
@@ -20,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import run_checks_locally as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-LOG_DIR = Path(__file__).resolve().parent / "logs"   # 校准用真实日志（不入库，需自备）
+LOG_DIR = Path(__file__).resolve().parent / "logs"  # 校准用真实日志（不入库，需自备）
 BASELINE_DIR = Path(__file__).resolve().parent / "baseline"
 
 # 重构期唯一可能"合理变化"的字段放这里（当前为空：要求严格等价）

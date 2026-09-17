@@ -10,6 +10,7 @@
 一份（web/scripts/lib/rule-expr.mjs）——Python 侧不再重复实现（两份一定漂移）。
 所以**改了 rules/ 要先 `cd web && pnpm build:kb` 再回归**，脚本会检查产物是否陈旧。
 """
+
 import json
 import re
 import sys
@@ -19,15 +20,15 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-KN_PX4 = REPO_ROOT / "knowledge" / "px4"      # 规则与阈值（知识）
-ENGINE = REPO_ROOT / "engine"                 # 引擎源码（通用算子与框架）
+KN_PX4 = REPO_ROOT / "knowledge" / "px4"  # 规则与阈值（知识）
+ENGINE = REPO_ROOT / "engine"  # 引擎源码（通用算子与框架）
 OPERATORS_PY = ENGINE / "operators.py"
-PROVIDER_API_PY = ENGINE / "providers" / "api.py"    # provider 契约（常量表 + 自检）
-PROVIDER_PX4_PY = ENGINE / "providers" / "px4.py"    # PX4 适配器（唯一认识 PX4 的地方）
+PROVIDER_API_PY = ENGINE / "providers" / "api.py"  # provider 契约（常量表 + 自检）
+PROVIDER_PX4_PY = ENGINE / "providers" / "px4.py"  # PX4 适配器（唯一认识 PX4 的地方）
 RULE_ENGINE_PY = ENGINE / "rule_engine.py"
 REPORT_DATA_PY = ENGINE / "report_data.py"
 RULES_DIR = KN_PX4 / "rules"
-FACTS_YAML = KN_PX4 / "facts.yaml"          # PX4 的数据（码表/文案/展示口径/规则元数据）
+FACTS_YAML = KN_PX4 / "facts.yaml"  # PX4 的数据（码表/文案/展示口径/规则元数据）
 FAULT_KB_JSON = REPO_ROOT / "web" / "workers" / "fault-kb.generated.json"
 CHECK_SCRIPT = REPO_ROOT / "web" / "workers" / "ulog-check-script.ts"
 
@@ -36,8 +37,9 @@ def _load_rules() -> list:
     """从构建产物里取规则（compute 已是表达式形态，老节点写法在构建期被编译掉了）。"""
     if not CHECK_SCRIPT.exists():
         raise RuntimeError("还没有构建产物，先 cd web && pnpm build:kb")
-    stale = [f.name for f in RULES_DIR.glob("*.yaml")
-             if f.stat().st_mtime > CHECK_SCRIPT.stat().st_mtime]
+    stale = [
+        f.name for f in RULES_DIR.glob("*.yaml") if f.stat().st_mtime > CHECK_SCRIPT.stat().st_mtime
+    ]
     if stale:
         raise RuntimeError(
             "构建产物比规则陈旧（%s 改过），先 cd web && pnpm build:kb 再回归"
@@ -62,6 +64,7 @@ def load_facts_payload() -> dict:
     别再各写各的。
     """
     import yaml as _yaml
+
     facts = _yaml.safe_load(FACTS_YAML.read_text(encoding="utf-8"))
     track_yml = KN_PX4 / "plot" / "track.yml"
     facts["track"] = _yaml.safe_load(track_yml.read_text(encoding="utf-8"))["track"]
@@ -128,8 +131,8 @@ def probe_one(path: Path) -> dict:
         fld = sample["fields"][0]["name"]
         series = call(
             ns,
-            f'np_series({json.dumps(sample["topic"])}, {sample["instance"]}, '
-            f'{json.dumps(json.dumps([fld]))}, 3000)',
+            f"np_series({json.dumps(sample['topic'])}, {sample['instance']}, "
+            f"{json.dumps(json.dumps([fld]))}, 3000)",
         )
     # 自检
     checks = {

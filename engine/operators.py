@@ -39,23 +39,27 @@ def _finite(values):
 
 # ─────────────────────────── 标量统计 ───────────────────────────
 
+
 @operator("max", doc="最大值（忽略 NaN）")
 def op_max(values, **kw):
-    if values is None: return None
+    if values is None:
+        return None
     a = _finite(values)
     return float(a.max()) if a.size else None
 
 
 @operator("min", doc="最小值（忽略 NaN）")
 def op_min(values, **kw):
-    if values is None: return None
+    if values is None:
+        return None
     a = _finite(values)
     return float(a.min()) if a.size else None
 
 
 @operator("min_ge", doc="有限且 >= ge 的最小值（排除无效值，如 remaining=-1 表示未知）")
 def op_min_ge(values, ge=None, **kw):
-    if values is None: return None
+    if values is None:
+        return None
     a = _finite(values)
     if ge is not None:
         a = a[a >= float(ge)]
@@ -69,12 +73,14 @@ def op_scale(x, factor=1.0, **kw):
 
 @operator("mean", doc="均值（忽略 NaN）")
 def op_mean(values, **kw):
-    if values is None: return None
+    if values is None:
+        return None
     a = _finite(values)
     return float(a.mean()) if a.size else None
 
 
 # ─────────────────────────── 空值 / 逻辑 / 算术（通用积木）───────────────────────────
+
 
 @operator("is_none", doc="值是否为 None（数据缺失在数据流里显式传播，而不是断链）")
 def op_is_none(x, **kw):
@@ -108,7 +114,9 @@ def op_value_if(cond, x, **kw):
     return x if cond else None
 
 
-@operator("div", in_arity=2, doc="a / b；b 为 0 或任一输入缺失返回 None；require_positive 时要求两者 >0")
+@operator(
+    "div", in_arity=2, doc="a / b；b 为 0 或任一输入缺失返回 None；require_positive 时要求两者 >0"
+)
 def op_div(a, b, require_positive=False, **kw):
     if a is None or b is None or float(b) == 0:
         return None
@@ -118,6 +126,7 @@ def op_div(a, b, require_positive=False, **kw):
 
 
 # ─────────────────────────── 定长数组字段（任意 float32[n] 时间序列列集合）───────────────────────────
+
 
 def _as_columns(matrix):
     """数组字段经 _read_field_ref 收集后是“每元素一列”的列表（各列为等长时间序列）；
@@ -177,8 +186,9 @@ def op_rows_aggregate(matrix, agg="min", gt=None, ge=None, **kw):
     out_names=["drop", "tail_median"],
     doc="第一个区间内（跳过前 skip_first_s 秒）头段中位数 - 尾段中位数；任意 (序列, 时间戳, 区间) 通用",
 )
-def op_head_tail_median_drop(x, vts, intervals, skip_first_s=5, min_seg=20,
-                             head_frac=0.1, tail_frac=0.2, **kw):
+def op_head_tail_median_drop(
+    x, vts, intervals, skip_first_s=5, min_seg=20, head_frac=0.1, tail_frac=0.2, **kw
+):
     """intervals 为 (start_us, end_us) 列表，只取第一个；seg 长度须 > min_seg。
     返回 (落差, 尾段中位数)，数据不足返回 None。"""
     import numpy as np
@@ -195,7 +205,7 @@ def op_head_tail_median_drop(x, vts, intervals, skip_first_s=5, min_seg=20,
     seg = seg[np.isfinite(seg)]
     if len(seg) <= int(min_seg):
         return None
-    tail = float(np.median(seg[-max(5, int(len(seg) * float(tail_frac))):]))
+    tail = float(np.median(seg[-max(5, int(len(seg) * float(tail_frac))) :]))
     head = float(np.median(seg[: max(5, int(len(seg) * float(head_frac)))]))
     return float(head - tail), tail
 
@@ -204,6 +214,7 @@ def op_head_tail_median_drop(x, vts, intervals, skip_first_s=5, min_seg=20,
 # 这类算子的输入是「每个传感器实例一组数据」的列表（框架对 per_instance 节点按
 # topic dataset 分组喂入）。数组字段（如 float32[3]）每组是「每元素一列」的列表。
 # 全部通用：不认识任何具体 topic/字段，只做跨实例归约，取「最差实例」并回传其序号。
+
 
 def _groups(groups):
     return [g for g in (groups or []) if g is not None]
@@ -231,7 +242,7 @@ def _pick(lst, i):
     out_arity=4,
     out_names=["mean", "p95", "vmax", "instance"],
     doc="每个实例一条标量序列：取均值最大的实例，回传其均值/p95/最大值/实例序号；"
-        "均值不超过 min_mean 的实例视作无效（缺省 0，即要求确有有效样本）",
+    "均值不超过 min_mean 的实例视作无效（缺省 0，即要求确有有效样本）",
 )
 def op_worst_mean_stats(groups, min_mean=0.0, **kw):
     import numpy as np
@@ -246,9 +257,9 @@ def op_worst_mean_stats(groups, min_mean=0.0, **kw):
         m = float(a.mean())
         if m <= float(min_mean):
             continue
-        if best is None or m > best[0]:      # 严格大于：并列时保留首个实例
+        if best is None or m > best[0]:  # 严格大于：并列时保留首个实例
             best = (m, float(np.percentile(a, 95)), float(a.max()), i)
-    return best                                # 无有效实例时返回 None
+    return best  # 无有效实例时返回 None
 
 
 @operator(
@@ -257,7 +268,7 @@ def op_worst_mean_stats(groups, min_mean=0.0, **kw):
     out_arity=2,
     out_names=["rss", "instance"],
     doc="每个实例三轴序列：mean(sqrt(x^2+y^2+z^2))，取 RSS 最大的实例及序号；"
-        "不超过 min_mean 的实例视作无效（缺省 0，与迁移前初值 0 的严格比较大一致）",
+    "不超过 min_mean 的实例视作无效（缺省 0，与迁移前初值 0 的严格比较大一致）",
 )
 def op_worst_rss_mean(gx, gy, gz, min_mean=0.0, **kw):
     import numpy as np
@@ -268,10 +279,21 @@ def op_worst_rss_mean(gx, gy, gz, min_mean=0.0, **kw):
         x, y, z = _pick(xs, i), _pick(ys, i), _pick(zs, i)
         if x is None or y is None or z is None:
             continue
-        if isinstance(x, (list, tuple)) or isinstance(y, (list, tuple)) or isinstance(z, (list, tuple)):
+        if (
+            isinstance(x, (list, tuple))
+            or isinstance(y, (list, tuple))
+            or isinstance(z, (list, tuple))
+        ):
             continue
-        rss = float(np.mean(np.sqrt(
-            np.asarray(x, float) ** 2 + np.asarray(y, float) ** 2 + np.asarray(z, float) ** 2)))
+        rss = float(
+            np.mean(
+                np.sqrt(
+                    np.asarray(x, float) ** 2
+                    + np.asarray(y, float) ** 2
+                    + np.asarray(z, float) ** 2
+                )
+            )
+        )
         if rss <= float(min_mean):
             continue
         if best is None or rss > best[0]:
@@ -303,7 +325,10 @@ def op_worst_column_delta(groups, **kw):
 
 # ─────────────────────────── 位掩码 / 跨实例归约（通用）───────────────────────────
 
-@operator("has_bits", in_arity=2, doc="value 是否置起了 mask 中的任意一位（mask 传 -1 表示“任意位非零”）")
+
+@operator(
+    "has_bits", in_arity=2, doc="value 是否置起了 mask 中的任意一位（mask 传 -1 表示“任意位非零”）"
+)
 def op_has_bits(value, mask, **kw):
     if value is None or mask is None:
         return None
@@ -348,12 +373,27 @@ def op_max_of_max(groups, **kw):
     out_arity=3,
     out_names=["frac", "names", "instance"],
     doc="按实例扫描“拒绝占比”：主信号（位掩码，如创新检验标志）非空时用它（非零样本占比、"
-        "按位或展开位名），否则逐一比较候选通道（有限样本中 >= ge 的占比，需 >= channel_min 个）；"
-        "取全局最大占比，返回占比/命中名称/实例序号。字段名与标签全部由经验文件提供。",
+    "按位或展开位名），否则逐一比较候选通道（有限样本中 >= ge 的占比，需 >= channel_min 个）；"
+    "取全局最大占比，返回占比/命中名称/实例序号。字段名与标签全部由经验文件提供。",
 )
-def op_worst_reject_ratio(primary, ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7,
-                          primary_min=3, primary_names=None, ge=1.0, channel_min=3,
-                          channel_labels=None, fallback_label="未知通道", **kw):
+def op_worst_reject_ratio(
+    primary,
+    ch0,
+    ch1,
+    ch2,
+    ch3,
+    ch4,
+    ch5,
+    ch6,
+    ch7,
+    primary_min=3,
+    primary_names=None,
+    ge=1.0,
+    channel_min=3,
+    channel_labels=None,
+    fallback_label="未知通道",
+    **kw,
+):
     import numpy as np
 
     bit_names = list(primary_names or [])
@@ -371,7 +411,7 @@ def op_worst_reject_ratio(primary, ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7,
             if bad < int(primary_min):
                 continue
             union = 0
-            for v in np.asarray(g):          # 不转 float：位掩码必须按位精确
+            for v in np.asarray(g):  # 不转 float：位掩码必须按位精确
                 union |= int(v)
             fired = "、".join(bit_names[b] for b in range(len(bit_names)) if union & (1 << b))
             frac = bad / float(len(g))
@@ -395,6 +435,7 @@ def op_worst_reject_ratio(primary, ch0, ch1, ch2, ch3, ch4, ch5, ch6, ch7,
 
 
 # ─────────────────────────── 序列统计 / 边沿 / 地理（通用）───────────────────────────
+
 
 @operator("percentile", doc="有限值的第 p 百分位（如 p=95）；无有效值则 None")
 def op_percentile(values, p=95, **kw):
@@ -455,8 +496,8 @@ def op_scale_series(values, factor=1.0, **kw):
     "adjacent_speed_mps",
     in_arity=3,
     doc="经纬度与时间戳（us）→ 相邻样本地面速度序列（m/s）；等距柱状近似。"
-        "unit 说明经纬度口径：degE7（旧字段 lat/lon 的 1e7 度）或 deg（新字段 latitude_deg），"
-        "由经验文件按固件版本给出",
+    "unit 说明经纬度口径：degE7（旧字段 lat/lon 的 1e7 度）或 deg（新字段 latitude_deg），"
+    "由经验文件按固件版本给出",
 )
 def op_adjacent_speed_mps(lat_in, lon_in, ts_us, unit="degE7", **kw):
     import numpy as np
@@ -471,7 +512,7 @@ def op_adjacent_speed_mps(lat_in, lon_in, ts_us, unit="degE7", **kw):
     dt = np.diff(np.asarray(ts_us, dtype=float)) / 1e6
     dlat = np.diff(lat) * 6371000.0
     dlon = np.diff(lon) * 6371000.0 * np.cos(lat[:-1])
-    return np.sqrt(dlat ** 2 + dlon ** 2) / np.maximum(dt, 1e-3)
+    return np.sqrt(dlat**2 + dlon**2) / np.maximum(dt, 1e-3)
 
 
 @operator("read", doc="显式取数/透传：把字段原样放进环境（供 coalesce 等后续节点使用）")
@@ -533,7 +574,7 @@ def op_ratio_equal(values, value=0.0, **kw):
     "masked_any_in",
     in_arity=3,
     doc="时间轴上的“区间内取值为集合之一”判定：在 intervals（us 区间列表）内是否存在取值"
-        "落在 codes 中的样本；codes 由经验文件给出，任意状态字段通用",
+    "落在 codes 中的样本；codes 由经验文件给出，任意状态字段通用",
 )
 def op_masked_any_in(values, ts_us, intervals, codes=None, **kw):
     import numpy as np
@@ -554,7 +595,9 @@ def op_masked_any_in(values, ts_us, intervals, codes=None, **kw):
     return bool(np.any(np.isin(vals[mask], list(codes))))
 
 
-@operator("require_true", doc="门控：条件为真返回 True，否则 None（使数据流在此中止，等效于原 if 分支）")
+@operator(
+    "require_true", doc="门控：条件为真返回 True，否则 None（使数据流在此中止，等效于原 if 分支）"
+)
 def op_require_true(cond, **kw):
     if cond is None:
         return None
@@ -565,11 +608,12 @@ def op_require_true(cond, **kw):
 # 返回「事件列表」（每项一个 dict）。配合规则级 `foreach:`：框架对每个事件按同一套
 # trigger 模板发一条 finding，因此文案仍写在经验文件里，算子只负责找事件。
 
+
 @operator(
     "rising_edge_events",
     in_arity=4,
     doc="上升沿事件（前一拍 != 1 且当前 == 1）且落在 intervals 内："
-        "返回 [{t_s: 相对日志起点秒数}, ...]；t0_us 一般传内置变量 t0_us",
+    "返回 [{t_s: 相对日志起点秒数}, ...]；t0_us 一般传内置变量 t0_us",
 )
 def op_rising_edge_events(values, ts_us, intervals, t0_us, **kw):
     import numpy as np
@@ -596,7 +640,7 @@ def op_rising_edge_events(values, ts_us, intervals, t0_us, **kw):
     "step_into_events",
     in_arity=4,
     doc="状态切换到 codes 集合内的取值、且落在 intervals 内的事件："
-        "返回 [{t_s, code, name}, ...]，codes 形如 {5: AUTO_RTL}（名称由经验文件给出）",
+    "返回 [{t_s, code, name}, ...]，codes 形如 {5: AUTO_RTL}（名称由经验文件给出）",
 )
 def op_step_into_events(values, ts_us, intervals, t0_us, codes=None, **kw):
     import numpy as np
@@ -623,18 +667,22 @@ def op_step_into_events(values, ts_us, intervals, t0_us, codes=None, **kw):
 
 # ─────────────────────────── 结构化条目列表（日志消息等）───────────────────────────
 
+
 def _item_hit(it, key, eq, lte, gte, in_list):
     if not isinstance(it, dict):
         return False
     if eq is None and lte is None and gte is None and in_list is None:
-        return True                      # 无条件 = 全选（可当计数器用）
+        return True  # 无条件 = 全选（可当计数器用）
     v = it.get(key)
     if v is None:
         return False
     if in_list is not None:
         return v in list(in_list)
-    return (eq is not None and v == eq) or (lte is not None and v <= lte) \
+    return (
+        (eq is not None and v == eq)
+        or (lte is not None and v <= lte)
         or (gte is not None and v >= gte)
+    )
 
 
 @operator("count_items", doc="条目列表里满足条件的条数：按 key 字段判定，in_list / eq / lte / gte")
@@ -644,16 +692,28 @@ def op_count_items(items, key="level", eq=None, lte=None, gte=None, in_list=None
     return sum(1 for it in items if _item_hit(it, key, eq, lte, gte, in_list))
 
 
-@operator("take_items", doc="条目列表里满足条件的前 limit 条（drop 可去掉辅助键；clip 可按字段截断文本）")
-def op_take_items(items, key="level", eq=None, lte=None, gte=None, in_list=None,
-                  limit=5, drop=None, clip=None, **kw):
+@operator(
+    "take_items", doc="条目列表里满足条件的前 limit 条（drop 可去掉辅助键；clip 可按字段截断文本）"
+)
+def op_take_items(
+    items,
+    key="level",
+    eq=None,
+    lte=None,
+    gte=None,
+    in_list=None,
+    limit=5,
+    drop=None,
+    clip=None,
+    **kw,
+):
     out = []
     clips = {str(k): int(v) for k, v in dict(clip or {}).items()}
-    for it in (items or []):
+    for it in items or []:
         if not _item_hit(it, key, eq, lte, gte, in_list):
             continue
         item = dict(it)
-        for k in (drop if isinstance(drop, (list, tuple)) else [drop] if drop else []):
+        for k in drop if isinstance(drop, (list, tuple)) else [drop] if drop else []:
             item.pop(k, None)
         for k, n in clips.items():
             if isinstance(item.get(k), str):
@@ -665,6 +725,7 @@ def op_take_items(items, key="level", eq=None, lte=None, gte=None, in_list=None,
 
 
 # ─────────────────────────── 姿态 / 时间轴（通用）───────────────────────────
+
 
 @operator(
     "interp_to",
@@ -681,7 +742,7 @@ def op_interp_to(values, src_ts, dst_ts, **kw):
     d = np.asarray(dst_ts, dtype=np.int64)
     if v.size < 2 or s.size != v.size or not d.size:
         return None
-    return np.interp(d, s[:v.size], v)
+    return np.interp(d, s[: v.size], v)
 
 
 @operator(
@@ -746,6 +807,7 @@ def op_count_true(mask, **kw):
 
 # ─────────────────────────── 掩码 / 多通道（通用）───────────────────────────
 
+
 @operator("interval_mask", in_arity=2, doc="时间戳落在 intervals 内的布尔掩码（armed 段等）")
 def op_interval_mask(ts_us, intervals, **kw):
     import numpy as np
@@ -795,7 +857,7 @@ def op_count_columns(matrix, **kw):
     "active_column_means",
     in_arity=2,
     doc="掩码内逐通道均值，只保留均值 > min_mean 的通道（未接/未用通道均值≈0，排除）；"
-        "返回 [{index, mean}, ...]；列长与掩码不一致时退化为前 N 个样本",
+    "返回 [{index, mean}, ...]；列长与掩码不一致时退化为前 N 个样本",
 )
 def op_active_column_means(matrix, mask, min_mean=0.01, **kw):
     import numpy as np
@@ -812,7 +874,7 @@ def op_active_column_means(matrix, mask, min_mean=0.01, **kw):
         if v.size == m.size:
             v = v[m]
         else:
-            v = v[:n_on]                 # 与原实现一致：长度不匹配时取前 N 个
+            v = v[:n_on]  # 与原实现一致：长度不匹配时取前 N 个
         v = v[np.isfinite(v)]
         if v.size and float(np.mean(v)) > float(min_mean):
             out.append({"index": i, "mean": float(np.mean(v))})
@@ -838,6 +900,7 @@ def op_items_spread(items, value_key="mean", index_key="index", **kw):
 
 
 # ─────────────────────────── 多轴传感器（通用）───────────────────────────
+
 
 @operator("apply_mask", in_arity=2, doc="按布尔掩码筛选序列（如只保留 armed 段样本），返回新序列")
 def op_apply_mask(values, mask, **kw):
@@ -866,8 +929,8 @@ def op_range_of(values, **kw):
     out_arity=2,
     out_names=["value", "name"],
     doc="三路序列各做一次归约（reduce: absmax | range | max | min | mean），"
-        "回传归约值最大的一路及名称（labels 由经验文件给出）；"
-        "样本数 < min_count 或归约值不超过 min_value 的路不参与（严格大于）",
+    "回传归约值最大的一路及名称（labels 由经验文件给出）；"
+    "样本数 < min_count 或归约值不超过 min_value 的路不参与（严格大于）",
 )
 def op_worst_named(a, b, c, reduce="absmax", labels=None, min_value=0.0, min_count=10, **kw):
     import numpy as np
@@ -896,13 +959,14 @@ def op_worst_named(a, b, c, reduce="absmax", labels=None, min_value=0.0, min_cou
 @operator(
     "label_if",
     doc="cond 为真取 label_true，否则取 label_false（文案以节点选项给出；缺省 None，便于 coalesce 串联）。"
-        "注意参数名不用 yes/no：YAML 1.1 会把裸 yes/no 解析成布尔，PyYAML 与浏览器侧 yaml 库行为不一致。",
+    "注意参数名不用 yes/no：YAML 1.1 会把裸 yes/no 解析成布尔，PyYAML 与浏览器侧 yaml 库行为不一致。",
 )
 def op_label_if(cond, label_true=None, label_false=None, **kw):
     return label_true if cond else label_false
 
 
 # ─────────────────────────── 逐样本数组运算（通用）───────────────────────────
+
 
 @operator("either", in_arity=2, doc="逻辑或（None 视作假）")
 def op_either(a, b, **kw):
@@ -984,7 +1048,7 @@ def op_smaller(a, b, **kw):
 @operator(
     "zero_cross_hz",
     doc="相对中位数符号翻转频率（Hz）：翻转次数 / 2 / (样本数 / sample_rate)；"
-        "样本 < 3 时 None。用于判定“误差高频振荡”",
+    "样本 < 3 时 None。用于判定“误差高频振荡”",
 )
 def op_zero_cross_hz(values, sample_rate=50.0, **kw):
     import numpy as np
@@ -1008,19 +1072,31 @@ def op_zero_cross_hz(values, sample_rate=50.0, **kw):
 # 掩码 → 统计」的固定套路可以收成一个算子：输入仍是 YAML 里写明的字段引用（算子不认识
 # 具体 topic/字段），参数（阈值/最少样本/采样率）也来自 YAML。
 
+
 @operator(
     "att_tracking_stats",
     in_arity=8,
     out_arity=3,
     out_names=["p99", "osc_hz", "seg_n"],
     doc="姿态跟踪统计：把姿态与姿态指令在时间轴上对齐（取较短长度、指令线性插值到姿态时间轴），"
-        "只在 armed 且非悬停（指令倾角 > tilt_min_deg）样本上算跟踪误差，输出 p99（度）、"
-        "误差过零频率（Hz）、参与统计的样本数。指令源在 q_d 四元数与 roll/pitch_body 之间自动选择"
-        "（fw_minor >= 15 或有四元数而无 body 字段时用四元数）。核心数据缺失返回 None。",
+    "只在 armed 且非悬停（指令倾角 > tilt_min_deg）样本上算跟踪误差，输出 p99（度）、"
+    "误差过零频率（Hz）、参与统计的样本数。指令源在 q_d 四元数与 roll/pitch_body 之间自动选择"
+    "（fw_minor >= 15 或有四元数而无 body 字段时用四元数）。核心数据缺失返回 None。",
 )
-def op_att_tracking_stats(att_q, sp_q, sp_roll, sp_pitch, att_ts, sp_ts, intervals,
-                          fw_minor=None, tilt_min_deg=10.0, min_samples=50,
-                          sample_rate=50.0, **kw):
+def op_att_tracking_stats(
+    att_q,
+    sp_q,
+    sp_roll,
+    sp_pitch,
+    att_ts,
+    sp_ts,
+    intervals,
+    fw_minor=None,
+    tilt_min_deg=10.0,
+    min_samples=50,
+    sample_rate=50.0,
+    **kw,
+):
     import numpy as np
 
     q = _as_columns(att_q)
@@ -1032,7 +1108,7 @@ def op_att_tracking_stats(att_q, sp_q, sp_roll, sp_pitch, att_ts, sp_ts, interva
     w, x, y, z = (np.asarray(c, dtype=float) for c in q[:4])
     n_q = min(len(w), len(x), len(y), len(z))
     w, x, y, z = w[:n_q], x[:n_q], y[:n_q], z[:n_q]
-    roll = np.arctan2(2 * (w * x + y * z), 1 - 2 * (x ** 2 + y ** 2))          # 弧度
+    roll = np.arctan2(2 * (w * x + y * z), 1 - 2 * (x**2 + y**2))  # 弧度
     pitch = np.arcsin(np.clip(2 * (w * y - z * x), -1, 1))
 
     # 指令源：1.15+ 只记四元数；旧固件记 roll/pitch_body（弧度）
@@ -1040,26 +1116,27 @@ def op_att_tracking_stats(att_q, sp_q, sp_roll, sp_pitch, att_ts, sp_ts, interva
     has_qd = len(qd) >= 4
     use_q = has_qd and (sp_roll is None or fw_minor is None or int(fw_minor) >= 15)
     if not use_q and sp_roll is None and has_qd:
-        use_q = True                       # 定制固件容错
+        use_q = True  # 定制固件容错
     if use_q:
         d0, d1, d2, d3 = (np.asarray(c, dtype=float) for c in qd[:4])
         ns = min(len(d0), len(d1), len(d2), len(d3))
         d0, d1, d2, d3 = d0[:ns], d1[:ns], d2[:ns], d3[:ns]
-        r_sp_raw = np.arctan2(2 * (d0 * d1 + d2 * d3), 1 - 2 * (d1 ** 2 + d2 ** 2))
+        r_sp_raw = np.arctan2(2 * (d0 * d1 + d2 * d3), 1 - 2 * (d1**2 + d2**2))
         p_sp_raw = np.arcsin(np.clip(2 * (d0 * d2 - d3 * d1), -1, 1))
     else:
         if sp_roll is None:
             return None
         r_sp_raw = np.asarray(sp_roll, dtype=float)
-        p_sp_raw = (np.asarray(sp_pitch, dtype=float) if sp_pitch is not None
-                    else np.zeros(len(r_sp_raw)))
+        p_sp_raw = (
+            np.asarray(sp_pitch, dtype=float) if sp_pitch is not None else np.zeros(len(r_sp_raw))
+        )
 
     n = min(n_q, len(r_sp_raw), len(p_sp_raw))
     if n < 1:
         return None
     ts_n = ts[:n]
-    r_sp = np.interp(ts_n, sp_ts[:len(r_sp_raw)], r_sp_raw)
-    p_sp = np.interp(ts_n, sp_ts[:len(p_sp_raw)], p_sp_raw)
+    r_sp = np.interp(ts_n, sp_ts[: len(r_sp_raw)], r_sp_raw)
+    p_sp = np.interp(ts_n, sp_ts[: len(p_sp_raw)], p_sp_raw)
     err = np.degrees(np.maximum(np.abs(roll[:n] - r_sp), np.abs(pitch[:n] - p_sp)))
 
     amask = np.zeros(n, dtype=bool)
@@ -1070,7 +1147,7 @@ def op_att_tracking_stats(att_q, sp_q, sp_roll, sp_pitch, att_ts, sp_ts, interva
     active = amask & (np.degrees(np.abs(r_sp)) + np.degrees(np.abs(p_sp)) > float(tilt_min_deg))
     seg = err[active] if int(np.count_nonzero(active)) > int(min_samples) else err[amask]
     if seg.size <= int(min_samples):
-        return (None, None, int(seg.size))      # 样本不足：不出结论，但把样本数带出去
+        return (None, None, int(seg.size))  # 样本不足：不出结论，但把样本数带出去
 
     p99 = float(np.percentile(seg, 99))
     sign = np.sign(seg - np.median(seg))
@@ -1086,13 +1163,22 @@ def op_att_tracking_stats(att_q, sp_q, sp_roll, sp_pitch, att_ts, sp_ts, interva
     out_arity=5,
     out_names=["bx", "by", "bz", "bts", "src_text"],
     doc="零偏取源（三取一）：① 直读零偏列（fw_minor >= 15 时优先）② 状态槽 A ③ 状态槽 A 缺失"
-        "时用状态槽 B。输入都是「数组字段的多列」或 None。"
-        "返回 三轴序列 + 时间戳 + 数据来源说明（用于 evidence.field）；主数据缺失返回 None。"
-        "来源说明是**展示文案**，由调用方用 sources=[直读, 槽A, 槽B] 给出——算子不认识字段名。",
+    "时用状态槽 B。输入都是「数组字段的多列」或 None。"
+    "返回 三轴序列 + 时间戳 + 数据来源说明（用于 evidence.field）；主数据缺失返回 None。"
+    "来源说明是**展示文案**，由调用方用 sources=[直读, 槽A, 槽B] 给出——算子不认识字段名。",
 )
-def op_gyro_bias_series(new_cols, new_ts, states_a_cols, states_a_ts,
-                        states_b_cols, states_b_ts, fw_minor, slot=10,
-                        sources=None, **kw):
+def op_gyro_bias_series(
+    new_cols,
+    new_ts,
+    states_a_cols,
+    states_a_ts,
+    states_b_cols,
+    states_b_ts,
+    fw_minor,
+    slot=10,
+    sources=None,
+    **kw,
+):
     nb = _as_columns(new_cols)
     la = _as_columns(states_a_cols)
     lb = _as_columns(states_b_cols)
@@ -1106,7 +1192,7 @@ def op_gyro_bias_series(new_cols, new_ts, states_a_cols, states_a_ts,
     leg_a, leg_b = pick3(la), pick3(lb)
     use_new = len(nb) >= 3 and new_ts is not None and (fw_minor is None or int(fw_minor) >= 15)
     if not use_new and leg_a is None and leg_b is None and len(nb) >= 3:
-        use_new = True                       # 定制固件容错：没有旧槽就用直读
+        use_new = True  # 定制固件容错：没有旧槽就用直读
     if use_new:
         return (nb[0], nb[1], nb[2], new_ts, names[0])
     if leg_a is not None and states_a_ts is not None:
@@ -1122,7 +1208,7 @@ def op_gyro_bias_series(new_cols, new_ts, states_a_cols, states_a_ts,
     out_arity=4,
     out_names=["abs_max", "abs_axis", "drift", "drift_axis"],
     doc="三轴零偏在 armed 区间内逐轴取 |最大值| 与极差（漂移），回传各自最差的轴名。"
-        "样本 < min_count 的轴不参与；|零偏| 严格 > 0 才算有效；轴名由经验文件给出。",
+    "样本 < min_count 的轴不参与；|零偏| 严格 > 0 才算有效；轴名由经验文件给出。",
 )
 def op_gyro_bias_worst(bx, by, bz, bts, intervals, labels=None, min_count=10, **kw):
     import numpy as np
@@ -1177,7 +1263,7 @@ def op_max_temp_range(t_a, t_b, **kw):
     "active_window_mask",
     in_arity=4,
     doc="活动窗口掩码：armed 区间 ∩ 状态取值落在 codes 内的样本；若交集样本 <= min_active，"
-        "退回整个 armed 区间（原实现“悬停样本太少就退用 armed 段”）。任意状态字段通用。",
+    "退回整个 armed 区间（原实现“悬停样本太少就退用 armed 段”）。任意状态字段通用。",
 )
 def op_active_window_mask(ts_us, intervals, values, values_ts, codes=None, min_active=20, **kw):
     import numpy as np
@@ -1207,7 +1293,7 @@ def op_active_window_mask(ts_us, intervals, values, values_ts, codes=None, min_a
     out_arity=4,
     out_names=["spread", "busiest", "idlest", "n_active"],
     doc="多通道均值极差：掩码内逐通道求均值，只保留均值 > min_mean 的通道（排除未接/未用），"
-        "活跃通道数不足 min_channels 时返回 None；回传 极差 / 最大通道号 / 最小通道号 / 活跃数。",
+    "活跃通道数不足 min_channels 时返回 None；回传 极差 / 最大通道号 / 最小通道号 / 活跃数。",
 )
 def op_column_spread_stats(matrix, mask, min_mean=0.01, min_channels=4, **kw):
     means = op_active_column_means(matrix, mask, min_mean=min_mean)
@@ -1228,8 +1314,8 @@ def op_column_spread_stats(matrix, mask, min_mean=0.01, min_channels=4, **kw):
     out_arity=6,
     out_names=["vmin", "cell_min", "cells", "have_measured", "have_fallback", "no_cell"],
     doc="单电芯最低电压：优先 voltage_cell_v[] 实测（各列 > 0 的最小值中的最小值），"
-        "缺失时回退 总压最小值 / 电芯数（两者都 > 0 才成立）；两者都没有但有总压 → no_cell 为真。"
-        "cells 只在回退路径给出（与迁移前一致）。",
+    "缺失时回退 总压最小值 / 电芯数（两者都 > 0 才成立）；两者都没有但有总压 → no_cell 为真。"
+    "cells 只在回退路径给出（与迁移前一致）。",
 )
 def op_cell_voltage_min(cell_cols, volt_v, volt_filtered, cell_count, **kw):
     import numpy as np
@@ -1258,5 +1344,5 @@ def op_cell_voltage_min(cell_cols, volt_v, volt_filtered, cell_count, **kw):
     have_measured = measured is not None
     have_fallback = fallback is not None
     cell_min = measured if have_measured else fallback
-    no_cell = (not have_measured and not have_fallback and vmin is not None)
+    no_cell = not have_measured and not have_fallback and vmin is not None
     return (vmin, cell_min, cells, have_measured, have_fallback, no_cell)
