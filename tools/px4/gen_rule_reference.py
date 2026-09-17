@@ -47,11 +47,7 @@ def operator_catalog() -> str:
         if not isinstance(node, ast.FunctionDef):
             continue
         deco = next(
-            (
-                d
-                for d in node.decorator_list
-                if isinstance(d, ast.Call) and getattr(d.func, "id", "") == "operator"
-            ),
+            (d for d in node.decorator_list if isinstance(d, ast.Call) and getattr(d.func, "id", "") == "operator"),
             None,
         )
         if deco is None:
@@ -72,9 +68,7 @@ def operator_catalog() -> str:
         in_a, out_a = val("in_arity", 1), val("out_arity", 1)
         out_names = val("out_names", []) or []
         doc = val("doc", "") or (ast.get_docstring(node) or "").strip().split("\n")[0]
-        outs = (
-            ", ".join(out_names) if out_names else ("1 个值" if out_a == 1 else "%d 个值" % out_a)
-        )
+        outs = ", ".join(out_names) if out_names else ("1 个值" if out_a == 1 else "%d 个值" % out_a)
         rows.setdefault(section_of.get(node.lineno, "其它"), []).append(
             (name, in_a, outs, doc.split("。")[0].split("；")[0].strip())
         )
@@ -113,8 +107,7 @@ def builtin_table() -> str:
         "is_fixed_wing": "机型别名（比 `airframe == 'fixed_wing'` 好读）",
         "duration_s": "日志总时长（秒）",
         "armed_s": "armed 总时长（秒）",
-        "armed_intervals": "armed 区间列表 `[(start_us, end_us)]`，升序不重叠；"
-        "`end=None` 表示持续到日志结束。时序算子按它切窗",
+        "armed_intervals": "armed 区间列表 `[(start_us, end_us)]`，升序不重叠；`end=None` 表示持续到日志结束。时序算子按它切窗",
         "t0_us": "日志起点时间戳（us），事件类算子算相对时刻用",
         "has_armed": "是否存在 armed 段（布尔）",
         "restart_detected": "是否有 topic 时间戳回退（疑似中途重启）",
@@ -125,10 +118,7 @@ def builtin_table() -> str:
     for k in keys:
         rows.append("| `%s` | %s |" % (k, note.get(k, "—")))
     # 框架自己补的两个（不属于 provider，但同样可以直接引用）
-    rows.append(
-        "| `no_data` | compute 是否算不出来：初值 False，compute 失败后置真"
-        "（`skip` 列表里用它记一条 skipped） |"
-    )
+    rows.append("| `no_data` | compute 是否算不出来：初值 False，compute 失败后置真（`skip` 列表里用它记一条 skipped） |")
     rows.append(
         "| `has_topic('x')` | 日志里有没有这个 topic，如 `not has_topic('cpuload')`；"
         "表达式里**唯一**允许的函数调用（其余函数一律不给） |"

@@ -185,10 +185,7 @@ def main(argv: list[str]) -> int:
     logs = fields_by_version_from_logs()
     meta = fields_by_version_from_meta()
     versions = sorted(set(logs) | set(meta))
-    print(
-        "来源版本：%s（日志实测 %d 个版本，字典 %d 个版本）"
-        % (", ".join(fmt(v) for v in versions), len(logs), len(meta))
-    )
+    print("来源版本：%s（日志实测 %d 个版本，字典 %d 个版本）" % (", ".join(fmt(v) for v in versions), len(logs), len(meta)))
 
     ok = gaps = legacy = suspicious = 0
     gap_rows: list[tuple[str, str, str, str, list[str]]] = []
@@ -199,11 +196,7 @@ def main(argv: list[str]) -> int:
         if any(found_in(logs, v, topic, fld) or found_in(meta, v, topic, fld) for v in applicable):
             ok += 1
             continue
-        elsewhere = [
-            fmt(v)
-            for v in versions
-            if found_in(logs, v, topic, fld) or found_in(meta, v, topic, fld)
-        ]
+        elsewhere = [fmt(v) for v in versions if found_in(logs, v, topic, fld) or found_in(meta, v, topic, fld)]
         if declared:
             legacy += 1
             legacy_rows.append((rid, topic, fld))
@@ -225,14 +218,9 @@ def main(argv: list[str]) -> int:
             print("   %-28s %s.%s" % (rid, topic, fld))
     if gap_rows:
         print("\n版本错配：声明的 firmware 范围内找不到这些字段（该经验在这些固件上不会生效）")
-        print(
-            "    修法：改 firmware 范围 / 用 pick_newer 或带 fw_minor 入参的算子补版本分支 / 改用新字段名"
-        )
+        print("    修法：改 firmware 范围 / 用 pick_newer 或带 fw_minor 入参的算子补版本分支 / 改用新字段名")
         for rid, topic, fld, fw, elsewhere in gap_rows:
-            print(
-                "   %-28s %-42s firmware=%s ｜ 仅存在于 %s"
-                % (rid, "%s.%s" % (topic, fld), fw, ", ".join(elsewhere))
-            )
+            print("   %-28s %-42s firmware=%s ｜ 仅存在于 %s" % (rid, "%s.%s" % (topic, fld), fw, ", ".join(elsewhere)))
     if bad_rows:
         print("\n可疑引用（哪里都没找到，多半是拼错）：")
         for rid, topic, fld in bad_rows:

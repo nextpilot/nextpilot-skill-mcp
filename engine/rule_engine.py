@@ -162,15 +162,9 @@ def _eval_expr(expr, env):
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):
             ok = isinstance(node.func, ast.Name) and node.func.id in _EXPR_CALLABLE
-            arg_ok = (
-                len(node.args) == 1
-                and isinstance(node.args[0], ast.Constant)
-                and isinstance(node.args[0].value, str)
-            )
+            arg_ok = len(node.args) == 1 and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str)
             if not (ok and arg_ok and not node.keywords):
-                raise ValueError(
-                    "表达式里只允许 %s('字符串')：%s" % ("/".join(sorted(_EXPR_CALLABLE)), expr)
-                )
+                raise ValueError("表达式里只允许 %s('字符串')：%s" % ("/".join(sorted(_EXPR_CALLABLE)), expr))
             continue
         if not isinstance(node, _ALLOWED_NODES):
             raise ValueError("表达式含不允许的语法 %s：%s" % (type(node).__name__, expr))
@@ -385,9 +379,7 @@ def _run_rules(group):
         # 不匹配则静默：既不 ran 也不 skipped（这是最外层的门，"这条经验根本不属于本机"
         # 不值得在报告里刷一条）。要留痕就把它写进 skip 列表。
         try:
-            _axis_ok = bool(_eval_expr(_rule["firmware"], _env)) and bool(
-                _eval_expr(_rule["airframe"], _env)
-            )
+            _axis_ok = bool(_eval_expr(_rule["firmware"], _env)) and bool(_eval_expr(_rule["airframe"], _env))
         except Exception:
             _axis_ok = False
         if not _axis_ok:

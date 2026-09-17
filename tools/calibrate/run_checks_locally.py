@@ -37,14 +37,9 @@ def _load_rules() -> list:
     """从构建产物里取规则（compute 已是表达式形态，老节点写法在构建期被编译掉了）。"""
     if not CHECK_SCRIPT.exists():
         raise RuntimeError("还没有构建产物，先 cd web && pnpm build:kb")
-    stale = [
-        f.name for f in RULES_DIR.glob("*.yaml") if f.stat().st_mtime > CHECK_SCRIPT.stat().st_mtime
-    ]
+    stale = [f.name for f in RULES_DIR.glob("*.yaml") if f.stat().st_mtime > CHECK_SCRIPT.stat().st_mtime]
     if stale:
-        raise RuntimeError(
-            "构建产物比规则陈旧（%s 改过），先 cd web && pnpm build:kb 再回归"
-            % "、".join(sorted(stale)[:5])
-        )
+        raise RuntimeError("构建产物比规则陈旧（%s 改过），先 cd web && pnpm build:kb 再回归" % "、".join(sorted(stale)[:5]))
     src = CHECK_SCRIPT.read_text(encoding="utf-8")
     m = re.search(r"^const rules = (.*?);$", src, re.M | re.S)
     if not m:
@@ -131,8 +126,7 @@ def probe_one(path: Path) -> dict:
         fld = sample["fields"][0]["name"]
         series = call(
             ns,
-            f"np_series({json.dumps(sample['topic'])}, {sample['instance']}, "
-            f"{json.dumps(json.dumps([fld]))}, 3000)",
+            f"np_series({json.dumps(sample['topic'])}, {sample['instance']}, {json.dumps(json.dumps([fld]))}, 3000)",
         )
     # 自检
     checks = {

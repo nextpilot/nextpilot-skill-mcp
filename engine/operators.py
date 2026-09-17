@@ -114,9 +114,7 @@ def op_value_if(cond, x, **kw):
     return x if cond else None
 
 
-@operator(
-    "div", in_arity=2, doc="a / b；b 为 0 或任一输入缺失返回 None；require_positive 时要求两者 >0"
-)
+@operator("div", in_arity=2, doc="a / b；b 为 0 或任一输入缺失返回 None；require_positive 时要求两者 >0")
 def op_div(a, b, require_positive=False, **kw):
     if a is None or b is None or float(b) == 0:
         return None
@@ -186,9 +184,7 @@ def op_rows_aggregate(matrix, agg="min", gt=None, ge=None, **kw):
     out_names=["drop", "tail_median"],
     doc="第一个区间内（跳过前 skip_first_s 秒）头段中位数 - 尾段中位数；任意 (序列, 时间戳, 区间) 通用",
 )
-def op_head_tail_median_drop(
-    x, vts, intervals, skip_first_s=5, min_seg=20, head_frac=0.1, tail_frac=0.2, **kw
-):
+def op_head_tail_median_drop(x, vts, intervals, skip_first_s=5, min_seg=20, head_frac=0.1, tail_frac=0.2, **kw):
     """intervals 为 (start_us, end_us) 列表，只取第一个；seg 长度须 > min_seg。
     返回 (落差, 尾段中位数)，数据不足返回 None。"""
     import numpy as np
@@ -279,21 +275,9 @@ def op_worst_rss_mean(gx, gy, gz, min_mean=0.0, **kw):
         x, y, z = _pick(xs, i), _pick(ys, i), _pick(zs, i)
         if x is None or y is None or z is None:
             continue
-        if (
-            isinstance(x, (list, tuple))
-            or isinstance(y, (list, tuple))
-            or isinstance(z, (list, tuple))
-        ):
+        if isinstance(x, (list, tuple)) or isinstance(y, (list, tuple)) or isinstance(z, (list, tuple)):
             continue
-        rss = float(
-            np.mean(
-                np.sqrt(
-                    np.asarray(x, float) ** 2
-                    + np.asarray(y, float) ** 2
-                    + np.asarray(z, float) ** 2
-                )
-            )
-        )
+        rss = float(np.mean(np.sqrt(np.asarray(x, float) ** 2 + np.asarray(y, float) ** 2 + np.asarray(z, float) ** 2)))
         if rss <= float(min_mean):
             continue
         if best is None or rss > best[0]:
@@ -326,9 +310,7 @@ def op_worst_column_delta(groups, **kw):
 # ─────────────────────────── 位掩码 / 跨实例归约（通用）───────────────────────────
 
 
-@operator(
-    "has_bits", in_arity=2, doc="value 是否置起了 mask 中的任意一位（mask 传 -1 表示“任意位非零”）"
-)
+@operator("has_bits", in_arity=2, doc="value 是否置起了 mask 中的任意一位（mask 传 -1 表示“任意位非零”）")
 def op_has_bits(value, mask, **kw):
     if value is None or mask is None:
         return None
@@ -595,9 +577,7 @@ def op_masked_any_in(values, ts_us, intervals, codes=None, **kw):
     return bool(np.any(np.isin(vals[mask], list(codes))))
 
 
-@operator(
-    "require_true", doc="门控：条件为真返回 True，否则 None（使数据流在此中止，等效于原 if 分支）"
-)
+@operator("require_true", doc="门控：条件为真返回 True，否则 None（使数据流在此中止，等效于原 if 分支）")
 def op_require_true(cond, **kw):
     if cond is None:
         return None
@@ -678,11 +658,7 @@ def _item_hit(it, key, eq, lte, gte, in_list):
         return False
     if in_list is not None:
         return v in list(in_list)
-    return (
-        (eq is not None and v == eq)
-        or (lte is not None and v <= lte)
-        or (gte is not None and v >= gte)
-    )
+    return (eq is not None and v == eq) or (lte is not None and v <= lte) or (gte is not None and v >= gte)
 
 
 @operator("count_items", doc="条目列表里满足条件的条数：按 key 字段判定，in_list / eq / lte / gte")
@@ -692,9 +668,7 @@ def op_count_items(items, key="level", eq=None, lte=None, gte=None, in_list=None
     return sum(1 for it in items if _item_hit(it, key, eq, lte, gte, in_list))
 
 
-@operator(
-    "take_items", doc="条目列表里满足条件的前 limit 条（drop 可去掉辅助键；clip 可按字段截断文本）"
-)
+@operator("take_items", doc="条目列表里满足条件的前 limit 条（drop 可去掉辅助键；clip 可按字段截断文本）")
 def op_take_items(
     items,
     key="level",
@@ -1047,8 +1021,7 @@ def op_smaller(a, b, **kw):
 
 @operator(
     "zero_cross_hz",
-    doc="相对中位数符号翻转频率（Hz）：翻转次数 / 2 / (样本数 / sample_rate)；"
-    "样本 < 3 时 None。用于判定“误差高频振荡”",
+    doc="相对中位数符号翻转频率（Hz）：翻转次数 / 2 / (样本数 / sample_rate)；样本 < 3 时 None。用于判定“误差高频振荡”",
 )
 def op_zero_cross_hz(values, sample_rate=50.0, **kw):
     import numpy as np
@@ -1127,9 +1100,7 @@ def op_att_tracking_stats(
         if sp_roll is None:
             return None
         r_sp_raw = np.asarray(sp_roll, dtype=float)
-        p_sp_raw = (
-            np.asarray(sp_pitch, dtype=float) if sp_pitch is not None else np.zeros(len(r_sp_raw))
-        )
+        p_sp_raw = np.asarray(sp_pitch, dtype=float) if sp_pitch is not None else np.zeros(len(r_sp_raw))
 
     n = min(n_q, len(r_sp_raw), len(p_sp_raw))
     if n < 1:

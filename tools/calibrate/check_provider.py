@@ -63,8 +63,7 @@ def check_provider(ns: dict, path: Path) -> None:
         for f in m["fields"]:
             check(
                 f["name"] in cols,
-                "%s: get_topic_meta() 列了 %s.%s，get_topic_data() 里却没有"
-                % (where, t, f["name"]),
+                "%s: get_topic_meta() 列了 %s.%s，get_topic_data() 里却没有" % (where, t, f["name"]),
             )
         # 抽第一个字段验 get_series() 与 get_topic_data() 同源（同一个实例上）
         if m["fields"]:
@@ -73,8 +72,7 @@ def check_provider(ns: dict, path: Path) -> None:
             if got is not None and not isinstance(got, list):
                 check(
                     len(got) == len(cols[fname]),
-                    "%s: series(%s.%s, instance=%d) 与 get_topic_data() 长度不一致"
-                    % (where, t, fname, inst),
+                    "%s: series(%s.%s, instance=%d) 与 get_topic_data() 长度不一致" % (where, t, fname, inst),
                 )
 
     # ---- 3. armed_intervals 的形状：升序、不重叠、只有最后一段可以开口 ----
@@ -124,9 +122,7 @@ def check_provider(ns: dict, path: Path) -> None:
         "%s: get_report_facts().armedDurationSec 与 builtin_variables().armed_s 不一致" % where,
     )
     if "phases" in facts:
-        check(
-            isinstance(facts["phases"], list), "%s: get_report_facts().phases 应当是 list" % where
-        )
+        check(isinstance(facts["phases"], list), "%s: get_report_facts().phases 应当是 list" % where)
 
     # ---- 5. parser_version：进报告头的解析器版本，必须是非空字符串 ----
     # 之所以要测：它在浏览器里取的是 Pyodide 当时装的解析器版本，取不到时会退化成
@@ -142,8 +138,7 @@ def check_provider(ns: dict, path: Path) -> None:
     check(p.match_version("") is True, "%s: match_version('') 应当为真" % where)
     check(
         p.match_version("<0.0") is unknown_fw,
-        "%s: match_version('<0.0') 期望 %s（版本%s）"
-        % (where, unknown_fw, "未知→不排除" if unknown_fw else "已知→应当为假"),
+        "%s: match_version('<0.0') 期望 %s（版本%s）" % (where, unknown_fw, "未知→不排除" if unknown_fw else "已知→应当为假"),
     )
     if not unknown_fw:
         check(p.match_version(">=0.1,<99.0") is True, "%s: 区间约束判定不对" % where)

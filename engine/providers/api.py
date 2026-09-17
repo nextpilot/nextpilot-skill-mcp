@@ -60,8 +60,7 @@ REQUIRED = {
     "match_version": {
         "kind": "method",
         "sig": "(spec) -> bool",
-        "doc": "固件约束串是否满足（ref(..., when_fw='>=1.15') 用）。"
-        "约束串的语法由格式自己定，引擎不解释",
+        "doc": "固件约束串是否满足（ref(..., when_fw='>=1.15') 用）。约束串的语法由格式自己定，引擎不解释",
     },
     "get_logged_information": {
         "kind": "method",
@@ -81,8 +80,7 @@ REQUIRED = {
     "builtin_variables": {
         "kind": "method",
         "sig": "() -> dict",
-        "doc": "内置变量表，**每次调用返回一个新 dict**（引擎会往里写 compute 的输出）。"
-        "键必须覆盖下面的 BUILTIN_VARIABLES",
+        "doc": "内置变量表，**每次调用返回一个新 dict**（引擎会往里写 compute 的输出）。键必须覆盖下面的 BUILTIN_VARIABLES",
     },
     "get_report_facts": {
         "kind": "method",
@@ -178,9 +176,7 @@ def open_log(raw, facts_cfg=None):
         if detect(raw):
             return check_provider(make(raw, facts_cfg), label)
     known = "、".join(label for _, _, label in FORMATS) or "（无）"
-    raise ValueError(
-        "不认识的日志格式：本站目前只支持 %s。扩展名不作数，判据是文件头 magic" % known
-    )
+    raise ValueError("不认识的日志格式：本站目前只支持 %s。扩展名不作数，判据是文件头 magic" % known)
 
 
 def _type_matches_spec(value, spec):
@@ -213,15 +209,9 @@ def check_provider(provider, where="provider"):
         raise ValueError("%s.semantics() 必须返回 dict" % where)
     for key, spec in BUILTIN_VARIABLES.items():
         if key not in sem:
-            raise ValueError(
-                "%s.semantics() 缺少内置变量 %s（%s）—— 规则里引用它会静默算不出数据"
-                % (where, key, spec["doc"])
-            )
+            raise ValueError("%s.semantics() 缺少内置变量 %s（%s）—— 规则里引用它会静默算不出数据" % (where, key, spec["doc"]))
         if not _type_matches_spec(sem[key], spec):
-            raise ValueError(
-                "%s.semantics()[%s] 类型不对：期望 %s，得到 %r"
-                % (where, key, spec["type"], sem[key])
-            )
+            raise ValueError("%s.semantics()[%s] 类型不对：期望 %s，得到 %r" % (where, key, spec["type"], sem[key]))
     # 每个 provider 都要能独立喂给多个规则：返回的必须是新 dict（引擎会往里写 compute 输出）
     sem2 = provider.builtin_variables()
     if sem2 is sem:

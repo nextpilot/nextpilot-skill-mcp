@@ -51,37 +51,23 @@ def probe_expr(ns, expr_src, env):
         if not isinstance(node, ast.Call):
             continue
         try:
-            val = eval(
-                compile(ast.Expression(body=node), "<probe>", "eval"), ns["_COMPUTE_GLOBALS"], env
-            )
+            val = eval(compile(ast.Expression(body=node), "<probe>", "eval"), ns["_COMPUTE_GLOBALS"], env)
             print("    %-28s = %s" % (src_of(node, expr_src)[:28], describe(val)))
         except Exception as err:
             print("    %-28s ! %s: %s" % (src_of(node, expr_src)[:28], type(err).__name__, err))
     try:
         ns["_eval_compute"](expr_src, env)
-        outs = [
-            t.id
-            for t in (
-                assign.targets[0].elts
-                if isinstance(assign.targets[0], ast.Tuple)
-                else [assign.targets[0]]
-            )
-        ]
+        outs = [t.id for t in (assign.targets[0].elts if isinstance(assign.targets[0], ast.Tuple) else [assign.targets[0]])]
         print(
             "  -> %s = %s"
             % (
                 ", ".join(outs),
-                describe(tuple(env.get(o) for o in outs))
-                if len(outs) > 1
-                else describe(env.get(outs[0])),
+                describe(tuple(env.get(o) for o in outs)) if len(outs) > 1 else describe(env.get(outs[0])),
             )
         )
         return True, guarded
     except Exception as err:
-        print(
-            "  -> 中止（%s: %s）%s"
-            % (type(err).__name__, err, "（_try 包裹，实际会置 None）" if guarded else "")
-        )
+        print("  -> 中止（%s: %s）%s" % (type(err).__name__, err, "（_try 包裹，实际会置 None）" if guarded else ""))
         return False, guarded
 
 
@@ -99,14 +85,8 @@ def main(argv):
         print("找不到规则 %s；现有：%s" % (rule_id, ", ".join(r["id"] for r in ns["RULES"])))
         return 2
     env = ns["_rule_env"]()
-    print(
-        "rule %s  group=%s  checks=%s"
-        % (rule_id, rule.get("group"), (rule.get("outputs") or {}).get("check"))
-    )
-    print(
-        "  firmware=%s airframe=%s skip=%s"
-        % (rule.get("firmware"), rule.get("airframe"), rule.get("skip"))
-    )
+    print("rule %s  group=%s  checks=%s" % (rule_id, rule.get("group"), (rule.get("outputs") or {}).get("check")))
+    print("  firmware=%s airframe=%s skip=%s" % (rule.get("firmware"), rule.get("airframe"), rule.get("skip")))
     declared = []
     for i, expr in enumerate(rule.get("compute") or [], 1):
         print("\n  [%d] %s" % (i, expr))

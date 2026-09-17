@@ -12,6 +12,4 @@ for d in ulog.data_list:
         print(f"\n== {d.name} (multi_id={d.multi_id}) n={len(d.data['timestamp'])} ==")
         for k, v in d.data.items():
             shape = getattr(v, "shape", None)
-            print(
-                f"  {k}: {getattr(v, 'dtype', type(v))} {shape if shape and len(shape) > 1 else ''}"
-            )
+            print(f"  {k}: {getattr(v, 'dtype', type(v))} {shape if shape and len(shape) > 1 else ''}")

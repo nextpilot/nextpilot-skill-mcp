@@ -48,15 +48,11 @@ DOWNLOAD_URL = BASE + "/download?log={uuid}"
 OVERVIEW_URL = BASE + "/overview_img/{uuid}.png"
 
 USER_AGENT = "nextpilot-skill-mcp-log-dataset/0.1 (rule calibration; contact via repo)"
-UUID_RE = re.compile(
-    r"plot_app\?log=([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
-)
+UUID_RE = re.compile(r"plot_app\?log=([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})")
 TAG_RE = re.compile(r"<[^>]+>")
 
 
-def http_get(
-    url: str, *, timeout: float = 60.0, max_bytes: int | None = None, retries: int = 3
-) -> bytes:
+def http_get(url: str, *, timeout: float = 60.0, max_bytes: int | None = None, retries: int = 3) -> bytes:
     """GET 一个 URL（自动跟随 302）；max_bytes 时流式拉取，超限抛 ValueError。
 
     国内网络到 logs.px4.io / jsdelivr 偶发 SSL EOF、连接重置，统一在此重试退避。"""
@@ -74,9 +70,7 @@ def http_get(
                         break
                     buf.extend(chunk)
                     if len(buf) > max_bytes:
-                        raise ValueError(
-                            "超过大小上限 %d 字节（已下载 %d）" % (max_bytes, len(buf))
-                        )
+                        raise ValueError("超过大小上限 %d 字节（已下载 %d）" % (max_bytes, len(buf)))
                 return bytes(buf)
         except ValueError:
             raise  # 大小上限是确定性失败，重试无意义
@@ -173,13 +167,9 @@ def matches_filters(meta: dict, args: argparse.Namespace) -> bool:
 def main() -> int:
     ap = argparse.ArgumentParser(description="从 logs.px4.io 下载真实 PX4 .ulg 到 .cache/px4/ulog")
     ap.add_argument("--count", type=int, default=20, help="目标下载条数（已存在的跳过，默认 20）")
-    ap.add_argument(
-        "--dest", type=Path, default=DEFAULT_DEST, help="保存目录（默认 .cache/px4/ulog）"
-    )
+    ap.add_argument("--dest", type=Path, default=DEFAULT_DEST, help="保存目录（默认 .cache/px4/ulog）")
     ap.add_argument("--page-size", type=int, default=100, help="列表翻页大小（站点上限 100）")
-    ap.add_argument(
-        "--max-scan", type=int, default=0, help="最多扫描多少条候选后放弃（默认 count*10）"
-    )
+    ap.add_argument("--max-scan", type=int, default=0, help="最多扫描多少条候选后放弃（默认 count*10）")
     ap.add_argument("--search", default="", help="browse 页面自带搜索（服务端模糊匹配）")
     ap.add_argument("--vehicle", default="", help="按机型名过滤，子串匹配（如 Quadrotor）")
     ap.add_argument("--airframe", default="", help="按机架名过滤，子串匹配")
@@ -187,12 +177,8 @@ def main() -> int:
     ap.add_argument("--version", default="", help="按固件版本过滤，子串匹配（如 v1.15）")
     ap.add_argument("--min-duration", type=int, default=None, help="最短飞行时长（秒）")
     ap.add_argument("--max-duration", type=int, default=None, help="最长飞行时长（秒）")
-    ap.add_argument(
-        "--max-size-mb", type=float, default=None, help="单文件大小上限（MB），超限跳过"
-    )
-    ap.add_argument(
-        "--delay", type=float, default=1.0, help="两次下载之间间隔秒数（礼貌限速，默认 1）"
-    )
+    ap.add_argument("--max-size-mb", type=float, default=None, help="单文件大小上限（MB），超限跳过")
+    ap.add_argument("--delay", type=float, default=1.0, help="两次下载之间间隔秒数（礼貌限速，默认 1）")
     ap.add_argument("--retries", type=int, default=3, help="单个文件失败重试次数（默认 3）")
     ap.add_argument("--list-only", action="store_true", help="只打印候选清单，不下载")
     args = ap.parse_args()
@@ -258,16 +244,11 @@ def main() -> int:
                     "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                     "source": "logs.px4.io",
                 }
-                meta_path.write_text(
-                    json.dumps(meta_out, ensure_ascii=False, indent=2), encoding="utf-8"
-                )
+                meta_path.write_text(json.dumps(meta_out, ensure_ascii=False, indent=2), encoding="utf-8")
                 with index_path.open("a", encoding="utf-8") as f:
                     f.write(json.dumps(meta_out, ensure_ascii=False) + "\n")
                 downloaded += 1
-                print(
-                    f"[{i + 1}/{len(candidates)}] 下载 {meta['uuid']} "
-                    f"({len(data) / 1024 / 1024:.1f} MB, {meta['duration']})"
-                )
+                print(f"[{i + 1}/{len(candidates)}] 下载 {meta['uuid']} ({len(data) / 1024 / 1024:.1f} MB, {meta['duration']})")
                 break
             except Exception as err:  # 单条失败不拖垮整批
                 last_err = err

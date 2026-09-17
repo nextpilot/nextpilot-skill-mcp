@@ -12,8 +12,9 @@
 #   python -m ruff format --check . && python -m ruff check .
 
 [tool.ruff]
-# 与既有代码的**事实行长**一致：默认 79 列会在本仓报 120 处 E501，100 列只剩 2 处。
-line-length = 100
+# 与既有代码的**事实行长**一致。E501 实测（ruff check --select E501）：
+# 79 列 653 处、100 列 102 处、128 列 4 处。
+line-length = 128
 target-version = "py311"
 
 # **只认 .py**。默认还会去格式化 Markdown 里嵌入的 Python 代码块，而本仓 .md 里的那些块是

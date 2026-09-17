@@ -19,16 +19,12 @@ for path in sys.argv[1:]:
         )
         if "accel_vibration_metric" in data:
             v = data["accel_vibration_metric"]
-            print(
-                f"  vibration_metric: mean={np.mean(v):.3f} p95={np.percentile(v, 95):.3f} max={np.max(v):.3f}"
-            )
+            print(f"  vibration_metric: mean={np.mean(v):.3f} p95={np.percentile(v, 95):.3f} max={np.max(v):.3f}")
         for pat in ("var_accel[", "stddev_accel_"):
             axes = [k for k in data if k.startswith(pat)]
             if axes:
                 if pat.startswith("var"):
-                    rss_mean = np.mean(
-                        np.sqrt(sum(data[k] ** 2 if False else data[k] for k in axes))
-                    )
+                    rss_mean = np.mean(np.sqrt(sum(data[k] ** 2 if False else data[k] for k in axes)))
                     print(f"  stddev RSS(mean of sqrt(sum var))={rss_mean:.4f} axes={axes}")
                 else:
                     rss = np.sqrt(sum(data[k] ** 2 for k in axes))
@@ -37,9 +33,7 @@ for path in sys.argv[1:]:
             for name in (f"accel_clipping[{i}]", f"accel_clipping_{i}", f"clipping_{i}"):
                 if name in data:
                     c = data[name]
-                    print(
-                        f"  {name}: first={int(c[0])} last={int(c[-1])} max={int(c.max())} n={len(c)}"
-                    )
+                    print(f"  {name}: first={int(c[0])} last={int(c[-1])} max={int(c.max())} n={len(c)}")
                     break
 
     for d in groups.get("estimator_status", []):
@@ -72,9 +66,7 @@ for path in sys.argv[1:]:
         data = d.data
         v = data.get("voltage_v")
         if v is not None:
-            print(
-                f"[battery] voltage_v min={np.min(v):.2f} cells={np.max(data.get('cell_count', [0]))}"
-            )
+            print(f"[battery] voltage_v min={np.min(v):.2f} cells={np.max(data.get('cell_count', [0]))}")
         cells = [k for k in data if k.startswith("voltage_cell_v[")]
         vals = [np.min(data[k]) for k in cells if np.any(data[k] > 0)]
         if vals:

@@ -72,9 +72,7 @@ def fetch_msg_dir(tag: str, base_url: str | None) -> dict[str, str]:
     """返回 {PascalCase 文件名(去.msg): 文本}。命中缓存则不解压。"""
     cache = CACHE_DIR / tag / "msg"
     if cache.exists() and any(cache.glob("*.msg")):
-        return {
-            p.stem: p.read_text(encoding="utf-8", errors="replace") for p in cache.glob("*.msg")
-        }
+        return {p.stem: p.read_text(encoding="utf-8", errors="replace") for p in cache.glob("*.msg")}
 
     url = (base_url or archive_url(tag)).format(tag=tag) if base_url else archive_url(tag)
     data = _download(url)
@@ -84,12 +82,7 @@ def fetch_msg_dir(tag: str, base_url: str | None) -> dict[str, str]:
         for member in tf.getmembers():
             # 归档内顶层目录形如 PX4-Autopilot-<ref>/
             parts = member.name.split("/")
-            if (
-                len(parts) >= 2
-                and parts[1] == "msg"
-                and member.isfile()
-                and member.name.endswith(".msg")
-            ):
+            if len(parts) >= 2 and parts[1] == "msg" and member.isfile() and member.name.endswith(".msg"):
                 stem = Path(member.name).stem
                 f = tf.extractfile(member)
                 if f is None:
@@ -114,9 +107,7 @@ def fetch_params(url: str, cache_key: str) -> dict:
 
 # ─────────────────────────── .msg 解析 ───────────────────────────
 
-_CONST_RE = re.compile(
-    r"^\s*(?:uint8|int32|uint16|int8)\s+([A-Z][A-Z0-9_]*)\s*=\s*(-?\d+)\s*(?:#.*)?$"
-)
+_CONST_RE = re.compile(r"^\s*(?:uint8|int32|uint16|int8)\s+([A-Z][A-Z0-9_]*)\s*=\s*(-?\d+)\s*(?:#.*)?$")
 # 数组长度 PX4 写在**类型**上（float32[10] voltage_cell_v），少数写法写在字段名上，
 # 两种都要认；否则整行匹配不上、数组字段会被静默丢掉（曾因此丢了 voltage_cell_v /
 # control[12] / q[4]，meta 字典残缺，构建期字段校验根本没法做）。
@@ -325,9 +316,7 @@ def normalize_params(payload: dict) -> dict[str, dict]:
 # ─────────────────────────── 主流程 ───────────────────────────
 
 
-def sync(
-    tags: list[str], params_url: str, params_tag: str, check: bool, base_url: str | None
-) -> int:
+def sync(tags: list[str], params_url: str, params_tag: str, check: bool, base_url: str | None) -> int:
     changed = False
 
     # 参数元数据只对 params_tag 生效（PX4 只发布分支构建的 parameters.json）
@@ -335,9 +324,7 @@ def sync(
 
     for tag in tags:
         msgs = fetch_msg_dir(tag, base_url)
-        topics = {
-            parse_msg(stem, text)["topic"]: parse_msg(stem, text) for stem, text in msgs.items()
-        }
+        topics = {parse_msg(stem, text)["topic"]: parse_msg(stem, text) for stem, text in msgs.items()}
         content = render_meta_json(tag, topics, params if tag == params_tag else None)
         out_file = META_OUT / f"{tag}.json"
         label = f"meta/{tag}.json"
@@ -351,9 +338,7 @@ def sync(
         else:
             out_file.parent.mkdir(parents=True, exist_ok=True)
             out_file.write_text(content, encoding="utf-8")
-            print(
-                f"META_WRITTEN {tag} topics={len(topics)} params={len(params) if tag == params_tag else 0}"
-            )
+            print(f"META_WRITTEN {tag} topics={len(topics)} params={len(params) if tag == params_tag else 0}")
 
     if not check:
         # 清理历史形态：topics/<tag>/*.yaml、topics/<tag>.json、params/<tag>.json、params/<tag>.yaml
@@ -373,17 +358,11 @@ def sync(
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
-    ap.add_argument(
-        "--tags", default="v1.15.0,v1.16.0,main", help="逗号分隔的 release tag（main 取主干）"
-    )
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--tags", default="v1.15.0,v1.16.0,main", help="逗号分隔的 release tag（main 取主干）")
     ap.add_argument("--params-url", default=DEFAULT_PARAMS_URL, help="parameters.json 地址")
     ap.add_argument("--params-tag", default="main", help="参数输出文件名（params/<tag>.yaml）")
-    ap.add_argument(
-        "--base-url", default=None, help="自定义归档 URL 模板（含 {tag} 占位），用于镜像"
-    )
+    ap.add_argument("--base-url", default=None, help="自定义归档 URL 模板（含 {tag} 占位），用于镜像")
     ap.add_argument("--check", action="store_true", help="只比对不写入")
     args = ap.parse_args(argv[1:])
     tags = [t.strip() for t in args.tags.split(",") if t.strip()]

@@ -49,10 +49,7 @@ class Px4Provider:
 
         self._level_names = {int(k): v for k, v in (self._cfg.get("log_levels") or {}).items()}
         self._nav_names = {int(k): v for k, v in (self._cfg.get("nav_state_names") or {}).items()}
-        self._nav_groups = [
-            (g["phase"], set(int(c) for c in g["codes"]))
-            for g in (self._cfg.get("nav_state_groups") or [])
-        ]
+        self._nav_groups = [(g["phase"], set(int(c) for c in g["codes"])) for g in (self._cfg.get("nav_state_groups") or [])]
         self._vehicle_types = {int(k): v for k, v in (self._cfg.get("vehicle_types") or {}).items()}
 
         # 本日志实际录到的 topic 名集合
@@ -336,9 +333,7 @@ class Px4Provider:
         'M' 多值信息怎么拼回文本、'Q' 默认值怎么推、逐字节的消息类型统计……换一种日志格式
         就是另一套。
         """
-        info = (
-            self.get_logged_information()
-        )  # 走契约能力取，别再直读 self.ulog（同一份数据两处知识）
+        info = self.get_logged_information()  # 走契约能力取，别再直读 self.ulog（同一份数据两处知识）
         cfgsys = self._cfg.get("sys_info_keys") or []
         info_types = getattr(self.ulog, "_msg_info_dict_types", None) or {}
         info_docs = self._cfg.get("info_key_docs") or {}
@@ -573,10 +568,7 @@ class Px4Provider:
                 lambda d: next(
                     (
                         v
-                        for v in (
-                            self._first_field(d, f"{stem}[{idx}]", f"{stem}_{idx}")
-                            for stem in [field] + aliases
-                        )
+                        for v in (self._first_field(d, f"{stem}[{idx}]", f"{stem}_{idx}") for stem in [field] + aliases)
                         if v is not None
                     ),
                     None,
@@ -656,9 +648,7 @@ class Px4Provider:
         self.fw = fw
         self.fw_minor = fw["minor"]
         self.fw_label = (
-            "%d.%d.%d" % (fw["major"], fw["minor"], fw["patch"])
-            if fw["minor"] is not None
-            else "未知（旧固件或无版本号）"
+            "%d.%d.%d" % (fw["major"], fw["minor"], fw["patch"]) if fw["minor"] is not None else "未知（旧固件或无版本号）"
         )
 
         self.hw_subtype = str(info.get("ver_hw_subtype", ""))
@@ -766,9 +756,7 @@ class Px4Provider:
                         start_i = None
                 if start_i is not None:
                     armed_intervals.append((int(vts[start_i]), None))
-                total_us = sum(
-                    ((e if e is not None else int(vts[-1])) - s) for s, e in armed_intervals
-                )
+                total_us = sum(((e if e is not None else int(vts[-1])) - s) for s, e in armed_intervals)
                 armed_duration_s = round(total_us / 1e6, 1)
 
             if nav_arr is not None:
@@ -795,9 +783,7 @@ class Px4Provider:
                 runs.append((run_start, len(nav_arr) - 1))
                 for lo_i, hi_i in runs:
                     code = int(nav_arr[lo_i])
-                    seg_arm = (
-                        int(np.median(arm_arr[lo_i : hi_i + 1])) if arm_arr is not None else None
-                    )
+                    seg_arm = int(np.median(arm_arr[lo_i : hi_i + 1])) if arm_arr is not None else None
                     phase_intervals.append(
                         {
                             "startSec": round(int(vts[lo_i]) / 1e6, 2),
@@ -836,11 +822,7 @@ class Px4Provider:
         # 别一处取"第一个"、一处取 instance 0
         self.start_utc = None
         track_cfg = self._cfg.get("track") or {}
-        gps = (
-            self._find_topic(track_cfg["topic"], int(track_cfg.get("instance", 0)))
-            if track_cfg.get("topic")
-            else None
-        )
+        gps = self._find_topic(track_cfg["topic"], int(track_cfg.get("instance", 0))) if track_cfg.get("topic") else None
         if gps is not None and "time_utc_usec" in gps.data:
             t = np.asarray(gps.data["time_utc_usec"], dtype=np.int64)
             nz = np.nonzero(t > 0)[0]
@@ -858,9 +840,7 @@ class Px4Provider:
                     restart += 1
         self.restart_topics = restart
         # 丢包累计
-        self.dropout_total_ms = int(
-            sum(getattr(d, "duration", 0) for d in getattr(ulog, "dropouts", []))
-        )
+        self.dropout_total_ms = int(sum(getattr(d, "duration", 0) for d in getattr(ulog, "dropouts", [])))
 
     def _read_logged_messages(self):
         """读 `ulog.logged_messages`：日志消息（PX4 的 `[模块] 文案`，含警告 / 错误级别）。
@@ -904,9 +884,7 @@ class Px4Provider:
             "durationSec": self.duration_s if self.duration_s is not None else 0,
             "vehicleType": self.vehicle_type,
             "firmware": self.fw_label,
-            "firmwareProfile": (
-                "px4-1.15+" if (self.fw_minor is not None and self.fw_minor >= 15) else "px4-legacy"
-            ),
+            "firmwareProfile": ("px4-1.15+" if (self.fw_minor is not None and self.fw_minor >= 15) else "px4-legacy"),
             "firmwareDisplay": self.fw_display,
             "fwReleaseType": self.fw_release_type,
             "armedDurationSec": self.armed_duration_s,

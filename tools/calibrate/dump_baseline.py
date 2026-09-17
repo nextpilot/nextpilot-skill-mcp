@@ -44,8 +44,7 @@ def source_of(path: Path) -> str:
     first = stem.split("-")[0]
     if len(first) == 8 and all(c in "0123456789abcdef" for c in first):
         return (
-            "logs.px4.io 公开日志：GET https://logs.px4.io/download?log=%s"
-            "（或 python tools/px4/download_px4_logs.py）" % stem
+            "logs.px4.io 公开日志：GET https://logs.px4.io/download?log=%s（或 python tools/px4/download_px4_logs.py）" % stem
         )
     return "本仓库自带（tools/calibrate/logs/，未入库，需自备）"
 
@@ -65,9 +64,7 @@ def dump_one(path: Path) -> Path:
     out.write_text(json.dumps(envelope, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     n_findings = len(result.get("findings", []))
     n_faults = len(result.get("matchedFaults", []))
-    print(
-        f"  {envelope['slug']:14} ← {path.name}  findings={n_findings} faults={n_faults}  → {out.name}"
-    )
+    print(f"  {envelope['slug']:14} ← {path.name}  findings={n_findings} faults={n_faults}  → {out.name}")
     return out
 
 

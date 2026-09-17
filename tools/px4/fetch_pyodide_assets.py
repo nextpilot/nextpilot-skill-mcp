@@ -62,9 +62,7 @@ def save(path: pathlib.Path, data: bytes) -> None:
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument(
         "--pyodide",
         default="v0.27.7",
