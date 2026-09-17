@@ -224,7 +224,7 @@ def main() -> int:
     for i, meta in enumerate(candidates):
         ulg_path = args.dest / f"{meta['uuid']}.ulg"
         meta_path = args.dest / f"{meta['uuid']}.json"
-        if ulg_path.exists() and is_valid_ulg(ulog_path):
+        if ulg_path.exists() and is_valid_ulg(ulg_path):
             print(f"[{i + 1}/{len(candidates)}] 已存在，跳过 {meta['uuid']}")
             skipped += 1
             continue

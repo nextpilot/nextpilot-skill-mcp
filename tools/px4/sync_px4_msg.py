@@ -74,7 +74,6 @@ def fetch_msg_dir(tag: str, base_url: str | None) -> dict[str, str]:
     cache.mkdir(parents=True, exist_ok=True)
     out: dict[str, str] = {}
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tf:
-        prefix = None
         for member in tf.getmembers():
             # 归档内顶层目录形如 PX4-Autopilot-<ref>/
             parts = member.name.split("/")

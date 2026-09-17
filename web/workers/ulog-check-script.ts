@@ -441,8 +441,6 @@ def op_is_zero(x, **kw):
 
 @operator("keep_gt", doc="只保留有限且 > gt 的样本（如排除 eph<=0 的无效值），返回序列")
 def op_keep_gt(values, gt=0.0, **kw):
-    import numpy as np
-
     if values is None:
         return None
     a = _finite(values)
@@ -496,12 +494,18 @@ def op_hypot(a, b, **kw):
     return np.sqrt(np.asarray(a, dtype=float) ** 2 + np.asarray(b, dtype=float) ** 2)
 
 
+# 四元数先**归一化**再转欧拉角：日志里的四元数可能因插值/截断略偏离单位长度，
+# 不归一化会放大 atan2 误差。2026-09-17 之前这里有一个同名的第二个定义（不归一化、带
+# 一个从未被调用方用过的 degrees 开关）静默覆盖了本实现，两个消费者（plot/attitude.yml
+# 的图表换算与 vtol-transition 规则）实际拿到的都是那个不归一化的版本——已删除。
+# 教训：OPERATORS[name] = fn 是赋值，**算子名重复注册不报错、后者静默胜出**；
+# 用 ruff 的 F811 在提交前拦住（见仓库根 pyproject.toml）。
 @operator(
     "quat_to_euler",
     in_arity=4,
     out_arity=3,
     out_names=["roll", "pitch", "yaw"],
-    doc="四元数四列（w, x, y, z）→ 欧拉角（度）；图上的姿态换算走这个，别在前端写",
+    doc="四元数四列（w, x, y, z，先归一化）→ 欧拉角（度）；图上的姿态换算走这个，别在前端写",
 )
 def op_quat_to_euler(w, x, y, z, **kw):
     import numpy as np
@@ -667,33 +671,6 @@ def op_take_items(items, key="level", eq=None, lte=None, gte=None, in_list=None,
 
 
 # ─────────────────────────── 姿态 / 时间轴（通用）───────────────────────────
-
-@operator(
-    "quat_to_euler",
-    in_arity=4,
-    out_arity=3,
-    out_names=["roll", "pitch", "yaw"],
-    doc="四元数 (w,x,y,z) 三路序列 → 欧拉角序列；degrees 为真输出角度制。"
-        "对应设计文档里“4 进 3 出”的多输入多输出算子示例",
-)
-def op_quat_to_euler(q0, q1, q2, q3, degrees=True, **kw):
-    import numpy as np
-
-    if q0 is None or q1 is None or q2 is None or q3 is None:
-        return None
-    w = np.asarray(q0, dtype=float)
-    x = np.asarray(q1, dtype=float)
-    y = np.asarray(q2, dtype=float)
-    z = np.asarray(q3, dtype=float)
-    n = min(len(w), len(x), len(y), len(z))
-    w, x, y, z = w[:n], x[:n], y[:n], z[:n]
-    roll = np.arctan2(2 * (w * x + y * z), 1 - 2 * (x ** 2 + y ** 2))
-    pitch = np.arcsin(np.clip(2 * (w * y - z * x), -1, 1))
-    yaw = np.arctan2(2 * (w * z + x * y), 1 - 2 * (y ** 2 + z ** 2))
-    if degrees:
-        roll, pitch, yaw = np.degrees(roll), np.degrees(pitch), np.degrees(yaw)
-    return roll, pitch, yaw
-
 
 @operator(
     "interp_to",
@@ -883,8 +860,6 @@ def op_apply_mask(values, mask, **kw):
 
 @operator("range_of", doc="有限样本的极差 max-min（样本 < 2 个时 None）")
 def op_range_of(values, **kw):
-    import numpy as np
-
     if values is None:
         return None
     a = _finite(values)
@@ -1193,8 +1168,6 @@ def op_gyro_bias_worst(bx, by, bz, bts, intervals, labels=None, min_count=10, **
     doc="两个温度来源各自取极差（样本 < 2 的来源忽略），返回较大者；都不可用则 None",
 )
 def op_max_temp_range(t_a, t_b, **kw):
-    import numpy as np
-
     best = None
     for t in (t_a, t_b):
         if t is None:
