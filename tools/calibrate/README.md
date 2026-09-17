@@ -25,3 +25,16 @@
 依赖：`pip install pyulog numpy`；Python **3.11+**。
 
 `logs/` 存放校准用真实日志（含 GPS 轨迹，勿提交大文件 / 涉密日志）。
+
+## 在哪儿跑（云端 CI 覆盖不到）
+
+本目录的校验都要 `logs/` 下的真实 `.ulg`，而它们含 GPS 轨迹、按隐私规则不入库（见
+`.gitignore`），**云端 CI 的 checkout 里没有这些文件，那一组必然被跳过**。所以这部分只在
+开发机跑，已挂在 `.githooks/pre-push` 上：
+
+```bash
+git config core.hooksPath .githooks   # 每台机器做一次
+```
+
+统一入口是 `python tools/ci/check_all.py`（本机有日志时自动带上本目录这组校验；
+校验清单与分组、以及「CI 全绿不等于回归过了」的原因，见该脚本的模块文档）。

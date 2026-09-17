@@ -1,8 +1,19 @@
 # 开发机上的 Python 工具（**不进 Pyodide、不影响运行期**）
 #
 # 装：python -m pip install -r requirements-dev.txt
-# 用：见仓库根 pyproject.toml 的 [tool.ruff]
+# 用：统一入口 tools/ci/check_all.py（CI 与 pre-push hook 都调它）
 #
 # 为什么钉死版本：风格约定只有在"所有人跑同一版"时才成立——ruff 的小版本会改格式
 # （举一个已经发生的例子：引号风格与 magic-comma 行为在版本间变过）。
+
+# 仓库校验：ruff 管风格与真 bug（配置见 pyproject.toml）
 ruff==0.16.7
+
+# 仓库校验：check_artifact.py 经 tools/calibrate/run_checks_locally.load_facts_payload()
+# 读 facts.yaml 与 plot/track.yml。**CI 也要这一条**，所以不能只写在 calibrate 那边。
+PyYAML==6.0
+
+# 需要真实日志的那组校验（冻结基线比对 / 契约测试 / probe-data）另外还要：
+#   pip install pyulog numpy
+# 它们跑不了 CI——原始 .ulg 含 GPS 轨迹、按隐私规则不入库——故不列在这里强制安装。
+# 见 .gitignore 与 tools/ci/check_all.py 的文档。

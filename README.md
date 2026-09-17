@@ -18,7 +18,7 @@
 ├── docs/            # 架构、运维手册（operations/ 是真实可用的部署运行手册）
 ├── engine/          # ★ 确定性引擎源码：operators / rule_engine / report_data
 ├── knowledge/       # ★ 日志分析的经验与字典：rules/*.yaml / 故障库 / LLM 提示词 / meta
-├── tools/           # 手动运行的工具：px4/ 上游同步与文档生成、calibrate/ 回归校准
+├── tools/           # 手动运行的工具：px4/ 上游同步与文档生成、calibrate/ 回归校准、ci/ 校验入口
 └── web/             # Next.js 站点 + Pages Functions（当前冲刺代码）
     ├── app/         # 页面与 /api/auth 路由
     ├── components/
@@ -63,3 +63,30 @@ pnpm dev
 - **第三层 LLM 解释**：`web/functions/api/explain.js`，只接收 findings，system prompt 禁止编造数值
 
 新增 Skill：在 `content/skills/` 添加一个 `.mdx` 文件并补全 frontmatter（字段规范见 CLAUDE.md 3.1）。
+
+## 校验与 CI
+
+所有校验收在**一个入口**（CI、pre-push hook 与本地跑的是同一份清单；要加一项校验只改
+`tools/ci/check_all.py` 一处，CI 自动跟着变）：
+
+```bash
+python tools/ci/check_all.py                 # 常规（本机有日志时连带跑日志类回归）
+python tools/ci/check_all.py --with-build    # 再加 next build（CI 用，本地太慢）
+```
+
+分两组，**区别在于是否需要真实 `.ulg` 日志**：
+
+| 组 | 拦什么 | 在哪跑 |
+| --- | --- | --- |
+| 不需要日志 | ruff 风格与 lint；`build:kb --check`（产物与 `knowledge/` 一致、契约不漏写）；指南页算子表是否跟上 `engine/` 源码；产物是否为合法 Python；`tsc --noEmit`；`next build` | 云端 CI（[.github/workflows/ci.yml](.github/workflows/ci.yml)）+ 本地 |
+| 需要日志 | 6 条冻结基线逐字段比对、适配器契约测试、数据层 probe、字段引用 lint | **只在本地** —— 原始日志含 GPS 轨迹、按隐私规则不入库（见 `.gitignore`），CI 的 checkout 里没有这些文件 |
+
+启用本地那道拦截（每台机器做一次；`core.hooksPath` 是本地设置，git 不跟着仓库走）：
+
+```bash
+git config core.hooksPath .githooks
+```
+
+> **CI 全绿 ≠ 回归过了**：改规则、算子或引擎后，必须在本机跑一次上面的命令 ——
+> 需要日志的那组是这道回归的真正门槛，云 CI 覆盖不到。
+> 校验项与设计理由见 [tools/ci/check_all.py](tools/ci/check_all.py) 的模块文档。

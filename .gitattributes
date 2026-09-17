@@ -1,0 +1,16 @@
+# 换行符统一 LF。**这不是风格偏好，是校验正确性的前提。**
+#
+# 为什么必须有：`web/scripts/build-knowledge.mjs --check`（构建产物）与
+# `tools/ci/check_all.py` 里的「指南页生成表与 engine 源码一致」都是**逐字节**比对
+# "生成出来的内容"与"仓库里的文件"。Windows 上 core.autocrlf=true 会把检出变成 CRLF，
+# 于是 8 个产物全部被误报成"与 knowledge/ 不一致"——实测：全新 clone 在 Windows 上
+# 这一项全红，同一个 commit 在 Linux 上全绿。即校验结果取决于**检出状态**而不是仓库
+# 内容，这种校验比没有更糟（会训练人忽略它）。
+#
+# 本文件优先于 core.autocrlf，钉死 LF 后各平台检出一致。
+#
+# 影响面已核对（2026-09-18）：索引里除两个二进制图标（apple-icon.png / favicon.ico）
+# 与 web/scripts/build-knowledge.mjs（含一个 NUL 字节，被 git 当二进制；也因此不受
+# eol 影响）外，其余文本文件本来就是 LF。所以加上本文件**不产生任何内容变更**，
+# 只是让 Windows 的检出也保持 LF。
+* text=auto eol=lf

@@ -95,11 +95,25 @@ operators.py → providers/api.py → providers/*.py → rule_engine.py → repo
 
 ## 跑一遍
 
+**一条命令跑完**（云端 CI 与 `.githooks/pre-push` 调的也是它，清单与设计理由见
+`tools/ci/check_all.py` 的模块文档）：
+
+```bash
+python tools/ci/check_all.py
+```
+
+它按「是否需要真实 `.ulg` 日志」分两组：
+
+- **不需要日志**（`ruff` / `build:kb --check` / 指南页算子表与源码一致 / 产物合法 / `tsc`）：
+  任何地方都能跑，云端 CI 每次提交都跑。
+- **需要日志**（`compare_baseline` / `check_provider` / `--probe-data` / `lint_rules`）：日志含
+  GPS 轨迹、不入库（见 `.gitignore`），**云端 CI 跑不了**，只在有日志的开发机上跑 —— 改本目录后必跑。
+
+要单独调试某一项时：
+
 ```bash
 cd web && pnpm build:kb                      # 内联进浏览器产物 + 生成指南页
 python tools/calibrate/check_provider.py tools/calibrate/logs/*.ulg   # 适配器契约测试
 python tools/calibrate/compare_baseline.py   # 6 条真实日志与冻结基线逐字段比对
-python tools/calibrate/lint_rules.py         # 字段引用与版本错配
-
-python -m ruff format --check . && python -m ruff check .   # Python 风格（见上一节）
+python tools/calibrate/lint_rules.py         # 字段引用与版本错配（只报告）
 ```

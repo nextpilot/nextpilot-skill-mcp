@@ -5,6 +5,7 @@
 
 | 工具 | 用途 |
 | --- | --- |
+| `ci/` | **仓库校验的统一入口**（`python tools/ci/check_all.py`）：CI（`.github/workflows/ci.yml`）与 `.githooks/pre-push` 都只调它。分「不需要日志」与「需要日志」两组，后者云 CI 跑不了 |
 | `calibrate/` | 日志规则校准与本地回归（阈值定标、数据层自检、字段探查）。见 [calibrate/README.md](calibrate/README.md) |
 | `check-upload.mjs` | 浏览器端日志分析链路自检：CDP 上传 `.ulg` → 等报告渲染 → 截图 + 抓异常。用 `node tools/check-upload.mjs <ulog> <out.png> [baseUrl]` |
 | `shot.mjs` | 页面截图（核对配色/布局），`node tools/shot.mjs <url> <out.png> [light\|dark] [w] [h] [full]` |

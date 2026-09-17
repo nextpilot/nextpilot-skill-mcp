@@ -336,6 +336,15 @@
 > 的"保存时自动修复"**：`engine/` 下的文件是拼接片段，那样会误删东西（清单见 `engine/README.md`）。
 > 这条约定的由来：在它之前每个编辑器各按自己的默认格式化器改文件，有一轮提交里混进了 500 行纯格式改动。
 >
+> **校验入口与 CI**：所有校验收在 `python tools/ci/check_all.py` 一处 —— 云端 CI
+> （`.github/workflows/ci.yml`）与 `.githooks/pre-push` 都只调它，要加校验只改这一处。
+> 校验按「是否需要真实 `.ulg` 日志」分两组：**不需要日志的**（ruff / `build:kb --check` /
+> 指南页算子表是否跟上 `engine/` 源码 / 产物是否为合法 Python / `tsc` / `next build`）云 CI
+> 每次提交都跑；**需要日志的**（6 条冻结基线逐字段比对、适配器契约测试、数据层 probe）
+> **云 CI 跑不了** —— 原始日志含 GPS 轨迹、按隐私规则不入库，CI 的 checkout 里没有这些文件，
+> 它们只在开发机跑（`git config core.hooksPath .githooks` 启用，每台机器做一次）。
+> 所以**CI 全绿不等于回归过了**：改规则、算子或 `engine/` 之后必须在本机跑一次。
+>
 > 派生数据版本（`web/lib/knowledge/derived-version.generated.ts`，构建期算的引擎源文件哈希）：
 > 改了 `engine/report_data.py` / `engine/rule_engine.py` / `facts.yaml` / `plot/*.yml`，用户本机存档
 > 会在打开时**自动重解析一次**（facts / findings 一并刷新，AI 报告保留），不用挨个提醒重新上传。
