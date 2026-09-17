@@ -69,6 +69,19 @@ def _lttb_indices(n, max_points, ref=None):
     return idx
 
 
+# ============ np_report：判定产物（跑规则 + 组装报告头）============
+def np_report():
+    """跑完全部规则，把判定产物摆到 \`__result\`（= 前端那份 report）。
+
+    为什么这个入口在这里、而不是在 rule_engine 里：本文件是**对前端的门面**（见文件头
+    "交给前端"）。跑规则仍是 rule_engine 的活（\`run_all()\`），这里只负责把结果交出去，
+    与 np_manifest / np_series / np_track / np_log_info 同一形状——
+    前端面对的 Python 面因此是 5 个对称的具名入口，没有"谁先读 __result"的隐含顺序。
+    """
+    global __result
+    __result = json.dumps(run_all(), ensure_ascii=False)
+
+
 # ============ np_manifest：话题清单（驱动前端预设可用性）============
 def np_manifest():
     global __result

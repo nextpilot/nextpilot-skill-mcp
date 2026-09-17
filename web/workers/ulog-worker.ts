@@ -203,8 +203,12 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
 
     post({ type: "stage", stage: "parsing", detail: "解析日志并执行检查规则…" });
     pyodide.globals.set("ulog_bytes", msg.file);
-    // 规则脚本 + 数据层 helpers 在同一 __main__ globals 中执行，共享 ulog 对象
-    const report = await runJson(pyodide, PY_ULG_CHECKS + PY_ULG_DATA_HELPERS);
+    // 装载：规则脚本 + 数据层 helpers 在同一 __main__ globals 中执行，共享 ulog 与 provider
+    await pyodide.runPythonAsync(PY_ULG_CHECKS + PY_ULG_DATA_HELPERS);
+    // 执行：三样都走具名入口。以前 report 是"执行脚本的副作用"留下的 `__result`，
+    // 而 `__result` 是同一个全局、每次调用都被覆盖，所以读 report 必须先于读 manifest——
+    // 那个顺序约束只写在注释里。现在没有这回事了。
+    const report = await runJson(pyodide, "np_report()");
     const manifest = (await runJson(pyodide, "np_manifest()")) as TopicManifest;
     const info = (await runJson(pyodide, "np_log_info()")) as LogInfo;
 

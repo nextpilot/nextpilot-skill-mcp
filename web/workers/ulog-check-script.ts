@@ -2391,15 +2391,19 @@ RULES.sort(key=lambda r: (r.get("order", 100000), r.get("id", "")))
 # ---------------- 打开日志（挑适配器 + 契约自检）----------------
 provider = open_log(bytes(ulog_bytes), FACTS)
 
+# 下面这批累加器由 run_all()（文件末尾）在入口**重置**。声明留在模块级是因为
+# add / add_tag / ran / skipped / _run_rules 都直接往它们里追加（靠模块名字找）——
+# 入口只重绑，不改变这些辅助函数的写法。
 findings = []
 checks_run = []
 checks_skipped = []
 tags = []          # 第二层异常标签（喂给第三层故障库匹配）
 guard_tags = []    # 数据质量/边界标签
 _fid = [0]
-
-# 阶段集合来自 provider（故障库按 flight_phase 匹配用它）
-phases_present = set(provider.facts().get("phases") or [])
+# 阶段集合来自 provider（故障库按 flight_phase 匹配用它）——在 run_all() 里填充
+phases_present = set()
+# 规则顺带产出的实测值（概览指标优先用它们，见 run_all 里的指标组装）
+metrics = {}
 
 
 def add_tag(t):
@@ -2790,7 +2794,7 @@ def _run_rules(group):
 # ---------------- 概览指标（knowledge/<格式>/facts.yaml 的 metrics）----------------
 # 规则顺带产出的实测值优先（更贴合判定口径）；规则没跑（缺字段 / 机型不适用）时按声明兜底现算，
 # 这样用户在「关键数据」里始终看得到数，不会因为某条规则 skip 就凭空少几项。
-metrics = {}
+# （累加器 metrics 在文件开头声明，由 run_all() 重置。）
 _M_RESERVED = {"key", "label", "unit", "topic", "field", "fields", "op", "pick", "scale", "round"}
 
 
@@ -2863,57 +2867,78 @@ def match_fault_kb():
     return matched
 
 
-# guards_early：必须在其它规则之前跑，保证 insufficient_data 是第一个 guard 标签
-# ---------------- 按 group_order 顺序执行各 group ----------------
-# 顺序即 finding 编号（F01、F02…）的生成顺序，也决定 guard 标签的先后
-# （guards_early 排第一，insufficient_data 才会是第一个 guard 标签）。
-# 新增经验只需把 group 写进 facts.yaml 的 group_order（或复用已有 group）
-# 并让经验里的 group 对上——**不用改这个文件**；构建期会校验 group 是否都已登记。
-for _group in FACTS["group_order"]:
-    _run_rules(_group)
+def run_all():
+    """跑完全部规则，返回报告头的判定产物（= 交给前端的 report）。
 
-# 短日志由 guard 标签派生（阈值的唯一来源是 guard-short-log.yaml）
-short_log = "insufficient_data" in guard_tags
-matched_faults = [] if short_log else match_fault_kb()
+    为什么是具名入口而不是模块级代码：原先它靠"执行脚本的副作用"——谁去读全局 \`__result\`
+    谁就顺手把规则跑了，调用顺序还被隐式约束着（\`__result\` 是同一个全局，读 report 必须早于
+    读 manifest）。现在交付边界有具名用例，由 \`report_data.np_report()\` 调这个函数。
 
-_metric_entries = []
-_declared = set()
-for _m in FACTS.get("metrics", []):
-    _key = _m.get("key")
-    if not _key:
-        continue
-    _declared.add(_key)
-    _val = metrics.get(_key)
-    if _val is None:
-        _val = _metric_fallback(_m)
-    if _val is None:
-        continue
-    _entry = {"key": _key, "label": _m.get("label", _key), "value": _val}
-    if _m.get("unit"):
-        _entry["unit"] = _m["unit"]
-    _metric_entries.append(_entry)
-# 规则产出、但没在 facts.yaml 里声明的（别丢，直接用键名当名字）
-for _key, _val in metrics.items():
-    if _key not in _declared:
-        _metric_entries.append({"key": _key, "label": _key, "value": _val})
+    **入口先重置累加器**：\`add\` / \`add_tag\` / \`ran\` / \`skipped\` / \`_run_rules\` 都是往模块级的
+    它们里追加的，不重置就会二次调用时累加。
+    """
+    global findings, checks_run, checks_skipped, tags, guard_tags, _fid, phases_present, metrics
+    findings = []
+    checks_run = []
+    checks_skipped = []
+    tags = []
+    guard_tags = []
+    _fid = [0]
+    metrics = {}
+    # 阶段集合来自 provider（故障库按 flight_phase 匹配用它）
+    phases_present = set(provider.facts().get("phases") or [])
 
-order = {"critical": 0, "warning": 1, "info": 2}
-findings.sort(key=lambda f: order.get(f["severity"], 9))
+    # guards_early：必须在其它规则之前跑，保证 insufficient_data 是第一个 guard 标签
+    # ---------------- 按 group_order 顺序执行各 group ----------------
+    # 顺序即 finding 编号（F01、F02…）的生成顺序，也决定 guard 标签的先后
+    # （guards_early 排第一，insufficient_data 才会是第一个 guard 标签）。
+    # 新增经验只需把 group 写进 facts.yaml 的 group_order（或复用已有 group）
+    # 并让经验里的 group 对上——**不用改这个文件**；构建期会校验 group 是否都已登记。
+    for _group in FACTS["group_order"]:
+        _run_rules(_group)
 
-__result = json.dumps({
-    "platform": "PX4",
-    "parserVersion": provider.parser_version(),
-    # 事实层产出：facts=日志是什么（离散，驱动判定）；metrics=关键数字（有序，带中文名与单位）
-    "facts": provider.facts(),
-    "metrics": _metric_entries,
-    # 判定层产出（规则与故障库）
-    "tags": tags,
-    "guardTags": guard_tags,
-    "checksRun": checks_run,
-    "checksSkipped": checks_skipped,
-    "matchedFaults": matched_faults,
-    "findings": findings,
-}, ensure_ascii=False)
+    # 短日志由 guard 标签派生（阈值的唯一来源是 guard-short-log.yaml）
+    short_log = "insufficient_data" in guard_tags
+    matched_faults = [] if short_log else match_fault_kb()
+
+    _metric_entries = []
+    _declared = set()
+    for _m in FACTS.get("metrics", []):
+        _key = _m.get("key")
+        if not _key:
+            continue
+        _declared.add(_key)
+        _val = metrics.get(_key)
+        if _val is None:
+            _val = _metric_fallback(_m)
+        if _val is None:
+            continue
+        _entry = {"key": _key, "label": _m.get("label", _key), "value": _val}
+        if _m.get("unit"):
+            _entry["unit"] = _m["unit"]
+        _metric_entries.append(_entry)
+    # 规则产出、但没在 facts.yaml 里声明的（别丢，直接用键名当名字）
+    for _key, _val in metrics.items():
+        if _key not in _declared:
+            _metric_entries.append({"key": _key, "label": _key, "value": _val})
+
+    order = {"critical": 0, "warning": 1, "info": 2}
+    findings.sort(key=lambda f: order.get(f["severity"], 9))
+
+    return {
+        "platform": "PX4",
+        "parserVersion": provider.parser_version(),
+        # 事实层产出：facts=日志是什么（离散，驱动判定）；metrics=关键数字（有序，带中文名与单位）
+        "facts": provider.facts(),
+        "metrics": _metric_entries,
+        # 判定层产出（规则与故障库）
+        "tags": tags,
+        "guardTags": guard_tags,
+        "checksRun": checks_run,
+        "checksSkipped": checks_skipped,
+        "matchedFaults": matched_faults,
+        "findings": findings,
+    }
 `
   .replace("__FAULT_KB__", JSON.stringify(faultKbJson.entries))
   .replace("__RULES__", JSON.stringify(rules))

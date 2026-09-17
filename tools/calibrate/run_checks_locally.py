@@ -86,7 +86,8 @@ def build_namespace(path: Path) -> dict:
 
 def run_one(path: Path) -> dict:
     ns = build_namespace(path)
-    return json.loads(ns["__result"])
+    # 判定产物走具名入口（np_report 会把结果摆到 __result）；以前它靠"执行脚本的副作用"留下
+    return call(ns, "np_report()")
 
 
 def call(ns: dict, code: str):

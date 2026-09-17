@@ -12,7 +12,6 @@ from __future__ import annotations
 import ast
 import json
 import re
-import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -110,6 +109,8 @@ def main() -> int:
     ns: dict = {"ulog_bytes": log.read_bytes()}
     try:
         exec(compile(final + "\n" + m2.group(1), "<artifact>", "exec"), ns)
+        # 判定产物走具名入口（np_report 把结果摆到 __result）；以前靠"执行脚本的副作用"留下
+        ns["np_report"]()
         result = json.loads(ns["__result"])
     except Exception as e:  # noqa: BLE001
         print(f"产物执行失败（{log.name}）：{type(e).__name__}: {e}")
