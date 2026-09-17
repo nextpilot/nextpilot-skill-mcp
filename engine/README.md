@@ -1,27 +1,40 @@
 # engine/ —— 确定性日志引擎（浏览器与本地工具共用的一份 Python 源码）
 
-这三个文件是项目的**确定性判断核心**。
+**这里没有一行业务数据，也没有一个具体的 topic 名 / 字段名。**
 
-**这里没有一行业务数据**：字段名、码值表、飞行阶段分组、slot 执行顺序全在
-`knowledge/px4/facts.yaml`（构建期内联成 `__FACTS__`）；规则与阈值在 `knowledge/px4/`。
-改数据不用碰 Python——这正是分家的目的。
+分两层看：
+
+- **与格式无关的机制**：算子、规则框架、报告数据层。
+- **格式适配器**（`providers/`）：唯一认识"某一种日志"的地方——PX4 的 topic 名、字段名、
+  固件版本怎么解码、取不到怎么回退，全在 `providers/px4.py`。
+  加一种日志格式（如 ArduPilot `.bin`）就是加一个适配器，上面那三个文件一行不改。
+
+判据（可机器查）：在 `rule_engine.py` / `operators.py` / `report_data.py` 里 grep 不到
+`vehicle_` / `ver_sw` / `cpuload` 这类具体名字。
 
 | 文件 | 内容 |
 | --- | --- |
-| `operators.py` | 算子注册表（当前 74 个通用算子，`@operator` 声明 in/out arity；权威清单见指南页「算子目录」）。**不认识任何具体字段**——字段名、阈值、文案都由经验与 plot 声明传入 |
-| `rule_engine.py` | pyulog 解析 + 事实层 + 规则框架（slot 调度 / 取数 / 受限 AST 表达式求值 / foreach 展开 / 发射 finding） |
-| `report_data.py` | 报告页数据层 helpers（图表序列 / 事件 / 参数） |
+| `operators.py` | 算子注册表（当前 73 个通用算子，`@operator` 声明 in/out arity；权威清单见指南页「算子目录」）。**不认识任何具体字段**——字段名、阈值、文案都由经验与 plot 声明传入 |
+| `rule_engine.py` | 规则框架（group 调度 / 受限 AST 表达式求值 / 调算子 / foreach 展开 / 发射 finding / 故障库匹配） |
+| `report_data.py` | 报告页数据层（按需抽时序 + LTTB 降采样，取数走 provider） |
+| `providers/api.py` | **适配器契约**：三张常量表（必需/可选能力、内置变量）+ 运行期自检 |
+| `providers/px4.py` | PX4 `.ulg` 适配器（固件解码 / 机型 / armed / 阶段 / 载具身份 / 轨迹 / 事件解码） |
+| `test_pyulog.py` | pyulog 在本机跑通的最小验证 |
+
+非格式相关的数据仍在 `knowledge/px4/facts.yaml`（码表、文案、展示口径、规则元数据、执行顺序）；
+格式相关的数据与逻辑在 `providers/<格式>.py` 与它的那份 `facts.yaml` 里。
 
 ## 什么时候跑
 
 | 场景 | 谁把它跑起来 |
 | --- | --- |
-| **用户上传 `.ulg` 分析** | 浏览器 Worker 里的 Pyodide。构建期 `web/scripts/build-knowledge.mjs` 把这三个文件**当文本读走**，拼成一份内联进 `web/workers/ulog-check-script.ts`（operators + rule_engine）与 `ulog-data-script.ts`（report_data） |
-| **本地回归 / 校准** | `tools/calibrate/run_checks_locally.py` 把同样三个文件按同样顺序拼接后 `exec`——跑的是**同一份源码**，所以本地结果与浏览器一致。其余校准脚本（`compare-baseline.py` / `dump-baseline.py` / `probe_rule.py`）都 import 它 |
-| 生成指南页的算子目录 | `tools/px4/gen-rule-reference.py` 用 `ast` 解析 `operators.py` |
+| **用户上传 `.ulg` 分析** | 浏览器 Worker 里的 Pyodide。构建期 `web/scripts/build-knowledge.mjs` 把这些文件**当文本读走**，按 `operators.py → providers/api.py → providers/*.py → rule_engine.py` 的顺序拼成一份内联进 `web/workers/ulog-check-script.ts`，`report_data.py` 单独进 `ulog-data-script.ts`（两者在同一个 `__main__` globals 里执行，数据层直接用那边建好的 `provider`） |
+| **本地回归 / 校准** | `tools/calibrate/run_checks_locally.py` 按同样顺序拼接后 `exec`——跑的是**同一份源码**，所以本地结果与浏览器一致。其余校准脚本（`compare-baseline.py` / `dump-baseline.py` / `probe_rule.py` / `check_provider.py`）都 import 它 |
+| 生成指南页的算子目录与内置变量表 | `tools/px4/gen_rule_reference.py` 用 `ast`/正则解析 `operators.py` 与 `providers/api.py` |
 | 阶段二服务端 / MCP（未实现） | 把本目录包成可 `import` 的 `nextpilot_engine`（parsers / models / rules 三层），规则仍从 `knowledge/` 加载，不另存一份 |
 
-注意：**构建期不执行这些代码**，只是搬运。改了它们必须重新 `cd web && pnpm build:kb`，否则浏览器里跑的还是旧的一份。
+注意：**构建期不执行这些代码**，只是搬运。改了它们必须重新 `cd web && pnpm build:kb`，
+否则浏览器里跑的还是旧的一份。
 
 ## 报告结构（引擎的输出）
 
@@ -29,19 +42,27 @@
 
 | 块 | 是什么 | 谁写 |
 | --- | --- | --- |
-| `facts` | 日志客观"是什么"：机型 / 固件 / 时长 / armed / 阶段 / 丢包——离散、驱动判定 | 引擎（取数方式由 `knowledge/px4/facts.yaml` 的 `bindings`/码表决定） |
+| `facts` | 日志客观"是什么"：机型 / 固件 / 时长 / armed / 阶段 / 丢包——离散、驱动判定 | provider 的 `facts()`（PX4 那份在 `providers/px4.py`） |
 | `metrics` | **关键数字**：有序数组，每项带中文名与单位（结果页「关键数据」直接渲染）。规则产出的实测值优先，规则没跑就按 `facts.yaml` 的声明兜底现算 | 引擎（清单在 `facts.yaml` 的 `metrics`，实测值来自 `rules/*.yaml`） |
 | `findings` / `tags` / `guardTags` / `matchedFaults` / `checksRun` / `checksSkipped` | 判定层产出：结论、标签、命中的故障库条目 | 规则与故障库匹配 |
 
 ## 与 knowledge/ 的边界（别混）
 
-- **这里**：*怎么算*——通用算子、框架、数据层，谁都认识，不认识具体 topic/字段
-- **`knowledge/px4/`**：*算完怎么判定*——`rules/*.yaml`（阈值与触发条件）、`px4-fault-kb.yaml`（故障根因 / 排查步骤）、`llm/`（GJB-841 提示词）、`meta/`（固件字段字典）
+| 目录 | 是什么 |
+| --- | --- |
+| `engine/`（本目录） | *怎么算*——通用算子、框架、数据层，谁都认识，不认识具体 topic/字段 |
+| `engine/providers/` | *怎么从某一种日志里把数据取出来*——唯一认识 topic 名、字段名、码值的地方 |
+| `knowledge/px4/facts.yaml` | 那一种格式的**纯数据**：码表、文案、展示口径、规则元数据、执行顺序 |
+| `knowledge/px4/rules/` | *算完怎么判定*——阈值与触发条件 |
+| `knowledge/px4/px4-fault-kb.yaml` | 故障根因 / 排查步骤（规则只留 `emit.tag` 指向它） |
+| `knowledge/px4/meta/` | 上游固件字典（字段与参数，按固件 tag 生成） |
+| `knowledge/px4/plot/` | 结果页曲线预设（纯前端渲染，不进 Pyodide 的规则侧） |
 
 ## 跑一遍
 
 ```bash
 cd web && pnpm build:kb                      # 内联进浏览器产物 + 生成指南页
-python tools/calibrate/compare-baseline.py   # 6 条真实日志与冻结基线逐字段比对
-python tools/calibrate/lint-rules.py         # 字段引用与版本错配
+python tools/calibrate/check_provider.py tools/calibrate/logs/*.ulg   # 适配器契约测试
+python tools/calibrate/compare_baseline.py   # 6 条真实日志与冻结基线逐字段比对
+python tools/calibrate/lint_rules.py         # 字段引用与版本错配
 ```

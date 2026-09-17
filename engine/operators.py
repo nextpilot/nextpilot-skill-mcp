@@ -1110,16 +1110,20 @@ def op_att_tracking_stats(att_q, sp_q, sp_roll, sp_pitch, att_ts, sp_ts, interva
     in_arity=7,
     out_arity=5,
     out_names=["bx", "by", "bz", "bts", "src_text"],
-    doc="陀螺零偏取源：1.15+ 直读零偏列（fw_minor >= 15 时优先），否则用 EKF 状态槽 10..12"
-        "（estimator_states 优先、estimator_status 兜底）。输入都是「数组字段的多列」或 None。"
-        "返回 三轴序列 + 时间戳 + 数据来源说明（用于 evidence.field）；主数据缺失返回 None。",
+    doc="零偏取源（三取一）：① 直读零偏列（fw_minor >= 15 时优先）② 状态槽 A ③ 状态槽 A 缺失"
+        "时用状态槽 B。输入都是「数组字段的多列」或 None。"
+        "返回 三轴序列 + 时间戳 + 数据来源说明（用于 evidence.field）；主数据缺失返回 None。"
+        "来源说明是**展示文案**，由调用方用 sources=[直读, 槽A, 槽B] 给出——算子不认识字段名。",
 )
 def op_gyro_bias_series(new_cols, new_ts, states_a_cols, states_a_ts,
-                        states_b_cols, states_b_ts, fw_minor, slot=10, **kw):
+                        states_b_cols, states_b_ts, fw_minor, slot=10,
+                        sources=None, **kw):
     nb = _as_columns(new_cols)
     la = _as_columns(states_a_cols)
     lb = _as_columns(states_b_cols)
     s = int(slot)
+    # 三个来源的展示名（经验文件给；没给就用中性说法，反正算子不认识具体字段）
+    names = list(sources or []) + ["零偏直读列", "状态槽（优先）", "状态槽（兜底）"]
 
     def pick3(cols):
         return [cols[s], cols[s + 1], cols[s + 2]] if len(cols) >= s + 3 else None
@@ -1129,11 +1133,11 @@ def op_gyro_bias_series(new_cols, new_ts, states_a_cols, states_a_ts,
     if not use_new and leg_a is None and leg_b is None and len(nb) >= 3:
         use_new = True                       # 定制固件容错：没有旧槽就用直读
     if use_new:
-        return (nb[0], nb[1], nb[2], new_ts, "estimator_sensor_bias.gyro_bias[]")
+        return (nb[0], nb[1], nb[2], new_ts, names[0])
     if leg_a is not None and states_a_ts is not None:
-        return (leg_a[0], leg_a[1], leg_a[2], states_a_ts, "estimator_states.states[10..12]")
+        return (leg_a[0], leg_a[1], leg_a[2], states_a_ts, names[1])
     if leg_b is not None and states_b_ts is not None:
-        return (leg_b[0], leg_b[1], leg_b[2], states_b_ts, "estimator_status.states[10..12]")
+        return (leg_b[0], leg_b[1], leg_b[2], states_b_ts, names[2])
     return None
 
 

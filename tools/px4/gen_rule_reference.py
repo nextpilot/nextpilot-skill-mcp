@@ -1,10 +1,11 @@
 """把「算子目录」与「内置变量表」生成进 content/guide/knowledge-write-rule.md。
 
-为什么用生成：这两张表的事实源分别在 engine/operators.py 与 engine/rule_engine.py 的
-_rule_env()，手写必然漂移。参考文档里用标记圈出生成区，本脚本只重写标记之间的内容，
+为什么用生成：这两张表的事实源分别在 engine/operators.py（算子注册表）与
+engine/providers/api.py 的 SEMANTICS（内置变量 = 适配器契约的一部分），手写必然漂移。
+参考文档里用标记圈出生成区，本脚本只重写标记之间的内容，
 其余（字段说明、示例）保持人工维护。
 
-用法：python tools/px4/gen-rule-reference.py
+用法：python tools/px4/gen_rule_reference.py
 """
 from pathlib import Path
 import ast
@@ -13,6 +14,7 @@ import re
 ROOT = Path(__file__).resolve().parents[2]
 OPS = ROOT / "engine" / "operators.py"
 CHECKS = ROOT / "engine" / "rule_engine.py"
+PROVIDER_API = ROOT / "engine" / "providers" / "api.py"
 DOC = ROOT / "content" / "guide" / "knowledge-write-rule.md"
 
 BEGIN_OPS, END_OPS = "<!-- BEGIN:operators -->", "<!-- END:operators -->"
@@ -84,39 +86,38 @@ def operator_catalog() -> str:
 
 
 def builtin_table() -> str:
-    """从 _rule_env() 抄出内置变量（规则里可直接引用，无需在 compute 里声明）。"""
-    src = CHECKS.read_text(encoding="utf-8")
-    m = re.search(r"def _rule_env\(\):(.*?)\n\n\ndef ", src, re.S)
+    """从 engine/providers/api.py 的 SEMANTICS 抄出内置变量。
+
+    为什么是那里：内置变量由 **provider 契约**定义（哪种日志都得给这几个），
+    它同时是构建期（build-knowledge.mjs 派生 BUILTIN_VARS）与运行期自检
+    （check_provider）的输入——一处定义、三处使用，手抄必然漂移。
+    """
+    src = PROVIDER_API.read_text(encoding="utf-8")
+    m = re.search(r"^SEMANTICS = \{(.*?)^\}", src, re.S | re.M)
     body = m.group(1) if m else ""
-    keys = re.findall(r'"([a-z_0-9]+)":', body)
+    keys = re.findall(r'^\s{4}"([A-Za-z_0-9]+)":', body, re.M)
     note = {
-        "firmware": "固件标签（如 `1.15.0`，无法识别时为“未知（旧固件或无版本号）”）",
-        "fw_major": "固件主版本号（int 或 None）",
-        "fw_minor": "固件次版本号（int 或 None）——版本分支最常用",
-        "fw_profile": "`px4-1.15+` 或 `px4-legacy`",
+        "fw_minor": "固件次版本号（int 或 None）——版本分支最常用，`None` = 这份日志没写版本号",
         "airframe": "机型字符串：`rotary_wing` / `fixed_wing` / `rover` / `airship` / `unknown`",
-        "is_rotary_wing": "布尔别名（下同）",
-        "is_fixed_wing": "布尔别名",
-        "is_vtol": "布尔别名（`vtol` 在机型串里）",
-        "is_rover": "布尔别名",
+        "is_fixed_wing": "机型别名（比 `airframe == 'fixed_wing'` 好读）",
         "duration_s": "日志总时长（秒）",
         "armed_s": "armed 总时长（秒）",
-        "phases": "本次日志出现过的飞行阶段集合（如 `'hover' in phases`）",
-        "tags": "已命中的异常标签集合（喂故障库）",
-        "guard_tags": "已产生的数据质量标签集合",
-        "armed_intervals": "armed 区间列表 `[(start_us, end_us)]`，时序算子按它切窗",
+        "armed_intervals": "armed 区间列表 `[(start_us, end_us)]`，升序不重叠；"
+                           "`end=None` 表示持续到日志结束。时序算子按它切窗",
         "t0_us": "日志起点时间戳（us），事件类算子算相对时刻用",
         "has_armed": "是否存在 armed 段（布尔）",
-        "topics": "本日志实际存在的 topic 名集合（如 `'vehicle_attitude' in topics`）",
         "restart_detected": "是否有 topic 时间戳回退（疑似中途重启）",
         "dropout_ms": "全日志丢包累计（毫秒）",
         "messages": "日志消息条目列表 `[{tSec, message, level, level_name}]`",
-        "no_data": "compute 是否算不出来：初值 False，compute 失败后置真（`skip` 列表里用它记一条 skipped）",
-        "has_topic": "日志里有没有这个 topic，如 `not has_topic('cpuload')`（比 `'cpuload' not in topics` 直白）；表达式里**唯一**允许的函数调用",
     }
     rows = ["| 变量 | 含义 |", "| --- | --- |"]
     for k in keys:
         rows.append("| `%s` | %s |" % (k, note.get(k, "—")))
+    # 框架自己补的两个（不属于 provider，但同样可以直接引用）
+    rows.append("| `no_data` | compute 是否算不出来：初值 False，compute 失败后置真"
+                "（`skip` 列表里用它记一条 skipped） |")
+    rows.append("| `has_topic('x')` | 日志里有没有这个 topic，如 `not has_topic('cpuload')`；"
+                "表达式里**唯一**允许的函数调用（其余函数一律不给） |")
     return "\n".join(rows)
 
 

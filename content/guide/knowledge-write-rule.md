@@ -15,20 +15,25 @@ order: 11
 > **本页是这份文档的唯一一份**：原先在 `knowledge/px4/guides/writing-rules.md`，现搬到指南的
 > 内容目录，不再由构建生成（同组的「当前有哪些规则」才是构建生成的）。
 > 单一事实源是 `knowledge/px4/rules/*.yaml`；标了 `<!-- BEGIN/END -->` 的两张表由
-> `python tools/px4/gen_rule_reference.py` 从 `engine/operators.py` 与 `engine/rule_engine.py` 注入，
-> 改完算子请重跑该脚本，标记之间不要手改，其余内容手维护。
+> `python tools/px4/gen_rule_reference.py` 从 `engine/operators.py`（算子）与
+> `engine/providers/api.py`（内置变量）注入，改完算子或契约请重跑该脚本，
+> 标记之间不要手改，其余内容手维护。
 
 ## 0. 一条经验怎么跑起来
 
 ```
-rules/<经验>.yaml     ──┐
-facts.yaml（数据绑定/   ──┤ 构建期校验（字段/算子/表达式/文案、
-  码表/group 顺序）      ──┤   group 是否登记、facts 键是否齐全）  ── 产物内联进 Python
-engine/operators.py    ──┤
-engine/rule_engine.py  ──┘   ↓                                      ↓
-                     web/workers/ulog-check-script.ts  →  Pyodide（浏览器）执行：
-                     事实层 → 按 group 顺序跑经验 → 取字段/调算子/求值表达式 → 发射 finding
+rules/<经验>.yaml        ──┐
+facts.yaml（码表/文案/    ──┤ 构建期校验（字段/算子/表达式/文案、group 是否登记、
+  展示口径/group 顺序）    ──┤  facts 键是否齐全、provider 有没有漏实现契约）
+engine/operators.py      ──┤                                    ── 产物内联进 Python
+engine/providers/*.py    ──┤   ↓                                    ↓
+engine/rule_engine.py    ──┘  web/workers/ulog-check-script.ts  →  Pyodide（浏览器）执行：
+                              provider 打开日志 → 按 group 顺序跑经验 → 取字段/调算子/
+                              求值表达式 → 发射 finding
 ```
+
+`engine/providers/<格式>.py` 是**唯一认识某一种日志**的地方（PX4 的 topic 名、字段名、
+固件版本怎么解码都在那儿）；框架与算子只认它给出的契约 —— 加一种日志格式就是加一个适配器。
 
 改完经验后的三步：
 
@@ -89,7 +94,7 @@ emit:
 | `group` | ✅ | 执行分组（见 §3），必须与它所替换的检查位置一致 |
 | `order` | | 同 group 内排序，缺省 100000；再按 `id` 兜底 |
 | `firmware` | ✅ | 适用范围轴①：**Python 表达式**，在 compute 之前求值（只认内置变量）。不限写 `"True"` |
-| `airframe` | ✅ | 适用范围轴②：同上，如 `"is_fixed_wing"` / `"is_rotary_wing or is_vtol"` |
+| `airframe` | ✅ | 适用范围轴②：同上，如 `"is_fixed_wing"` / `"airframe == 'rotary_wing'"` |
 | `skip` | | `[{when, reason?}]`：**按顺序**判，命中第一条即跳过本条。写了 `reason` → 记一条 skipped（报告里能看到"为什么没跑"）；**不写 `reason`** → **静默**跳过，用于"这本来就跟我无关"的场合（如非 VTOL 机谈不上转换段）。`when` 是与 compute 同一套 Python 子集 |
 | `ran_on_success` | | `true` 时把 `ran()` 推迟到 compute 成功之后（原实现把 ran 放在数据判定之后的情形） |
 | `ran_when` | | 表达式为真才记 `ran()`（如"机动段样本足够"才算跑过） |
@@ -332,7 +337,7 @@ compute:
 | `att_tracking_stats` | 8 | p99, osc_hz, seg_n | 姿态跟踪统计：把姿态与姿态指令在时间轴上对齐（取较短长度、指令线性插值到姿态时间轴），只在 armed 且非悬停（指令倾角 > tilt_min_deg）样本上算跟踪误差，输出 p99（度）、误差过零频率（Hz）、参与统计的样本数 |
 | `cell_voltage_min` | 4 | vmin, cell_min, cells, have_measured, have_fallback, no_cell | 单电芯最低电压：优先 voltage_cell_v[] 实测（各列 > 0 的最小值中的最小值），缺失时回退 总压最小值 / 电芯数（两者都 > 0 才成立） |
 | `column_spread_stats` | 2 | spread, busiest, idlest, n_active | 多通道均值极差：掩码内逐通道求均值，只保留均值 > min_mean 的通道（排除未接/未用），活跃通道数不足 min_channels 时返回 None |
-| `gyro_bias_series` | 7 | bx, by, bz, bts, src_text | 陀螺零偏取源：1.15+ 直读零偏列（fw_minor >= 15 时优先），否则用 EKF 状态槽 10..12（estimator_states 优先、estimator_status 兜底） |
+| `gyro_bias_series` | 7 | bx, by, bz, bts, src_text | 零偏取源（三取一）：① 直读零偏列（fw_minor >= 15 时优先）② 状态槽 A ③ 状态槽 A 缺失时用状态槽 B |
 | `gyro_bias_worst` | 5 | abs_max, abs_axis, drift, drift_axis | 三轴零偏在 armed 区间内逐轴取 |最大值| 与极差（漂移），回传各自最差的轴名 |
 | `max_temp_range` | 2 | 1 个值 | 两个温度来源各自取极差（样本 < 2 的来源忽略），返回较大者 |
 
@@ -374,29 +379,19 @@ compute:
 <!-- BEGIN:builtins -->
 | 变量 | 含义 |
 | --- | --- |
-| `firmware` | 固件标签（如 `1.15.0`，无法识别时为“未知（旧固件或无版本号）”） |
-| `fw_major` | 固件主版本号（int 或 None） |
-| `fw_minor` | 固件次版本号（int 或 None）——版本分支最常用 |
-| `fw_profile` | `px4-1.15+` 或 `px4-legacy` |
+| `fw_minor` | 固件次版本号（int 或 None）——版本分支最常用，`None` = 这份日志没写版本号 |
 | `airframe` | 机型字符串：`rotary_wing` / `fixed_wing` / `rover` / `airship` / `unknown` |
-| `is_rotary_wing` | 布尔别名（下同） |
-| `is_fixed_wing` | 布尔别名 |
-| `is_vtol` | 布尔别名（`vtol` 在机型串里） |
-| `is_rover` | 布尔别名 |
+| `is_fixed_wing` | 机型别名（比 `airframe == 'fixed_wing'` 好读） |
 | `duration_s` | 日志总时长（秒） |
 | `armed_s` | armed 总时长（秒） |
-| `phases` | 本次日志出现过的飞行阶段集合（如 `'hover' in phases`） |
-| `tags` | 已命中的异常标签集合（喂故障库） |
-| `guard_tags` | 已产生的数据质量标签集合 |
-| `armed_intervals` | armed 区间列表 `[(start_us, end_us)]`，时序算子按它切窗 |
+| `armed_intervals` | armed 区间列表 `[(start_us, end_us)]`，升序不重叠；`end=None` 表示持续到日志结束。时序算子按它切窗 |
 | `t0_us` | 日志起点时间戳（us），事件类算子算相对时刻用 |
 | `has_armed` | 是否存在 armed 段（布尔） |
-| `topics` | 本日志实际存在的 topic 名集合（如 `'vehicle_attitude' in topics`） |
-| `has_topic` | 日志里有没有这个 topic，如 `not has_topic('cpuload')`（比 `'cpuload' not in topics` 直白）；表达式里**唯一**允许的函数调用 |
 | `restart_detected` | 是否有 topic 时间戳回退（疑似中途重启） |
 | `dropout_ms` | 全日志丢包累计（毫秒） |
 | `messages` | 日志消息条目列表 `[{tSec, message, level, level_name}]` |
 | `no_data` | compute 是否算不出来：初值 False，compute 失败后置真（`skip` 列表里用它记一条 skipped） |
+| `has_topic('x')` | 日志里有没有这个 topic，如 `not has_topic('cpuload')`；表达式里**唯一**允许的函数调用（其余函数一律不给） |
 <!-- END:builtins -->
 
 ### 6.2 模板占位符
@@ -450,7 +445,7 @@ emit:
   引用了未声明的名字、多输出算子嵌在表达式中间、`_try` 不在最外层
 - 字段引用写法不对（必须是 `topic.field` 两段小写名，可带 `[n]` 下标）；`ref(...)` 的修饰键
   写错、`when_fw` 不是合法固件约束串
-- `fw_minor` / `fw_major` 做了大小比较却没先判 `None`（见 §4 末尾）
+- `fw_minor` 做了大小比较却没先判 `None`（见 §4 末尾）
 - `firmware` / `airframe` / `skip` 的条件写成了非字符串、或引用了**非内置变量**
   （它们在 compute 之前求值，拿不到 compute 的输出）
 - `severity` 非法、trigger 缺 `when`/`title`/`field`、guard_tags 条件写了错名字

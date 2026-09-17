@@ -19,6 +19,43 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 参数元数据的来源、**派生数据版本**让旧存档自动重解析。都在本文档下面的
 「报告页数据层」一节，改数据层前必读。
 
+**2026-09-17 追加（第二段）：引擎与日志格式分家 —— provider 适配器**
+（**架构层面的改动，改 `engine/` 前先读这一节**）：
+
+原先取数分散在四个地方（`facts.yaml` 的 `bindings`/`track`、`rule_engine.py` 里硬编码的
+固件解码与载具身份、`rules/*.yaml` 里裸写的字段、`plot/*.yml` 里裸写的字段）。
+现在的分工是"**机制 / 数据 / 格式**"三分：
+
+| 放哪 | 是什么 | 判据 |
+| --- | --- | --- |
+| `engine/providers/<格式>.py` | **唯一认识某一种日志的地方**：topic 名、字段名、固件版本怎么解码、取不到怎么回退、载具身份从哪来 | 有分支 / 回退 / 按版本挑 → 代码 |
+| `engine/{rule_engine,operators,report_data}.py` | 与格式无关的机制：调度、表达式求值、算子、报告数据层 | 里面 grep 不到 `vehicle_` / `ver_sw` / `cpuload` |
+| `knowledge/px4/facts.yaml` | 那一种格式的**纯数据**：码表、文案、展示口径、规则元数据、执行顺序 | 纯映射 → YAML（改它不该碰 Python） |
+
+- 契约本体是 `engine/providers/api.py` 的三张常量表（REQUIRED / OPTIONAL / SEMANTICS）。
+  它同时是**构建期**（`build-knowledge.mjs` 派生 `BUILTIN_VARS`、查每个适配器有没有漏实现）、
+  **运行期**（`check_provider()` 自检类型与缺席）、**测试**（`tools/calibrate/check_provider.py`）
+  三处的输入 —— 一处定义、三处使用。**不写 `typing.Protocol`**：两端都没有类型检查器
+  （构建期不执行 Python、Pyodide 里没有 mypy），写了只是"看着有约束、实际没人管"。
+- 内置变量从 23 个收敛到 **11 个 + `has_topic()`**（实测 10 个零引用：
+  `firmware` `fw_major` `fw_profile` `is_rotary_wing` `is_vtol` `is_rover` `phases` `tags`
+  `guard_tags` `topics`）。其中 `topics` 删掉之后，"同一个事实两种写法"（`'x' in topics`
+  vs `has_topic('x')`）只剩一种。
+- 指南页的内置变量表改从 `providers/api.py` 的 SEMANTICS 生成
+  （`tools/px4/gen_rule_reference.py`），构建期的 `BUILTIN_VARS` 也改成从它派生——
+  这份名字以前手抄两份，漂移时的表现是"构建期放行、运行期 NameError → 那条规则静默不出结论"
+  （`no_data` 当初就是这么漏的）。
+- **`meta/` 的角色**：上游字段与参数字典（一固件 tag 一份，生成物）。它回答"**某个版本里**
+  有没有这个字段/参数、什么类型、什么单位、码值什么意思"，所以它既不是 facts 也不是规则：
+  **单位与类型一律查它，不要在别处抄**。它的键是上游 `.msg` 名，与日志 topic 名不一一对应，
+  所以新增了 `meta/topic-map.yaml`（日志 topic → 字典键，构建期专用、不进产物）。
+- 本轮**明确不做**（都留着后续）：用 meta 做构建期字段校验（rules 与 plot 的每个
+  `topic.field`）、`meta` 与 `facts.yaml` 码表的一致性对账、`plot` 的单位改由 meta 派生、
+  内置变量全大写、ArduPilot 适配器。
+
+验证口径同前：`compare_baseline.py` 6 条日志**逐字段零差异**（这次是纯搬家，
+出现任何差异都说明搬错了），外加新增的 `check_provider.py`（契约测试）。
+
 **2026-09-17 追加：规则写法全面换成 Python 子集**（本文档下面那些「算子节点」的例子
 只代表**最初设计**，现状见这一段）：
 

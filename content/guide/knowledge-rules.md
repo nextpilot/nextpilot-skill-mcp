@@ -348,7 +348,9 @@ order: 12
 - 文件：`rules/imu-bias.yaml` ｜ 位置：group `imu_bias` #1
 - 适用：不适用当 not has_armed ｜ 不适用当 no_data
 - 取值：
-- `bx, by, bz, bts, src_text = _try(gyro_bias_series( ref("estimator_sensor_bias.gyro_bias", instance=0), ref("estimator_sensor_bias.timestamp", instance=0), ref("estimator_states.states", instance=0), ref("estimator_states.timestamp", instance=0), ref("estimator_status.states", instance=0), ref("estimator_status.timestamp", instance=0), fw_minor, slot=10))`
+- `bx, by, bz, bts, src_text = _try(gyro_bias_series( ref("estimator_sensor_bias.gyro_bias", instance=0), ref("estimator_sensor_bias.timestamp", instance=0), ref("estimator_states.states", instance=0), ref("estimator_states.timestamp", instance=0), ref("estimator_status.states", instance=0), ref("estimator_status.timestamp", instance=0), fw_minor, slot=10, sources=["estimator_sensor_bias.gyro_bias[]",
+         "estimator_states.states[10..12]",
+         "estimator_status.states[10..12]"]))`
 - `worst_abs, worst_axis, worst_drift, drift_axis = _try(gyro_bias_worst( bx, by, bz, bts, armed_intervals, labels=["X", "Y", "Z"], min_count=10))`
 - `abs_gate = require_true(worst_axis is not None)`
 - `temp_range = _try(max_temp_range(ref("vehicle_imu_status.temperature_gyro", instance=0), ref("vehicle_air_data.ambient_temperature", instance=0)))`

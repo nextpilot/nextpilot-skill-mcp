@@ -22,10 +22,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 KN_PX4 = REPO_ROOT / "knowledge" / "px4"      # 规则与阈值（知识）
 ENGINE = REPO_ROOT / "engine"                 # 引擎源码（通用算子与框架）
 OPERATORS_PY = ENGINE / "operators.py"
+PROVIDER_API_PY = ENGINE / "providers" / "api.py"    # provider 契约（常量表 + 自检）
+PROVIDER_PX4_PY = ENGINE / "providers" / "px4.py"    # PX4 适配器（唯一认识 PX4 的地方）
 RULE_ENGINE_PY = ENGINE / "rule_engine.py"
 REPORT_DATA_PY = ENGINE / "report_data.py"
 RULES_DIR = KN_PX4 / "rules"
-FACTS_YAML = KN_PX4 / "facts.yaml"          # 事实层的数据绑定与码表
+FACTS_YAML = KN_PX4 / "facts.yaml"          # PX4 的数据（码表/文案/展示口径/规则元数据）
 FAULT_KB_JSON = REPO_ROOT / "web" / "workers" / "fault-kb.generated.json"
 CHECK_SCRIPT = REPO_ROOT / "web" / "workers" / "ulog-check-script.ts"
 
@@ -65,9 +67,13 @@ def _load_checks() -> str:
 
 
 def build_namespace(path: Path) -> dict:
-    # 顺序与线上一致：operators（算子注册表）→ ulog_checks（框架用算子）→ ulog_data
+    # 顺序与线上一致：算子注册表 → provider 契约 → PX4 适配器 → 框架 → 数据层
     script = (
         OPERATORS_PY.read_text(encoding="utf-8")
+        + "\n"
+        + PROVIDER_API_PY.read_text(encoding="utf-8")
+        + "\n"
+        + PROVIDER_PX4_PY.read_text(encoding="utf-8")
         + "\n"
         + _load_checks()
         + "\n"

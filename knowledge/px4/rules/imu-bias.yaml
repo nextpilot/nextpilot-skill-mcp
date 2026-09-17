@@ -27,7 +27,8 @@ skip:
 known_legacy: [estimator_status.states]
 
 compute:
-  # 取源（新/旧固件自动选，附带 evidence 用的来源说明）；主数据缺失返回 None
+  # 取源（新/旧固件自动选，附带 evidence 用的来源说明）；主数据缺失返回 None。
+  # sources 就是 evidence.field 里的那句"这条结论读的是哪儿"——文案留在经验里，算子不认识字段名
   - >-
       bx, by, bz, bts, src_text = _try(gyro_bias_series(
       ref("estimator_sensor_bias.gyro_bias", instance=0),
@@ -35,7 +36,10 @@ compute:
       ref("estimator_states.states", instance=0),
       ref("estimator_states.timestamp", instance=0),
       ref("estimator_status.states", instance=0),
-      ref("estimator_status.timestamp", instance=0), fw_minor, slot=10))
+      ref("estimator_status.timestamp", instance=0), fw_minor, slot=10,
+      sources=["estimator_sensor_bias.gyro_bias[]",
+               "estimator_states.states[10..12]",
+               "estimator_status.states[10..12]"]))
   # armed 段内逐轴 |最大零偏| 与漂移，各取最差轴
   - >-
       worst_abs, worst_axis, worst_drift, drift_axis = _try(gyro_bias_worst(

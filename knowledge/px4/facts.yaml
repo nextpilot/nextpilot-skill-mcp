@@ -1,12 +1,19 @@
-# 事实层的数据绑定与码表 —— 引擎（engine/*.py）只提供机制，具体数据全在这里。
+# PX4 的数据文件 —— 码表、文案、展示口径、规则元数据。
+#
+# 这里**只有数据，没有取数逻辑**：从日志的哪儿取、取不到怎么回退、按固件版本挑哪个字段，
+# 全在 `engine/providers/px4.py`（那是本项目唯一认识 PX4 的地方）。判据是：
+# **同一个节里没有分支/回退/异常** → 留这里；有 → 进 provider。
+# 所以换一种日志格式（ArduPilot .bin）时，这个文件要另写一份，providers/px4.py 也要。
+#
 # 改这个文件不用碰 Python：`cd web && pnpm build:kb` 之后，浏览器与本地回归同时生效。
+# （注意它是**整份内联**进浏览器产物的，见 engine/providers/api.py 顶部的说明：
+#   新增节前先问一句"运行期用得上吗"，只给构建期用的内容不该放这儿。）
 #
 # 谁读它：
-#   engine/rule_engine.py   机型识别 / 飞行阶段判定 / 日志级别名 / 规则执行顺序
-#   engine/report_data.py   报告页的飞行模式名 / 系统信息字段清单
-# 怎么进去：构建期 web/scripts/build-knowledge.mjs 内联成 __FACTS__（与 __RULES__ 同一机制）。
+#   engine/rule_engine.py   规则执行顺序（group_order）、规则元数据（rule_meta）、概览指标的展示口径
+#   engine/providers/px4.py 机型码表 / 飞行阶段分组 / 日志级别名 / 信息字典文案 / 消息类型表
 #
-# 下面这些**键名**是引擎约定的（改了要同步改 engine/）；**值**（字段名、码值、顺序）随 PX4 上游变。
+# 下面这些**键名**是引擎与 provider 约定的（改了要同步改 engine/）；**值**（码值、文案、顺序）随 PX4 上游变。
 
 # 规则执行顺序：引擎就按这个列表逐个 group 执行，**顺序即报告里 finding 编号
 # （F01、F02…）的生成顺序**，也决定 guard 标签的先后。
@@ -53,18 +60,6 @@ rule_meta:
     vibration:         {category: vibration, doc: "https://docs.px4.io/main/en/assembly/vibration_isolation.html"}
     vtol_transition:   {category: vtol,     doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html"}
     wind_estimate:     {category: wind,     doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html"}
-
-# 事实从哪个 topic 的哪个字段取（固件改了字段名就改这里；要按固件分支时见规则里的 when_fw）
-bindings:
-  vehicle_status:
-    topic: vehicle_status
-    timestamp: timestamp
-    nav_state: nav_state
-    arming_state: arming_state
-    vehicle_type: vehicle_type
-    is_rotary_wing: is_rotary_wing
-    vtol_in_trans_mode: vtol_in_trans_mode
-    armed_value: 2            # arming_state 等于这个值即视为已解锁
 
 # ULog 日志级别：PX4 把 **ASCII 码**写进 log_level（'0'=48 … '7'=55），与 pyulog
 # Message.log_level_str() 一致。经验里按 level_name 判定，别拿 3/4 去比 51/52。
@@ -179,21 +174,3 @@ metrics:
   - {key: navStateChanges,     label: 模式切换次数,    unit: 次}
   - {key: vtolTransitionSamples, label: VTOL 转换样本数, unit: 个}
   - {key: batteryCellCount,    label: 电芯数,          unit: 个}
-
-# ── 地图轨迹 ──
-# 取 GPS 的经纬高画轨迹。字段名与量纲都随固件改过（1.15 起 lat/lon/alt →
-# latitude_deg/longitude_deg/altitude_msl_m，且 degE7→deg、mm→m），所以**每个字段给候选**，
-# 按顺序取第一个存在的，并按各自的 scale 换算——这正是不把字段名写死在代码里的原因。
-track:
-  topic: vehicle_gps_position
-  instance: 0
-  lat:
-    - {field: latitude_deg, scale: 1}       # 1.15+：直接是度
-    - {field: lat,          scale: 1.0e-7}  # 旧固件：degE7
-  lon:
-    - {field: longitude_deg, scale: 1}
-    - {field: lon,           scale: 1.0e-7}
-  alt:
-    - {field: altitude_msl_m, scale: 1}     # 1.15+：米
-    - {field: alt,            scale: 0.001} # 旧固件：毫米
-  max_points: 1500

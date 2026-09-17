@@ -35,10 +35,17 @@ const webRoot = resolve(here, "..");
 const KN = resolve(webRoot, "../knowledge/px4");
 
 const ENGINE = resolve(webRoot, "../engine");   // 确定性引擎源码（浏览器与本地工具共用一份）
-const PY_RULE_ENGINE = resolve(ENGINE, "rule_engine.py");
-const PY_REPORT_DATA = resolve(ENGINE, "report_data.py");
+const PY_RULE_ENGINE = resolve(ENGINE, "rule_engine.py");        // 框架（与格式无关）
+const PY_REPORT_DATA = resolve(ENGINE, "report_data.py");        // 报告数据层（与格式无关）
+const PY_PROVIDER_API = resolve(ENGINE, "providers/api.py");     // provider 契约（常量表 + 自检）
+// 日志格式适配器：每个文件都实现同一份契约，引擎不认识它们内部
+const PROVIDER_DIR = resolve(ENGINE, "providers");
+const providerFiles = readdirSync(PROVIDER_DIR)
+  .filter((f) => f.endsWith(".py") && f !== "api.py")
+  .sort();
+if (providerFiles.length === 0) throw new Error("engine/providers/ 下没有任何适配器");
 const YAML_PATH = resolve(KN, "px4-fault-kb.yaml");
-const FACTS_PATH = resolve(KN, "facts.yaml");   // 事实层的数据绑定与码表
+const FACTS_PATH = resolve(KN, "facts.yaml");   // PX4 的数据：码表 / 文案 / 展示口径 / 规则元数据
 const RULES_DIR = resolve(KN, "rules");
 const OPERATORS_PY = resolve(ENGINE, "operators.py");
 const PROMPT_PATH = resolve(KN, "llm/gjb841-system-prompt.md");
@@ -156,14 +163,18 @@ function toRawTemplate(text) {
   return text.replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
 }
 
-/** 日志级内置变量：经验里可直接引用，无需在 compute 声明（与 engine/rule_engine.py 的 _rule_env 对齐） */
-const BUILTIN_VARS = new Set([
-  "firmware", "fw_major", "fw_minor", "fw_profile",
-  "airframe", "is_rotary_wing", "is_fixed_wing", "is_vtol", "is_rover",
-  "duration_s", "armed_s", "phases", "tags", "guard_tags", "armed_intervals",
-  "t0_us", "has_armed", "topics", "messages", "restart_detected", "dropout_ms",
-  "no_data", "has_topic",
-]);
+// 框架自己往求值环境里补的名字（不属于 provider，见 providers/api.py 末尾的说明）
+const FRAMEWORK_VARS = ["no_data", "has_topic"];
+
+/**
+ * 规则表达式能引用的内置变量 = provider 契约的 SEMANTICS + 框架补的两个。
+ *
+ * **从 engine/providers/api.py 派生，不手抄**：这份名字以前是手维护的副本，
+ * 与引擎漂移时表现为"构建期放行、运行期 NameError"——引擎按"数据不足"静默处理，
+ * 那条规则从此不出结论，没有任何提示（`no_data` 当初就是这么漏的）。
+ */
+const BUILTIN_VARS = new Set([...parseProviderApi(read(PY_PROVIDER_API)).semantics,
+                              ...FRAMEWORK_VARS]);
 
 /** 表达式里允许出现、但不是变量名的关键字/字面量（校验标识符时跳过） */
 const EXPR_KEYWORDS = new Set([
@@ -215,6 +226,28 @@ function parseOperatorSignatures(py) {
     };
   }
   return sigs;
+}
+
+/**
+ * 从 providers/api.py 解析契约的三张常量表（格式固定：`NAME = {` 起、顶层键各占一行）。
+ *
+ * 为什么在 Node 里用正则而不是"跑一下 Python"：构建期**不执行** engine/ 下的代码
+ * （只当文本搬运，见 engine/README.md），这条约定不能破——所以契约表按固定格式解析，
+ * 解析不到就构建失败（同 parseOperatorSignatures 的做法）。
+ */
+function parseProviderApi(py) {
+  const block = (name) => {
+    const m = new RegExp(`^${name} = \\{([\\s\\S]*?)^\\}`, "m").exec(py);
+    if (!m) throw new Error(`engine/providers/api.py 里解析不到 ${name} 常量表`);
+    const keys = [...m[1].matchAll(/^\s{4}"([a-z_0-9]+)":/gm)].map((x) => x[1]);
+    if (keys.length === 0) throw new Error(`engine/providers/api.py 的 ${name} 是空的`);
+    return keys;
+  };
+  return {
+    required: block("REQUIRED"),
+    optional: block("OPTIONAL"),
+    semantics: block("SEMANTICS"),
+  };
 }
 
 /** 校验并加载 rules/*.yaml；任何不完整都构建失败（杜绝"空洞经验"） */
@@ -604,9 +637,10 @@ if (!ruleEnginePy.includes("__RULES__")) {
 if (!ruleEnginePy.includes("__FACTS__")) {
   throw new Error("rule_engine.py 必须保留 __FACTS__ 占位符");
 }
-// facts.yaml：事实层的数据绑定与码表。键名是引擎约定的，缺一个就构建失败
-// （宁可构建失败，也不要在浏览器里跑到某个码表是空的才发现）。
-for (const key of ["group_order", "bindings", "log_levels", "vehicle_types",
+// facts.yaml：那一种格式的数据（码表 / 文案 / 展示口径 / 规则元数据）。
+// 键名是引擎与 provider 约定的，缺一个就构建失败（宁可构建失败，也不要在浏览器里
+// 跑到某个码表是空的才发现）。取数逻辑不在这里——它在 engine/providers/<格式>.py。
+for (const key of ["group_order", "log_levels", "vehicle_types",
                    "nav_state_names", "nav_state_groups", "sys_info_keys", "ulog_msg_types",
                    "info_key_docs", "rule_meta"]) {
   if (facts[key] === undefined) throw new Error(`facts.yaml 缺少 ${key}`);
@@ -622,7 +656,6 @@ for (const t of facts.ulog_msg_types) {
     throw new Error(`facts.yaml 的 ulog_msg_types 每项都要有单字母 code：${JSON.stringify(t)}`);
   }
 }
-if (!facts.bindings?.vehicle_status) throw new Error("facts.yaml 缺少 bindings.vehicle_status");
 // metrics：概览指标的展示清单（key/label/unit + 可选的兜底取数）
 const metricKeys = new Set();
 for (const m of facts.metrics ?? []) {
@@ -652,8 +685,41 @@ for (const r of rules) {
     throw new Error(`规则 ${r.id} 的 group「${r.group}」未登记在 knowledge/px4/facts.yaml 的 group_order`);
   }
 }
-// 算子定义必须在框架之前执行（框架用它按名字调用）
-const pyWithOperators = operatorsPy + "\n" + ruleEnginePy;
+// ---------------- provider 契约：构建期查"漏写" ----------------
+// 契约的事实源是 engine/providers/api.py 的两张常量表。这里查每个适配器是否**定义了**
+// 契约要求的能力、semantics() 的字典字面量键是否齐全。
+// 查不了运行时行为（类型、失败语义）——那两道在引擎的运行期自检与
+// tools/calibrate/check_provider.py 里，三道合起来才是完整的一道关。
+const providerApi = parseProviderApi(read(PY_PROVIDER_API));
+for (const f of providerFiles) {
+  const src = read(resolve(PROVIDER_DIR, f));
+  const where = `engine/providers/${f}`;
+  if (!/^class\s+\w+/m.test(src)) throw new Error(`${where}: 里没有定义适配器类`);
+  for (const name of providerApi.required) {
+    const ok = name === "fmt"
+      ? /^\s+fmt\s*=/m.test(src)
+      : new RegExp(`^\\s+def ${name}\\(`, "m").test(src);
+    if (!ok) {
+      throw new Error(`${where}: 缺少契约要求的能力 ${name}（见 engine/providers/api.py 的 REQUIRED）`);
+    }
+  }
+  // semantics() 必须给出契约里列的每一个内置变量——少一个，引用它的规则会**静默**算不出数据
+  const body = src.slice(src.indexOf("def semantics("));
+  const cut = body.indexOf("\n    def ", 10);
+  const sem = cut === -1 ? body : body.slice(0, cut);
+  for (const key of providerApi.semantics) {
+    if (!sem.includes(`"${key}"`)) {
+      throw new Error(`${where}: semantics() 缺少内置变量 ${key}（见 api.py 的 SEMANTICS）`);
+    }
+  }
+}
+// 拼接顺序即执行顺序：算子注册表 → provider 契约 → 各格式适配器 → 框架 → 数据层
+const pyWithOperators = [
+  operatorsPy,
+  read(PY_PROVIDER_API),
+  ...providerFiles.map((f) => read(resolve(PROVIDER_DIR, f))),
+  ruleEnginePy,
+].join("\n");
 emit(
   resolve(outWorkers, "ulog-check-script.ts"),
   banner +
@@ -762,6 +828,8 @@ emit(
 const versionSources = [
   ["engine/report_data.py", PY_REPORT_DATA],
   ["engine/rule_engine.py", PY_RULE_ENGINE],
+  ["engine/providers/api.py", PY_PROVIDER_API],
+  ...providerFiles.map((f) => [`engine/providers/${f}`, resolve(PROVIDER_DIR, f)]),
   ["knowledge/px4/facts.yaml", FACTS_PATH],
   ...plotFiles.map((f) => [`knowledge/px4/plot/${f}`, resolve(PLOT_DIR, f)]),
 ];
@@ -773,7 +841,8 @@ const derivedVersionHex = derivedVersion.digest("hex").slice(0, 12);
 emit(
   resolve(webRoot, "lib/knowledge/derived-version.generated.ts"),
   banner +
-    "// 源：engine/report_data.py + knowledge/px4/{facts.yaml,plot/*.yml} 的内容哈希\n" +
+    "// 源：engine/{report_data,rule_engine}.py + engine/providers/*.py + " +
+    "knowledge/px4/{facts.yaml,plot/*.yml} 的内容哈希\n" +
     "// 用途：存档里的派生数据（info / 曲线 / 轨迹）带的版本，与这里不一致就重新解析一次。\n" +
     "export const DERIVED_DATA_VERSION = " +
     JSON.stringify(derivedVersionHex) +
