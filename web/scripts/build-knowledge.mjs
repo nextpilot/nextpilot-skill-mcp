@@ -1022,6 +1022,8 @@ function normalizeConditions(raw, where, airframes) {
   return out;
 }
 
+const escapeMdx = (s) => String(s ?? "").replace(/\{/g, "\\{").replace(/\}/g, "\\}");
+
 function fmtApplicability(raw) {
   const parts = [];
   // conditions 的三个键（不限就整个省掉）：固件 / 机架 / 依赖的 topic
@@ -1046,7 +1048,7 @@ function fmtTriggers(raw) {
     const bits = [`**${t.severity}**`, `\`${t.when}\``];
     if (t.threshold !== undefined && t.threshold !== null) bits.push(`阈值 ${t.threshold}`);
     if (t.unit) bits.push(`单位 ${t.unit}`);
-    bits.push(`标题「${t.title}」`);
+    bits.push(`标题「${escapeMdx(t.title)}」`);
     lines.push("- " + bits.join(" ｜ "));
   }
   for (const g of raw.outputs?.guard_tags || []) {
