@@ -180,6 +180,19 @@ def np_series(request_json, max_points=3000):
             arrs.append(np.full(n, float(v)))  # 换算出的是标量：铺成常量线（门限线是正当用法）
         else:
             arrs.append(np.asarray(v, dtype=float))
+    # 横轴与曲线必须来自同一份采样：一张图的 compute 若横跨了两个话题（采样率不同），
+    # 降采样按横轴长度走，索引到较短的那条会越界——给一句能照着改的话，别抛 numpy 的 IndexError
+    for a in arrs:
+        if a is not None and len(a) < n:
+            __result = json.dumps(
+                {
+                    "error": "横轴与某条线的采样数对不上（横轴 %d 点、那条线 %d 点）——"
+                    "一张图的 compute 横跨了多个话题时，请显式写 xdata，"
+                    "或用 fill_to / head 把序列对齐" % (n, len(a))
+                },
+                ensure_ascii=False,
+            )
+            return
     ref = next((a for a in arrs if a is not None), None)
     idx = _lttb_indices(n, int(max_points), ref)
     __result = json.dumps(

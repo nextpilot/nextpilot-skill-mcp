@@ -39,8 +39,16 @@ outputs:
     per_instance: false        # 可选，默认 false；置 true 时下面写 [:] 的线按实例拆成多张图
     children:                  # 至少一条 child：每条 child 一组取数
       - mode: TimeSeries       # TimeSeries（横轴=时间）｜xyplot（横轴=你给的 xdata）
-        xdata: >-              # xyplot 必填；TimeSeries 可省（省 = 时间戳）
-          ref("vehicle_gps_position[0].latitude_deg", "vehicle_gps_position[0].lat", unit="deg")
+        # 横轴：不写 xdata 时取**命中字段那个话题的 timestamp**（同一份采样，天然对齐）。
+        # 命中字段 = ydata 里第一个取到数据的字段；整张图都由 compute 算出来时，从 compute
+        # 语句里反推第一个"topic 存在于日志"的引用（ref(...) 与裸写 topic.field 都认）。
+        # ⚠ 一张图的 compute 若**横跨两个话题**，反推可能取到另一个话题——采样数不同会报错
+        #   （不是画错图）。这种图请显式写 xdata，或用 fill_to / head 把序列对齐。
+        # 时间序列**通常不用写 xdata**（缺省就是时间戳）；要画"非时间"的横轴就用 mode: xyplot：
+        #   - mode: xyplot
+        #     xdata: ref("vehicle_gps_position[0].latitude_deg", "vehicle_gps_position[0].lat", unit="deg")
+        #     ydata: ref("vehicle_gps_position[0].altitude_msl_m", "vehicle_gps_position[0].alt", unit="m")
+        #     label: 海拔
         # ydata：要画的线，逗号分隔。每一项要么是字段引用，要么是上面 compute 算出来的变量名。
         # 字段引用与规则**同一套**语言：候选组按存在性挑第一个；unit= 是**期望输出单位**
         # （源单位构建期从 meta/ 查，查不到会告警，补一行到 meta/topic-overrides.yaml 即可）。

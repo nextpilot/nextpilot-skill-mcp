@@ -68,12 +68,30 @@ outputs:
 | 键 | 必填 | 说明 |
 | --- | --- | --- |
 | `mode` | ✓ | `TimeSeries`（横轴=时间）｜`xyplot`（横轴=你给的 `xdata`） |
-| `xdata` | | `xyplot` 必填；`TimeSeries` 缺省用命中字段那个话题的 `timestamp` |
+| `xdata` | | `xyplot` 必填；写了的**优先**，不写才走"自动定时间轴"（见下） |
 | `ydata` | ✓ | 要画的线，**逗号分隔**。每一项要么是字段引用（`ref(...)` 或裸写 `topic.field`），要么是 `compute` 算出来的变量名 |
 | `label` / `style` / `color` | | 与 `ydata` **逐项对齐**（个数不等就构建失败）。`style` 取 `solid｜dashed｜dotted`；`color` 是 `#rrggbb`，**用块标量写**（YAML 不允许标量以引号开头，而 `#` 不加引号会被当注释） |
 
 `map` 的 child：`mode: track` + `label` + `max_points` + `lat` / `lon` / `alt`（各一个字段引用，
 **必须写明实例**：同一条轨道的时间戳与 `fix_type` 要跟坐标来自同一个话题的同一个实例）。
+
+## 横轴（时间轴）是怎么定的
+
+`TimeSeries` 不写 `xdata` 时，横轴取**命中字段那个话题的 `timestamp`**（同一个实例）——
+这样横轴与曲线来自同一份采样，天然对齐。判据按顺序是：
+
+1. `ydata` 里**第一个取到数据**的字段引用所在的话题；
+2. 整张图都由 `compute` 算出来时（ydata 全是变量名），从 `compute` 语句里反推**第一个 topic
+   在日志里存在**的引用——`ref("topic.field")` 与裸写的 `topic.field` 都认。
+   例：`roll, pitch, yaw = quat_to_euler(vehicle_attitude.q)` → 横轴 = `vehicle_attitude.timestamp`。
+
+**边界（要注意）**：第 2 条是启发式——它挑的是"文字上先出现的、话题存在的引用"，不是"哪条序列
+在驱动横轴"。所以**一张图的 `compute` 如果横跨两个话题**（例如四元数来自 `vehicle_attitude`、
+又算了条 GPS 的速度），横轴可能取到另一个话题；两个话题采样数不同时，降采样按横轴长度走，
+索引到较短的那条序列会**报错**（画不出来，而不是画一张错的图）。
+
+> **这种图请显式写 `xdata`**：它是字段引用，写了就优先，兜底不再介入。
+> 想让两条不同采样率的序列对齐，也有现成算子（`fill_to` / `head`，见算子目录）。
 
 ## 取数语言：与规则完全一致
 
