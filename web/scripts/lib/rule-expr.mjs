@@ -51,6 +51,15 @@ export function isAirframeSpec(v) {
   );
 }
 
+/**
+ * `triggers[].severity` 的合法取值。
+ *
+ * 放在这里是为了**只有一份真源**：构建期校验与编辑器用的 JSON Schema 都取这一份。
+ * 抄成两份的后果不是"两边不一致"这么轻——IDE 会拿着旧词表去**纠正**新写法
+ * （飘红建议改成已经不合法的值），比完全没有提示更糟。
+ */
+export const SEVERITIES = new Set(["critical", "warning", "info"]);
+
 /** 日志 topic 名（uORB 风格的小写 snake_case） */
 const TOPIC_NAME = /^[a-z][a-z0-9_]*$/;
 

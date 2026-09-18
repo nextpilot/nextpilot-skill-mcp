@@ -162,16 +162,16 @@ Python `str.format_map` 支持的格式：
 
 ## 8. 构建期拒绝的写法（常见坑）
 
-| 问题 | 表现 |
-|------|------|
-| `group` 不在 `facts.yaml` 的 `group_order` 里 | 构建直接报错：「group『xxx』未登记」 |
-| `tags` 的值在 `facts.yaml` 的 tags 字典里找不到 | 构建直接报错：「tag『xxx』不在 facts 里」 |
-| `trigger` 用的 Topic 在 `facts.yaml` 的白名单里没有 | 构建直接报错：「topic『xxx』不在允许列表里」 |
-| 算子名写错了 | 构建直接报错：「未知的算子名『xxx』」 |
-| 算子参数不全 / 多了 | 构建直接报错：「XX 算子缺少必填参数 YY」/「XX 算子有多余参数 YY」 |
-| `compute` 不写单管道（多了一条管道） | 构建直接报错：「每条经验只允许一个 compute 键值对」 |
-| 名字以 `_` 开头 | 构建直接报错：「compute 名不能以 `_` 开头——那是引擎保留名」 |
-| 配置文件用的 `.yaml` 键名写成 `Title` 而不是 `title` | 构建直接报错：「不认识的键名」 |
+| 问题 | 构建期报错 |
+|------|-----------|
+| `group` 未在 `facts.yaml` 的 `group_order` 里登记 | `group『xxx』未登记` |
+| `tags` 值在 `facts.yaml` 的 tags 字典里找不到 | `tag『xxx』不在 facts 里` |
+| `trigger` 用的 Topic 不在 `facts.yaml` 白名单里 | `topic『xxx』不在允许列表里` |
+| 算子名拼写错误 | `未知的算子名『xxx』` |
+| 算子参数缺失或多余 | `缺少必填参数` / `有多余参数` |
+| `compute` 写了多管道（不止一个键值对） | `每条经验只允许一个 compute 键值对` |
+| compute 名以 `_` 开头 | `compute 名不能以 _ 开头——那是引擎保留名` |
+| 键名大小写错误（如 `Title` 写成 `title`） | `不认识的键名『xxx』` |
 
 > **以上全部在 `tools/ci/check_all.py` 和 web 构建期（`pnpm build`）执行**。
 

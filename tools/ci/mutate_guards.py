@@ -74,6 +74,7 @@ FLIGHT_MAP = "web/components/LogFlightMap.tsx"
 GUARDS = {
     "artifact": ([PY, "tools/calibrate/check_artifact.py"], ROOT, "产物侧（check_artifact）", "prose"),
     "ui": ([NODE, "scripts/test-issue-filer.mjs"], WEB, "界面侧（test-issue-filer）", "fail-lines"),
+    "hygiene": ([PY, "tools/ci/check_hygiene.py"], ROOT, "卫生检查（check_hygiene）", "fail-lines"),
 }
 
 
@@ -188,6 +189,65 @@ MUTATIONS: list[Mutation] = [
         expect="引擎没给原因时明说是解析器缺陷",
         note="伪装成「日志里没有轨迹」会让解析器缺陷看起来像用户的数据问题",
     ),
+    # ---- 卫生检查：引用落点 / 判据可重跑 / 失败可见（2026-09-18 的第二批） ----
+    #
+    # 这六条与上面十条性质不同：上面守的是"功能有没有说谎"，这里守的是"**校验本身**有没有说谎"。
+    # 它们坏掉时都没有输出——引用悬空要人读到才发现、误报会让人去改没坏的东西、吞掉的失败连
+    # "有人在看"这个前提都不成立。所以每一条都得当场证明它会红。
+    Mutation(
+        name="某一节丢了编号（引用它的人当场暴露）",
+        path="CLAUDE.md",
+        old="### 6.6 守卫自己也要被校验（判空查的名字必须真实存在）",
+        new="### 守卫自己也要被校验（判空查的名字必须真实存在）",
+        guard="hygiene",
+        expect="悬空 § 引用",
+        note="那天的原形：5 处注释写着 CLAUDE.md §6.8，而 §6.8 当时并不存在——读者按图索骥，翻到一页空白",
+    ),
+    Mutation(
+        name="CI 门改用 git 工作区状态判产物",
+        path="tools/ci/check_all.py",
+        old="PY = sys.executable",
+        new='PY = sys.executable\nGATE_GIT = ["git", "status", "--porcelain"]  # 变异：拿工作区状态当判据',
+        guard="hygiene",
+        expect="产物新鲜度不许用 git 当判据",
+        note="判据落在 git 上，人的正常编辑也会被算成漂移（作者当时只能回一句「是我手动修改的」）",
+    ),
+    Mutation(
+        name="产物新鲜度门不再据比对结果判失败",
+        path="web/scripts/build-knowledge.mjs",
+        old="if (drifted.length > 0) {",
+        new="if (false) {",
+        guard="hygiene",
+        expect="产物新鲜度门还在",
+        note="防「目标消失」：这道门被删掉之后，上面那条规则会因为找不到目标而恒绿",
+    ),
+    Mutation(
+        name="Python 校验脚本不把 main 的返回值交给退出码",
+        path="tools/calibrate/compare_baseline.py",
+        old="raise SystemExit(main(sys.argv))",
+        new="main(sys.argv)",
+        guard="hygiene",
+        expect="打了 FAIL/ERROR 就要能非零退出",
+        note="原形就是它：main() 里对 6 份日志全打 ERROR，然后 return 0——pre-push 与 CI 一起放行",
+    ),
+    Mutation(
+        name="JS 侧打了 CHECK FAIL 却把 exitCode 设成 0",
+        path="web/scripts/build-knowledge.mjs",
+        old="process.exitCode = 1;",
+        new="process.exitCode = 0;",
+        guard="hygiene",
+        expect="打了 FAIL/ERROR 就要能非零退出",
+        note="同一形状的另一半：产物新鲜度门报完不一致，却以成功退出",
+    ),
+    Mutation(
+        name="坏输入不再让校验脚本非零退出",
+        path="tools/calibrate/run_checks_locally.py",
+        old="return 1 if failed else 0",
+        new="return 0",
+        guard="hygiene",
+        expect="坏输入必须非零退出",
+        note="静态规则看不见这一半：确实 return 1 了，但那条路根本没被走到过",
+    ),
 ]
 
 
@@ -258,7 +318,9 @@ def _failed_names(key: str, out: str) -> set[str]:
     """从守卫输出里数出**红了的**那几条（不是"输出了哪些字"）。
 
     两种格式：
-    - `fail-lines`（test-issue-filer.mjs）：每条打印 `  FAIL  <名字>  → <补充>`，只认 FAIL 行；
+    - `fail-lines`（test-issue-filer.mjs / check_hygiene.py）：每条打印 `  FAIL  <名字>  → <补充>`，
+      只认 FAIL 行。箭头**两种都收**：`→` 与 `->` —— 仓库的 ASCII/GBK 约定让有的脚本用
+      `->`，只认 `→` 的话那些脚本的名字会把整行都吞进去（"红的不是它"的假失败）。
     - `prose`（check_artifact.py）：失败时打印一段人话再 `return 1`，没有统一前缀——
       只能拿注册表里的文案去对，但**产物侧的文案只在失败时才打印**，所以这么对是准的。
     """
@@ -266,7 +328,7 @@ def _failed_names(key: str, out: str) -> set[str]:
     if kind == "fail-lines":
         names = set()
         for line in out.splitlines():
-            m = _re.match(r"\s*FAIL\s+(.*?)(?:\s+→\s+.*)?$", line)
+            m = _re.match(r"\s*FAIL\s+(.*?)(?:\s+(?:->|→)\s+.*)?$", line)
             if m:
                 names.add(m.group(1).strip())
         return names
@@ -305,12 +367,21 @@ def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--list", action="store_true", help="只打印注册表")
     ap.add_argument("--only", default="", help="只跑名字里含这个词的变异")
+    ap.add_argument("--guard", default="", help=f"只跑某一层守卫的变异：{' / '.join(sorted(GUARDS))}")
     ap.add_argument("--skip-baseline", action="store_true", help="跳过基线（调试用；正常别加）")
     args = ap.parse_args(argv[1:])
 
-    picked = [m for m in MUTATIONS if args.only in m.name] if args.only else list(MUTATIONS)
-    if args.only and not picked:
-        print(f"FAIL --only {args.only!r} 没匹配到任何变异")
+    if args.guard and args.guard not in GUARDS:
+        print(f"FAIL --guard {args.guard!r} 不是已知的守卫层：{' / '.join(sorted(GUARDS))}")
+        return 1
+
+    picked = list(MUTATIONS)
+    if args.guard:
+        picked = [m for m in picked if m.guard == args.guard]
+    if args.only:
+        picked = [m for m in picked if args.only in m.name]
+    if (args.only or args.guard) and not picked:
+        print(f"FAIL --only {args.only!r} --guard {args.guard!r} 没匹配到任何变异")
         return 1
 
     if args.list:
@@ -393,6 +464,8 @@ def main(argv: list[str]) -> int:
             continue
         # 断言「恰好一条」而不是「预期那条在里面」：牵连说明守卫之间有耦合，
         # 以后任何一次正常改动都会连带报错，人就会开始忽略它们。
+        # 排除 expect 与自己相同的那些：两条变异合法地指向同一条检查（一条守 Python 半边、
+        # 一条守 JS 半边）时，那不算牵连。
         if len(red) > 1:
             print("FAIL 牵连了别的守卫（变异改到了它守的东西）：")
             for one in sorted(red - {m.expect}):

@@ -39,9 +39,11 @@ import {
   normalizeUnit,
   UNIT_ALIASES,
   UNIT_KIND,
+  SEVERITIES,
   checkFieldItem,
   splitFieldRef,
 } from "./lib/rule-expr.mjs";
+import { buildRuleSchema } from "./lib/gen-rule-schema.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
@@ -426,8 +428,9 @@ function loadRules(dir, signatures, ruleMeta, airframes) {
     }
     for (const t of raw.triggers || []) {
       if (typeof t.when !== "string") throw new Error(`${where}: trigger 缺 when（须为字符串，注意加引号）`);
-      if (!["critical", "warning", "info"].includes(t.severity)) {
-        throw new Error(`${where}: trigger severity 非法：${t.severity}`);
+      // 词表取 rule-expr.mjs 的 SEVERITIES（编辑器 schema 也用这一份，别再抄一份）
+      if (!SEVERITIES.has(t.severity)) {
+        throw new Error(`${where}: trigger severity 非法：${t.severity}（可用：${[...SEVERITIES].join(" / ")}）`);
       }
       if (typeof t.title !== "string") throw new Error(`${where}: trigger 缺 title`);
       if (typeof t.field !== "string") throw new Error(`${where}: trigger 缺 field（evidence.field）`);
@@ -1122,7 +1125,7 @@ function catalogueFrontmatter({ title, titleEn, description, descriptionEn, orde
 function renderCataloguePage(rules, sources) {
   return (
     catalogueFrontmatter({
-      title: "当前有哪些规则",
+      title: "现在规则清单",
       titleEn: "Rule catalogue",
       description: "全部检查经验的清单：各自读什么字段、什么条件触发、产出什么标签。",
       descriptionEn: "Every built-in check — the fields it reads, the condition that fires it, and the tags it emits.",
@@ -1379,16 +1382,16 @@ Python \`str.format_map\` 支持的格式：
 
 ## 8. 构建期拒绝的写法（常见坑）
 
-| 问题 | 表现 |
-|------|------|
-| \`group\` 不在 \`facts.yaml\` 的 \`group_order\` 里 | 构建直接报错：「group『xxx』未登记」 |
-| \`tags\` 的值在 \`facts.yaml\` 的 tags 字典里找不到 | 构建直接报错：「tag『xxx』不在 facts 里」 |
-| \`trigger\` 用的 Topic 在 \`facts.yaml\` 的白名单里没有 | 构建直接报错：「topic『xxx』不在允许列表里」 |
-| 算子名写错了 | 构建直接报错：「未知的算子名『xxx』」 |
-| 算子参数不全 / 多了 | 构建直接报错：「XX 算子缺少必填参数 YY」/「XX 算子有多余参数 YY」 |
-| \`compute\` 不写单管道（多了一条管道） | 构建直接报错：「每条经验只允许一个 compute 键值对」 |
-| 名字以 \`_\` 开头 | 构建直接报错：「compute 名不能以 \`_\` 开头——那是引擎保留名」 |
-| 配置文件用的 \`.yaml\` 键名写成 \`Title\` 而不是 \`title\` | 构建直接报错：「不认识的键名」 |
+| 问题 | 构建期报错 |
+|------|-----------|
+| \`group\` 未在 \`facts.yaml\` 的 \`group_order\` 里登记 | \`group『xxx』未登记\` |
+| \`tags\` 值在 \`facts.yaml\` 的 tags 字典里找不到 | \`tag『xxx』不在 facts 里\` |
+| \`trigger\` 用的 Topic 不在 \`facts.yaml\` 白名单里 | \`topic『xxx』不在允许列表里\` |
+| 算子名拼写错误 | \`未知的算子名『xxx』\` |
+| 算子参数缺失或多余 | \`缺少必填参数\` / \`有多余参数\` |
+| \`compute\` 写了多管道（不止一个键值对） | \`每条经验只允许一个 compute 键值对\` |
+| compute 名以 \`_\` 开头 | \`compute 名不能以 _ 开头——那是引擎保留名\` |
+| 键名大小写错误（如 \`Title\` 写成 \`title\`） | \`不认识的键名『xxx』\` |
 
 > **以上全部在 \`tools/ci/check_all.py\` 和 web 构建期（\`pnpm build\`）执行**。
 
@@ -1699,6 +1702,15 @@ writeArtifact(
     count: Object.keys(paramCompact).length,
     params: paramCompact,
   }) + "\n",
+);
+
+// 4.8) rules/*.yaml 的**编辑器 schema**（yaml-language-server 消费，配 .vscode/settings.json）
+//      词表全部从 facts.yaml / engine/ 派生（见 lib/gen-rule-schema.mjs）——手抄一份就多一个
+//      真源：改了 facts.yaml 而这里没跟上时，IDE 会拿旧词表去纠正新写法，比没提示更糟。
+//      与别的产物一样走 writeArtifact：`--check` 会比对它与源是否一致。
+writeArtifact(
+  resolve(KN, "rules-editor-schema.generated.json"),
+  JSON.stringify(buildRuleSchema({ signatures, facts, airframes, builtinVars: BUILTIN_VARS }), null, 2) + "\n",
 );
 
 // 5) 指南的「知识库」分组：规则清单 + 规则编写参考（改规则/算子/内置变量后自动跟上，不用谁记得手动同步）
