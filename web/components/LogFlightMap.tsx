@@ -100,7 +100,7 @@ export function LogFlightMap({
       // 不重置的话上一轮的错误文案会一直挂着，看起来像按钮没生效
       setState("loading");
       setErrorMsg(null);
-      setErrorReasons([]);
+      
       setErrorCode(undefined);
       try {
         LModule = await getLeaflet();
