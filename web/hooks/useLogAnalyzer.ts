@@ -310,9 +310,9 @@ export function useLogAnalyzer() {
                 worker.postMessage({
                     type: "series",
                     reqId,
-                    topic: req.topic,
-                    instance: req.instance,
-                    fields: req.fields,
+                    // 取数声明整份发给引擎（字段引用 + 候选组 + 单位 + 换算节点）：
+                    // 前端不解释它，只在 np_series 里原样用（见 report_data.py）
+                    request: req,
                 });
             });
         },
@@ -339,17 +339,22 @@ export function useLogAnalyzer() {
                 const series: StoredPlotSeries = {};
                 for (const sp of panels) {
                     for (let i = 0; i < sp.panels.length; i++) {
-                        const req = sp.panels[i].requests[0];
-                        if (!req) continue;
-                        const resp = await requestSeries(req);
-                        if (resp && !(resp as { error?: string }).error) series[`${sp.presetId}#${i}`] = resp;
+                        // 一个面板可能要发多次取数（多条 child 各有自己的横轴）——
+                        // 落盘时按请求顺序存成数组，键仍是 `${presetId}#面板序号`
+                        const reqs = sp.panels[i].requests;
+                        if (reqs.length === 0) continue;
+                        const got = await Promise.all(reqs.map((r) => requestSeries(r)));
+                        if (got.every((r) => r && !(r as { error?: string }).error)) {
+                            series[`${sp.presetId}#${i}`] = got;
+                        }
                     }
                 }
                 setStoredPlots({ panels, series });
                 if (liveAnalysis?.id === id) liveAnalysis.storedPlots = { panels, series };
-                // 轨迹（地图用）：一次抽好存下，之后打开历史不必再解析
+                // 轨迹（地图用）：一次抽好存下，之后打开历史不必再解析。
+                // 可能有多条（多条叠画 + 图例）——一条都没有才算没轨迹。
                 const track = await requestTrack();
-                const hasTrack = track && !track.error && (track.lat?.length ?? 0) > 1;
+                const hasTrack = Boolean(track && !track.error && (track.tracks?.length ?? 0) > 0);
                 if (hasTrack) setStoredTrack(track);
                 await saveReportData(id, {
                     derivedVersion: DERIVED_DATA_VERSION,

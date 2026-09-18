@@ -61,22 +61,18 @@ def load_field_units() -> dict:
 
 
 def load_facts_payload() -> dict:
-    """provider 拿到的那份数据配置 —— **facts.yaml + plot/track.yml**。
+    """provider 拿到的那份数据配置 —— **从产物里取**（`const facts = {...}`）。
 
-    轨迹的取数声明按「要画什么、从哪几列画」归在 plot/ 下，但它的消费者是 provider
-    （轨迹在引擎侧取数、换算、抽稀），所以并进 facts 一起送进去。
-
-    **这条装配规则构建期也有一份**（web/scripts/build-knowledge.mjs 里同样两行）——
-    改了要一起改。两边不一致时，本地回归与浏览器会拿到不同的配置，而本地的表现是
-    "轨迹取数声明丢了"（get_flight_track() 返回 error）——这次就是这么踩到的，所以单独抽成函数，
-    别再各写各的。
+    为什么要从产物取、而不是本地重新装配：facts.yaml 与 plot/ 下的地图声明是**构建期**
+    合流的（预设要编译成候选组、单位要查表），本地再装配一遍就是"同一份规则有两处实现"——
+    两边一旦不一致，本地的表现是"轨迹声明丢了"（`get_flight_track()` 返回 error），
+    而浏览器没事。2026-09-17 与 2026-09-18 各踩过一次，所以改成只认产物。
     """
-    import yaml as _yaml
-
-    facts = _yaml.safe_load(FACTS_YAML.read_text(encoding="utf-8"))
-    track_yml = KN_PX4 / "plot" / "track.yml"
-    facts["track"] = _yaml.safe_load(track_yml.read_text(encoding="utf-8"))["track"]
-    return facts
+    src = CHECK_SCRIPT.read_text(encoding="utf-8")
+    m = re.search(r"^const facts = (.*?);$", src, re.M | re.S)
+    if not m:
+        raise RuntimeError("产物里找不到 `const facts = ...`，先 cd web && pnpm build:kb")
+    return json.loads(m.group(1))
 
 
 def _load_checks() -> str:

@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import type { TrackData } from "@/lib/types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Layer } from "leaflet";
+import type { TrackData, TrackSeries } from "@/lib/types";
 import { FileUp, Loader2, MapPin } from "lucide-react";
 import { wgs84ToGcj02 } from "@/lib/coord";
+import { SERIES_COLORS_DARK, SERIES_COLORS_LIGHT } from "@/lib/chart-presets";
 import {
   AMAP_ATTRIBUTION,
   AMAP_SATELLITE,
@@ -21,6 +23,13 @@ interface GpsPoint {
   alt: number;
 }
 
+/** 画在地图上的一条轨道（坐标已换算成 GCJ-02） */
+interface DrawnTrack {
+  label: string;
+  color: string;
+  points: GpsPoint[];
+}
+
 /**
  * 底图：**国内可达**的高德瓦片（OpenStreetMap / Esri 在国内实测连不上，地图会是一片灰）。
  * 代价是坐标系——高德是 GCJ-02，日志是 WGS-84，所以画之前统一换算（见 lib/coord.ts）。
@@ -31,6 +40,10 @@ function altitudeColor(alt: number, minAlt: number, maxAlt: number): string {
   const t = Math.max(0, Math.min(1, (alt - minAlt) / (maxAlt - minAlt)));
   const hue = Math.round(220 * (1 - t));
   return `hsl(${hue}, 70%, 48%)`;
+}
+
+function isDark(): boolean {
+  return document.documentElement.dataset.theme === "dark";
 }
 
 type LeafletModule = typeof import("leaflet");
@@ -56,11 +69,16 @@ export function LogFlightMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const boundsRef = useRef<import("leaflet").LatLngBounds | null>(null);
+  /** 每条约定的图层（图例点选隐藏时按 label 增删） */
+  const layersRef = useRef<Map<string, Layer[]>>(new Map());
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [altRange, setAltRange] = useState<[number, number] | null>(null);
   const [pointCount, setPointCount] = useState(0);
   /** 被剔除的未定位采样数（GPS 没定位时 PX4 会记 lat=lon=0，画进来就是一条飞出非洲的直线） */
   const [droppedCount, setDroppedCount] = useState(0);
+  /** 图例（多条轨道时显示；单条沿用海拔渐变，不出图例） */
+  const [legend, setLegend] = useState<{ label: string; color: string }[]>([]);
+  const [hidden, setHidden] = useState<string[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   /** 错误种类（见 TrackData.code）：`not-parsed` 才给「重新选择文件」按钮 */
   const [errorCode, setErrorCode] = useState<TrackData["code"]>(undefined);
@@ -82,46 +100,58 @@ export function LogFlightMap({
       try {
         LModule = await getLeaflet();
 
-        // 轨迹由引擎按 facts.yaml 的声明取好并换算（旧固件 degE7/mm、新固件 deg/m 都在这儿消化）
+        // 轨迹由引擎按预设的声明取好并换算（旧固件 degE7/mm、新固件 deg/m 都在这儿消化）
         const track = await loadTrack();
         if (cancelled) return;
 
-        if (track.error || !track.lat?.length || !track.lon?.length) {
+        const list: TrackSeries[] = track.tracks ?? [];
+        if (track.error || list.length === 0) {
           setErrorMsg(track.error ?? "日志里没有可用的 GPS 轨迹");
           setErrorCode(track.code);
           setState("error");
           return;
         }
 
-        const points: GpsPoint[] = [];
-        for (let i = 0; i < track.lat.length; i++) {
-          const lat = track.lat[i];
-          const lon = track.lon[i];
-          if (lat !== null && lon !== null) {
-            points.push({ lat, lon, alt: track.alt?.[i] ?? 0 });
+        // 底图是高德的 GCJ-02，日志是 WGS-84：画之前统一换算，否则轨迹整体偏几百米。
+        // 只换算画图用的那份，"这份轨迹是 WGS-84" 的事实不被改写。
+        const colors = isDark() ? SERIES_COLORS_DARK : SERIES_COLORS_LIGHT;
+        const drawn: DrawnTrack[] = [];
+        let total = 0;
+        let dropped = 0;
+        const alts: number[] = [];
+        list.forEach((tk, ti) => {
+          const points: GpsPoint[] = [];
+          for (let i = 0; i < tk.lat.length; i++) {
+            const lat = tk.lat[i];
+            const lon = tk.lon[i];
+            if (typeof lat !== "number" || typeof lon !== "number") continue;
+            const [gLat, gLon] = wgs84ToGcj02(lat, lon);
+            const alt = typeof tk.alt?.[i] === "number" ? (tk.alt[i] as number) : 0;
+            points.push({ lat: gLat, lon: gLon, alt });
+            alts.push(alt);
           }
-        }
+          if (points.length < 2) return;
+          total += points.length;
+          dropped += tk.dropped ?? 0;
+          drawn.push({ label: tk.label || `轨道 ${ti + 1}`, color: colors[ti % colors.length], points });
+        });
 
-        if (points.length < 2) {
+        if (drawn.length === 0) {
           setState("error");
           return;
         }
 
-        const alts = points.map((p) => p.alt);
-        setAltRange([Math.min(...alts), Math.max(...alts)]);
-        setPointCount(points.length);
-        setDroppedCount(track.dropped ?? 0);
-        // 底图是高德的 GCJ-02，日志是 WGS-84：画之前统一换算，否则轨迹整体偏几百米。
-        // 只换算画图用的那份，"这份轨迹是 WGS-84" 的事实不被改写。
-        const drawPoints = points.map((p) => {
-          const [lat, lon] = wgs84ToGcj02(p.lat, p.lon);
-          return { ...p, lat, lon };
-        });
-        const [startLat, startLon] = wgs84ToGcj02(points[0].lat, points[0].lon);
+        setPointCount(total);
+        setDroppedCount(dropped);
+        // 单条轨道：保留海拔渐变着色（左侧色带用它）；多条：各自纯色 + 图例
+        setAltRange(drawn.length === 1 ? [Math.min(...alts), Math.max(...alts)] : null);
+        setLegend(drawn.map((t) => ({ label: t.label, color: t.color })));
+        setHidden([]);
+        const start = drawn[0].points[0];
         setAmapUrl(
-          `https://uri.amap.com/marker?position=${startLon.toFixed(6)},${startLat.toFixed(6)}&name=${encodeURIComponent("飞行起点")}`,
+          `https://uri.amap.com/marker?position=${start.lon.toFixed(6)},${start.lat.toFixed(6)}&name=${encodeURIComponent("飞行起点")}`,
         );
-        buildMap(LModule, drawPoints);
+        buildMap(LModule, drawn);
         setState("ready");
       } catch (err) {
         console.error("LogFlightMap 加载失败:", err);
@@ -158,7 +188,22 @@ export function LogFlightMap({
     return () => clearTimeout(timer);
   }, [state]);
 
-  function buildMap(L: LeafletModule, points: GpsPoint[]) {
+  /** 图例点选：把那条轨道的图层从地图上摘掉/加回来（**不重 fit**，免得视野乱跳） */
+  const toggleTrack = useCallback((label: string) => {
+    const map = mapRef.current;
+    if (!map) return;
+    const layers = layersRef.current.get(label) ?? [];
+    setHidden((prev) => {
+      const off = prev.includes(label);
+      for (const l of layers) {
+        if (off) l.addTo(map);
+        else map.removeLayer(l);
+      }
+      return off ? prev.filter((x) => x !== label) : [...prev, label];
+    });
+  }, []);
+
+  function buildMap(L: LeafletModule, tracks: DrawnTrack[]) {
     if (!containerRef.current) return;
 
     if (mapRef.current) {
@@ -208,25 +253,46 @@ export function LogFlightMap({
     // 比例尺：判断"飞了多远"比看经纬度直观
     L.control.scale({ imperial: false, position: "bottomright" }).addTo(map);
 
-    const alts = points.map((p) => p.alt);
-    const minAlt = Math.min(...alts);
-    const maxAlt = Math.max(...alts);
+    layersRef.current = new Map();
+    const all: [number, number][] = [];
+    const single = tracks.length === 1;
+    const alts = single ? tracks[0].points.map((p) => p.alt) : [];
+    const minAlt = single ? Math.min(...alts) : 0;
+    const maxAlt = single ? Math.max(...alts) : 0;
 
-    const segCount = Math.min(150, points.length);
-    const segSize = Math.max(1, Math.floor((points.length - 1) / segCount));
-
-    for (let i = 0; i < points.length - 1; i += segSize) {
-      const end = Math.min(i + segSize + 1, points.length);
-      const seg = points.slice(i, end);
-      const segAlt = seg.reduce((s, p) => s + p.alt, 0) / seg.length;
-      const color = altitudeColor(segAlt, minAlt, maxAlt);
-
-      L.polyline(
-        seg.map((p) => [p.lat, p.lon] as [number, number]),
-        { color, weight: 3, opacity: 0.85 },
-      ).addTo(map);
+    for (const tk of tracks) {
+      const layers: Layer[] = [];
+      if (single) {
+        // 单条：按海拔分段着色（每段一色，读得出高度变化）
+        const points = tk.points;
+        const segCount = Math.min(150, points.length);
+        const segSize = Math.max(1, Math.floor((points.length - 1) / segCount));
+        for (let i = 0; i < points.length - 1; i += segSize) {
+          const end = Math.min(i + segSize + 1, points.length);
+          const seg = points.slice(i, end);
+          const segAlt = seg.reduce((s, p) => s + p.alt, 0) / seg.length;
+          const color = altitudeColor(segAlt, minAlt, maxAlt);
+          layers.push(
+            L.polyline(
+              seg.map((p) => [p.lat, p.lon] as [number, number]),
+              { color, weight: 3, opacity: 0.85 },
+            ).addTo(map),
+          );
+        }
+      } else {
+        // 多条：一条一个纯色（图例按同一个颜色列出），叠着看分叉
+        layers.push(
+          L.polyline(
+            tk.points.map((p) => [p.lat, p.lon] as [number, number]),
+            { color: tk.color, weight: 3, opacity: 0.85 },
+          ).addTo(map),
+        );
+      }
+      layersRef.current.set(tk.label, layers);
+      all.push(...tk.points.map((p) => [p.lat, p.lon] as [number, number]));
     }
 
+    // 起终点只画**第一条**轨道：多条轨道时 2N 个 marker 太乱，图例里已经分得清
     const startIcon = L.divIcon({
       className: "",
       html: '<div style="background:#22c55e;width:10px;height:10px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)"></div>',
@@ -239,15 +305,16 @@ export function LogFlightMap({
       iconSize: [14, 14],
       iconAnchor: [7, 7],
     });
-
-    L.marker([points[0].lat, points[0].lon], { icon: startIcon })
-      .bindTooltip(`起点 · ${points[0].alt.toFixed(1)} m`)
+    const first = tracks[0].points;
+    L.marker([first[0].lat, first[0].lon], { icon: startIcon })
+      .bindTooltip(`起点 · ${first[0].alt.toFixed(1)} m`)
       .addTo(map);
-    L.marker([points[points.length - 1].lat, points[points.length - 1].lon], { icon: endIcon })
-      .bindTooltip(`终点 · ${points[points.length - 1].alt.toFixed(1)} m`)
+    const last = first[first.length - 1];
+    L.marker([last.lat, last.lon], { icon: endIcon })
+      .bindTooltip(`终点 · ${last.alt.toFixed(1)} m`)
       .addTo(map);
 
-    const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lon] as [number, number]));
+    const bounds = L.latLngBounds(all);
     boundsRef.current = bounds;
     map.fitBounds(bounds, { padding: [20, 20], maxZoom: FIT_MAX_ZOOM });
   }
@@ -257,6 +324,7 @@ export function LogFlightMap({
       <h4 className="mb-2 flex flex-wrap items-center gap-1.5 text-xs font-medium text-muted">
         <MapPin className="h-3.5 w-3.5" />
         GPS 轨迹 · {pointCount > 0 ? `${pointCount} 点` : ""}
+        {legend.length > 1 ? ` · ${legend.length} 条轨道` : ""}
         {droppedCount > 0 ? `（已剔除 ${droppedCount} 个未定位采样）` : ""}
         <span className="text-faint">
           （底图高德，坐标已从 WGS-84 换算到 GCJ-02；右上角可切街道图）
@@ -281,7 +349,8 @@ export function LogFlightMap({
           滚动时地图糊在导航栏上面。隔离后这些 z-index 只在这个容器内比较。 */}
       <div className="relative isolate">
         <div ref={containerRef} className="h-[380px] w-full overflow-hidden rounded-lg sm:h-[520px]" />
-        {/* 高度色带：竖着贴在地图左侧（颜色 = 轨迹那段的平均高度）。
+        {/* 高度色带：竖着贴在地图左侧（颜色 = 轨迹那段的平均高度）。只在**单条轨道**时给——
+            多条时每条是纯色（图例里分色），色带就没有对应关系了。
             从 top-20 起是为了让开 Leaflet 左上角的缩放按钮；pointer-events-none 不挡地图操作；
             z-[700] 必须给——Leaflet 自己的 pane 是 z-index 200~800 的绝对定位层，
             不给 z 就会被瓦片层（200）盖住 */}
@@ -303,6 +372,30 @@ export function LogFlightMap({
             <span className="rounded bg-surface-2/85 px-1 text-[10px] text-muted">
               {altRange[0].toFixed(0)} m
             </span>
+          </div>
+        )}
+
+        {/* 图例：多条轨道时给出"哪条是什么颜色"，点一下可以隐藏/显示那条。
+            放在右上角图层控件**下面**（top-20），避免两个控件叠在一起 */}
+        {state === "ready" && legend.length > 1 && (
+          <div className="absolute top-20 right-3 z-[700] flex flex-col gap-1 rounded-md bg-surface-2/90 px-2 py-1.5 text-[11px] backdrop-blur-sm">
+            {legend.map((it) => (
+              <button
+                key={it.label}
+                type="button"
+                onClick={() => toggleTrack(it.label)}
+                title={hidden.includes(it.label) ? "点击显示这条轨道" : "点击隐藏这条轨道"}
+                className={`flex items-center gap-1.5 text-left transition-colors hover:text-text ${
+                  hidden.includes(it.label) ? "text-faint line-through" : "text-muted"
+                }`}
+              >
+                <span
+                  className="inline-block h-2 w-2 shrink-0 rounded-sm"
+                  style={{ background: it.color }}
+                />
+                {it.label}
+              </button>
+            ))}
           </div>
         )}
 

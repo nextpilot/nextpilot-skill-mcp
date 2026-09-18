@@ -1,4 +1,4 @@
-import type { Finding, LogFacts, LogInfo, MatchedFault, MetricEntry, TrackData } from "./types";
+import type { Finding, LogFacts, LogInfo, MatchedFault, MetricEntry, TrackData, TrackSeries } from "./types";
 import type { StoredPlotPanel, StoredPlotSeries } from "./chart-presets";
 
 /**
@@ -114,10 +114,12 @@ function normalize(raw: Partial<SavedReport> | null | undefined): SavedReport {
   };
 }
 
-/** 从完整轨迹抽一份缩略图（等距抽样 + 保留末点） */
+/** 从完整轨迹抽一份缩略图（等距抽样 + 保留末点）。多条轨道时取第一条（主 GNSS） */
 export function makeTrackThumb(track: TrackData | null | undefined, maxPoints = 40): TrackThumb | undefined {
-  const lat = track?.lat;
-  const lon = track?.lon;
+  // 兼容改造前的单条形状（老存档里 track 直接是 {lat, lon, …}）
+  const one = Array.isArray(track?.tracks) ? track?.tracks[0] : (track as unknown as TrackSeries | undefined);
+  const lat = one?.lat;
+  const lon = one?.lon;
   if (!lat?.length || !lon?.length) return undefined;
   const push = (out: TrackThumb, i: number) => {
     const la = lat[i];

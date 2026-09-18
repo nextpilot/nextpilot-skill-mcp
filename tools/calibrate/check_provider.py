@@ -164,12 +164,23 @@ def check_provider(ns: dict, path: Path) -> None:
             isinstance(p.get_logged_dropouts(), list),
             "%s: get_logged_dropouts() 应当返回 list" % where,
         )
-    if hasattr(p, "track"):
+    # 轨迹：能力名是 get_flight_track（曾经这里写的是 `hasattr(p, "track")`——provider 上
+    # 没有 track 这个名字，于是这段检查**从来没跑过**。契约没被守住的坑就是这么来的。）
+    if hasattr(p, "get_flight_track"):
         tr = p.get_flight_track()
         check(
-            isinstance(tr, dict) and ("lat" in tr or "error" in tr),
-            "%s: get_flight_track() 要么给 lat/lon/alt，要么给 error" % where,
+            isinstance(tr, dict) and ("tracks" in tr or "error" in tr),
+            "%s: get_flight_track() 要么给 tracks（每条 {label,t,lat,lon,alt}），要么给 error" % where,
         )
+        for tk in tr.get("tracks") or []:
+            check(
+                {"label", "t", "lat", "lon", "alt"} <= set(tk),
+                "%s: 每条轨道的键要有 label/t/lat/lon/alt（实际 %s）" % (where, sorted(tk)),
+            )
+            check(
+                len(tk["t"]) == len(tk["lat"]) == len(tk["lon"]) == len(tk["alt"]),
+                "%s: 轨道的 t/lat/lon/alt 必须等长" % where,
+            )
 
     # ---- 8. 报告页的两块整体数据能取到且是 dict ----
     li = p.report_materials()

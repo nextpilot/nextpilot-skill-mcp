@@ -39,6 +39,14 @@ function isDark(): boolean {
   return document.documentElement.dataset.theme === "dark";
 }
 
+/** 预设里的 `style` → Plotly 的 `line.dash`。
+ *  预设有意用通用叫法（solid / dashed / dotted），换绘图库时只改这一处映射。 */
+function plotlyDash(style: string | null): string {
+  if (style === "dashed") return "dash";
+  if (style === "dotted") return "dot";
+  return "solid";
+}
+
 export function LogCharts({
   manifest,
   storedPanels,
@@ -335,7 +343,7 @@ function PanelChart({
         const stored = storedSeries?.[seriesKey];
         const responses = await Promise.all(
           panel.requests.map((r, i) =>
-            i === 0 && stored ? Promise.resolve(stored) : requestSeries(r),
+            stored && stored[i] ? Promise.resolve(stored[i]) : requestSeries(r),
           ),
         );
         if (cancelled || !elRef.current) return;
@@ -345,29 +353,30 @@ function PanelChart({
         const colors = isDark() ? SERIES_COLORS_DARK : SERIES_COLORS_LIGHT;
         const traces: unknown[] = [];
         let colorIdx = 0;
-
-        for (const resp of responses) {
-          if (resp.error || !resp.series) continue;
-          const t = resp.t;
-          // 画什么完全看引擎返回的 series：无 op 时键=请求的字段名，
-          // 有 op 时键=算子的 out_names（如 roll/pitch/yaw）——前端不做任何换算
-          const opLabels = panel.requests[0]?.op?.labels ?? [];
-          Object.entries(resp.series as Record<string, (number | null)[] | null>).forEach(
-            ([key, vals], i) => {
-              if (!vals) return;
-              const label = opLabels[i] ?? panel.fieldLabels?.[key] ?? key;
-              traces.push({
-                x: t,
-                y: vals,
-                type: "scatter",
-                mode: "lines",
-                name: label,
-                line: { color: colors[colorIdx++ % colors.length], width: 2 },
-                connectgaps: false,
-              });
-            },
-          );
-        }
+        // 一条线画什么完全由预设定（label / color / style），引擎只按 ydata 顺序把序列给回来：
+        // 取不到的那条是 null，跳过即可（老固件少个字段就少一条线，不用另写回退）
+        panel.requests.forEach((req, ri) => {
+          const resp = responses[ri];
+          if (!resp || resp.error) return;
+          const x = resp.x ?? resp.t;
+          req.series.forEach((meta, si) => {
+            const vals = resp.series?.[si];
+            if (!vals) return;
+            traces.push({
+              x,
+              y: vals,
+              type: "scatter",
+              mode: "lines",
+              name: meta.label,
+              line: {
+                color: meta.color ?? colors[colorIdx++ % colors.length],
+                width: 2,
+                dash: plotlyDash(meta.style),
+              },
+              connectgaps: false,
+            });
+          });
+        });
 
         if (panel.hlines) {
           for (const h of panel.hlines) {
@@ -585,6 +594,33 @@ function buildLayout(
       layer: "below",
     });
   }
+  // 坐标轴：范围 / 翻转 / 网格都是**面板级**属性（一张图一个量纲、一个视野）
+  const xaxis: Record<string, unknown> = {
+    title: { text: panel.xLabel, font: { color: muted, size: 10 } },
+    gridcolor: grid,
+    zeroline: false,
+    tickfont: { color: muted },
+    showline: true,
+    mirror: true,
+    linecolor: axisLine,
+    linewidth: 1,
+    showgrid: panel.grid,
+  };
+  if (panel.flipx) xaxis.autorange = "reversed";
+  if (panel.range) xaxis.range = [panel.range[0], panel.range[1]];
+  const yaxis: Record<string, unknown> = {
+    title: { text: panel.yLabel, font: { color: muted, size: 10 } },
+    gridcolor: grid,
+    zeroline: false,
+    tickfont: { color: muted },
+    showline: true,
+    mirror: true,
+    linecolor: axisLine,
+    linewidth: 1,
+    showgrid: panel.grid,
+  };
+  if (panel.flipy) yaxis.autorange = "reversed";
+  if (panel.range && panel.range.length === 4) yaxis.range = [panel.range[2], panel.range[3]];
   return {
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: plotBg,
@@ -597,27 +633,9 @@ function buildLayout(
       color: muted,
       activecolor: text,
     },
-    xaxis: {
-      title: { text: "秒（相对日志开始）", font: { color: muted, size: 10 } },
-      gridcolor: grid,
-      zeroline: false,
-      tickfont: { color: muted },
-      showline: true,
-      mirror: true,
-      linecolor: axisLine,
-      linewidth: 1,
-    },
-    yaxis: {
-      title: { text: panel.yLabel, font: { color: muted, size: 10 } },
-      gridcolor: grid,
-      zeroline: false,
-      tickfont: { color: muted },
-      showline: true,
-      mirror: true,
-      linecolor: axisLine,
-      linewidth: 1,
-    },
-    showlegend: true,
+    xaxis,
+    yaxis,
+    showlegend: panel.legend,
     legend: { font: { color: muted, size: 10 }, orientation: "h", x: 0, y: 1.02 },
     hovermode: "x unified",
     shapes,

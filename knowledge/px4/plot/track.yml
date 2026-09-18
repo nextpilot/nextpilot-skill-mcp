@@ -1,26 +1,25 @@
-# 地图轨迹的**取数声明** —— 只声明"读哪个 topic 的哪几列、各按什么量纲换算"，不含解析逻辑。
-#
-# 为什么放在 plot/ 而不是 facts.yaml：它与同目录的曲线预设是同一类东西——"要画什么、
-# 从哪几列画"。区别在消费者：曲线预设进前端（→ plots.generated.ts，前端据此搭面板），
-# 这份要进 **Python**——轨迹是在引擎侧取数、换算、抽稀的（provider 的 track()），前端只管画。
-# 所以构建期把下面这个 track 块并进 __FACTS__（见 build-knowledge.mjs），由 provider 从 cfg 读。
-#
-# **逻辑不在这里**：「按顺序取第一个存在的候选字段」「剔掉未定位的采样（GPS 没定位时 PX4 记
-# lat=lon=0）」「等距抽样」都是分支逻辑，留在 engine/providers/px4.py 的 track() 里。
-# 把分支搬进 YAML 只能再造一门小语言——本项目已经删掉两门了。
-#
-# 字段名与量纲随固件改过（1.15 起 lat/lon/alt → latitude_deg/longitude_deg/altitude_msl_m，
-# 且 degE7→deg、mm→m），所以每个字段给**候选**，按顺序试、各按自己的 scale 换算。
-track:
-  topic: vehicle_gps_position
-  instance: 0
-  max_points: 1500
-  lat:
-    - {field: latitude_deg, scale: 1}        # 1.15+：直接是度
-    - {field: lat,          scale: 1.0e-7}   # 旧固件：degE7
-  lon:
-    - {field: longitude_deg, scale: 1}
-    - {field: lon,           scale: 1.0e-7}
-  alt:
-    - {field: altitude_msl_m, scale: 1}      # 1.15+：米
-    - {field: alt,            scale: 0.001}  # 旧固件：毫米
+id: track
+title: 轨迹
+description: 地图上的飞行轨迹（原始 GNSS），多条轨道叠画、可点选隐藏。
+conditions:
+  topics: ["sensor_gps || vehicle_gps_position"]
+# 地图容器的声明方式与曲线**完全一样**，只是 container 不同、children 画的是轨道。
+# 取数走 ref 的候选组 + unit=：sensor_gps 优先（1.16+），老固件退回 vehicle_gps_position，
+# 且要写成 `[N]` 指明实例——同一条轨道的时间戳与 fix_type 必须来自同一个 topic 的同一个实例。
+outputs:
+  - container: map
+    title: 轨迹
+    legend: true
+    children:
+      - mode: track
+        label: gps
+        max_points: 1500
+        lat: >-
+          ref("sensor_gps[0].latitude_deg", "vehicle_gps_position[0].latitude_deg",
+          "vehicle_gps_position[0].lat", unit="deg")
+        lon: >-
+          ref("sensor_gps[0].longitude_deg", "vehicle_gps_position[0].longitude_deg",
+          "vehicle_gps_position[0].lon", unit="deg")
+        alt: >-
+          ref("sensor_gps[0].altitude_msl_m", "vehicle_gps_position[0].altitude_msl_m",
+          "vehicle_gps_position[0].alt", unit="m")

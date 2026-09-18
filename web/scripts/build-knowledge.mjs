@@ -38,6 +38,9 @@ import {
   normalizeUnit,
   UNIT_ALIASES,
   UNIT_KIND,
+  checkFieldList,
+  splitTopLevel,
+  splitFieldRef,
 } from "./lib/rule-expr.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -305,12 +308,7 @@ function loadRules(dir, signatures, ruleMeta, airframes) {
     if (raw.outputs !== undefined && (typeof raw.outputs !== "object" || raw.outputs === null || Array.isArray(raw.outputs))) {
       throw new Error(`${where}: outputs 必须是对象`);
     }
-    // ── 适用范围：一个 conditions 块，三个键都能省 ──
-    //   firmware —— 固件约束串（any / ">=1.15" / ">=1.14,<1.15"）。与节点级 ref(..., when_fw=)
-    //               同一套语法，由 provider.match_version 解释；省 = any。
-    //   airframe —— any / 机架名 / 机架名列表（机架词表由各格式的适配器定义，引擎只做字符串比对）；省 = any。
-    //   topics   —— 日志里得有这些 topic，缺了记一条 skipped。`||` = 其中任意一个在日志里就够，
-    //               项间 = 都要有。省 = 没有依赖。
+    // ── 适用范围：一个 conditions 块，四个键都能省（规则与绘图预设共用 normalizeConditions）──
     // 下面归一化成运行期的形态：两个平铺的轴 + 嵌套的 topics。**没有 skip 这个键**
     // （原来那坨 no_data / not has_armed 的判定已退役，理由见 knowledge/px4/CLAUDE.md）。
     // 退役的顶层键：不静默忽略，写错了要当场知道
@@ -321,58 +319,9 @@ function loadRules(dir, signatures, ruleMeta, airframes) {
     ]) {
       if (raw[key] !== undefined) throw new Error(`${where}: ${key} 已移除——${hint}`);
     }
-    const cond = raw.conditions ?? {};
-    if (typeof cond !== "object" || cond === null || Array.isArray(cond)) {
-      throw new Error(`${where}: conditions 必须是对象（可用键：firmware / airframe / topics）`);
-    }
-    for (const k of Object.keys(cond)) {
-      if (!["firmware", "airframe", "topics", "precheck"].includes(k)) {
-        throw new Error(`${where}: conditions 里有未知键 ${k}（可用：firmware / airframe / topics / precheck）`);
-      }
-    }
-    if (cond.firmware !== undefined && !isFirmwareSpec(cond.firmware)) {
-      throw new Error(
-        `${where}: conditions.firmware 必须是固件约束串（any / ">=1.15" / "<1.15" / ">=1.14,<1.15"），` +
-          `实际是 ${JSON.stringify(cond.firmware)}`,
-      );
-    }
-    if (cond.airframe !== undefined && !isAirframeSpec(cond.airframe)) {
-      throw new Error(
-        `${where}: conditions.airframe 必须是 any / 机架名 / 机架名列表（如 [fixed_wing, unknown]），` +
-          `实际是 ${JSON.stringify(cond.airframe)}`,
-      );
-    }
-    if (cond.topics !== undefined && !Array.isArray(cond.topics)) {
-      throw new Error(`${where}: conditions.topics 必须是数组（每项一个 topic，多个候选用 || 分隔）`);
-    }
-    if (Array.isArray(cond.topics) && cond.topics.length === 0) {
-      throw new Error(`${where}: conditions.topics 是空数组（没有依赖就整个删掉）`);
-    }
-    const topics = (cond.topics ?? []).map((t) => {
-      try {
-        return parseTopicReq(t);
-      } catch (err) {
-        throw new Error(`${where}: ${err.message}`);
-      }
-    });
-    // precheck：compute 之前求值的先决条件，命中即静默不跑。只认内置变量与 has_topic()，
-    // 因为它在 compute 之前求值（拿不到 compute 的输出）——写别的名字这里就拦下。
-    if (cond.precheck !== undefined) {
-      if (!Array.isArray(cond.precheck) || cond.precheck.length === 0) {
-        throw new Error(`${where}: conditions.precheck 必须是非空数组（每项一条表达式，没有就整个删掉）`);
-      }
-      for (const w of cond.precheck) {
-        if (typeof w !== "string" || !w.trim()) {
-          throw new Error(`${where}: conditions.precheck 的每一项都要是非空表达式字符串`);
-        }
-        checkBuiltinOnly(w, where, `precheck 条件「${w}」`);
-      }
-    }
+    const cond = normalizeConditions(raw.conditions, where, airframes);
     delete raw.conditions;
-    raw.firmware = cond.firmware ?? "any";
-    raw.airframe = normalizeAirframe(cond.airframe ?? "any", airframes, where);
-    if (topics.length) raw.topics = topics;
-    if (cond.precheck !== undefined) raw.precheck = cond.precheck.map((s) => s.trim());
+    Object.assign(raw, cond);
     if (seen.has(raw.id)) throw new Error(`${where}: 规则 id 重复 ${raw.id}`);
     seen.add(raw.id);
 
@@ -553,7 +502,7 @@ const listOr = (v, fallback) =>
  * 现有规则。查不到 → **告警**（不是失败）：那条留空，运行期按原样给、不换算。
  * 目标单位（作者写的那个）认不出、或与源单位不同量纲 → 构建失败。
  */
-function resolveFieldUnits(rules, metaDir) {
+function resolveFieldUnits(refs, metaDir) {
   const topicMap = parseYaml(read(resolve(metaDir, "topic-map.yaml"))).topics ?? {};
   const overridePath = resolve(metaDir, "topic-overrides.yaml");
   const overrides = existsSync(overridePath) ? parseYaml(read(overridePath)).units ?? {} : {};
@@ -573,24 +522,21 @@ function resolveFieldUnits(rules, metaDir) {
     }
   }
 
-  // 先把"谁要单位、要哪个单位"收齐
+  // "谁要单位、要哪个单位"由调用方收齐（规则从 compute 抽、预设从字段声明与 compute 抽），
+  // 这里只认 `{where, fields, unit}` 三样
   const wanted = new Map();   // "topic.field" -> Set(规范目标单位)
-  for (const raw of rules) {
-    for (const expr of raw.compute ?? []) {
-      for (const r of collectRefs(expr)) {
-        if (r.unit === undefined) continue;
-        const dst = normalizeUnit(r.unit);
-        if (!dst) {
-          throw new Error(
-            `${raw.id}: ref(..., unit="${r.unit}") 里那个单位认不出（可用：` +
-              `${[...new Set(Object.values(UNIT_ALIASES))].sort().join(" / ")}）`,
-          );
-        }
-        for (const fld of r.fields) {
-          if (!wanted.has(fld)) wanted.set(fld, new Set());
-          wanted.get(fld).add(dst);
-        }
-      }
+  for (const r of refs) {
+    if (r.unit === undefined || r.unit === null) continue;
+    const dst = normalizeUnit(r.unit);
+    if (!dst) {
+      throw new Error(
+        `${r.where}: unit="${r.unit}" 里那个单位认不出（可用：` +
+          `${[...new Set(Object.values(UNIT_ALIASES))].sort().join(" / ")}）`,
+      );
+    }
+    for (const fld of r.fields) {
+      if (!wanted.has(fld)) wanted.set(fld, new Set());
+      wanted.get(fld).add(dst);
     }
   }
 
@@ -607,7 +553,7 @@ function resolveFieldUnits(rules, metaDir) {
       unknown.push(fld);
       continue;
     }
-    for (const dst of wanted.get(fld)) {
+    for (const dst of wanted.get(fldRaw)) {
       if (UNIT_KIND[src] !== UNIT_KIND[dst]) {
         throw new Error(
           `${fld} 的单位是 ${src}（${UNIT_KIND[src]}），而规则要它输出 ${dst}（${UNIT_KIND[dst]}）` +
@@ -649,6 +595,363 @@ function normalizeAirframe(spec, airframes, where) {
   };
   if (typeof spec === "string") return spec.trim() === "any" ? "any" : canon(spec);
   return spec.map(canon);
+}
+
+// ─────────────────────────── 绘图预设（plot/*.yml）───────────────────────────
+// 曲线与地图**共用一套声明**：conditions（适用范围，与规则同形）+ 可选的 compute（换算）
+// + outputs[]（容器 = 一张图 or 地图，children = 图上的线 / 地图上的轨道）。
+// 取数一律走 ref 那套语言（候选组 + unit=），所以"字段换代、改了量纲"在图上与规则里是
+// 同一种写法，单位也共用同一张表（resolveFieldUnits）。
+
+/** 图的两种模式；`track` 只出现在 `container: map` 的 child 上 */
+const CHART_MODES = new Set(["TimeSeries", "xyplot"]);
+/** 线型取值 = ECharts 的 lineStyle.type（**照抄人家的词汇，不自造格式串**） */
+const LINE_STYLES = new Set(["solid", "dashed", "dotted"]);
+const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
+/**
+ * 与 `ydata` **逐项对齐**的平行串（`label` / `style` / `color`）。
+ * 逗号切分只认引号与括号（`splitTopLevel`），个数不等、某项为空、取值非法都在这里报错，
+ * 报错要指到"第几项"——这是保留逗号串写法的代价，不能让作者自己去数。
+ */
+function parallelList(raw, n, where, what, check) {
+  if (raw === undefined || raw === null) return null;
+  const items = splitTopLevel(String(raw)).map((s) => s.replace(/^["']|["']$/g, "").trim());
+  if (items.length !== n) {
+    throw new Error(`${where}: ${what} 有 ${items.length} 项、ydata 有 ${n} 项——两者必须一一对应`);
+  }
+  items.forEach((v, i) => {
+    if (!v) throw new Error(`${where}: ${what} 第 ${i + 1} 项是空的`);
+    if (check) check(v, i);
+  });
+  return items;
+}
+
+/** 一个取数声明串（`ydata` / `xdata` / 地图的 lat…）→ 运行期描述。 */
+function compileFields(src, where, what, declaredVars, { single = false, refs = null } = {}) {
+  if (typeof src !== "string" || !src.trim()) {
+    throw new Error(`${where}: ${what} 必须是非空的字段声明（如 ref("vehicle_gps_position.eph", unit="m")）`);
+  }
+  let items;
+  try {
+    items = checkFieldList(src, { signatures, builtinVars: BUILTIN_VARS, declaredVars });
+  } catch (err) {
+    throw new Error(`${where}: ${what}——${err.message}`);
+  }
+  if (single && items.length !== 1) {
+    throw new Error(`${where}: ${what} 只能写一个字段引用（这里不接受逗号串）`);
+  }
+  // 带 unit= 的引用要登记进单位表（源单位在 meta/<tag>.json 查，见 resolveFieldUnits）。
+  // **在编译处登记**，不靠事后遍历产物猜形状——地图坐标编译后不是同一个形状，遍历会漏。
+  if (refs) {
+    for (const d of items) if (d.kind === "field" && d.unit) refs.push({ where, fields: d.fields, unit: d.unit });
+  }
+  return items;
+}
+
+/** 一条线没写 label 时的图例名：字段引用用第一个候选的字段名，换算节点的输出用变量名。 */
+function defaultLabel(desc) {
+  if (desc.kind === "var") return desc.name;
+  const parsed = splitFieldRef(desc.fields[0]);
+  return parsed ? parsed.field : desc.fields[0];
+}
+
+/** 容器级那些可有可无的开关（legend / grid / flipx / flipy / range）。 */
+function containerSwitches(out, where) {
+  for (const k of ["legend", "grid", "flipx", "flipy"]) {
+    if (out[k] !== undefined && typeof out[k] !== "boolean") {
+      throw new Error(`${where}: ${k} 只能是 true / false（实际 ${JSON.stringify(out[k])}）`);
+    }
+  }
+  let range = null;
+  if (out.range !== undefined) {
+    if (!Array.isArray(out.range) || ![2, 4].includes(out.range.length) || out.range.some((x) => typeof x !== "number")) {
+      throw new Error(`${where}: range 要是两个或四个数字（[x0,x1] 或 [x0,x1,y0,y1]），不写就是自动适配`);
+    }
+    range = out.range;
+  }
+  let hlines = null;
+  if (out.hlines !== undefined) {
+    if (!Array.isArray(out.hlines) || !out.hlines.length) throw new Error(`${where}: hlines 必须是非空数组`);
+    hlines = out.hlines.map((h) => {
+      if (typeof h.value !== "number" || !h.label) throw new Error(`${where}: hlines 每项要有 value 与 label`);
+      if (!["ok", "warning", "critical"].includes(h.level)) {
+        throw new Error(`${where}: hlines.level 只能是 ok / warning / critical`);
+      }
+      return { value: h.value, level: h.level, label: h.label };
+    });
+  }
+  return {
+    title: out.title ?? null,
+    legend: out.legend !== false,
+    grid: out.grid !== false,
+    flipx: out.flipx === true,
+    flipy: out.flipy === true,
+    range,
+    hlines,
+  };
+}
+
+/**
+ * `container: axes` → 一张图。**单位一致性在这里卡住**：同一张图里写了 `unit=` 的引用必须
+ * 目标单位相同（一图一量纲 —— `eph`(m) 与 `hdop`(无量纲) 画在一个 y 轴上没法读）。
+ * `per_instance` 要求图上有 `[:]` 的引用（否则拆不出多张图）；反过来，没有 `per_instance`
+ * 的图不许出现 `[:]`（那会取到一组实例，引擎会报错——不如在这里说清楚）。
+ */
+function compileAxes(out, where, declaredVars, refs) {
+  const switches = containerSwitches(out, where);
+  if (typeof out.ylabel !== "string" || !out.ylabel.trim()) {
+    throw new Error(`${where}: container: axes 必须有 ylabel（这张图的 y 轴标签，如 m / deg / %）`);
+  }
+  if (!Array.isArray(out.children) || out.children.length === 0) {
+    throw new Error(`${where}: children 必须是非空数组（这张图画哪几条线）`);
+  }
+  const perInstance = out.per_instance === true;
+  const children = out.children.map((child, ci) => {
+    const cwhere = `${where} 第 ${ci + 1} 条 child`;
+    if (!CHART_MODES.has(child.mode)) {
+      throw new Error(`${cwhere}: mode 只能是 TimeSeries / xyplot（实际 ${JSON.stringify(child.mode)}）`);
+    }
+    const ydata = compileFields(child.ydata, cwhere, "ydata", declaredVars, { refs });
+    const labels = parallelList(child.label, ydata.length, cwhere, "label") ?? ydata.map(defaultLabel);
+    const styles = parallelList(child.style, ydata.length, cwhere, "style", (v, i) => {
+      if (!LINE_STYLES.has(v)) {
+        throw new Error(
+          `${cwhere}: style 第 ${i + 1} 项 ${JSON.stringify(v)} 不是 ECharts 的线型` +
+            `（可用：${[...LINE_STYLES].join(" / ")}）`,
+        );
+      }
+    }) ?? [];
+    const colors = parallelList(child.color, ydata.length, cwhere, "color", (v, i) => {
+      if (!COLOR_RE.test(v)) throw new Error(`${cwhere}: color 第 ${i + 1} 项 ${JSON.stringify(v)} 要是 #rrggbb`);
+    }) ?? [];
+    const xdata = child.xdata === undefined
+      ? null
+      : compileFields(child.xdata, cwhere, "xdata", declaredVars, { single: true, refs })[0];
+    if (child.mode === "xyplot" && !xdata) throw new Error(`${cwhere}: mode: xyplot 必须写 xdata`);
+    return { mode: child.mode, xdata, ydata, labels, styles, colors };
+  });
+
+  const units = new Set();
+  let grouped = 0;
+  for (const c of children) {
+    for (const d of c.ydata) {
+      if (d.unit) units.add(d.unit);
+      if (d.kind === "field" && d.fields.some((f) => typeof (splitFieldRef(f) ?? {}).inst !== "number")) grouped++;
+    }
+  }
+  if (units.size > 1) {
+    throw new Error(
+      `${where}: 同一张图里出现了不同单位的曲线（${[...units].join(" / ")}）——一张图只画一个量纲，` +
+        `拆成两张图，或者去掉不需要换算的那条线的 unit=`,
+    );
+  }
+  if (perInstance && grouped === 0) {
+    throw new Error(`${where}: 写了 per_instance 但没有任何引用取"所有实例"——那条线要写成 ref("topic[:].field")`);
+  }
+  if (!perInstance && grouped > 0) {
+    throw new Error(
+      `${where}: 有引用取到了"所有实例"（[:] 或不写实例），这样画不出图——` +
+        `要么给容器加 per_instance: true（每实例一张图），要么在引用里写死第几个实例`,
+    );
+  }
+  return { container: "axes", ...switches, per_instance: perInstance, ylabel: out.ylabel.trim(), xlabel: out.xlabel ?? "秒（相对日志开始）", children };
+}
+
+/**
+ * `container: map` → 轨迹声明（进 `facts.track`，由 provider 在引擎侧取数、换算、抽稀）。
+ * 三个坐标都必须写明实例：同一条轨道的时间戳与 `fix_type` 得跟坐标来自同一个 topic 的
+ * 同一个实例，否则三路采样率不同、画出来是错的。
+ */
+function compileMap(out, where, declaredVars, refs) {
+  const switches = containerSwitches(out, where);
+  if (!Array.isArray(out.children) || out.children.length === 0) {
+    throw new Error(`${where}: children 必须是非空数组（地图上画哪几条轨道）`);
+  }
+  const children = out.children.map((child, ci) => {
+    const cwhere = `${where} 第 ${ci + 1} 条轨道`;
+    if (child.mode !== "track") throw new Error(`${cwhere}: 地图上的 mode 只能是 track`);
+    const maxPoints = child.max_points === undefined ? 1500 : Number(child.max_points);
+    if (!Number.isFinite(maxPoints) || maxPoints < 2) {
+      throw new Error(`${cwhere}: max_points 要是 ≥ 2 的数字（抽稀到多少点）`);
+    }
+    const coords = {};
+    for (const axis of ["lat", "lon", "alt"]) {
+      const desc = compileFields(child[axis], cwhere, axis, declaredVars, { single: true, refs })[0];
+      if (desc.kind !== "field") {
+        throw new Error(`${cwhere}: ${axis} 必须是字段引用（地图坐标不支持换算节点的输出）`);
+      }
+      for (const f of desc.fields) {
+        const parsed = splitFieldRef(f);
+        if (!parsed) throw new Error(`${cwhere}: ${axis} 的 ${JSON.stringify(f)} 不是 topic.field 形式`);
+        if (typeof parsed.inst !== "number") {
+          throw new Error(
+            `${cwhere}: ${axis} 的候选 ${f} 没写明实例——地图坐标要指定第几个实例` +
+              `（如 sensor_gps[0].latitude_deg；两条轨道各画一个实例时才有理由写别的 N）`,
+          );
+        }
+      }
+      coords[axis] = { cands: desc.fields, unit: desc.unit ?? null };
+    }
+    // 候选顺序即优先级；provider 拿它去同一 topic 上取起始 UTC（与坐标同一口径）
+    const topics = [];
+    for (const f of coords.lat.cands) {
+      const parsed = splitFieldRef(f);
+      if (!topics.some(([t, i]) => t === parsed.topic && i === parsed.inst)) topics.push([parsed.topic, parsed.inst]);
+    }
+    return {
+      label: child.label ?? splitFieldRef(coords.lat.cands[0]).topic,
+      max_points: maxPoints,
+      lat: coords.lat,
+      lon: coords.lon,
+      alt: coords.alt,
+      topics,
+    };
+  });
+  return { container: "map", title: switches.title ?? "轨迹", legend: switches.legend, children };
+}
+
+/** 一份预设 → `{plot, map, refs}`（plot 进前端产物，map 进 facts.track）。 */
+function compilePreset(spec, where, airframes) {
+  for (const key of ["id", "title", "description", "outputs"]) {
+    if (spec[key] === undefined || spec[key] === null || spec[key] === "") {
+      throw new Error(`${where}: 缺少必填字段 ${key}`);
+    }
+  }
+  if (spec.order !== undefined && !Number.isFinite(Number(spec.order))) {
+    throw new Error(`${where}: order 必须是数字`);
+  }
+  const conditions = normalizeConditions(spec.conditions, where, airframes);
+  const compute = (spec.compute ?? []).map((s) => String(s).trim());
+  let declaredVars = new Set();
+  if (compute.length) {
+    try {
+      // 与规则的 compute **同一个校验器**：左值个数对得上算子、引用的名字已声明、算子已注册
+      declaredVars = new Set(validateComputeList(compute, { signatures, builtinVars: BUILTIN_VARS }).keys());
+    } catch (err) {
+      throw new Error(`${where}: compute ${err.message}`);
+    }
+  }
+  if (!Array.isArray(spec.outputs) || spec.outputs.length === 0) {
+    throw new Error(`${where}: outputs 必须是非空数组`);
+  }
+  let map = null;
+  const refs = [];
+  const outputs = spec.outputs.map((out, oi) => {
+    const owhere = `${where} 第 ${oi + 1} 个 container`;
+    if (out.container === "axes") return compileAxes(out, owhere, declaredVars, refs);
+    if (out.container === "map") {
+      if (map) throw new Error(`${where}: 一份预设里最多一个 container: map`);
+      map = compileMap(out, owhere, declaredVars, refs);
+      return map;
+    }
+    throw new Error(`${owhere}: container 只能是 axes / map（实际 ${JSON.stringify(out.container)}）`);
+  });
+  const plot = {
+    id: spec.id,
+    title: spec.title,
+    description: spec.description,
+    order: Number(spec.order ?? 999),
+    conditions,
+    compute,
+    outputs,
+  };
+  // 换算节点里的 ref(..., unit=) 也要进单位表（与规则同一套）
+  for (const stmt of compute) {
+    for (const r of collectRefs(stmt)) refs.push({ where: `${where} 的 compute`, ...r });
+  }
+  return { plot, map, refs };
+}
+
+/** plot/ 下所有预设 → `{plots, mapSpec, refs}`。`*-template.yml` 是给人抄的骨架，不加载。 */
+function loadPresets(dir, airframes) {
+  const files = readdirSync(dir).filter((f) => f.endsWith(".yml") && !f.endsWith("-template.yml")).sort();
+  if (files.length === 0) throw new Error("knowledge/px4/plot/ 下没有预设文件");
+  const plots = [];
+  const refs = [];
+  const seen = new Set();
+  let mapSpec = null;
+  for (const file of files) {
+    const where = `plot/${file}`;
+    const { plot, map, refs: r } = compilePreset(parseYaml(read(resolve(dir, file))), where, airframes);
+    if (seen.has(plot.id)) throw new Error(`${where}: 预设 id 重复 ${plot.id}`);
+    seen.add(plot.id);
+    if (map) {
+      // 地图是报告页的常驻区，只有一块地方：多个预设各声明一份 map，谁都画不了
+      if (mapSpec) throw new Error(`${where}: 已经有一份预设声明了 container: map（全局只能一个）`);
+      mapSpec = map;
+    }
+    plots.push(plot);
+    refs.push(...r);
+  }
+  plots.sort((a, b) => a.order - b.order);
+  return { plots, mapSpec, refs };
+}
+
+/**
+ * 适用范围（`conditions`）→ 运行期形态。**规则与绘图预设共用这一处**（别造第三种方言）：
+ *
+ *   firmware  固件约束串（any / ">=1.15" / ">=1.14,<1.15"），由 provider.match_version 解释
+ *   airframe  any / 机架名 / 机架名列表；简写（mc / fw）在这里换成规范名
+ *   topics    日志里得有这些 topic，缺了记一条 skipped；项内 `||` = 任意一个存在即可
+ *   precheck  compute **之前**求值的先决条件（命中即不跑，只认内置变量与 has_topic()）
+ *
+ * 没写的键**省略掉**——产物里不留空壳。退役的顶层键（skip / ran_on_success / known_legacy）
+ * 由调用方各自拦（规则那边有历史包袱，预设那边写了直接报错）。
+ */
+function normalizeConditions(raw, where, airframes) {
+  const cond = raw ?? {};
+  if (typeof cond !== "object" || cond === null || Array.isArray(cond)) {
+    throw new Error(`${where}: conditions 必须是对象（可用键：firmware / airframe / topics / precheck）`);
+  }
+  for (const k of Object.keys(cond)) {
+    if (!["firmware", "airframe", "topics", "precheck"].includes(k)) {
+      throw new Error(`${where}: conditions 里有未知键 ${k}（可用：firmware / airframe / topics / precheck）`);
+    }
+  }
+  if (cond.firmware !== undefined && !isFirmwareSpec(cond.firmware)) {
+    throw new Error(
+      `${where}: conditions.firmware 必须是固件约束串（any / ">=1.15" / "<1.15" / ">=1.14,<1.15"），` +
+        `实际是 ${JSON.stringify(cond.firmware)}`,
+    );
+  }
+  if (cond.airframe !== undefined && !isAirframeSpec(cond.airframe)) {
+    throw new Error(
+      `${where}: conditions.airframe 必须是 any / 机架名 / 机架名列表（如 [fixed_wing, unknown]），` +
+        `实际是 ${JSON.stringify(cond.airframe)}`,
+    );
+  }
+  if (cond.topics !== undefined && !Array.isArray(cond.topics)) {
+    throw new Error(`${where}: conditions.topics 必须是数组（每项一个 topic，多个候选用 || 分隔）`);
+  }
+  if (Array.isArray(cond.topics) && cond.topics.length === 0) {
+    throw new Error(`${where}: conditions.topics 是空数组（没有依赖就整个删掉）`);
+  }
+  const topics = (cond.topics ?? []).map((t) => {
+    try {
+      return parseTopicReq(t);
+    } catch (err) {
+      throw new Error(`${where}: ${err.message}`);
+    }
+  });
+  if (cond.precheck !== undefined) {
+    if (!Array.isArray(cond.precheck) || cond.precheck.length === 0) {
+      throw new Error(`${where}: conditions.precheck 必须是非空数组（每项一条表达式，没有就整个删掉）`);
+    }
+    for (const w of cond.precheck) {
+      if (typeof w !== "string" || !w.trim()) {
+        throw new Error(`${where}: conditions.precheck 的每一项都要是非空表达式字符串`);
+      }
+      checkBuiltinOnly(w, where, `precheck 条件「${w}」`);
+    }
+  }
+  const out = {
+    firmware: cond.firmware ?? "any",
+    airframe: normalizeAirframe(cond.airframe ?? "any", airframes, where),
+  };
+  if (topics.length) out.topics = topics;
+  if (cond.precheck !== undefined) out.precheck = cond.precheck.map((s) => s.trim());
+  return out;
 }
 
 function fmtApplicability(raw) {
@@ -780,14 +1083,6 @@ const signatures = parseOperatorSignatures(operatorsPy);
 if (Object.keys(signatures).length === 0) throw new Error("operators.py 里没解析到任何算子签名");
 // facts.yaml 要在规则校验**之前**读：规则的 category / doc / 身份块默认值都在 rule_meta 里
 const facts = parseYaml(read(FACTS_PATH));
-// plot/track.yml 的取数声明并进 facts：**它的消费者是 provider**（轨迹在引擎侧取数、换算、
-// 抽稀），而它按"要画什么、从哪几列画"归在 plot/ 下——曲线预设进前端，这一份进 Python。
-// 两者都是纯数据，差别只在消费者，构建期在这里合流。见 knowledge/px4/plot/track.yml 的说明。
-const plotTrack = parseYaml(read(resolve(PLOT_DIR, "track.yml"))).track;
-if (!plotTrack || !plotTrack.topic) {
-  throw new Error("knowledge/px4/plot/track.yml 缺少 track.topic");
-}
-facts.track = plotTrack;
 const airframes = {
   // 简写 → 规范名（facts.yaml 里的人工数据）；合法名 = vehicle_types 的值 + unknown
   aliases: facts.airframe_aliases ?? {},
@@ -795,7 +1090,17 @@ const airframes = {
 };
 const { rules, sources } = loadRules(RULES_DIR, signatures, facts.rule_meta ?? {}, airframes);
 // guards 类经验没有 compute（其判定在 outputs.guard_tags），逐条校验已在 loadRules 里做
-const fieldUnits = resolveFieldUnits(rules, resolve(KN, "meta"));
+
+// 3) 绘图预设（plot/*.yml）—— 曲线与地图**同一套声明**。编译结果两处消费：
+//    · 曲线与布局 → plots.generated.ts（前端）
+//    · `container: map` 那一份 → facts.track（provider 在引擎侧取数、换算、抽稀）
+const { plots, mapSpec, refs: plotRefs } = loadPresets(PLOT_DIR, airframes);
+facts.track = mapSpec ?? {};
+// 单位表：规则与预设里所有写了 `unit=` 的引用一起查（源单位在 meta/<tag>.json，见 resolveFieldUnits）
+const ruleRefs = rules.flatMap((r) =>
+  (r.compute ?? []).flatMap((expr) => collectRefs(expr).map((x) => ({ where: r.id, ...x }))),
+);
+const fieldUnits = resolveFieldUnits([...ruleRefs, ...plotRefs], resolve(KN, "meta"));
 
 const ruleEnginePy = read(PY_RULE_ENGINE);
 // 单位词表在两边各有一份（构建期管"别名 → 规范名"，运行期管"规范名 → 换算因子"），
@@ -963,54 +1268,10 @@ writeArtifact(
     ";\n",
 );
 
-// 4.5) 结果页曲线预设：knowledge/px4/plot/*.yml → web/lib/knowledge/plots.generated.ts
+// 4.5) 绘图预设 → web/lib/knowledge/plots.generated.ts
 // 与引擎产物不同，这一份是**纯前端**渲染用（不进 Pyodide），所以单独生成一个 ESM 文件。
+// 内容已在上面编译并校验过（loadPresets）：这里只负责写出来。
 const plotFiles = readdirSync(PLOT_DIR).filter((f) => f.endsWith(".yml")).sort();
-// track.yml 是**取数声明**（provider 读，见上面并进 facts 的那段），不是曲线预设——它没有 panels，
-// 进不了下面的预设校验。其余文件才是预设。两者都留在 plotFiles 里参与派生版本的哈希。
-const presetFiles = plotFiles.filter((f) => f !== "track.yml");
-if (presetFiles.length === 0) throw new Error("knowledge/px4/plot/ 下没有曲线预设文件");
-const plots = presetFiles.map((file) => {
-  const spec = parseYaml(read(resolve(PLOT_DIR, file)));
-  const where = `plot/${file}`;
-  for (const key of ["id", "title", "description", "panels"]) {
-    if (spec[key] === undefined) throw new Error(`${where}: 缺少必填字段 ${key}`);
-  }
-  if (!Array.isArray(spec.panels) || spec.panels.length === 0) {
-    throw new Error(`${where}: panels 必须是非空数组`);
-  }
-  for (const panel of spec.panels) {
-    if (!panel.title || !panel.yLabel) throw new Error(`${where}: panel 缺少 title / yLabel`);
-    if (!panel.topic && !panel.topics) throw new Error(`${where}: panel 需要 topic 或 topics`);
-    if (!Array.isArray(panel.fields) || panel.fields.length === 0) {
-      throw new Error(`${where}: panel 的 fields 不能为空`);
-    }
-    if (panel.instance !== undefined && !["first", "all"].includes(panel.instance)) {
-      throw new Error(`${where}: panel.instance 只能是 first / all`);
-    }
-    // op：预处理算子（图上要先换算时用）。名字必须能在 engine/operators.py 里找到，
-    // 否则运行期才报错——这里先拦住。
-    if (panel.op !== undefined) {
-      if (!panel.op?.name) throw new Error(`${where}: panel.op 需要 name`);
-      if (!signatures[panel.op.name]) {
-        throw new Error(`${where}: panel.op 引用了未注册的算子 ${panel.op.name}`);
-      }
-    }
-    for (const h of panel.hlines ?? []) {
-      if (typeof h.value !== "number" || !h.label) throw new Error(`${where}: hlines 每项要有 value 与 label`);
-      if (!["ok", "warning", "critical"].includes(h.level)) {
-        throw new Error(`${where}: hlines.level 只能是 ok / warning / critical`);
-      }
-    }
-  }
-  return { order: Number(spec.order ?? 999), ...spec };
-});
-plots.sort((a, b) => a.order - b.order);
-const seenPlotIds = new Set();
-for (const p of plots) {
-  if (seenPlotIds.has(p.id)) throw new Error(`plot 的 id 重复：${p.id}`);
-  seenPlotIds.add(p.id);
-}
 writeArtifact(
   resolve(webRoot, "lib/knowledge/plots.generated.ts"),
   banner +

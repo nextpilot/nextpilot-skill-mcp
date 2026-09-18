@@ -190,19 +190,26 @@ export interface TopicManifest {
   topics: TopicMeta[];
 }
 
-/** np_series() 的返回：LTTB 降采样后的时序，NaN 已转为 null */
+/** np_series() 的返回：LTTB 降采样后的时序，NaN 已转为 null。
+ *
+ *  `series` 与请求里的 `ydata` **同序等长**（取不到的那条是 null）——前端按预设里
+ *  逐项写好的 label / color 对齐即可，不用靠字段名反查（一条线画什么由预设定，
+ *  引擎只负责把数取出来、把单位换算掉）。 */
 export interface SeriesResponse {
-  topic: string;
-  instance: number;
   /** 时间基准：**开机以来的秒数**（与 Flight Review 一致） */
   t: number[];
-  series: Record<string, (number | null)[] | null>;
+  /** 显式声明的横轴（`mode: xyplot`）；null = 横轴就是 `t` */
+  x: (number | null)[] | null;
+  series: ((number | null)[] | null)[];
   fullCount: number;
   error?: string;
 }
 
-/** GPS 轨迹（地图用）：np_track() 的产物，经纬高**已按固件换算成度/米** */
-export interface TrackData {
+/** 地图上的一条轨道（`container: map` 的一个 child）。
+ *  坐标**已按固件换算成度/米**（候选组按存在性挑、unit= 在引擎侧换算）。 */
+export interface TrackSeries {
+  /** 图例名（预设里的 label） */
+  label: string;
   t: number[];
   lat: number[];
   lon: number[];
@@ -211,6 +218,15 @@ export interface TrackData {
   fullCount?: number;
   /** 被剔除的未定位采样数（lat=lon=0 或 fix_type < 3）；>0 时界面要说明 */
   dropped?: number;
+}
+
+/** GPS 轨迹（地图用）：np_track() 的产物。**可以多条**——多条叠画 + 图例。 */
+export interface TrackData {
+  /** 地图标题（预设里的 container.title） */
+  title?: string;
+  /** 是否显示图例（预设里的 legend，缺省 true）；单条轨道时前端按海拔着色，不看它 */
+  legend?: boolean;
+  tracks: TrackSeries[];
   error?: string;
   /** 出错的**种类**（有 error 时才有）。
    *  `not-parsed` = 这份日志本次会话还没解析过，重新选择该 .ulg 文件就能恢复——

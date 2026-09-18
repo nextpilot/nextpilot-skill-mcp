@@ -1,8 +1,25 @@
-order: 5          # 页面里这组图的先后
 id: power
 title: 电源
 description: 电压 / 电流 / 剩余电量，多面板共享时间轴。
-panels:
-  - {title: 电压,     yLabel: V,   topic: battery_status, instance: first, fields: [voltage_v, voltage_filtered_v]}
-  - {title: 电流,     yLabel: A,   topic: battery_status, instance: first, fields: [current_a]}
-  - {title: 剩余电量, yLabel: "%", topic: battery_status, instance: first, fields: [remaining]}
+order: 5
+conditions:
+  topics: [battery_status]
+outputs:
+  - container: axes
+    title: 电压
+    ylabel: V
+    children:
+      - mode: TimeSeries
+        ydata: ref("battery_status[0].voltage_v"), ref("battery_status[0].voltage_filtered_v")
+  - container: axes
+    title: 电流
+    ylabel: A
+    children:
+      - mode: TimeSeries
+        ydata: ref("battery_status[0].current_a")
+  - container: axes
+    title: 剩余电量
+    ylabel: "%"
+    children:
+      - mode: TimeSeries
+        ydata: ref("battery_status[0].remaining")

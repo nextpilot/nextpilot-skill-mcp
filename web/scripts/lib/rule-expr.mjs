@@ -421,7 +421,15 @@ function Parser(src, toks) {
     return { k: "call", fn: nameTok.v, args, kwargs, pos: nameTok.pos };
   }
 
-  return { statement };
+  // 一串裸表达式：`e, e, e`（预设里的 ydata / style 这类"逗号串"用它）
+  function list() {
+    const items = [expr()];
+    while (skip("punct", ",")) items.push(expr());
+    if (!at("eof")) fail(`表达式后面还有多余内容 ${JSON.stringify(peek().v)}`, src, peek().pos);
+    return items;
+  }
+
+  return { statement, list };
 }
 
 /** 解析一条 compute 表达式：`a, b = expr` */
@@ -429,6 +437,37 @@ export function parseCompute(src) {
   const text = String(src).trim();
   if (!text) throw new Error("compute 表达式是空的");
   return Parser(text, tokenize(text)).statement();
+}
+
+/** 解析一串裸表达式（`a, b, c`）——预设里的字段/样式串用它。**按同一套词法切**，
+ *  所以 `ref("a.b", "c.d", unit="deg"), x` 里的逗号不会被切错。 */
+export function parseExprList(src) {
+  const text = String(src).trim();
+  if (!text) throw new Error("表达式串是空的");
+  return Parser(text, tokenize(text)).list();
+}
+
+/** 顶层逗号切分（**只认引号与括号**，不当表达式解析）——给 `style` / `color` 这种
+ *  不是表达式的并列串用。`a, "b,c", d` → ["a", "\"b,c\"", "d"]。 */
+export function splitTopLevel(s) {
+  const out = [];
+  let depth = 0;
+  let quote = null;
+  let cur = "";
+  for (const c of String(s)) {
+    if (quote) {
+      cur += c;
+      if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '"' || c === "'") { quote = c; cur += c; continue; }
+    if (c === "(" || c === "[") depth++;
+    if (c === ")" || c === "]") depth--;
+    if (c === "," && depth === 0) { out.push(cur); cur = ""; continue; }
+    cur += c;
+  }
+  out.push(cur);
+  return out.map((x) => x.trim());
 }
 
 // ─────────────────────────── 校验 ───────────────────────────
@@ -834,7 +873,64 @@ export function collectRefs(src) {
   return out;
 }
 
-/** 收集表达式里引用到的**裸变量名**（不含字段引用的 topic、不含算子名） */function collectNames(node, out = new Set()) {
+/**
+ * 预设（`plot/*.yml`）里的一个**字段表达式串** → 结构化描述；逗号串就是多项。
+ *
+ * 只认三种形态（图上要算术请写进预设的 `computer` 节点，别在这里藏表达式）：
+ *   · 裸写字段引用 `topic.field`（要实例 / 单位 / 候选组就得包 ref）
+ *   · `ref("新名", "旧名", unit="deg")` —— 与规则**同一套**候选组与单位语法
+ *   · `computer` 里赋过值的变量名
+ *
+ * @param {object} opts { signatures, builtinVars, declaredVars }
+ * @returns {Array<{kind:"field",fields:string[],unit?:string,alias?:string[]}|{kind:"var",name:string}>}
+ */
+export function checkFieldList(src, opts = {}) {
+  const text = String(src).trim();
+  return parseExprList(text).map((node, i) => {
+    const where = text.includes(",") ? `第 ${i + 1} 项：` : "";
+    if (node.k === "attr") {
+      return { kind: "field", fields: [`${node.topic}.${node.field}`] };
+    }
+    if (node.k === "call" && node.fn === "ref") {
+      // 复用规则那套 ref 校验（位置实参必须是字符串、候选组实例写法一致、修饰键只有 alias/unit）
+      checkRef(node, {
+        src: text,
+        signatures: opts.signatures ?? {},
+        builtinVars: opts.builtinVars,
+        types: new Map(),
+        topCall: node,
+        tryAllowed: false,
+      });
+      const out = { kind: "field", fields: node.args.map((a) => a.v) };
+      if (node.kwargs.unit) out.unit = node.kwargs.unit.v;
+      if (node.kwargs.alias) {
+        out.alias = node.kwargs.alias.k === "list" ? node.kwargs.alias.items.map((x) => x.v) : [node.kwargs.alias.v];
+      }
+      return out;
+    }
+    if (node.k === "name") {
+      if (!opts.declaredVars?.has(node.name)) {
+        fail(
+          `${where}引用了没有赋值的名字 ${node.name}——图上要算新量请写在预设的 computer 节点里` +
+            "（写法与规则的 compute 相同）",
+          text,
+          node.pos,
+        );
+      }
+      return { kind: "var", name: node.name };
+    }
+    fail(
+      `${where}只能是字段引用（topic.field，或 ref("a.b", "c.d", unit="deg")）或 computer 里赋过值的变量名；` +
+        "算术与函数调用请写进 computer 节点",
+      text,
+      node.pos,
+    );
+    return null;
+  });
+}
+
+/** 收集表达式里引用到的**裸变量名**（不含字段引用的 topic、不含算子名） */
+function collectNames(node, out = new Set()) {
   if (!node || typeof node !== "object") return out;
   if (Array.isArray(node)) { node.forEach((x) => collectNames(x, out)); return out; }
   if (node.k === "name") { out.add(node.name); return out; }

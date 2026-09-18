@@ -1,11 +1,21 @@
 id: attitude
 title: 姿态
-description: 四元数经算子转欧拉角（Roll / Pitch / Yaw，度）。换算在引擎侧做（op 算子），前端只画。
-panels:
-  - title: 欧拉角
-    yLabel: deg
-    topic: vehicle_attitude
-    instance: first
-    fields: ["q[0]", "q[1]", "q[2]", "q[3]"]
-    # 预处理用引擎的算子（engine/operators.py 的 quat_to_euler）：4 列四元数 → roll/pitch/yaw
-    op: {name: quat_to_euler, labels: [Roll, Pitch, Yaw]}
+description: 四元数经 quat_to_euler 转欧拉角（Roll / Pitch / Yaw，度）；换算在引擎侧做，前端只画。
+conditions:
+  topics: [vehicle_attitude]
+# 换算节点：与规则 compute 同一套表达式与算子。四元数的四个分量是数组字段，
+# 裸写不能带下标，所以用 ref() 包起来（与规则里的写法一致）。
+compute:
+  - >-
+      roll, pitch, yaw = quat_to_euler(
+      ref("vehicle_attitude.q[0]"), ref("vehicle_attitude.q[1]"),
+      ref("vehicle_attitude.q[2]"), ref("vehicle_attitude.q[3]"))
+outputs:
+  - container: axes
+    title: 欧拉角
+    ylabel: deg
+    children:
+      - mode: TimeSeries
+        # 线名就是换算节点的输出变量名
+        ydata: roll, pitch, yaw
+        label: Roll, Pitch, Yaw

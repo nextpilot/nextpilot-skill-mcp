@@ -28,7 +28,9 @@ RULES = json.loads(r"""__RULES__""")
 # ---------------- 那一份数据文件（knowledge/<格式>/facts.yaml 编译而来）----------------
 # 码表、文案、展示口径、规则元数据、执行顺序都在里面；引擎只提供机制。
 # 它同时也是 provider 的数据源（随 open_log 一起传进去）。
-FACTS = __FACTS__
+# **按 JSON 解析**（与 RULES 同款）：它里面可能有 true / false / null（绘图预设的开关），
+# 那些不是合法的 Python 字面量——当字面量注入会直接 NameError。
+FACTS = json.loads(r"""__FACTS__""")
 
 # ---------------- 字段单位表（构建期查好的，只含写了 unit= 的引用涉及的字段）----------------
 # 源单位从 meta/<tag>.json 查（经 meta/topic-map.yaml 换字典键）、meta/topic-overrides.yaml
@@ -248,6 +250,29 @@ def _missing_topics(spec):
     return None
 
 
+def _pick_ref(name, *more, alias=None, unit=None, instance=None):
+    """候选组按顺序取第一个存在的 → `(序列, 命中的 bare "topic.field")`；都没有 → `(None, None)`。
+
+    与 `_ref` 是同一件事，区别只在**回传命中的是哪个字段**——地图轨迹要用它去同一 topic 上
+    取时间戳与定位类型（`fix_type`），图上的时间轴也要。`instance` 非 None 时**覆盖**引用里
+    写的实例切片（图上"每实例一个面板"用：声明里写 `[:]`，具体画第几个由这一层定）；
+    写死的 `[N]` 不受它影响。
+    """
+    for cand in (name, *more):
+        bare, inst = _split_ref(cand)
+        if instance is not None and isinstance(inst, slice):
+            inst = instance
+        series = provider.get_series(bare, instance=inst, alias=alias)
+        if series is None:
+            continue
+        if unit is not None:
+            scale = _unit_scale(FIELD_UNITS.get(bare), unit)
+            if scale is not None:
+                series = _scale_series(series, scale)
+        return series, bare
+    return None, None
+
+
 def _ref(name, *more, alias=None, unit=None):
     """字段取数：表达式里的 `ref("topic.field", ...)` 与裸写的 `topic.field` 都走这里。
 
@@ -270,22 +295,13 @@ def _ref(name, *more, alias=None, unit=None):
                   按原样给——宁可不换算，也别悄悄乘错系数。
 
     取数本身由 provider 实现（契约：取不到返回 None，不抛异常）——存在性判据就是它。
+    **要回传"命中的是哪个字段"用 `_pick_ref`**（图与地图用），这里只是它的薄壳。
     """
-    for cand in (name, *more):
-        bare, inst = _split_ref(cand)
-        series = provider.get_series(bare, instance=inst, alias=alias)
-        if series is None:
-            continue
-        if unit is not None:
-            scale = _unit_scale(FIELD_UNITS.get(bare), unit)
-            if scale is not None:
-                series = _scale_series(series, scale)
-        return series
-    return None
+    return _pick_ref(name, *more, alias=alias, unit=unit)[0]
 
 
 def _split_ref(ref):
-    """`"topic[:].field"` → ("topic.field", slice(None, None))；`[N]` → int；不写 → 0。
+    """`"topic[:].field"` → ("topic.field", slice(None, None))；`[N]` → int；**不写也是 slice**。
 
     实例说明交给 provider 直接用下标取（Python 的 int/切片语义），这里只负责拆开。
     """
@@ -441,8 +457,11 @@ _COMPUTE_GLOBALS = {"__builtins__": {}, "ref": None}
 _COMPUTE_GLOBALS.update(OPERATORS)
 
 
-def _eval_compute(stmt, env):
+def _eval_compute(stmt, env, ref_fn=None):
     """求值一条 compute 表达式，结果写进 env。
+
+    ref_fn：把表达式里的 `ref(...)` 换成别的实现（图上"每实例一个面板"要覆盖实例切片，
+    见 `_pick_ref` 的 instance）。不传就是规则那套 `_ref`。
 
     空值语义（与老节点链的唯一差别，**有意为之**）：
       老写法里 `optional: false` 的节点拿到 None 就整条规则中止，`optional: true` 的才允许
@@ -456,8 +475,9 @@ def _eval_compute(stmt, env):
       就显式写 `require_true(is_not_none(x))`——那正是它的用途。
     """
     code, guarded, targets = _compile_compute(stmt, env)
+    glb = _COMPUTE_GLOBALS if ref_fn is None else {**_COMPUTE_GLOBALS, "ref": ref_fn}
     try:
-        exec(code, _COMPUTE_GLOBALS, env)
+        exec(code, glb, env)
     except Exception:
         if not guarded:
             raise

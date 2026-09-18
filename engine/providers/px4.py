@@ -290,57 +290,109 @@ class Px4Provider:
             return None
 
     def get_flight_track(self, max_points=None):
-        """地图轨迹：按字段候选取数、按各自 scale 换算，剔除未定位的采样。"""
+        """地图轨迹（**可以多条**）：每条轨道按声明取数、换算、剔除未定位采样、等距抽样。
+
+        声明来自 `knowledge/px4/plot/` 里 `container: map` 的那个预设（构建期编译进数据配置）：
+
+            children:
+              - label: gps                 # 图例名
+                max_points: 1500
+                lat: {cands: ["sensor_gps[0].latitude_deg", …], unit: "deg"}
+                lon / alt 同形
+
+        坐标取数走引擎的 `_pick_ref`（候选组按存在性挑、单位换算）——与规则、曲线**同一套**。
+        单条轨道取不到就跳过它；一条都没有才返回 `error`（保留 `tracks: []`，形状稳定）。
+        """
         cfg = self._cfg.get("track")
-        if not cfg or not cfg.get("topic"):
+        if not cfg or not cfg.get("children"):
             return {"error": "这份格式没有声明轨迹取数来源（knowledge/px4/plot/track.yml）"}
-        cols = self.get_topic_data(cfg["topic"], int(cfg.get("instance", 0)))
-        if not cols:
-            return {"error": "日志里没有 %s 话题" % cfg["topic"]}
-        limit = int(max_points or cfg.get("max_points") or 1500)
-
-        picked, scales = {}, {}
-        for name in ("lat", "lon", "alt"):
-            for cand in cfg.get(name) or []:
-                col = cols.get(cand["field"])
-                if col is not None:
-                    picked[name] = np.asarray(col, dtype=float)
-                    scales[name] = float(cand.get("scale", 1))
-                    break
-            if name not in picked:
-                return {"error": "轨迹缺少 %s（候选字段都不在日志里）" % name}
-
-        ts = np.asarray(cols["timestamp"], dtype=np.int64)
-        lat = picked["lat"] * scales["lat"]
-        lon = picked["lon"] * scales["lon"]
-        n = len(ts)
-
-        # GPS 没定位时的采样必须剔掉：PX4 在拿到定位前会连着记 lat=lon=0（几内亚湾那个"空岛"），
-        # 一条直线就从那儿连到真正的航迹上——地图上看着完全不对（实测用户日志就是这样）。
-        # 判据：坐标在合法范围、不是 (0,0)、且（有 fix_type 时）fix_type ≥ 3 才算 3D 定位。
-        valid = np.isfinite(lat) & np.isfinite(lon)
-        valid &= (np.abs(lat) <= 90.0) & (np.abs(lon) <= 180.0)
-        valid &= ~((np.abs(lat) < 1e-7) & (np.abs(lon) < 1e-7))
-        fix = cols.get("fix_type")
-        if fix is not None:
-            valid &= np.asarray(fix) >= 3
-        idx_valid = np.nonzero(valid)[0]
-        if len(idx_valid) < 2:
-            return {"error": "这段日志没有有效的 GPS 定位点（未定位的采样已剔除）"}
-
-        # 轨迹用等距抽样：路径形状比峰值更需要均匀（在有效点里抽，别把 invalid 又抽回来）
-        step = max(1, int(np.ceil(len(idx_valid) / limit)))
-        idx = [int(i) for i in idx_valid[::step]]
-        clean = _json_clean
-        return {
-            "t": [round(int(ts[i]) / 1e6, 2) for i in idx],
-            "lat": [clean(lat[i]) for i in idx],
-            "lon": [clean(lon[i]) for i in idx],
-            "alt": [clean(picked["alt"][i] * scales["alt"]) for i in idx],
-            "fullCount": len(idx_valid),
-            # 剔掉了多少未定位采样：界面据此说明"点数为什么比采样数少"
-            "dropped": int(n - len(idx_valid)),
+        tracks = []
+        for child in cfg["children"]:
+            one = self._one_track(child, max_points)
+            if one is not None:
+                tracks.append(one)
+        out = {
+            "title": cfg.get("title") or "轨迹",
+            "legend": cfg.get("legend", True),
+            "tracks": tracks,
         }
+        if not tracks:
+            out["error"] = "这段日志里没有可用的定位轨迹（声明里的坐标候选都不在日志里）"
+        return out
+
+    def _one_track(self, child, max_points=None):
+        """一条轨道 → `{label, t, lat, lon, alt, fullCount, dropped}`；取不到返回 None。
+
+        **三个坐标与时间戳必须来自同一个 topic 的同一个实例**：候选顺序即优先级，取第一个
+        "lat / lon / alt 三样都能给齐"的 topic 生效。不这么定的话，三路的采样率不同、数组
+        长度不同，`lat[i]` 与 `alt[i]` 根本不是同一时刻，画出来是错的。
+        """
+        limit = int(max_points or child.get("max_points") or 1500)
+        for cand in child["lat"]["cands"]:
+            bare, inst = _split_ref(cand)
+            topic = bare.partition(".")[0]
+            if isinstance(inst, slice):
+                continue  # 构建期就要求写死实例；这里防御性跳过
+            cols = self.get_topic_data(topic, inst)
+            if not cols:
+                continue
+            axes, ok = {}, True
+            for name in ("lat", "lon", "alt"):
+                spec = child.get(name) or {}
+                same = [c for c in spec.get("cands", []) if _split_ref(c)[0].partition(".")[0] == topic]
+                fields = [c.partition(".")[2] for c in same]
+                hit = next((f for f in fields if f in cols), None)
+                if hit is None:
+                    ok = False
+                    break
+                axes[name] = (same[fields.index(hit)], spec.get("unit"))
+            if not ok:
+                continue
+
+            series = {}
+            for name, (cand_str, unit) in axes.items():
+                got, _bare = _pick_ref(cand_str, unit=unit)
+                if got is None:
+                    ok = False
+                    break
+                series[name] = np.asarray(got, dtype=float)
+            ts = self.get_series("%s.timestamp" % topic, instance=inst)
+            if not ok or ts is None:
+                continue
+            ts = np.asarray(ts, dtype=np.int64)
+            n = len(ts)
+            if any(len(series[k]) != n for k in ("lat", "lon", "alt")):
+                continue  # 同 topic 同实例却长度不同：宁可这条不画，也不硬凑坐标
+
+            lat, lon, alt = series["lat"], series["lon"], series["alt"]
+            # GPS 没定位时的采样必须剔掉：PX4 在拿到定位前会连着记 lat=lon=0（几内亚湾那个"空岛"），
+            # 一条直线就从那儿连到真正的航迹上——地图上看着完全不对（实测用户日志就是这样）。
+            # 判据：坐标在合法范围、不是 (0,0)、且（有 fix_type 时）fix_type ≥ 3 才算 3D 定位。
+            valid = np.isfinite(lat) & np.isfinite(lon) & np.isfinite(alt)
+            valid &= (np.abs(lat) <= 90.0) & (np.abs(lon) <= 180.0)
+            valid &= ~((np.abs(lat) < 1e-7) & (np.abs(lon) < 1e-7))
+            fix = self.get_series("%s.fix_type" % topic, instance=inst)
+            if fix is not None:
+                valid &= np.asarray(fix) >= 3
+            idx_valid = np.nonzero(valid)[0]
+            if len(idx_valid) < 2:
+                continue
+
+            # 轨迹用等距抽样：路径形状比峰值更需要均匀（在有效点里抽，别把 invalid 又抽回来）
+            step = max(1, int(np.ceil(len(idx_valid) / limit)))
+            idx = [int(i) for i in idx_valid[::step]]
+            clean = _json_clean
+            return {
+                "label": child.get("label") or topic,
+                "t": [round(int(ts[i]) / 1e6, 2) for i in idx],
+                "lat": [clean(lat[i]) for i in idx],
+                "lon": [clean(lon[i]) for i in idx],
+                "alt": [clean(alt[i]) for i in idx],
+                "fullCount": len(idx_valid),
+                # 剔掉了多少未定位采样：界面据此说明"点数为什么比采样数少"
+                "dropped": int(n - len(idx_valid)),
+            }
+        return None
 
     def report_materials(self):
         """报告页要的几块原料（**不是某一个 tab 的 payload**，四个 tab 各取所需）。
@@ -801,16 +853,18 @@ class Px4Provider:
 
         # ---- 扫全局：记录起始的 UTC 时刻 ----
         # 取 GPS 首次给出有效时间的那一刻（比 boot_time_utc_us 可靠，后者要飞控对过时）。
-        # 实例按 plot/track.yml 的声明取，与 get_flight_track() 同一口径——两处都只认那一个实例，
-        # 别一处取"第一个"、一处取 instance 0
+        # topic 按 plot/ 里地图声明的**候选顺序**取第一个存在的（构建期已按声明编译好 topics），
+        # 与 get_flight_track() 同一优先级——两处别各挑各的。
         self.start_utc = None
-        track_cfg = self._cfg.get("track") or {}
-        gps = self._find_topic(track_cfg["topic"], int(track_cfg.get("instance", 0))) if track_cfg.get("topic") else None
-        if gps is not None and "time_utc_usec" in gps.data:
+        for topic, inst in (self._cfg.get("track") or {}).get("children", [{}])[0].get("topics", []):
+            gps = self._find_topic(topic, int(inst))
+            if gps is None or "time_utc_usec" not in gps.data:
+                continue
             t = np.asarray(gps.data["time_utc_usec"], dtype=np.int64)
             nz = np.nonzero(t > 0)[0]
             if len(nz):
                 self.start_utc = int(t[nz[0]] // 1000000)
+                break
 
         # ---- 扫全局：数据质量事实 ----
         # 中途重启：同一 topic 时间戳出现回退（样本 > 10 才算）

@@ -1,13 +1,19 @@
-order: 1          # 页面里这组图的先后
 id: vibration
 title: 振动
 description: 每个 IMU 的高频振动指标（accel_vibration_metric，m/s²），参考线 4.905 / 9.81。
-panels:
-  - title: "IMU #{instance}"
-    yLabel: m/s²
-    topic: vehicle_imu_status
-    instance: all
-    fields: [accel_vibration_metric]
+order: 1
+conditions:
+  topics: [vehicle_imu_status]
+outputs:
+  - container: axes
+    title: "IMU #{instance}"
+    ylabel: m/s²
+    # [:] = 所有实例；配上 per_instance 就是"每个 IMU 一张图"（与改造前一致）
+    per_instance: true
     hlines:
-      - {value: 4.905, level: warning,  label: "4.905（警告）"}
-      - {value: 9.81,  level: critical, label: "9.81（严重）"}
+      - {value: 4.905, level: warning, label: "4.905（警告）"}
+      - {value: 9.81, level: critical, label: "9.81（严重）"}
+    children:
+      - mode: TimeSeries
+        ydata: ref("vehicle_imu_status[:].accel_vibration_metric")
+        label: 振动

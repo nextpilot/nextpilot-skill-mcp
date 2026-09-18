@@ -88,70 +88,148 @@ def np_manifest():
 
 
 # ============ np_series：按需抽取 + LTTB 降采样 ============
-def np_series(topic, instance, fields_json, max_points=3000, op_json=None):
-    """按需抽取时序并 LTTB 降采样。
+def np_series(request_json, max_points=3000):
+    """按需抽取时序并降采样。**要哪几条线由构建期编译好的预设声明决定**（本函数只执行）。
 
-    op_json：图上要做换算时的**预处理算子**（如 {"name": "quat_to_euler"}），
-    与经验用的同一套算子；给了 op 就只返回算子的输出（键为算子的 out_names），
-    换算在引擎侧做，前端只画。
+    request（前端从预设拼出来，JSON）：
+
+      instance  面板要第几个实例——声明里写 `[:]` 的引用按它取（"每实例一个面板"用）
+      ydata     每条线一项：`{"kind":"field","fields":[…],"unit":…}`（字段引用，含候选组与单位）
+                            `{"kind":"var","name":…}`（预设 compute 节点的输出）
+      xdata     可选：`mode: xyplot` 的横轴。不给就用**命中字段那个 topic 的 timestamp**
+      compute   可选：预设的换算节点（与规则 compute 同一套表达式与算子），在取 ydata **之前**求值
+
+    返回 `{t, x, series:[…], fullCount}`：`series` 与 ydata **同序等长**（取不到的那条是
+    `null`），前端按预设里的 label/color 逐项对齐即可；`x` 为 null 表示横轴就是 `t`。
+    一条都取不到、或拿到的是一组实例（`[:]` 没配 `per_instance`），给 `{"error": …}`。
+
+    换算（四元数→欧拉角、单位、多字段合成）都在这里做，前端只画——"前端不写数学"。
     """
     global __result
-    fields = json.loads(fields_json)
-    op = json.loads(op_json) if op_json else None
-    cols = provider.get_topic_data(topic, int(instance))
-    if cols is None:
-        __result = json.dumps({"error": "topic not found: %s#%d" % (topic, instance)})
-        return
-    ts = np.asarray(cols["timestamp"], dtype=np.int64)
-    n = len(ts)
-    ref = None
-    for f in fields:
-        if f in cols:
-            ref = cols[f]
-            break
-    idx = _lttb_indices(n, int(max_points), ref)
-
-    if op:
-        name = op.get("name")
-        if name not in OPERATORS:
-            __result = json.dumps({"error": "未注册的预处理算子：%s" % name})
-            return
-        args = [np.asarray(cols[f], dtype=float) if f in cols else None for f in fields]
-        if any(a is None for a in args):
-            __result = json.dumps({"error": "预处理算子 %s 的输入字段缺失" % name})
-            return
-        opts = {k: v for k, v in op.items() if k not in ("name", "labels")}
-        res = OPERATORS[name](*args, **opts)
-        if res is None:
-            __result = json.dumps({"error": "预处理算子 %s 无结果（数据不足）" % name})
-            return
-        outs = list(res) if isinstance(res, tuple) else [res]
-        names = SIGNATURES.get(name, {}).get("out_names") or ["out%d" % i for i in range(len(outs))]
-        out = {
-            "topic": topic,
-            "instance": int(instance),
-            "t": [_since_boot(ts[i], 3) for i in idx],
-            "series": {names[i]: [_clean(np.asarray(o, dtype=float)[j]) for j in idx] for i, o in enumerate(outs)},
-            "fullCount": n,
-            "op": name,
-        }
-        __result = json.dumps(out, ensure_ascii=False)
+    req = json.loads(request_json)
+    inst = int(req.get("instance") or 0)
+    yspec = req.get("ydata") or []
+    if not yspec:
+        __result = json.dumps({"error": "这张图没有声明任何一条数据（ydata 为空）"}, ensure_ascii=False)
         return
 
-    out = {
-        "topic": topic,
-        "instance": int(instance),
-        "t": [_since_boot(ts[i], 3) for i in idx],
-        "series": {},
-        "fullCount": n,
-    }
-    for f in fields:
-        if f in cols:
-            vv = np.asarray(cols[f], dtype=float)
-            out["series"][f] = [_clean(vv[i]) for i in idx]
+    # 1) 换算节点：与规则同一套求值器，只把 ref 换成"按本面板的实例取"
+    env = _rule_env()
+    if req.get("compute"):
+
+        def panel_ref(*args, **kwargs):
+            return _pick_ref(*args, instance=inst, **kwargs)[0]
+
+        try:
+            for stmt in req["compute"]:
+                _eval_compute(stmt, env, ref_fn=panel_ref)
+        except Exception as exc:
+            __result = json.dumps({"error": "换算节点算不出来：%s" % exc}, ensure_ascii=False)
+            return
+
+    # 2) 逐条取数（字段引用 / 换算节点的输出）
+    hit_bare = None
+    values = []
+    try:
+        for spec in yspec:
+            got, bare = _panel_series(spec, env, inst)
+            if bare and hit_bare is None:
+                hit_bare = bare
+            values.append(got)
+        if req.get("xdata"):
+            x_vals, bare_x = _panel_series(req["xdata"], env, inst)
+            if bare_x and hit_bare is None:
+                hit_bare = bare_x
+            if x_vals is None:
+                __result = json.dumps({"error": "横轴那个字段在日志里没有"}, ensure_ascii=False)
+                return
         else:
-            out["series"][f] = None
-    __result = json.dumps(out, ensure_ascii=False)
+            x_vals = None
+    except Exception as exc:
+        __result = json.dumps({"error": str(exc)}, ensure_ascii=False)
+        return
+    if all(v is None for v in values):
+        __result = json.dumps({"error": "这张图的数据在日志里都没有"}, ensure_ascii=False)
+        return
+
+    # 3) 横轴：显式给了就用它，否则用命中字段那个 topic 的时间戳（阶段底色、tooltip 都要）。
+    #    整张图都靠换算节点算出来时，命中字段要从节点里的 ref 反推（只定 topic，不求值）。
+    if hit_bare is None and req.get("compute"):
+        hit_bare = _first_ref_bare(req["compute"])
+    ts = None
+    if hit_bare:
+        topic = hit_bare.partition(".")[0]
+        _, inst_hit = _split_ref(hit_bare)
+        ts = provider.get_series(
+            "%s.timestamp" % topic,
+            instance=inst if isinstance(inst_hit, slice) else inst_hit,
+        )
+    if ts is None:
+        __result = json.dumps(
+            {"error": "取不到时间戳（%s 里没有 timestamp 列）" % (hit_bare or "任何命中的字段")},
+            ensure_ascii=False,
+        )
+        return
+
+    n = len(np.asarray(ts, dtype=np.int64))
+    arrs = []
+    for v in values:
+        if v is None:
+            arrs.append(None)
+        elif np.ndim(v) == 0:
+            arrs.append(np.full(n, float(v)))  # 换算出的是标量：铺成常量线（门限线是正当用法）
+        else:
+            arrs.append(np.asarray(v, dtype=float))
+    ref = next((a for a in arrs if a is not None), None)
+    idx = _lttb_indices(n, int(max_points), ref)
+    __result = json.dumps(
+        {
+            "t": [_since_boot(ts[i], 3) for i in idx],
+            "x": None if x_vals is None else [_clean(np.asarray(x_vals, dtype=float)[i]) for i in idx],
+            "series": [None if a is None else [_clean(a[i]) for i in idx] for a in arrs],
+            "fullCount": n,
+        },
+        ensure_ascii=False,
+    )
+
+
+def _panel_series(spec, env, inst):
+    """一条线 → (序列, 命中的 bare 字段名)。
+
+    · `{"kind":"var"}` 取换算节点的输出（标量由调用方铺成常量线）
+    · `{"kind":"field"}` 走 `_pick_ref`（候选组 + 单位换算 + 实例覆盖）
+
+    分组结果（`[:]` 且容器没写 `per_instance`）是**用错了**：报错，别把一组数据画成一条线。
+    """
+    if spec.get("kind") == "var":
+        return env.get(spec.get("name")), None
+    if spec.get("kind") != "field":
+        raise ValueError("不认识的取数声明：%s" % json.dumps(spec, ensure_ascii=False))
+    series, bare = _pick_ref(*spec.get("fields") or [], unit=spec.get("unit"), instance=inst)
+    if series is None:
+        return None, None
+    if isinstance(series, list) and series and isinstance(series[0], (list, tuple)):
+        raise ValueError(
+            "%s 取到的是所有实例（[:]），图上画不了——要么给容器加 per_instance: true、要么在引用里指定第几个实例" % bare
+        )
+    return series, bare
+
+
+def _first_ref_bare(stmts):
+    """换算节点里第一个"topic 在日志里存在"的字段引用（只用来定时间戳的 topic，不求值）。"""
+    for stmt in stmts:
+        try:
+            tree = ast.parse(stmt)
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "ref":
+                for arg in node.args:
+                    if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                        bare, _ = _split_ref(arg.value)
+                        if provider.has_topic(bare.partition(".")[0]):
+                            return bare
+    return None
 
 
 # ============ np_track：GPS 轨迹 ============

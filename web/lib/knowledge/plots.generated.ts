@@ -5,15 +5,25 @@ export const PLOT_PRESETS = [
     "id": "vibration",
     "title": "振动",
     "description": "每个 IMU 的高频振动指标（accel_vibration_metric，m/s²），参考线 4.905 / 9.81。",
-    "panels": [
+    "conditions": {
+      "firmware": "any",
+      "airframe": "any",
+      "topics": [
+        [
+          "vehicle_imu_status"
+        ]
+      ]
+    },
+    "compute": [],
+    "outputs": [
       {
+        "container": "axes",
         "title": "IMU #{instance}",
-        "yLabel": "m/s²",
-        "topic": "vehicle_imu_status",
-        "instance": "all",
-        "fields": [
-          "accel_vibration_metric"
-        ],
+        "legend": true,
+        "grid": true,
+        "flipx": false,
+        "flipy": false,
+        "range": null,
         "hlines": [
           {
             "value": 4.905,
@@ -25,6 +35,28 @@ export const PLOT_PRESETS = [
             "level": "critical",
             "label": "9.81（严重）"
           }
+        ],
+        "per_instance": true,
+        "ylabel": "m/s²",
+        "xlabel": "秒（相对日志开始）",
+        "children": [
+          {
+            "mode": "TimeSeries",
+            "xdata": null,
+            "ydata": [
+              {
+                "kind": "field",
+                "fields": [
+                  "vehicle_imu_status[:].accel_vibration_metric"
+                ]
+              }
+            ],
+            "labels": [
+              "振动"
+            ],
+            "styles": [],
+            "colors": []
+          }
         ]
       }
     ]
@@ -33,19 +65,65 @@ export const PLOT_PRESETS = [
     "id": "imu-accel",
     "title": "IMU 原始加速度",
     "description": "三轴加速度（m/s²）。旧固件可能未记录该话题。",
-    "panels": [
-      {
-        "title": "IMU 加速度（{topic}#{instance}）",
-        "yLabel": "m/s²",
-        "topics": [
+    "conditions": {
+      "firmware": "any",
+      "airframe": "any",
+      "topics": [
+        [
           "sensor_combined",
           "sensor_accel"
-        ],
-        "instance": "first",
-        "fields": [
-          "accelerometer_m_s2[0]",
-          "accelerometer_m_s2[1]",
-          "accelerometer_m_s2[2]"
+        ]
+      ]
+    },
+    "compute": [],
+    "outputs": [
+      {
+        "container": "axes",
+        "title": "IMU 加速度",
+        "legend": true,
+        "grid": true,
+        "flipx": false,
+        "flipy": false,
+        "range": null,
+        "hlines": null,
+        "per_instance": false,
+        "ylabel": "m/s²",
+        "xlabel": "秒（相对日志开始）",
+        "children": [
+          {
+            "mode": "TimeSeries",
+            "xdata": null,
+            "ydata": [
+              {
+                "kind": "field",
+                "fields": [
+                  "sensor_combined[0].accelerometer_m_s2[0]",
+                  "sensor_accel[0].accelerometer_m_s2[0]"
+                ]
+              },
+              {
+                "kind": "field",
+                "fields": [
+                  "sensor_combined[0].accelerometer_m_s2[1]",
+                  "sensor_accel[0].accelerometer_m_s2[1]"
+                ]
+              },
+              {
+                "kind": "field",
+                "fields": [
+                  "sensor_combined[0].accelerometer_m_s2[2]",
+                  "sensor_accel[0].accelerometer_m_s2[2]"
+                ]
+              }
+            ],
+            "labels": [
+              "accelerometer_m_s2",
+              "accelerometer_m_s2",
+              "accelerometer_m_s2"
+            ],
+            "styles": [],
+            "colors": []
+          }
         ]
       }
     ]
@@ -54,68 +132,101 @@ export const PLOT_PRESETS = [
     "id": "ekf",
     "title": "EKF 创新检验",
     "description": "创新值与检验门限之比（≥1 表示该路观测被 EKF 拒绝），参考线 1.0。",
-    "panels": [
+    "conditions": {
+      "firmware": "any",
+      "airframe": "any",
+      "topics": [
+        [
+          "estimator_status"
+        ]
+      ]
+    },
+    "compute": [],
+    "outputs": [
       {
+        "container": "axes",
         "title": "estimator_status #{instance}",
-        "yLabel": "ratio",
-        "topic": "estimator_status",
-        "instance": "first",
-        "fields": [
-          {
-            "label": "速度",
-            "fields": [
-              "vel_test_ratio"
-            ]
-          },
-          {
-            "label": "水平位置",
-            "fields": [
-              "pos_test_ratio"
-            ]
-          },
-          {
-            "label": "垂直高度",
-            "fields": [
-              "hgt_test_ratio"
-            ]
-          },
-          {
-            "label": "航向",
-            "fields": [
-              "hdg_test_ratio"
-            ]
-          },
-          {
-            "label": "磁罗盘",
-            "fields": [
-              "mag_test_ratio"
-            ],
-            "only_when_missing": "hdg_test_ratio"
-          },
-          {
-            "label": "空速",
-            "fields": [
-              "tas_test_ratio"
-            ]
-          },
-          {
-            "label": "离地高度",
-            "fields": [
-              "hagl_test_ratio"
-            ]
-          },
-          {
-            "label": "侧滑",
-            "fields": [
-              "beta_test_ratio"
-            ]
-          }
-        ],
+        "legend": true,
+        "grid": true,
+        "flipx": false,
+        "flipy": false,
+        "range": null,
         "hlines": [
           {
             "value": 1,
             "level": "critical",
-            "label": "1.0 (拒绝)"
+            "label": "1.0（拒绝）"
+          }
+        ],
+        "per_instance": false,
+        "ylabel": "ratio",
+        "xlabel": "秒（相对日志开始）",
+        "children": [
+          {
+            "mode": "TimeSeries",
+            "xdata": null,
+            "ydata": [
+              {
+                "kind": "field",
+                "fields": [
+                  "estimator_status[0].vel_test_ratio"
+                ]
+              },
+              {
+                "kind": "field",
+                "fields": [
+                  "estimator_status[0].pos_test_ratio"
+                ]
+              },
+              {
+                "kind": "field",
+                "fields": [
+                  "estimator_status[0].hgt_test_ratio"
+                ]
+              },
+              {
+                "kind": "field",
+                "fields": [
+                  "estimator_status[0].hdg_test_ratio"
+                ]
+              },
+              {
+                "kind": "field",
+                "fields": [
+                  "estimator_status[0].mag_test_ratio"
+                ]
+              },
+              {
+                "kind": "field",
+                "fields": [
+                  "estimator_status[0].tas_test_ratio"
+                ]
+              },
+              {
+                "kind": "field",
+                "fields": [
+                  "estimator_status[0].hagl_test_ratio"
+                ]
+              },
+              {
+                "kind": "field",
+                "fields": [
+                  "estimator_status[0].beta_test_ratio"
+                ]
+              }
+            ],
+            "labels": [
+              "速度",
+              "水平位置",
+              "垂直高度",
+              "航向",
+              "磁罗盘",
+              "空速",
+              "离地高度",
+              "侧滑"
+            ],
+            "styles": [],
+            "colors": []
           }
         ]
       }
@@ -125,33 +236,118 @@ export const PLOT_PRESETS = [
     "id": "power",
     "title": "电源",
     "description": "电压 / 电流 / 剩余电量，多面板共享时间轴。",
-    "panels": [
+    "conditions": {
+      "firmware": "any",
+      "airframe": "any",
+      "topics": [
+        [
+          "battery_status"
+        ]
+      ]
+    },
+    "compute": [],
+    "outputs": [
       {
+        "container": "axes",
         "title": "电压",
-        "yLabel": "V",
-        "topic": "battery_status",
-        "instance": "first",
-        "fields": [
-          "voltage_v",
-          "voltage_filtered_v"
+        "legend": true,
+        "grid": true,
+        "flipx": false,
+        "flipy": false,
+        "range": null,
+        "hlines": null,
+        "per_instance": false,
+        "ylabel": "V",
+        "xlabel": "秒（相对日志开始）",
+        "children": [
+          {
+            "mode": "TimeSeries",
+            "xdata": null,
+            "ydata": [
+              {
+                "kind": "field",
+                "fields": [
+                  "battery_status[0].voltage_v"
+                ]
+              },
+              {
+                "kind": "field",
+                "fields": [
+                  "battery_status[0].voltage_filtered_v"
+                ]
+              }
+            ],
+            "labels": [
+              "voltage_v",
+              "voltage_filtered_v"
+            ],
+            "styles": [],
+            "colors": []
+          }
         ]
       },
       {
+        "container": "axes",
         "title": "电流",
-        "yLabel": "A",
-        "topic": "battery_status",
-        "instance": "first",
-        "fields": [
-          "current_a"
+        "legend": true,
+        "grid": true,
+        "flipx": false,
+        "flipy": false,
+        "range": null,
+        "hlines": null,
+        "per_instance": false,
+        "ylabel": "A",
+        "xlabel": "秒（相对日志开始）",
+        "children": [
+          {
+            "mode": "TimeSeries",
+            "xdata": null,
+            "ydata": [
+              {
+                "kind": "field",
+                "fields": [
+                  "battery_status[0].current_a"
+                ]
+              }
+            ],
+            "labels": [
+              "current_a"
+            ],
+            "styles": [],
+            "colors": []
+          }
         ]
       },
       {
+        "container": "axes",
         "title": "剩余电量",
-        "yLabel": "%",
-        "topic": "battery_status",
-        "instance": "first",
-        "fields": [
-          "remaining"
+        "legend": true,
+        "grid": true,
+        "flipx": false,
+        "flipy": false,
+        "range": null,
+        "hlines": null,
+        "per_instance": false,
+        "ylabel": "%",
+        "xlabel": "秒（相对日志开始）",
+        "children": [
+          {
+            "mode": "TimeSeries",
+            "xdata": null,
+            "ydata": [
+              {
+                "kind": "field",
+                "fields": [
+                  "battery_status[0].remaining"
+                ]
+              }
+            ],
+            "labels": [
+              "remaining"
+            ],
+            "styles": [],
+            "colors": []
+          }
         ]
       }
     ]
@@ -160,30 +356,106 @@ export const PLOT_PRESETS = [
     "id": "gps",
     "title": "GPS",
     "description": "卫星数与定位精度（HDOP/EPH/EPV）。",
-    "panels": [
+    "conditions": {
+      "firmware": "any",
+      "airframe": "any",
+      "topics": [
+        [
+          "vehicle_gps_position",
+          "sensor_gps"
+        ]
+      ]
+    },
+    "compute": [],
+    "outputs": [
       {
+        "container": "axes",
         "title": "卫星数",
-        "yLabel": "count",
-        "topic": "vehicle_gps_position",
-        "instance": "first",
-        "fields": [
+        "legend": true,
+        "grid": true,
+        "flipx": false,
+        "flipy": false,
+        "range": null,
+        "hlines": null,
+        "per_instance": false,
+        "ylabel": "count",
+        "xlabel": "秒（相对日志开始）",
+        "children": [
           {
-            "fields": [
+            "mode": "TimeSeries",
+            "xdata": null,
+            "ydata": [
+              {
+                "kind": "field",
+                "fields": [
+                  "vehicle_gps_position[0].satellites_used",
+                  "sensor_gps[0].satellites_used"
+                ]
+              },
+              {
+                "kind": "field",
+                "fields": [
+                  "vehicle_gps_position[0].satellites_visible",
+                  "sensor_gps[0].satellites_visible"
+                ]
+              }
+            ],
+            "labels": [
               "satellites_used",
               "satellites_visible"
-            ]
+            ],
+            "styles": [],
+            "colors": []
           }
         ]
       },
       {
+        "container": "axes",
         "title": "定位精度",
-        "yLabel": "m",
-        "topic": "vehicle_gps_position",
-        "instance": "first",
-        "fields": [
-          "eph",
-          "epv",
-          "hdop"
+        "legend": true,
+        "grid": true,
+        "flipx": false,
+        "flipy": false,
+        "range": null,
+        "hlines": null,
+        "per_instance": false,
+        "ylabel": "m",
+        "xlabel": "秒（相对日志开始）",
+        "children": [
+          {
+            "mode": "TimeSeries",
+            "xdata": null,
+            "ydata": [
+              {
+                "kind": "field",
+                "fields": [
+                  "vehicle_gps_position[0].eph",
+                  "sensor_gps[0].eph"
+                ]
+              },
+              {
+                "kind": "field",
+                "fields": [
+                  "vehicle_gps_position[0].epv",
+                  "sensor_gps[0].epv"
+                ]
+              },
+              {
+                "kind": "field",
+                "fields": [
+                  "vehicle_gps_position[0].hdop",
+                  "sensor_gps[0].hdop"
+                ]
+              }
+            ],
+            "labels": [
+              "eph",
+              "epv",
+              "hdop"
+            ],
+            "styles": [],
+            "colors": []
+          }
         ]
       }
     ]
@@ -191,27 +463,122 @@ export const PLOT_PRESETS = [
   {
     "id": "attitude",
     "title": "姿态",
-    "description": "四元数经算子转欧拉角（Roll / Pitch / Yaw，度）。换算在引擎侧做（op 算子），前端只画。",
-    "panels": [
+    "description": "四元数经 quat_to_euler 转欧拉角（Roll / Pitch / Yaw，度）；换算在引擎侧做，前端只画。",
+    "conditions": {
+      "firmware": "any",
+      "airframe": "any",
+      "topics": [
+        [
+          "vehicle_attitude"
+        ]
+      ]
+    },
+    "compute": [
+      "roll, pitch, yaw = quat_to_euler( ref(\"vehicle_attitude.q[0]\"), ref(\"vehicle_attitude.q[1]\"), ref(\"vehicle_attitude.q[2]\"), ref(\"vehicle_attitude.q[3]\"))"
+    ],
+    "outputs": [
       {
+        "container": "axes",
         "title": "欧拉角",
-        "yLabel": "deg",
-        "topic": "vehicle_attitude",
-        "instance": "first",
-        "fields": [
-          "q[0]",
-          "q[1]",
-          "q[2]",
-          "q[3]"
-        ],
-        "op": {
-          "name": "quat_to_euler",
-          "labels": [
-            "Roll",
-            "Pitch",
-            "Yaw"
-          ]
-        }
+        "legend": true,
+        "grid": true,
+        "flipx": false,
+        "flipy": false,
+        "range": null,
+        "hlines": null,
+        "per_instance": false,
+        "ylabel": "deg",
+        "xlabel": "秒（相对日志开始）",
+        "children": [
+          {
+            "mode": "TimeSeries",
+            "xdata": null,
+            "ydata": [
+              {
+                "kind": "var",
+                "name": "roll"
+              },
+              {
+                "kind": "var",
+                "name": "pitch"
+              },
+              {
+                "kind": "var",
+                "name": "yaw"
+              }
+            ],
+            "labels": [
+              "Roll",
+              "Pitch",
+              "Yaw"
+            ],
+            "styles": [],
+            "colors": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "track",
+    "title": "轨迹",
+    "description": "地图上的飞行轨迹（原始 GNSS），多条轨道叠画、可点选隐藏。",
+    "conditions": {
+      "firmware": "any",
+      "airframe": "any",
+      "topics": [
+        [
+          "sensor_gps",
+          "vehicle_gps_position"
+        ]
+      ]
+    },
+    "compute": [],
+    "outputs": [
+      {
+        "container": "map",
+        "title": "轨迹",
+        "legend": true,
+        "children": [
+          {
+            "label": "gps",
+            "max_points": 1500,
+            "lat": {
+              "cands": [
+                "sensor_gps[0].latitude_deg",
+                "vehicle_gps_position[0].latitude_deg",
+                "vehicle_gps_position[0].lat"
+              ],
+              "unit": "deg"
+            },
+            "lon": {
+              "cands": [
+                "sensor_gps[0].longitude_deg",
+                "vehicle_gps_position[0].longitude_deg",
+                "vehicle_gps_position[0].lon"
+              ],
+              "unit": "deg"
+            },
+            "alt": {
+              "cands": [
+                "sensor_gps[0].altitude_msl_m",
+                "vehicle_gps_position[0].altitude_msl_m",
+                "vehicle_gps_position[0].alt"
+              ],
+              "unit": "m"
+            },
+            "topics": [
+              [
+                "sensor_gps",
+                0
+              ],
+              [
+                "vehicle_gps_position",
+                0
+              ]
+            ]
+          }
+        ]
       }
     ]
   }

@@ -5,12 +5,13 @@
  *
  * 协议：
  * - 入站 analyze {file}：加载运行时（只一次）→ 解析 → 规则 → done
- * - 入站 series {reqId, topic, instance, fields}：懒抽取降采样时序
+ * - 入站 series {reqId, request}：按预设的取数声明懒抽取降采样时序（换算在引擎侧）
  * - 出站 done {report, manifest, info} / series {reqId, data} / stage / error
  */
 import { PY_ULG_CHECKS } from "./ulog-check-script";
 import { PY_ULG_DATA_HELPERS } from "./ulog-data-script";
 import type { LogInfo, TopicManifest } from "@/lib/types";
+import type { SeriesRequest } from "@/lib/chart-presets";
 
 // 默认走 jsdelivr CDN；生产建议改 NEXT_PUBLIC_PYODIDE_URL 指向自托管（EdgeOne Blob）——
 // 国内访问 jsdelivr / PyPI 都不稳，自托管后运行时与 wheel 都是一次下载、长期缓存。
@@ -34,11 +35,8 @@ export type WorkerInMessage =
   | {
     type: "series";
     reqId: string;
-    topic: string;
-    instance: number;
-    fields: string[];
-    /** 预处理算子（可选）：换算在引擎侧做，别在前端写数学 */
-    op?: { name: string; labels?: string[]; };
+    /** 取数声明（前端从预设拼好，引擎解释）：字段引用 + 候选组 + 单位 + 换算节点 */
+    request: SeriesRequest;
   };
 
 export type WorkerOutMessage =
@@ -188,10 +186,10 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
 
     if (msg.type === "series") {
       try {
-        // 入参经 json.dumps 字符串传入，避免 Python 侧注入问题
-        const code = `np_series(${JSON.stringify(msg.topic)}, ${msg.instance}, ${JSON.stringify(
-          JSON.stringify(msg.fields),
-        )}, 1500, ${msg.op ? JSON.stringify(JSON.stringify(msg.op)) : "None"})`;
+        // 取数声明整份由前端从预设拼好（字段引用/候选组/单位/换算节点），这里只转发给引擎：
+        // np_series 自己解释它（见 engine/report_data.py）。入参经 json.dumps 字符串传入，
+        // 避免 Python 侧注入问题。
+        const code = `np_series(${JSON.stringify(JSON.stringify(msg.request))}, 3000)`;
         const data = await runJson(pyodide, code);
         post({ type: "series", reqId: msg.reqId, data });
       } catch (err) {
