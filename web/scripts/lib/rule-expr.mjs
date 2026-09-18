@@ -447,29 +447,6 @@ export function parseExprList(src) {
   return Parser(text, tokenize(text)).list();
 }
 
-/** 顶层逗号切分（**只认引号与括号**，不当表达式解析）——给 `style` / `color` 这种
- *  不是表达式的并列串用。`a, "b,c", d` → ["a", "\"b,c\"", "d"]。 */
-export function splitTopLevel(s) {
-  const out = [];
-  let depth = 0;
-  let quote = null;
-  let cur = "";
-  for (const c of String(s)) {
-    if (quote) {
-      cur += c;
-      if (c === quote) quote = null;
-      continue;
-    }
-    if (c === '"' || c === "'") { quote = c; cur += c; continue; }
-    if (c === "(" || c === "[") depth++;
-    if (c === ")" || c === "]") depth--;
-    if (c === "," && depth === 0) { out.push(cur); cur = ""; continue; }
-    cur += c;
-  }
-  out.push(cur);
-  return out.map((x) => x.trim());
-}
-
 // ─────────────────────────── 校验 ───────────────────────────
 
 /** 粗类型：够用来抓「三元两分支一个是列表一个是标量」这类明显错误 */

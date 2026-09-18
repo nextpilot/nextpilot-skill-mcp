@@ -19,4 +19,4 @@ outputs:
           ref("estimator_status[0].hgt_test_ratio"), ref("estimator_status[0].hdg_test_ratio"),
           ref("estimator_status[0].mag_test_ratio"), ref("estimator_status[0].tas_test_ratio"),
           ref("estimator_status[0].hagl_test_ratio"), ref("estimator_status[0].beta_test_ratio")
-        label: 速度, 水平位置, 垂直高度, 航向, 磁罗盘, 空速, 离地高度, 侧滑
+        label: [速度, 水平位置, 垂直高度, 航向, 磁罗盘, 空速, 离地高度, 侧滑]

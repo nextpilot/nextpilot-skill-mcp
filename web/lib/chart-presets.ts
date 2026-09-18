@@ -27,7 +27,7 @@ export type SeriesRequest = {
   ydata: FieldDesc[];
   /** 预设的换算节点（与规则 compute 同一套），引擎在取数前求值 */
   compute: string[];
-  /** 与 ydata **同序等长**：每条线的图例名与样式（style = ECharts 的 lineStyle.type） */
+  /** 与 ydata **同序等长**：每条线的图例名与样式（style = solid / dashed / dotted，渲染时映射到绘图库） */
   series: { label: string; style: string | null; color: string | null; }[];
 };
 

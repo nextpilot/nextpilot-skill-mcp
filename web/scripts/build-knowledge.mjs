@@ -39,7 +39,6 @@ import {
   UNIT_ALIASES,
   UNIT_KIND,
   checkFieldList,
-  splitTopLevel,
   splitFieldRef,
 } from "./lib/rule-expr.mjs";
 
@@ -620,26 +619,37 @@ function normalizeAirframe(spec, airframes, where) {
 
 /** 图的两种模式；`track` 只出现在 `container: map` 的 child 上 */
 const CHART_MODES = new Set(["TimeSeries", "xyplot"]);
-/** 线型取值 = ECharts 的 lineStyle.type（**照抄人家的词汇，不自造格式串**） */
+/** 线型取值：三个通用叫法（渲染时映射到绘图库的线型；**不自造 `-^` 那种格式串**） */
 const LINE_STYLES = new Set(["solid", "dashed", "dotted"]);
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 /**
- * 与 `ydata` **逐项对齐**的平行串（`label` / `style` / `color`）。
- * 逗号切分只认引号与括号（`splitTopLevel`），个数不等、某项为空、取值非法都在这里报错，
- * 报错要指到"第几项"——这是保留逗号串写法的代价，不能让作者自己去数。
+ * 与 `ydata` **逐项对齐**的并列键（`label` / `style` / `color`）——必须是 **YAML 列表**。
+ *
+ * 为什么不用逗号串：这三个都是枚举/普通字符串，让 YAML 自己切既准确又能报到位；
+ * 而且颜色是 `#rrggbb`，逗号串形态下**没法写**（YAML 不允许标量以引号开头，`#` 不加引号
+ * 又会被当注释，只能绕块标量）。表达式那一列（`ydata`）仍走逗号串——它必须由
+ * `parseExprList` 认引号与括号。
  */
 function parallelList(raw, n, where, what, check) {
   if (raw === undefined || raw === null) return null;
-  const items = splitTopLevel(String(raw)).map((s) => s.replace(/^["']|["']$/g, "").trim());
-  if (items.length !== n) {
-    throw new Error(`${where}: ${what} 有 ${items.length} 项、ydata 有 ${n} 项——两者必须一一对应`);
+  if (!Array.isArray(raw)) {
+    throw new Error(
+      `${where}: ${what} 要写成 YAML 列表，如 ${what}: [甲, 乙]（只有一项也要写 ${what}: [甲]）` +
+        `——与 ydata 逐项对应；逗号串那种写法不再认`,
+    );
   }
-  items.forEach((v, i) => {
-    if (!v) throw new Error(`${where}: ${what} 第 ${i + 1} 项是空的`);
-    if (check) check(v, i);
+  if (raw.length !== n) {
+    throw new Error(`${where}: ${what} 有 ${raw.length} 项、ydata 有 ${n} 项——两者必须一一对应`);
+  }
+  return raw.map((v, i) => {
+    if (typeof v !== "string" || !v.trim()) {
+      throw new Error(`${where}: ${what} 第 ${i + 1} 项必须是非空字符串（实际 ${JSON.stringify(v)}）`);
+    }
+    const s = v.trim();
+    if (check) check(s, i);
+    return s;
   });
-  return items;
 }
 
 /** 一个取数声明串（`ydata` / `xdata` / 地图的 lat…）→ 运行期描述。 */
@@ -732,7 +742,7 @@ function compileAxes(out, where, declaredVars, refs) {
     const styles = parallelList(child.style, ydata.length, cwhere, "style", (v, i) => {
       if (!LINE_STYLES.has(v)) {
         throw new Error(
-          `${cwhere}: style 第 ${i + 1} 项 ${JSON.stringify(v)} 不是 ECharts 的线型` +
+          `${cwhere}: style 第 ${i + 1} 项 ${JSON.stringify(v)} 不是合法线型` +
             `（可用：${[...LINE_STYLES].join(" / ")}）`,
         );
       }

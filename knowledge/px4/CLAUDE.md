@@ -398,6 +398,11 @@ w_p95 = percentile(hypot(ref("estimator_wind.windspeed_north", "wind_estimate.wi
   **同时存在**，前者采样少得多（181/43/309 vs 1390/436/3095）——**轨迹点数会明显变少、更"粗"**，
   这是明知的取舍（宁可要新话题的原始 GNSS）。曲线那边**故意反过来**（`vehicle_gps_position` 优先），
   为的是与改造前画的是同一份数据。
+- **并列键是 YAML 列表，不是逗号串**（`label` / `style` / `color`，与 `ydata` 逐项对齐）：
+  一开始三者都写成逗号串（`style: solid, dashed`），但 `color` 是 `#rrggbb` —— YAML 不允许标量以
+  引号开头、`#` 不加引号又会被当注释，逗号串形态下**根本没法写**，只能绕块标量（已在模板里踩过）。
+  现在三者只认列表、`ydata` 仍走逗号串（它每项是**表达式**，得靠 `parseExprList` 认引号与括号），
+  顺带把只为此存在的 `splitTopLevel` 删了。构建期报错会指出第几项。
 - **`FACTS` 改成按 JSON 解析**（`json.loads(r"""…""")`，与 `RULES` 同款）：预设里出现 `legend: true`
   之后，当 Python 字面量注入直接 `NameError: name 'true' is not defined`。**凡是有布尔/空值的
   JSON 载荷都不能当 Python 字面量注入。**

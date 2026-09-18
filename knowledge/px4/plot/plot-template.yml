@@ -57,13 +57,11 @@ outputs:
           ref("battery_status[0].voltage_v"),
           ref("battery_status[0].voltage_filtered_v"),
           remaining_pct
-        # label / style / color 与 ydata **逐项对齐**（个数不等就构建失败，报错指出第几项）
-        label: 电压, 滤波后电压, 剩余电量
-        style: solid, dashed, solid      # solid｜dashed｜dotted（缺省 solid）
-        # 颜色是 `#rrggbb`：**必须以引号开头**，而 YAML 不允许标量以引号开头，所以用块标量写。
-        # 不写就按站点调色板顺序取。
-        color: >-
-          "#409eff", "#ff4d4f"
+        # label / style / color 都是 **YAML 列表**，与 ydata **逐项对齐**
+        # （个数不等就构建失败，报错指出第几项；只有一项也要写 [甲]）
+        label: [电压, 滤波后电压, 剩余电量]
+        style: [solid, dashed, solid]    # solid｜dashed｜dotted（缺省 solid）
+        color: ["#409eff", "#ff4d4f"]    # #rrggbb；不写就按站点调色板顺序取
         # 老固件少个字段怎么办：**什么都不用写** —— 那条线取到 null，前端自动不画；
         # 要"换个名字继续画"就把它放进候选组：ref("新名", "旧名")。
 

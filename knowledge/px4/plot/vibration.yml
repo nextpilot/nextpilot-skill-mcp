@@ -16,4 +16,4 @@ outputs:
     children:
       - mode: TimeSeries
         ydata: ref("vehicle_imu_status[:].accel_vibration_metric")
-        label: 振动
+        label: [振动]

@@ -70,7 +70,7 @@ outputs:
 | `mode` | ✓ | `TimeSeries`（横轴=时间）｜`xyplot`（横轴=你给的 `xdata`） |
 | `xdata` | | `xyplot` 必填；写了的**优先**，不写才走"自动定时间轴"（见下） |
 | `ydata` | ✓ | 要画的线，**逗号分隔**。每一项要么是字段引用（`ref(...)` 或裸写 `topic.field`），要么是 `compute` 算出来的变量名 |
-| `label` / `style` / `color` | | 与 `ydata` **逐项对齐**（个数不等就构建失败）。`style` 取 `solid｜dashed｜dotted`；`color` 是 `#rrggbb`，**用块标量写**（YAML 不允许标量以引号开头，而 `#` 不加引号会被当注释） |
+| `label` / `style` / `color` | | **YAML 列表**，与 `ydata` **逐项对齐**（个数不等就构建失败，报错指出第几项；只有一项也要写 `[甲]`）。`style` 取 `solid｜dashed｜dotted`；`color` 是 `#rrggbb` |
 
 `map` 的 child：`mode: track` + `label` + `max_points` + `lat` / `lon` / `alt`（各一个字段引用，
 **必须写明实例**：同一条轨道的时间戳与 `fix_type` 要跟坐标来自同一个话题的同一个实例）。
