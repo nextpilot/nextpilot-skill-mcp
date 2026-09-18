@@ -441,7 +441,7 @@ export function parseCompute(src) {
 
 /** 解析一串裸表达式（`a, b, c`）——预设里的字段/样式串用它。**按同一套词法切**，
  *  所以 `ref("a.b", "c.d", unit="deg"), x` 里的逗号不会被切错。 */
-export function parseExprList(src) {
+function parseExprList(src) {
   const text = String(src).trim();
   if (!text) throw new Error("表达式串是空的");
   return Parser(text, tokenize(text)).list();
@@ -856,59 +856,66 @@ export function collectRefs(src) {
 }
 
 /**
- * 预设（`plot/*.yml`）里的一个**字段表达式串** → 结构化描述；逗号串就是多项。
+ * 预设（`plot/*.yml`）里的**一个**取数声明串 → 结构化描述。
  *
- * 只认三种形态（图上要算术请写进预设的 `computer` 节点，别在这里藏表达式）：
+ * 只认三种形态（图上要算术请写进预设的 `compute` 节点，别在这里藏表达式）：
  *   · 裸写字段引用 `topic.field`（要实例 / 单位 / 候选组就得包 ref）
  *   · `ref("新名", "旧名", unit="deg")` —— 与规则**同一套**候选组与单位语法
- *   · `computer` 里赋过值的变量名
+ *   · `compute` 里赋过值的变量名
+ *
+ * **一项就是一条线**：多条写成 YAML 列表（一行一项，或 `[甲, 乙]`），别在这里塞逗号——
+ * 逗号串那套（连同类）已经退役，见 CLAUDE.md。
  *
  * @param {object} opts { signatures, builtinVars, declaredVars }
- * @returns {Array<{kind:"field",fields:string[],unit?:string,alias?:string[]}|{kind:"var",name:string}>}
+ * @returns {{kind:"field",fields:string[],unit?:string,alias?:string[]}|{kind:"var",name:string}}
  */
-export function checkFieldList(src, opts = {}) {
+export function checkFieldItem(src, opts = {}) {
   const text = String(src).trim();
-  return parseExprList(text).map((node, i) => {
-    const where = text.includes(",") ? `第 ${i + 1} 项：` : "";
-    if (node.k === "attr") {
-      return { kind: "field", fields: [`${node.topic}.${node.field}`] };
-    }
-    if (node.k === "call" && node.fn === "ref") {
-      // 复用规则那套 ref 校验（位置实参必须是字符串、候选组实例写法一致、修饰键只有 alias/unit）
-      checkRef(node, {
-        src: text,
-        signatures: opts.signatures ?? {},
-        builtinVars: opts.builtinVars,
-        types: new Map(),
-        topCall: node,
-        tryAllowed: false,
-      });
-      const out = { kind: "field", fields: node.args.map((a) => a.v) };
-      if (node.kwargs.unit) out.unit = node.kwargs.unit.v;
-      if (node.kwargs.alias) {
-        out.alias = node.kwargs.alias.k === "list" ? node.kwargs.alias.items.map((x) => x.v) : [node.kwargs.alias.v];
-      }
-      return out;
-    }
-    if (node.k === "name") {
-      if (!opts.declaredVars?.has(node.name)) {
-        fail(
-          `${where}引用了没有赋值的名字 ${node.name}——图上要算新量请写在预设的 computer 节点里` +
-            "（写法与规则的 compute 相同）",
-          text,
-          node.pos,
-        );
-      }
-      return { kind: "var", name: node.name };
-    }
-    fail(
-      `${where}只能是字段引用（topic.field，或 ref("a.b", "c.d", unit="deg")）或 computer 里赋过值的变量名；` +
-        "算术与函数调用请写进 computer 节点",
-      text,
-      node.pos,
+  const nodes = parseExprList(text);
+  if (nodes.length !== 1) {
+    throw new Error(
+      `一项只能写一个取数声明（实际写了 ${nodes.length} 个）——` +
+        "多条线请写成 YAML 列表，一行一项（或 [甲, 乙]）",
     );
-    return null;
-  });
+  }
+  const node = nodes[0];
+  if (node.k === "attr") {
+    return { kind: "field", fields: [`${node.topic}.${node.field}`] };
+  }
+  if (node.k === "call" && node.fn === "ref") {
+    // 复用规则那套 ref 校验（位置实参必须是字符串、候选组实例写法一致、修饰键只有 alias/unit）
+    checkRef(node, {
+      src: text,
+      signatures: opts.signatures ?? {},
+      builtinVars: opts.builtinVars,
+      types: new Map(),
+      topCall: node,
+      tryAllowed: false,
+    });
+    const out = { kind: "field", fields: node.args.map((a) => a.v) };
+    if (node.kwargs.unit) out.unit = node.kwargs.unit.v;
+    if (node.kwargs.alias) {
+      out.alias = node.kwargs.alias.k === "list" ? node.kwargs.alias.items.map((x) => x.v) : [node.kwargs.alias.v];
+    }
+    return out;
+  }
+  if (node.k === "name") {
+    if (!opts.declaredVars?.has(node.name)) {
+      fail(
+        `引用了没有赋值的名字 ${node.name}——图上要算新量请写在预设的 compute 节点里` +
+          "（写法与规则的 compute 相同）",
+        text,
+        node.pos,
+      );
+    }
+    return { kind: "var", name: node.name };
+  }
+  fail(
+    `只能是字段引用（topic.field，或 ref("a.b", "c.d", unit="deg")）或 compute 里赋过值的变量名；` +
+      "算术与函数调用请写进 compute 节点",
+    text,
+    node.pos,
+  );
 }
 
 /** 收集表达式里引用到的**裸变量名**（不含字段引用的 topic、不含算子名） */

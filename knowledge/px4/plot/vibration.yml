@@ -15,5 +15,6 @@ outputs:
       - {value: 9.81, level: critical, label: "9.81（严重）"}
     children:
       - mode: TimeSeries
-        ydata: ref("vehicle_imu_status[:].accel_vibration_metric")
+        ydata:
+          - ref("vehicle_imu_status[:].accel_vibration_metric")
         label: [振动]

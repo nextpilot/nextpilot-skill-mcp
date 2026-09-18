@@ -547,12 +547,12 @@ outputs:
     hlines: [{value: 4.905, level: warning, label: "4.905（警告）"}]
     children:
       - mode: TimeSeries
-        ydata: >-
-          ref("battery_status[0].voltage_v"),
-          ref("battery_status[0].voltage_filtered_v"),
-          remaining_pct
-        label: 电压, 滤波后电压, 剩余电量
-        style: solid, dashed, solid
+        ydata:
+          - ref("battery_status[0].voltage_v")
+          - ref("battery_status[0].voltage_filtered_v")
+          - remaining_pct
+        label: [电压, 滤波后电压, 剩余电量]
+        style: [solid, dashed, solid]
 ```
 
 几条与规则一致的约定：

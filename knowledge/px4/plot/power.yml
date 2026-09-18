@@ -10,16 +10,20 @@ outputs:
     ylabel: V
     children:
       - mode: TimeSeries
-        ydata: ref("battery_status[0].voltage_v"), ref("battery_status[0].voltage_filtered_v")
+        ydata:
+          - ref("battery_status[0].voltage_v")
+          - ref("battery_status[0].voltage_filtered_v")
   - container: axes
     title: 电流
     ylabel: A
     children:
       - mode: TimeSeries
-        ydata: ref("battery_status[0].current_a")
+        ydata:
+          - ref("battery_status[0].current_a")
   - container: axes
     title: 剩余电量
     ylabel: "%"
     children:
       - mode: TimeSeries
-        ydata: ref("battery_status[0].remaining")
+        ydata:
+          - ref("battery_status[0].remaining")

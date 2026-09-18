@@ -47,16 +47,19 @@ outputs:
         # 时间序列**通常不用写 xdata**（缺省就是时间戳）；要画"非时间"的横轴就用 mode: xyplot：
         #   - mode: xyplot
         #     xdata: ref("vehicle_gps_position[0].latitude_deg", "vehicle_gps_position[0].lat", unit="deg")
-        #     ydata: ref("vehicle_gps_position[0].altitude_msl_m", "vehicle_gps_position[0].alt", unit="m")
+        #     ydata:
+        #       - ref("vehicle_gps_position[0].altitude_msl_m", "vehicle_gps_position[0].alt", unit="m")
         #     label: 海拔
-        # ydata：要画的线，逗号分隔。每一项要么是字段引用，要么是上面 compute 算出来的变量名。
-        # 字段引用与规则**同一套**语言：候选组按存在性挑第一个；unit= 是**期望输出单位**
-        # （源单位构建期从 meta/ 查，查不到会告警，补一行到 meta/topic-overrides.yaml 即可）。
-        # 只在**需要换算**时写 unit=；字段本来就是目标单位就别写（不写 = 不换算、也不查表）。
-        ydata: >-
-          ref("battery_status[0].voltage_v"),
-          ref("battery_status[0].voltage_filtered_v"),
-          remaining_pct
+        # ydata：要画的线，**YAML 列表，一行一条**（流式的 [甲, 乙] 也行——但项里带逗号时
+        # 必须给每项加引号，所以块列表更省事）。每一项要么是字段引用，要么是上面 compute
+        # 算出来的变量名。字段引用与规则**同一套**语言：候选组按存在性挑第一个；unit= 是
+        # **期望输出单位**（源单位构建期从 meta/ 查，查不到会告警，补一行到
+        # meta/topic-overrides.yaml 即可）。只在**需要换算**时写 unit=；字段本来就是目标
+        # 单位就别写（不写 = 不换算、也不查表）。
+        ydata:
+          - ref("battery_status[0].voltage_v")          # 行尾可以挂注释
+          - ref("battery_status[0].voltage_filtered_v")
+          - remaining_pct
         # label / style / color 都是 **YAML 列表**，与 ydata **逐项对齐**
         # （个数不等就构建失败，报错指出第几项；只有一项也要写 [甲]）
         label: [电压, 滤波后电压, 剩余电量]

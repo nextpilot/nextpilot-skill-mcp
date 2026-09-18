@@ -38,7 +38,7 @@ import {
   normalizeUnit,
   UNIT_ALIASES,
   UNIT_KIND,
-  checkFieldList,
+  checkFieldItem,
   splitFieldRef,
 } from "./lib/rule-expr.mjs";
 
@@ -652,26 +652,43 @@ function parallelList(raw, n, where, what, check) {
   });
 }
 
-/** 一个取数声明串（`ydata` / `xdata` / 地图的 lat…）→ 运行期描述。 */
-function compileFields(src, where, what, declaredVars, { single = false, refs = null } = {}) {
-  if (typeof src !== "string" || !src.trim()) {
+/**
+ * 一个取数声明（`xdata`、地图的 `lat`…）→ 运行期描述。**单个**必须是字符串。
+ *
+ * 带 `unit=` 的引用在这里登记进单位表（源单位在 meta/<tag>.json 查，见 resolveFieldUnits）——
+ * **在编译处登记**，不靠事后遍历产物猜形状：地图坐标编译后不是同一个形状，遍历会漏。
+ */
+function compileFieldOne(raw, where, what, declaredVars, refs) {
+  if (typeof raw !== "string" || !raw.trim()) {
     throw new Error(`${where}: ${what} 必须是非空的字段声明（如 ref("vehicle_gps_position.eph", unit="m")）`);
   }
-  let items;
+  let desc;
   try {
-    items = checkFieldList(src, { signatures, builtinVars: BUILTIN_VARS, declaredVars });
+    desc = checkFieldItem(raw, { signatures, builtinVars: BUILTIN_VARS, declaredVars });
   } catch (err) {
     throw new Error(`${where}: ${what}——${err.message}`);
   }
-  if (single && items.length !== 1) {
-    throw new Error(`${where}: ${what} 只能写一个字段引用（这里不接受逗号串）`);
+  if (refs && desc.kind === "field" && desc.unit) {
+    refs.push({ where, fields: desc.fields, unit: desc.unit });
   }
-  // 带 unit= 的引用要登记进单位表（源单位在 meta/<tag>.json 查，见 resolveFieldUnits）。
-  // **在编译处登记**，不靠事后遍历产物猜形状——地图坐标编译后不是同一个形状，遍历会漏。
-  if (refs) {
-    for (const d of items) if (d.kind === "field" && d.unit) refs.push({ where, fields: d.fields, unit: d.unit });
+  return desc;
+}
+
+/** 一条线一个取数声明（`ydata`）→ 运行期描述数组。**必须是 YAML 列表**，与 label/style/color 同形。 */
+function compileFieldList(raw, where, what, declaredVars, refs) {
+  if (!Array.isArray(raw)) {
+    throw new Error(
+      `${where}: ${what} 要写成 YAML 列表，一行一条线：\n` +
+        `    ${what}:\n      - ref("vehicle_gps_position.eph", unit="m")\n      - remaining_pct`,
+    );
   }
-  return items;
+  if (raw.length === 0) throw new Error(`${where}: ${what} 是空列表（这张图画什么？）`);
+  return raw.map((item, i) => {
+    if (typeof item !== "string" || !item.trim()) {
+      throw new Error(`${where}: ${what} 第 ${i + 1} 项必须是非空字符串（实际 ${JSON.stringify(item)}）`);
+    }
+    return compileFieldOne(item, `${where} 的 ${what} 第 ${i + 1} 项`, "", declaredVars, refs);
+  });
 }
 
 /** 一条线没写 label 时的图例名：字段引用用第一个候选的字段名，换算节点的输出用变量名。 */
@@ -737,7 +754,7 @@ function compileAxes(out, where, declaredVars, refs) {
     if (!CHART_MODES.has(child.mode)) {
       throw new Error(`${cwhere}: mode 只能是 TimeSeries / xyplot（实际 ${JSON.stringify(child.mode)}）`);
     }
-    const ydata = compileFields(child.ydata, cwhere, "ydata", declaredVars, { refs });
+    const ydata = compileFieldList(child.ydata, cwhere, "ydata", declaredVars, refs);
     const labels = parallelList(child.label, ydata.length, cwhere, "label") ?? ydata.map(defaultLabel);
     const styles = parallelList(child.style, ydata.length, cwhere, "style", (v, i) => {
       if (!LINE_STYLES.has(v)) {
@@ -752,7 +769,7 @@ function compileAxes(out, where, declaredVars, refs) {
     }) ?? [];
     const xdata = child.xdata === undefined
       ? null
-      : compileFields(child.xdata, cwhere, "xdata", declaredVars, { single: true, refs })[0];
+      : compileFieldOne(child.xdata, cwhere, "xdata", declaredVars, refs);
     if (child.mode === "xyplot" && !xdata) throw new Error(`${cwhere}: mode: xyplot 必须写 xdata`);
     return { mode: child.mode, xdata, ydata, labels, styles, colors };
   });
@@ -802,7 +819,7 @@ function compileMap(out, where, declaredVars, refs) {
     }
     const coords = {};
     for (const axis of ["lat", "lon", "alt"]) {
-      const desc = compileFields(child[axis], cwhere, axis, declaredVars, { single: true, refs })[0];
+      const desc = compileFieldOne(child[axis], cwhere, axis, declaredVars, refs);
       if (desc.kind !== "field") {
         throw new Error(`${cwhere}: ${axis} 必须是字段引用（地图坐标不支持换算节点的输出）`);
       }

@@ -30,7 +30,8 @@ outputs:
     ylabel: V
     children:
       - mode: TimeSeries
-        ydata: ref("battery_status[0].voltage_v")
+        ydata:
+          - ref("battery_status[0].voltage_v")
 ```
 
 ## 字段
@@ -69,7 +70,7 @@ outputs:
 | --- | --- | --- |
 | `mode` | ✓ | `TimeSeries`（横轴=时间）｜`xyplot`（横轴=你给的 `xdata`） |
 | `xdata` | | `xyplot` 必填；写了的**优先**，不写才走"自动定时间轴"（见下） |
-| `ydata` | ✓ | 要画的线，**逗号分隔**。每一项要么是字段引用（`ref(...)` 或裸写 `topic.field`），要么是 `compute` 算出来的变量名 |
+| `ydata` | ✓ | 要画的线，**YAML 列表、一行一条**（也可以流式 `[甲, 乙]`，但项里带逗号时必须给每项加引号，块列表更省事）。每一项要么是字段引用（`ref(...)` 或裸写 `topic.field`），要么是 `compute` 算出来的变量名 |
 | `label` / `style` / `color` | | **YAML 列表**，与 `ydata` **逐项对齐**（个数不等就构建失败，报错指出第几项；只有一项也要写 `[甲]`）。`style` 取 `solid｜dashed｜dotted`；`color` 是 `#rrggbb` |
 
 `map` 的 child：`mode: track` + `label` + `max_points` + `lat` / `lon` / `alt`（各一个字段引用，
@@ -98,7 +99,8 @@ outputs:
 字段引用就是规则里那套（见 `content/guide/knowledge-write-rule.md`）：
 
 ```yaml
-ydata: ref("sensor_gps[0].latitude_deg", "vehicle_gps_position[0].latitude_deg", unit="deg")
+ydata:
+  - ref("sensor_gps[0].latitude_deg", "vehicle_gps_position[0].latitude_deg", unit="deg")
 ```
 
 - **候选组**按顺序取第一个在日志里存在的：字段改名（`ref("新名", "旧名")`）、话题改名
