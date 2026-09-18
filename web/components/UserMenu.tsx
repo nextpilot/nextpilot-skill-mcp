@@ -28,14 +28,22 @@ export function UserMenu() {
   const name = session.user.name || session.user.email || "飞手";
   return (
     <span className="flex items-center gap-1.5">
-      <span
-        className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold"
-        title={session.user.email ?? name}
-        aria-hidden
+      {/* 头像与昵称整体链到「我的」页（账号信息 / 额度 / 云端报告） */}
+      <Link
+        href="/me"
+        className="flex items-center gap-1.5 rounded-lg px-1 py-0.5 transition-colors hover:bg-surface-2"
+        title="个人中心"
+        aria-label="个人中心"
       >
-        {name.slice(0, 1).toUpperCase()}
-      </span>
-      <span className="hidden max-w-[120px] truncate text-sm text-muted sm:inline">{name}</span>
+        <span
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold"
+          title={session.user.email ?? name}
+          aria-hidden
+        >
+          {name.slice(0, 1).toUpperCase()}
+        </span>
+        <span className="hidden max-w-[120px] truncate text-sm text-muted sm:inline">{name}</span>
+      </Link>
       <button
         type="button"
         onClick={() => void signOut({ redirectTo: "/" })}

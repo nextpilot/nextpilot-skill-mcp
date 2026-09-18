@@ -87,6 +87,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = String(token.uid);
         session.user.plan = typeof token.plan === "string" ? token.plan : "free";
       }
+      // 登录方式跟着 JWT 走（/me 页展示「GitHub 登录 / 邮箱登录」用）
+      const loginType = token?.loginType;
+      if (loginType === "email" || loginType === "github") {
+        session.user.loginType = loginType;
+      }
       return session;
     },
   },

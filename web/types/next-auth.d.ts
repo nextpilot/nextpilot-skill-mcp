@@ -6,6 +6,8 @@ declare module "next-auth" {
     user: {
       id: string;
       plan: string;
+      /** 登录方式（/me 页展示用）：GitHub OAuth 或邮箱验证码 */
+      loginType?: "email" | "github";
     } & DefaultSession["user"];
   }
 
