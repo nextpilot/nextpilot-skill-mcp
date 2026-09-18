@@ -29,7 +29,7 @@ Write-Host ""
 Write-Host "===== 3/3: E2E tests =====" -ForegroundColor Cyan
 if ($env:SKIP_LOG_ANALYSIS -eq "1") {
     Write-Host "  SKIP_LOG_ANALYSIS=1, skipping log analysis test" -ForegroundColor Yellow
-    pnpm exec playwright test --grep-invert "log analysis"
+    pnpm exec playwright test --grep-invert "日志分析流程"
 } else {
     pnpm exec playwright test
 }

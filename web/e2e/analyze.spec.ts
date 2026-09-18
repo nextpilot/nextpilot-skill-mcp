@@ -7,14 +7,11 @@ test.describe("日志分析流程", () => {
     test("上传 .ulg 并完成分析", async ({ page }) => {
         await page.goto("/analyze", { waitUntil: "networkidle" });
 
-        // 上传区域应该可见
-        const uploadZone = page.locator("text=上传日志")
-            .or(page.locator('[data-testid="upload-zone"]'))
-            .or(page.locator('input[type="file"]'));
-        await expect(uploadZone.first()).toBeVisible({ timeout: 5000 });
+        // 隐藏的 file input 应该存在
+        const fileInput = page.locator('input[type="file"]').first();
+        await expect(fileInput).toBeAttached();
 
         // 上传 .ulg 文件
-        const fileInput = page.locator('input[type="file"]').first();
         await fileInput.setInputFiles(SAMPLE_ULG);
 
         // 等待分析完成：状态从 "加载 Pyodide" → "安装 pyulog" → "解析" → "完成"

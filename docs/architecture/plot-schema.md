@@ -1,7 +1,7 @@
 # 绘图配置 schema：container + children
 
 > 状态：设计稿（未实现）。
-> 骨架取自 `knowledge/px4/plot/plot-template.yml`（草案），保留其分层，修订三处（§1）。
+> 骨架取自 `knowledge/px4/plot-template.yml`（草案），保留其分层，修订三处（§1）。
 > 相关：`knowledge/px4/plot/`、`engine/operators.py`、`engine/report_data.py:np_series()`、`web/lib/chart-presets.ts`、`web/components/LogCharts.tsx`、`web/components/LogFlightMap.tsx`
 
 ---
