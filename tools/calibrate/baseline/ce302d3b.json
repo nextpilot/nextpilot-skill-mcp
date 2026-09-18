@@ -202,8 +202,12 @@
     ],
     "checksSkipped": [
       {
+        "check": "battery",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
         "check": "motor_balance",
-        "reason": "active motor channels < 4 (非多旋翼或未记录全部电机)"
+        "reason": "数据不足，本条没算出结论"
       },
       {
         "check": "vtol_transition",

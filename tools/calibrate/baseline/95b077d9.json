@@ -119,7 +119,6 @@
     ],
     "checksRun": [
       "vibration",
-      "ekf_innovations",
       "ekf_faults",
       "cpu_load",
       "gps_health",
@@ -130,16 +129,24 @@
     ],
     "checksSkipped": [
       {
+        "check": "ekf_innovations",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
         "check": "battery",
         "reason": "battery_status not in log"
       },
       {
         "check": "motor_balance",
-        "reason": "active motor channels < 4 (非多旋翼或未记录全部电机)"
+        "reason": "数据不足，本条没算出结论"
       },
       {
         "check": "attitude_tracking",
-        "reason": "vehicle_attitude(_setpoint) 或 armed 段缺失"
+        "reason": "vehicle_attitude_setpoint not in log"
+      },
+      {
+        "check": "airspeed",
+        "reason": "机架不适用 fixed_wing"
       },
       {
         "check": "vtol_transition",

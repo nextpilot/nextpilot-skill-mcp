@@ -155,7 +155,6 @@
     ],
     "checksRun": [
       "vibration",
-      "ekf_innovations",
       "ekf_faults",
       "battery",
       "cpu_load",
@@ -170,8 +169,20 @@
     ],
     "checksSkipped": [
       {
+        "check": "ekf_innovations",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "check": "battery",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
         "check": "motor_balance",
         "reason": "actuator_motors not in log"
+      },
+      {
+        "check": "airspeed",
+        "reason": "机架不适用 fixed_wing"
       }
     ],
     "matchedFaults": [],

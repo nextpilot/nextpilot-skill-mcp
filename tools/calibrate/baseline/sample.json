@@ -44,7 +44,6 @@
       "topic_missing:battery_status"
     ],
     "checksRun": [
-      "ekf_innovations",
       "ekf_faults",
       "cpu_load",
       "failsafe",
@@ -55,6 +54,10 @@
       {
         "check": "vibration",
         "reason": "vehicle_imu_status not in log"
+      },
+      {
+        "check": "ekf_innovations",
+        "reason": "数据不足，本条没算出结论"
       },
       {
         "check": "battery",
@@ -70,11 +73,15 @@
       },
       {
         "check": "imu_bias",
-        "reason": "无 armed 段，不做零偏判定"
+        "reason": "先决条件命中：not HAS_ARMED"
       },
       {
-        "check": "attitude_tracking",
-        "reason": "vehicle_attitude(_setpoint) 或 armed 段缺失"
+        "check": "airspeed",
+        "reason": "机架不适用 fixed_wing"
+      },
+      {
+        "check": "vtol_transition",
+        "reason": "vtol_vehicle_status not in log"
       },
       {
         "check": "wind_estimate",
