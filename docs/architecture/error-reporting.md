@@ -143,7 +143,7 @@
 | `web/components/IssueBridgeMount.tsx` | 新增。挂进 RootLayout，同步登录态 |
 | `web/app/global-error.tsx` | 新增。React 渲染崩溃兜底（此前完全没有）；内联样式、不依赖任何 Provider |
 | `web/hooks/useLogAnalyzer.ts` | Worker 加载失败与解析失败（`ParseError`）上报为 **fatal** |
-| `web/components/AnalyzeReport.tsx` | 新增「反馈问题」入口（检查结论 tab 底部），只提交规则 id / 条数 / 固件版本 / 用户填的一段话 |
+| `web/components/LogReport.tsx` | 新增「反馈问题」入口（检查结论 tab 底部），只提交规则 id / 条数 / 固件版本 / 用户填的一段话 |
 | `web/.env.example`、`docs/operations/README.md` | 环境变量、KV key、自检步骤与排查条目 |
 
 **一个容易踩的实现细节**：Pyodide 抛的 Python traceback 里，最关键的一行

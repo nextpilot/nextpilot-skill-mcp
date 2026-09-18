@@ -192,13 +192,13 @@
 
 | tab | 组件 | 内容 |
 | --- | --- | --- |
-| 基本情况 | `AnalyzeReport.tsx` 内 · `MetricsTab` | 规则产出的关键数字（metrics，声明在 `facts.yaml`） |
+| 基本情况 | `LogReport.tsx` 内 · `MetricsTab` | 规则产出的关键数字（metrics，声明在 `facts.yaml`） |
 | 系统消息 | `LogSystemMsg.tsx` | 消息记录统计（逐字节数 `MSG_TYPE`）+ Information Message 字典（变量名 / 取值 / 说明） |
 | 事件消息 | `LogEventsMsg.tsx` | PX4 事件解码 + 固件文本消息 + 多值信息（'M'），可按级别过滤 |
 | 飞控参数 | `LogParamsMsg.tsx` | 参数 / 当前值 / 默认值 / 最小值 / 最大值 / 说明；**当前值 ≠ 默认值则整行标红**；默认按"与默认不同"筛 |
 | 数据图表 | `LogCharts.tsx` | 曲线预设（`knowledge/px4/plot/*.yml`），含飞行阶段底色 |
-| 检查结论 | `AnalyzeReport.tsx` 内 | findings + 故障知识库命中条目 |
-| AI 中文解读 | `AnalyzeReport.tsx` 内 | DeepSeek 报告 |
+| 检查结论 | `LogReport.tsx` 内 | findings + 故障知识库命中条目 |
+| AI 解读 | `LogReport.tsx` 内 | DeepSeek 报告 |
 
 报告页之外还有两块常驻区域：**飞行阶段条**（`LogPhaseStrip.tsx`）紧贴 **飞行轨迹地图**（`LogFlightMap.tsx`，高德瓦片：国内可达；轨迹按 WGS-84 → GCJ-02 换算后绘制，换算见 `lib/coord.ts`）。
 
@@ -324,8 +324,12 @@
 1. **一条功能链上，每个文件占一个不重复的角色词**，名字连起来要能读成一句"谁采 → 谁收 → 谁建单"。
    例：`lib/issue-bridge.ts`（浏览器采集 + 投递）→ `functions/api/issues.js`（边缘入口，只接收）
    → `functions/_lib/issue-filer.js`（边缘，判定 + 建单）。
-2. **禁止只差词序 / 单复数的孪生名**：`error-reporter` 与 `report-error` 这样的名字真的并排出现过，
+2. **禁止只差词序 / 单复数 / 一两个字母的孪生名**：`error-reporter` 与 `report-error` 这样的名字真的并排出现过，
    读的人分不出哪个是模块、哪个是路由。同理不要 `foo-bar` / `bar-foo` 并存。
+   **更要防"读起来有上下级、其实是并列"的一对**：`GuideMarkdown` / `GuideMdx` 只差一个字母，
+   而 `Markdown ⊂ MDX` 让人以为前者是后者的基础版——于是"删掉基础版"看起来是简化，实际会把带
+   `{占位符}` 的文档交给 JSX 解析器（2026-09-18 已合并成 `GuideBody.tsx`，守卫 §[14] 钉住）。
+   **名字读出来的关系必须与真实关系一致**：不一致的名字比难读更坏，它会指错方向。
 3. **领域词先查有没有被占用**：本仓库 `report` 已指"飞行分析报告"（`/api/reports`、`lib/report-history.ts`），
    所以"线上报错自动建单"这条链统一用 **`issue`** 词根，不用 `report`。
    （也曾试过 `telemetry`：它不撞任何词根，但**语义比实际宽**——这条链只装错误上报这一件事，
@@ -340,13 +344,27 @@
    就只能靠位置后缀硬分，又回到上面那句。
 5. **同一目录里不许出现"开头一样、意思不同"的名字**（`/api/reports` 与 `/api/report-error` 前缀相同、
    一个名词一个动词，并列在 `functions/api/` 里）。
+6. **词根要读出一族文件的共同不变量，不能只图好看**。`web/components/` 的 `Log*` 家族定义是
+   "渲染**某一份**日志的分析结果"——**不是**"手里有日志字节"（从历史打开时字节可能已被淘汰，
+   这些组件各自处理了那条路：`isHistory` / `manifest?` / `storedPanels` / 存档轨迹）。据此：
+   - 单份的组件一律 `Log*`。`LogReport.tsx` 是那六个 tab 组件的父壳，2026-09-18 由 `AnalyzeReport`
+     改来——`Analyze` 是**路由**的词（`app/analyze/` + `Analyze*Client` + `useLogAnalyzer` 已占着），
+     给 `components/` 里的共享组件再挂一次，读者看不出它在 `Log*` 家族里占哪一格。
+   - **集合类不在此列**：一次列很多份的，用**数据模型**的词。`ReportHistoryList.tsx`
+     （2026-09-18 由 `HistoryList` 改来）列的是 `SavedReport` / `HistoryItem`，与
+     `lib/report-history.ts` 认亲。
+   - 判据：**这条记录能不能比它依赖的东西活得久**。报告能——字节被 `REPORT_DATA_KEEP` 淘汰、
+     或报告本来就来自别的设备（`source: "cloud"`），此时只剩结论；日志字节不能。所以给列表挂
+     `Log` 词根是在承诺"日志在这"，而那张表里恰恰经常没有。名字读出的承诺必须是数据模型能兑现的。
 
 > 注意：Worker 相关文件统一用连字符（`ulog-worker.ts`），不要用点号（❌ `ulog.worker.ts`）。
 >
 > **日志分析的人工经验（阈值 / 故障树 / 检查逻辑 / LLM 范式 / 事实层绑定与码表）单一事实源在仓库根
 > `knowledge/px4/`**（= `rules/*.yaml` + `px4-fault-kb.yaml` + `facts.yaml` + `llm/*.md`；
 > 引擎机制在 `engine/`，同样不含业务数据），web 与未来 MCP 服务都只消费其派生产物（`web/workers/*`、
-> `web/lib/knowledge/*.generated.js`、`content/guide/knowledge-*.md`）。改经验只改
+> `web/lib/knowledge/*.generated.js`、`content/guide/knowledge-*.md` **后者必须按普通 markdown 渲染**
+> ——`web/components/GuideBody.tsx` 按扩展名分流，`.md` 走 react-markdown；那些文档里有 `{占位符}`、
+> `meta/<tag>.json`，交给 MDX 会被当 JSX 表达式解析。改经验只改
 > `knowledge/`，然后 `cd web && pnpm build:kb`（只比对不写入：`cd web && pnpm build:kb --check`）。
 >
 > 改 `knowledge/px4/` 下的规则、算子或引擎前，先读同目录的 **`knowledge/px4/CLAUDE.md`**：
@@ -381,8 +399,11 @@
 活 7 天、IndexedDB / localStorage 里躺着几个月前老代码写的记录——只要数据能跨部署存活，它读回来时
 就可能缺字段、多字段、甚至换了个形状。而 **TypeScript 在这里一点用都没有**：类型是编译期的，JSON 是运行期的。
 
-不在这一列的是 Worker / 引擎的 `postMessage`：同一次构建、与页面同时发布，不存在版本错位
-（跨版本失效已由 `derived-version.generated.ts` 的自动重解析兜住）。
+**Worker 的 `done` 消息在这一列**（2026-09-18 更正；原文写的是"不在"，错了）：Worker 是模块级单例、
+**常驻且从不因代码更新重建**（见 `hooks/useLogAnalyzer.ts` 文件头），所以"页面已经是新代码、Worker
+还揣着上一版产物"是常态而非意外——判据（写入方与读取方可能不是同一版本）成立，改代码后只热更新
+页面、不刷新浏览器就能复现。引擎 Python 侧的跨版本失效仍由 `derived-version.generated.ts` 的
+自动重解析兜住，那一层不受这里影响。
 
 规则：
 
@@ -405,6 +426,7 @@
 | 报告存档 `SavedReport`（索引库 / localStorage / `/api/reports/:id`） | `lib/report-history.ts` `normalizeSavedReport` | `hooks/useLogAnalyzer.ts` `openSaved()` |
 | 收藏 / 评分 / 排行榜（`/api/favorite`、`/api/rating`、`/api/download/track`） | `lib/community-stats.ts` `normalizeFavoriteStats` / `normalizeRatingStats` / `normalizeLeaderboard` | 该文件里各自的 fetch 包装函数 |
 | 内部接口（`/internal/users/upsert`、`/internal/otp/set`、`/internal/otp/consume`） | `lib/internal-kv.ts` `normalizeInternalUser` / `normalizeOtpRequest` / `normalizeOtpConsume` | 该文件里各自的调用包装函数 |
+| Worker 的 `done` 消息（`report`） | `hooks/useLogAnalyzer.ts` `normalizeWorkerReport` | 同文件 `handleWorkerMessage` 的 `done` 分支 |
 
 **与形状无关的通用判断**（`asRecord` / `toCount`）收在 `lib/json-boundary.ts`，别在各自文件里重写；
 "缺哪个字段、缺了当什么"则是那个形状自己的知识，留在上表那些模块里。这个文件不叫 `normalize.ts`——
@@ -413,7 +435,7 @@
 > 由来（同一形状栽过两次，报告存档那次是线上白屏）：构建期的 `__FACTS__` 哨兵——Python 全量
 > `replace` 与 JS 只换一处，两条替换路径只有一条被机器校验；报告存档——`SavedReport` 有一半来自
 > 外部 JSON，但兜底只装在了本地一侧（索引库），云端一侧靠 `as SavedReport` 接住，于是线上炸在
-> `AnalyzeReport` 的 `report.findings.filter`（`GeneralInfo` 白屏）。
+> `LogReport` 的 `report.findings.filter`（`GeneralInfo` 白屏）。
 > **两次都不是"少写一个 `?.`"，都是"同一份数据有两个入口，只有一个被校验"。**
 >
 > 守住这条的是 `web/scripts/test-issue-filer.mjs` §[10]：全仓库扫 `.ts/.tsx`，**同一行里同时出现
@@ -440,6 +462,10 @@
 4. **守卫要答两件不同的事时，两件必须一起成立。** 例：`track`/`series` 请求既要"命名空间装载了"
    又要"装的就是这一份日志"——少后半句，工作区里装着日志 A 时打开没有轨迹存档的报告 B，
    会把 A 的航线画成 B 的飞行记录（`web/workers/ulog-worker.ts` 的 `logNotLoadedReason`）。
+5. **"缺字段"和"空"是两个答案，判空不许给同一个。** `result.get("findings", [])` 对"字段没交付"
+   和"本来就没有告警"返回同一个 0——守卫看着是绿的，其实什么也没查。查"在不在"就直说：
+   `if "findings" not in result` / `if not isinstance(..., list)`。同型的还有不区分来源的
+   `dict.get(k, None)`、把"取不到"和"本来就是空"混在一起的 `?? {}`。
 
 > 由来（**同一形状栽过三次**，前两次见 §6.5）：`__FACTS__` 哨兵、`as SavedReport`、
 > 以及 2026-09-18 的 `pyodide.globals.get("ulog")`——产物里从来没有名为 `ulog` 的全局
@@ -453,6 +479,119 @@
 > 所有 `pyodide.globals.get("…")` 的名字**逐个拿到那个命名空间里核**（核对前先按 worker 的顺序
 > 调一遍 `np_report` / `np_manifest` / `np_log_info` / `np_track`，`__result` 这类由函数内部
 > `global` 摆出来的名字才真的存在），不存在即红并打印命名空间里真实存在的名字。
+> 它还检查交付给前端的报告**必需字段在不在**——这一格以前用的是 `result.get("findings", [])`，
+> 缺字段时照样打印 `findings=0` 并放行（同一形状的第四次，见规则 5）。
+>
+> 第五、第六次（2026-09-18 晚，同一天内）：`track` 的"取不到要说清缺什么"那条契约，
+> **回归日志恰好有 GPS**，失败分支一次都不会被执行 → 守卫恒绿（做法：**构造反向用例**，
+> 改运行期配置把分支逼出来，见 `check_artifact.py` 的两道 probe）；以及
+> `run_checks_locally.py --probe-data` **对每一份日志都打 ERROR 却 `return 0`**——
+> 它的 `np_series` 调用还停在旧的 4 参签名上，签名改成请求体之后没人跟着改，
+> 于是 `series` 那一路**很久没被真的检过**，而 `check_all.py` 只看退出码、一直报 OK。
+> **一次失败要不要算失败，是守卫的一部分**；只打印不计数等于没写。
+
+---
+
+### 6.7 共享常驻 Worker：取数据前先确保它装着当前这份日志
+
+Worker 里一次只装得下一份日志，而它是模块级单例、跨路由与跨报告常驻（理由见
+`hooks/useLogAnalyzer.ts` 文件头：Pyodide 初始化太贵）。于是"打开的历史报告"与"Worker 里现在装的"
+很容易不是同一份——**这是常态，不是异常**，必须有个人负责兜住，而且只能是前端：Worker 手里没有
+字节，它救不了自己。
+
+规则：
+
+1. **取数据（`track` / `series`）之前，先 `await ensureLogLoaded(pendingHashRef.current)`。**
+   装着 → 直接走；不是这份 → 用手里的字节补一次解析并等它结束；**手里也没字节**（历史记录 +
+   本机缓存被淘汰／记录来自别的设备）→ 才让 Worker 回那句实话、界面给"重新选择该 .ulg 文件"。
+2. **字节必须与指纹配对**（`pendingBytesHashRef`）：`pendingHashRef` 会被 `viewSaved` 改成"当前
+   显示的报告"，而字节还是上一份的——不配对就会出现"拿 A 的字节去补 B 的数据"，比报错难查得多。
+3. **Worker 侧的拒绝照旧保留**：它是"绝不静默交出另一份日志的数据"的最后一道闸。
+   前端补装成功是常态，闸门只在真的给不出数据时说话。
+4. **同一份日志的补解析要能去重**（`analyzeInFlight`），别让三个图表面板各解析一遍。
+5. **等待必须有出口**：解析失败（`error`）时把所有等待者放行。否则一个 `await` 永远挂着，
+   界面卡在"加载中"——用户连"重新选择文件"的按钮都看不到。
+6. **`done` 要认领自己的结果**：补解析是在页面**已经把报告渲染出来之后**才发起的，而 Pyodide
+   首次初始化要十几秒——用户完全可能在这中间回列表打开另一份报告。所以 `done` 只在
+   `logId === pendingHashRef.current`（= 这份数据正是当前页面要的）时才写 `report`/`manifest`/`info`；
+   否则只记账（`workerLoadedHash`）、`settleAnalyze`，不落 state。缺了这条就是"头部显示 C、
+   结论是 B"，而 `liveAnalysis` 还会被记成「C 的 id + B 的 manifest」，随后的结果页交接一并错。
+7. **补解析要沿用"当前显示的报告"那份 AI 解读**（`aiMarkdownRef`，跟着 `aiMarkdown` state 走），
+   **不是** `pendingAiRef`（那是"上一次解析那份日志的 priorAi"，从历史打开第二份报告时它还是
+   上一份的值、常常是 `null`）。写错的后果不只是显示：`done` 紧接着就 `persist`，
+   用户花额度换来的 AI 报告会被**永久覆盖成空**。同理，别逐个 `setAiMarkdown` 调用点去写这个
+   ref——`setAiMarkdown` 是导出给调用方的，漏一处就静默丢一次。
+
+> 由来（2026-09-18，用户连着报了三轮"还是这个问题"）：Worker 里的闸门查出"装的是另一份日志"，
+> 界面就只给一句"重新选择该 .ulg 文件即可恢复"。可沿着这条链每一步看都没错——它错在**没有人
+> 负责"把这份日志装进 Worker"**：字节往往就在手里（刚选过的那份、或本机缓存里的），
+> 却要用户再选一遍；曲线那条路连按钮都没有，用户只能一直看不到图。
+> **判据：让用户做一件应用自己能做到的事，就是 bug。**
+>
+> 顺手接上的两个坑（同一个根因的另一面：`parseBytes` 以前只由用户的显式动作触发，
+> 现在会被 `ensureLogLoaded` 在后台触发，于是"解析在飞的时候页面已经换了"变成了可达状态）：
+> `done` 的落 state 必须先认领 `logId`（规则 6）；补解析传入的 `priorAi` 必须是当前报告的
+> 那一份（规则 7），否则一次后台补装就把存档里的 AI 报告抹掉。
+>
+> 守住这条的是 `web/scripts/test-issue-filer.mjs` §[12]：Worker 必须在 `done` 里回传 `logId`
+> （前端**不许**靠"我发过 analyze"推断——analyze 是会失败的），`workerLoadedHash` 必须是模块级、
+> 丢弃 Worker 时要一并清掉，两个取数入口都要先 `ensureLogLoaded`，且 `ensureLogLoaded`
+> 必须有"手里没字节就返回 false"的出口（不许硬编、不许拿别的日志凑）；`done` 必须拿
+> `logId` 与当前页面对照；补解析的 `priorAi` 必须是 `aiMarkdownRef.current`。
+
+---
+
+### 6.8 报错要说清"缺什么"，不许给一句概括
+
+**适用判据一句话：一句概括只有在"它恰好是唯一原因"时才是对的；有 N 种原因时，它就是 N 分之一。**
+
+失败信息是产品的一部分，不是日志。用户拿到的若是"没有可用的定位轨迹"这种话，他既不能确认
+是不是自己弄错了，也无从下手；更糟的是**它常常是错的**——同一句概括被套在六种不同的原因上，
+其中五种下它都在指向一个不存在的事实。
+
+规则：
+
+1. **一条失败路径有几种原因，就交出几条**，逐条带上是哪个 topic / 哪个字段 / 多少采样。
+   界面上并列渲染（`TrackData.errorReasons` → `LogFlightMap` 的列表），不要合成一句。
+2. **概括句只许当标题，而且必须由具体的那一条拼出来**（`"这段日志里没有可用的定位轨迹——" + headline`），
+   不许另写一句泛化的文案。多条原因时取**最后**一条作标题：候选是按优先级依次试的，
+   最后试的那个才是"把整串试完"的那一个，它前面几条只是"为什么跳过了它"。
+3. **原因文案只许有一处实现。** 缺 topic 的判据复用 `rule_engine._missing_topics`（规则与绘图
+   预设共用，见 §6.5）；provider 里再写一份，两边迟早分叉。
+4. **声明期的判据必须真的送到判定的那一侧，并且每次搬家都要有守卫。** `conditions.topics`
+   写在 `plot/track.yml`，判定在引擎侧——构建期把这份声明搬进 `facts.track` 时漏过一次，
+   于是引擎"看不到"闸门，只能退回那句概括。搬家的丢失只有产物看得见，所以
+   `check_artifact.py` 拿 `track.yml` 的声明与产物里的 `facts.track.conditions.topics` 对账。
+5. **"缺什么"要和"实际有什么"成对出现。** 只说缺，用户分不清是固件版本不同、还是字段改了名；
+   附一句"这份日志里带经纬度字段的 topic 有：…"才有对照物。挑对照物要按**字段**而不是 topic 名——
+   `vehicle_local_position` 这个名字看不出它只有参考原点 `ref_lat/ref_lon`、没有逐点经纬度，
+   而那恰恰是答案。**判据里的关键词必须独立成段**（`^` / `.` / `_` 起、`.` / `_` / `$` 止）：
+   裸子串 `"lat" in name` 会把 `relative_test_ratio`、`accelerometer_timestamp_relative` 当成纬度，
+   于是对照物里列出 `estimator_selector_status`、`sensor_combined`——**比不给对照物更糟**，
+   因为它以"听起来很具体"的方式把人带偏（实测第一版就是这个错）。同理"有没有坐标"只看经纬度：
+   高度到处都有（`baro_alt_meter`、`fd_alt`、`mode_req_local_alt` 里的 `alt` 甚至有布尔标志），
+   算进来只会淹没答案。
+6. **"给不出原因"本身要报成解析器缺陷**，不许伪装成"你的数据里没有这项"（同 §6.6 规则 5）。
+   否则我们自己的 bug 会被当成用户的数据问题：用户不会反馈，我们也永远不知道。
+
+> 由来（2026-09-18，用户："这段日志里没有可用的定位轨迹 直接告诉用户缺少什么字段，不要这么空洞的提示"）：
+> 那句概括只对应六种原因里的一种——日志里没有 GPS 相关的 topic；另外五种是"有 topic 但缺
+> 坐标字段"、"字段改了名"、"有采样但全程没拿到 3D 定位（fix_type 一直 < 3）"、"采样数对不上"、
+> "没有 timestamp 列"。实测本机两份日志（`efd2ee9d`、`sample`）走的正是第一种，
+> 但它们在界面上和第五种**长得一模一样**。
+>
+> 空洞只是表象，底下还有一层：用户补了一句"`conditions.topics` 里没有 `sensor_gps` /
+> `vehicle_gps_position` 就会退出，会创建一个 skip reason，把原因发给前端就好了"——
+> 这个机制**早就有**，文案也**早就只在一个地方生成**（`_missing_topics`），
+> 断的是构建期那一段：`compileMap` 只把 `children` 搬进了 `facts.track`，`conditions` 留在原地。
+> **机制存在 ≠ 机制可达**；`conditions` 这类"声明"在链路上每经过一次搬运，都值得配一道对账的守卫。
+>
+> 守住这条的是 `tools/calibrate/check_artifact.py`（对账 `conditions` 搬运 + 真执行 `np_track()`
+> 核返回体契约，并且**构造两道反向用例**——一道逼出"声明的 topic 不在日志里"，一道逼出"字段取不到"，
+> 因为回归日志有 GPS，不构造的话失败分支一次都不会被执行，守卫恒绿）与 `test-issue-filer.mjs`
+> §[16]（界面那半：失败分支真的填、列表真的渲染、切了日志清空）。§[16] 只留 `tsc` **看不见**
+> 的那几条——第一版把"类型声明了字段""state 声明了"也写成守卫，变异怎么打都不红，
+> 因为 `tsc` 早就拦住了（§6.6 那条"守卫自己也要被校验"）。
 
 ---
 

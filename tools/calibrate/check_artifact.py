@@ -6,7 +6,10 @@
 用户浏览器里炸出来。
 
 四道检查，从松到紧：语法 → `.replace` 链按浏览器语义（只换第一处）复现 → compute
-表达式 Python 侧可解析 → **真执行**（含"worker 守卫查的全局名真的存在"）。
+表达式 Python 侧可解析 → **真执行**（含"worker 守卫查的全局名真的存在"）。另有一组契约：
+地图预设的适用范围（`conditions.topics`）真的搬进了 `facts.track`、"取不到轨迹必须逐条给出
+原因"（并**构造两道反向用例**逼出失败分支）、"像经纬度"的判据不会把 `relative` 里的 `lat`
+当成纬度、worker 查的全局名真的存在。
 
 用法：python tools/calibrate/check-artifact.py
 """
@@ -27,6 +30,43 @@ import run_checks_locally as runner  # noqa: E402
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TS = REPO_ROOT / "web" / "workers" / "ulog-check-script.ts"
 FAULT_KB = REPO_ROOT / "web" / "workers" / "fault-kb.generated.json"
+TRACK_YML = REPO_ROOT / "knowledge" / "px4" / "plot" / "track.yml"
+
+
+def _declared_track_topics(text: str) -> list:
+    """从 plot/track.yml 读出 `conditions.topics` 的声明，**并折成运行期形态**（候选组）。
+
+    YAML 里写成 `["sensor_gps || vehicle_gps_position"]`，`facts.track` 里存的是
+    `[["sensor_gps", "vehicle_gps_position"]]`——项内 `||` 由构建期拆成候选列表
+    （`rule_engine._missing_topics` 只认折好的形态，它不认识 `||`）。比对时必须用同一个
+    语义折过，否则守卫会对着"表示形式不同"报假失败。
+
+    这里**不引 pyyaml**：只为一行声明装一个解析器不划算，而且这是"守卫读声明"的窄用途——
+    读不出来（格式没见过的写法）时返回空列表，由调用方报错，而不是静默当成"没声明"。
+    """
+    m = re.search(r"^\s*topics:\s*(.*)$", text, re.M)
+    if not m:
+        return []
+    inline = m.group(1).strip()
+    if inline.startswith("["):
+        try:
+            val = ast.literal_eval(inline)
+        except (ValueError, SyntaxError):
+            return []
+        items = [str(x) for x in val] if isinstance(val, list) else []
+    elif inline:
+        return []
+    else:
+        # 块状写法：`topics:` 后面换行，随后是若干 `- ...`
+        items = []
+        for line in text[m.end() :].splitlines():
+            if not line.strip():
+                continue
+            if re.match(r"^\s*-\s+", line):
+                items.append(line.split("-", 1)[1].strip().strip("\"'"))
+                continue
+            break  # 遇到同级的别的键就停
+    return [[c.strip() for c in it.split("||") if c.strip()] for it in items]
 
 
 def extract_json_const(src: str, name: str):
@@ -102,6 +142,24 @@ def main() -> int:
     rules = extract_json_const(src, "rules")
     print(f"产物语法检查通过：{len(final.splitlines())} 行，含 {len(rules)} 条经验规则")
 
+    # 地图预设的适用范围（`conditions.topics`）是**构建期**从 plot/track.yml 搬到 `facts.track` 的。
+    # 这一步曾经无声漏掉：`compileMap` 只搬了 `children`，`conditions` 留在原地 → 引擎收不到
+    # 「这份预设要 sensor_gps / vehicle_gps_position」这个闸门，于是日志里没有 GPS 时只能笼统报
+    # 一句"声明里的坐标候选都不在日志里"（而且常常是错的：有 GPS 但全程没拿到 3D 定位时也是这句），
+    # 用户拿不到任何能自己判断的线索。**搬家的丢失只在产物里看得见**，所以在这里核一遍。
+    declared_topics = _declared_track_topics(TRACK_YML.read_text(encoding="utf-8"))
+    if not declared_topics:
+        print(f"{TRACK_YML.name} 里没有 conditions.topics 声明（守卫看不见判据，先确认是不是有意去掉的）")
+        return 1
+    got_topics = (runner.load_facts_payload().get("track") or {}).get("conditions", {}).get("topics")
+    if got_topics != declared_topics:
+        print("facts.track 里的 conditions.topics 与 plot/track.yml 的声明不一致：")
+        print(f"  声明：{declared_topics}")
+        print(f"  产物：{got_topics}")
+        print("  构建期把这份声明丢了 —— 引擎侧就没有「缺哪个 topic」这道闸门了")
+        return 1
+    print(f"地图预设的适用范围搬运检查通过：conditions.topics = {got_topics}")
+
     # compute 表达式是**构建期用 JS 校验**（web/scripts/lib/rule-expr.mjs）、**运行期用 Python
     # ast 求值**的。两侧是两套实现，中间就有缝：JS 放行而 Python 解析不了的写法会构建通过、
     # 到用户浏览器里才炸。这里用 Python 自己把每条表达式解析一遍，把缝焊上。
@@ -142,8 +200,20 @@ def main() -> int:
 
         traceback.print_exc(limit=3)
         return 1
+    # 交付给前端的报告：关键字段必须**在**，不能"取不到就当空"。
+    # `result.get('findings', [])` 对「字段缺了」和「本来就没有告警」给出同一个 0——
+    # 2026-09-18 报告页那个 `report.findings.filter` 白屏，正是这一格没兜住：
+    # 前端拿到缺 findings 的报告，GeneralInfo 直接抛 TypeError，整页白。
+    required = ("findings", "facts", "metrics", "checksRun", "tags", "guardTags", "matchedFaults")
+    missing_fields = [k for k in required if k not in result]
+    if missing_fields:
+        print(f"产物执行通过，但交付的报告缺字段：{missing_fields}（实际键：{sorted(result)}）")
+        return 1
+    if not isinstance(result["findings"], list):
+        print(f"findings 不是数组，而是 {type(result['findings']).__name__}")
+        return 1
     print(
-        f"产物执行检查通过：{log.name} → findings={len(result.get('findings', []))}, "
+        f"产物执行检查通过：{log.name} → findings={len(result['findings'])}, "
         f"checksRun={len(result.get('checksRun', []))}, tags={result.get('tags')}"
     )
 
@@ -174,6 +244,115 @@ def main() -> int:
         return 1
     track_n = len((produced.get("np_track") or {}).get("tracks") or [])  # type: ignore[union-attr]
     print(f"worker 守卫的全局名核对通过：{asked}（np_track 跑出 {track_n} 条轨迹）")
+
+    # 轨迹取不到时**必须**逐条给出原因（`errorReasons`）——界面就是拿它当列表渲染的。
+    # 这条契约曾经没有：只给一句"声明里的坐标候选都不在日志里"，而那一句只对应六种原因里的
+    # 一种（字段改名 / 有采样但全程没定位 / 采样数对不上 / 没 timestamp…都对不上），用户据此
+    # 什么也判断不了。契约写在 types.ts 与 px4.py 两处，容易各说各的——这里用真跑出来的返回体核。
+    def check_track_contract(payload: dict, case: str) -> bool:
+        if payload.get("error"):
+            reasons = payload.get("errorReasons")
+            if not isinstance(reasons, list) or not reasons or not all(isinstance(r, str) and r for r in reasons):
+                print(f"轨迹取不到却没有给出逐条原因（{case}）：")
+                print(f"  error = {payload.get('error')!r}")
+                print(f"  errorReasons = {reasons!r}")
+                print("  界面只能显示那句概括，而概括往往会说错（见 CLAUDE.md §6.8）")
+                return False
+            print(f"轨迹失败的返回体契约通过（{case}）：error 带 {len(reasons)} 条具体原因")
+            return True
+        if not payload.get("tracks"):
+            print(f"轨迹既没有 tracks 也没有 error（{case}）——返回体形状不对，前端会当成解析器缺陷")
+            return False
+        print(f"轨迹成功的返回体契约通过（{case}）：{len(payload['tracks'])} 条轨道")
+        return True
+
+    if not check_track_contract(produced.get("np_track") or {}, f"{log.name} 实跑"):
+        return 1
+
+    # 「像经纬度」的判据必须**独立成段**。裸子串会把 `relative_test_ratio` /
+    # `accelerometer_timestamp_relative` 里的 "lat" 当成纬度，于是对照物里混进
+    # `estimator_selector_status`、`sensor_combined` 这些跟坐标毫无关系的 topic；
+    # 而这份对照物的**唯一用途**就是让用户看出"日志里到底有没有坐标"——判据错了它就以
+    # "听起来很具体"的方式把人带偏（实测第一版就是这个错，比不给对照物更糟）。
+    # 纯函数，直接拿引擎源码 exec 出来的那个函数核——它和运行期是同一份实现。
+    latlon = ns.get("_latlon_fields")
+    if not callable(latlon):
+        print("产物里找不到 _latlon_fields（对照物的判据）——_coord_field_topics_note 的实现换了？")
+        return 1
+    should = [
+        "lat",
+        "lon",
+        "lng",
+        "ref_lat",
+        "ref_lon",
+        "latitude_deg",
+        "longitude_deg",
+        "previous.lat",
+        "current.lon",
+        "gps_lat_deg",
+    ]
+    should_not = [
+        "relative_test_ratio[0]",
+        "accelerometer_timestamp_relative",
+        "lateral_accel",
+        "altitude_msl_m",
+        "mode_req_local_alt",
+        "fd_alt",
+        "baro_alt_meter",
+        "timestamp",
+        "lonely_thing",
+    ]
+    got, got_not = latlon(should), latlon(should_not)
+    if got != should or got_not:
+        print("「像经纬度」的判据错了（对照物会列出与坐标无关的 topic）：")
+        print(f"  该认出来的漏了：{sorted(set(should) - set(got))}")
+        print(f"  不该认的认了：{got_not}")
+        return 1
+    print(f"经纬度判据检查通过：认出 {len(should)} 个（含 `previous.lat` 这类嵌套），挡掉 {len(should_not)} 个干扰名")
+
+    # **守卫自己也要被校验**（CLAUDE.md §6.6）：上面这条契约只在"取不到"时生效，而回归用的
+    # 这条日志有 GPS —— 光跑它，"error 不带原因"这个 bug 一次都不会被抓到（守卫恒绿）。
+    # 所以把声明的 topic 改成一个日志里不可能有的名字，逼出失败路径，再核同一份契约。
+    # 走的就是用户遇到的那条路：`conditions.topics` 一个候选都不在日志里 → 引擎该说"缺哪个 topic"。
+    provider = ns.get("provider")
+    cfg = getattr(provider, "_cfg", None)
+    track_spec = (cfg or {}).get("track") if isinstance(cfg, dict) else None
+    if not isinstance(track_spec, dict) or "conditions" not in track_spec:
+        print("产物里的 provider 拿不到 track 声明（`provider._cfg['track']`）——对不上就构造不出反向用例")
+        return 1
+    track_spec["conditions"]["topics"] = [["__no_such_topic_regression_probe__"]]
+    ns["np_track"]()
+    forced = json.loads(ns["__result"])
+    if not forced.get("error"):
+        print("声明了一个日志里没有的 topic，引擎却没报错——闸门没生效（conditions.topics 被忽略了）")
+        print(f"  返回体：{json.dumps(forced, ensure_ascii=False)[:200]}")
+        return 1
+    if not check_track_contract(forced, "逼出的失败路径"):
+        return 1
+    if "__no_such_topic_regression_probe__" not in (forced.get("errorReasons") or [""])[0]:
+        print("失败原因里没提声明的 topic 名——用户看不出到底缺哪个（引擎没复用 _missing_topics）")
+        print(f"  errorReasons = {forced.get('errorReasons')!r}")
+        return 1
+
+    # 第二道反向用例：闸门**过了**、却取不到坐标。这条和上面那道是**两条**产出原因的路径
+    # （`get_flight_track` 里先过 `conditions.topics`，再逐候选走 `_one_track`），只测一条
+    # 的话另一条退化成"只给一句概括"照样绿。把 lat 的候选改成一个日志里没有的 topic 造出来。
+    track_spec["conditions"]["topics"] = []  # 闸门放行（空声明 = 不限）
+    lat_spec = track_spec["children"][0]["lat"]
+    lat_spec["cands"] = ["__no_such_topic_regression_probe__[0].latitude_deg"]
+    ns["np_track"]()
+    broke = json.loads(ns["__result"])
+    if not broke.get("error"):
+        print("候选字段全取不到，引擎却没报错——逐候选的原因那条路没接上")
+        print(f"  返回体：{json.dumps(broke, ensure_ascii=False)[:200]}")
+        return 1
+    if not check_track_contract(broke, "逼出的字段失败路径"):
+        return 1
+    joined = " ".join(broke.get("errorReasons") or [])
+    if "__no_such_topic_regression_probe__" not in joined:
+        print("失败原因里没提是哪个 topic / 哪个字段取不到——用户没法照着改")
+        print(f"  errorReasons = {broke.get('errorReasons')!r}")
+        return 1
     return 0
 
 

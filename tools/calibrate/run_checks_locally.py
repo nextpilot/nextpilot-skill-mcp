@@ -9,6 +9,9 @@
 为什么不直接读 rules/*.yaml：compute 的老节点写法要编译成表达式，而那份编译器只有构建期
 一份（web/scripts/lib/rule-expr.mjs）——Python 侧不再重复实现（两份一定漂移）。
 所以**改了 rules/ 要先 `cd web && pnpm build:kb` 再回归**，脚本会检查产物是否陈旧。
+
+任何一份日志出错都以**非零退出码**结束（`check_all.py` 只看退出码）。别把它改回"只打印、
+不计数"——那会让这一项永远绿着，而它其实什么都没检（见 CLAUDE.md §6.6）。
 """
 
 import json
@@ -134,10 +137,18 @@ def probe_one(path: Path) -> dict:
     series = None
     if sample:
         fld = sample["fields"][0]["name"]
-        series = call(
-            ns,
-            f"np_series({json.dumps(sample['topic'])}, {sample['instance']}, {json.dumps(json.dumps([fld]))}, 3000)",
-        )
+        # `np_series` 收的是一份**请求 JSON**（契约见 ulog-data-script.ts 的 `np_series`）：
+        # 面板要第几个实例、每条线怎么取，全在声明里。**别改回位置参数**——以前这里写的是
+        # `np_series(topic, instance, fields, max_points)`，签名改成请求体之后没人跟着改，
+        # 于是这一段**每次都以 TypeError 结束**；而 `main()` 又不看失败（见下），结果是
+        # "对 6 份日志全打 ERROR 却报 OK"（§6.6：恒绿的守卫和没写守卫，肉眼完全一样）。
+        # 后果不是崩溃，是 `series` 这一路**很久没被真的检过**——数据层坏掉也没人知道。
+        req = {
+            "instance": sample["instance"],
+            # 字段引用要带 topic（`_pick_ref` 收的是 `"topic.field"`，不是裸字段名）
+            "ydata": [{"kind": "field", "fields": [f"{sample['topic']}.{fld}"]}],
+        }
+        series = call(ns, f"np_series({json.dumps(json.dumps(req, ensure_ascii=False))}, 3000)")
     # 自检
     checks = {
         "topics": len(topics),
@@ -152,7 +163,9 @@ def probe_one(path: Path) -> dict:
         "dropouts": len(info["dropouts"]),
         "sysInfoKeys": sorted(info["sysInfo"].keys()),
     }
-    if series:
+    if series is not None:
+        if series.get("error"):
+            raise RuntimeError(f"np_series 报了错：{series['error']}")
         # 确保无 NaN 泄漏（json 已把 NaN 转 null，这里只查点数）
         checks["seriesField"] = sample["topic"] + "#" + str(sample["instance"]) + "." + fld
         checks["seriesPoints"] = len(series.get("t", []))
@@ -161,6 +174,10 @@ def probe_one(path: Path) -> dict:
         raw = json.dumps(series)
         assert "NaN" not in raw and "Infinity" not in raw, "series 泄漏 NaN/Infinity"
         assert checks["seriesPoints"] <= 3000, "降采样点数超标"
+        # "取到了但一个点都没有"和"没取到"是两回事，不许都给 0（§6.6 规则 5）
+        assert checks["seriesPoints"] > 0, f"series 一个点都没取到（field={checks['seriesField']}）"
+    else:
+        raise RuntimeError(f"没能抽到任何有采样的 topic（topics={len(topics)}），series 这条路没被检")
     return checks
 
 
@@ -172,6 +189,7 @@ def main(argv: list[str]) -> int:
     if not args:
         print(__doc__)
         return 2
+    failed = 0
     for name in args:
         path = Path(name)
         print(f"\n=== {path.name} ===")
@@ -181,8 +199,12 @@ def main(argv: list[str]) -> int:
             else:
                 print(json.dumps(run_one(path), ensure_ascii=False, indent=2))
         except Exception as exc:
+            # 打印错误**并且计数**。以前这里只打印、最后无条件 `return 0` —— 于是
+            # `--probe-data` 对每一份日志都 ERROR 也照样报 OK（`check_all.py` 只看退出码）。
+            # 恒绿的守卫比没写守卫更糟：它让人以为这一项是绿的（见 CLAUDE.md §6.6）。
+            failed += 1
             print(f"ERROR: {type(exc).__name__}: {exc}")
-    return 0
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

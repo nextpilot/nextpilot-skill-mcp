@@ -4,11 +4,18 @@
 //   3. 白名单是否真挡住额外字段（前端或第三方可以随便往 payload 里塞东西）
 //   4. 超长文本截断后，末尾的关键行是否还在（Python traceback 的异常行在最后）
 //
-// 末尾三节（§[9] / §[10] / §[11]）性质不同：它们不测行为，而是**扫源码防架构回潮**——
+// 末尾八节（§[9]~§[16]）性质不同：它们不测行为，而是**扫源码防架构回潮**——
 //   §[9]  两侧共用的政策只许有一份实现（防止再长出第二份，悄悄分叉）；
 //   §[10] 外部 JSON 进内部类型必须过归一、不许 `as` 强转（线上白屏过一次）；
-//   §[11] 派生数据（曲线/轨迹）必须按报告身份清理（切了日志还在用上一份的，静默错数据）。
-// 这三类问题都属于"同一件事有两条路径、只有一条被校验"，本仓库已经因此出过几次事故，
+//   §[11] 派生数据（曲线/轨迹）必须按报告身份清理（切了日志还在用上一份的，静默错数据）；
+//   §[12] 取数据前必须先让 Worker 装上当前这份日志（共享常驻 Worker 的"装着谁"要能自愈）；
+//   §[13] `functions/` 下每个端点都必须在本地 dev 垫片的映射表里（漏一个 = 本地整条静默 404）；
+//   §[14] 指南正文只许有一个渲染入口（曾裂成 `GuideMarkdown` / `GuideMdx` 一对近音名 +
+//         两份分叉的 `textOf`，`{占位符}` 文档差点被 MDX 解析）；
+//   §[15] 组件名跟着家族不变量走（`Log*` = 某一份日志；一次列很多份的用数据模型的词）；
+//   §[16] 轨迹取不到时界面要把引擎给的**逐条原因**显示出来（一句概括只对六种原因里的一种，
+//         另外五种下它是错的——"空洞"的代价是用户拿不到任何能自己判断的线索）。
+// 这几类问题都属于"同一件事有两条路径、只有一条被校验"，本仓库已经因此出过几次事故，
 // 光靠人记没用，所以做成机器能拦的守卫。
 //
 // 跑法：node web/scripts/test-issue-filer.mjs
@@ -17,7 +24,8 @@ import {
   fingerprintOf,
   reportIssue,
 } from "../functions/_lib/issue-filer.js";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 // 脱敏/截断是两侧**共用**的那一份（浏览器侧 lib/issue-bridge.ts 也引它），
 // 所以直接对共享模块验证——它错了，两边一起错，这一节必须守住。
@@ -35,6 +43,14 @@ function check(name, cond, extra = "") {
 
 /** 读 web/ 下的源码（末尾几节的静态守卫用；路径相对本文件，即 web/scripts/） */
 const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
+/** web/ 根目录（静态守卫要 readdir / join 时用） */
+const WEB = fileURLToPath(new URL("..", import.meta.url));
+/**
+ * 剥掉注释再扫。**静态守卫必须先过这一步**：本仓库的习惯是把"为什么"写进注释，注释里
+ * 会原样出现标识符（`node.type === "code"`、`react-markdown`…），裸子串检查于是被注释
+ * 喂饱——把真代码删掉它照样绿。2026-09-18 连着踩了两次，才明白该修的是检查方式本身。
+ */
+const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/[^\n]*/g, "$1");
 
 console.log("\n[1] 指纹归一化（决定去重成不成立）");
 {
@@ -297,7 +313,7 @@ console.log("\n[10] 外部数据的读取边界（网络响应与存档一律过
   //   · 索引库里的老记录（早期版本没有 findings 字段，还有从 localStorage 迁移来的）
   //   · /api/reports/:id 取回的云端 KV 记录（TTL 7 天，里面可能是任意历史版本写的）
   // 这些 JSON 到了前端，TypeScript 一点用都没有。以前靠 `as SavedReport` 强转接住，
-  // 缺字段的报告就一路走到 AnalyzeReport 的 `report.findings.filter` 才崩（GeneralInfo 白屏）。
+  // 缺字段的报告就一路走到 LogReport 的 `report.findings.filter` 才崩（GeneralInfo 白屏）。
   // 同一个坑在 lib/community-stats.ts（`(await resp.json()) as RatingStats`）和
   // lib/internal-kv.ts（`r.user as InternalUser`）各有一份。规则写在 CLAUDE.md §6.5，
   // 这里把它变成机器能查的两条：
@@ -398,19 +414,303 @@ console.log("\n[11] 派生数据必须按报告身份清理（切了日志就不
   check("清理函数清掉了轨迹", helper.includes("setStoredTrack(null)"));
   check("清理函数按报告 id 判据（同一份就地复解析时不清）", helper.includes("reportIdRef.current === nextId"));
 
-  // 两个"换报告"的入口都必须调它
+  // 两个"换报告"的入口都必须调它。
+  // 取函数体用"到下一个同级声明为止"，不用固定字符窗口——窗口会因为注释变长而失效
+  // （2026-09-18 踩过：parseBytes 加了几行注释，检查就掉到窗口外，报了个假的失败）
   for (const [entry, anchor] of [
-    ["viewSaved（切报告）", "const viewSaved"],
-    ["parseBytes（换文件/复解析）", "const parseBytes"],
+    ["viewSaved（切报告）", "const viewSaved = useCallback"],
+    // 锚点要写成 `= useCallback`：光写 `const parseBytes` 会命中 `parseBytesRef`（声明顺序上它更靠前）
+    ["parseBytes（换文件/复解析）", "const parseBytes = useCallback"],
   ]) {
     const at = hook.indexOf(anchor);
-    const body = at >= 0 ? hook.slice(at, at + 1400) : "";
+    const nextDecl = at >= 0 ? hook.indexOf("\n    const ", at + 1) : -1;
+    const body = at >= 0 ? hook.slice(at, nextDecl > at ? nextDecl : at + 3000) : "";
     check(`${entry} 调用了清理`, body.includes("dropOtherReportData("), at < 0 ? "找不到入口" : "");
   }
 
   // 显示中的报告 id 只许在这两个入口被赋值（第三处 = 有人加了新入口但没清派生数据）
   const idWrites = hook.split(/\n/).filter((l) => /^\s*reportIdRef\.current\s*=/.test(l)).length;
   check("reportIdRef 只在两个换报告入口赋值", idWrites === 2, `实际 ${idWrites} 处`);
+}
+
+console.log("\n[12] 取数据前先让 Worker 装上这份日志（共享 Worker 的\"装着谁\"要能自愈）");
+{
+  // 背景：Worker 共享且常驻（跨路由存活，见 hooks/useLogAnalyzer.ts 文件头）。它可能正装着
+  // **另一份**日志，于是 track/series 请求被 Worker 的闸门挡下，界面只能叫用户"重新选择该 .ulg
+  // 文件"——而字节往往就在手里（刚选过的那份、或本机缓存里的）。2026-09-18 用户连着报了三轮
+  // "还是这个问题"，就是这么来的：每一步看起来都对，但没有人负责"把这份日志装进 Worker"。
+  // 现在这个责任归前端：取数前先 ensureLogLoaded。下面几条把结构钉住。
+  const worker = read("../workers/ulog-worker.ts");
+  const hook = read("../hooks/useLogAnalyzer.ts");
+
+  // Worker 必须回传"这次装的是哪一份"——前端不许靠"我发过 analyze"推断（analyze 会失败）
+  check(
+    "worker 的 done 回传了 logId",
+    /type:\s*"done",\s*report,\s*manifest,\s*info,\s*logId:\s*msg\.logId/.test(worker),
+  );
+  const doneAt = worker.indexOf("loadedLogId = msg.logId");
+  check("worker 成功之后才记 loadedLogId", doneAt >= 0);
+
+  // "装着谁"是 Worker 的属性，不是页面的属性 → 必须模块级（Hook 内 = 每个页面各记一份会互相撒谎）
+  const modScope = hook.slice(0, hook.indexOf("export function useLogAnalyzer()"));
+  check("workerLoadedHash 是模块级状态", /^let workerLoadedHash/m.test(modScope));
+  check("丢弃 Worker 时一并清掉它", /dropSharedWorker[\s\S]{0,400}workerLoadedHash = null/.test(hook));
+  const doneHandler = hook.slice(hook.indexOf('m.type === "done"'), hook.indexOf('m.type === "track"'));
+  check(
+    "done 里按 worker 回传的 logId 记账（不是靠发过 analyze 推断）",
+    doneHandler.includes("m.logId"),
+    "没看到 m.logId",
+  );
+
+  // 两个取数入口都必须先确保装上；ensureLogLoaded 必须有"手里没字节"的出口
+  for (const entry of ["const requestSeries", "const requestTrack"]) {
+    const at = hook.indexOf(entry);
+    const body = at >= 0 ? hook.slice(at, at + 800) : "";
+    check(`${entry} 先确保日志已装载`, body.includes("ensureLogLoaded("), at < 0 ? "找不到入口" : "");
+  }
+  const ensureAt = hook.indexOf("const ensureLogLoaded");
+  // 同 §[11]：取函数体用"到下一个同级声明为止"，不用固定字符窗口（注释一长窗口就失效）
+  const ensureNext = ensureAt >= 0 ? hook.indexOf("\n    const ", ensureAt + 1) : -1;
+  const ensure =
+    ensureAt >= 0 ? hook.slice(ensureAt, ensureNext > ensureAt ? ensureNext : ensureAt + 3000) : "";
+  check("ensureLogLoaded 存在", ensureAt >= 0);
+  check(
+    "手里没字节就返回 false（不硬编、不拿别的日志凑）",
+    ensure.includes("if (!bytes) return false"),
+  );
+  check(
+    "字节必须与指纹配对（不许拿 A 的字节补 B）",
+    ensure.includes("pendingBytesHashRef.current === hash"),
+  );
+  check("同一份日志的并发补解析去重", ensure.includes("analyzeInFlight"));
+
+  // 补解析是"页面已经把报告渲染出来之后"才发起的：Pyodide 首次初始化要十几秒，用户完全
+  // 可能在这中间回列表打开另一份报告。于是 done 必须**认领自己的结果**——判据用 worker 回传的
+  // logId（= 这份数据属于哪份日志），而不是"我发过 analyze"（analyze 会失败，推断出来的
+  // "就是它"会让上面这条竞态被误判成正常路径）。少了这一条，页面就会"头部显示 C、结论是 B"，
+  // liveAnalysis 还会被记成「C 的 id + B 的 manifest」。
+  check(
+    "done 只把结果写进它自己要的那份报告（补解析的结果不许盖住已经换过的页面）",
+    /if \(logId !== pendingHashRef\.current\) return;/.test(doneHandler),
+    "done 里没看到 logId 与当前页面对照",
+  );
+
+  // 补解析要沿用**当前显示的报告**那份 AI 解读。用 pendingAiRef（"上次解析那份日志的 priorAi"）
+  // 会把这份报告的 AI 报告覆盖成空/别的——而且 done 紧跟着就 persist，落盘一并改掉：
+  // 这不是显示问题，是把用户花额度换来的解读**永久删掉**。
+  check(
+    "补解析沿用当前报告的 AI 解读（aiMarkdownRef，不是 pendingAiRef）",
+    ensure.includes("priorAi: aiMarkdownRef.current"),
+    "ensureLogLoaded 里的 priorAi 不是 aiMarkdownRef.current",
+  );
+  check(
+    "aiMarkdownRef 跟着 state 走（写漏一处 = AI 报告静默丢失）",
+    /aiMarkdownRef\.current = aiMarkdown;/.test(hook),
+    "没有把 aiMarkdown 同步进 aiMarkdownRef",
+  );
+
+  // 解析失败必须把等待者放行：否则 await 永远挂着，界面卡在"加载中"没有出路
+  const errBranch = hook.slice(hook.indexOf('m.type === "error"'), hook.indexOf('m.type === "done"'));
+  check("解析失败会结算所有等待者", errBranch.includes("failPendingAnalyze()"));
+  const parseFn = hook.slice(hook.indexOf("const parseBytes = useCallback"));
+  check(
+    "新解析顶掉旧日志时也放行（别的日志的等待者再等不到自己的 done）",
+    parseFn.includes("failPendingAnalyze(meta.hash)"),
+  );
+
+  // 最后一个没人校验的入口：worker 的 done 直接进 report state。它缺 findings 时
+  // GeneralInfo 的 `findings.filter` 会把整页打白——所以 done 必须过归一，而不是塞进去算数。
+  check(
+    "done 边界过了归一（不许把 worker 的报告直接塞进 state）",
+    hook.includes("normalizeWorkerReport(m.report)") &&
+      /function normalizeWorkerReport\(raw: unknown\)/.test(hook) &&
+      /Array\.isArray\(r\.findings\)/.test(hook),
+  );
+}
+
+console.log("\n[13] functions/ 下的端点在本地 dev 垫片里必须可达（漏一个 = 整条功能在本地静默 404）");
+{
+  // 本地只有 Next 自身，跑不了 EdgeOne 的 Edge 函数：`/api/*` 与 `/internal/*` 靠
+  // next.config.ts 的 afterFiles rewrite 转进 app/edge-dev，再由那里的**一张白名单**
+  // 按路径动态 import 处理器。
+  //
+  // 白名单漏项的失败形态是最难认的一种：不抛错、不进日志、也没有类型错误，就是一个 404——
+  // 与"这个功能还没做"长得一模一样。2026-09-18 实际漏了 `api/issues`：它由
+  // `lib/issue-bridge.ts:51` 的 `ENDPOINT` 唯一引用，于是本机**所有 `reportError()`
+  // 全部静默丢掉**（桥接层按设计吞掉失败），排查缺字段那类问题时等于没有证据。
+  // 三个根级探针（ping / kv-probe / issue-probe）同样没接上：它们是"发布前手工验一遍"
+  // 的工具，本地访问不了就只能等上线后再发现。
+  const route = readFileSync(join(WEB, "app/edge-dev/[[...path]]/route.ts"), "utf8");
+  const config = readFileSync(join(WEB, "next.config.ts"), "utf8");
+
+  const mapAt = route.indexOf("const handlers:");
+  const mapEnd = route.indexOf("\n};", mapAt);
+  const mapBody = mapAt >= 0 && mapEnd > mapAt ? route.slice(mapAt, mapEnd) : "";
+  check("垫片里有显式处理器映射表", mapBody.length > 0);
+  // 键可能带引号（"api/reports/[id]"）也可能不带（ping）
+  const mapped = new Set(
+    [...mapBody.matchAll(/^\s*"?([A-Za-z0-9\-_/[\]]+)"?\s*:\s*\(\s*\)\s*=>/gm)].map((m) => m[1]),
+  );
+
+  // 端点 = functions/ 目录树里的每个 .js；`_` 开头的（_lib）是共享库，不是端点
+  const endpoints = [];
+  const walk = (dir, prefix) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name.startsWith("_")) continue;
+      if (e.isDirectory()) walk(join(dir, e.name), `${prefix}${e.name}/`);
+      else if (e.name.endsWith(".js")) endpoints.push(`${prefix}${e.name.slice(0, -3)}`);
+    }
+  };
+  walk(join(WEB, "functions"), "");
+  check("扫到了端点清单", endpoints.length > 0, `实际 ${endpoints.length} 个`);
+
+  const missing = endpoints.filter((e) => !mapped.has(e));
+  check(
+    "functions/ 下每个端点都在垫片映射表里",
+    missing.length === 0,
+    missing.length ? `未映射：${missing.join(", ")} —— 本地访问会 404` : "",
+  );
+
+  // 根级端点（不带 /api、/internal 前缀）还得在 next.config.ts 里有一条显式 rewrite：
+  // 那两条通用 rewrite 只覆盖前缀，根级的不会自动被转发
+  const missingRewrite = endpoints
+    .filter((e) => !e.includes("/"))
+    .filter((e) => !config.includes(`source: "/${e}"`));
+  check(
+    "根级端点都有显式 rewrite",
+    missingRewrite.length === 0,
+    missingRewrite.length ? `缺 rewrite：${missingRewrite.join(", ")}` : "",
+  );
+}
+
+console.log("\n[14] 指南正文只有一个渲染入口（防止再裂成一对近音文件名 + 两份分叉的 textOf）");
+{
+  // 由来：`GuideMarkdown.tsx` / `GuideMdx.tsx` 曾并排存在，两个名字只差一个字母、
+  // 读起来像「基础版 / 升级版」——于是看起来 MDX 那份是超集，可以把另一份删掉。
+  // **恰好相反**：`content/guide/knowledge-*.md` 里有 `{invalid_frac:.0%}`、`meta/<tag>.json`，
+  // MDX 会把花括号当 JSX 表达式解析，所以普通 markdown 那份才是不能删的那份。
+  //
+  // 更要命的是两个文件**各抄了一份 `textOf`**（把标题子节点还原成原始 markdown 文本）。
+  // 右侧目录是从原始 markdown 抽标题的（`lib/guide.ts` 的 extractHeadings），两边必须算出
+  // 同一个锚点；而两份 textOf 已经分叉——只有普通 markdown 那份会补回反引号，于是
+  // `.mdx` 标题里的行内代码会从锚点里消失（`### 用 \`foo\`` 点不动）。当时没发作只是因为
+  // 六个 `.mdx` 里恰好没有含内联代码的标题，属于侥幸。
+  //
+  // 2026-09-18 合并成 GuideBody.tsx，本节把"不许再裂开"钉住。
+  const COMP = join(WEB, "components");
+  const names = readdirSync(COMP);
+  check("GuideBody.tsx 存在", names.includes("GuideBody.tsx"));
+
+  const twins = names.filter((n) => /^Guide(Markdown|Mdx)\.tsx$/.test(n));
+  check("旧的孪生名没有回来", twins.length === 0, twins.length ? `又出现了：${twins.join(", ")}` : "");
+
+  // 算标题文本的 textOf 全目录只许有一份：两份就会分叉（这正是原来的缺陷）
+  const textOfCount = names
+    .filter((n) => n.endsWith(".tsx") || n.endsWith(".ts"))
+    .reduce(
+      (n, f) => n + (stripComments(readFileSync(join(COMP, f), "utf8")).match(/function\s+textOf\b/g) ?? []).length,
+      0,
+    );
+  check("算标题文本的 textOf 只有一份", textOfCount === 1, `实际 ${textOfCount} 份`);
+
+  const body = stripComments(readFileSync(join(COMP, "GuideBody.tsx"), "utf8"));
+  // 两个解析器都得在：删掉普通 markdown 那份正是坏名字诱导的方向。
+  // 判据要认**导入语句 + 实际使用**，不能是裸子串——文档注释里也写着 "react-markdown"，
+  // 裸子串的检查删掉解析器照样绿（2026-09-18 自证时实测到的假绿）。
+  check(
+    "导入并使用了普通 markdown 解析器",
+    /from "react-markdown"/.test(body) && body.includes("<ReactMarkdown"),
+  );
+  check(
+    "导入并使用了 MDX 解析器",
+    /from "next-mdx-remote\/rsc"/.test(body) && body.includes("<MDXRemote"),
+  );
+  check("按 renderer 分发", /renderer === "md"/.test(body));
+  // 1 是**正确性**约束：`H2`/`H3` 渲染的就是 textOf 的返回串，不递归进元素就等于把
+  //   标题里的行内代码整段丢掉（老 GuideMdx 的 3 行 stub 正是如此）——id 和显示一起错。
+  check(
+    "textOf 递归进元素捞出文本（少了它标题会丢内容）",
+    body.includes("React.isValidElement(node)") && body.includes("node.props as { children"),
+  );
+  // 2 只是**显示保真**（让标题渲染出原始 markdown 的 `代码` 记号）。注意它不影响锚点 id：
+  //   headingId 把所有非字母数字折叠成 `-`，`` `foreach` `` 与 `foreach` 归一成同一个。
+  //   两条分开断言，免得将来有人以为删掉反引号只是"少个记号"而顺手删了上面那条。
+  check("textOf 给行内代码补回反引号（显示保真）", body.includes('node.type === "code"') && body.includes("${inner}"));
+
+  // 扩展名 → renderer 是"哪个文档走哪条路"的唯一判据；翻了它等于把 knowledge 派生的
+  // `.md` 交给 MDX 解析（上面那些 `{占位符}` 立刻变成 JSX 表达式）
+  const guide = stripComments(read("../lib/guide.ts"));
+  check(
+    "lib/guide.ts 仍按扩展名决定 renderer",
+    guide.includes('fileName.endsWith(".mdx") ? "mdx" : "md"'),
+  );
+}
+
+console.log("\n[15] 组件名跟着家族不变量走（`Log*` = 某一份日志；一次列很多份的用数据模型的词）");
+{
+  // 由来：两个名字各错一半，错的方向恰好相反（2026-09-18）。
+  //  · `AnalyzeReport.tsx`（841 行，六个 `Log*` tab 组件的**父壳**）挂的是**路由**的词——
+  //    `Analyze` 已经被 `app/analyze/` + `Analyze*Client` + `useLogAnalyzer` 占着，
+  //    读者看不出这个共享组件在 `Log*` 家族里占哪一格。
+  //  · `HistoryList.tsx`（列 `SavedReport` / `HistoryItem`，含云端报告）一个词根都没有，
+  //    看不出它的数据来自 `lib/report-history.ts`。
+  // 两个都改成跟着家族/数据模型走：`LogReport.tsx` / `ReportHistoryList.tsx`。
+  //
+  // 关键在于 `Log*` 家族的**定义**：它指"渲染**某一份**日志的分析结果"，**不是**
+  // "手里有日志字节"（从历史打开时字节可能已被淘汰，子组件各自处理了那条路）。
+  // 所以单份的挂 `Log`、集合类不挂——`LogHistoryList` 那种写法是在承诺"日志在这"，
+  // 而那张表里恰恰经常没有（`REPORT_DATA_KEEP` 淘汰字节、`source: "cloud"` 来自别的设备）。
+  const COMP = join(WEB, "components");
+  const names = readdirSync(COMP);
+
+  check("LogReport.tsx 存在", names.includes("LogReport.tsx"));
+  check("AnalyzeReport.tsx 没有回来", !names.includes("AnalyzeReport.tsx"));
+  check("ReportHistoryList.tsx 存在", names.includes("ReportHistoryList.tsx"));
+  check("HistoryList.tsx 没有回来", !names.includes("HistoryList.tsx"));
+
+  // 比"文件叫什么"更实质的一条：父壳引的子组件必须都在 `Log*` 家族里。
+  // 将来新加一个 tab 组件时用了别的词根（`MetricsPanel.tsx` 之类），当场被拦——
+  // 否则家族会一格一格被拆散，而每个单看都"挺合理"。
+  const shell = stripComments(readFileSync(join(COMP, "LogReport.tsx"), "utf8"));
+  const kids = [...shell.matchAll(/from "\.\/([A-Za-z0-9_]+)"/g)].map((m) => m[1]);
+  check("LogReport 引到了子组件", kids.length >= 6, `实际 ${kids.length} 个`);
+  const odd = kids.filter((n) => !/^Log[A-Z]/.test(n));
+  check(
+    "LogReport 的子组件全带 Log 词根",
+    odd.length === 0,
+    odd.length ? `不带 Log 词根：${odd.join(", ")}` : "",
+  );
+
+  // 反方向也要拦：报告历史列表不许被"顺手统一进 Log 家族"——它列的是能比日志活得久的记录
+  const logNamedList = names.filter((n) => /^LogHistory/.test(n));
+  check(
+    "报告历史列表没被挂上 Log 词根",
+    logNamedList.length === 0,
+    logNamedList.join(", "),
+  );
+}
+
+console.log("\n[16] 轨迹取不到要说清缺什么（不许再退回一句空洞的概括）");
+{
+  // 用户的原话："这段日志里没有可用的定位轨迹 直接告诉用户缺少什么字段，不要这么空洞的提示"。
+  // 空洞只是表象：那句概括只对应六种原因里的一种（缺 topic / 缺字段 / 字段改名 / 有采样但
+  // 全程没定位 / 采样数对不上 / 没 timestamp），另外五种下它是**错的**。
+  // 引擎侧那半（返回体必须带 errorReasons）由 tools/calibrate/check_artifact.py 动态核；
+  // 这里管界面这半——失败分支真的填、列表真的渲染、切了日志清空。
+  // 只留 `tsc` **看不见**的那几条：`TrackData` 的字段声明、state 声明、setter 调用，少一环
+  // tsc 都会当场报错，再给它们配守卫就是"恒绿的守卫"（§6.6 那条"守卫自己也要被校验"——
+  // 第一次写就有一条被另外两条**蕴含**，变异怎么打都不红）。真正会静默退化的是**行为**：
+  // 填了不渲染、渲染了不在失败分支填、切了日志不清空、引擎违约时拿一句谎话顶上。
+  const map = stripComments(readFileSync(join(WEB, "components", "LogFlightMap.tsx"), "utf8"));
+  check("失败分支收下引擎给的全部原因", /setErrorReasons\(\s*track\.errorReasons/.test(map));
+  check("界面把逐条原因渲染成列表", /errorReasons\.map\(/.test(map));
+  check("重新取数时清空上一轮的原因", /setErrorReasons\(\[\]\)/.test(map));
+  // 引擎违约（有 error 却不给原因）时不许伪装成"日志里没有轨迹"——那会让解析器缺陷
+  // 看起来像用户的数据问题，用户既不会反馈、我们也永远不知道
+  check(
+    "引擎没给原因时明说是解析器缺陷",
+    /引擎没有返回任何轨道，也没给出原因/.test(map),
+  );
 }
 
 console.log(failed === 0 ? "\n全部通过\n" : `\n${failed} 项失败\n`);

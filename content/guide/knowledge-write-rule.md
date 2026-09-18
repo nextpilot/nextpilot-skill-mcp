@@ -1,5 +1,5 @@
 ---
-title: 如何编写一条规则
+title: 如何编写知识规则
 titleEn: Writing a rule
 description: 从必填字段到数据流表达式、触发条件与输出，附算子目录与常见坑。
 descriptionEn: Required fields, data-flow expressions, triggers and outputs — plus the operator catalogue and pitfalls.
@@ -10,10 +10,10 @@ order: 11
 
 写一条经验的权威参考：字段级定义、数据流（`compute`）语义、触发与输出、内置变量、
 算子目录，以及构建期会直接拒绝的写法。内部设计（动机、实施状态与已知缺口）见仓库里的
-`knowledge/px4/CLAUDE.md`；现有规则清单：[当前有哪些规则](/guide/knowledge-rules)。
+`knowledge/px4/CLAUDE.md`；现有规则清单：[现有规则清单](/guide/knowledge-rules)。
 
 > **本页是这份文档的唯一一份**：原先在 `knowledge/px4/guides/writing-rules.md`，现搬到指南的
-> 内容目录，不再由构建生成（同组的「当前有哪些规则」才是构建生成的）。
+> 内容目录，不再由构建生成（同组的「现有规则清单」才是构建生成的）。
 > 单一事实源是 `knowledge/px4/rules/*.yaml`；标了 `<!-- BEGIN/END -->` 的两张表由
 > `python tools/px4/gen_rule_reference.py` 从 `engine/operators.py`（算子）与
 > `engine/providers/api.py`（内置变量）注入，改完算子或契约请重跑该脚本，

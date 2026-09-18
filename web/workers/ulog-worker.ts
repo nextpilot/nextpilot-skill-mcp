@@ -7,7 +7,7 @@
  * - 入站 analyze {file, logId}：加载运行时（只一次）→ 解析 → 规则 → done
  * - 入站 series {reqId, request, logId}：按预设的取数声明懒抽取降采样时序（换算在引擎侧）
  * - 入站 track {reqId, logId}：GPS 轨迹（多条）
- * - 出站 done {report, manifest, info} / series {reqId, data} / track {reqId, data} / stage / error
+ * - 出站 done {report, manifest, info, logId} / series {reqId, data} / track {reqId, data} / stage / error
  *
  * 请求都带 `logId`（日志内容指纹）：这个 Worker 是**共享**的、跨报告存活，
  * 一旦里面装的是另一份日志，取数据会静默拿错——见 logNotLoadedReason 的说明。
@@ -51,6 +51,13 @@ export type WorkerOutMessage =
     report: unknown;
     manifest: TopicManifest;
     info: LogInfo;
+    /** 这次真正装进命名空间的是**哪一份**日志（analyze 带上来的指纹，原样回给前端）。
+     *
+     *  前端要拿它记住"Worker 现在装着谁"：这个 Worker 是共享且常驻的，
+     *  跨报告存活，取数据前必须先知道要不要为当前这份日志补一次解析
+     *  （见 hooks/useLogAnalyzer.ts 的 ensureLogLoaded）。不回传的话前端只能
+     *  假设"我发过 analyze 就装上了"——而 analyze 是可能失败的。 */
+    logId: string;
   }
   | { type: "series"; reqId: string; data: unknown; }
   | { type: "track"; reqId: string; data: unknown; }
@@ -177,7 +184,11 @@ let loadedLogId: string | null = null;
  *    用户打开没有轨迹存档的报告 B 时，会把 A 的轨迹画成 B 的飞行记录——
  *    错得静悄悄，比报错难查得多。系列曲线同理。
  *
- * 指纹对不上**不算异常**：判成"要重选文件"，界面给按钮，复解析这份日志即可恢复。
+ * 指纹对不上**不算异常**，而且正常情况下走不到这里：前端在取数据之前会先补一次解析
+ * （见 hooks/useLogAnalyzer.ts 的 ensureLogLoaded），让这个 Worker 装上它要的那一份。
+ * 剩下能走到这里的只有一种情况——**字节已经不在用户手里了**（历史记录 + 本机缓存被淘汰／
+ * 那份记录来自别的设备）：这时 Worker 只能说实话，界面给"重新选择该 .ulg 文件"的按钮，
+ * 用户选一次即可恢复。**不要在这里给"能自己解决"的出路**：Worker 手里没有字节，救不了。
  */
 function logNotLoadedReason(pyodide: Pyodide, logId: string): string | null {
   if (!pyodide.globals.get("provider")) {
@@ -266,7 +277,7 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
     // **成功之后**才记"现在装的是这一份"：解析中途失败时命名空间里可能还留着上一份的
     // provider，先记就会让 track / series 把旧日志的数据当成新日志的交出去
     loadedLogId = msg.logId;
-    post({ type: "done", report, manifest, info });
+    post({ type: "done", report, manifest, info, logId: msg.logId });
   } catch (err) {
     post({
       type: "error",

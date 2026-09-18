@@ -942,7 +942,7 @@ function collectNames(node, out = new Set()) {
 export function normalizeCompute(raw, where) {
   if (typeof raw !== "string") {
     throw new Error(
-      `${where}: compute 的每一项都必须是字符串表达式（写法见指南的「如何编写一条规则」§4）。` +
+      `${where}: compute 的每一项都必须是字符串表达式（写法见指南的「如何编写知识规则」§4）。` +
         `算子节点写法已移除——\`- {out: x, from: a.b, op: max}\` 请改写成 \`- x = max(a.b)\`；` +
         `取数修饰写在 ref(...) 上：\`- y = f(ref("a.b[:]"))\``,
     );

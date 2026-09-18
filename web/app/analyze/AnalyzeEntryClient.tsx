@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useLogAnalyzer } from "@/hooks/useLogAnalyzer";
-import { HistoryList } from "@/components/HistoryList";
+import { ReportHistoryList } from "@/components/ReportHistoryList";
 import { takePendingLog } from "@/lib/pending-log";
 import {
   UploadCloud,
@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { LocalizedText } from "@/components/LocalizedText";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import type { HistoryItem } from "@/components/HistoryList";
+import type { HistoryItem } from "@/components/ReportHistoryList";
 
 const STAGE_TEXT: Record<string, string> = {
   "loading-runtime": "加载浏览器端 Pyodide 运行时",
@@ -177,7 +177,7 @@ export function AnalyzeEntryClient() {
 
         {/* 历史列表 */}
         <div className="card p-4 sm:p-5">
-          <HistoryList
+          <ReportHistoryList
             items={mergedHistory}
             localCount={localCount}
             cachedHashes={cachedHashes}

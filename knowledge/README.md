@@ -32,10 +32,10 @@ px4/
 
 **「知识库」分组的两个页面不在这个目录里**（都在仓库根 `content/guide/`，`/guide` 站内可见）：
 
-- 「如何编写一条规则」`knowledge-write-rule.md`：手维护，**唯一一份**（原先在
+- 「如何编写知识规则」`knowledge-write-rule.md`：手维护，**唯一一份**（原先在
   `knowledge/px4/guides/writing-rules.md`，已搬走，那个目录现在没有了）；
   其中两张表由 `python tools/px4/gen-rule-reference.py` 注入。
-- 「当前有哪些规则」`knowledge-rules.md`：构建时从 `rules/*.yaml` 现读现算，**只出网站这一份**。
+- 「现有规则清单」`knowledge-rules.md`：构建时从 `rules/*.yaml` 现读现算，**只出网站这一份**。
 
 ## 我要做什么 → 看哪里
 
@@ -68,7 +68,7 @@ python tools/calibrate/probe_rule.py tools/calibrate/logs/<log>.ulg <rule_id>
 ```
 
 改完算子后，记得重跑 `python tools/px4/gen-rule-reference.py`（把算子目录与内置变量表注入
-「如何编写一条规则」页）。**规则清单不用手动跑**——`build:kb` 会从 `rules/*.yaml` 现读现算，
+「如何编写知识规则」页）。**规则清单不用手动跑**——`build:kb` 会从 `rules/*.yaml` 现读现算，
 直接生成网站页面；产物是否与知识源一致，用 `--check` 比对（CI 用，不一致则退出码 1）：
 
 ```bash
@@ -81,7 +81,7 @@ cd web && pnpm build:kb --check    # 只比对不写入：任一产物与 knowle
 `web/workers/ulog-data-script.ts`、`web/workers/fault-kb.generated.json`、
 `web/lib/knowledge/prompts.generated.js`、
 `content/guide/knowledge-rules.md`（指南「知识库」分组的规则清单页；同分组的
-「如何编写一条规则」是手维护页面，不是生成物）。
+「如何编写知识规则」是手维护页面，不是生成物）。
 
 **铁律**：生成物不要手改；所有数值判断只在 `px4/rules/*.yaml` + 引擎框架里发生，
 LLM 只做翻译与组装。

@@ -39,6 +39,32 @@ _RELEASE_TYPE_SUFFIX = {64: "-alpha", 128: "-beta", 192: "-rc", 255: ""}
 # **解析逻辑留在本文件**（get_flight_track()）：按顺序取第一个存在的候选、剔未定位点、等距抽样——
 # 这些是分支，写进 YAML 只能再造一门小语言（见 track.yml 的说明）。
 
+# 列名里像经纬度／高度的：**关键词必须独立成段**（`^` / `.` / `_` 起，`.` / `_` / `$` 止）。
+# 不能用裸子串——`relative_test_ratio`、`accelerometer_timestamp_relative` 里都含 "lat"，
+# 于是 `estimator_selector_status` / `sensor_combined` 会被列成"带经纬度字段的 topic"，
+# 而它们跟坐标毫无关系。`alt` 同理：`mode_req_local_alt`、`fd_alt` 是**布尔标志**，不是高度。
+# 这类"听起来合理但是错的"输出正是本节要消灭的东西（见 CLAUDE.md §6.8）。
+# 分隔符带上 `.`：嵌套字段写成 `previous.lat` / `current.lon`（position_setpoint_triplet）。
+_LATLON_FIELD_RE = _re.compile(r"(^|[._])(latitude|longitude|lng|lat|lon)([._]|$)")
+_ALT_FIELD_RE = _re.compile(r"(^|[._])(altitude|alt)([._]|$)")
+
+
+def _latlon_fields(columns):
+    """列名里像**经纬度**的。
+
+    「这份日志到底有没有坐标」只该看经纬度：高度到处都有（气压计、EKF、失效保护标志位），
+    把它们算进来会让对照物里混进一堆与轨迹无关的 topic，反而看不出真答案。
+    """
+    return [c for c in columns if _LATLON_FIELD_RE.search(str(c).lower())]
+
+
+def _coord_like_fields(columns):
+    """经纬度或高度——「这个 topic 能不能给出坐标」的宽判据（`_one_track` 的缺字段文案用）。
+
+    那里说的是"这个 topic 的坐标相关字段实际叫什么"，高度是轨迹三轴之一，该算。
+    """
+    return [c for c in columns if _LATLON_FIELD_RE.search(str(c).lower()) or _ALT_FIELD_RE.search(str(c).lower())]
+
 
 class Px4Provider:
     """PX4 .ulg 适配器。契约见 providers/api.py。"""
@@ -302,32 +328,101 @@ class Px4Provider:
 
         坐标取数走引擎的 `_pick_ref`（候选组按存在性挑、单位换算）——与规则、曲线**同一套**。
         单条轨道取不到就跳过它；一条都没有才返回 `error`（保留 `tracks: []`，形状稳定）。
+
+        **取不到时必须说清"缺什么"**（`errorReasons` 逐条列出：哪个 topic 不在、缺哪个字段、
+        还是"有采样但全程未定位"）。以前这里只给一句"声明里的坐标候选都不在日志里"，
+        而那只对应其中一种原因——日志里有 `vehicle_gps_position` 但全程没拿到 3D 定位时，
+        这句话是**错的**，用户还拿不到任何能自己判断的线索。见 CLAUDE.md §6.8。
         """
         cfg = self._cfg.get("track")
         if not cfg or not cfg.get("children"):
             return {"error": "这份格式没有声明轨迹取数来源（knowledge/px4/plot/track.yml）"}
+        # ① 先过声明里的闸门（`conditions.topics`，构建期从预设搬到 facts.track）：一个都不在
+        #    日志里时，这份预设**本就不适用**，该说的是"缺哪个 topic"而不是"坐标候选取不到"。
+        #    文案复用 `rule_engine._missing_topics`——规则与绘图预设共用这一处，别在这儿再写
+        #    第二份（它给的正是缺什么：`sensor_gps / vehicle_gps_position not in log`）。
+        missing = _missing_topics((cfg.get("conditions") or {}).get("topics"))
+        if missing:
+            return self._track_failure(cfg, ["轨迹声明要的 topic 不在日志里：%s" % missing])
+        # ② 闸门过了（至少一个候选 topic 在）却还是取不到，再逐候选说清为什么。这些原因
+        #    `conditions.topics` 看不出来：字段改了名，或者有 GPS 采样但全程没拿到 3D 定位。
         tracks = []
+        reasons = []
         for child in cfg["children"]:
-            one = self._one_track(child, max_points)
+            one, why = self._one_track(child, max_points)
             if one is not None:
                 tracks.append(one)
-        out = {
+            else:
+                reasons.extend(why)
+        if not tracks:
+            return self._track_failure(cfg, reasons or ["声明里的候选一条都没取到坐标"])
+        return {
             "title": cfg.get("title") or "轨迹",
             "legend": cfg.get("legend", True),
             "tracks": tracks,
         }
-        if not tracks:
-            out["error"] = "这段日志里没有可用的定位轨迹（声明里的坐标候选都不在日志里）"
-        return out
+
+    def _track_failure(self, cfg, reasons):
+        """轨迹取不到的返回体。
+
+        `error` 带上**最后一条**原因（给"只看一行"的消费方：日志、非界面接口），完整清单在
+        `errorReasons`（界面按列表渲染）。为什么是最后一条：候选按优先级依次试，**最后试的
+        那个才是把整串试完的那一个**，它前面几条只是"为什么跳过了它"——把第一条当结论，
+        会指着"日志里没有 sensor_gps"去解释"有 GPS 但全程没定位"。
+        """
+        headline = reasons[-1]
+        declared = {
+            _split_ref(c)[0].partition(".")[0]
+            for ch in cfg["children"]
+            for ax in ("lat", "lon", "alt")
+            for c in (ch.get(ax) or {}).get("cands", [])
+        }
+        # 声明的 topic 一个都不在日志里时，补一句"日志里实际有什么"：只说"缺了东西"用户
+        # 无从下手——有对照物才看得出是固件版本不同，还是字段改了名
+        if declared and not any(self.has_topic(t) for t in declared):
+            reasons = reasons + [self._coord_field_topics_note()]
+        return {
+            "title": cfg.get("title") or "轨迹",
+            "legend": cfg.get("legend", True),
+            "tracks": [],
+            "error": "这段日志里没有可用的定位轨迹——" + headline,
+            "errorReasons": reasons,
+        }
+
+    def _coord_field_topics_note(self):
+        """日志里"带经纬度字段"的 topic 一句话清单（给 `errorReasons` 当对照物）。
+
+        挑判据用**字段**而不是 topic 名：用户真正要问的是"这份日志里到底有没有坐标"，
+        只列 `vehicle_local_position` 这种名字看不出它只有参考原点 `ref_lat/ref_lon`、
+        没有逐点经纬度——而那恰恰是"为什么画不出轨迹"的答案。
+
+        判据见 `_latlon_fields`（关键词独立成段、只看经纬度不看高度）。**写成裸子串 `"lat" in name`
+        会让 `relative_test_ratio` 里的 "lat" 混进来**，列出 `estimator_selector_status` 这种
+        与坐标无关的 topic——比不给对照物更糟，因为它听起来很具体。
+        """
+        hits = []
+        for m in self.get_topic_meta():
+            coord = _latlon_fields([f["name"] for f in m["fields"]])
+            if coord:
+                hits.append("%s[%d]（%s）" % (m["topic"], int(m["instance"]), ", ".join(coord[:4])))
+        if not hits:
+            return "这份日志里没有任何带经纬度字段的 topic"
+        more = "，另有 %d 个" % (len(hits) - 6) if len(hits) > 6 else ""
+        return "这份日志里带经纬度字段的 topic 有：" + "；".join(hits[:6]) + more
 
     def _one_track(self, child, max_points=None):
-        """一条轨道 → `{label, t, lat, lon, alt, fullCount, dropped}`；取不到返回 None。
+        """一条轨道 → `(轨道, [])`；取不到返回 `(None, [原因…])`。
 
         **三个坐标与时间戳必须来自同一个 topic 的同一个实例**：候选顺序即优先级，取第一个
         "lat / lon / alt 三样都能给齐"的 topic 生效。不这么定的话，三路的采样率不同、数组
         长度不同，`lat[i]` 与 `alt[i]` 根本不是同一时刻，画出来是错的。
+
+        失败原因是要**给用户看**的，所以每一句都得落到具体的 topic / 字段上：
+        "缺字段"要说缺哪个、这个 topic 的坐标字段实际叫什么；"全是未定位"要说清几个采样、
+        几个有效——用户据此才能判断是固件版本不同、字段改了名，还是这次飞行压根没上星。
         """
         limit = int(max_points or child.get("max_points") or 1500)
+        why = []
         for cand in child["lat"]["cands"]:
             bare, inst = _split_ref(cand)
             topic = bare.partition(".")[0]
@@ -335,33 +430,55 @@ class Px4Provider:
                 continue  # 构建期就要求写死实例；这里防御性跳过
             cols = self.get_topic_data(topic, inst)
             if not cols:
+                why.append("%s[%s]：日志里没有这个 topic" % (topic, inst))
                 continue
-            axes, ok = {}, True
+            axes, ok, missing = {}, True, {}
             for name in ("lat", "lon", "alt"):
                 spec = child.get(name) or {}
                 same = [c for c in spec.get("cands", []) if _split_ref(c)[0].partition(".")[0] == topic]
                 fields = [c.partition(".")[2] for c in same]
                 hit = next((f for f in fields if f in cols), None)
                 if hit is None:
+                    missing[name] = fields
                     ok = False
-                    break
-                axes[name] = (same[fields.index(hit)], spec.get("unit"))
+                else:
+                    axes[name] = (same[fields.index(hit)], spec.get("unit"))
             if not ok:
+                coordish = _coord_like_fields(cols)
+                why.append(
+                    "%s[%s]：缺 %s 字段——声明找的是 %s，该 topic 的坐标相关字段是 %s（共 %d 列）"
+                    % (
+                        topic,
+                        inst,
+                        "/".join(missing),
+                        "、".join("%s→%s" % (k, "/".join(v) or "（声明里没有同 topic 的候选）") for k, v in missing.items()),
+                        ", ".join(coordish) if coordish else "（一个都没有）",
+                        len(cols),
+                    )
+                )
                 continue
 
-            series = {}
+            series, ok = {}, True
             for name, (cand_str, unit) in axes.items():
                 got, _bare = _pick_ref(cand_str, unit=unit)
                 if got is None:
+                    why.append("%s[%s]：%s 取不出值（候选 %s，unit=%s）" % (topic, inst, name, cand_str, unit))
                     ok = False
                     break
                 series[name] = np.asarray(got, dtype=float)
+            if not ok:
+                continue
             ts = self.get_series("%s.timestamp" % topic, instance=inst)
-            if not ok or ts is None:
+            if ts is None:
+                why.append("%s[%s]：没有 timestamp 字段（轨迹点的时间轴取自它）" % (topic, inst))
                 continue
             ts = np.asarray(ts, dtype=np.int64)
             n = len(ts)
             if any(len(series[k]) != n for k in ("lat", "lon", "alt")):
+                why.append(
+                    "%s[%s]：采样数对不上——timestamp %d 个，lat/lon/alt 分别 %d/%d/%d 个"
+                    % (topic, inst, n, len(series["lat"]), len(series["lon"]), len(series["alt"]))
+                )
                 continue  # 同 topic 同实例却长度不同：宁可这条不画，也不硬凑坐标
 
             lat, lon, alt = series["lat"], series["lon"], series["alt"]
@@ -372,10 +489,22 @@ class Px4Provider:
             valid &= (np.abs(lat) <= 90.0) & (np.abs(lon) <= 180.0)
             valid &= ~((np.abs(lat) < 1e-7) & (np.abs(lon) < 1e-7))
             fix = self.get_series("%s.fix_type" % topic, instance=inst)
+            fix_note = ""
             if fix is not None:
-                valid &= np.asarray(fix) >= 3
+                fx = np.asarray(fix)
+                valid &= fx >= 3
+                kinds = {}
+                for v in fx:
+                    kinds[int(v)] = kinds.get(int(v), 0) + 1
+                fix_note = "，fix_type 分布 %s" % " ".join("%d×%d" % (k, v) for k, v in sorted(kinds.items()))
             idx_valid = np.nonzero(valid)[0]
             if len(idx_valid) < 2:
+                # "字段都在、但整段没定位"是另一回事：不说清的话用户会以为日志里没这个字段，
+                # 而真相是这次飞行没上星（或飞控没进 3D fix）
+                why.append(
+                    "%s[%s]：%d 个采样里只有 %d 个有效定位（要 fix_type≥3、坐标非 0 非 NaN）%s"
+                    % (topic, inst, n, len(idx_valid), fix_note)
+                )
                 continue
 
             # 轨迹用等距抽样：路径形状比峰值更需要均匀（在有效点里抽，别把 invalid 又抽回来）
@@ -391,8 +520,8 @@ class Px4Provider:
                 "fullCount": len(idx_valid),
                 # 剔掉了多少未定位采样：界面据此说明"点数为什么比采样数少"
                 "dropped": int(n - len(idx_valid)),
-            }
-        return None
+            }, []
+        return None, why
 
     def report_materials(self):
         """报告页要的几块原料（**不是某一个 tab 的 payload**，四个 tab 各取所需）。

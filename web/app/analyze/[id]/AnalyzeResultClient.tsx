@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useLogAnalyzer } from "@/hooks/useLogAnalyzer";
-import { AnalyzeReport } from "@/components/AnalyzeReport";
+import { LogReport } from "@/components/LogReport";
 import { getReport, initReportStore } from "@/lib/report-history";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { ArrowLeft, Loader2, Sparkles } from "lucide-react";
@@ -183,7 +183,7 @@ export function AnalyzeResultClient() {
 
       {/* 主分析报告 */}
       <div className="card p-5 sm:p-6">
-        <AnalyzeReport
+        <LogReport
           report={report}
           aiMarkdown={aiMarkdown}
           manifest={manifest}

@@ -279,7 +279,19 @@ function shortName(fileName: string): string {
   return i > 0 ? fileName.slice(0, i) : fileName;
 }
 
-export function HistoryList({
+/**
+ * 报告历史列表：本机 IndexedDB 与云端 `/api/reports` 两张表合并成一张。
+ *
+ * 列的是 **报告**（`SavedReport` / `HistoryItem`），不是日志。这个区别是实质的：
+ * 一条报告可以**比它的日志活得久**——字节被淘汰（`REPORT_DATA_KEEP` 只留最近 20 份的
+ * 曲线/轨迹），或这份报告本来就来自别的设备（`source: "cloud"`，本地根本没有它的 `.ulg`）。
+ * 那种时候只有结论在，曲线与轨迹要重新选文件才补齐。
+ *
+ * 所以它**不能**叫 `LogHistoryList`：`Log*` 是"某一份日志"家族的词根（见 `LogReport.tsx`），
+ * 挂上去等于承诺"日志在这"——而这张表里恰恰经常没有。`Report` 才是与
+ * `lib/report-history.ts`（`SavedReport` / `listReports` / `normalizeSavedReport`）认亲的那个词。
+ */
+export function ReportHistoryList({
   items,
   localCount,
   cachedHashes,

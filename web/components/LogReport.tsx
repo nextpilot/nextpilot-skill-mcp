@@ -80,7 +80,22 @@ const TAG_LABELS: Record<string, string> = {
 
 type TabKey = "sysmsg" | "metrics" | "messages" | "params" | "charts" | "summary" | "ai";
 
-export function AnalyzeReport({
+/**
+ * 一份日志的**分析报告**正文（tab 壳）。六个子组件——`LogCharts` / `LogEventsMsg` /
+ * `LogParamsMsg` / `LogSystemMsg` / `LogPhaseStrip` / `LogFlightMap`——全在 `Log*` 家族里，
+ * 所以本组件也带 `Log` 词根：它渲染的确实是**某一份**日志。
+ *
+ * `Log*` 家族的定义是"渲染**某一份**日志的分析结果"，**不是**"手里有日志字节"：
+ * 从历史打开时字节可能已被淘汰（`REPORT_DATA_KEEP`），本组件与子组件都各自处理了那条路
+ * （`isHistory` / `manifest?` / `storedPanels`）。**集合类**（一次列很多份）不在此列，
+ * 见 `ReportHistoryList.tsx` 那份说明。
+ *
+ * 名字曾叫 `AnalyzeReport`：`Analyze` 是**路由**的词（`app/analyze/`、`Analyze*Client`、
+ * `useLogAnalyzer`），让 `components/` 里的一个共享组件再挂一次同一个词，读的人看不出它在
+ * `Log*` 家族里占哪一格——正是 §6.4「词根认亲」要避免的（同 §6.4 第②条的事故形态：
+ * 名字读出的关系与真实关系不一致）。
+ */
+export function LogReport({
   report,
   aiMarkdown,
   manifest,
@@ -132,7 +147,7 @@ export function AnalyzeReport({
       disabled: !manifest && !storedPlots?.panels?.length,
     },
     { key: "summary", label: "检查结论", icon: <ClipboardCheck className="h-4 w-4" /> },
-    { key: "ai", label: "AI 中文解读", icon: <Sparkles className="h-4 w-4" /> },
+    { key: "ai", label: "AI 解读", icon: <Sparkles className="h-4 w-4" /> },
   ];
   const effectiveTab = isHistory ? "summary" : activeTab;
 
@@ -471,7 +486,7 @@ function AiTab({
   return (
     <div>
       <h2 className="mb-3 text-sm font-semibold">
-        AI 中文解读（GJB-841 归零报告）
+        AI 解读（GJB-841 归零报告）
       </h2>
       {aiMarkdown ? (
         <article className="prose-guide">

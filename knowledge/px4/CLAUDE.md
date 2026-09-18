@@ -3,7 +3,7 @@
 > **这是给 AI（Claude Code）读的项目上下文**：改 `rules/*.yaml`、`engine/` 下的算子与框架、
 > 或构建脚本前，先按这里的约定来——它记着每条设计决策的动机、
 > 与最初设计的落地差异（避免把有意为之当成 bug 改回去）、以及已知缺口。
-> 面向人的入口见 `../README.md`（怎么读）与站内 [如何编写一条规则](/guide/knowledge-write-rule)（怎么写经验）。
+> 面向人的入口见 `../README.md`（怎么读）与站内 [如何编写知识规则](/guide/knowledge-write-rule)（怎么写经验）。
 > 本文件不发布到网站：里面有实施状态、已知缺口与提交记录。
 
 ## 实施状态（2026-09-15：已实施）
@@ -127,7 +127,7 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 "派生的 `category/version/status/license/author/outputs.check/doc` 与改动前逐条相同"的核对
 （基线只覆盖 6 份日志，**在那上面没触发的规则比不到**，所以那次核对是必需的）。
 
-字段级权威参考（写经验时看这份）：站内 **[如何编写一条规则](/guide/knowledge-write-rule)**（源文件 `content/guide/knowledge-write-rule.md`）；
+字段级权威参考（写经验时看这份）：站内 **[如何编写知识规则](/guide/knowledge-write-rule)**（源文件 `content/guide/knowledge-write-rule.md`）；
 经验索引（站内页面，构建时生成）：**[/guide/knowledge-rules](/guide/knowledge-rules)**；迁移过程中顺带修掉的 6 处
 真实缺陷见提交 `6a081d5` 的说明（最要紧的一条：日志消息级别判据按 ASCII 语义修正后，
 `Kill engaged / Flight termination active`、`no barometer found` 这类"冒烟的枪"才浮出来）。
@@ -773,7 +773,7 @@ fixtures:
 > ⚠️ **这一节是最初设计的 7 层 schema**，里面的 `phase` / `min_samples` / `excludes_if` /
 > `confidence` / `safety` / `thresholds_source` / `calibration` / `fixtures` 都**没有落地**
 > （哪些落了、为什么没落见开头那张「与设计的落地差异」表）。**当前真实写法**看站内
-> [如何编写一条规则](/guide/knowledge-write-rule)，或直接读 `rules/vibration.yaml`——
+> [如何编写知识规则](/guide/knowledge-write-rule)，或直接读 `rules/vibration.yaml`——
 > 顶层字段只有 10 个，`compute` 是表达式，取数修饰写在 `ref(...)` 上。
 
 ```yaml

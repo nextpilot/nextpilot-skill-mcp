@@ -80,6 +80,9 @@ export function LogFlightMap({
   const [legend, setLegend] = useState<{ label: string; color: string }[]>([]);
   const [hidden, setHidden] = useState<string[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  /** 取不到轨迹的逐条原因（见 TrackData.errorReasons）：与 errorMsg 一起显示，
+   *  因为"画不出轨迹"有六种原因，一句话说不清、而且容易说错 */
+  const [errorReasons, setErrorReasons] = useState<string[]>([]);
   /** 错误种类（见 TrackData.code）：`log-not-loaded` 才给「重新选择文件」按钮
    *  （= Worker 里没装着这份日志；重选文件解析一次就能恢复。别的错误重选也没用） */
   const [errorCode, setErrorCode] = useState<TrackData["code"]>(undefined);
@@ -97,6 +100,7 @@ export function LogFlightMap({
       // 不重置的话上一轮的错误文案会一直挂着，看起来像按钮没生效
       setState("loading");
       setErrorMsg(null);
+      setErrorReasons([]);
       setErrorCode(undefined);
       try {
         LModule = await getLeaflet();
@@ -107,7 +111,10 @@ export function LogFlightMap({
 
         const list: TrackSeries[] = track.tracks ?? [];
         if (track.error || list.length === 0) {
-          setErrorMsg(track.error ?? "日志里没有可用的 GPS 轨迹");
+          // `track.error` 一定带着逐条原因（引擎侧保证）。走到 ?? 那一支说明引擎违约，
+          // 别把它伪装成"日志里没有轨迹"——那是另一回事
+          setErrorMsg(track.error ?? "引擎没有返回任何轨道，也没给出原因（解析器缺陷，请反馈）");
+          setErrorReasons(track.errorReasons ?? []);
           setErrorCode(track.code);
           setState("error");
           return;
@@ -117,10 +124,13 @@ export function LogFlightMap({
         // 只换算画图用的那份，"这份轨迹是 WGS-84" 的事实不被改写。
         const colors = isDark() ? SERIES_COLORS_DARK : SERIES_COLORS_LIGHT;
         const drawn: DrawnTrack[] = [];
+        /** 点数不足 2 个、画不出来的轨道：连着它的采样数一起说清（不然界面没话可说） */
+        const thin: string[] = [];
         let total = 0;
         let dropped = 0;
         const alts: number[] = [];
         list.forEach((tk, ti) => {
+          const label = tk.label || `轨道 ${ti + 1}`;
           const points: GpsPoint[] = [];
           for (let i = 0; i < tk.lat.length; i++) {
             const lat = tk.lat[i];
@@ -131,13 +141,19 @@ export function LogFlightMap({
             points.push({ lat: gLat, lon: gLon, alt });
             alts.push(alt);
           }
-          if (points.length < 2) return;
+          if (points.length < 2) {
+            thin.push(`${label}：${tk.lat.length} 个采样里只有 ${points.length} 个能画`);
+            return;
+          }
           total += points.length;
           dropped += tk.dropped ?? 0;
-          drawn.push({ label: tk.label || `轨道 ${ti + 1}`, color: colors[ti % colors.length], points });
+          drawn.push({ label, color: colors[ti % colors.length], points });
         });
 
         if (drawn.length === 0) {
+          // 引擎说"有轨道"，可换算后一条都画不出来（坐标数组里混了 null 等）。以前这里只把
+          // state 置成 error，界面就只剩兜底那句文案——等于什么都没说
+          setErrorMsg(`解析出 ${list.length} 条轨道，但换算后顶点都不足 2 个（${thin.join("；")}）`);
           setState("error");
           return;
         }
@@ -410,8 +426,17 @@ export function LogFlightMap({
             ) : (
               // 说清是什么问题 + （能救回来时）给个**就地**重选文件的按钮。
               // 只写一句"重新选择该 .ulg 文件"的话，用户得自己猜到要回列表页再选一次
-              <div className="flex flex-col items-center gap-2">
+              <div className="flex max-w-2xl flex-col items-center gap-2">
                 <span>{errorMsg ?? "无法加载 GPS 轨迹数据"}</span>
+                {errorReasons.length > 1 && (
+                  // 逐条原因（引擎给的）："缺哪个 topic / 哪个字段 / 有没有定位"一句话概括不了，
+                  // 概括出来那句往往是错的（见 CLAUDE.md §6.8）
+                  <ul className="w-full list-disc space-y-0.5 pl-5 text-left">
+                    {errorReasons.map((r) => (
+                      <li key={r}>{r}</li>
+                    ))}
+                  </ul>
+                )}
                 {errorCode === "log-not-loaded" && onRestore && (
                   <button
                     type="button"

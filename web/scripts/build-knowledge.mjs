@@ -481,7 +481,7 @@ function loadRules(dir, signatures, ruleMeta, airframes) {
 // 把 rules/*.yaml 渲染成 /guide/knowledge-rules 那一页（产物提交进仓库）。
 // 与引擎产物同源、同一次构建生成：规则改了页面就跟着变，不用谁记得手动同步。
 // 清单只出网站这一份，仓库里不留第二份拷贝（免得两处对不上）；同分组的
-// 「如何编写一条规则」是手维护页面（content/guide/knowledge-write-rule.md），本脚本不碰。
+// 「如何编写知识规则」是手维护页面（content/guide/knowledge-write-rule.md），本脚本不碰。
 
 const GROUP = { zh: "知识库", en: "Knowledge base" };
 
@@ -853,6 +853,31 @@ function compileMap(out, where, declaredVars, refs) {
   return { container: "map", title: switches.title ?? "轨迹", legend: switches.legend, children };
 }
 
+/**
+ * 把预设的适用范围（`conditions`）附到地图声明上（它会进 `facts.track`）。
+ *
+ * 地图与曲线**共用同一份声明**，但判据在两头：曲线在前端按 `conditions.topics` 判适用性
+ * （`web/lib/chart-presets.ts` 的 `presetApplies`），地图的判据在引擎侧
+ * （`engine/providers/px4.py` 的 `get_flight_track`）。`facts.track` 以前只带 `children`，
+ * 于是引擎**看不到这句声明**，取不到坐标时只能笼统报"声明里的坐标候选都不在日志里"——
+ * 而真相常常是"这份日志根本没有 `sensor_gps` / `vehicle_gps_position`"。带上声明之后，
+ * 引擎就能复用 `rule_engine._missing_topics` 说清缺哪个 topic（**文案只在那里生成一处**）。
+ *
+ * 只认 `topics`：固件 / 机架 / 先决条件这三个轴，引擎的地图路径没有求值器（规则的闸门是
+ * 内联在 `_run_rules` 里的）。写了非默认值就在**构建期**报错，别让它在运行期悄悄不生效。
+ */
+function withMapConditions(map, conditions, where) {
+  const unsupported = ["firmware", "airframe"].filter((k) => conditions[k] && conditions[k] !== "any");
+  if (conditions.precheck) unsupported.push("precheck");
+  if (unsupported.length) {
+    throw new Error(
+      `${where}: 地图预设的 conditions 只支持 topics（引擎侧的地图路径没接 ${unsupported.join(" / ")}）——` +
+        `要按固件 / 机架 / 先决条件收紧，得先在 get_flight_track 里接上同一个闸门`,
+    );
+  }
+  return { ...map, conditions: { topics: conditions.topics ?? [] } };
+}
+
 /** 一份预设 → `{plot, map, refs}`（plot 进前端产物，map 进 facts.track）。 */
 function compilePreset(spec, where, airframes) {
   for (const key of ["id", "title", "description", "outputs"]) {
@@ -921,7 +946,7 @@ function loadPresets(dir, airframes) {
     if (map) {
       // 地图是报告页的常驻区，只有一块地方：多个预设各声明一份 map，谁都画不了
       if (mapSpec) throw new Error(`${where}: 已经有一份预设声明了 container: map（全局只能一个）`);
-      mapSpec = map;
+      mapSpec = withMapConditions(map, plot.conditions, where);
     }
     plots.push(plot);
     refs.push(...r);

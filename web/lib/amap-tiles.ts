@@ -1,6 +1,6 @@
 /**
  * 高德瓦片的地址与取瓦片要用的墨卡托换算 —— 报告页的大地图（LogFlightMap）与
- * 历史列表的缩略图（HistoryList 的 TrackThumb）共用一份，免得两处各写一遍。
+ * 历史列表的缩略图（ReportHistoryList 的 TrackThumb）共用一份，免得两处各写一遍。
  *
  * ⚠️ 子域名是 ["1".."4"]，拼出来是 webrd01 / webst01 这类主机名——写成 "01" 会得到
  * webrd001.is.autonavi.com（**该域名不存在**，地图一片灰，实测 curl 直接 DNS 失败）。

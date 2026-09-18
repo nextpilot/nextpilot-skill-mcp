@@ -228,6 +228,19 @@ export interface TrackData {
   legend?: boolean;
   tracks: TrackSeries[];
   error?: string;
+  /** 取不到轨迹的**逐条原因**（有 error 时才有，界面按列表渲染）。
+   *
+   *  为什么要有它：`error` 只有一句话，而"画不出轨迹"有六种原因，各说各的实话——
+   *    ① 日志里没有声明要的 topic（`sensor_gps` / `vehicle_gps_position` 一个都不在）
+   *    ② 那个 topic 在，但没有声明里找的坐标字段（字段改了名）
+   *    ③ 字段名对得上却取不出值（`ref()` 解析失败）
+   *    ④ 那个 topic 没有 `timestamp` 列（轨迹的时间轴取自它）
+   *    ⑤ `timestamp` 与 lat/lon/alt 的采样数不一致（同 topic 同实例却长度不同）
+   *    ⑥ 有采样但有效定位不足 2 个（坐标全 0 / NaN，或 `fix_type` 一直 < 3）
+   *  只给一句概括时，用户拿到的是**听起来合理但可能是错的**提示——曾经一律说"声明里的坐标
+   *  候选都不在日志里"，可实测有两份日志是 ①、另有一份是 ⑥，界面上长得一模一样。
+   *  见 CLAUDE.md §6.8。 */
+  errorReasons?: string[];
   /** 出错的**种类**（有 error 时才有）。
    *  `log-not-loaded` = 这个 Worker 里没装着这份日志（从没解析过，或装的是另一份）——
    *  重新选择该 .ulg 文件解析一次就能恢复，界面据此给出「重新选择 .ulg 文件」按钮；

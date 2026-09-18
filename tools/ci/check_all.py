@@ -13,9 +13,9 @@
 | `ruff format --check` / `ruff check` | Python 风格漂移与真 bug（见仓库根 `pyproject.toml`） |
 | `build:kb --check` | 产物与 `knowledge/` 不一致、契约写漏、字段/算子引用错 |
 | `gen_rule_reference.py` + `git diff` | 指南页里的算子/内置变量表与 `engine/` 源码漂移 |
-| `check_artifact.py` | 产物不是合法 Python、`compute` 表达式 Python 侧解析不了、`.replace` 链缺名字、**worker 守卫查的全局名在产物命名空间里不存在**（恒真/恒假的守卫，语法与执行检查都看不见） |
+| `check_artifact.py` | 产物不是合法 Python、`compute` 表达式 Python 侧解析不了、`.replace` 链缺名字、**worker 守卫查的全局名在产物命名空间里不存在**（恒真/恒假的守卫，语法与执行检查都看不见）、**地图预设的适用范围（`conditions.topics`）没搬进 `facts.track`**（搬丢了引擎就少了"缺哪个 topic"那道闸门）、**轨迹取不到时的返回体没带逐条原因**（界面只能显示一句常常说错的概括） |
 | `tsc --noEmit` | 类型 |
-| `test-issue-filer.mjs` | ① 报错上报的指纹归一化、脱敏正则、白名单 —— 写错了要么去重失效、要么把用户信息泄进公开 issue；② §[9]~[11] 防回潮守卫：两侧共用政策只许有一份，外部 JSON（网络响应 / 存档）必须过归一函数、不许 `as` 强转（§6.5），派生数据（曲线 / 轨迹）必须按报告身份清理 |
+| `test-issue-filer.mjs` | ① 报错上报的指纹归一化、脱敏正则、白名单 —— 写错了要么去重失效、要么把用户信息泄进公开 issue；② §[9]~[16] 防回潮守卫：两侧共用政策只许有一份，外部 JSON（网络响应 / 存档 / worker 消息）必须过归一函数、不许 `as` 强转（§6.5），派生数据（曲线 / 轨迹）必须按报告身份清理，取数据前必须先把当前这份日志装进共享 Worker（§6.7），`functions/` 下每个端点都必须在本地 dev 垫片里可达（漏一个 = 本地整条静默 404），指南正文只许有一个渲染入口（防止再裂成一对近音名 + 两份分叉的标题文本规则），组件名跟着家族不变量走（`Log*` = 某一份日志；列很多份的用数据模型的词），轨迹取不到时界面要把引擎给的逐条原因显示出来 |
 | `next build`（`--with-build`） | 真编译 —— CI 才跑，本地太慢 |
 
 需要日志（**云端 CI 跑不了**）：`tools/calibrate/logs/*.ulg` 含真实 GPS 轨迹，
@@ -26,7 +26,7 @@
 | --- | --- |
 | `compare_baseline.py` | 6 条冻结基线逐字段比对 —— 改规则/引擎的硬门槛 |
 | `check_provider.py` | 适配器契约（三张常量表声明的方法是否真的可用） |
-| `run_checks_locally.py --probe-data` | 数据层三个 API 的结构与 JSON 合法性 |
+| `run_checks_locally.py --probe-data` | 数据层三个 API 的结构与 JSON 合法性，**并且真的抽一次 `series`**（会以非零退出码结束；以前它对每份日志都打 ERROR 却 `return 0`，`series` 那一路早就废了没人知道） |
 | `lint_rules.py --strict` | 字段引用错 / 版本错配。**必须在有日志时跑**：日志实测字段是它的主要证据源，没有日志时它只能拿上游字典比对，会把日志里真实存在的旧固件字段误报成"拼错" |
 
 日志不在时这几步打印 `SKIP` 并说明原因，**不算失败** —— 但要清楚：
@@ -121,20 +121,30 @@ def gate(name: str, cmd: list, cwd: Path = ROOT) -> tuple[str, str]:
 
 
 def gate_guide_in_sync() -> tuple[str, str]:
-    """生成器是幂等的：重写一遍再看 git diff 是否有变化。
+    """生成器是幂等的：跑一遍生成器，看它有没有**改写**那份文档。
 
     这条能拦住一类很隐蔽的漂移 —— 改了 `engine/operators.py` 或 `providers/api.py`
     却忘了重新生成指南页里的算子/内置变量表，站点文档就与引擎对不上了。
+
+    **判据是"生成器会不会改动它"，不是"它跟 HEAD 一不一样"。** 两者差别很实在：
+    那份文档的正文是**手写**的（生成器只替换两张标了 BEGIN/END 的表），与 HEAD 比会把
+    "作者刚改的标题/文案还没提交"也判成失败，而它跟算子表同步毫无关系——作者只会看到
+    一句误导人的"与源码不一致"，然后去找引擎的问题（实测踩到）。
+    （比较用**文本**而不是字节：生成器写入固定 `\\n`，工作区若是 CRLF 会被判成一次
+    "改写"，那只是行尾归一，不是漂移。）
     """
     name = "指南页生成表与 engine 源码一致"
     print(f"\n· {name}")
+    path = ROOT / GUIDE_RULE_DOC
+    before = path.read_text(encoding="utf-8")
     if run([PY, "tools/px4/gen_rule_reference.py"]) != 0:
         print(f"FAIL {name}（生成器自身失败）")
         return name, "fail"
-    diff = capture(["git", "diff", "--exit-code", "--", GUIDE_RULE_DOC])
-    if diff.returncode != 0:
+    if path.read_text(encoding="utf-8") != before:
+        print(f"FAIL {name}：生成器改写了 {GUIDE_RULE_DOC} —— 上面两张表与 engine 源码不一致")
+        diff = capture(["git", "diff", "--", GUIDE_RULE_DOC])
         print(diff.stdout)
-        print(f"FAIL {name}：{GUIDE_RULE_DOC} 与源码不一致（上面是差异，文件已按源码重写，提交它）")
+        print("  （若差异只在标题/正文，说明是这次生成以外的手写改动，一并提交即可）")
         return name, "fail"
     print(f"OK {name}")
     return name, "ok"
