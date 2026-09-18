@@ -340,6 +340,15 @@ function PanelChart({
     let cancelled = false;
     (async () => {
       try {
+        // 存档可能是**旧版格式**（取数声明从"topic + 列名"改成 ref 之后，`ydata` 才存在）：
+        // 派生版本一变就会触发重解析，但本机原始日志已被淘汰时只能拿旧数据渲染——
+        // 那种情况说清楚，别让 Plotly 拿着半截请求去画
+        const stale = panel.requests.find((r) => !Array.isArray(r.ydata) || r.ydata.length === 0 || !r.series);
+        if (stale) {
+          setError("这份存档的曲线是旧版格式，重新选择该 .ulg 文件解析一次即可恢复");
+          setState("error");
+          return;
+        }
         const stored = storedSeries?.[seriesKey];
         const responses = await Promise.all(
           panel.requests.map((r, i) =>
