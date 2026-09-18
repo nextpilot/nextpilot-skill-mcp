@@ -50,6 +50,22 @@ def main() -> int:
     if missing:
         raise SystemExit(f"生成产物的 .replace 链缺占位符：{sorted(missing)}")
 
+    # 浏览器端的替换链是 JS 的 String.replace——**只换第一处**；上面"覆盖了"的存在性检查
+    # 抓不住同一占位符出现多次的情况。2026-09-17 的 NameError 就是这么漏的：providers/px4.py
+    # 的注释里提了一句 `__FACTS__`，浏览器第一处被注释吃掉、真正的赋值行原样进 Pyodide；
+    # 而本地回归与下面的复现都用 Python 的 str.replace（全换）→ 本地全绿、线上打不开。
+    # 这里按浏览器语义复现一遍：每个占位符只换第一处（第三参 1 对齐 JS 行为），
+    # 换完不允许再有任何占位符残留。
+    first_only = body
+    for tok in replaces:
+        first_only = first_only.replace(tok, "null", 1)
+    leftover = set(re.findall(r"(__[A-Z_]+__)", first_only))
+    if leftover:
+        raise SystemExit(
+            f"占位符在模板里出现了多次，浏览器只换第一处会漏掉真正的赋值行（NameError）：{sorted(leftover)}；"
+            "把 engine/ 注释里提到占位符原文的地方改个说法，或查 build-knowledge.mjs 的拼接输入"
+        )
+
     # .replace 链里引用的名字必须已在产物里声明（const X = ... / import X from ...）。
     # 踩过：加了 .replace("__FACTS__", JSON.stringify(facts)) 却忘了 const facts = ...，
     # 语法检查与"复现替换"都发现不了（这里自己代填占位符），但浏览器一加载就 ReferenceError。

@@ -798,18 +798,6 @@ const { rules, sources } = loadRules(RULES_DIR, signatures, facts.rule_meta ?? {
 const fieldUnits = resolveFieldUnits(rules, resolve(KN, "meta"));
 
 const ruleEnginePy = read(PY_RULE_ENGINE);
-if (!ruleEnginePy.includes("__FAULT_KB__")) {
-  throw new Error("ulog_checks.py 必须保留 __FAULT_KB__ 占位符");
-}
-if (!ruleEnginePy.includes("__RULES__")) {
-  throw new Error("rule_engine.py 必须保留 __RULES__ 占位符");
-}
-if (!ruleEnginePy.includes("__FACTS__")) {
-  throw new Error("rule_engine.py 必须保留 __FACTS__ 占位符");
-}
-if (!ruleEnginePy.includes("__FIELD_UNITS__")) {
-  throw new Error("rule_engine.py 必须保留 __FIELD_UNITS__ 占位符");
-}
 // 单位词表在两边各有一份（构建期管"别名 → 规范名"，运行期管"规范名 → 换算因子"），
 // 规范名必须一模一样。各改各的会静默换算出错数，所以在这里比一次。
 {
@@ -908,6 +896,23 @@ const pyWithOperators = [
   ...providerFiles.map((f) => read(resolve(PROVIDER_DIR, f))),
   ruleEnginePy,
 ].join("\n");
+
+// 四个占位符在拼接后的 Python 里**必须恰好出现一次**。
+// 产物用的是 JS 的 `.replace()`——**只换第一处**：多出来的那一处（往往只是某段注释里提了一句
+// `__FACTS__`）会把真正的赋值挡在替换范围之外，浏览器里报 `NameError: name '__FACTS__' is not
+// defined`、整份日志都解析不了；而本地回归与 Python 的 `str.replace` 都是全换 → 本地全绿、线上打不开。
+// 2026-09-17 就是这么挂的（provider 注释里提到占位符），所以这里按"恰好一次"卡住，不按"存在"。
+for (const ph of ["__FAULT_KB__", "__RULES__", "__FACTS__", "__FIELD_UNITS__"]) {
+  const n = pyWithOperators.split(ph).length - 1;
+  if (n === 0) throw new Error(`engine/ 里必须保留 ${ph} 占位符（见 rule_engine.py）`);
+  if (n > 1) {
+    throw new Error(
+      `${ph} 在拼接后的 Python 里出现了 ${n} 次，必须恰好 1 次：` +
+        "产物的 .replace() 只换第一处，多出来的那处会让真正的赋值留在原地、浏览器直接报 NameError。" +
+        "把注释里提到它的地方改个说法即可。",
+    );
+  }
+}
 writeArtifact(
   resolve(outWorkers, "ulog-check-script.ts"),
   banner +

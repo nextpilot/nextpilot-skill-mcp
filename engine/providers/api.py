@@ -60,7 +60,7 @@ REQUIRED = {
     "match_version": {
         "kind": "method",
         "sig": "(spec) -> bool",
-        "doc": "固件约束串是否满足（ref(..., when_fw='>=1.15') 用）。约束串的语法由格式自己定，引擎不解释",
+        "doc": "固件约束串是否满足（规则级 conditions.firmware 用）。约束串的语法由格式自己定，引擎不解释",
     },
     "get_logged_information": {
         "kind": "method",

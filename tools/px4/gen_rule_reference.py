@@ -85,7 +85,7 @@ def operator_catalog() -> str:
         "\n共 **%d** 个算子。输入个数与左值个数由算子签名强制校验（对不上则构建失败）；"
         "各算子的可调参数（如 `gt` / `p` / `factor` / `codes` / `labels` / `min_count`）"
         "写成算子调用的**关键字实参**（如 `percentile(w, p=95)`）；"
-        "取数修饰（`per_instance` / `instance` / `alias` / `when_fw`）写在 `ref(...)` 上。" % total
+        "取数修饰（`instance` / `alias` / `unit`，以及位置参数给的候选组）写在 `ref(...)` 上。" % total
     )
     return "\n".join(out)
 

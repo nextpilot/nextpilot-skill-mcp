@@ -402,7 +402,7 @@ compute:
 | `gyro_bias_worst` | 5 | abs_max, abs_axis, drift, drift_axis | 三轴零偏在 armed 区间内逐轴取 |最大值| 与极差（漂移），回传各自最差的轴名 |
 | `max_temp_range` | 2 | 1 个值 | 两个温度来源各自取极差（样本 < 2 的来源忽略），返回较大者 |
 
-共 **73** 个算子。输入个数与左值个数由算子签名强制校验（对不上则构建失败）；各算子的可调参数（如 `gt` / `p` / `factor` / `codes` / `labels` / `min_count`）写成算子调用的**关键字实参**（如 `percentile(w, p=95)`）；取数修饰（`per_instance` / `instance` / `alias` / `when_fw`）写在 `ref(...)` 上。
+共 **73** 个算子。输入个数与左值个数由算子签名强制校验（对不上则构建失败）；各算子的可调参数（如 `gt` / `p` / `factor` / `codes` / `labels` / `min_count`）写成算子调用的**关键字实参**（如 `percentile(w, p=95)`）；取数修饰（`instance` / `alias` / `unit`，以及位置参数给的候选组）写在 `ref(...)` 上。
 <!-- END:operators -->
 
 ## 5. triggers 与 outputs
