@@ -108,7 +108,7 @@ node tools/check-upload.mjs \
 本次真正要交付的「检查规则迁移到一经验一个 YAML」并不依赖这个 e2e 脚本，已分别验证：
 
 - 5 个真实日志的**冻结基线**逐条逐字段完全一致
-  （`python tools/calibrate/compare-baseline.py` 全绿）；
+  （`python tools/calibrate/compare_baseline.py` 全绿）；
 - 对**生成产物**实际执行（不只是语法）通过
   （`python tools/calibrate/check-artifact.py`）；
 - 浏览器 Pyodide 端有过一次完整成功解析，F04「电芯电压严重过低 3.339 V/cell critical」、

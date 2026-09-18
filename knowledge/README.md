@@ -49,14 +49,14 @@ px4/
 | 加一条故障模式（根因 / 排查步骤） | `px4/px4-fault-kb.yaml`（trigger_tags 必须是引擎会产出的标签） |
 | 加一个可复用计算步骤 | `engine/operators.py`（`@operator` 声明 in/out arity），再在经验的 `compute` 里引用 |
 | 改 AI 报告口径 | `px4/llm/*.md` |
-| 同步固件元数据 | `python tools/px4/sync-px4-msg.py --tags ...` → 生成物在 `px4/meta/<tag>.json` |
+| 同步固件元数据 | `python tools/px4/sync_px4_msg.py --tags ...` → 生成物在 `px4/meta/<tag>.json` |
 
 ## 改完怎么验证
 
 ```bash
 cd web && node scripts/build-knowledge.mjs     # 构建；校验失败会直接报错（或 pnpm build:kb）
 # 等价回归：6 条真实日志与冻结基线逐字段比对（不依赖 Node）
-python tools/calibrate/compare-baseline.py
+python tools/calibrate/compare_baseline.py
 # 生成产物是否真的可执行（不只是语法）
 python tools/calibrate/check-artifact.py
 # 字段引用与版本错配（字段名写错时引擎只会静默取到 None，这条能揪出来）

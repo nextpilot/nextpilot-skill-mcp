@@ -7,7 +7,7 @@ import { En, Zh } from "@/components/Bilingual";
 import { headingId, splitHeading } from "@/lib/heading";
 import type { GuideDoc } from "@/lib/guide";
 
-/**
+/*
  * 指南正文。**一个入口、两个解析器**——选哪个由**文件扩展名**决定（`lib/guide.ts` 的
  * `renderer`），不在这里判断：
  *
@@ -20,7 +20,25 @@ import type { GuideDoc } from "@/lib/guide";
  * 字母、读起来像「基础版 / 升级版」——于是看起来 MDX 那份是超集，可以把另一份删掉。
  * **恰好相反**：普通 markdown 那份才是不能删的那份（见上面第一条）。合并成一个文件、
  * 把这条注释贴在分发点上，就是为了不再有人做那个方向反了的"简化"。
+ *
+ * 两条路**还必须共用同一份 remark 插件**——各写一份清单就是下一次分叉的起点，
+ * 而少一个扩展的后果是**静默降级**（见 `sharedRemarkPlugins`）。
  */
+
+/**
+ * 两个解析器**共用**的 remark 插件。写成一份而不是各写一份，是因为"各写一份"正是
+ * 这两条路的通用缺陷形状：两份清单一分叉，就只有一边是新的（见文件头）。
+ *
+ * 缺 `remark-gfm` 的后果值得单独记住——**GFM 管道表格在 CommonMark 里不是表格**，
+ * 整块会退化成"一段带竖线的普通段落"：不报错、不抛异常，页面上只是"排版有点怪"。
+ * 2026-09-19 线上就是这个症状：`/guide/rule-schema` 的 5 张表全渲染成了原文。
+ *
+ * `.md` 那条路一直在传它，所以从没露馅；`.mdx` 那条路漏了——而 MDX 的默认管线只有
+ * CommonMark（`@mdx-js/mdx@3` 的依赖里根本没有 `remark-gfm`），于是 `.mdx` 里的表格
+ * 全部失效。所以插件要共用，而且**构建期有一道守卫盯着 MDX 侧的调用点**（§[14]）。
+ */
+const sharedRemarkPlugins = [remarkGfm];
+
 export function GuideBody({
   renderer,
   source,
@@ -31,14 +49,20 @@ export function GuideBody({
   if (renderer === "md") {
     return (
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkDropComments]}
+        remarkPlugins={[...sharedRemarkPlugins, remarkDropComments]}
         components={markdownComponents}
       >
         {source}
       </ReactMarkdown>
     );
   }
-  return <MDXRemote source={source} components={mdxComponents} />;
+  return (
+    <MDXRemote
+      source={source}
+      components={mdxComponents}
+      options={{ mdxOptions: { remarkPlugins: sharedRemarkPlugins } }}
+    />
+  );
 }
 
 /**
@@ -150,10 +174,24 @@ function Callout({
 const markdownComponents = { h2: H2, h3: H3, table: Table };
 
 /**
- * MDX 专用组件表。写内容时的两条硬约束（踩过）：
- * 1. `<Zh>` / `<En>` 必须独占一行，前后留空行；写成单行 `<Zh>text</Zh>` 时
- *    内部只有行内 JSX 生效，`**加粗**` 会原样输出星号。
- * 2. 表格单元格里不要放 `<Zh>` / `<En>`——MDX 无法解析含 JSX 的 GFM 管道表格，
- *    整张表会退化成一行纯文本。双语对照改用列表（见 basics.mdx）。
+ * MDX 专用组件表。`table` **必须有**：`.md` 侧有 `Table` 覆写，`.mdx` 侧漏了就没有
+ * 横向滚动的外框，字段表十几列会把窄屏整页撑破（两侧组件表要对着看）。
+ *
+ * 关于 `<Zh>` / `<En>`，这里原先写着两条"硬约束"，**2026-09-19 逐条实测后都不成立**，
+ * 留着会继续误导写内容的人（原文与实测结论都记在下面，免得被当成"曾经的真理"再捡回来）：
+ *
+ * · 原文说「表格单元格里不要放 `<Zh>`/`<En>`，MDX 无法解析含 JSX 的 GFM 表格，整张表
+ *   会退化成一行纯文本」。**误诊**。用真实入口（`compileMDX` + `renderToStaticMarkup`）
+ *   跑单元格内联 `<Zh>`：表格正常成表、`<Zh>` 挂得上组件、内部 `**加粗**` 也照样加粗。
+ *   当时确实"退化"了，但**跟 JSX 无关**——真凶是 `.mdx` 这条路漏传 `remark-gfm`
+ *   （见 `sharedRemarkPlugins`），不含 JSX 的表格一样退化。锅记错了对象，
+ *   代价是写内容的人从此绕开表格。
+ * · 原文说「写成单行 `<Zh>text</Zh>` 时内部 `**加粗**` 会原样输出星号，必须独占一行」。
+ *   同样**没复现**：单行内联一样渲染出 `<strong>`。`basics.mdx` 里那几处用 HTML
+ *   `<strong>` 是照这条规则写的，不是必需，但也不必为它专门返工。
+ *
+ * 所以现在真正的约束只剩两条，都是**能被构建期拦下**的：组件名要在这个表里（否则
+ * 运行期 `_missingMdxReference` 直接抛），以及 GFM 表格的**一行必须是完整的一行**——
+ * 单元格里塞不下跨行的 JSX，双语对照要写两列或改用列表。
  */
-const mdxComponents = { h2: H2, h3: H3, Zh, En, Callout };
+const mdxComponents = { h2: H2, h3: H3, table: Table, Zh, En, Callout };

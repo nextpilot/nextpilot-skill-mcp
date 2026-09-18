@@ -11,7 +11,8 @@
 //   §[12] 取数据前必须先让 Worker 装上当前这份日志（共享常驻 Worker 的"装着谁"要能自愈）；
 //   §[13] `functions/` 下每个端点都必须在本地 dev 垫片的映射表里（漏一个 = 本地整条静默 404）；
 //   §[14] 指南正文只许有一个渲染入口（曾裂成 `GuideMarkdown` / `GuideMdx` 一对近音名 +
-//         两份分叉的 `textOf`，`{占位符}` 文档差点被 MDX 解析）；
+//         两份分叉的 `textOf`，`{占位符}` 文档差点被 MDX 解析），且两条路要共用同一份
+//         remark 插件——MDX 侧漏了 `remark-gfm`，GFM 表格会静默退化成纯文本（线上 5 张表）；
 //   §[15] 组件名跟着家族不变量走（`Log*` = 某一份日志；一次列很多份的用数据模型的词）；
 //   §[16] 轨迹取不到时界面要把引擎给的**逐条原因**显示出来（一句概括只对六种原因里的一种，
 //         另外五种下它是错的——"空洞"的代价是用户拿不到任何能自己判断的线索）。
@@ -626,6 +627,28 @@ console.log("\n[14] 指南正文只有一个渲染入口（防止再裂成一对
     /from "next-mdx-remote\/rsc"/.test(body) && body.includes("<MDXRemote"),
   );
   check("按 renderer 分发", /renderer === "md"/.test(body));
+
+  // MDX 侧必须真的启用 GFM。`@mdx-js/mdx@3` 的默认管线只有 CommonMark，管道表格属于
+  // GFM 扩展——漏传 `remark-gfm` 时整张表会退化成"一段带竖线的普通段落"：不报错、
+  // 不抛异常，页面上只是"排版有点怪"（2026-09-19 线上：/guide/rule-schema 的 5 张表
+  // 全渲染成了 `| 参数 | 说明 | |------|------| …` 原文）。
+  //
+  // 判据必须落在 `<MDXRemote` 那个调用**里面**，不能写成"文件里出现过 remarkGfm"：
+  // 后者在 `.md` 分支里也成立，把 MDX 侧的插件删空照样绿——正是本文件反复踩的裸子串陷阱。
+  const mdxAt = body.indexOf("<MDXRemote");
+  const mdxCall = mdxAt < 0 ? "" : body.slice(mdxAt, body.indexOf("/>", mdxAt) + 2);
+  check("MDX 调用点找得到（判据有落点）", mdxCall.includes("<MDXRemote"));
+  check(
+    "MDX 分支启用了 GFM（漏了它表格会静默退化成纯文本）",
+    /remarkPlugins/.test(mdxCall) && /remarkGfm|sharedRemarkPlugins/.test(mdxCall),
+    "MDXRemote 的调用里没带上 remark-gfm",
+  );
+
+  // 同一处的姊妹缺陷：`.md` 侧有 `table: Table` 覆写（横向滚动外框），`.mdx` 侧漏了就会
+  // 把十几列的字段表直接撑破窄屏——不会报错，只是"页面上多出一条横向滚动条"。
+  const compsAt = body.indexOf("const mdxComponents");
+  const mdxComps = compsAt < 0 ? "" : body.slice(compsAt, body.indexOf(";", compsAt) + 1);
+  check("MDX 侧也覆写了 table（否则宽表撑破窄屏）", /\btable:\s*Table\b/.test(mdxComps));
   // 1 是**正确性**约束：`H2`/`H3` 渲染的就是 textOf 的返回串，不递归进元素就等于把
   //   标题里的行内代码整段丢掉（老 GuideMdx 的 3 行 stub 正是如此）——id 和显示一起错。
   check(

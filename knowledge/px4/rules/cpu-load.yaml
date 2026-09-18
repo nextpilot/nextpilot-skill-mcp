@@ -19,6 +19,12 @@ compute:
 
 # ── 输出：溯源与副作用 ──
 outputs:
+  # ⚠️ 26 条规则里唯一一条 check ≠ group，是刻意的，不是笔误 —— 不要"顺手统一"。
+  #   `group: cpu` 是**执行槽位**（facts.yaml 的 group_order，决定 finding 的 F01/F02 顺序）；
+  #   `check` 是**报告名**（checksRun / checksSkipped），两者本就是两回事，多数规则恰好同名而已。
+  #   `cpu_load` 是历史名，tools/calibrate/baseline/ 下 6 份冻结基线的 checksRun 全都冻着它。
+  #   改成 `cpu` 会让 compare_baseline.py 在 6 条日志上全红；而这门校验要真实 .ulg、
+  #   在 CI 里是 SKIP 的 —— 云端抓不到，只有本机 pre-push 兜得住。
   check: cpu_load                                   # checksRun / checksSkipped 里的名字
   stats:
     cpuLoadMax: {var: cpu_max, round: 3}             # 写入 stats 的键

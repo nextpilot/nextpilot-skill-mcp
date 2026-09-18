@@ -15,12 +15,12 @@
 
 ## 冻结基线与等价比对（规则重构时必用）
 
-- `dump-baseline.py`：把 `tools/calibrate/logs/*.ulg` 的**完整引擎输出**冻结到 `baseline/<slug>.json`。
+- `dump_baseline.py`：把 `tools/calibrate/logs/*.ulg` 的**完整引擎输出**冻结到 `baseline/<slug>.json`。
   这是"一条经验一个 YAML"重构前的唯一真相，重构规则时不得改动（除非单独提交并说明理由）。
-- `compare-baseline.py`：重新跑同一份日志，与冻结基线**逐字段深度比较**
+- `compare_baseline.py`：重新跑同一份日志，与冻结基线**逐字段深度比较**
   （findings 的 id/ruleId/severity/tag/title/evidence/docUrl/suggestion 与 stats/tags/guards/
   phases/checks*/matchedFaults）。退出码 0/1，任何差异（含 finding 的**顺序变化**，id 是按顺序分配的）
-  都算回归。重构每一步都必须 `compare-baseline.py` 全绿。
+  都算回归。重构每一步都必须 `compare_baseline.py` 全绿。
 
 依赖：`pip install pyulog numpy`；Python **3.11+**。
 

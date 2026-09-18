@@ -189,6 +189,19 @@ MUTATIONS: list[Mutation] = [
         expect="引擎没给原因时明说是解析器缺陷",
         note="伪装成「日志里没有轨迹」会让解析器缺陷看起来像用户的数据问题",
     ),
+    # ---- 界面侧：MDX 指南必须真的启用 GFM（2026-09-19） ----
+    #
+    # 这条的失败形态是**静默降级**：漏传 remark-gfm 时 GFM 表格不是"报错"，而是退回成
+    # 一段带竖线的普通段落——页面照样出得来，只是表格没了。跟上面几条"功能说谎"是同一类。
+    Mutation(
+        name="MDX 分支不再启用 GFM（表格会退化成纯文本）",
+        path="web/components/GuideBody.tsx",
+        old="options={{ mdxOptions: { remarkPlugins: sharedRemarkPlugins } }}",
+        new="",
+        guard="ui",
+        expect="MDX 分支启用了 GFM（漏了它表格会静默退化成纯文本）",
+        note="MDX 默认管线只有 CommonMark；线上症状是 /guide/rule-schema 的 5 张表全渲染成 | 参数 | 说明 | 原文",
+    ),
     # ---- 卫生检查：引用落点 / 判据可重跑 / 失败可见（2026-09-18 的第二批） ----
     #
     # 这六条与上面十条性质不同：上面守的是"功能有没有说谎"，这里守的是"**校验本身**有没有说谎"。

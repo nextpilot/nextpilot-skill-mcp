@@ -221,8 +221,9 @@ conditions:                       # 整块可省
 - **内置变量一律大写**（`FW_MINOR` / `AIRFRAME` / `IS_FIXED_WING` / `DURATION_S` / `ARMED_S` /
   `ARMED_INTERVALS` / `T0_US` / `HAS_ARMED` / `RESTART_DETECTED` / `DROPOUT_MS` / `MESSAGES`）：
   规则里自己赋的变量是小写，一眼分得清"这个数是引擎给的还是自己算的"。事实源是
-  `engine/providers/api.py` 的 `BUILTIN_VARIABLES`（`tools/px4/gen_rule_reference.py` 的
-  §6.1 表从它派生、`build-knowledge.mjs` 的 `BUILTIN_VARS` 也派生自它）。`has_topic()` 是函数，
+  `engine/providers/api.py` 的 `BUILTIN_VARIABLES`（`build-knowledge.mjs` 的 §6.1 表与
+  它的 `BUILTIN_VARS` 都派生自它；原先那张表由 `tools/px4/gen_rule_reference.py` 生成，
+  该脚本已并入 `build-knowledge.mjs`）。`has_topic()` 是函数，
   不大写。`web/scripts/lib/rule-expr.mjs` 里那个"版本号必须先判 `None`"的护栏跟着改成
   `FW_MINOR` / `FW_MAJOR`。
 - **这一轮动了 `rule_engine.py`**（删 skip 机制、加 `_missing_topics`），所以 `derived-version`
@@ -433,7 +434,7 @@ w_p95 = percentile(hypot(ref("estimator_wind.windspeed_north", "wind_estimate.wi
 而 1.15+ 已改名成 `latitude_deg/longitude_deg`（单位也从 1e7 度变成度）——
 该经验在现代固件上其实一直静默不生效、连统计量都不产出；补上版本分流后才恢复正常。
 
-**怎么验证**：`python tools/calibrate/compare-baseline.py`（6 条日志逐字段比对）、
+**怎么验证**：`python tools/calibrate/compare_baseline.py`（6 条日志逐字段比对）、
 `python tools/calibrate/check-artifact.py`（生成产物真实执行）、
 `python tools/calibrate/lint-rules.py`（字段引用 + 版本错配）、
 `python tools/calibrate/probe_rule.py <log.ulg> <rule_id>`（单条经验逐节点诊断）。
@@ -766,7 +767,7 @@ fixtures:
 ```
 
 没有这一层，第三方的规则无法被验证，70/30 分成也就无从谈起；
-有了它，`compare-baseline.py` 可以退化成"跑每条经验自带的 fixtures"。
+有了它，`compare_baseline.py` 可以退化成"跑每条经验自带的 fixtures"。
 
 ## 完整示例（一条经验的全文）
 
@@ -1108,10 +1109,10 @@ fields:
 
 ```bash
 # 拉取指定 release tag 的 msg 与 parameters.json，生成/更新 meta/<tag>.json
-python tools/px4/sync-px4-msg.py --tags v1.13.3,v1.14.4,v1.15.0,v1.16.0,main
+python tools/px4/sync_px4_msg.py --tags v1.13.3,v1.14.4,v1.15.0,v1.16.0,main
 
 # CI / 本地校验：只比对不写入，若上游已变则非零退出
-python tools/px4/sync-px4-msg.py --check
+python tools/px4/sync_px4_msg.py --check
 ```
 
 **落盘结构：缓存与产物都按 tag 组织**——一个 tag 一个文件夹，里面的东西都属于该版本。
@@ -1271,15 +1272,15 @@ knowledge/px4/
 
 ## 实施步骤
 
-- **阶段 0 冻结基线**：`tools/calibrate/dump-baseline.py` 把 5 个日志的完整输出冻结成
+- **阶段 0 冻结基线**：`tools/calibrate/dump_baseline.py` 把 5 个日志的完整输出冻结成
   `tools/calibrate/baseline/*.json` 提交（findings 全字段 + tags/guards/phases/checks*）
-- **阶段 0.5 同步字段与参数字典**：`tools/px4/sync-px4-msg.py` 按 tag（v1.13.3 / v1.14.4 /
+- **阶段 0.5 同步字段与参数字典**：`tools/px4/sync_px4_msg.py` 按 tag（v1.13.3 / v1.14.4 /
   v1.15.0 / v1.16.0 / main）各建一个文件夹，下载 `msg/` 与 `parameters.json`，生成
   `meta/<tag>.json`（该版本字段字典 + 参数字典）；
   人工补 `topic-overrides.yaml` 的 `aliases` / `groups` / `invalid`
 - **阶段 1**：`operators.py` + 框架改造 + 12 条标准型 + 全部 guard 迁移 + `meta/<tag>.json` +
   `build-knowledge.mjs` 必填/表达式校验 + **删掉已无用的 TOML 解析器**（统一 YAML 后只剩一个）；
-  `compare-baseline.py` 验等价
+  `compare_baseline.py` 验等价
 - **阶段 2（已完成）**：补时序/掩码类 9 个函数，迁剩余 10 个告警点，引擎侧改为 `engine/rule_engine.py`，原 `ulog_checks.py` 已删除
 - **阶段 3（可选）**：`fixtures` 跑通后，回归从"比对整体基线"升级为"每条经验自带正反例"
 
@@ -1287,7 +1288,7 @@ knowledge/px4/
 
 1. **反空洞护栏**：删掉某条的 `airframe` 或 `triggers` → `pnpm build:kb` 必须失败；
    算子名拼错、表达式引用未声明变量同样失败
-2. **等价回归（核心）**：`compare-baseline.py` 要求 5 个日志输出与冻结基线逐条逐字段完全相同。
+2. **等价回归（核心）**：`compare_baseline.py` 要求 5 个日志输出与冻结基线逐条逐字段完全相同。
    基线：ce302d3b=9/F004、39f26cce=4/F001·F006·F009、95b077d9=0、两个 sample=0
 3. `run_checks_locally.py --probe-data` 结构不变
 4. `tsc --noEmit` + `pnpm build`；`node tools/check-upload.mjs <ulog> <png>` 浏览器端跑通
