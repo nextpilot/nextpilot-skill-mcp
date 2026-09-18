@@ -5,7 +5,7 @@
 与浏览器端 Pyodide 执行的是同一份规则源码、同一套逻辑——改完 `knowledge/` 无需 Node 构建即可回归。
 
 - `run_checks_locally.py <file.ulg> ...`：输出完整 findings JSON（规则文档见
-  [content/guide/knowledge-rules.md](../../content/guide/knowledge-rules.md)）。
+  [content/guide/rule-catalogue.mdx](../../content/guide/rule-catalogue.mdx)）。
 - `run_checks_locally.py --probe-data <file.ulg> ...`：校验数据层三个 API
   （`np_manifest` / `np_log_info` / `np_series`）的结构、JSON 合法性（NaN→null）
   与降采样点数。

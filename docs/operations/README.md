@@ -157,3 +157,32 @@ GET  /issue-probe?write=1    确认写入真的通（需要 ISSUE_DEBUG=1）—�
 ```
 
 `write=1` 走正常上报路径，反复自检只会建**一个** issue（同指纹后续都是评论），验完手动关掉即可。
+
+## 8. CI/CD（GitHub Actions）
+
+两个 workflow，分工是「CI 只判质量，Deploy 只管发布」：
+
+| 文件 | 触发 | 做什么 |
+| --- | --- | --- |
+| `.github/workflows/ci.yml` | push 到 master / PR / 手动 | 跑 `tools/ci/check_all.py --with-build`（含 ruff、产物比对、`tsc --noEmit`、`next build`） |
+| `.github/workflows/deploy.yml` | CI 跑完且成功（`workflow_run`）/ 手动 / 同仓 PR | `edgeone pages deploy` 到 EdgeOne Pages，生产环境加 `/ping` 冒烟 |
+
+- **部署等 CI 绿了才发**：`workflow_run` 无法在 `on` 里过滤结果，判据写在 job 的 `if` 里（只认 `conclusion == 'success'`）。
+- **回滚 / 补发**走 Actions 页面手动触发 `Deploy`，`env` 选 `production`。
+- **同仓 PR 自动发预览环境**（`-e preview`）；fork 的 PR 拿不到 secret，已显式跳过而不是让它红。
+- 环境变量（见第 3 节）**仍配在 EdgeOne 控制台**，不进仓库、不进 CI 日志。
+
+需要配的仓库配置（Settings → Secrets and variables → Actions）：
+
+| 类型 | 名称 | 说明 |
+| --- | --- | --- |
+| Secret | `EDGEONE_API_TOKEN` | EdgeOne 控制台 → API Token |
+| Variable | `EDGEONE_PROJECT` | Pages 项目名。**填错会自动新建一个空项目**，首次跑前务必核对 |
+| Variable | `SMOKE_BASE_URL` | 可选。生产源站如 `https://skill.nextpilot.org`，不配则跳过冒烟 |
+
+> ⚠ **仓库托管方**：当前 `origin` 是 Gitee（默认分支 `master`），而 Gitee **不执行 `.github/workflows/`**，
+> 它有自己的流水线配置目录。要让上面两个文件真正跑起来，需要把仓库镜像/迁移到 GitHub，
+> 或在 Gitee 侧另写一份等价配置（但那样就破了「校验命令只写一处」的约定，CI 与本地会分成两处维护）。
+> 未迁移前，云端门禁实际处于**未生效**状态，质量仍只靠本机 `.githooks/pre-push` 拦。
+
+改动校验清单时只改 `tools/ci/check_all.py` 一处，两个 workflow 都跟着变——命令不要在 workflow 里另抄一份。

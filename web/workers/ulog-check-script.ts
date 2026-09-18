@@ -1477,7 +1477,7 @@ OPTIONAL = {
 }
 
 # ---------------- builtin_variables() 必须给的键（= 规则与 plot 能引用的内置变量）----------------
-# 这份表就是"作者能引用什么"的权威清单，站内指南的内置变量表由 tools/px4/gen_rule_reference.py
+# 这份表就是"作者能引用什么"的权威清单，站内指南的内置变量表由 build-knowledge.mjs
 # 从这里生成。加名字 = 改契约；删名字 = 破坏兼容（老规则会构建失败，这是有意的）。
 # **名字一律大写**：规则里自己赋的变量是小写，一眼就能分出"这个数是引擎给的还是自己算的"。
 BUILTIN_VARIABLES = {
@@ -1579,7 +1579,6 @@ def check_provider(provider, where="provider"):
     if not isinstance(provider.parser_version(), str):
         raise ValueError("%s.parser_version() 必须返回 str" % where)
     return provider
-
 # PX4 .ulg（ULog）适配器 —— **本项目唯一认识 PX4 的地方**
 #
 # 契约见 providers/api.py。引擎（rule_engine.py / operators.py / report_data.py）不认识

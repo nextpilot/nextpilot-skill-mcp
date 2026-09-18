@@ -96,7 +96,7 @@ outputs:
 
 ## 取数语言：与规则完全一致
 
-字段引用就是规则里那套（见 `content/guide/knowledge-write-rule.md`）：
+字段引用就是规则里那套（见 `/guide/rule-schema`）：
 
 ```yaml
 ydata:

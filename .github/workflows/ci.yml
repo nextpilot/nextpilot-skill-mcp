@@ -1,12 +1,12 @@
-# 仓库校验（CI 侧）。
+# 仓库校验（CI 侧）—— 只做**质量门禁**，不做部署（部署在 deploy.yml）。
 #
 # 校验命令**不写在这里**——只调 tools/ci/check_all.py，与本地、pre-push hook 共用同一份
 # 清单。理由：命令抄成两份后必然漂移，然后"本地绿、CI 红"会变成常态，两边都开始被忽略。
 # 要加一项校验，改 tools/ci/check_all.py 一处即可，CI 自动跟着变。
 #
 # ⚠ **CI 全绿 ≠ 回归过了**：需要真实 .ulg 的那组校验（6 条冻结基线逐字段比对、适配器契约
-# 测试、数据层 probe）在这里必然被跳过——原始日志含 GPS 轨迹，按项目隐私规则不入库
-# （见 .gitignore 的 tools/calibrate/logs/*.ulg），checkout 里根本没有这些文件。
+# 测试、数据层 probe、字段引用 lint）在这里必然被跳过——原始日志含 GPS 轨迹，按项目隐私
+# 规则不入库（见 .gitignore 的 tools/calibrate/logs/*.ulg），checkout 里根本没有这些文件。
 # 那几项挂在 .githooks/pre-push 上，只在开发机跑。详情见 tools/ci/check_all.py 的文档。
 name: CI
 
@@ -26,13 +26,20 @@ permissions:
 jobs:
   checks:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    env:
+      # 上报的 issue 里带版本号（web/lib/issue-bridge.ts 读它），否则线上报错无法定位到
+      # 具体提交。产物只用于诊断，不影响 build:kb --check 的产物比对（版本不在产物里）。
+      NEXT_PUBLIC_APP_VERSION: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          # 与 requirements-dev.txt 绑定：改了依赖文件，缓存自动失效
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
 
       # 版本对齐开发机（node 22 / pnpm 12），本地过不了的这里也不该过
       - uses: pnpm/action-setup@v4
@@ -45,7 +52,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
 
-      # ruff 版本钉死在这里（见 requirements-dev.txt）：风格约定只有所有人跑同一版才成立
+      # ruff 版本钉死在 requirements-dev.txt（风格约定只有所有人跑同一版才成立）
       - name: 装 Python 校验工具
         run: python -m pip install -r requirements-dev.txt
 
@@ -57,3 +64,9 @@ jobs:
       # 那套里没有它）。其余校验项见 tools/ci/check_all.py
       - name: 仓库校验
         run: python tools/ci/check_all.py --with-build
+
+      # 日志类那组在 CI 里必然 SKIP，把这句话顶到汇总最上面，免得"全绿"被误读成回归通过
+      - name: 提醒：日志类回归未跑
+        if: always()
+        run: |
+          echo "::notice::CI 全绿不等于回归过了 —— 需要真实 .ulg 的 4 项（冻结基线比对 / 适配器契约 / probe-data / lint_rules --strict）在本机 pre-push 才跑：python tools/ci/check_all.py"

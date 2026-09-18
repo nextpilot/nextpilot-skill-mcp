@@ -32,19 +32,17 @@ px4/
 
 **「知识库」分组的两个页面不在这个目录里**（都在仓库根 `content/guide/`，`/guide` 站内可见）：
 
-- 「如何编写知识规则」`knowledge-write-rule.md`：手维护，**唯一一份**（原先在
-  `knowledge/px4/guides/writing-rules.md`，已搬走，那个目录现在没有了）；
-  其中两张表由 `python tools/px4/gen-rule-reference.py` 注入。
-- 「现有规则清单」`knowledge-rules.md`：构建时从 `rules/*.yaml` 现读现算，**只出网站这一份**。
+- 「如何编写知识规则」`rule-schema.mdx`：由 `build-knowledge.mjs` 自动生成（算子目录与内置变量表从 `engine/` 源码派生），**唯一一份**。
+- 「现有规则清单」`rule-catalogue.mdx`：构建时从 `rules/*.yaml` 现读现算，**只出网站这一份**。
 
 ## 我要做什么 → 看哪里
 
 | 我要…… | 看 / 改 |
 | --- | --- |
 | 了解整套规则体系为什么这么设计 | [px4/CLAUDE.md](px4/CLAUDE.md)（给 AI 与维护者的设计上下文） |
-| **写一条新规则 / 改一条现有规则** | 站内 `/guide/knowledge-write-rule`（字段、算子、常见坑；源文件 `content/guide/knowledge-write-rule.md`） |
+| **写一条新规则 / 改一条现有规则** | 站内 `/guide/rule-schema`（字段、算子、常见坑；源文件 `content/guide/rule-schema.mdx`） |
 | 弄清自己这类经验该写在哪 | [px4/CLAUDE.md](px4/CLAUDE.md) 的「四类经验 → 四种载体」 |
-| 查现在有哪些规则、各自读什么字段、什么条件触发 | 网站 `/guide/knowledge-rules`（构建时从 `rules/*.yaml` 生成，仓库里不留拷贝） |
+| 查现在有哪些规则、各自读什么字段、什么条件触发 | 网站 `/guide/rule-catalogue`（构建时从 `rules/*.yaml` 生成，仓库里不留拷贝） |
 | **只是想"用网页看"这些内容** | 站点 `/guide` 的「知识库」分组（怎么写规则 / 现有规则两页） |
 | 调一条阈值 | 直接改 `px4/rules/<那条经验>.yaml` 的 `threshold` 与 `triggers[].expr` |
 | 改字段绑定 / 码值 / 阶段分组 / slot 执行顺序 / 关键数据的名字与顺序 | `px4/facts.yaml`（引擎不含业务数据，全在这里） |
@@ -80,8 +78,8 @@ cd web && pnpm build:kb --check    # 只比对不写入：任一产物与 knowle
 `web/workers/ulog-check-script.ts`（内联 engine/operators.py + engine/rule_engine.py + rules/*.yaml）、
 `web/workers/ulog-data-script.ts`、`web/workers/fault-kb.generated.json`、
 `web/lib/knowledge/prompts.generated.js`、
-`content/guide/knowledge-rules.md`（指南「知识库」分组的规则清单页；同分组的
-「如何编写知识规则」是手维护页面，不是生成物）。
+`content/guide/rule-catalogue.mdx`（指南「知识库」分组的规则清单页）、
+`content/guide/rule-schema.mdx`（指南「知识库」分组的规则编写参考页）。
 
 **铁律**：生成物不要手改；所有数值判断只在 `px4/rules/*.yaml` + 引擎框架里发生，
 LLM 只做翻译与组装。

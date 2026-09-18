@@ -30,7 +30,7 @@
 | --- | --- |
 | **用户上传 `.ulg` 分析** | 浏览器 Worker 里的 Pyodide。构建期 `web/scripts/build-knowledge.mjs` 把这些文件**当文本读走**，按 `operators.py → providers/api.py → providers/*.py → rule_engine.py` 的顺序拼成一份内联进 `web/workers/ulog-check-script.ts`，`report_data.py` 单独进 `ulog-data-script.ts`（两者在同一个 `__main__` globals 里执行，数据层直接用那边建好的 `provider`） |
 | **本地回归 / 校准** | `tools/calibrate/run_checks_locally.py` 按同样顺序拼接后 `exec`——跑的是**同一份源码**，所以本地结果与浏览器一致。其余校准脚本（`compare-baseline.py` / `dump-baseline.py` / `probe_rule.py` / `check_provider.py`）都 import 它 |
-| 生成指南页的算子目录与内置变量表 | `tools/px4/gen_rule_reference.py` 用 `ast`/正则解析 `operators.py` 与 `providers/api.py` |
+| 生成指南页的算子目录与内置变量表 | `build-knowledge.mjs` 从 `operators.py` 与 `providers/api.py` 派生 |
 | 阶段二服务端 / MCP（未实现） | 把本目录包成可 `import` 的 `nextpilot_engine`（parsers / models / rules 三层），规则仍从 `knowledge/` 加载，不另存一份 |
 
 注意：**构建期不执行这些代码**，只是搬运。改了它们必须重新 `cd web && pnpm build:kb`，

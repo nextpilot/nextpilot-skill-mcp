@@ -20,12 +20,11 @@
 
 ## 两篇特殊页面
 
-`guide/knowledge-rules.md`（规则清单）与 `guide/knowledge-write-rule.md`（怎么写规则）属于
+`guide/rule-catalogue.mdx`（规则清单）与 `guide/rule-schema.mdx`（规则编写参考）属于
 「知识库」分组，与 `knowledge/` 关系密切：
 
-- `knowledge-rules.md` 是**生成物**（构建期从 `knowledge/px4/rules/*.yaml` 现读现算，勿手改）
-- `knowledge-write-rule.md` 是**手维护**的，但里面两张表（算子目录、内置变量）由
-  `python tools/px4/gen-rule-reference.py` 注入到 `<!-- BEGIN/END -->` 标记之间，标记内勿手改
+- `rule-catalogue.mdx` 是**生成物**（构建期从 `knowledge/px4/rules/*.yaml` 现读现算，勿手改）
+- `rule-schema.mdx` 也是**生成物**：正文是构建脚本里的模板，算子目录与内置变量表从 `engine/` 源码派生
 
 ## 加一篇内容
 

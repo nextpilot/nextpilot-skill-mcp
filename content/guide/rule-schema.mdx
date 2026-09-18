@@ -1,0 +1,208 @@
+---
+title: 规则编写参考
+titleEn: Rule schema reference
+description: 从必填字段到数据流表达式、触发条件与输出，附算子目录与常见坑。
+descriptionEn: Required fields, data-flow expressions, triggers and outputs — plus the operator catalogue and pitfalls.
+group: 知识库
+groupEn: Knowledge base
+order: 11
+---
+写一条经验的权威参考：字段级定义、数据流（`compute`）语义、触发与输出、内置变量、
+算子目录，以及构建期会直接拒绝的写法。内部设计（动机、实施状态与已知缺口）见仓库里的
+`knowledge/px4/CLAUDE.md`；现有规则清单：[规则目录](/guide/rule-catalogue)。
+
+> **本页由构建期 `build-knowledge.mjs` 自动生成**：正文是模板（随代码规范变动时更新此处），
+> 算子目录与内置变量表从 `engine/operators.py` 与 `engine/providers/api.py` 动态派生。
+> 单一事实源是 `knowledge/px4/rules/*.yaml`；改完算子或内置变量后重跑 `pnpm build:kb`（dev/build 自动执行）。
+
+## 0. 一条经验怎么跑起来
+
+```
+rules/<经验>.yaml        ──┐
+facts.yaml（码表/文案/    ──┤ 构建期校验（字段/算子/表达式/文案、group 是否登记、
+  展示口径/group 顺序）    ──┤  facts 键是否齐全、provider 有没有漏实现契约）
+engine/operators.py      ──┤                                    ── 产物内联进 Python
+  ↓                         │                                         ↓
+engine/rule_engine.py  ← ──┘                                  运行时只读产物
+  └─ 逐行（`next_rule()`）跑检查经验                             （不读源 yaml）
+     └─ `provider.read_timeseries(...)` 取原始浮点序列
+        └─ 交给 `compute` 算子做流式计算
+           └─ 计算结果进入模板 → 标签/分数/描述性文案
+```
+
+## 1. 必需字段
+
+| 字段 | 说明 |
+|------|------|
+| `id` | 唯一标识（字符串）。建议用描述性命名，如 `navigator-consistency`。 |
+| `group` | 所属分组（字符串）。必须在 `knowledge/px4/facts.yaml` 的 `group_order` 里登记，否则引擎直接跳过。 |
+| `slot` | 执行位置（字符串）。决定了这条经验在哪个阶段跑——不同阶段能读的原始数据不同，详见下一节。 |
+| `compute` | 数据流表达式（**多行的 YAML 字符串块**，写法见 §3）。 |
+| `condition` | 触发条件（字符串，Python 表达式）。`True` 表示总是触发。 |
+| `triggers` | 需要哪些原始 Topic（列表）。引擎据此决定取哪些数据；[`facts.yaml` 的 topic 白名单](/knowledge/px4/facts#topic) 里找不到的 topic 不能用。 |
+
+### 额外注意
+- `title` / `suggestion` / `value_text`：Python `str.format_map` 模板占位符。`{name}` 引用 `compute` 里声明的名字或内置变量。用到的名跨两个 docstring 时—致即可；不—致的启动自检会报错。
+- `tags`：**构建期检查**——每个值必须在 `facts.yaml` 的 `tags` 里登记并给出中英文文案。只有 `severity` 不算 tags（单独字段）。
+- `brief` / `detail`：可选的结论分档说明，分别对应短和长的场景（比如界面卡片 vs 报告）。占位符同样来自 `compute` 输出；如果填了 `detail` 则建议把关键数值也放进去。
+- `display`：前端展示选项。见继续下的「`display` 可设项」表格。
+
+## 2. `slot`（执行位置）
+
+不同 slot 可用的原始 Topic 和上下文不同。具体去 `engine/rule_engine.py` 找对应的 `_run_slot_*` 函数；该函数会列出哪些 provider 方法会在该阶段被调用，也就等于告诉你这段经验能读到什么数据。
+
+SLOT 表见 YAML 构建产物或浏览器控制台——这里不手写。
+
+## 3. `compute`（数据流表达式）
+
+经验的数据流由一组管道组成，每个管道定义一个名字、一个算子与参数，输出一个值。多个管道可用——每条输出一个值，最后在 `title`/tags/`suggestion`/brief/detail 里用这个名引用。
+**注意：目前只支持单管道（一个键值对）。**
+
+### 3.1 写法
+
+```yaml
+compute:
+  <任意名字>:
+    op: <算子名>
+    ...   # 算子的参数
+```
+
+- 名字是你自己起的（供后面的模板引用）。
+- 算子名必须来自下面的算子目录；参数是固定的，写错了**构建期会直接报错**。
+- 名字*开头*不要用 `_`——那是引擎保留的名字（如自动用的 `_level_id` 变换）。
+
+### 3.2 上下文：哪些东西可以直接写进表达式
+
+三个来源都能直接用（不需要在 `compute` 里声明）。声明计算的结果可以被后面引用。
+
+**内置变量**：`provider.builtin_variables()` 返回的一切。当前实现的完整清单见 §6.1。
+
+**槽位级上下文**：`slot` 决定了 provider 传进来的每个槽位级上下文子集，详见各自 Provider 的文档。
+
+**自身形参**：算子的 `inputs:` 列表里的名字，引用写成表达式张量（`_expr`）格式。
+
+### 3.3 类型：每一条表达式都是一个流
+
+> 即同一 Topic 的一个 RollingWindow（滑动窗口）或历史全量，取决于算子参数。
+
+所有算子都工作在时间序列上。输入是同一个 Topic 的一个窗口或历史全量，输出也是一个**窗口或全量结果**——不是单个标量。最后 `title`/`suggestion` 里通过模板（`{avg:.1f}`），引擎自动取最新值并格式化。
+
+### 3.4 字段级参数
+
+| 参数 | 说明 |
+|------|------|
+| `topic` | ULog 主题名，必需。 |
+| `field` | 要读的字段名（单字段）。 |
+| `fields` | 多字段输入时的字段名列表——例如差值算子 `sub`、检查一致的 `consistency`。 |
+| `fps` | 想要的重采样率（Hz）。大多数 ULog 是乱拍点，不重采没法做逐点算。 |
+| `window` | 窗口秒数。 |
+| `pick` | 算子有多个输出时选哪一个（名字和算子 `out_names` 对得上才算通过）。 |
+| `pick_t` | 跟 `pick` 类似但要的是「到达某阈值*过程中*`pick` 输出序列的百分比/时间」——如首次掉下 50\% 的时刻；不支持混合类型输出。 |
+| `threshold` | 用户手写的阈值（数值）。 |
+| `unit` | 输出单位（字符串；必须跟 engine/units.py 的规范名一致）。 |
+
+## 4. 算子
+
+内部实现与签名见 `engine/operators.py`。
+
+### 4.1 算子目录
+
+
+
+## 5. triggers 与 outputs
+
+### 5.1 `triggers`
+
+- **数组**。每一项是一个 ULog Topic 名（字符串）。
+- 列举需要哪些 Topic 的原始数据；引擎据此决定取哪些。
+- Topic 必须在 `facts.yaml` 的 `building-topics` 或 ULog 格式内存块表里存在；构造不存在的 Topic 会导致构建失败。
+
+### 5.2 `outputs`
+
+类型：
+- **`tags`（必填）**：字符串列表。每个值必须在 `facts.yaml` → `tags` 字典的键里出现（中文+英文文案）。
+- **`severity`（可选）**：字符串 `info` / `warning` / `error` / `critical`。缺省 `warning`。
+- **`suggestion`（推荐）**：诊断建议文案。模板占位符同样来自 `compute` 输出或内置变量。
+
+## 6. 可用变量（内置 + 模板）
+
+### 6.1 内置变量（直接引用，无需在 compute 声明）
+
+
+
+### 6.2 模板占位符
+
+`title` / `field` / `suggestion` / `value_text` 都走 Python `str.format_map`，
+因此可以写 `{cpu_max:.0%}`、`{p99:.1f}`、`{names}`。**只有声明过的名字（compute 输出、
+内置变量、上下文变量）才能在模板里用**；没声明直接写 `{xxx}` 引擎会在启动自检时报错。
+
+### 6.3 模板里的格式说明
+
+Python `str.format_map` 支持的格式：
+
+| 格式 | 示例 |
+|------|------|
+| 浮点精度 | `{value:.2f}` |
+| 百分数 | `{ratio:.1%}` |
+| 逗号分隔千位 | `{number:,}` |
+| 科学计数 | `{large:.2e}` |
+| 时间（秒→人类可读） | `duration`（引擎会转换） 或 `{total_s:.1f}` |
+| 默认（repr） | `{}` |
+
+## 7. `compute` 调试：日志与图
+
+### 7.1 快速看日志
+
+写 `display: {log: true}`，跑日志就能在浏览器控制台看到计算出的值。
+
+### 7.2 画曲线图
+
+写 `display: {plots: ["avg"]}`，引擎自动把每个阶段的曲线图写进 HTML。适合本地跑看形状。
+格式／布局／多图配置见 `knowledge/px4/plot/README.md`。
+
+## 8. 构建期拒绝的写法（常见坑）
+
+| 问题 | 表现 |
+|------|------|
+| `group` 不在 `facts.yaml` 的 `group_order` 里 | 构建直接报错：「group『xxx』未登记」 |
+| `tags` 的值在 `facts.yaml` 的 tags 字典里找不到 | 构建直接报错：「tag『xxx』不在 facts 里」 |
+| `trigger` 用的 Topic 在 `facts.yaml` 的白名单里没有 | 构建直接报错：「topic『xxx』不在允许列表里」 |
+| 算子名写错了 | 构建直接报错：「未知的算子名『xxx』」 |
+| 算子参数不全 / 多了 | 构建直接报错：「XX 算子缺少必填参数 YY」/「XX 算子有多余参数 YY」 |
+| `compute` 不写单管道（多了一条管道） | 构建直接报错：「每条经验只允许一个 compute 键值对」 |
+| 名字以 `_` 开头 | 构建直接报错：「compute 名不能以 `_` 开头——那是引擎保留名」 |
+| 配置文件用的 `.yaml` 键名写成 `Title` 而不是 `title` | 构建直接报错：「不认识的键名」 |
+
+> **以上全部在 `tools/ci/check_all.py` 和 web 构建期（`pnpm build`）执行**。
+
+## 9. `display` 可设项
+
+| 键 | 类型 | 说明 |
+|----|------|------|
+| `log` | bool | 在浏览器或终端里打印计算中间结果 |
+| `plots` | string[] | 输出线条的图列表（广播） |
+| `hidden` | bool | 在界面上静默隐藏这条 |
+
+更多关于图——`knowledge/px4/plot/README.md` 有 YAML 和图骨架。
+
+## 10. 内部细节补充
+
+### 10.1 表达式、占位符，还有 `__builtins__`
+
+三种来源都能直接用（不需要在 `compute` 里声明）：
+- **内置变量**：§6.1
+- **槽位上下文**：各 `slot` 的上下文 dict
+- **expr 内部变量**：算子 `inputs` 的列
+
+占位符写法是 `{name}`，应用到 `title`、tags/`suggestion`、brief/detail 模板里。
+
+**狼绕不过去的点**：模版里不要直接写 `{__builtins__}`——那是个很大的字典，用得好能切进引擎，用不好就会炸。构建期会直接拒绝模板里有 `__builtins__`。
+
+### 10.2 图形的实现细节
+
+- 图的 YAML 描述在 `knowledge/px4/plot/*.yml`
+- 模板骨架在 `knowledge/px4/plot/plot-template.yml`
+- 图的输出单位转换（`unit=`）在引擎侧做，前端只画线
+- 图上的换算（`compute` 节点、`unit=`）一律在引擎侧做，前端只画——"前端不写数学"。
+
+细节见 `knowledge/px4/plot/README.md`（骨架可抄 `plot-template.yml`）。

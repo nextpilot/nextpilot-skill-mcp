@@ -1,0 +1,151 @@
+# 部署到 EdgeOne Pages（Next.js 全栈模式）。
+#
+# 与 CI 的关系：**CI 只判质量，这里只管发布**。部署挂在 workflow_run 上等 CI 跑完，
+# 失败就不发布——避免"校验红了但已经上线"。手动触发（workflow_dispatch）留给回滚与补发。
+#
+# ## 为什么不让 CI 直接传构建产物
+# 本项目是 Next.js **全栈**模式（边缘函数在 web/functions/，运行时要读 package.json 与
+# functions/），不是静态导出。EdgeOne CLI 对 Next.js 的推荐路径是**从项目源码目录执行
+# deploy、由 CLI 自己完成构建**——所以这里刻意不 pnpm install、不手动传 .next：
+# 少一层"产物组装"的伪造风险，也不用把几百 MB node_modules 打包上传。
+# （若哪天改成 output: 'export' 静态导出，再改为先 build 再 deploy ./out。）
+#
+# ## 需要的仓库配置（Settings → Secrets and variables → Actions）
+#   Secrets:   EDGEONE_API_TOKEN   EdgeOne 控制台 → API Token 生成的 CI/CD 令牌
+#   Variables: EDGEONE_PROJECT     EdgeOne Pages 项目名（-n 参数；**填错会自动新建一个空项目**）
+#              SMOKE_BASE_URL      可选，生产站点公网源站，如 https://skill.nextpilot.org
+#                                  不配则跳过部署后冒烟
+#
+# 环境变量（AUTH_SECRET / DEEPSEEK_API_KEY / SMTP_* / ISSUE_* 等）**不在这里注入**——
+# 它们配在 EdgeOne 控制台的项目环境变量里（见 docs/operations/README.md 第 3 节）。
+# 密钥不进仓库、不进 CI 日志，这条与项目"token 只在边缘函数"的约定一致。
+name: Deploy
+
+on:
+  # CI 跑完才部署。conclusion 在 job 的 if 里判——workflow_run 无法在 on 里过滤结果
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      env:
+        description: 部署目标环境
+        required: true
+        default: production
+        type: choice
+        options: [production, preview]
+  # 同仓 PR → 预览环境。fork 的 PR 拿不到 secret，下面用 if 显式跳过而不是让它红
+  pull_request:
+    branches: [master]
+
+concurrency:
+  # 生产串行、预览按 PR 隔离；cancel-in-progress: false —— 部署中途取消会留下半份产物
+  group: deploy-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'production' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: 部署（${{ github.event_name == 'pull_request' && 'preview' || github.event.inputs.env || 'production' }}）
+    # workflow_run 时只认 CI 成功；手动触发无条件放行（回滚 / 补发要走这条路）
+    if: >
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+      || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DEPLOY_ENV: ${{ github.event.inputs.env || 'production' }}
+      # workflow_run 的 checkout 默认落在 master 上，而不是触发它的那次提交；
+      # 必须显式 head_sha，否则会发布一份与 CI 验过的不同的代码
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: 校验部署配置
+        env:
+          TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
+          PROJECT: ${{ vars.EDGEONE_PROJECT }}
+        run: |
+          set -euo pipefail
+          [ -n "${TOKEN}" ] || {
+            echo "::error::缺 secret EDGEONE_API_TOKEN（EdgeOne 控制台 → API Token）"
+            exit 1
+          }
+          [ -n "${PROJECT}" ] || {
+            echo "::error::缺 variable EDGEONE_PROJECT（EdgeOne Pages 项目名，填错会自动新建空项目）"
+            exit 1
+          }
+          echo "OK 配置齐全，目标项目 ${PROJECT}"
+
+      # 不 pin 版本：EdgeOne CLI 仍在快速迭代。**首次跑通后请把它钉死**（看日志里的
+      # edgeone 版本号，改成 edgeone@x.y.z）——理由同 requirements-dev.txt 钉 ruff。
+      - name: 部署到 EdgeOne Pages
+        id: deploy
+        working-directory: web
+        env:
+          TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
+          PROJECT: ${{ vars.EDGEONE_PROJECT }}
+        run: npx --yes edgeone pages deploy -n "$PROJECT" -t "$TOKEN" -e "$DEPLOY_ENV"
+
+      - name: 部署后冒烟
+        if: vars.SMOKE_BASE_URL != '' && env.DEPLOY_ENV == 'production'
+        env:
+          SMOKE_BASE_URL: ${{ vars.SMOKE_BASE_URL }}
+        run: |
+          set -uo pipefail
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$SMOKE_BASE_URL/ping" || echo 000)
+            if [ "$code" = "200" ]; then
+              echo "OK /ping 200（第 $i 次探测）"
+              exit 0
+            fi
+            echo "第 $i 次 /ping -> $code，15s 后重试"
+            sleep 15
+          done
+          echo "::error::冒烟失败：5 分钟内 /ping 一直不是 200。可能是 CLI 报成功但产物没生效，去 EdgeOne 控制台看部署状态"
+          exit 1
+
+      - name: 摘要
+        if: always()
+        run: |
+          echo "环境=${DEPLOY_ENV} 提交=${DEPLOY_SHA} 触发=${{ github.event_name }}"
+          echo "部署后自检顺序：/issue-probe → /issue-probe?write=1（需 ISSUE_DEBUG=1），见 docs/operations/README.md 第 7 节"
+
+  preview:
+    name: 预览（PR #${{ github.event.pull_request.number }}）
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DEPLOY_ENV: preview
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: 校验部署配置
+        env:
+          TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
+          PROJECT: ${{ vars.EDGEONE_PROJECT }}
+        run: |
+          set -euo pipefail
+          [ -n "${TOKEN}" ] || { echo "::error::缺 secret EDGEONE_API_TOKEN"; exit 1; }
+          [ -n "${PROJECT}" ] || { echo "::error::缺 variable EDGEONE_PROJECT"; exit 1; }
+
+      - name: 部署到预览环境
+        working-directory: web
+        env:
+          TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
+          PROJECT: ${{ vars.EDGEONE_PROJECT }}
+        run: npx --yes edgeone pages deploy -n "$PROJECT" -t "$TOKEN" -e preview
