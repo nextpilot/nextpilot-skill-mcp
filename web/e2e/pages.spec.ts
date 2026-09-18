@@ -13,6 +13,7 @@ const CRITICAL_PAGES = [
     { path: "/analyze", label: "日志分析入口" },
     { path: "/skills", label: "技能广场" },
     { path: "/login", label: "登录页" },
+    { path: "/issue", label: "提交反馈" },
 ];
 
 test.describe("关键页面渲染", () => {
