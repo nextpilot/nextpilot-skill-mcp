@@ -594,8 +594,12 @@ function inferCall(node, ctx) {
   // 入参分两类：形参表的前 in_arity 个是**输入**（可以是任意表达式，按位置或按名字给），
   // 其余是**命名选项**（如 codes= / min_mean= / p=，只能是字面量——它们在运行期是
   // `**` 直通给算子的 Python 值，老节点写法本来就是这个约束）。
+  // `in_arity` 可以是**列表**（同一个算子的两种写法，如 quat_to_euler 收一组或收四列）
   const params = sig.params ?? [];
-  const isInputName = (k) => params.indexOf(k) >= 0 && params.indexOf(k) < sig.in_arity;
+  const arities = Array.isArray(sig.in_arity) ? sig.in_arity : [sig.in_arity];
+  const maxIn = Math.max(...arities);
+  const needTxt = arities.join(" 或 ");
+  const isInputName = (k) => params.indexOf(k) >= 0 && params.indexOf(k) < maxIn;
 
   for (const [k, v] of Object.entries(kwargs)) {
     if (isInputName(k)) {
@@ -617,19 +621,20 @@ function inferCall(node, ctx) {
 
   if (params.length === 0) {
     // 形参没解析出来（operators.py 里格式变了才会发生）：退回"位置实参个数 = in_arity"
-    if (args.length !== sig.in_arity) {
-      fail(`算子 ${fn} 需要 ${sig.in_arity} 个输入，实际给了 ${args.length} 个`, ctx.src, node.pos);
+    if (!arities.includes(args.length)) {
+      fail(`算子 ${fn} 需要 ${needTxt} 个输入，实际给了 ${args.length} 个`, ctx.src, node.pos);
     }
   } else {
     // 输入必须给齐（位置或按名字都行），且不能重复给
     const covered = new Set();
     args.forEach((_, i) => { if (i < params.length) covered.add(params[i]); });
     for (const k of Object.keys(kwargs)) if (isInputName(k)) covered.add(k);
-    if (covered.size !== sig.in_arity) {
+    if (!arities.includes(covered.size)) {
       fail(
-        `算子 ${fn} 需要 ${sig.in_arity} 个输入（${params.slice(0, sig.in_arity).join(", ")}），` +
+        `算子 ${fn} 需要 ${needTxt} 个输入（${params.slice(0, maxIn).join(", ")}），` +
           `实际给了 ${covered.size} 个`,
-        ctx.src, node.pos,
+        ctx.src,
+        node.pos,
       );
     }
   }

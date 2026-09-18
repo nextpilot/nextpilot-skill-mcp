@@ -66,11 +66,13 @@ def operator_catalog() -> str:
             return default
 
         in_a, out_a = val("in_arity", 1), val("out_arity", 1)
+        # in_arity 可以是列表（同一算子接受两种写法，如 quat_to_euler 收一组或收四列）
+        in_txt = " 或 ".join(str(x) for x in (in_a if isinstance(in_a, list) else [in_a]))
         out_names = val("out_names", []) or []
         doc = val("doc", "") or (ast.get_docstring(node) or "").strip().split("\n")[0]
         outs = ", ".join(out_names) if out_names else ("1 个值" if out_a == 1 else "%d 个值" % out_a)
         rows.setdefault(section_of.get(node.lineno, "其它"), []).append(
-            (name, in_a, outs, doc.split("。")[0].split("；")[0].strip())
+            (name, in_txt, outs, doc.split("。")[0].split("；")[0].strip())
         )
 
     out = []
@@ -79,7 +81,7 @@ def operator_catalog() -> str:
         out.append("| 算子 | 入参 | 输出 | 说明 |")
         out.append("| --- | --- | --- | --- |")
         for name, in_a, outs, doc in sorted(rows[sec]):
-            out.append("| `%s` | %d | %s | %s |" % (name, in_a, outs, doc))
+            out.append("| `%s` | %s | %s | %s |" % (name, in_a, outs, doc))
     total = sum(len(v) for v in rows.values())
     out.append(
         "\n共 **%d** 个算子。输入个数与左值个数由算子签名强制校验（对不上则构建失败）；"

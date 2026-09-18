@@ -3,13 +3,11 @@ title: 姿态
 description: 四元数经 quat_to_euler 转欧拉角（Roll / Pitch / Yaw，度）；换算在引擎侧做，前端只画。
 conditions:
   topics: [vehicle_attitude]
-# 换算节点：与规则 compute 同一套表达式与算子。四元数的四个分量是数组字段，
-# 裸写不能带下标，所以用 ref() 包起来（与规则里的写法一致）。
+# 换算节点：与规则 compute 同一套表达式与算子。
+# 四元数 q 是「每元素一列」的数组字段，裸写就取到那四列（不用逐个 q[0]、q[1]…）——
+# quat_to_euler 收这一组列即可（也接受 w, x, y, z 分开给的老写法）。
 compute:
-  - >-
-      roll, pitch, yaw = quat_to_euler(
-      ref("vehicle_attitude.q[0]"), ref("vehicle_attitude.q[1]"),
-      ref("vehicle_attitude.q[2]"), ref("vehicle_attitude.q[3]"))
+  - roll, pitch, yaw = quat_to_euler(vehicle_attitude.q)
 outputs:
   - container: axes
     title: 欧拉角

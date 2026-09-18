@@ -324,7 +324,7 @@ compute:
 | `keep_gt` | 1 | 1 个值 | 只保留有限且 > gt 的样本（如排除 eph<=0 的无效值），返回序列 |
 | `masked_any_in` | 3 | 1 个值 | 时间轴上的“区间内取值为集合之一”判定：在 intervals（us 区间列表）内是否存在取值落在 codes 中的样本 |
 | `percentile` | 1 | 1 个值 | 有限值的第 p 百分位（如 p=95） |
-| `quat_to_euler` | 4 | roll, pitch, yaw | 四元数四列（w, x, y, z，先归一化）→ 欧拉角（度） |
+| `quat_to_euler` | 1 或 4 | roll, pitch, yaw | 四元数 → 欧拉角（度，先归一化） |
 | `ratio_equal` | 1 | 1 个值 | 取值为 value 的样本占比（如无效标志 == 0 的比例） |
 | `read` | 1 | 1 个值 | 显式取数/透传：把字段原样放进环境（供 coalesce 等后续节点使用） |
 | `require_true` | 1 | 1 个值 | 门控：条件为真返回 True，否则 None（使数据流在此中止，等效于原 if 分支） |

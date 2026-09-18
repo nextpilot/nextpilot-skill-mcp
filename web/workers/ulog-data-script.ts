@@ -217,7 +217,13 @@ def _panel_series(spec, env, inst):
 
 
 def _first_ref_bare(stmts):
-    """换算节点里第一个"topic 在日志里存在"的字段引用（只用来定时间戳的 topic，不求值）。"""
+    """换算节点里第一个"topic 在日志里存在"的字段引用（只用来定时间戳的 topic，不求值）。
+
+    两种写法都要认：\`ref("topic.field")\`，以及**裸写的** \`topic.field\`——后者在
+    \`_compile_compute\` 里才会被改写成 ref（见 rule_engine 的 \`_ComputeRefs\`），这里看的是
+    原文，所以得自己认一遍（踩过：\`quat_to_euler(vehicle_attitude.q)\` 因为只认 ref，
+    整张图报"取不到时间戳"）。
+    """
     for stmt in stmts:
         try:
             tree = ast.parse(stmt)
@@ -230,6 +236,10 @@ def _first_ref_bare(stmts):
                         bare, _ = _split_ref(arg.value)
                         if provider.has_topic(bare.partition(".")[0]):
                             return bare
+            elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+                bare = "%s.%s" % (node.value.id, node.attr)
+                if provider.has_topic(bare.partition(".")[0]):
+                    return bare
     return None
 
 

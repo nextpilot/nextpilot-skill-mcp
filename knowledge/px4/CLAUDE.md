@@ -378,9 +378,14 @@ w_p95 = percentile(hypot(ref("estimator_wind.windspeed_north", "wind_estimate.wi
   数组长度不一致，画出来是错的。`_ref` 现在是它的薄壳（规则侧行为零变化）。
 - **`compute` 节点**：预设里的换算与规则的 `compute` **同一套**（同一个构建期校验器
   `validateComputeList`、同一个运行期 `_eval_compute`）。`attitude.yml` 的"四元数→欧拉角"由此
-  从容器级 `op` 改成 `compute` 里一行 `roll, pitch, yaw = quat_to_euler(ref("vehicle_attitude.q[…]"), …)`。
+  从容器级 `op` 改成 `compute` 里一行 `roll, pitch, yaw = quat_to_euler(vehicle_attitude.q)`
+  ——`q` 是「每元素一列」的数组字段，裸写就取到那四列。为此 `@operator` 的 `in_arity`
+  扩展成**可给列表**（`quat_to_euler` 声明 `[1, 4]`：一组四列、或 w/x/y/z 四列都认，
+  `vtol-transition` 规则仍用后者），构建期按列表逐个放行、别的一律拒绝。
   实测：与改造前 `op` 路径在**共同时间戳上逐值零差异**（约 3 万次比较），只有 LTTB 的采样点不同
-  （参考序列从 `q[0]` 变成 `roll`）。
+  （参考序列从 `q[0]` 变成 `roll`）。**踩到的坑**：`np_series` 的"时间戳从命中字段反推"只认
+  `ref(...)`，而裸写字段要到 `_compile_compute` 才被改写成 ref——于是 `quat_to_euler(vehicle_attitude.q)`
+  整张图报"取不到时间戳"；`_first_ref_bare` 现在两种写法都认。
 - **单位表扩到预设**：`resolveFieldUnits` 不再只遍历规则的 compute，而是收"规则 + 预设"两边的
   引用（预设侧在**编译时登记**，不靠事后遍历产物猜形状——地图坐标编译后不是同一个形状，遍历会漏）。
   顺带修了一个潜伏 bug：表键带实例（`topic[0].field`）时，量纲检查取了剥掉实例的名字、

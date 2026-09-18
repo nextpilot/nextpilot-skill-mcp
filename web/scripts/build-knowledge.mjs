@@ -224,6 +224,21 @@ function parseOperatorSignatures(py) {
       const mm = rest.match(new RegExp(key + "\\s*=\\s*(\\d+)"));
       return mm ? Number(mm[1]) : 1;
     };
+    // 入参个数可以写成**列表**（如 `in_arity=[1, 4]`）：同一种运算接受两种写法时用
+    // （`quat_to_euler` 收一组四列、或收 w/x/y/z 四列）。列表里每个数都是"可以接受的个数"，
+    // 构建期逐个放行、别的一律拒绝。
+    const arity = (key) => {
+      const mm = rest.match(new RegExp(key + "\\s*=\\s*(\\[[^\\]]*\\]|\\d+)"));
+      if (!mm) return 1;
+      if (!mm[1].startsWith("[")) return Number(mm[1]);
+      const list = mm[1]
+        .slice(1, -1)
+        .split(",")
+        .map((x) => Number(x.trim()))
+        .filter((x) => Number.isFinite(x));
+      if (list.length === 0) throw new Error(`算子 ${name} 的 ${key} 列表是空的`);
+      return list;
+    };
     const names = rest.match(/out_names\s*=\s*\[([^\]]*)\]/);
     // 紧跟装饰器的 def 的形参名：用来校验**关键字实参名**。
     // node 上的额外键是 `**kw` 直通给算子的，名字写错不会报错、算子会用默认值算出错的结果，
@@ -234,7 +249,7 @@ function parseOperatorSignatures(py) {
           .filter((s) => /^[a-z_][a-z0-9_]*$/.test(s))
       : [];
     sigs[name] = {
-      in_arity: num("in_arity"),
+      in_arity: arity("in_arity"),
       out_arity: num("out_arity"),
       out_names: names ? names[1].split(",").map((x) => x.trim().replace(/["']/g, "")).filter(Boolean) : [],
       params,

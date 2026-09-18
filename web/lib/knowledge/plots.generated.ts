@@ -474,7 +474,7 @@ export const PLOT_PRESETS = [
       ]
     },
     "compute": [
-      "roll, pitch, yaw = quat_to_euler( ref(\"vehicle_attitude.q[0]\"), ref(\"vehicle_attitude.q[1]\"), ref(\"vehicle_attitude.q[2]\"), ref(\"vehicle_attitude.q[3]\"))"
+      "roll, pitch, yaw = quat_to_euler(vehicle_attitude.q)"
     ],
     "outputs": [
       {

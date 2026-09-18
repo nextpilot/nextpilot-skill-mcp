@@ -3,6 +3,8 @@
 约定：
 - 算子签名用 @operator 声明 in_arity / out_arity / out_names，
   构建期按签名校验规则文件里 in/out 的数量（多输入/多输出不靠约定，靠校验）。
+  `in_arity` 也可以给**列表**（如 `[1, 4]`），表示同一种运算接受两种写法——
+  目前只有 `quat_to_euler`（收一组四列，或收 w/x/y/z 四列）这么用。
 - 调用形式 fn(*args, **opts)：args 是按 `in` 顺序取到的值（numpy 数组或标量），
   opts 是节点上的其他键（unit / instance 等），算子用 **kw 吸收不关心的项。
 - 返回：out_arity==1 时返回标量；>1 时返回与 out_names 等长的元组。
@@ -518,14 +520,21 @@ def op_hypot(a, b, **kw):
 # 用 ruff 的 F811 在提交前拦住（见仓库根 pyproject.toml）。
 @operator(
     "quat_to_euler",
-    in_arity=4,
+    in_arity=[1, 4],  # 两种写法都认：**一个**四列数组，或**四列**分开给
     out_arity=3,
     out_names=["roll", "pitch", "yaw"],
-    doc="四元数四列（w, x, y, z，先归一化）→ 欧拉角（度）；图上的姿态换算走这个，别在前端写",
+    doc="四元数 → 欧拉角（度，先归一化）。"
+    '一个输入：四元数四列组成的数组（ref("vehicle_attitude.q") 取出来就是这个形状）；'
+    "四个输入：w, x, y, z 四列",
 )
-def op_quat_to_euler(w, x, y, z, **kw):
+def op_quat_to_euler(w, x=None, y=None, z=None, **kw):
     import numpy as np
 
+    if x is None and y is None and z is None:
+        # 一个输入 = 「每元素一列」类型的字段（q 这种）：ref 给回来的是一组列
+        if not isinstance(w, (list, tuple)) or len(w) < 4:
+            return None, None, None
+        w, x, y, z = w[0], w[1], w[2], w[3]
     if w is None or x is None or y is None or z is None:
         return None, None, None
     w, x, y, z = (np.asarray(v, dtype=float) for v in (w, x, y, z))

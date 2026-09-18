@@ -20,10 +20,9 @@ conditions:
 # ── 换算节点：可选，整块可省。与规则的 compute **同一套表达式与算子**（engine/operators.py）
 #    用途：图上要先算再画（四元数→欧拉角、多字段合成、按版本分流…）。算出来的变量供 ydata 引用。
 #    算式写在引擎侧、前端只画——"前端不写数学"是硬规矩。
+#    `vehicle_attitude.q` 是「每元素一列」的数组字段，裸写就取到那四列。
 compute:
-  - roll, pitch, yaw = quat_to_euler(
-      ref("vehicle_attitude.q[0]"), ref("vehicle_attitude.q[1]"),
-      ref("vehicle_attitude.q[2]"), ref("vehicle_attitude.q[3]"))
+  - roll, pitch, yaw = quat_to_euler(vehicle_attitude.q)
 
 # ── 输出：至少一个。容器两种 —— axes（一张曲线图）｜map（地图轨迹）──
 outputs:
