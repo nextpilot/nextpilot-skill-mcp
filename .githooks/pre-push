@@ -9,6 +9,15 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WEB_DIR="$SCRIPT_DIR/../web"
 
+# powershell.exe 是 Windows 原生程序，认不了 Git Bash 的 MSYS 路径（/d/xxx），
+# 必须给 D:\xxx——否则报「-File 形式参数的实际参数不存在」而 push 被拦。
+# cygpath 最稳；没有就退回 Git for Windows 自带的 pwd -W。
+if command -v cygpath >/dev/null 2>&1; then
+  HOOK_PS1="$(cygpath -w "$SCRIPT_DIR/pre-push.ps1")"
+else
+  HOOK_PS1="$(cd "$(dirname "$0")" && pwd -W)/pre-push.ps1"
+fi
+
 # 快速模式
 if [ "$SKIP_E2E" = "1" ]; then
   echo "===== SKIP_E2E=1: knowledge + tsc only ====="
@@ -20,5 +29,5 @@ if [ "$SKIP_E2E" = "1" ]; then
 fi
 
 # 完整检查：调用 PowerShell 脚本
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/pre-push.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$HOOK_PS1"
 exit $?
