@@ -454,7 +454,7 @@ order: 12
 - `trans_n = _try(count_above(vtol_vehicle_status.vtol_in_trans_mode, gt=0))`
 - `trans_n_i = _try(to_int(trans_n))`
 - `trans_mask = _try(fill_to(ref("vtol_vehicle_status.vtol_in_trans_mode"), ref("vtol_vehicle_status.timestamp"), ref("vehicle_attitude.timestamp")))`
-- `roll, pitch, yaw = _try(quat_to_euler(ref("vehicle_attitude.q[0]"), ref("vehicle_attitude.q[1]"), ref("vehicle_attitude.q[2]"), ref("vehicle_attitude.q[3]")))`
+- `roll, pitch, yaw = _try(quat_to_euler(ref("vehicle_attitude.q")))`
 - `tilt_max = _try(masked_absmax(larger(abs_values(roll), abs_values(pitch)), trans_mask))`
 - `trans_cnt = _try(count_true(trans_mask))`
 - `enough = _try(trans_cnt > 5)`
