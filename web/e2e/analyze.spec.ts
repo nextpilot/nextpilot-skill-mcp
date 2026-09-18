@@ -29,7 +29,7 @@ test.describe("日志分析流程", () => {
 
         const body = await page.locator("body").textContent();
         expect(body).not.toMatch(/Application error/);
-        expect(body).not.toMatch(/[next-mdx-remote].*error/);
+        expect(body).not.toContain("[next-mdx-remote] error");
     });
 
     test("历史记录可见", { timeout: 30_000 }, async ({ page }) => {
