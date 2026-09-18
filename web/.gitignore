@@ -8,3 +8,5 @@ out
 .DS_Store
 .vercel
 .edgeone
+playwright-report
+test-results

@@ -1,23 +1,24 @@
-#!/bin/sh
-# pre-push —— 把「云端 CI 覆盖不到」的那部分挡在推送之前。
-#
-# 为什么必须挂在本地：6 条冻结基线的逐字段比对（compare_baseline）需要真实 .ulg，
-# 而原始日志含 GPS 轨迹、按项目隐私规则不入库（见 .gitignore），云端 CI 的 checkout 里
-# 没有这些文件。也就是说**改规则或引擎时，这是唯一一道自动拦截**。
-#
-# 启用（每台机器做一次；core.hooksPath 是本地设置，git 不会跟着仓库走）：
-#   git config core.hooksPath .githooks
-# 若 hook 没被执行，补一下可执行位：
-#   chmod +x .githooks/pre-push
-#
-# 临时跳过（不推荐，仅用于明知基线会变的中间提交）：
-#   git push --no-verify
-#
-# 这里不跑 next build（太慢，那是 CI 的活）。完整清单与分组见 tools/ci/check_all.py。
+#!/bin/bash
+# Pre-push hook — 在每次 git push 前执行测试
+# 如果 push 太慢，可设置环境变量跳过 E2E：
+#   SKIP_E2E=1 git push         # 只跑 knowledge + tsc，跳过全部 E2E
+#   SKIP_LOG_ANALYSIS=1 git push  # 跳过日志分析测试（页面渲染仍跑）
 
-echo "▶ pre-push：仓库校验（含本地日志类回归，不含 next build）"
-if ! python tools/ci/check_all.py; then
-  echo ""
-  echo "✗ 校验未通过，推送已拦截。修完再推；确需跳过用 git push --no-verify"
-  exit 1
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+WEB_DIR="$SCRIPT_DIR/../web"
+
+# 快速模式
+if [ "$SKIP_E2E" = "1" ]; then
+  echo "===== SKIP_E2E=1: knowledge + tsc only ====="
+  cd "$WEB_DIR"
+  node scripts/build-knowledge.mjs
+  pnpm exec tsc --noEmit
+  echo "===== OK ====="
+  exit 0
 fi
+
+# 完整检查：调用 PowerShell 脚本
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$SCRIPT_DIR/pre-push.ps1"
+exit $?

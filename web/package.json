@@ -8,7 +8,11 @@
     "build:kb": "node scripts/build-knowledge.mjs",
     "build": "node scripts/build-knowledge.mjs && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test:e2e:smoke": "playwright test --grep-invert '日志分析流程'",
+    "test:e2e:analyze": "playwright test --grep '日志分析流程'"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.3.3",
@@ -32,6 +36,7 @@
     "yaml": "^2.9.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/node": "^26.5.1",
     "@types/nodemailer": "^8.0.1",
     "@types/react": "^19.3.0",

@@ -318,9 +318,13 @@ def _failed_names(key: str, out: str) -> set[str]:
     """从守卫输出里数出**红了的**那几条（不是"输出了哪些字"）。
 
     两种格式：
-    - `fail-lines`（test-issue-filer.mjs / check_hygiene.py）：每条打印 `  FAIL  <名字>  → <补充>`，
-      只认 FAIL 行。箭头**两种都收**：`→` 与 `->` —— 仓库的 ASCII/GBK 约定让有的脚本用
-      `->`，只认 `→` 的话那些脚本的名字会把整行都吞进去（"红的不是它"的假失败）。
+    - `fail-lines`（test-issue-filer.mjs / check_hygiene.py）：`  FAIL  <名字>` 或 `  FAIL  <名字>  → <补充>`。
+      解析只能"凡 FAIL 行就取名字"——不能要求带箭头：`test-issue-filer.mjs` 在补充文本为空时
+      **不打印箭头**（`` `FAIL ${name}${extra ? ` → ${extra}` : ""}` ``），要求带箭头会漏掉那些检查，
+      而漏掉表现为"红的不是它"，比误报更难查。
+      两个箭头都收（`→` 与 `->`）：仓库的 ASCII/GBK 约定让有的脚本用 `->`。
+      **因此被解析的守卫有一条格式契约**：它的总结行不要写成 `FAIL <名字>`（第一版 check_hygiene
+      的 `FAIL 1 项卫生检查未过` 就被当成了检查名，六条变异全报"牵连 1 条"）。写成 `N 项未过` 这种。
     - `prose`（check_artifact.py）：失败时打印一段人话再 `return 1`，没有统一前缀——
       只能拿注册表里的文案去对，但**产物侧的文案只在失败时才打印**，所以这么对是准的。
     """

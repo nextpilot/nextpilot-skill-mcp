@@ -1579,6 +1579,7 @@ def check_provider(provider, where="provider"):
     if not isinstance(provider.parser_version(), str):
         raise ValueError("%s.parser_version() 必须返回 str" % where)
     return provider
+
 # PX4 .ulg（ULog）适配器 —— **本项目唯一认识 PX4 的地方**
 #
 # 契约见 providers/api.py。引擎（rule_engine.py / operators.py / report_data.py）不认识

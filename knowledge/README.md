@@ -79,7 +79,18 @@ cd web && pnpm build:kb --check    # 只比对不写入：任一产物与 knowle
 `web/workers/ulog-data-script.ts`、`web/workers/fault-kb.generated.json`、
 `web/lib/knowledge/prompts.generated.js`、
 `content/guide/rule-catalogue.mdx`（指南「知识库」分组的规则清单页）、
-`content/guide/rule-schema.mdx`（指南「知识库」分组的规则编写参考页）。
+`content/guide/rule-schema.mdx`（指南「知识库」分组的规则编写参考页）、
+`px4/rules-editor-schema.generated.json`（编辑器用，见下节）。
+
+### 编辑器提示（键名补全 / 拼写检查）
+
+`rules/*.yaml` 的 schema 已配在 `.vscode/settings.json`（需要扩展 `redhat.vscode-yaml`）：
+写规则时键名会补全、拼错会当场飘红。**那份 schema 同样是生成物**——词表从 `facts.yaml`
+与 `engine/` 派生，手改它就等于造出第二份真源（改了 `facts.yaml` 而它没跟上时，
+IDE 会拿旧词表去纠正新写法，比没有提示更糟）。
+
+它只管键名 / 枚举 / 类型这类「纯形状」的问题。`compute` 表达式**内部**的语法、算子名、
+字段存在性它查不了——那些在字符串里，仍然只有 `pnpm build:kb` 能查。
 
 **铁律**：生成物不要手改；所有数值判断只在 `px4/rules/*.yaml` + 引擎框架里发生，
 LLM 只做翻译与组装。

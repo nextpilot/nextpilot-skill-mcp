@@ -3,6 +3,9 @@
 #   cd web && pnpm build:kb                      # 构建 + 校验（写错就构建失败）
 #   python tools/calibrate/compare_baseline.py   # 6 条真实日志与冻结基线逐字段比对
 #
+# 编辑器里键名会补全、拼错会飘红：schema 配在 .vscode/settings.json，文件本体
+# （knowledge/px4/rules-editor-schema.generated.json）由 build:kb 生成，**不要手改**。
+#
 # **必填只有四个**：id / name / group / compute（guard 类经验连 compute 都不要，
 # 见文件末尾）。其余每一项都能省，省掉的含义写在各自注释里。
 

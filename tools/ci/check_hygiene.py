@@ -15,19 +15,27 @@
 
 ## 判据
 
+三类裂缝，落成 5 项检查（后两项分别是"防目标消失"与"动态补静态之不足"）：
+
 1. **§ 引用必须有落点。** 解析顺序：引用的同一行如果**点名了某份文档** → 只在那份文档里找
-   （最常见的是 `见 CLAUDE.md §6.4`）；否则本文档是编号文档就**只在本文档里找**；都不是
-   才退到全局（root `CLAUDE.md` + 任一编号文档）。某份文档算不算"编号文档"由它**自己**的
-   标题决定（≥3 个编号标题），不维护名单——名单会过期，标题不会。
-2. **产物新鲜度的判据只能是「重跑生成逻辑再逐字节比对」。** 凡"既调生成器、又用 git 判定"
-   的文件都算违规。同时断言这道门**还在**（防止它被删掉之后，本项检查因为没有目标而恒绿）。
-3. **失败必须能被调用方看见。** Python 侧：打了 `FAIL` / `ERROR` 的文件，模块顶层必须有
+   （最常见的是 `见 CLAUDE.md §6.4`，取离引用**最近**的那个名字，不是行内第一个）；否则本文档
+   是编号文档就**只在本文档里找**；都不是才退到全局（root `CLAUDE.md` + 任一编号文档）。
+   某份文件算不算"编号文档"由它**自己**的标题决定（≥3 个编号标题 + 只有 `.md` / `.mdx` 才算数），
+   不维护名单——名单会过期，标题不会。
+2. **产物新鲜度的判据只能是「重跑生成逻辑再逐字节比对」。** 凡**调用生成器并带 `--check`** 的
+   文件（以及生成器自身）都算这道门的当事人，它们不许用 git 判定产物。
+3. 同时断言这道门**还在**（收集 `drifted` + 非零退出 + 挂在统一入口上）——否则门被删掉之后，
+   第 2 项会因为找不到目标而恒绿。
+4. **失败必须能被调用方看见。** Python 侧：打了 `FAIL` / `ERROR` 的文件，**模块顶层**必须有
    `raise SystemExit(...)` / `sys.exit(...)`——否则 `main()` 的返回值会被丢掉，退出码还是 0
    （这正是那天的原形）。JS 侧：往 stderr 打了 `FAIL` / `ERROR` 的脚本必须设非零
    `process.exitCode` 或 `process.exit(n)`。
-4. 第 3 条是**静态**的（看源码），另有**动态**探针（第 5 项）：拿必然失败的输入真跑一次，
+5. 第 4 项是**静态**的（看源码），所以再配一条**动态**探针：拿必然失败的输入真跑一次，
    断言「退出码非零**且**输出里有失败标记」——只要退出码非零是不够的，加载依赖失败、路径
    写错都非零，那会让探针绿得毫无意义。
+
+第 4、5 项都要留意一个格式契约：本脚本的**总结行不许写成 `FAIL <名字>` 的形状**，因为
+`tools/ci/mutate_guards.py` 逐行取 "FAIL 后面的东西" 当检查名（那条写在下面的 `main()` 里）。
 
 输出只用 ASCII 与 GBK 里都有的符号（`OK` / `FAIL` / `SKIP` / `·`）：
 Windows 控制台默认 GBK，`✓ ✗ ▶` 这类字符会直接 UnicodeEncodeError 崩掉脚本。
@@ -70,8 +78,10 @@ SKIP_FILES = frozenset(
     }
 )
 
-# 走 `git ls-files` 拿**被跟踪**的文件（自带 node_modules / .next / 缓存 的过滤）；
-# 不在仓库里（没有 git）时退回 rglob + 跳过名单。
+# 走 `git ls-files` 拿文件清单：`--cached` 是被跟踪的，`--others --exclude-standard` 是
+# **还没 add 但也没被忽略**的（`.gitignore` 里的日志、`.next`、`node_modules` 都据此排除）。
+# 两样都要：只取被跟踪的会让"新建的文件在 add 之前不在覆盖范围内"——本文件自己就是新建的，
+# 第一次跑时它没被扫到；而问题恰恰最容易出现在刚写的新文件里。
 SKIP_DIRS = frozenset({".git", "node_modules", ".next", "__pycache__", ".workbuddy", "out", "dist", "build"})
 
 
@@ -85,7 +95,7 @@ def _read(path: Path) -> str:
 
 def _scanned_files() -> list[Path]:
     proc = subprocess.run(
-        ["git", "ls-files", "-z"],
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
         cwd=str(ROOT),
         capture_output=True,
         text=True,
@@ -396,8 +406,20 @@ def check_freshness_gate_alive() -> list[str]:
 
 PY_FAIL_PRINT_RE = re.compile(r"""print\(\s*f?["']\s*(?:FAIL|ERROR)\b""")
 JS_FAIL_PRINT_RE = re.compile(r"""console\.(?:error|warn|log)\(\s*[`"']\s*(?:CHECK\s+)?(?:FAIL|ERROR)\b""")
-# `process.exitCode = 0` 不算；`process.exitCode = failed ? 1 : 0` 算。
-JS_EXIT_RE = re.compile(r"process\.exitCode\s*=\s*(?!0\b)|process\.exit\(\s*(?!0\b)")
+
+# 取"等号右边/括号里"**再看它是不是常量 0**，而不是把 `(?!0)` 写在 `\s*` 后面：
+# `\s*` 会回溯——先吃掉空格、负向断言在 `0;` 上失败，于是退回去只吃零个空格、断言在空格上
+# 就成功了，`process.exitCode = 0;` 照样算"非零退出"。这个坑第一版真踩了：那条变异因此
+# 报"守卫恒绿"，看着像守卫坏了，其实是正则写坏。
+JS_EXIT_ASSIGN_RE = re.compile(r"process\.exitCode\s*=\s*([^;\n]*)")
+JS_EXIT_CALL_RE = re.compile(r"process\.exit\(\s*([^)\n]*)")
+
+
+def _js_exits_nonzero(code: str) -> bool:
+    """设了退出码且**不是**常量 0。`process.exitCode = failed ? 1 : 0` 算，`= 0;` 不算。"""
+    return any(m.group(1).strip() != "0" for m in JS_EXIT_ASSIGN_RE.finditer(code)) or any(
+        m.group(1).strip() != "0" for m in JS_EXIT_CALL_RE.finditer(code)
+    )
 
 
 def _top_level_exit(node: ast.AST) -> bool:
@@ -439,7 +461,7 @@ def check_failure_visible() -> list[str]:
                 )
         elif path.suffix in (".mjs", ".js", ".ts", ".tsx"):
             code = _js_code_only(_read(path))
-            if JS_FAIL_PRINT_RE.search(code) and not JS_EXIT_RE.search(code):
+            if JS_FAIL_PRINT_RE.search(code) and not _js_exits_nonzero(code):
                 problems.append(
                     f"{_rel(path)} 往 stderr 打了 FAIL / ERROR，但没设非零的 process.exitCode / process.exit"
                     " —— 调用方看到的仍是成功"
@@ -570,7 +592,10 @@ def main(argv: list[str]) -> int:
         mark = "FAIL" if name in failed else ("SKIP" if name in skipped else "OK  ")
         print(f"  {mark} {name}")
     if failed:
-        print(f"\nFAIL {len(failed)} 项卫生检查未过 —— 逐项看上面的输出。")
+        # 这句**不能**写成 `FAIL <名字>` 的形状：tools/ci/mutate_guards.py 逐行取 "FAIL 后面的东西"
+        # 当检查名，那句总结会被它当成一条检查名，于是每条变异都多报一次"牵连"。
+        # （被那套跑手解析的守卫都有这条格式契约，见它的 _failed_names。）
+        print(f"\n{len(failed)} 项卫生检查未过 —— 逐项看上面的输出。")
         return 1
     print(f"\nOK 全部通过（{len(CHECKS) - len(skipped)} 项，跳过的已说明原因）。")
     return 0

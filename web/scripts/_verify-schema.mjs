@@ -15,6 +15,8 @@ let rules = 0;
 let files = 0;
 
 const bad = (where, msg) => problems.push(`${where}: ${msg}`);
+// enum 只给"构建期本来就强制校验"的字段；没设 enum 的字段不做取值断言
+const inEnum = (p, v) => !p?.enum || p.enum.includes(v);
 
 for (const f of readdirSync(resolve(KN, "rules")).filter((x) => x.endsWith(".yaml")).sort()) {
   files++;
@@ -32,7 +34,7 @@ for (const f of readdirSync(resolve(KN, "rules")).filter((x) => x.endsWith(".yam
     if (r?.group !== undefined && !props.group.enum.includes(r.group)) {
       bad(where, `group「${r.group}」不在 enum`);
     }
-    if (r?.category !== undefined && !props.category.enum.includes(r.category)) {
+    if (r?.category !== undefined && !inEnum(props.category, r.category)) {
       bad(where, `category「${r.category}」不在 enum`);
     }
 
@@ -55,7 +57,7 @@ for (const f of readdirSync(resolve(KN, "rules")).filter((x) => x.endsWith(".yam
       for (const k of Object.keys(r.outputs)) {
         if (!(k in props.outputs.properties)) bad(where, `outputs.${k} 不在 schema 里`);
       }
-      if (r.outputs.check !== undefined && !props.outputs.properties.check.enum.includes(r.outputs.check)) {
+      if (r.outputs.check !== undefined && !inEnum(props.outputs.properties.check, r.outputs.check)) {
         bad(where, `outputs.check「${r.outputs.check}」不在 enum`);
       }
     }
