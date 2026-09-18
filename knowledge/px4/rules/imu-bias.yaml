@@ -10,40 +10,36 @@ group: imu_bias
 order: 1
 version: 1.1.0
 
-firmware: "True"
-airframe: "True"
-skip:
-  - {when: "not has_armed", reason: 无 armed 段，不做零偏判定}
-  - {when: "no_data", reason: 无陀螺零偏数据（无 estimator_sensor_bias / estimator_status.states）}
-# 原实现外层是 `if armed_intervals:`，无 armed 段时留一条 skip 记录
-# 1.15 之前零偏藏在 estimator_status.states[10..12]（该字段在新固件已不存在），
-# 属于已知遗留：lint-rules.py 据此不再把它列为可疑引用
-known_legacy: [estimator_status.states]
+# 没有 armed 段就谈不上"飞行中的零偏"——先决条件直接不跑（原实现外层是 `if armed_intervals:`）。
+conditions:
+  precheck:
+    - "not HAS_ARMED"
 
 compute:
-  # 取源（新/旧固件自动选，附带 evidence 用的来源说明）；主数据缺失返回 None。
-  # sources 就是 evidence.field 里的那句"这条结论读的是哪儿"——文案留在经验里，算子不认识字段名
+  # 取源：**谁有数据用谁**——直读零偏列（更直接）优先，没有就退回状态槽 [10..12]。
+  # 按存在性挑，不按版本号挑：升级换代就是老名字没了、新名字在。
+  # 主数据缺失返回 None；sources 是 evidence.field 里那句"这条结论读的是哪儿"（文案留在经验里）。
   - >-
       bx, by, bz, bts, src_text = _try(gyro_bias_series(
-      ref("estimator_sensor_bias.gyro_bias", instance=0),
-      ref("estimator_sensor_bias.timestamp", instance=0),
-      ref("estimator_states.states", instance=0),
-      ref("estimator_states.timestamp", instance=0),
-      ref("estimator_status.states", instance=0),
-      ref("estimator_status.timestamp", instance=0), fw_minor, slot=10,
+      ref("estimator_sensor_bias[0].gyro_bias"),
+      ref("estimator_sensor_bias[0].timestamp"),
+      ref("estimator_states[0].states"),
+      ref("estimator_states[0].timestamp"),
+      ref("estimator_status[0].states"),
+      ref("estimator_status[0].timestamp"), slot=10,
       sources=["estimator_sensor_bias.gyro_bias[]",
                "estimator_states.states[10..12]",
                "estimator_status.states[10..12]"]))
-  # armed 段内逐轴 |最大零偏| 与漂移，各取最差轴
+  # armed 段内逐轴 |最大零偏| 与漂移，各取最差轴。**不包 _try**：整份日志都没有零偏数据时
+  # 算子返回 None，解包即抛异常 → 本条就此中止（不写 stats、不发 finding）。
+  # （"没有 armed 段"那半由上面的 precheck 拦下，不必再依赖异常。）
   - >-
-      worst_abs, worst_axis, worst_drift, drift_axis = _try(gyro_bias_worst(
-      bx, by, bz, bts, armed_intervals, labels=["X", "Y", "Z"], min_count=10))
-  # 至少一个轴有效，否则整条中止
-  - abs_gate = require_true(worst_axis is not None)
+      worst_abs, worst_axis, worst_drift, drift_axis = gyro_bias_worst(
+      bx, by, bz, bts, ARMED_INTERVALS, labels=["X", "Y", "Z"], min_count=10)
   # 温度跨度：两个来源取较大者（样本 < 2 的来源忽略）
   - >-
-      temp_range = _try(max_temp_range(ref("vehicle_imu_status.temperature_gyro", instance=0),
-      ref("vehicle_air_data.ambient_temperature", instance=0)))
+      temp_range = _try(max_temp_range(ref("vehicle_imu_status[0].temperature_gyro"),
+      ref("vehicle_air_data[0].ambient_temperature")))
   - bias_stat = _try(larger(worst_abs, worst_drift))
 
 outputs:

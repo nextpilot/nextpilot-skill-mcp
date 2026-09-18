@@ -8,22 +8,22 @@ name: 风扰估计
 group: wind_estimate
 order: 1
 
-firmware: "True"
-airframe: "True"
-skip:
-  - {when: "not has_topic('estimator_wind') and not has_topic('wind_estimate')", reason: estimator_wind / wind_estimate not in log}
+conditions:
+  topics:
+    - estimator_wind || wind_estimate
 
 compute:
-  # 版本分流写在取数上：when_fw 不满足的那个引用返回 None，由 coalesce 选另一支。
-  # 1.15+ 用估计器风。日志里这个 topic 叫 estimator_wind；上游另有一个叫 wind 的 topic
-  # （字典按 .msg 文件名收录，与日志 topic 名不是一一对应，所以字典里查不到 estimator_wind）
-  # 缺任一路（两个 topic 都没有）时 hypot 得 None、w_p95 也是 None → 不出结论
+  # 1.15 起这个量在日志里的 topic 叫 estimator_wind，之前叫 wind_estimate——**候选组**
+  # 按存在性取（实测两者从不同时出现，所以"有谁用谁"就是原来的版本分流）。
+  # 上游另有一个叫 wind 的 topic：字典按 .msg 文件名收录，与日志 topic 名不是一一对应，
+  # 别按名字猜。缺任一路（两个 topic 都没有）时 hypot 得 None、w_p95 也是 None → 不出结论。
+  # **只看第 0 个估计器实例**：以前靠"不加修饰＝所有实例拼起来"隐式跨实例取最大，现在得写明。
   - >-
     w_p95 = percentile(
-      hypot(coalesce(ref("estimator_wind.windspeed_north", when_fw=">=1.15"),
-                     ref("wind_estimate.windspeed_north", when_fw="<1.15")),
-            coalesce(ref("estimator_wind.windspeed_east", when_fw=">=1.15"),
-                     ref("wind_estimate.windspeed_east", when_fw="<1.15"))),
+      hypot(coalesce(ref("estimator_wind[0].windspeed_north"),
+                     ref("wind_estimate[0].windspeed_north")),
+            coalesce(ref("estimator_wind[0].windspeed_east"),
+                     ref("wind_estimate[0].windspeed_east"))),
       p=95)
 
 outputs:

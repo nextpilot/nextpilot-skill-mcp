@@ -48,7 +48,7 @@ REQUIRED = {
     },
     "get_series": {
         "kind": "method",
-        "sig": "(ref, instance=None, alias=None, per_instance=False)",
+        "sig": "(ref, instance=slice(None), alias=None)",
         "doc": "按 'topic.field' 取一条序列（1-D 数组 / 每实例一组 / 定长数组按列）。"
         "**取不到一律返回 None，不抛异常**——引擎按'数据不足'处理",
     },
@@ -124,31 +124,31 @@ OPTIONAL = {
 # ---------------- builtin_variables() 必须给的键（= 规则与 plot 能引用的内置变量）----------------
 # 这份表就是"作者能引用什么"的权威清单，站内指南的内置变量表由 tools/px4/gen_rule_reference.py
 # 从这里生成。加名字 = 改契约；删名字 = 破坏兼容（老规则会构建失败，这是有意的）。
+# **名字一律大写**：规则里自己赋的变量是小写，一眼就能分出"这个数是引擎给的还是自己算的"。
 BUILTIN_VARIABLES = {
-    "fw_minor": {
+    "FW_MINOR": {
         "type": "int|None",
         "doc": "固件次版本号。**版本分支唯一常用的量**；None = 这份日志没写版本号",
     },
-    "airframe": {
+    "AIRFRAME": {
         "type": "str",
         "doc": "机型：rotary_wing / fixed_wing / rover / airship / unknown",
     },
-    "is_fixed_wing": {"type": "bool", "doc": "机型别名（比 airframe == 'fixed_wing' 好读）"},
-    "duration_s": {"type": "float", "doc": "日志总时长（秒）"},
-    "armed_s": {"type": "float", "doc": "armed 总时长（秒）"},
-    "armed_intervals": {
+    "IS_FIXED_WING": {"type": "bool", "doc": "机型别名（比 AIRFRAME == 'fixed_wing' 好读）"},
+    "DURATION_S": {"type": "float", "doc": "日志总时长（秒）"},
+    "ARMED_S": {"type": "float", "doc": "armed 总时长（秒）"},
+    "ARMED_INTERVALS": {
         "type": "list[(us,us)]",
         "doc": "armed 区间，升序不重叠；end=None 表示持续到日志结束。时序算子按它切窗",
     },
-    "t0_us": {"type": "int", "doc": "日志起点时间戳（us），事件类算子算相对时刻的基准"},
-    "has_armed": {"type": "bool", "doc": "是否存在 armed 段"},
-    "restart_detected": {"type": "bool", "doc": "是否有 topic 时间戳回退（疑似中途重启）"},
-    "dropout_ms": {"type": "int", "doc": "全日志丢包累计（毫秒）"},
-    "messages": {"type": "list[dict]", "doc": "日志消息条目（供消息类经验按级别筛选）"},
+    "T0_US": {"type": "int", "doc": "日志起点时间戳（us），事件类算子算相对时刻的基准"},
+    "HAS_ARMED": {"type": "bool", "doc": "是否存在 armed 段"},
+    "RESTART_DETECTED": {"type": "bool", "doc": "是否有 topic 时间戳回退（疑似中途重启）"},
+    "DROPOUT_MS": {"type": "int", "doc": "全日志丢包累计（毫秒）"},
+    "MESSAGES": {"type": "list[dict]", "doc": "日志消息条目（供消息类经验按级别筛选）"},
 }
 
 # 框架自己往 env 里补的名字（**不属于** provider）：
-#   no_data     —— compute 失败后置真（"数据不足"也是 skip 里的一条普通条件）
 #   has_topic() —— 表达式里唯一放行的函数调用，指向 provider.has_topic
 
 
@@ -197,7 +197,7 @@ def check_provider(provider, where="provider"):
     """运行期自检：契约里要求的东西，这个 provider 真的给了吗、类型对吗。
 
     为什么还要这一道（构建期不是已经查过 AST 了吗）：AST 只看"有没有定义"，
-    看不了"跑起来给的是什么"——比如 builtin_variables() 少返回一个键、fw_minor 给了字符串。
+    看不了"跑起来给的是什么"——比如 builtin_variables() 少返回一个键、FW_MINOR 给了字符串。
     这类问题如果放过，表现是**静默失效**（规则算不出数据 → 不发射 finding），很难查。
     """
     for name, spec in REQUIRED.items():

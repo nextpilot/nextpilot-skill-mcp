@@ -6,10 +6,9 @@ name: 加速度计削波
 group: vibration
 order: 3
 
-firmware: "True"
-airframe: "True"
-skip:
-  - {when: "not has_topic('vehicle_imu_status')", reason: vehicle_imu_status not in log}
+conditions:
+  topics:
+    - vehicle_imu_status
 
 compute:
   # 每个实例每组 3 列（每轴一条累计计数序列）；逐列 max-min，取全局最大差值。
@@ -17,7 +16,7 @@ compute:
   # （原实现同样用条件性统计保持等价）
   - >-
     clip, clip_idx, clip_axis = worst_column_delta(
-      ref("vehicle_imu_status.accel_clipping", per_instance=True, alias="clipping"))
+      ref("vehicle_imu_status[:].accel_clipping", alias="clipping"))
   - clip_stat = clip if clip > 0 else None
 
 outputs:

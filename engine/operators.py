@@ -4,7 +4,7 @@
 - 算子签名用 @operator 声明 in_arity / out_arity / out_names，
   构建期按签名校验规则文件里 in/out 的数量（多输入/多输出不靠约定，靠校验）。
 - 调用形式 fn(*args, **opts)：args 是按 `in` 顺序取到的值（numpy 数组或标量），
-  opts 是节点上的其他键（unit / per_instance / scope 等），算子用 **kw 吸收不关心的项。
+  opts 是节点上的其他键（unit / instance 等），算子用 **kw 吸收不关心的项。
 - 返回：out_arity==1 时返回标量；>1 时返回与 out_names 等长的元组。
 - 数据不足时返回 None，框架据此跳过该规则（不产出 finding）。
 """
@@ -206,9 +206,9 @@ def op_head_tail_median_drop(x, vts, intervals, skip_first_s=5, min_seg=20, head
     return float(head - tail), tail
 
 
-# ─────────────────────────── 多实例传感器（per-instance）───────────────────────────
-# 这类算子的输入是「每个传感器实例一组数据」的列表（框架对 per_instance 节点按
-# topic dataset 分组喂入）。数组字段（如 float32[3]）每组是「每元素一列」的列表。
+# ─────────────────────────── 多实例传感器（分组取数）───────────────────────────
+# 这类算子的输入是「每个传感器实例一组数据」的列表（规则里用 ref(..., instance=-1) 取）。
+# 数组字段（如 float32[3]）每组是「每元素一列」的列表。
 # 全部通用：不认识任何具体 topic/字段，只做跨实例归约，取「最差实例」并回传其序号。
 
 
@@ -217,7 +217,7 @@ def _groups(groups):
 
 
 def _as_group_list(x):
-    """per_instance 分组 → 列表，**保留 None 占位**。
+    """分组取数（instance=-1）→ 列表，**保留 None 占位**。
 
     实例序号（标题里的 “IMU #1”、estimator #2）必须与原始 dataset 顺序一致，
     所以这里不能过滤 None——过滤会让后面的实例序号整体前移。
@@ -478,17 +478,16 @@ def op_scale_series(values, factor=1.0, **kw):
     "adjacent_speed_mps",
     in_arity=3,
     doc="经纬度与时间戳（us）→ 相邻样本地面速度序列（m/s）；等距柱状近似。"
-    "unit 说明经纬度口径：degE7（旧字段 lat/lon 的 1e7 度）或 deg（新字段 latitude_deg），"
-    "由经验文件按固件版本给出",
+    '**入参是度**（口径由规则在 ref(..., unit="deg") 上统一好）——算子不认识固件版本、'
+    "也不认识 degE7 这种老口径。",
 )
-def op_adjacent_speed_mps(lat_in, lon_in, ts_us, unit="degE7", **kw):
+def op_adjacent_speed_mps(lat_in, lon_in, ts_us, **kw):
     import numpy as np
 
     if lat_in is None or lon_in is None or ts_us is None:
         return None
-    div = 1e7 if str(unit).lower() in ("dege7", "1e7") else 1.0
-    lat = np.radians(np.asarray(lat_in, dtype=float) / div)
-    lon = np.radians(np.asarray(lon_in, dtype=float) / div)
+    lat = np.radians(np.asarray(lat_in, dtype=float))
+    lon = np.radians(np.asarray(lon_in, dtype=float))
     if lat.size < 3 or lat.size != lon.size or lat.size != len(ts_us):
         return None
     dt = np.diff(np.asarray(ts_us, dtype=float)) / 1e6
@@ -1048,13 +1047,14 @@ def op_zero_cross_hz(values, sample_rate=50.0, **kw):
 
 @operator(
     "att_tracking_stats",
-    in_arity=8,
+    in_arity=7,
     out_arity=3,
     out_names=["p99", "osc_hz", "seg_n"],
     doc="姿态跟踪统计：把姿态与姿态指令在时间轴上对齐（取较短长度、指令线性插值到姿态时间轴），"
     "只在 armed 且非悬停（指令倾角 > tilt_min_deg）样本上算跟踪误差，输出 p99（度）、"
-    "误差过零频率（Hz）、参与统计的样本数。指令源在 q_d 四元数与 roll/pitch_body 之间自动选择"
-    "（fw_minor >= 15 或有四元数而无 body 字段时用四元数）。核心数据缺失返回 None。",
+    "误差过零频率（Hz）、参与统计的样本数。指令源**有 q_d 就用 q_d**（新版只记它），"
+    "没有才回退 roll/pitch_body（旧版口径，弧度）——**算子不认识固件版本**，规则把两路都"
+    "递给它、顺序在这里定。核心数据缺失返回 None。",
 )
 def op_att_tracking_stats(
     att_q,
@@ -1064,7 +1064,6 @@ def op_att_tracking_stats(
     att_ts,
     sp_ts,
     intervals,
-    fw_minor=None,
     tilt_min_deg=10.0,
     min_samples=50,
     sample_rate=50.0,
@@ -1084,12 +1083,11 @@ def op_att_tracking_stats(
     roll = np.arctan2(2 * (w * x + y * z), 1 - 2 * (x**2 + y**2))  # 弧度
     pitch = np.arcsin(np.clip(2 * (w * y - z * x), -1, 1))
 
-    # 指令源：1.15+ 只记四元数；旧固件记 roll/pitch_body（弧度）
+    # 指令源：**有 q_d 就用 q_d**（新版只记它），没有才用 roll/pitch_body（旧版口径，弧度）。
+    # 两路都给了也优先 q_d——顺序写在算子里，规则只管把存在的递进来。
     qd = _as_columns(sp_q)
     has_qd = len(qd) >= 4
-    use_q = has_qd and (sp_roll is None or fw_minor is None or int(fw_minor) >= 15)
-    if not use_q and sp_roll is None and has_qd:
-        use_q = True  # 定制固件容错
+    use_q = has_qd
     if use_q:
         d0, d1, d2, d3 = (np.asarray(c, dtype=float) for c in qd[:4])
         ns = min(len(d0), len(d1), len(d2), len(d3))
@@ -1130,12 +1128,13 @@ def op_att_tracking_stats(
 
 @operator(
     "gyro_bias_series",
-    in_arity=7,
+    in_arity=6,
     out_arity=5,
     out_names=["bx", "by", "bz", "bts", "src_text"],
-    doc="零偏取源（三取一）：① 直读零偏列（fw_minor >= 15 时优先）② 状态槽 A ③ 状态槽 A 缺失"
-    "时用状态槽 B。输入都是「数组字段的多列」或 None。"
-    "返回 三轴序列 + 时间戳 + 数据来源说明（用于 evidence.field）；主数据缺失返回 None。"
+    doc="零偏取源：**谁有数据用谁**（直读列 → 状态槽 A → 状态槽 B），输入都是「数组字段的多列」"
+    "或 None。**算子不认识固件版本**——挑来源只看数据本身：样本数 >= min_count、且至少一处非零"
+    "（字段存在但没被填过的情形：实测 1.11 的直读列只有 7 个样本，状态槽才有值）。"
+    "返回 三轴序列 + 时间戳 + 数据来源说明（用于 evidence.field）；全都没有返回 None。"
     "来源说明是**展示文案**，由调用方用 sources=[直读, 槽A, 槽B] 给出——算子不认识字段名。",
 )
 def op_gyro_bias_series(
@@ -1145,27 +1144,46 @@ def op_gyro_bias_series(
     states_a_ts,
     states_b_cols,
     states_b_ts,
-    fw_minor,
     slot=10,
+    min_count=10,
     sources=None,
     **kw,
 ):
+    import numpy as np
+
     nb = _as_columns(new_cols)
     la = _as_columns(states_a_cols)
     lb = _as_columns(states_b_cols)
     s = int(slot)
+    need = int(min_count)
     # 三个来源的展示名（经验文件给；没给就用中性说法，反正算子不认识具体字段）
     names = list(sources or []) + ["零偏直读列", "状态槽（优先）", "状态槽（兜底）"]
 
     def pick3(cols):
         return [cols[s], cols[s + 1], cols[s + 2]] if len(cols) >= s + 3 else None
 
-    leg_a, leg_b = pick3(la), pick3(lb)
-    use_new = len(nb) >= 3 and new_ts is not None and (fw_minor is None or int(fw_minor) >= 15)
-    if not use_new and leg_a is None and leg_b is None and len(nb) >= 3:
-        use_new = True  # 定制固件容错：没有旧槽就用直读
-    if use_new:
+    def usable3(cols):
+        """够样本、且至少一处非零才算"有数据"。
+
+        "字段存在但没被填过"有两种表现，都要挡住：整段全零（真正的 0 不可能三轴同时
+        恒为 0），以及只有零星几个样本（实测 1.11 的直读列 7 个 vs 状态槽 636 个）——
+        这种放过去，下游 `gyro_bias_worst` 会因样本不足判成"没有零偏数据"，
+        指标就凭空消失了。
+        """
+        if cols is None:
+            return None
+        for c in cols:
+            a = np.asarray(c, dtype=float)
+            if a.size < need:
+                return None
+            if bool(np.any(np.isfinite(a) & (np.abs(a) > 0))):
+                return cols
+        return None
+
+    if new_ts is not None and len(nb) >= 3 and usable3(nb[:3]) is not None:
         return (nb[0], nb[1], nb[2], new_ts, names[0])
+    leg_a = usable3(pick3(la))
+    leg_b = usable3(pick3(lb))
     if leg_a is not None and states_a_ts is not None:
         return (leg_a[0], leg_a[1], leg_a[2], states_a_ts, names[1])
     if leg_b is not None and states_b_ts is not None:

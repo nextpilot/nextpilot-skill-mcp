@@ -8,11 +8,10 @@ group: attitude_tracking
 order: 2
 version: 1.1.0
 
-firmware: "True"
-airframe: "True"
-skip:
-  - {when: "not has_armed", reason: vehicle_attitude(_setpoint) 或 armed 段缺失}
-  - {when: "not has_topic('vehicle_attitude') or not has_topic('vehicle_attitude_setpoint')", reason: vehicle_attitude(_setpoint) 或 armed 段缺失}
+conditions:
+  topics:
+    - vehicle_attitude
+    - vehicle_attitude_setpoint
 ran_when: "seg_ok"
 
 compute:
@@ -20,13 +19,14 @@ compute:
   - >-
     p99, osc_hz, seg_n = _try(att_tracking_stats(
       att_q=vehicle_attitude.q,
-      sp_q=vehicle_attitude_setpoint.q_d,
-      sp_roll=vehicle_attitude_setpoint.roll_body,
-      sp_pitch=vehicle_attitude_setpoint.pitch_body,
+      # 指令源：两路都给，**有 q_d 就用 q_d**（新版只记它），没有才回退 roll/pitch_body。
+      # 顺序由算子定，规则不用管版本——按存在性挑，不按版本号挑。
+      sp_q=ref("vehicle_attitude_setpoint.q_d"),
+      sp_roll=ref("vehicle_attitude_setpoint.roll_body"),
+      sp_pitch=ref("vehicle_attitude_setpoint.pitch_body"),
       att_ts=vehicle_attitude.timestamp,
       sp_ts=vehicle_attitude_setpoint.timestamp,
-      intervals=armed_intervals,
-      fw_minor=fw_minor,
+      intervals=ARMED_INTERVALS,
       tilt_min_deg=10.0, min_samples=50, sample_rate=50))
   # 样本不足（<= 50）或核心数据缺失（seg_n 为 None）都不出结论：统计量与 finding
   # 都由这个开关把住；ran_when 也引用它（所以必须是个具名变量，不能写成内联条件）
@@ -41,7 +41,7 @@ outputs:
     attitudeOscHz: {var: osc_stat, round: 2}
 
 triggers:
-  - when: "osc_stat >= 4.0 and p99_stat >= 25.0 and is_fixed_wing"
+  - when: "osc_stat >= 4.0 and p99_stat >= 25.0 and IS_FIXED_WING"
     severity: warning
     tag: attitude_overshoot
     threshold: 4.0
@@ -50,7 +50,7 @@ triggers:
     field: "姿态跟踪误差符号翻转频率"
     title: "姿态误差高频振荡（约 {osc_stat:.1f} Hz）"
     suggestion: "振荡多与控制增益/机架共振相关，禁用大幅调参，先做频响检查。"
-  - when: "osc_stat >= 4.0 and p99_stat >= 15.0 and not is_fixed_wing"
+  - when: "osc_stat >= 4.0 and p99_stat >= 15.0 and not IS_FIXED_WING"
     severity: warning
     tag: attitude_overshoot
     threshold: 4.0

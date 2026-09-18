@@ -1,0 +1,24 @@
+# 人工补充/纠错层：**日志 topic 名** → 元数据修正。
+#
+# 为什么需要它：`meta/<tag>.json` 是从上游 `.msg` **生成**的，有几处天生不靠谱——
+#   · 单位是注释里抠出来的自由文本（`metres` / `radians` / `us`，也有 `'stop the motors'` 这种）
+#   · 字典按 `.msg` 文件名收录，与日志 topic 名不一一对应（改名映射在 `topic-map.yaml`）
+#   · 老字段在新 tag 里已经不存在
+# 生成物不手改，所以修正写在这里；键用**日志 topic 名**（写规则的人看的就是它）。
+#
+# 用在哪：构建期解析 `ref(..., unit="期望单位")` 的源单位时，**本文件优先于 meta**；
+# 查不到就告警（不是失败），提示往这儿补一行。
+#
+# 写法：
+#   units:
+#     vehicle_gps_position.lat: degE7      # 度 × 1e7（PX4 老口径）
+#
+# 只登记 meta 里查不到的或查错的，别把能查到的也抄一遍（抄了就会漂移）。
+
+units:
+  # 新口径（1.15+）的字段在 meta 里只有 note（"Latitude in degrees…"）、没有 unit 字段
+  vehicle_gps_position.latitude_deg: deg
+  vehicle_gps_position.longitude_deg: deg
+  # 老口径：meta 里只收了 v1.15.0 / v1.16.0 / main 三份 tag，这些字段已经不在其中
+  vehicle_gps_position.lat: degE7
+  vehicle_gps_position.lon: degE7

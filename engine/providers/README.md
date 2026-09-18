@@ -43,8 +43,8 @@ Python（只当文本搬运，见 `../README.md`），Pyodide 里也没有 mypy�
 - **取不到一律返回 `None`，不抛异常**。引擎把 `None` 当"数据不足"（那条规则静默不出结论）；
   抛异常会顺着 `_eval_compute` 的兜底变成同一种静默，但更难查。这条是契约测试第一个查的。
 - **`builtin_variables()` 每次返回新 dict**：引擎会把 compute 的输出直接写进它。
-- **`no_data` / `has_topic` 不在这里**：前者由框架置（compute 失败后为真），
-  后者是框架给 `provider.has` 起的别名（表达式里唯一放行的函数调用）。
+- **`has_topic` 不在这里**：它是框架给 `provider.has_topic` 起的别名（表达式里唯一放行的
+  函数调用）——规则里判"某个 topic 在不在日志里"用它。
 - **别把取数逻辑搬回 YAML**：候选字段、异常回退、位解码、按版本挑分支——这些是逻辑，
   用 YAML 表达只能再造一门小语言（本项目已经删掉两门了）。
 - **这里会整份进浏览器**：`api.py` 与各适配器都被内联进 `web/workers/ulog-check-script.ts`，

@@ -8,17 +8,20 @@ group: battery
 order: 1                 # battery group 内次序：cell-voltage=1, sag=2, remaining=3
 version: 1.1.0
 
-firmware: "True"
-airframe: "True"
-skip:
-  - {when: "not has_topic('battery_status')", reason: battery_status not in log}
+conditions:
+  topics:
+    - battery_status
 
 compute:
-  # 总压最小值 / 实测单芯最低值 / 回退值 / 芯数 / 两条分支标志 —— 一个算子一次算齐
+  # 总压最小值 / 实测单芯最低值 / 回退值 / 芯数 / 两条分支标志 —— 一个算子一次算齐。
+  # **只看第 0 块电池**：以前靠"不加修饰＝所有实例拼起来"隐式跨电池取最差，现在得写明；
+  # 要跨电池取最差得让算子吃 `[−1]` 的分组输入（见 CLAUDE.md 的已知缺口）。
   - >-
       vmin, cell_min, cells, have_measured, have_fallback, no_cell = _try(cell_voltage_min(
-      battery_status.voltage_cell_v, battery_status.voltage_v,
-      battery_status.voltage_filtered_v, battery_status.cell_count))
+      ref("battery_status[0].voltage_cell_v"),
+      ref("battery_status[0].voltage_v"),
+      ref("battery_status[0].voltage_filtered_v"),
+      ref("battery_status[0].cell_count")))
 
 outputs:
   tag: battery_voltage_drop

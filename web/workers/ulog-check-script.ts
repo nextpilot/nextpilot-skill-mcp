@@ -1,8 +1,10 @@
 // ⚠️ 自动生成，请勿手改。源文件在 engine/ 与 knowledge/px4/，改完跑 `pnpm build:kb`（dev/build 自动执行）。
 import faultKbJson from "./fault-kb.generated.json";
 
-const rules = [{"id":"px4-airspeed-invalid","name":"空速健康","group":"airspeed","order":1,"firmware":"True","airframe":"is_fixed_wing or airframe == 'unknown'","skip":[{"when":"airframe == 'unknown'","reason":"机型未知，无法判定固定翼巡航段"},{"when":"not has_topic('vehicle_attitude_setpoint')"},{"when":"no_data","reason":"无固定翼巡航段或未记录 airspeed_validated"},{"when":"not has_topic('airspeed_validated')","reason":"无固定翼巡航段或未记录 airspeed_validated"}],"compute":["cruise_ok = require_true(masked_any_in(vehicle_status.nav_state, vehicle_status.timestamp, armed_intervals, codes=[3, 8]))","invalid_frac = _try(ratio_equal( ref(\"airspeed_validated.airspeed_sensor_measurement_valid\"), value=0))","has_invalid = invalid_frac is not None","tas_min = _try(min(airspeed_validated.true_airspeed_m_s))"],"outputs":{"tag":"low_airspeed","stats":{"airspeedInvalidRatio":{"var":"invalid_frac","round":3},"airspeedMinM":{"var":"tas_min","round":1}},"check":"airspeed"},"triggers":[{"when":"has_invalid and invalid_frac >= 0.50","severity":"critical","tag":"low_airspeed","threshold":0.5,"value":"f\"{invalid_frac:.3f}\"","field":"airspeed_validated.airspeed_sensor_measurement_valid","title":"空速传感器在固定翼段大部分时间无效（{invalid_frac:.0%} 样本）","suggestion":"结合故障库 F009：空速失效极易引发失速，检查空速管堵塞/积水、管路漏气与校准。"},{"when":"has_invalid and invalid_frac >= 0.10","severity":"warning","tag":"low_airspeed","threshold":0.1,"value":"f\"{invalid_frac:.3f}\"","field":"airspeed_validated.airspeed_sensor_measurement_valid","title":"空速传感器间歇无效（{invalid_frac:.0%} 样本）","suggestion":"结合故障库 F009 检查空速管与管路密封。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"airspeed","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},{"id":"px4-attitude-oscillation","name":"姿态误差高频振荡","group":"attitude_tracking","order":2,"version":"1.1.0","firmware":"True","airframe":"True","skip":[{"when":"not has_armed","reason":"vehicle_attitude(_setpoint) 或 armed 段缺失"},{"when":"not has_topic('vehicle_attitude') or not has_topic('vehicle_attitude_setpoint')","reason":"vehicle_attitude(_setpoint) 或 armed 段缺失"}],"ran_when":"seg_ok","compute":["p99, osc_hz, seg_n = _try(att_tracking_stats(\n  att_q=vehicle_attitude.q,\n  sp_q=vehicle_attitude_setpoint.q_d,\n  sp_roll=vehicle_attitude_setpoint.roll_body,\n  sp_pitch=vehicle_attitude_setpoint.pitch_body,\n  att_ts=vehicle_attitude.timestamp,\n  sp_ts=vehicle_attitude_setpoint.timestamp,\n  intervals=armed_intervals,\n  fw_minor=fw_minor,\n  tilt_min_deg=10.0, min_samples=50, sample_rate=50))","seg_ok = seg_n > 50 if seg_n else False","p99_stat = p99 if seg_ok else None","osc_stat = osc_hz if seg_ok else None"],"outputs":{"tag":"attitude_overshoot","stats":{"attitudeErrDegP99":{"var":"p99_stat","round":1},"attitudeOscHz":{"var":"osc_stat","round":2}},"check":"attitude_tracking"},"triggers":[{"when":"osc_stat >= 4.0 and p99_stat >= 25.0 and is_fixed_wing","severity":"warning","tag":"attitude_overshoot","threshold":4,"value":"f\"{osc_stat:.2f}\"","unit":"Hz","field":"姿态跟踪误差符号翻转频率","title":"姿态误差高频振荡（约 {osc_stat:.1f} Hz）","suggestion":"振荡多与控制增益/机架共振相关，禁用大幅调参，先做频响检查。"},{"when":"osc_stat >= 4.0 and p99_stat >= 15.0 and not is_fixed_wing","severity":"warning","tag":"attitude_overshoot","threshold":4,"value":"f\"{osc_stat:.2f}\"","unit":"Hz","field":"姿态跟踪误差符号翻转频率","title":"姿态误差高频振荡（约 {osc_stat:.1f} Hz）","suggestion":"振荡多与控制增益/机架共振相关，禁用大幅调参，先做频响检查。"}],"status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"attitude","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},{"id":"px4-attitude-overshoot","name":"姿态跟踪超调","group":"attitude_tracking","order":1,"version":"1.1.0","firmware":"True","airframe":"True","skip":[{"when":"not has_armed","reason":"vehicle_attitude(_setpoint) 或 armed 段缺失"},{"when":"not has_topic('vehicle_attitude') or not has_topic('vehicle_attitude_setpoint')","reason":"vehicle_attitude(_setpoint) 或 armed 段缺失"}],"ran_when":"seg_ok","compute":["p99, osc_hz, seg_n = _try(att_tracking_stats(\n  att_q=vehicle_attitude.q,\n  sp_q=vehicle_attitude_setpoint.q_d,\n  sp_roll=vehicle_attitude_setpoint.roll_body,\n  sp_pitch=vehicle_attitude_setpoint.pitch_body,\n  att_ts=vehicle_attitude.timestamp,\n  sp_ts=vehicle_attitude_setpoint.timestamp,\n  intervals=armed_intervals,\n  fw_minor=fw_minor,\n  tilt_min_deg=10.0, min_samples=50, sample_rate=50))","seg_ok = seg_n > 50 if seg_n else False","p99_stat = p99 if seg_ok else None","osc_stat = osc_hz if seg_ok else None"],"outputs":{"tag":"attitude_overshoot","stats":{"attitudeErrDegP99":{"var":"p99_stat","round":1},"attitudeOscHz":{"var":"osc_stat","round":2}},"check":"attitude_tracking"},"triggers":[{"when":"p99_stat >= 40.0 and is_fixed_wing","severity":"critical","tag":"attitude_overshoot","threshold":25,"value":"f\"{p99_stat:.1f}\"","unit":"°","field":"vehicle_attitude vs vehicle_attitude_setpoint（机动段）","title":"姿态跟踪误差过大（p99 {p99_stat:.1f}°）","suggestion":"结合故障库 F006：检查姿态环增益、机架共振；避免直接大幅降 PID。"},{"when":"p99_stat >= 25.0 and is_fixed_wing","severity":"warning","tag":"attitude_overshoot","threshold":25,"value":"f\"{p99_stat:.1f}\"","unit":"°","field":"vehicle_attitude vs vehicle_attitude_setpoint（机动段）","title":"姿态跟踪误差偏大（p99 {p99_stat:.1f}°）","suggestion":"结合故障库 F006 排查；大风环境下优先归因环境扰动。"},{"when":"p99_stat >= 30.0 and not is_fixed_wing","severity":"critical","tag":"attitude_overshoot","threshold":15,"value":"f\"{p99_stat:.1f}\"","unit":"°","field":"vehicle_attitude vs vehicle_attitude_setpoint（机动段）","title":"姿态跟踪误差过大（p99 {p99_stat:.1f}°）","suggestion":"结合故障库 F006：检查姿态环增益、机架共振；避免直接大幅降 PID。"},{"when":"p99_stat >= 15.0 and not is_fixed_wing","severity":"warning","tag":"attitude_overshoot","threshold":15,"value":"f\"{p99_stat:.1f}\"","unit":"°","field":"vehicle_attitude vs vehicle_attitude_setpoint（机动段）","title":"姿态跟踪误差偏大（p99 {p99_stat:.1f}°）","suggestion":"结合故障库 F006 排查；大风环境下优先归因环境扰动。"}],"status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"attitude","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},{"id":"px4-cpu-load","group":"cpu","name":"CPU 负载","firmware":"True","airframe":"True","skip":[{"when":"not has_topic('cpuload')","reason":"cpuload not in log"}],"compute":["cpu_max = max(cpuload.load)"],"outputs":{"check":"cpu_load","stats":{"cpuLoadMax":{"var":"cpu_max","round":3}}},"triggers":[{"when":"cpu_max >= 0.95","severity":"critical","threshold":0.95,"value":"f\"{cpu_max:.3f}\"","field":"cpuload.load(max)","title":"CPU 负载峰值 {cpu_max:.0%} 超阈值","suggestion":"CPU 长期接近满载会导致控制环丢步；检查高耗率模块与日志流配置。"},{"when":"cpu_max >= 0.90","severity":"warning","threshold":0.9,"value":"f\"{cpu_max:.3f}\"","field":"cpuload.load(max)","title":"CPU 负载峰值 {cpu_max:.0%} 偏高","suggestion":"关注 CPU 余量，必要时降低消息发布率。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"system","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},{"id":"px4-ekf-fault","name":"EKF 融合硬故障","group":"ekf_faults","order":1,"firmware":"True","airframe":"True","skip":[{"when":"not has_topic('estimator_status')","reason":"estimator_status not in log"}],"known_legacy":["estimator_status.nan_flags"],"compute":["fault_raw = _try(bit_or_max( ref(\"estimator_status.filter_fault_flags\", per_instance=True)))","nan_raw = _try(max_of_max( ref(\"estimator_status.nan_flags\", per_instance=True)))","fault_union = _try(coalesce(fault_raw, 0))","nan_max = _try(to_int(coalesce(nan_raw, 0)))","crit_bits = _try(has_bits(fault_union, 63))"],"outputs":{"tag":"ekf_innovation_failure","check":"ekf_faults"},"triggers":[{"when":"nan_max > 0 or crit_bits","severity":"critical","threshold":0,"value":"f\"fault={fault_union},nan={nan_max}\"","field":"estimator_status.filter_fault_flags/nan_flags","title":"EKF 报告核心融合硬故障（filter_fault_flags={fault_union}, nan_flags={nan_max}）","suggestion":"估计器出现硬故障/NaN，建议停飞排查传感器与振动后重新标定。"},{"when":"fault_union > 0 and not crit_bits and nan_max == 0","severity":"info","tag":null,"threshold":0,"value":"fault_union","field":"estimator_status.filter_fault_flags","title":"EKF 报告非核心辅助传感器融合拒绝（filter_fault_flags={fault_union}，常见为未使用视觉/光流）","suggestion":"若该机确实未启用视觉/光流定位，此位可忽略；否则检查对应传感器。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"ekf","doc":"https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"},{"id":"px4-ekf-innovation","name":"EKF 创新检验","group":"ekf_innovations","order":1,"firmware":"True","airframe":"True","skip":[{"when":"not has_topic('estimator_status')","reason":"estimator_status not in log"}],"compute":["frac, names, inst = worst_reject_ratio(\n  ref(\"estimator_status.innovation_check_flags\", per_instance=True),\n  ref(\"estimator_status.vel_test_ratio\", per_instance=True),\n  ref(\"estimator_status.pos_test_ratio\", per_instance=True),\n  ref(\"estimator_status.hgt_test_ratio\", per_instance=True),\n  ref(\"estimator_status.hdg_test_ratio\", per_instance=True),\n  ref(\"estimator_status.mag_test_ratio\", per_instance=True),\n  ref(\"estimator_status.tas_test_ratio\", per_instance=True),\n  ref(\"estimator_status.hagl_test_ratio\", per_instance=True),\n  ref(\"estimator_status.beta_test_ratio\", per_instance=True),\n  primary_min=3,\n  primary_names=[\"速度\", \"水平位置\", \"垂直位置\", \"磁罗盘 X\", \"磁罗盘 Y\", \"磁罗盘 Z\",\n                 \"航向\", \"空速\", \"侧滑\", \"离地高度\", \"光流 X\", \"光流 Y\"],\n  ge=1.0,                    # 通道判拒阈值：ratio >= 1 即该路观测被 EKF 拒绝\n  channel_min=3,             # 通道最少被拒样本数，去偶发尖峰毛刺\n  channel_labels=[\"速度\", \"水平位置\", \"垂直高度\", \"航向\", \"磁罗盘\", \"空速\", \"离地高度\", \"侧滑\"],\n  fallback_label=\"未知通道\")","pct = frac * 100"],"outputs":{"tag":"ekf_innovation_failure","stats":{"ekfRejectRatioPct":{"var":"pct","round":2}},"check":"ekf_innovations"},"triggers":[{"when":"pct >= 5.0","severity":"critical","threshold":5,"value":"f\"{pct:.2f}\"","unit":"%","field":"estimator_status 创新检验拒绝样本占比","title":"EKF 创新检验持续失败（estimator #{inst}：{names}）","suggestion":"涉及：{names}。检查对应传感器健康度、安装与校准。"},{"when":"pct >= 1.0","severity":"warning","threshold":1,"value":"f\"{pct:.2f}\"","unit":"%","field":"estimator_status 创新检验拒绝样本占比","title":"EKF 创新检验偶发失败（estimator #{inst}：{names}）","suggestion":"涉及：{names}。关注 GPS 卫星数、磁罗盘干扰、振动与气压计异常。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"ekf","doc":"https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"},{"id":"px4-failsafe-failsafe","name":"失效保护触发","group":"failsafe","order":1,"firmware":"True","airframe":"True","compute":["events = rising_edge_events(vehicle_status.failsafe, vehicle_status.timestamp, armed_intervals, t0_us)"],"foreach":{"var":"events","keys":["t_s"]},"triggers":[{"when":"True","severity":"critical","tag":"failsafe","value":"f\"set at {t_s:.1f}s\"","field":"vehicle_status.failsafe","title":"触发失效保护（飞行中，t={t_s:.1f}s）","suggestion":"结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"failsafe","outputs":{"check":"failsafe"},"doc":"https://docs.px4.io/main/en/config/safety.html"},{"id":"px4-failsafe-rc_signal_lost","name":"遥控信号丢失","group":"failsafe","order":2,"firmware":"True","airframe":"True","compute":["events = rising_edge_events(vehicle_status.rc_signal_lost, vehicle_status.timestamp, armed_intervals, t0_us)"],"foreach":{"var":"events","keys":["t_s"]},"triggers":[{"when":"True","severity":"warning","tag":"rc_lost","value":"f\"set at {t_s:.1f}s\"","field":"vehicle_status.rc_signal_lost","title":"遥控信号丢失（飞行中，t={t_s:.1f}s）","suggestion":"结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"failsafe","outputs":{"check":"failsafe"},"doc":"https://docs.px4.io/main/en/config/safety.html"},{"id":"px4-failsafe-data_link_lost","name":"数据链路丢失","group":"failsafe","order":3,"firmware":"True","airframe":"True","compute":["events = rising_edge_events(vehicle_status.data_link_lost, vehicle_status.timestamp, armed_intervals, t0_us)"],"foreach":{"var":"events","keys":["t_s"]},"triggers":[{"when":"True","severity":"warning","tag":null,"value":"f\"set at {t_s:.1f}s\"","field":"vehicle_status.data_link_lost","title":"数据链路丢失（飞行中，t={t_s:.1f}s）","suggestion":"结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"failsafe","outputs":{"check":"failsafe"},"doc":"https://docs.px4.io/main/en/config/safety.html"},{"id":"px4-failsafe-engine_failure","name":"动力故障保护","group":"failsafe","order":4,"firmware":"True","airframe":"True","compute":["events = rising_edge_events(vehicle_status.engine_failure, vehicle_status.timestamp, armed_intervals, t0_us)"],"foreach":{"var":"events","keys":["t_s"]},"triggers":[{"when":"True","severity":"critical","tag":null,"value":"f\"set at {t_s:.1f}s\"","field":"vehicle_status.engine_failure","title":"发动机/动力故障保护（飞行中，t={t_s:.1f}s）","suggestion":"结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"failsafe","outputs":{"check":"failsafe"},"doc":"https://docs.px4.io/main/en/config/safety.html"},{"id":"px4-failsafe-mission_failure","name":"任务失效保护","group":"failsafe","order":5,"firmware":"True","airframe":"True","compute":["events = rising_edge_events(vehicle_status.mission_failure, vehicle_status.timestamp, armed_intervals, t0_us)"],"foreach":{"var":"events","keys":["t_s"]},"triggers":[{"when":"True","severity":"critical","tag":null,"value":"f\"set at {t_s:.1f}s\"","field":"vehicle_status.mission_failure","title":"任务失效保护（飞行中，t={t_s:.1f}s）","suggestion":"结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"failsafe","outputs":{"check":"failsafe"},"doc":"https://docs.px4.io/main/en/config/safety.html"},{"id":"px4-failsafe-nav","name":"失效保护导航状态","group":"failsafe","order":6,"firmware":"True","airframe":"True","skip":[{"when":"not has_topic('vehicle_status')","reason":"vehicle_status not in log"}],"compute":["events = step_into_events(vehicle_status.nav_state, vehicle_status.timestamp, armed_intervals, t0_us, codes={5: \"AUTO_RTL\", 12: \"DESCEND\", 13: \"TERMINATION\", 18: \"LAND\"})"],"foreach":{"var":"events","keys":["t_s","code","name"]},"triggers":[{"when":"True","severity":"critical","tag":"failsafe","value":"name","field":"vehicle_status.nav_state","title":"飞行中导航状态切换为 {name}（t={t_s:.1f}s）","suggestion":"说明飞控进入失效保护状态，需结合前文事件定位触发原因。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"failsafe","outputs":{"check":"failsafe"},"doc":"https://docs.px4.io/main/en/config/safety.html"},{"id":"px4-gps-eph","name":"GPS 水平位置误差","group":"gps_health","order":1,"firmware":"True","airframe":"True","skip":[{"when":"not has_topic('vehicle_gps_position')","reason":"vehicle_gps_position not in log"}],"compute":["eph_pos = keep_gt(vehicle_gps_position.eph, gt=0)","eph_m = eph_pos * 0.001","e_p95 = percentile(eph_m, p=95)","e_max = max(eph_m)"],"outputs":{"tag":"gps_eph_high","stats":{"gpsEphP95M":{"var":"e_p95","round":2},"gpsEphMaxM":{"var":"e_max","round":2}},"check":"gps_health"},"triggers":[{"when":"e_p95 >= 10.0","severity":"warning","tag":"gps_eph_high","threshold":10,"value":"f\"{e_p95:.2f}\"","unit":"m","field":"vehicle_gps_position.eph(armed p95)","title":"GPS 水平位置误差持续偏大（p95 {e_p95:.1f} m）","suggestion":"结合故障库 F002：排查天线电磁干扰/遮挡/馈线虚接/多路径。"},{"when":"e_p95 >= 5.0","severity":"info","tag":"gps_eph_high","threshold":5,"value":"f\"{e_p95:.2f}\"","unit":"m","field":"vehicle_gps_position.eph(armed p95)","title":"GPS 水平位置误差偶发偏大（p95 {e_p95:.1f} m）","suggestion":"关注天线安装位置与遮挡。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"gps","doc":"https://docs.px4.io/main/en/gps_compass/"},{"id":"px4-gps-jump","name":"GPS 位置跳变","group":"gps_health","order":3,"firmware":"True","airframe":"True","skip":[{"when":"not has_topic('vehicle_gps_position')","reason":"vehicle_gps_position not in log"}],"compute":["step_new = _try(adjacent_speed_mps( ref(\"vehicle_gps_position.latitude_deg\", when_fw=\">=1.15\"), ref(\"vehicle_gps_position.longitude_deg\", when_fw=\">=1.15\"), ref(\"vehicle_gps_position.timestamp\", when_fw=\">=1.15\"), unit=\"deg\"))","step_old = _try(adjacent_speed_mps( ref(\"vehicle_gps_position.lat\", when_fw=\"<1.15\"), ref(\"vehicle_gps_position.lon\", when_fw=\"<1.15\"), ref(\"vehicle_gps_position.timestamp\", when_fw=\"<1.15\"), unit=\"degE7\"))","step = _try(coalesce(step_new, step_old))","njump = _try(to_int(count_above(step, gt=50.0)))"],"outputs":{"tag":"gps_jump","stats":{"gpsJumpCount":{"var":"njump"}},"check":"gps_health"},"triggers":[{"when":"njump >= 3","severity":"warning","tag":"gps_jump","threshold":3,"value":"njump","unit":"次","field":"vehicle_gps_position lat/lon 相邻差分","title":"GPS 位置出现 {njump} 次异常跳变（>50 m/s）","suggestion":"结合故障库 F002：排查多路径、馈线与电磁干扰；室内跳变为正常现象。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"gps","doc":"https://docs.px4.io/main/en/gps_compass/"},{"id":"px4-gps-sats","name":"GPS 卫星数","group":"gps_health","order":2,"firmware":"True","airframe":"True","skip":[{"when":"not has_topic('vehicle_gps_position')","reason":"vehicle_gps_position not in log"}],"compute":["s_min_raw = min(vehicle_gps_position.satellites_used)","s_min = to_int(s_min_raw)"],"outputs":{"tag":"gps_eph_high","stats":{"gpsSatellitesMin":{"var":"s_min"}},"check":"gps_health"},"triggers":[{"when":"s_min <= 6","severity":"warning","tag":"gps_eph_high","threshold":8,"value":"s_min","unit":"颗","field":"vehicle_gps_position.satellites_used(min)","title":"GPS 卫星数最少仅 {s_min} 颗","suggestion":"卫星数不足时定位易跳变；排查遮挡与天线。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"gps","doc":"https://docs.px4.io/main/en/gps_compass/"},{"id":"px4-guard-log-dropouts","name":"数据质量-日志丢包","group":"guards","order":3,"firmware":"True","airframe":"True","outputs":{"guard_tags":[{"when":"dropout_ms > 1000","tag":"log_dropouts_high"}]},"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"guard","compute":[]},{"id":"px4-guard-restart","name":"数据质量-中途重启","group":"guards","order":1,"firmware":"True","airframe":"True","outputs":{"guard_tags":[{"when":"restart_detected","tag":"restart_detected"}]},"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"guard","compute":[]},{"id":"px4-guard-short-log","name":"数据质量-短日志","group":"guards_early","order":1,"firmware":"True","airframe":"True","outputs":{"guard_tags":[{"when":"armed_s > 0 and armed_s < 60","tag":"insufficient_data"},{"when":"armed_s == 0 and duration_s < 60","tag":"insufficient_data"}]},"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"guard","compute":[]},{"id":"px4-guard-topic-missing","name":"数据质量-关键 topic 缺失","group":"guards","order":2,"firmware":"True","airframe":"True","outputs":{"guard_tags":[{"when":"not has_topic('vehicle_status')","tag":"topic_missing:vehicle_status"},{"when":"not has_topic('battery_status')","tag":"topic_missing:battery_status"},{"when":"not has_topic('estimator_status')","tag":"topic_missing:estimator_status"}]},"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"guard","compute":[]},{"id":"px4-imu-bias-drift","name":"陀螺零偏漂移","group":"imu_bias","order":1,"version":"1.1.0","firmware":"True","airframe":"True","skip":[{"when":"not has_armed","reason":"无 armed 段，不做零偏判定"},{"when":"no_data","reason":"无陀螺零偏数据（无 estimator_sensor_bias / estimator_status.states）"}],"known_legacy":["estimator_status.states"],"compute":["bx, by, bz, bts, src_text = _try(gyro_bias_series( ref(\"estimator_sensor_bias.gyro_bias\", instance=0), ref(\"estimator_sensor_bias.timestamp\", instance=0), ref(\"estimator_states.states\", instance=0), ref(\"estimator_states.timestamp\", instance=0), ref(\"estimator_status.states\", instance=0), ref(\"estimator_status.timestamp\", instance=0), fw_minor, slot=10, sources=[\"estimator_sensor_bias.gyro_bias[]\",\n         \"estimator_states.states[10..12]\",\n         \"estimator_status.states[10..12]\"]))","worst_abs, worst_axis, worst_drift, drift_axis = _try(gyro_bias_worst( bx, by, bz, bts, armed_intervals, labels=[\"X\", \"Y\", \"Z\"], min_count=10))","abs_gate = require_true(worst_axis is not None)","temp_range = _try(max_temp_range(ref(\"vehicle_imu_status.temperature_gyro\", instance=0), ref(\"vehicle_air_data.ambient_temperature\", instance=0)))","bias_stat = _try(larger(worst_abs, worst_drift))"],"outputs":{"tag":"imu_bias_drift","stats":{"gyroBiasMaxRadS":{"var":"worst_abs","round":4},"gyroBiasDriftRadS":{"var":"worst_drift","round":4},"gyroBiasSource":{"var":"src_text"},"imuTempRangeC":{"var":"temp_range","round":1}},"guard_tags":[{"when":"temp_range >= 15","tag":"temperature_change_large"}],"check":"imu_bias"},"triggers":[{"when":"worst_abs >= 0.05 or worst_drift >= 0.05","severity":"critical","tag":"imu_bias_drift","threshold":0.02,"value":"f\"{bias_stat:.4f}\"","unit":"rad/s","field":"{src_text}","title":"陀螺零偏异常（轴 {worst_axis}：绝对值 {worst_abs:.4f} rad/s，漂移 {worst_drift:.4f} rad/s）","suggestion":"结合故障库 F005：检查 IMU 安装紧固、执行陀螺/加计标定；若温度跨度大，优先按温度漂移解释。"},{"when":"worst_abs >= 0.02 or worst_drift >= 0.02","severity":"warning","tag":"imu_bias_drift","threshold":0.02,"value":"f\"{bias_stat:.4f}\"","unit":"rad/s","field":"{src_text}","title":"陀螺零偏异常（轴 {worst_axis}：绝对值 {worst_abs:.4f} rad/s，漂移 {worst_drift:.4f} rad/s）","suggestion":"结合故障库 F005：检查 IMU 安装紧固、执行陀螺/加计标定；若温度跨度大，优先按温度漂移解释。"}],"status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"imu","doc":"https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"},{"id":"px4-imu-clipping","name":"加速度计削波","group":"vibration","order":3,"firmware":"True","airframe":"True","skip":[{"when":"not has_topic('vehicle_imu_status')","reason":"vehicle_imu_status not in log"}],"compute":["clip, clip_idx, clip_axis = worst_column_delta(\n  ref(\"vehicle_imu_status.accel_clipping\", per_instance=True, alias=\"clipping\"))","clip_stat = clip if clip > 0 else None"],"outputs":{"tag":"high_vibration","stats":{"imuAccelClippingCountMax":{"var":"clip_stat"}},"check":"vibration"},"triggers":[{"when":"clip >= 1000","severity":"critical","threshold":1000,"value":"clip","unit":"count","field":"vehicle_imu_status.accel_clipping[{clip_axis}](末值-首值)","title":"加速度计削波严重：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）","suggestion":"持续削波会破坏 EKF 估计，请优先排除机械振动源。"},{"when":"clip >= 100","severity":"warning","threshold":100,"value":"clip","unit":"count","field":"vehicle_imu_status.accel_clipping[{clip_axis}](末值-首值)","title":"检测到明显加速度计削波：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）","suggestion":"削波表明振动峰值已超出传感器量程，建议排查机械振动源。"},{"when":"clip > 0","severity":"info","tag":null,"threshold":0,"value":"clip","unit":"count","field":"vehicle_imu_status.accel_clipping[{clip_axis}](末值-首值)","title":"偶发加速度计削波：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）","suggestion":"少量削波可先观察；频次升高或伴随振动告警需排查机械问题。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"vibration","doc":"https://docs.px4.io/main/en/assembly/vibration_isolation.html"},{"id":"px4-log-errors","name":"日志错误消息","group":"logged_messages","order":1,"version":"1.0.1","firmware":"True","airframe":"True","compute":["n = count_items(messages, key=\"level_name\", in_list=[\"EMERGENCY\", \"ALERT\", \"CRITICAL\", \"ERROR\"])","samples = take_items(messages, key=\"level_name\", in_list=[\"EMERGENCY\", \"ALERT\", \"CRITICAL\", \"ERROR\"], limit=5, clip={\"message\": 200}, drop=[\"level\", \"level_name\"])"],"triggers":[{"when":"n > 0","severity":"critical","tag":null,"threshold":0,"value":"n","unit":"条","field":"ulog.logged_messages(log_level<=3)","title":"日志中出现 {n} 条 ERROR 及以上消息","suggestion":"按时间顺序核对错误原文，这通常是定位根因最直接的证据。","evidence_extra":{"samples":"samples"}}],"status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"messages","outputs":{"check":"logged_messages"},"doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},{"id":"px4-log-warnings","name":"日志警告消息","group":"logged_messages","order":2,"version":"1.0.1","firmware":"True","airframe":"True","compute":["n = count_items(messages, key=\"level_name\", eq=\"WARNING\")","samples = take_items(messages, key=\"level_name\", eq=\"WARNING\", limit=5, clip={\"message\": 200}, drop=[\"level\", \"level_name\"])"],"triggers":[{"when":"n > 0","severity":"warning","tag":null,"threshold":0,"value":"n","unit":"条","field":"ulog.logged_messages(log_level=4)","title":"日志中出现 {n} 条 WARNING 消息","evidence_extra":{"samples":"samples"}}],"status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"messages","outputs":{"check":"logged_messages"},"doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},{"id":"px4-mode-thrash","name":"飞行模式抖动","group":"mode_thrash","order":1,"firmware":"True","airframe":"True","skip":[{"when":"not has_topic('vehicle_status')","reason":"vehicle_status not in log"}],"compute":["n_changes_raw = edges_count(vehicle_status.nav_state)","n_changes = to_int(n_changes_raw)"],"outputs":{"stats":{"navStateChanges":{"var":"n_changes"}},"check":"mode_thrash"},"triggers":[{"when":"n_changes > 12","severity":"warning","tag":null,"threshold":12,"value":"n_changes","unit":"次","field":"vehicle_status.nav_state 变化次数","title":"飞行模式切换 {n_changes} 次（>12），可能存在模式抖动","suggestion":"频繁切模式易诱发操纵混乱；检查遥控器开关与失效保护反复触发。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"mode","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},{"id":"px4-motor-unbalance","name":"电机输出不平衡","group":"motor_balance","order":1,"version":"1.1.0","firmware":"True","airframe":"True","skip":[{"when":"no_data","reason":"active motor channels < 4 (非多旋翼或未记录全部电机)"},{"when":"not has_topic('actuator_motors')","reason":"actuator_motors not in log"}],"ran_on_success":true,"compute":["mts = actuator_motors.timestamp","cols = actuator_motors.control","seg = active_window_mask(mts, armed_intervals, vehicle_status.nav_state, vehicle_status.timestamp, codes=[2, 4, 6, 14, 21], min_active=20)","spread, busiest, idlest, n_active = column_spread_stats( cols, seg, min_mean=0.01, min_channels=4)"],"outputs":{"tag":"motor_output_unbalance","stats":{"motorControlSpread":{"var":"spread","round":3},"motorCountActive":{"var":"n_active"}},"check":"motor_balance"},"triggers":[{"when":"spread >= 0.15","severity":"critical","tag":"motor_output_unbalance","threshold":0.15,"value":"f\"{spread:.3f}\"","field":"actuator_motors.control[](悬停段均值极差)","title":"电机输出不平衡（悬停段通道 {busiest} 与 {idlest} 差 {spread:.3f}）","suggestion":"结合故障库 F008：检查桨叶型号/正反桨是否一致、单电机效率、机架形变。"},{"when":"spread >= 0.08","severity":"warning","tag":"motor_output_unbalance","threshold":0.08,"value":"f\"{spread:.3f}\"","field":"actuator_motors.control[](悬停段均值极差)","title":"电机输出差异偏大（通道 {busiest} 与 {idlest} 差 {spread:.3f}）","suggestion":"结合故障库 F008 排查动力一致性；偶发差异可先观察。"}],"status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"motor","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},{"id":"px4-power-cell-voltage","name":"单电芯电压","group":"battery","order":1,"version":"1.1.0","firmware":"True","airframe":"True","skip":[{"when":"not has_topic('battery_status')","reason":"battery_status not in log"}],"compute":["vmin, cell_min, cells, have_measured, have_fallback, no_cell = _try(cell_voltage_min( battery_status.voltage_cell_v, battery_status.voltage_v, battery_status.voltage_filtered_v, battery_status.cell_count))"],"outputs":{"tag":"battery_voltage_drop","stats":{"batteryVoltageMin":{"var":"vmin","round":2},"batteryCellCount":{"var":"cells"},"batteryCellVoltageMin":{"var":"cell_min","round":3}},"check":"battery"},"triggers":[{"when":"have_measured and cell_min < 3.55","severity":"critical","threshold":3.55,"value":"f\"{cell_min:.3f}\"","unit":"V/cell","field":"battery_status.voltage_cell_v[](实测最小值)","title":"电芯电压严重过低","suggestion":"存在过放风险，检查电池老化、放电倍率匹配与低压告警阈值。"},{"when":"have_fallback and not have_measured and cell_min < 3.55","severity":"critical","threshold":3.55,"value":"f\"{cell_min:.3f}\"","unit":"V/cell","field":"battery_status.voltage_v(min)/cell_count","title":"电芯电压严重过低","suggestion":"存在过放风险，检查电池老化、放电倍率匹配与低压告警阈值。"},{"when":"have_measured and cell_min < 3.70","severity":"warning","threshold":3.7,"value":"f\"{cell_min:.3f}\"","unit":"V/cell","field":"battery_status.voltage_cell_v[](实测最小值)","title":"电芯电压偏低","suggestion":"建议核对剩余容量估计与返航电压裕度。"},{"when":"have_fallback and not have_measured and cell_min < 3.70","severity":"warning","threshold":3.7,"value":"f\"{cell_min:.3f}\"","unit":"V/cell","field":"battery_status.voltage_v(min)/cell_count","title":"电芯电压偏低","suggestion":"建议核对剩余容量估计与返航电压裕度。"},{"when":"no_cell","severity":"info","tag":null,"value":"f\"missing\"","field":"battery_status.voltage_cell_v / cell_count","title":"日志缺少电芯电压与 cell_count，未做单电芯判断"}],"status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"power","doc":"https://docs.px4.io/main/en/config/battery.html"},{"id":"px4-power-remaining","name":"电池剩余电量","group":"battery","order":3,"firmware":"True","airframe":"True","skip":[{"when":"not has_topic('battery_status')","reason":"battery_status not in log"}],"compute":["rem = min_ge(battery_status.remaining, ge=0)","rem_pct = rem * 100"],"outputs":{"tag":"battery_voltage_drop","stats":{"batteryRemainingMin":{"var":"rem","round":3}},"check":"battery"},"triggers":[{"when":"rem <= 0.10","severity":"critical","threshold":0.1,"value":"f\"{rem:.3f}\"","field":"battery_status.remaining(min)","title":"电池剩余电量极低（{rem_pct:.0f}%）","suggestion":"剩余电量低于 10%，应立即返航；检查电量估算与电池健康。"},{"when":"rem <= 0.20","severity":"warning","threshold":0.2,"value":"f\"{rem:.3f}\"","field":"battery_status.remaining(min)","title":"电池剩余电量偏低（{rem_pct:.0f}%）","suggestion":"剩余电量低于 20%，注意返航裕度。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"power","doc":"https://docs.px4.io/main/en/config/battery.html"},{"id":"px4-power-sag","name":"飞行中持续压降","group":"battery","order":2,"firmware":"True","airframe":"True","skip":[{"when":"not has_topic('battery_status')","reason":"battery_status not in log"}],"compute":["cell_min_t = rows_aggregate(battery_status.voltage_cell_v, agg=\"min\", gt=0)","drop, tail = head_tail_median_drop(cell_min_t, battery_status.timestamp, armed_intervals, skip_first_s=5, min_seg=20)"],"outputs":{"tag":"battery_voltage_drop","stats":{"batteryCellSagFlight":{"var":"drop","round":3}},"check":"battery"},"triggers":[{"when":"drop >= 0.30 and tail < 3.70","severity":"warning","threshold":0.3,"value":"f\"{drop:.3f}\"","unit":"V","field":"battery_status.voltage_cell_v[] armed 段趋势","title":"飞行中单电芯持续压降 {drop:.2f} V（尾段中位 {tail:.2f} V）","suggestion":"持续压降区别于大机动瞬时压降：排查电芯老化内阻、插头虚接、线缆线径与负载匹配。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"power","doc":"https://docs.px4.io/main/en/config/battery.html"},{"id":"px4-vibration-stddev","name":"IMU 加速度标准差","group":"vibration","order":2,"firmware":"True","airframe":"True","skip":[{"when":"not has_topic('vehicle_imu_status')","reason":"vehicle_imu_status not in log"}],"compute":["stddev_rss, stddev_idx = worst_rss_mean( ref(\"vehicle_imu_status.stddev_accel_x_m_s2\", per_instance=True, alias=\"stddev_accel_x\"), ref(\"vehicle_imu_status.stddev_accel_y_m_s2\", per_instance=True, alias=\"stddev_accel_y\"), ref(\"vehicle_imu_status.stddev_accel_z_m_s2\", per_instance=True, alias=\"stddev_accel_z\"), min_mean=0)"],"outputs":{"tag":"high_vibration","stats":{"imuStddevAccelRssMax":{"var":"stddev_rss","round":3}},"check":"vibration"},"triggers":[{"when":"stddev_rss >= 1.0","severity":"critical","threshold":1,"value":"f\"{stddev_rss:.3f}\"","unit":"m/s^2","field":"vehicle_imu_status.stddev_accel_*_m_s2(RSS 均值)","title":"IMU 加速度标准差严重超标（IMU #{stddev_idx}）","suggestion":"结合故障库条目排查桨叶/电机轴承/机架紧固/减震。"},{"when":"stddev_rss >= 0.5","severity":"warning","threshold":0.5,"value":"f\"{stddev_rss:.3f}\"","unit":"m/s^2","field":"vehicle_imu_status.stddev_accel_*_m_s2(RSS 均值)","title":"IMU 加速度标准差偏大（IMU #{stddev_idx}）","suggestion":"关注桨叶损伤、电机动平衡与 IMU 减震。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"vibration","doc":"https://docs.px4.io/main/en/assembly/vibration_isolation.html"},{"id":"px4-vibration","name":"高频振动","group":"vibration","order":1,"firmware":"True","airframe":"True","skip":[{"when":"not has_topic('vehicle_imu_status')","reason":"vehicle_imu_status not in log"}],"compute":["vibe_mean, vibe_p95, vibe_max, imu_idx = worst_mean_stats(\n  ref(\"vehicle_imu_status.accel_vibration_metric\", per_instance=True), min_mean=0)"],"outputs":{"tag":"high_vibration","stats":{"imuAccelVibrationMean":{"var":"vibe_mean","round":3},"imuAccelVibrationP95":{"var":"vibe_p95","round":3},"imuAccelVibrationMax":{"var":"vibe_max","round":3}},"check":"vibration"},"triggers":[{"when":"vibe_mean >= 9.81","severity":"critical","threshold":9.81,"value":"f\"{vibe_mean:.3f}\"","unit":"m/s^2","field":"vehicle_imu_status.accel_vibration_metric(均值)","title":"高频振动严重超标（IMU #{imu_idx}）","suggestion":"Flight Review 红色区间（>9.81 m/s^2）。结合故障库条目排查桨叶/电机/机架/减震。"},{"when":"vibe_mean >= 4.905","severity":"warning","threshold":4.905,"value":"f\"{vibe_mean:.3f}\"","unit":"m/s^2","field":"vehicle_imu_status.accel_vibration_metric(均值)","title":"高频振动偏大（IMU #{imu_idx}）","suggestion":"Flight Review 橙色区间（4.905~9.81 m/s^2）。结合故障库条目排查桨叶动平衡/电机/IMU 减震。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"vibration","doc":"https://docs.px4.io/main/en/assembly/vibration_isolation.html"},{"id":"px4-vtol-transition-attitude","name":"VTOL 转换姿态越限","group":"vtol_transition","order":1,"firmware":"True","airframe":"True","skip":[{"when":"not has_armed or not has_topic('vehicle_status')"},{"when":"not has_topic('vtol_vehicle_status')","reason":"vtol_vehicle_status not in log"}],"compute":["trans_n = _try(count_above(vtol_vehicle_status.vtol_in_trans_mode, gt=0))","trans_n_i = _try(to_int(trans_n))","trans_mask = _try(fill_to(ref(\"vtol_vehicle_status.vtol_in_trans_mode\"), ref(\"vtol_vehicle_status.timestamp\"), ref(\"vehicle_attitude.timestamp\")))","roll, pitch, yaw = _try(quat_to_euler(ref(\"vehicle_attitude.q[0]\"), ref(\"vehicle_attitude.q[1]\"), ref(\"vehicle_attitude.q[2]\"), ref(\"vehicle_attitude.q[3]\")))","tilt_max = _try(masked_absmax(larger(abs_values(roll), abs_values(pitch)), trans_mask))","trans_cnt = _try(count_true(trans_mask))","enough = _try(trans_cnt > 5)","has_tilt = tilt_max is not None","tilt_stat = _try(tilt_max if enough else None)"],"outputs":{"tag":"vtol_convert_attitude_over","stats":{"vtolTransitionSamples":{"var":"trans_n_i"},"vtolTransitionMaxTiltDeg":{"var":"tilt_stat","round":1}},"check":"vtol_transition"},"triggers":[{"when":"has_tilt and enough and tilt_max > 8.0","severity":"warning","tag":"vtol_convert_attitude_over","threshold":8,"value":"f\"{tilt_max:.1f}\"","unit":"°","field":"vehicle_attitude（vtol_in_trans_mode 段）","title":"VTOL 转换阶段姿态越限（最大 {tilt_max:.1f}°，限值 8°）","suggestion":"结合故障库 F003：复盘转换时序与推力匹配，强风环境优先归因环境扰动。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"vtol","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},{"id":"px4-wind-estimate","name":"风扰估计","group":"wind_estimate","order":1,"firmware":"True","airframe":"True","skip":[{"when":"not has_topic('estimator_wind') and not has_topic('wind_estimate')","reason":"estimator_wind / wind_estimate not in log"}],"compute":["w_p95 = percentile(\n  hypot(coalesce(ref(\"estimator_wind.windspeed_north\", when_fw=\">=1.15\"),\n                 ref(\"wind_estimate.windspeed_north\", when_fw=\"<1.15\")),\n        coalesce(ref(\"estimator_wind.windspeed_east\", when_fw=\">=1.15\"),\n                 ref(\"wind_estimate.windspeed_east\", when_fw=\"<1.15\"))),\n  p=95)"],"outputs":{"tag":"wind_disturb","guard_tags":[{"when":"w_p95 >= 8.0","tag":"wind_strong"}],"stats":{"windSpeedP95M":{"var":"w_p95","round":1}},"check":"wind_estimate"},"triggers":[{"when":"w_p95 >= 12.0","severity":"warning","tag":"wind_disturb","threshold":8,"value":"f\"{w_p95:.1f}\"","unit":"m/s","field":"estimator_wind.windspeed_north/east","title":"估计风速较大（p95 {w_p95:.1f} m/s）","suggestion":"结合故障库 F010：强风属环境扰动，姿态超调/转换越限优先归因风，不要直接改 PID。"},{"when":"w_p95 >= 8.0","severity":"info","tag":"wind_disturb","threshold":8,"value":"f\"{w_p95:.1f}\"","unit":"m/s","field":"estimator_wind.windspeed_north/east","title":"估计风速偏大（p95 {w_p95:.1f} m/s）","suggestion":"解释姿态类异常时需考虑风扰因素。"}],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"wind","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"}];
-const facts = {"group_order":["guards_early","vibration","ekf_innovations","ekf_faults","battery","cpu","gps_health","failsafe","mode_thrash","motor_balance","imu_bias","attitude_tracking","airspeed","vtol_transition","wind_estimate","logged_messages","guards"],"rule_meta":{"defaults":{"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"}},"by_group":{"airspeed":{"category":"airspeed","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},"attitude_tracking":{"category":"attitude","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},"battery":{"category":"power","doc":"https://docs.px4.io/main/en/config/battery.html"},"cpu":{"category":"system","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},"ekf_faults":{"category":"ekf","doc":"https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"},"ekf_innovations":{"category":"ekf","doc":"https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"},"failsafe":{"category":"failsafe","doc":"https://docs.px4.io/main/en/config/safety.html"},"gps_health":{"category":"gps","doc":"https://docs.px4.io/main/en/gps_compass/"},"guards":{"category":"guard"},"guards_early":{"category":"guard"},"imu_bias":{"category":"imu","doc":"https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"},"logged_messages":{"category":"messages","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},"mode_thrash":{"category":"mode","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},"motor_balance":{"category":"motor","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},"vibration":{"category":"vibration","doc":"https://docs.px4.io/main/en/assembly/vibration_isolation.html"},"vtol_transition":{"category":"vtol","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},"wind_estimate":{"category":"wind","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"}}},"log_levels":{"48":"EMERGENCY","49":"ALERT","50":"CRITICAL","51":"ERROR","52":"WARNING","53":"NOTICE","54":"INFO","55":"DEBUG"},"vehicle_types":{"1":"rotary_wing","2":"fixed_wing","3":"rover","4":"airship"},"nav_state_names":{"0":"Manual","1":"Altitude","2":"Position","3":"Mission","4":"Hold","5":"Return","6":"Position Slow","7":"Free5","8":"Free4","10":"Acro","11":"Free3","12":"Descend","13":"Termination","14":"Offboard","15":"Stabilized","16":"Free2","17":"Takeoff","18":"Land","19":"Free1","20":"Follow","21":"Orbit","22":"VTOL Takeoff"},"nav_state_groups":[{"phase":"takeoff","codes":[17,22]},{"phase":"hover","codes":[2,4,6,14,21]},{"phase":"maneuver","codes":[0,1,10,15]},{"phase":"fw_cruise","codes":[3,8]},{"phase":"landing","codes":[18,20,5,12,13]}],"sys_info_keys":["sys_name","ver_sw","ver_sw_release","ver_vendor_sw_release","ver_hw","ver_hw_subtype","sys_os_name","sys_os_ver","sys_toolchain","sys_toolchain_ver","sys_mcu","time_start_utc","duration","git_branch"],"ulog_msg_types":[{"code":"B","name":"标志位","en":"Flag Bits","desc":"兼容性标志，只在文件开头出现"},{"code":"I","name":"信息","en":"Information","desc":"键 → 值，系统信息字典"},{"code":"M","name":"多值信息","en":"Multi Information","desc":"键 → 多组值，无时间戳（一条长消息会拆成多行续写，故条数多于键数）"},{"code":"F","name":"消息格式","en":"Format","desc":"每个订阅话题的字段定义"},{"code":"P","name":"参数","en":"Parameter","desc":"日志开头的参数值；飞行中改参数也用它"},{"code":"Q","name":"参数默认值","en":"Default Parameter","desc":"只记与当前值不同的默认值（一个参数可能写两条）"},{"code":"A","name":"订阅话题","en":"Add Logged","desc":"每个话题实例一条"},{"code":"R","name":"取消订阅","en":"Remove Logged","desc":"运行中停止记录某话题"},{"code":"D","name":"数据","en":"Data","desc":"日志主体：订阅话题的每一次采样"},{"code":"L","name":"日志消息","en":"Logging","desc":"带时间戳的日志行"},{"code":"C","name":"带标签日志消息","en":"Tagged Logging","desc":"同上，另有来源 tag"},{"code":"O","name":"丢包","en":"Dropout","desc":"记录线程来不及时丢掉的时长"},{"code":"S","name":"同步标记","en":"Sync","desc":"每约 4 KB 一个，损坏后靠它重新对齐"}],"info_key_docs":{"ver_sw":{"name":"固件提交号","desc":"固件构建时的 git 提交，用来对上游源码"},"ver_sw_branch":{"name":"固件分支","desc":"构建所在的分支 / 标签"},"ver_sw_release":{"name":"固件版本号","desc":"打包成 major<<24 | minor<<16 | patch<<8 | 类型（1=release 等）"},"ver_vendor_sw_release":{"name":"厂商版本号","desc":"厂商自定义版本；255 表示厂商未使用"},"ver_hw":{"name":"硬件型号","desc":"飞控板型号，判断引脚 / 传感器配置的入口"},"ver_hw_subtype":{"name":"硬件子型号","desc":"同型号的不同批次 / 变体"},"ver_data_format":{"name":"数据格式版本","desc":"ULog 数据格式版本，与本站解析器看到的格式对应"},"sys_name":{"name":"系统名","desc":"固定为 PX4"},"sys_os_name":{"name":"操作系统","desc":"NuttX（飞控本机）或 Linux（机载计算机）"},"sys_os_ver":{"name":"OS 提交号","desc":"操作系统的 git 提交"},"sys_os_ver_release":{"name":"OS 版本号","desc":"打包方式同固件版本号"},"sys_toolchain":{"name":"工具链","desc":"编译固件用的工具链"},"sys_toolchain_ver":{"name":"工具链版本","desc":"工具链的具体版本，排查\"换个编译器行为就不一样\"时用"},"sys_mcu":{"name":"MCU","desc":"主控芯片型号与硅版本"},"sys_uuid":{"name":"飞控唯一 ID","desc":"PX4GUID，出厂烧录；同型号不同板子也不同，可用来区分设备"},"time_ref_utc":{"name":"UTC 时间参考","desc":"相对启动的偏移（秒）；0 表示这次飞行没对时"},"time_start_utc":{"name":"起始 UTC 时间","desc":"日志起始时刻（旧固件记录）"},"boot_time_utc_us":{"name":"启动时刻","desc":"UTC 微秒；只有对过时才有意义"},"duration":{"name":"日志时长","desc":"秒（旧固件记录）"},"git_branch":{"name":"固件分支","desc":"旧固件的分支名字段"},"metadata_events_sha256":{"name":"事件元数据哈希","desc":"事件定义文件的 SHA-256，用来校验事件定义是否被改动"}},"metrics":[{"key":"imuAccelVibrationMax","label":"最大振动","unit":"m/s²","topic":"vehicle_imu_status","field":"accel_vibration_metric","op":"max","round":2},{"key":"batteryVoltageMin","label":"最低电压","unit":"V","topic":"battery_status","field":"voltage_v","op":"min","round":2},{"key":"batteryCellVoltageMin","label":"最低电芯电压","unit":"V","topic":"battery_status","fields":["voltage_cell_v","voltage_v","voltage_filtered_v","cell_count"],"op":"cell_voltage_min","pick":"vmin","round":3},{"key":"currentMax","label":"最大电流","unit":"A","topic":"battery_status","field":"current_a","op":"max","round":2},{"key":"batteryRemainingMin","label":"最低剩余电量","unit":"0..1","topic":"battery_status","field":"remaining","op":"min_ge","ge":0,"round":3},{"key":"gpsSatellitesMin","label":"最少搜星","unit":"颗","topic":"vehicle_gps_position","field":["satellites_used","satellites_visible"],"op":"min","round":0},{"key":"gpsEphMaxM","label":"最大定位误差","unit":"m","topic":"vehicle_gps_position","field":"eph","op":"max","scale":0.001,"round":2},{"key":"cpuLoadMax","label":"CPU 峰值","unit":"0..1","topic":"cpuload","field":"load","op":"max","round":3},{"key":"imuAccelClippingCountMax","label":"加速度计削波计数","unit":"次"},{"key":"imuTempRangeC","label":"IMU 温度跨度","unit":"°C"},{"key":"ekfRejectRatioPct","label":"EKF 拒绝占比","unit":"比例"},{"key":"attitudeErrDegP99","label":"姿态误差 p99","unit":"°"},{"key":"attitudeOscHz","label":"姿态振荡频率","unit":"Hz"},{"key":"motorControlSpread","label":"电机输出离散度"},{"key":"motorCountActive","label":"活跃电机数","unit":"个"},{"key":"gyroBiasMaxRadS","label":"陀螺零偏最大","unit":"rad/s"},{"key":"gyroBiasDriftRadS","label":"陀螺零偏漂移","unit":"rad/s"},{"key":"windSpeedP95M","label":"风速 p95","unit":"m/s"},{"key":"airspeedMinM","label":"最低空速","unit":"m/s"},{"key":"airspeedInvalidRatio","label":"空速无效占比","unit":"比例"},{"key":"gpsJumpCount","label":"GPS 跳变次数","unit":"次"},{"key":"navStateChanges","label":"模式切换次数","unit":"次"},{"key":"vtolTransitionSamples","label":"VTOL 转换样本数","unit":"个"},{"key":"batteryCellCount","label":"电芯数","unit":"个"}],"track":{"topic":"vehicle_gps_position","instance":0,"max_points":1500,"lat":[{"field":"latitude_deg","scale":1},{"field":"lat","scale":1e-7}],"lon":[{"field":"longitude_deg","scale":1},{"field":"lon","scale":1e-7}],"alt":[{"field":"altitude_msl_m","scale":1},{"field":"alt","scale":0.001}]}};
+const rules = [{"id":"px4-airspeed-invalid","name":"空速健康","group":"airspeed","order":1,"compute":["cruise_ok = require_true(masked_any_in(vehicle_status.nav_state, vehicle_status.timestamp, ARMED_INTERVALS, codes=[3, 8]))","invalid_frac = _try(ratio_equal( ref(\"airspeed_validated.airspeed_sensor_measurement_valid\"), value=0))","has_invalid = invalid_frac is not None","tas_min = _try(min(airspeed_validated.true_airspeed_m_s))"],"outputs":{"tag":"low_airspeed","stats":{"airspeedInvalidRatio":{"var":"invalid_frac","round":3},"airspeedMinM":{"var":"tas_min","round":1}},"check":"airspeed"},"triggers":[{"when":"has_invalid and invalid_frac >= 0.50","severity":"critical","tag":"low_airspeed","threshold":0.5,"value":"f\"{invalid_frac:.3f}\"","field":"airspeed_validated.airspeed_sensor_measurement_valid","title":"空速传感器在固定翼段大部分时间无效（{invalid_frac:.0%} 样本）","suggestion":"结合故障库 F009：空速失效极易引发失速，检查空速管堵塞/积水、管路漏气与校准。"},{"when":"has_invalid and invalid_frac >= 0.10","severity":"warning","tag":"low_airspeed","threshold":0.1,"value":"f\"{invalid_frac:.3f}\"","field":"airspeed_validated.airspeed_sensor_measurement_valid","title":"空速传感器间歇无效（{invalid_frac:.0%} 样本）","suggestion":"结合故障库 F009 检查空速管与管路密封。"}],"firmware":"any","airframe":"fixed_wing","topics":[["airspeed_validated"]],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"airspeed","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},{"id":"px4-attitude-oscillation","name":"姿态误差高频振荡","group":"attitude_tracking","order":2,"version":"1.1.0","ran_when":"seg_ok","compute":["p99, osc_hz, seg_n = _try(att_tracking_stats(\n  att_q=vehicle_attitude.q,\n  # 指令源：两路都给，**有 q_d 就用 q_d**（新版只记它），没有才回退 roll/pitch_body。\n  # 顺序由算子定，规则不用管版本——按存在性挑，不按版本号挑。\n  sp_q=ref(\"vehicle_attitude_setpoint.q_d\"),\n  sp_roll=ref(\"vehicle_attitude_setpoint.roll_body\"),\n  sp_pitch=ref(\"vehicle_attitude_setpoint.pitch_body\"),\n  att_ts=vehicle_attitude.timestamp,\n  sp_ts=vehicle_attitude_setpoint.timestamp,\n  intervals=ARMED_INTERVALS,\n  tilt_min_deg=10.0, min_samples=50, sample_rate=50))","seg_ok = seg_n > 50 if seg_n else False","p99_stat = p99 if seg_ok else None","osc_stat = osc_hz if seg_ok else None"],"outputs":{"tag":"attitude_overshoot","stats":{"attitudeErrDegP99":{"var":"p99_stat","round":1},"attitudeOscHz":{"var":"osc_stat","round":2}},"check":"attitude_tracking"},"triggers":[{"when":"osc_stat >= 4.0 and p99_stat >= 25.0 and IS_FIXED_WING","severity":"warning","tag":"attitude_overshoot","threshold":4,"value":"f\"{osc_stat:.2f}\"","unit":"Hz","field":"姿态跟踪误差符号翻转频率","title":"姿态误差高频振荡（约 {osc_stat:.1f} Hz）","suggestion":"振荡多与控制增益/机架共振相关，禁用大幅调参，先做频响检查。"},{"when":"osc_stat >= 4.0 and p99_stat >= 15.0 and not IS_FIXED_WING","severity":"warning","tag":"attitude_overshoot","threshold":4,"value":"f\"{osc_stat:.2f}\"","unit":"Hz","field":"姿态跟踪误差符号翻转频率","title":"姿态误差高频振荡（约 {osc_stat:.1f} Hz）","suggestion":"振荡多与控制增益/机架共振相关，禁用大幅调参，先做频响检查。"}],"firmware":"any","airframe":"any","topics":[["vehicle_attitude"],["vehicle_attitude_setpoint"]],"status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"attitude","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},{"id":"px4-attitude-overshoot","name":"姿态跟踪超调","group":"attitude_tracking","order":1,"version":"1.1.0","ran_when":"seg_ok","compute":["p99, osc_hz, seg_n = _try(att_tracking_stats(\n  att_q=vehicle_attitude.q,\n  # 指令源：两路都给，**有 q_d 就用 q_d**（新版只记它），没有才回退 roll/pitch_body。\n  # 顺序由算子定，规则不用管版本——按存在性挑，不按版本号挑。\n  sp_q=ref(\"vehicle_attitude_setpoint.q_d\"),\n  sp_roll=ref(\"vehicle_attitude_setpoint.roll_body\"),\n  sp_pitch=ref(\"vehicle_attitude_setpoint.pitch_body\"),\n  att_ts=vehicle_attitude.timestamp,\n  sp_ts=vehicle_attitude_setpoint.timestamp,\n  intervals=ARMED_INTERVALS,\n  tilt_min_deg=10.0, min_samples=50, sample_rate=50))","seg_ok = seg_n > 50 if seg_n else False","p99_stat = p99 if seg_ok else None","osc_stat = osc_hz if seg_ok else None"],"outputs":{"tag":"attitude_overshoot","stats":{"attitudeErrDegP99":{"var":"p99_stat","round":1},"attitudeOscHz":{"var":"osc_stat","round":2}},"check":"attitude_tracking"},"triggers":[{"when":"p99_stat >= 40.0 and IS_FIXED_WING","severity":"critical","tag":"attitude_overshoot","threshold":25,"value":"f\"{p99_stat:.1f}\"","unit":"°","field":"vehicle_attitude vs vehicle_attitude_setpoint（机动段）","title":"姿态跟踪误差过大（p99 {p99_stat:.1f}°）","suggestion":"结合故障库 F006：检查姿态环增益、机架共振；避免直接大幅降 PID。"},{"when":"p99_stat >= 25.0 and IS_FIXED_WING","severity":"warning","tag":"attitude_overshoot","threshold":25,"value":"f\"{p99_stat:.1f}\"","unit":"°","field":"vehicle_attitude vs vehicle_attitude_setpoint（机动段）","title":"姿态跟踪误差偏大（p99 {p99_stat:.1f}°）","suggestion":"结合故障库 F006 排查；大风环境下优先归因环境扰动。"},{"when":"p99_stat >= 30.0 and not IS_FIXED_WING","severity":"critical","tag":"attitude_overshoot","threshold":15,"value":"f\"{p99_stat:.1f}\"","unit":"°","field":"vehicle_attitude vs vehicle_attitude_setpoint（机动段）","title":"姿态跟踪误差过大（p99 {p99_stat:.1f}°）","suggestion":"结合故障库 F006：检查姿态环增益、机架共振；避免直接大幅降 PID。"},{"when":"p99_stat >= 15.0 and not IS_FIXED_WING","severity":"warning","tag":"attitude_overshoot","threshold":15,"value":"f\"{p99_stat:.1f}\"","unit":"°","field":"vehicle_attitude vs vehicle_attitude_setpoint（机动段）","title":"姿态跟踪误差偏大（p99 {p99_stat:.1f}°）","suggestion":"结合故障库 F006 排查；大风环境下优先归因环境扰动。"}],"firmware":"any","airframe":"any","topics":[["vehicle_attitude"],["vehicle_attitude_setpoint"]],"status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"attitude","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},{"id":"px4-cpu-load","group":"cpu","name":"CPU 负载","compute":["cpu_max = max(cpuload.load)"],"outputs":{"check":"cpu_load","stats":{"cpuLoadMax":{"var":"cpu_max","round":3}}},"triggers":[{"when":"cpu_max >= 0.95","severity":"critical","threshold":0.95,"value":"f\"{cpu_max:.3f}\"","field":"cpuload.load(max)","title":"CPU 负载峰值 {cpu_max:.0%} 超阈值","suggestion":"CPU 长期接近满载会导致控制环丢步；检查高耗率模块与日志流配置。"},{"when":"cpu_max >= 0.90","severity":"warning","threshold":0.9,"value":"f\"{cpu_max:.3f}\"","field":"cpuload.load(max)","title":"CPU 负载峰值 {cpu_max:.0%} 偏高","suggestion":"关注 CPU 余量，必要时降低消息发布率。"}],"firmware":"any","airframe":"any","topics":[["cpuload"]],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"system","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},{"id":"px4-ekf-fault","name":"EKF 融合硬故障","group":"ekf_faults","order":1,"compute":["fault_raw = _try(bit_or_max( ref(\"estimator_status[:].filter_fault_flags\")))","fault_union = _try(coalesce(fault_raw, 0))","crit_bits = _try(has_bits(fault_union, 63))"],"outputs":{"tag":"ekf_innovation_failure","check":"ekf_faults"},"triggers":[{"when":"crit_bits","severity":"critical","threshold":0,"value":"f\"fault={fault_union}\"","field":"estimator_status.filter_fault_flags","title":"EKF 报告核心融合硬故障（filter_fault_flags={fault_union}）","suggestion":"估计器出现硬故障，建议停飞排查传感器与振动后重新标定。"},{"when":"fault_union > 0 and not crit_bits","severity":"info","tag":null,"threshold":0,"value":"fault_union","field":"estimator_status.filter_fault_flags","title":"EKF 报告非核心辅助传感器融合拒绝（filter_fault_flags={fault_union}，常见为未使用视觉/光流）","suggestion":"若该机确实未启用视觉/光流定位，此位可忽略；否则检查对应传感器。"}],"firmware":"any","airframe":"any","topics":[["estimator_status"]],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"ekf","doc":"https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"},{"id":"px4-ekf-innovation","name":"EKF 创新检验","group":"ekf_innovations","order":1,"compute":["frac, names, inst = worst_reject_ratio(\n  ref(\"estimator_status[:].innovation_check_flags\"),\n  ref(\"estimator_status[:].vel_test_ratio\"),\n  ref(\"estimator_status[:].pos_test_ratio\"),\n  ref(\"estimator_status[:].hgt_test_ratio\"),\n  ref(\"estimator_status[:].hdg_test_ratio\"),\n  ref(\"estimator_status[:].mag_test_ratio\"),\n  ref(\"estimator_status[:].tas_test_ratio\"),\n  ref(\"estimator_status[:].hagl_test_ratio\"),\n  ref(\"estimator_status[:].beta_test_ratio\"),\n  primary_min=3,\n  primary_names=[\"速度\", \"水平位置\", \"垂直位置\", \"磁罗盘 X\", \"磁罗盘 Y\", \"磁罗盘 Z\",\n                 \"航向\", \"空速\", \"侧滑\", \"离地高度\", \"光流 X\", \"光流 Y\"],\n  ge=1.0,                    # 通道判拒阈值：ratio >= 1 即该路观测被 EKF 拒绝\n  channel_min=3,             # 通道最少被拒样本数，去偶发尖峰毛刺\n  channel_labels=[\"速度\", \"水平位置\", \"垂直高度\", \"航向\", \"磁罗盘\", \"空速\", \"离地高度\", \"侧滑\"],\n  fallback_label=\"未知通道\")","pct = frac * 100"],"outputs":{"tag":"ekf_innovation_failure","stats":{"ekfRejectRatioPct":{"var":"pct","round":2}},"check":"ekf_innovations"},"triggers":[{"when":"pct >= 5.0","severity":"critical","threshold":5,"value":"f\"{pct:.2f}\"","unit":"%","field":"estimator_status 创新检验拒绝样本占比","title":"EKF 创新检验持续失败（estimator #{inst}：{names}）","suggestion":"涉及：{names}。检查对应传感器健康度、安装与校准。"},{"when":"pct >= 1.0","severity":"warning","threshold":1,"value":"f\"{pct:.2f}\"","unit":"%","field":"estimator_status 创新检验拒绝样本占比","title":"EKF 创新检验偶发失败（estimator #{inst}：{names}）","suggestion":"涉及：{names}。关注 GPS 卫星数、磁罗盘干扰、振动与气压计异常。"}],"firmware":"any","airframe":"any","topics":[["estimator_status"]],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"ekf","doc":"https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"},{"id":"px4-failsafe-failsafe","name":"失效保护触发","group":"failsafe","order":1,"compute":["events = rising_edge_events(vehicle_status.failsafe, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)"],"foreach":{"var":"events","keys":["t_s"]},"triggers":[{"when":"True","severity":"critical","tag":"failsafe","value":"f\"set at {t_s:.1f}s\"","field":"vehicle_status.failsafe","title":"触发失效保护（飞行中，t={t_s:.1f}s）","suggestion":"结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"}],"firmware":"any","airframe":"any","version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"failsafe","outputs":{"check":"failsafe"},"doc":"https://docs.px4.io/main/en/config/safety.html"},{"id":"px4-failsafe-rc_signal_lost","name":"遥控信号丢失","group":"failsafe","order":2,"compute":["events = rising_edge_events(vehicle_status.rc_signal_lost, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)"],"foreach":{"var":"events","keys":["t_s"]},"triggers":[{"when":"True","severity":"warning","tag":"rc_lost","value":"f\"set at {t_s:.1f}s\"","field":"vehicle_status.rc_signal_lost","title":"遥控信号丢失（飞行中，t={t_s:.1f}s）","suggestion":"结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"}],"firmware":"any","airframe":"any","version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"failsafe","outputs":{"check":"failsafe"},"doc":"https://docs.px4.io/main/en/config/safety.html"},{"id":"px4-failsafe-data_link_lost","name":"数据链路丢失","group":"failsafe","order":3,"compute":["events = rising_edge_events(vehicle_status.data_link_lost, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)"],"foreach":{"var":"events","keys":["t_s"]},"triggers":[{"when":"True","severity":"warning","tag":null,"value":"f\"set at {t_s:.1f}s\"","field":"vehicle_status.data_link_lost","title":"数据链路丢失（飞行中，t={t_s:.1f}s）","suggestion":"结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"}],"firmware":"any","airframe":"any","version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"failsafe","outputs":{"check":"failsafe"},"doc":"https://docs.px4.io/main/en/config/safety.html"},{"id":"px4-failsafe-engine_failure","name":"动力故障保护","group":"failsafe","order":4,"compute":["events = rising_edge_events(vehicle_status.engine_failure, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)"],"foreach":{"var":"events","keys":["t_s"]},"triggers":[{"when":"True","severity":"critical","tag":null,"value":"f\"set at {t_s:.1f}s\"","field":"vehicle_status.engine_failure","title":"发动机/动力故障保护（飞行中，t={t_s:.1f}s）","suggestion":"结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"}],"firmware":"any","airframe":"any","version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"failsafe","outputs":{"check":"failsafe"},"doc":"https://docs.px4.io/main/en/config/safety.html"},{"id":"px4-failsafe-mission_failure","name":"任务失效保护","group":"failsafe","order":5,"compute":["events = rising_edge_events(vehicle_status.mission_failure, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)"],"foreach":{"var":"events","keys":["t_s"]},"triggers":[{"when":"True","severity":"critical","tag":null,"value":"f\"set at {t_s:.1f}s\"","field":"vehicle_status.mission_failure","title":"任务失效保护（飞行中，t={t_s:.1f}s）","suggestion":"结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"}],"firmware":"any","airframe":"any","version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"failsafe","outputs":{"check":"failsafe"},"doc":"https://docs.px4.io/main/en/config/safety.html"},{"id":"px4-failsafe-nav","name":"失效保护导航状态","group":"failsafe","order":6,"compute":["events = step_into_events(vehicle_status.nav_state, vehicle_status.timestamp, ARMED_INTERVALS, T0_US, codes={5: \"AUTO_RTL\", 12: \"DESCEND\", 13: \"TERMINATION\", 18: \"LAND\"})"],"foreach":{"var":"events","keys":["t_s","code","name"]},"triggers":[{"when":"True","severity":"critical","tag":"failsafe","value":"name","field":"vehicle_status.nav_state","title":"飞行中导航状态切换为 {name}（t={t_s:.1f}s）","suggestion":"说明飞控进入失效保护状态，需结合前文事件定位触发原因。"}],"firmware":"any","airframe":"any","topics":[["vehicle_status"]],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"failsafe","outputs":{"check":"failsafe"},"doc":"https://docs.px4.io/main/en/config/safety.html"},{"id":"px4-gps-eph","name":"GPS 水平位置误差","group":"gps_health","order":1,"compute":["eph_pos = keep_gt(vehicle_gps_position.eph, gt=0)","eph_m = eph_pos * 0.001","e_p95 = percentile(eph_m, p=95)","e_max = max(eph_m)"],"outputs":{"tag":"gps_eph_high","stats":{"gpsEphP95M":{"var":"e_p95","round":2},"gpsEphMaxM":{"var":"e_max","round":2}},"check":"gps_health"},"triggers":[{"when":"e_p95 >= 10.0","severity":"warning","tag":"gps_eph_high","threshold":10,"value":"f\"{e_p95:.2f}\"","unit":"m","field":"vehicle_gps_position.eph(armed p95)","title":"GPS 水平位置误差持续偏大（p95 {e_p95:.1f} m）","suggestion":"结合故障库 F002：排查天线电磁干扰/遮挡/馈线虚接/多路径。"},{"when":"e_p95 >= 5.0","severity":"info","tag":"gps_eph_high","threshold":5,"value":"f\"{e_p95:.2f}\"","unit":"m","field":"vehicle_gps_position.eph(armed p95)","title":"GPS 水平位置误差偶发偏大（p95 {e_p95:.1f} m）","suggestion":"关注天线安装位置与遮挡。"}],"firmware":"any","airframe":"any","topics":[["vehicle_gps_position"]],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"gps","doc":"https://docs.px4.io/main/en/gps_compass/"},{"id":"px4-gps-jump","name":"GPS 位置跳变","group":"gps_health","order":3,"compute":["step = _try(adjacent_speed_mps( ref(\"vehicle_gps_position.latitude_deg\", \"vehicle_gps_position.lat\", unit=\"deg\"), ref(\"vehicle_gps_position.longitude_deg\", \"vehicle_gps_position.lon\", unit=\"deg\"), ref(\"vehicle_gps_position.timestamp\")))","njump = _try(to_int(count_above(step, gt=50.0)))"],"outputs":{"tag":"gps_jump","stats":{"gpsJumpCount":{"var":"njump"}},"check":"gps_health"},"triggers":[{"when":"njump >= 3","severity":"warning","tag":"gps_jump","threshold":3,"value":"njump","unit":"次","field":"vehicle_gps_position lat/lon 相邻差分","title":"GPS 位置出现 {njump} 次异常跳变（>50 m/s）","suggestion":"结合故障库 F002：排查多路径、馈线与电磁干扰；室内跳变为正常现象。"}],"firmware":"any","airframe":"any","topics":[["vehicle_gps_position"]],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"gps","doc":"https://docs.px4.io/main/en/gps_compass/"},{"id":"px4-gps-sats","name":"GPS 卫星数","group":"gps_health","order":2,"compute":["s_min_raw = min(vehicle_gps_position.satellites_used)","s_min = to_int(s_min_raw)"],"outputs":{"tag":"gps_eph_high","stats":{"gpsSatellitesMin":{"var":"s_min"}},"check":"gps_health"},"triggers":[{"when":"s_min <= 6","severity":"warning","tag":"gps_eph_high","threshold":8,"value":"s_min","unit":"颗","field":"vehicle_gps_position.satellites_used(min)","title":"GPS 卫星数最少仅 {s_min} 颗","suggestion":"卫星数不足时定位易跳变；排查遮挡与天线。"}],"firmware":"any","airframe":"any","topics":[["vehicle_gps_position"]],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"gps","doc":"https://docs.px4.io/main/en/gps_compass/"},{"id":"px4-guard-log-dropouts","name":"数据质量-日志丢包","group":"guards","order":3,"outputs":{"guard_tags":[{"when":"DROPOUT_MS > 1000","tag":"log_dropouts_high"}]},"firmware":"any","airframe":"any","version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"guard","compute":[]},{"id":"px4-guard-restart","name":"数据质量-中途重启","group":"guards","order":1,"outputs":{"guard_tags":[{"when":"RESTART_DETECTED","tag":"restart_detected"}]},"firmware":"any","airframe":"any","version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"guard","compute":[]},{"id":"px4-guard-short-log","name":"数据质量-短日志","group":"guards_early","order":1,"outputs":{"guard_tags":[{"when":"ARMED_S > 0 and ARMED_S < 60","tag":"insufficient_data"},{"when":"ARMED_S == 0 and DURATION_S < 60","tag":"insufficient_data"}]},"firmware":"any","airframe":"any","version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"guard","compute":[]},{"id":"px4-guard-topic-missing","name":"数据质量-关键 topic 缺失","group":"guards","order":2,"outputs":{"guard_tags":[{"when":"not has_topic('vehicle_status')","tag":"topic_missing:vehicle_status"},{"when":"not has_topic('battery_status')","tag":"topic_missing:battery_status"},{"when":"not has_topic('estimator_status')","tag":"topic_missing:estimator_status"}]},"firmware":"any","airframe":"any","version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"guard","compute":[]},{"id":"px4-imu-bias-drift","name":"陀螺零偏漂移","group":"imu_bias","order":1,"version":"1.1.0","compute":["bx, by, bz, bts, src_text = _try(gyro_bias_series( ref(\"estimator_sensor_bias[0].gyro_bias\"), ref(\"estimator_sensor_bias[0].timestamp\"), ref(\"estimator_states[0].states\"), ref(\"estimator_states[0].timestamp\"), ref(\"estimator_status[0].states\"), ref(\"estimator_status[0].timestamp\"), slot=10, sources=[\"estimator_sensor_bias.gyro_bias[]\",\n         \"estimator_states.states[10..12]\",\n         \"estimator_status.states[10..12]\"]))","worst_abs, worst_axis, worst_drift, drift_axis = gyro_bias_worst( bx, by, bz, bts, ARMED_INTERVALS, labels=[\"X\", \"Y\", \"Z\"], min_count=10)","temp_range = _try(max_temp_range(ref(\"vehicle_imu_status[0].temperature_gyro\"), ref(\"vehicle_air_data[0].ambient_temperature\")))","bias_stat = _try(larger(worst_abs, worst_drift))"],"outputs":{"tag":"imu_bias_drift","stats":{"gyroBiasMaxRadS":{"var":"worst_abs","round":4},"gyroBiasDriftRadS":{"var":"worst_drift","round":4},"gyroBiasSource":{"var":"src_text"},"imuTempRangeC":{"var":"temp_range","round":1}},"guard_tags":[{"when":"temp_range >= 15","tag":"temperature_change_large"}],"check":"imu_bias"},"triggers":[{"when":"worst_abs >= 0.05 or worst_drift >= 0.05","severity":"critical","tag":"imu_bias_drift","threshold":0.02,"value":"f\"{bias_stat:.4f}\"","unit":"rad/s","field":"{src_text}","title":"陀螺零偏异常（轴 {worst_axis}：绝对值 {worst_abs:.4f} rad/s，漂移 {worst_drift:.4f} rad/s）","suggestion":"结合故障库 F005：检查 IMU 安装紧固、执行陀螺/加计标定；若温度跨度大，优先按温度漂移解释。"},{"when":"worst_abs >= 0.02 or worst_drift >= 0.02","severity":"warning","tag":"imu_bias_drift","threshold":0.02,"value":"f\"{bias_stat:.4f}\"","unit":"rad/s","field":"{src_text}","title":"陀螺零偏异常（轴 {worst_axis}：绝对值 {worst_abs:.4f} rad/s，漂移 {worst_drift:.4f} rad/s）","suggestion":"结合故障库 F005：检查 IMU 安装紧固、执行陀螺/加计标定；若温度跨度大，优先按温度漂移解释。"}],"firmware":"any","airframe":"any","precheck":["not HAS_ARMED"],"status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"imu","doc":"https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"},{"id":"px4-imu-clipping","name":"加速度计削波","group":"vibration","order":3,"compute":["clip, clip_idx, clip_axis = worst_column_delta(\n  ref(\"vehicle_imu_status[:].accel_clipping\", alias=\"clipping\"))","clip_stat = clip if clip > 0 else None"],"outputs":{"tag":"high_vibration","stats":{"imuAccelClippingCountMax":{"var":"clip_stat"}},"check":"vibration"},"triggers":[{"when":"clip >= 1000","severity":"critical","threshold":1000,"value":"clip","unit":"count","field":"vehicle_imu_status.accel_clipping[{clip_axis}](末值-首值)","title":"加速度计削波严重：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）","suggestion":"持续削波会破坏 EKF 估计，请优先排除机械振动源。"},{"when":"clip >= 100","severity":"warning","threshold":100,"value":"clip","unit":"count","field":"vehicle_imu_status.accel_clipping[{clip_axis}](末值-首值)","title":"检测到明显加速度计削波：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）","suggestion":"削波表明振动峰值已超出传感器量程，建议排查机械振动源。"},{"when":"clip > 0","severity":"info","tag":null,"threshold":0,"value":"clip","unit":"count","field":"vehicle_imu_status.accel_clipping[{clip_axis}](末值-首值)","title":"偶发加速度计削波：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）","suggestion":"少量削波可先观察；频次升高或伴随振动告警需排查机械问题。"}],"firmware":"any","airframe":"any","topics":[["vehicle_imu_status"]],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"vibration","doc":"https://docs.px4.io/main/en/assembly/vibration_isolation.html"},{"id":"px4-log-errors","name":"日志错误消息","group":"logged_messages","order":1,"version":"1.0.1","compute":["n = count_items(MESSAGES, key=\"level_name\", in_list=[\"EMERGENCY\", \"ALERT\", \"CRITICAL\", \"ERROR\"])","samples = take_items(MESSAGES, key=\"level_name\", in_list=[\"EMERGENCY\", \"ALERT\", \"CRITICAL\", \"ERROR\"], limit=5, clip={\"message\": 200}, drop=[\"level\", \"level_name\"])"],"triggers":[{"when":"n > 0","severity":"critical","tag":null,"threshold":0,"value":"n","unit":"条","field":"ulog.logged_messages(log_level<=3)","title":"日志中出现 {n} 条 ERROR 及以上消息","suggestion":"按时间顺序核对错误原文，这通常是定位根因最直接的证据。","evidence_extra":{"samples":"samples"}}],"firmware":"any","airframe":"any","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"messages","outputs":{"check":"logged_messages"},"doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},{"id":"px4-log-warnings","name":"日志警告消息","group":"logged_messages","order":2,"version":"1.0.1","compute":["n = count_items(MESSAGES, key=\"level_name\", eq=\"WARNING\")","samples = take_items(MESSAGES, key=\"level_name\", eq=\"WARNING\", limit=5, clip={\"message\": 200}, drop=[\"level\", \"level_name\"])"],"triggers":[{"when":"n > 0","severity":"warning","tag":null,"threshold":0,"value":"n","unit":"条","field":"ulog.logged_messages(log_level=4)","title":"日志中出现 {n} 条 WARNING 消息","evidence_extra":{"samples":"samples"}}],"firmware":"any","airframe":"any","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"messages","outputs":{"check":"logged_messages"},"doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},{"id":"px4-mode-thrash","name":"飞行模式抖动","group":"mode_thrash","order":1,"compute":["n_changes_raw = edges_count(vehicle_status.nav_state)","n_changes = to_int(n_changes_raw)"],"outputs":{"stats":{"navStateChanges":{"var":"n_changes"}},"check":"mode_thrash"},"triggers":[{"when":"n_changes > 12","severity":"warning","tag":null,"threshold":12,"value":"n_changes","unit":"次","field":"vehicle_status.nav_state 变化次数","title":"飞行模式切换 {n_changes} 次（>12），可能存在模式抖动","suggestion":"频繁切模式易诱发操纵混乱；检查遥控器开关与失效保护反复触发。"}],"firmware":"any","airframe":"any","topics":[["vehicle_status"]],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"mode","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},{"id":"px4-motor-unbalance","name":"电机输出不平衡","group":"motor_balance","order":1,"version":"1.1.0","compute":["mts = actuator_motors.timestamp","cols = actuator_motors.control","seg = active_window_mask(mts, ARMED_INTERVALS, vehicle_status.nav_state, vehicle_status.timestamp, codes=[2, 4, 6, 14, 21], min_active=20)","spread, busiest, idlest, n_active = column_spread_stats( cols, seg, min_mean=0.01, min_channels=4)"],"outputs":{"tag":"motor_output_unbalance","stats":{"motorControlSpread":{"var":"spread","round":3},"motorCountActive":{"var":"n_active"}},"check":"motor_balance"},"triggers":[{"when":"spread >= 0.15","severity":"critical","tag":"motor_output_unbalance","threshold":0.15,"value":"f\"{spread:.3f}\"","field":"actuator_motors.control[](悬停段均值极差)","title":"电机输出不平衡（悬停段通道 {busiest} 与 {idlest} 差 {spread:.3f}）","suggestion":"结合故障库 F008：检查桨叶型号/正反桨是否一致、单电机效率、机架形变。"},{"when":"spread >= 0.08","severity":"warning","tag":"motor_output_unbalance","threshold":0.08,"value":"f\"{spread:.3f}\"","field":"actuator_motors.control[](悬停段均值极差)","title":"电机输出差异偏大（通道 {busiest} 与 {idlest} 差 {spread:.3f}）","suggestion":"结合故障库 F008 排查动力一致性；偶发差异可先观察。"}],"firmware":"any","airframe":"any","topics":[["actuator_motors"]],"status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"motor","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},{"id":"px4-power-cell-voltage","name":"单电芯电压","group":"battery","order":1,"version":"1.1.0","compute":["vmin, cell_min, cells, have_measured, have_fallback, no_cell = _try(cell_voltage_min( ref(\"battery_status[0].voltage_cell_v\"), ref(\"battery_status[0].voltage_v\"), ref(\"battery_status[0].voltage_filtered_v\"), ref(\"battery_status[0].cell_count\")))"],"outputs":{"tag":"battery_voltage_drop","stats":{"batteryVoltageMin":{"var":"vmin","round":2},"batteryCellCount":{"var":"cells"},"batteryCellVoltageMin":{"var":"cell_min","round":3}},"check":"battery"},"triggers":[{"when":"have_measured and cell_min < 3.55","severity":"critical","threshold":3.55,"value":"f\"{cell_min:.3f}\"","unit":"V/cell","field":"battery_status.voltage_cell_v[](实测最小值)","title":"电芯电压严重过低","suggestion":"存在过放风险，检查电池老化、放电倍率匹配与低压告警阈值。"},{"when":"have_fallback and not have_measured and cell_min < 3.55","severity":"critical","threshold":3.55,"value":"f\"{cell_min:.3f}\"","unit":"V/cell","field":"battery_status.voltage_v(min)/cell_count","title":"电芯电压严重过低","suggestion":"存在过放风险，检查电池老化、放电倍率匹配与低压告警阈值。"},{"when":"have_measured and cell_min < 3.70","severity":"warning","threshold":3.7,"value":"f\"{cell_min:.3f}\"","unit":"V/cell","field":"battery_status.voltage_cell_v[](实测最小值)","title":"电芯电压偏低","suggestion":"建议核对剩余容量估计与返航电压裕度。"},{"when":"have_fallback and not have_measured and cell_min < 3.70","severity":"warning","threshold":3.7,"value":"f\"{cell_min:.3f}\"","unit":"V/cell","field":"battery_status.voltage_v(min)/cell_count","title":"电芯电压偏低","suggestion":"建议核对剩余容量估计与返航电压裕度。"},{"when":"no_cell","severity":"info","tag":null,"value":"f\"missing\"","field":"battery_status.voltage_cell_v / cell_count","title":"日志缺少电芯电压与 cell_count，未做单电芯判断"}],"firmware":"any","airframe":"any","topics":[["battery_status"]],"status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"power","doc":"https://docs.px4.io/main/en/config/battery.html"},{"id":"px4-power-remaining","name":"电池剩余电量","group":"battery","order":3,"compute":["rem = min_ge(ref(\"battery_status[0].remaining\"), ge=0)","rem_pct = rem * 100"],"outputs":{"tag":"battery_voltage_drop","stats":{"batteryRemainingMin":{"var":"rem","round":3}},"check":"battery"},"triggers":[{"when":"rem <= 0.10","severity":"critical","threshold":0.1,"value":"f\"{rem:.3f}\"","field":"battery_status.remaining(min)","title":"电池剩余电量极低（{rem_pct:.0f}%）","suggestion":"剩余电量低于 10%，应立即返航；检查电量估算与电池健康。"},{"when":"rem <= 0.20","severity":"warning","threshold":0.2,"value":"f\"{rem:.3f}\"","field":"battery_status.remaining(min)","title":"电池剩余电量偏低（{rem_pct:.0f}%）","suggestion":"剩余电量低于 20%，注意返航裕度。"}],"firmware":"any","airframe":"any","topics":[["battery_status"]],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"power","doc":"https://docs.px4.io/main/en/config/battery.html"},{"id":"px4-power-sag","name":"飞行中持续压降","group":"battery","order":2,"compute":["cell_min_t = rows_aggregate(ref(\"battery_status[0].voltage_cell_v\"), agg=\"min\", gt=0)","drop, tail = head_tail_median_drop(cell_min_t, ref(\"battery_status[0].timestamp\"), ARMED_INTERVALS, skip_first_s=5, min_seg=20)"],"outputs":{"tag":"battery_voltage_drop","stats":{"batteryCellSagFlight":{"var":"drop","round":3}},"check":"battery"},"triggers":[{"when":"drop >= 0.30 and tail < 3.70","severity":"warning","threshold":0.3,"value":"f\"{drop:.3f}\"","unit":"V","field":"battery_status.voltage_cell_v[] armed 段趋势","title":"飞行中单电芯持续压降 {drop:.2f} V（尾段中位 {tail:.2f} V）","suggestion":"持续压降区别于大机动瞬时压降：排查电芯老化内阻、插头虚接、线缆线径与负载匹配。"}],"firmware":"any","airframe":"any","topics":[["battery_status"]],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"power","doc":"https://docs.px4.io/main/en/config/battery.html"},{"id":"px4-vibration","name":"高频振动","group":"vibration","order":1,"compute":["vibe_mean, vibe_p95, vibe_max, imu_idx = worst_mean_stats(\n  ref(\"vehicle_imu_status[:].accel_vibration_metric\"), min_mean=0)"],"outputs":{"tag":"high_vibration","stats":{"imuAccelVibrationMean":{"var":"vibe_mean","round":3},"imuAccelVibrationP95":{"var":"vibe_p95","round":3},"imuAccelVibrationMax":{"var":"vibe_max","round":3}},"check":"vibration"},"triggers":[{"when":"vibe_mean >= 9.81","severity":"critical","threshold":9.81,"value":"f\"{vibe_mean:.3f}\"","unit":"m/s^2","field":"vehicle_imu_status.accel_vibration_metric(均值)","title":"高频振动严重超标（IMU #{imu_idx}）","suggestion":"Flight Review 红色区间（>9.81 m/s^2）。结合故障库条目排查桨叶/电机/机架/减震。"},{"when":"vibe_mean >= 4.905","severity":"warning","threshold":4.905,"value":"f\"{vibe_mean:.3f}\"","unit":"m/s^2","field":"vehicle_imu_status.accel_vibration_metric(均值)","title":"高频振动偏大（IMU #{imu_idx}）","suggestion":"Flight Review 橙色区间（4.905~9.81 m/s^2）。结合故障库条目排查桨叶动平衡/电机/IMU 减震。"}],"firmware":"any","airframe":"any","topics":[["vehicle_imu_status"]],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"vibration","doc":"https://docs.px4.io/main/en/assembly/vibration_isolation.html"},{"id":"px4-vtol-transition-attitude","name":"VTOL 转换姿态越限","group":"vtol_transition","order":1,"compute":["trans_n = _try(count_above(vtol_vehicle_status.vtol_in_trans_mode, gt=0))","trans_n_i = _try(to_int(trans_n))","trans_mask = _try(fill_to(ref(\"vtol_vehicle_status.vtol_in_trans_mode\"), ref(\"vtol_vehicle_status.timestamp\"), ref(\"vehicle_attitude.timestamp\")))","roll, pitch, yaw = _try(quat_to_euler(ref(\"vehicle_attitude.q[0]\"), ref(\"vehicle_attitude.q[1]\"), ref(\"vehicle_attitude.q[2]\"), ref(\"vehicle_attitude.q[3]\")))","tilt_max = _try(masked_absmax(larger(abs_values(roll), abs_values(pitch)), trans_mask))","trans_cnt = _try(count_true(trans_mask))","enough = _try(trans_cnt > 5)","has_tilt = tilt_max is not None","tilt_stat = _try(tilt_max if enough else None)"],"outputs":{"tag":"vtol_convert_attitude_over","stats":{"vtolTransitionSamples":{"var":"trans_n_i"},"vtolTransitionMaxTiltDeg":{"var":"tilt_stat","round":1}},"check":"vtol_transition"},"triggers":[{"when":"has_tilt and enough and tilt_max > 8.0","severity":"warning","tag":"vtol_convert_attitude_over","threshold":8,"value":"f\"{tilt_max:.1f}\"","unit":"°","field":"vehicle_attitude（vtol_in_trans_mode 段）","title":"VTOL 转换阶段姿态越限（最大 {tilt_max:.1f}°，限值 8°）","suggestion":"结合故障库 F003：复盘转换时序与推力匹配，强风环境优先归因环境扰动。"}],"firmware":"any","airframe":"any","topics":[["vtol_vehicle_status"]],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"vtol","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},{"id":"px4-wind-estimate","name":"风扰估计","group":"wind_estimate","order":1,"compute":["w_p95 = percentile(\n  hypot(coalesce(ref(\"estimator_wind[0].windspeed_north\"),\n                 ref(\"wind_estimate[0].windspeed_north\")),\n        coalesce(ref(\"estimator_wind[0].windspeed_east\"),\n                 ref(\"wind_estimate[0].windspeed_east\"))),\n  p=95)"],"outputs":{"tag":"wind_disturb","guard_tags":[{"when":"w_p95 >= 8.0","tag":"wind_strong"}],"stats":{"windSpeedP95M":{"var":"w_p95","round":1}},"check":"wind_estimate"},"triggers":[{"when":"w_p95 >= 12.0","severity":"warning","tag":"wind_disturb","threshold":8,"value":"f\"{w_p95:.1f}\"","unit":"m/s","field":"estimator_wind.windspeed_north/east","title":"估计风速较大（p95 {w_p95:.1f} m/s）","suggestion":"结合故障库 F010：强风属环境扰动，姿态超调/转换越限优先归因风，不要直接改 PID。"},{"when":"w_p95 >= 8.0","severity":"info","tag":"wind_disturb","threshold":8,"value":"f\"{w_p95:.1f}\"","unit":"m/s","field":"estimator_wind.windspeed_north/east","title":"估计风速偏大（p95 {w_p95:.1f} m/s）","suggestion":"解释姿态类异常时需考虑风扰因素。"}],"firmware":"any","airframe":"any","topics":[["estimator_wind","wind_estimate"]],"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"},"category":"wind","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"}];
+const facts = {"group_order":["guards_early","vibration","ekf_innovations","ekf_faults","battery","cpu","gps_health","failsafe","mode_thrash","motor_balance","imu_bias","attitude_tracking","airspeed","vtol_transition","wind_estimate","logged_messages","guards"],"rule_meta":{"defaults":{"version":"1.0.0","status":"stable","license":"CC-BY-4.0","author":{"name":"NextPilot 内置"}},"by_group":{"airspeed":{"category":"airspeed","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},"attitude_tracking":{"category":"attitude","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},"battery":{"category":"power","doc":"https://docs.px4.io/main/en/config/battery.html"},"cpu":{"category":"system","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},"ekf_faults":{"category":"ekf","doc":"https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"},"ekf_innovations":{"category":"ekf","doc":"https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"},"failsafe":{"category":"failsafe","doc":"https://docs.px4.io/main/en/config/safety.html"},"gps_health":{"category":"gps","doc":"https://docs.px4.io/main/en/gps_compass/"},"guards":{"category":"guard"},"guards_early":{"category":"guard"},"imu_bias":{"category":"imu","doc":"https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"},"logged_messages":{"category":"messages","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},"mode_thrash":{"category":"mode","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},"motor_balance":{"category":"motor","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},"vibration":{"category":"vibration","doc":"https://docs.px4.io/main/en/assembly/vibration_isolation.html"},"vtol_transition":{"category":"vtol","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"},"wind_estimate":{"category":"wind","doc":"https://docs.px4.io/main/en/log/flight_log_analysis.html"}}},"log_levels":{"48":"EMERGENCY","49":"ALERT","50":"CRITICAL","51":"ERROR","52":"WARNING","53":"NOTICE","54":"INFO","55":"DEBUG"},"vehicle_types":{"1":"rotary_wing","2":"fixed_wing","3":"rover","4":"airship"},"airframe_aliases":{"mc":"rotary_wing","fw":"fixed_wing"},"nav_state_names":{"0":"Manual","1":"Altitude","2":"Position","3":"Mission","4":"Hold","5":"Return","6":"Position Slow","7":"Free5","8":"Free4","10":"Acro","11":"Free3","12":"Descend","13":"Termination","14":"Offboard","15":"Stabilized","16":"Free2","17":"Takeoff","18":"Land","19":"Free1","20":"Follow","21":"Orbit","22":"VTOL Takeoff"},"nav_state_groups":[{"phase":"takeoff","codes":[17,22]},{"phase":"hover","codes":[2,4,6,14,21]},{"phase":"maneuver","codes":[0,1,10,15]},{"phase":"fw_cruise","codes":[3,8]},{"phase":"landing","codes":[18,20,5,12,13]}],"sys_info_keys":["sys_name","ver_sw","ver_sw_release","ver_vendor_sw_release","ver_hw","ver_hw_subtype","sys_os_name","sys_os_ver","sys_toolchain","sys_toolchain_ver","sys_mcu","time_start_utc","duration","git_branch"],"ulog_msg_types":[{"code":"B","name":"标志位","en":"Flag Bits","desc":"兼容性标志，只在文件开头出现"},{"code":"I","name":"信息","en":"Information","desc":"键 → 值，系统信息字典"},{"code":"M","name":"多值信息","en":"Multi Information","desc":"键 → 多组值，无时间戳（一条长消息会拆成多行续写，故条数多于键数）"},{"code":"F","name":"消息格式","en":"Format","desc":"每个订阅话题的字段定义"},{"code":"P","name":"参数","en":"Parameter","desc":"日志开头的参数值；飞行中改参数也用它"},{"code":"Q","name":"参数默认值","en":"Default Parameter","desc":"只记与当前值不同的默认值（一个参数可能写两条）"},{"code":"A","name":"订阅话题","en":"Add Logged","desc":"每个话题实例一条"},{"code":"R","name":"取消订阅","en":"Remove Logged","desc":"运行中停止记录某话题"},{"code":"D","name":"数据","en":"Data","desc":"日志主体：订阅话题的每一次采样"},{"code":"L","name":"日志消息","en":"Logging","desc":"带时间戳的日志行"},{"code":"C","name":"带标签日志消息","en":"Tagged Logging","desc":"同上，另有来源 tag"},{"code":"O","name":"丢包","en":"Dropout","desc":"记录线程来不及时丢掉的时长"},{"code":"S","name":"同步标记","en":"Sync","desc":"每约 4 KB 一个，损坏后靠它重新对齐"}],"info_key_docs":{"ver_sw":{"name":"固件提交号","desc":"固件构建时的 git 提交，用来对上游源码"},"ver_sw_branch":{"name":"固件分支","desc":"构建所在的分支 / 标签"},"ver_sw_release":{"name":"固件版本号","desc":"打包成 major<<24 | minor<<16 | patch<<8 | 类型（1=release 等）"},"ver_vendor_sw_release":{"name":"厂商版本号","desc":"厂商自定义版本；255 表示厂商未使用"},"ver_hw":{"name":"硬件型号","desc":"飞控板型号，判断引脚 / 传感器配置的入口"},"ver_hw_subtype":{"name":"硬件子型号","desc":"同型号的不同批次 / 变体"},"ver_data_format":{"name":"数据格式版本","desc":"ULog 数据格式版本，与本站解析器看到的格式对应"},"sys_name":{"name":"系统名","desc":"固定为 PX4"},"sys_os_name":{"name":"操作系统","desc":"NuttX（飞控本机）或 Linux（机载计算机）"},"sys_os_ver":{"name":"OS 提交号","desc":"操作系统的 git 提交"},"sys_os_ver_release":{"name":"OS 版本号","desc":"打包方式同固件版本号"},"sys_toolchain":{"name":"工具链","desc":"编译固件用的工具链"},"sys_toolchain_ver":{"name":"工具链版本","desc":"工具链的具体版本，排查\"换个编译器行为就不一样\"时用"},"sys_mcu":{"name":"MCU","desc":"主控芯片型号与硅版本"},"sys_uuid":{"name":"飞控唯一 ID","desc":"PX4GUID，出厂烧录；同型号不同板子也不同，可用来区分设备"},"time_ref_utc":{"name":"UTC 时间参考","desc":"相对启动的偏移（秒）；0 表示这次飞行没对时"},"time_start_utc":{"name":"起始 UTC 时间","desc":"日志起始时刻（旧固件记录）"},"boot_time_utc_us":{"name":"启动时刻","desc":"UTC 微秒；只有对过时才有意义"},"duration":{"name":"日志时长","desc":"秒（旧固件记录）"},"git_branch":{"name":"固件分支","desc":"旧固件的分支名字段"},"metadata_events_sha256":{"name":"事件元数据哈希","desc":"事件定义文件的 SHA-256，用来校验事件定义是否被改动"}},"metrics":[{"key":"imuAccelVibrationMax","label":"最大振动","unit":"m/s²","topic":"vehicle_imu_status","field":"accel_vibration_metric","op":"max","round":2},{"key":"batteryVoltageMin","label":"最低电压","unit":"V","topic":"battery_status","field":"voltage_v","op":"min","round":2},{"key":"batteryCellVoltageMin","label":"最低电芯电压","unit":"V","topic":"battery_status","fields":["voltage_cell_v","voltage_v","voltage_filtered_v","cell_count"],"op":"cell_voltage_min","pick":"vmin","round":3},{"key":"currentMax","label":"最大电流","unit":"A","topic":"battery_status","field":"current_a","op":"max","round":2},{"key":"batteryRemainingMin","label":"最低剩余电量","unit":"0..1","topic":"battery_status","field":"remaining","op":"min_ge","ge":0,"round":3},{"key":"gpsSatellitesMin","label":"最少搜星","unit":"颗","topic":"vehicle_gps_position","field":["satellites_used","satellites_visible"],"op":"min","round":0},{"key":"gpsEphMaxM","label":"最大定位误差","unit":"m","topic":"vehicle_gps_position","field":"eph","op":"max","scale":0.001,"round":2},{"key":"cpuLoadMax","label":"CPU 峰值","unit":"0..1","topic":"cpuload","field":"load","op":"max","round":3},{"key":"imuAccelClippingCountMax","label":"加速度计削波计数","unit":"次"},{"key":"imuTempRangeC","label":"IMU 温度跨度","unit":"°C"},{"key":"ekfRejectRatioPct","label":"EKF 拒绝占比","unit":"比例"},{"key":"attitudeErrDegP99","label":"姿态误差 p99","unit":"°"},{"key":"attitudeOscHz","label":"姿态振荡频率","unit":"Hz"},{"key":"motorControlSpread","label":"电机输出离散度"},{"key":"motorCountActive","label":"活跃电机数","unit":"个"},{"key":"gyroBiasMaxRadS","label":"陀螺零偏最大","unit":"rad/s"},{"key":"gyroBiasDriftRadS","label":"陀螺零偏漂移","unit":"rad/s"},{"key":"windSpeedP95M","label":"风速 p95","unit":"m/s"},{"key":"airspeedMinM","label":"最低空速","unit":"m/s"},{"key":"airspeedInvalidRatio","label":"空速无效占比","unit":"比例"},{"key":"gpsJumpCount","label":"GPS 跳变次数","unit":"次"},{"key":"navStateChanges","label":"模式切换次数","unit":"次"},{"key":"vtolTransitionSamples","label":"VTOL 转换样本数","unit":"个"},{"key":"batteryCellCount","label":"电芯数","unit":"个"}],"track":{"topic":"vehicle_gps_position","instance":0,"max_points":1500,"lat":[{"field":"latitude_deg","scale":1},{"field":"lat","scale":1e-7}],"lon":[{"field":"longitude_deg","scale":1},{"field":"lon","scale":1e-7}],"alt":[{"field":"altitude_msl_m","scale":1},{"field":"alt","scale":0.001}]}};
+
+const fieldUnits = {"vehicle_gps_position.lat":"degE7","vehicle_gps_position.latitude_deg":"deg","vehicle_gps_position.lon":"degE7","vehicle_gps_position.longitude_deg":"deg"};
 
 export const PY_ULG_CHECKS = String.raw`"""预定函数（算子）注册表 —— 经验文件里的 \`op:\` 只能引用这里注册的算子。
 
@@ -10,7 +12,7 @@ export const PY_ULG_CHECKS = String.raw`"""预定函数（算子）注册表 —
 - 算子签名用 @operator 声明 in_arity / out_arity / out_names，
   构建期按签名校验规则文件里 in/out 的数量（多输入/多输出不靠约定，靠校验）。
 - 调用形式 fn(*args, **opts)：args 是按 \`in\` 顺序取到的值（numpy 数组或标量），
-  opts 是节点上的其他键（unit / per_instance / scope 等），算子用 **kw 吸收不关心的项。
+  opts 是节点上的其他键（unit / instance 等），算子用 **kw 吸收不关心的项。
 - 返回：out_arity==1 时返回标量；>1 时返回与 out_names 等长的元组。
 - 数据不足时返回 None，框架据此跳过该规则（不产出 finding）。
 """
@@ -212,9 +214,9 @@ def op_head_tail_median_drop(x, vts, intervals, skip_first_s=5, min_seg=20, head
     return float(head - tail), tail
 
 
-# ─────────────────────────── 多实例传感器（per-instance）───────────────────────────
-# 这类算子的输入是「每个传感器实例一组数据」的列表（框架对 per_instance 节点按
-# topic dataset 分组喂入）。数组字段（如 float32[3]）每组是「每元素一列」的列表。
+# ─────────────────────────── 多实例传感器（分组取数）───────────────────────────
+# 这类算子的输入是「每个传感器实例一组数据」的列表（规则里用 ref(..., instance=-1) 取）。
+# 数组字段（如 float32[3]）每组是「每元素一列」的列表。
 # 全部通用：不认识任何具体 topic/字段，只做跨实例归约，取「最差实例」并回传其序号。
 
 
@@ -223,7 +225,7 @@ def _groups(groups):
 
 
 def _as_group_list(x):
-    """per_instance 分组 → 列表，**保留 None 占位**。
+    """分组取数（instance=-1）→ 列表，**保留 None 占位**。
 
     实例序号（标题里的 “IMU #1”、estimator #2）必须与原始 dataset 顺序一致，
     所以这里不能过滤 None——过滤会让后面的实例序号整体前移。
@@ -484,17 +486,16 @@ def op_scale_series(values, factor=1.0, **kw):
     "adjacent_speed_mps",
     in_arity=3,
     doc="经纬度与时间戳（us）→ 相邻样本地面速度序列（m/s）；等距柱状近似。"
-    "unit 说明经纬度口径：degE7（旧字段 lat/lon 的 1e7 度）或 deg（新字段 latitude_deg），"
-    "由经验文件按固件版本给出",
+    '**入参是度**（口径由规则在 ref(..., unit="deg") 上统一好）——算子不认识固件版本、'
+    "也不认识 degE7 这种老口径。",
 )
-def op_adjacent_speed_mps(lat_in, lon_in, ts_us, unit="degE7", **kw):
+def op_adjacent_speed_mps(lat_in, lon_in, ts_us, **kw):
     import numpy as np
 
     if lat_in is None or lon_in is None or ts_us is None:
         return None
-    div = 1e7 if str(unit).lower() in ("dege7", "1e7") else 1.0
-    lat = np.radians(np.asarray(lat_in, dtype=float) / div)
-    lon = np.radians(np.asarray(lon_in, dtype=float) / div)
+    lat = np.radians(np.asarray(lat_in, dtype=float))
+    lon = np.radians(np.asarray(lon_in, dtype=float))
     if lat.size < 3 or lat.size != lon.size or lat.size != len(ts_us):
         return None
     dt = np.diff(np.asarray(ts_us, dtype=float)) / 1e6
@@ -1054,13 +1055,14 @@ def op_zero_cross_hz(values, sample_rate=50.0, **kw):
 
 @operator(
     "att_tracking_stats",
-    in_arity=8,
+    in_arity=7,
     out_arity=3,
     out_names=["p99", "osc_hz", "seg_n"],
     doc="姿态跟踪统计：把姿态与姿态指令在时间轴上对齐（取较短长度、指令线性插值到姿态时间轴），"
     "只在 armed 且非悬停（指令倾角 > tilt_min_deg）样本上算跟踪误差，输出 p99（度）、"
-    "误差过零频率（Hz）、参与统计的样本数。指令源在 q_d 四元数与 roll/pitch_body 之间自动选择"
-    "（fw_minor >= 15 或有四元数而无 body 字段时用四元数）。核心数据缺失返回 None。",
+    "误差过零频率（Hz）、参与统计的样本数。指令源**有 q_d 就用 q_d**（新版只记它），"
+    "没有才回退 roll/pitch_body（旧版口径，弧度）——**算子不认识固件版本**，规则把两路都"
+    "递给它、顺序在这里定。核心数据缺失返回 None。",
 )
 def op_att_tracking_stats(
     att_q,
@@ -1070,7 +1072,6 @@ def op_att_tracking_stats(
     att_ts,
     sp_ts,
     intervals,
-    fw_minor=None,
     tilt_min_deg=10.0,
     min_samples=50,
     sample_rate=50.0,
@@ -1090,12 +1091,11 @@ def op_att_tracking_stats(
     roll = np.arctan2(2 * (w * x + y * z), 1 - 2 * (x**2 + y**2))  # 弧度
     pitch = np.arcsin(np.clip(2 * (w * y - z * x), -1, 1))
 
-    # 指令源：1.15+ 只记四元数；旧固件记 roll/pitch_body（弧度）
+    # 指令源：**有 q_d 就用 q_d**（新版只记它），没有才用 roll/pitch_body（旧版口径，弧度）。
+    # 两路都给了也优先 q_d——顺序写在算子里，规则只管把存在的递进来。
     qd = _as_columns(sp_q)
     has_qd = len(qd) >= 4
-    use_q = has_qd and (sp_roll is None or fw_minor is None or int(fw_minor) >= 15)
-    if not use_q and sp_roll is None and has_qd:
-        use_q = True  # 定制固件容错
+    use_q = has_qd
     if use_q:
         d0, d1, d2, d3 = (np.asarray(c, dtype=float) for c in qd[:4])
         ns = min(len(d0), len(d1), len(d2), len(d3))
@@ -1136,12 +1136,13 @@ def op_att_tracking_stats(
 
 @operator(
     "gyro_bias_series",
-    in_arity=7,
+    in_arity=6,
     out_arity=5,
     out_names=["bx", "by", "bz", "bts", "src_text"],
-    doc="零偏取源（三取一）：① 直读零偏列（fw_minor >= 15 时优先）② 状态槽 A ③ 状态槽 A 缺失"
-    "时用状态槽 B。输入都是「数组字段的多列」或 None。"
-    "返回 三轴序列 + 时间戳 + 数据来源说明（用于 evidence.field）；主数据缺失返回 None。"
+    doc="零偏取源：**谁有数据用谁**（直读列 → 状态槽 A → 状态槽 B），输入都是「数组字段的多列」"
+    "或 None。**算子不认识固件版本**——挑来源只看数据本身：样本数 >= min_count、且至少一处非零"
+    "（字段存在但没被填过的情形：实测 1.11 的直读列只有 7 个样本，状态槽才有值）。"
+    "返回 三轴序列 + 时间戳 + 数据来源说明（用于 evidence.field）；全都没有返回 None。"
     "来源说明是**展示文案**，由调用方用 sources=[直读, 槽A, 槽B] 给出——算子不认识字段名。",
 )
 def op_gyro_bias_series(
@@ -1151,27 +1152,46 @@ def op_gyro_bias_series(
     states_a_ts,
     states_b_cols,
     states_b_ts,
-    fw_minor,
     slot=10,
+    min_count=10,
     sources=None,
     **kw,
 ):
+    import numpy as np
+
     nb = _as_columns(new_cols)
     la = _as_columns(states_a_cols)
     lb = _as_columns(states_b_cols)
     s = int(slot)
+    need = int(min_count)
     # 三个来源的展示名（经验文件给；没给就用中性说法，反正算子不认识具体字段）
     names = list(sources or []) + ["零偏直读列", "状态槽（优先）", "状态槽（兜底）"]
 
     def pick3(cols):
         return [cols[s], cols[s + 1], cols[s + 2]] if len(cols) >= s + 3 else None
 
-    leg_a, leg_b = pick3(la), pick3(lb)
-    use_new = len(nb) >= 3 and new_ts is not None and (fw_minor is None or int(fw_minor) >= 15)
-    if not use_new and leg_a is None and leg_b is None and len(nb) >= 3:
-        use_new = True  # 定制固件容错：没有旧槽就用直读
-    if use_new:
+    def usable3(cols):
+        """够样本、且至少一处非零才算"有数据"。
+
+        "字段存在但没被填过"有两种表现，都要挡住：整段全零（真正的 0 不可能三轴同时
+        恒为 0），以及只有零星几个样本（实测 1.11 的直读列 7 个 vs 状态槽 636 个）——
+        这种放过去，下游 \`gyro_bias_worst\` 会因样本不足判成"没有零偏数据"，
+        指标就凭空消失了。
+        """
+        if cols is None:
+            return None
+        for c in cols:
+            a = np.asarray(c, dtype=float)
+            if a.size < need:
+                return None
+            if bool(np.any(np.isfinite(a) & (np.abs(a) > 0))):
+                return cols
+        return None
+
+    if new_ts is not None and len(nb) >= 3 and usable3(nb[:3]) is not None:
         return (nb[0], nb[1], nb[2], new_ts, names[0])
+    leg_a = usable3(pick3(la))
+    leg_b = usable3(pick3(lb))
     if leg_a is not None and states_a_ts is not None:
         return (leg_a[0], leg_a[1], leg_a[2], states_a_ts, names[1])
     if leg_b is not None and states_b_ts is not None:
@@ -1374,7 +1394,7 @@ REQUIRED = {
     },
     "get_series": {
         "kind": "method",
-        "sig": "(ref, instance=None, alias=None, per_instance=False)",
+        "sig": "(ref, instance=slice(None), alias=None)",
         "doc": "按 'topic.field' 取一条序列（1-D 数组 / 每实例一组 / 定长数组按列）。"
         "**取不到一律返回 None，不抛异常**——引擎按'数据不足'处理",
     },
@@ -1450,31 +1470,31 @@ OPTIONAL = {
 # ---------------- builtin_variables() 必须给的键（= 规则与 plot 能引用的内置变量）----------------
 # 这份表就是"作者能引用什么"的权威清单，站内指南的内置变量表由 tools/px4/gen_rule_reference.py
 # 从这里生成。加名字 = 改契约；删名字 = 破坏兼容（老规则会构建失败，这是有意的）。
+# **名字一律大写**：规则里自己赋的变量是小写，一眼就能分出"这个数是引擎给的还是自己算的"。
 BUILTIN_VARIABLES = {
-    "fw_minor": {
+    "FW_MINOR": {
         "type": "int|None",
         "doc": "固件次版本号。**版本分支唯一常用的量**；None = 这份日志没写版本号",
     },
-    "airframe": {
+    "AIRFRAME": {
         "type": "str",
         "doc": "机型：rotary_wing / fixed_wing / rover / airship / unknown",
     },
-    "is_fixed_wing": {"type": "bool", "doc": "机型别名（比 airframe == 'fixed_wing' 好读）"},
-    "duration_s": {"type": "float", "doc": "日志总时长（秒）"},
-    "armed_s": {"type": "float", "doc": "armed 总时长（秒）"},
-    "armed_intervals": {
+    "IS_FIXED_WING": {"type": "bool", "doc": "机型别名（比 AIRFRAME == 'fixed_wing' 好读）"},
+    "DURATION_S": {"type": "float", "doc": "日志总时长（秒）"},
+    "ARMED_S": {"type": "float", "doc": "armed 总时长（秒）"},
+    "ARMED_INTERVALS": {
         "type": "list[(us,us)]",
         "doc": "armed 区间，升序不重叠；end=None 表示持续到日志结束。时序算子按它切窗",
     },
-    "t0_us": {"type": "int", "doc": "日志起点时间戳（us），事件类算子算相对时刻的基准"},
-    "has_armed": {"type": "bool", "doc": "是否存在 armed 段"},
-    "restart_detected": {"type": "bool", "doc": "是否有 topic 时间戳回退（疑似中途重启）"},
-    "dropout_ms": {"type": "int", "doc": "全日志丢包累计（毫秒）"},
-    "messages": {"type": "list[dict]", "doc": "日志消息条目（供消息类经验按级别筛选）"},
+    "T0_US": {"type": "int", "doc": "日志起点时间戳（us），事件类算子算相对时刻的基准"},
+    "HAS_ARMED": {"type": "bool", "doc": "是否存在 armed 段"},
+    "RESTART_DETECTED": {"type": "bool", "doc": "是否有 topic 时间戳回退（疑似中途重启）"},
+    "DROPOUT_MS": {"type": "int", "doc": "全日志丢包累计（毫秒）"},
+    "MESSAGES": {"type": "list[dict]", "doc": "日志消息条目（供消息类经验按级别筛选）"},
 }
 
 # 框架自己往 env 里补的名字（**不属于** provider）：
-#   no_data     —— compute 失败后置真（"数据不足"也是 skip 里的一条普通条件）
 #   has_topic() —— 表达式里唯一放行的函数调用，指向 provider.has_topic
 
 
@@ -1523,7 +1543,7 @@ def check_provider(provider, where="provider"):
     """运行期自检：契约里要求的东西，这个 provider 真的给了吗、类型对吗。
 
     为什么还要这一道（构建期不是已经查过 AST 了吗）：AST 只看"有没有定义"，
-    看不了"跑起来给的是什么"——比如 builtin_variables() 少返回一个键、fw_minor 给了字符串。
+    看不了"跑起来给的是什么"——比如 builtin_variables() 少返回一个键、FW_MINOR 给了字符串。
     这类问题如果放过，表现是**静默失效**（规则算不出数据 → 不发射 finding），很难查。
     """
     for name, spec in REQUIRED.items():
@@ -1653,27 +1673,40 @@ class Px4Provider:
         d = self._find_topic(topic, instance)
         return d.data if d is not None else None
 
-    def get_series(self, ref, instance=None, alias=None, per_instance=False):
+    def get_series(self, ref, instance=slice(None, None), alias=None):
         """按 \`"topic.field"\` 取一条序列（与规则里写的引用形一致）。
 
         **取不到或字段不存在一律返回 None，不抛异常。** 形态：
-          · 默认（instance=None 且 per_instance=False）—— 该字段在各实例上的值**拼接**成一条
-            （多实例 topic 的主流用法，如 estimator_status 每个 IMU 一个实例）
-          · per_instance=True —— 返回「每实例一组」的列表，交给需要分组的算子
-          · instance=N —— 只取第 N 个实例
+          · instance=slice（规则里写 \`topic[:].field\`，**不写下标也一样**）—— 所有实例。
+            多实例时返回「每实例一组」的列表；**只有一个实例时返回那一条序列本身**
+            （否则单实例字段就得处处写 \`[0]\`，而且 \`q\` 这种"每元素一列"的数组字段会被
+            多包一层而读不出来）
+          · instance=N（规则里写 \`topic[N].field\`，N 可为负，按 Python 语义从末尾数）
+            —— 只取第 N 个实例
           · alias —— 该字段的备用命名（旧固件改过名），可给字符串或字符串列表
         定长数组字段（如 float32[3] accel_clipping）：pyulog 按 'field[i]' 暴露，
         这里返回**每元素一列的列表**，缺的元素位置为 None。
+
+        **没有"把所有实例拼成一条"这个形态**（曾经有，默认就是它）：一条曲线里混着几个
+        传感器的数据，读的人看不出来。要哪个实例就写哪个；多实例归约用 \`[:]\`
+        交给会分组的算子。
         """
         aliases = None
         if alias is not None:
             aliases = [alias] if isinstance(alias, str) else list(alias)
-        if per_instance or instance is not None:
-            groups = self._read_grouped(ref, aliases)
-            if instance is not None:
-                return groups[instance] if groups and len(groups) > instance else None
-            return groups
-        return self._read_concat(ref, aliases)
+        if instance is None:
+            instance = slice(None, None)
+        groups = self._read_grouped(ref, aliases)
+        if not groups:
+            return None
+        try:
+            picked = groups[instance]
+        except (IndexError, TypeError):
+            return None
+        if isinstance(instance, slice):
+            # 单实例：直接给那一条（与 \`[0]\` 同形），别让调用方无谓地拆一层
+            return picked[0] if len(picked) == 1 else picked
+        return picked
 
     def get_first_existing_column(self, topic, names):
         """只取第一个实例、按候选名取第一个存在的**原样列**（概览指标兜底取数用）。"""
@@ -1692,7 +1725,8 @@ class Px4Provider:
     def match_version(self, spec):
         """固件约束串：any / ">=1.15" / "<1.15" / ">=1.14,<1.15"（逗号=与）。
 
-        只给 \`ref(..., when_fw=)\` 用（规则级的适用范围轴已经是表达式了）。
+        规则级的适用范围轴与节点级 \`ref(..., when_fw=)\` **共用这一个**（同一个概念、
+        同一套语法）；写错了先抛出来，别被下面"版本未知就放行"盖过去。
         版本未知（老日志没写版本号）时不因版本排除——与迁移前"按字段存在性判定"一致。
         """
         if not spec or spec == "any":
@@ -1734,23 +1768,26 @@ class Px4Provider:
         return [dict(m) for m in self._logged_messages]
 
     def builtin_variables(self):
-        """内置变量表。**每次返回新 dict**（引擎会往里写 compute 的输出）。"""
+        """内置变量表。**每次返回新 dict**（引擎会往里写 compute 的输出）。
+
+        键一律大写（见 api.py 的 BUILTIN_VARIABLES）：规则里自己赋的变量是小写。
+        """
         return {
-            "fw_minor": self.fw_minor,
-            "airframe": self.vehicle_type,
-            "is_fixed_wing": self.vehicle_type == "fixed_wing",
-            "duration_s": self.duration_s if self.duration_s is not None else 0,
-            "armed_s": self.armed_duration_s,
+            "FW_MINOR": self.fw_minor,
+            "AIRFRAME": self.vehicle_type,
+            "IS_FIXED_WING": self.vehicle_type == "fixed_wing",
+            "DURATION_S": self.duration_s if self.duration_s is not None else 0,
+            "ARMED_S": self.armed_duration_s,
             # 时序算子（如 head_tail_median_drop）按 armed 区间切窗用
-            "armed_intervals": list(self.armed_intervals),
+            "ARMED_INTERVALS": list(self.armed_intervals),
             # 事件类算子的相对时间（t=xx.x s）基准
-            "t0_us": self.t0_us,
-            "has_armed": bool(self.armed_intervals),
+            "T0_US": self.t0_us,
+            "HAS_ARMED": bool(self.armed_intervals),
             # 数据质量事实（guards 类经验用）
-            "restart_detected": self.restart_topics > 0,
-            "dropout_ms": self.dropout_total_ms,
+            "RESTART_DETECTED": self.restart_topics > 0,
+            "DROPOUT_MS": self.dropout_total_ms,
             # 日志消息：供「日志消息聚合」类经验按级别筛选
-            "messages": self.get_logged_messages(),
+            "MESSAGES": self.get_logged_messages(),
         }
 
     def get_report_facts(self):
@@ -2093,50 +2130,13 @@ class Px4Provider:
                 return v
         return None
 
-    def _read_concat(self, ref, aliases):
-        """'topic.field' → 该字段在各实例上的值（多实例拼接）；topic/字段缺失返回 None。"""
-        topic, _, field = ref.partition(".")
-        ds = self._find_topic_all(topic)
-        if not ds:
-            return None
-        aliases = list(aliases or [])
-
-        def gather(get_one):
-            vals = []
-            for d in ds:
-                v = get_one(d)
-                if v is not None and len(v):
-                    vals.append(np.asarray(v, dtype=float))
-            if not vals:
-                return None
-            return np.concatenate(vals) if len(vals) > 1 else vals[0]
-
-        direct = gather(lambda d: self._first_field(d, field, *aliases))
-        if direct is not None:
-            return direct
-
-        def gather_cell(idx):
-            # pyulog 对定长数组通常暴露为 'field[0]'，个别构建为 'field_0'
-            return gather(
-                lambda d: next(
-                    (
-                        v
-                        for v in (self._first_field(d, f"{stem}[{idx}]", f"{stem}_{idx}") for stem in [field] + aliases)
-                        if v is not None
-                    ),
-                    None,
-                )
-            )
-
-        if gather_cell(0) is None:
-            return None
-        columns = [gather_cell(i) for i in range(32)]
-        while columns and columns[-1] is None:
-            columns.pop()
-        return columns
-
     def _read_grouped(self, ref, aliases):
-        """per_instance 取数：返回「每个 topic 实例一组」的列表（不跨实例拼接）。"""
+        """'topic.field' → 「每个 topic 实例一组」的列表；topic 不存在返回 None。
+
+        实例顺序 = \`_find_topic_all()\` 的顺序（与 topic meta 一致），所以 \`instance=N\` 的
+        N 就是标题里那个实例序号。缺字段的实例留一个 None 占位，**不剔除**——剔了会让
+        后面的实例序号整体前移。
+        """
         topic, _, field = ref.partition(".")
         ds = self._find_topic_all(topic)
         if not ds:
@@ -2502,6 +2502,8 @@ FORMATS.append((_is_ulog, _make_px4, "PX4 ULog（.ulg）"))
 
 import json
 import ast
+import math
+import re
 import numpy as np
 
 
@@ -2515,6 +2517,12 @@ RULES = json.loads(r"""__RULES__""")
 # 码表、文案、展示口径、规则元数据、执行顺序都在里面；引擎只提供机制。
 # 它同时也是 provider 的数据源（随 open_log 一起传进去）。
 FACTS = __FACTS__
+
+# ---------------- 字段单位表（构建期查好的，只含写了 unit= 的引用涉及的字段）----------------
+# 源单位从 meta/<tag>.json 查（经 meta/topic-map.yaml 换字典键）、meta/topic-overrides.yaml
+# 可补/纠。查不到的构建期会告警并在产物里留空——这里拿不到就**不换算**。
+# 键是 \`topic.field\`（日志里的名字，不是字典键），值是规范化后的单位名（见 _UNIT_FACTORS）。
+FIELD_UNITS = __FIELD_UNITS__
 
 # 同一 group 内多条规则按 order 字段排序（缺省 100000，再按 id 兜底）。
 # **跨 group 的顺序不在这里决定**：由 facts.yaml 的 group_order 决定（见文件末尾的执行循环），
@@ -2659,25 +2667,173 @@ def _eval_expr(expr, env):
     return eval(compile(tree, "<rule>", "eval"), {"__builtins__": {}}, env)
 
 
-def _ref(name, per_instance=False, instance=None, alias=None, when_fw=None):
+def _precheck_hit(spec, env):
+    """\`conditions.precheck\`：一串先决条件，命中任意一条就不跑本条。
+
+    与 \`topics\` 的分工：\`topics\` 只回答"日志里有没有这个 topic"，这里放**要算一遍才知道的
+    适用范围**——如 \`not HAS_ARMED\`（没有 armed 段就谈不上零偏判定、机动段统计）。
+    在 compute **之前**求值，所以只认内置变量与 \`has_topic()\`，拿不到 compute 的输出。
+
+    **返回命中的那条表达式原文**（没命中返回 None）——它就是 skipped 的原因文案：作者写的
+    本来就是一句可读的判据，不必再翻译一遍。表达式本身出错（名字写错、取值缺失）当作
+    **未命中**：宁可多跑一条，也别把整条误杀。
+
+    注意这里**没有**"数据不足"这条：compute 算不出来本来就会留痕，见 \`_run_rules\`。
+    """
+    for when in spec or []:
+        try:
+            if _eval_expr(when, env):
+                return when
+        except Exception:
+            continue
+    return None
+
+
+def _airframe_label(spec):
+    """机架约束的展示写法（只用于 skipped 文案）：列表用 \` / \` 连接。"""
+    if isinstance(spec, list):
+        return " / ".join(str(s).strip() for s in spec)
+    return str(spec).strip()
+
+
+def _match_airframe(spec, env):
+    """机架适用范围：\`any\` ｜ 单个机架名 ｜ 列表（如 \`[fixed_wing, unknown]\`）。
+
+    **只做字符串精确比对，不解释语义**：拿 provider 在 \`builtin_variables()\` 里报的
+    \`AIRFRAME\` 值去比（PX4 报 rotary_wing / fixed_wing / vtol / rover / unknown）。
+    所以换一种日志格式不用改这里——它的机架词表由它自己的适配器定义。
+
+    写成 \`IS_FIXED_WING or AIRFRAME == 'unknown'\` 那种表达式是旧写法，构建期已拦。
+    """
+    if isinstance(spec, str):
+        name = spec.strip()
+        if name == "any":
+            return True
+        wanted = [name]
+    elif isinstance(spec, list):
+        if not spec:
+            raise ValueError("airframe 列表为空（不限就写 any）")
+        wanted = [str(s).strip() for s in spec]
+    else:
+        raise ValueError("airframe 必须是 any / 机架名 / 列表，收到 %r" % (spec,))
+    current = (env or {}).get("AIRFRAME")
+    return current is not None and str(current) in wanted
+
+
+def _missing_topics(spec):
+    """\`conditions.topics\` 的判定：每项是「候选 topic」，项间是「都要有」。
+
+    一项里有多个候选（YAML 里写成 \`vehicle_gps_position || sensor_gps\`）时，
+    **其中任意一个在日志里就算满足**；两个都不在才跳过。命中第一项即中止——
+    与过去 skip 列表命中第一条的语义相同。
+
+    返回缺失项的原因文案（\`"a / b not in log"\`），全都有则返回 None。
+    文案只在这里生成一处：构建期只负责把 \`a || b\` 拆成候选列表，不认识语义。
+    """
+    for candidates in spec or []:
+        if not any(provider.has_topic(t) for t in candidates):
+            return " / ".join(candidates) + " not in log"
+    return None
+
+
+def _ref(name, *more, alias=None, unit=None):
     """字段取数：表达式里的 \`ref("topic.field", ...)\` 与裸写的 \`topic.field\` 都走这里。
 
-    修饰与老节点上的同名选项一一对应，只是作用域从「整个节点」收窄到「这一个引用」：
-      per_instance —— 按实例分组读（每实例一组），交给需要分组的算子
-      instance     —— 只取第 N 个实例
-      alias        —— 字段的备用命名（旧固件改过名）
-      when_fw      —— 固件版本不满足就返回 None（交给 coalesce 选另一个分支）
+    字段名有两种下标，别混：
+      \`topic.field\` / \`topic[:].field\` —— **所有实例**（两种写法等效）。多实例时给
+                          「每实例一组」的列表，交给需要分组的算子；**只有一个实例时
+                          就是那一条序列**（与写 \`[0]\` 同形），所以单实例字段照旧直接算
+      \`topic[N].field\` —— 只取第 N 个实例（N 可为负）
+      \`topic.field[N]\` —— 数组字段的元素下标（如 \`vehicle_attitude.q[0]\`）
 
-    取数本身由 provider 实现（契约：取不到返回 None，不抛异常）。
+    **位置参数可以给多个**：\`ref("新名", "旧名")\` 是候选组——按顺序取第一个在日志里
+    存在的；都没有返回 None，由数据流自己中止。改名的场合一律用它，**没有"这个引用只
+    适用于某版本"这种写法**（升级换代就是"老名字没了、新名字在"，按存在性挑就够——
+    真需要按版本分流的语义差异，交给算子或拆成两条规则）。
+
+    修饰：
+      alias    —— 字段的备用命名（旧固件改过名），等价于放进候选组
+      unit     —— **期望输出的单位**：源单位由构建期从 meta/override 查好，这里只做一次
+                  乘法。不写就是不换算（无量纲字段）。源单位查不到时构建期已告警，这里
+                  按原样给——宁可不换算，也别悄悄乘错系数。
+
+    取数本身由 provider 实现（契约：取不到返回 None，不抛异常）——存在性判据就是它。
     """
-    if when_fw is not None and not provider.match_version(when_fw):
+    for cand in (name, *more):
+        bare, inst = _split_ref(cand)
+        series = provider.get_series(bare, instance=inst, alias=alias)
+        if series is None:
+            continue
+        if unit is not None:
+            scale = _unit_scale(FIELD_UNITS.get(bare), unit)
+            if scale is not None:
+                series = _scale_series(series, scale)
+        return series
+    return None
+
+
+def _split_ref(ref):
+    """\`"topic[:].field"\` → ("topic.field", slice(None, None))；\`[N]\` → int；不写 → 0。
+
+    实例说明交给 provider 直接用下标取（Python 的 int/切片语义），这里只负责拆开。
+    """
+    m = re.match(r"^([a-z][a-z0-9_]*)(?:\[([-]?\d*(?::-?\d*)?)\])?\.(.+)$", str(ref))
+    if not m:
+        return str(ref), 0
+    return "%s.%s" % (m.group(1), m.group(3)), _parse_inst(m.group(2))
+
+
+def _parse_inst(txt):
+    """\`[2]\` → int；\`[:]\` / \`[1:3]\` / **不写** → slice（不写就是"所有实例"）。形状由构建期保证。"""
+    if txt is None or txt == "":
+        return slice(None, None)
+    if ":" in txt:
+        a, _, b = txt.partition(":")
+        return slice(int(a) if a else None, int(b) if b else None)
+    return int(txt)
+
+
+# ---------------- 单位换算 ----------------
+# 只服务 \`ref(..., unit="期望单位")\`。按「到族基准单位的因子」定义：族内可换、跨族不行
+# （跨族在构建期就报错了）。键是**规范化后**的单位名——构建期把 meta 里那些自由文本
+# （"metres" / "radians" / "us"…）统一成这一套，运行期不再认别名的拼法。
+_UNIT_FACTORS = {
+    # 长度（基准 m）
+    "m": ("len", 1.0),
+    "mm": ("len", 1e-3),
+    "cm": ("len", 1e-2),
+    # 角度（基准 rad）。degE7 = 度 × 1e7，PX4 经纬度的老口径
+    "rad": ("angle", 1.0),
+    "deg": ("angle", math.pi / 180),
+    "dege7": ("angle", 1e-7 * math.pi / 180),
+    # 时间（基准 s）
+    "s": ("time", 1.0),
+    "ms": ("time", 1e-3),
+    "us": ("time", 1e-6),
+}
+
+
+def _unit_scale(src, dst):
+    """从 src 换到 dst 的乘数；任一边认不出、或跨族 → None（构建期已经查过一遍）。"""
+    a = _UNIT_FACTORS.get(str(src or "").strip().lower())
+    b = _UNIT_FACTORS.get(str(dst or "").strip().lower())
+    if not a or not b or a[0] != b[0]:
         return None
-    return provider.get_series(name, instance=instance, alias=alias, per_instance=per_instance)
+    return a[1] / b[1]
+
+
+def _scale_series(x, scale):
+    """按因子缩放一条序列。数组字段是「每元素一列」，分组取数是「每实例一组」——都递归下去。"""
+    if x is None:
+        return None
+    if isinstance(x, list):
+        return [_scale_series(v, scale) for v in x]
+    return np.asarray(x, dtype=float) * scale
 
 
 # ---------------- compute 表达式求值 ----------------
 # 产物里存的**就是作者写的原文**：
-#   vibe_mean, vibe_p95, ..., imu_idx = worst_mean_stats(ref("...", per_instance=True), min_mean=0)
+#   vibe_mean, vibe_p95, ..., imu_idx = worst_mean_stats(ref("...[:]"), min_mean=0)
 #   pct = frac * 100
 #   p99_stat = p99 if seg_n > 50 else None
 #
@@ -2802,48 +2958,14 @@ _COMPUTE_GLOBALS["has_topic"] = provider.has_topic
 
 
 def _rule_env():
-    """一条规则求值时的名字空间：内置变量（provider 给）+ 框架补的两个。
+    """一条规则求值时的名字空间：内置变量（provider 给）+ 框架补的一个。
 
     每次都要新的一份：compute 的输出直接写进这个 dict。
-      no_data     —— compute 是否算不出来。初值 False；compute 失败后置真，再判一轮 \`skip\`。
-                     于是"数据不足要记一条 skipped"不必再单设字段。
       has_topic() —— 表达式里唯一放行的函数调用，指向 provider.has_topic
     """
     env = provider.builtin_variables()
     env["has_topic"] = provider.has_topic
-    env["no_data"] = False
     return env
-
-
-def _rule_skipped(rule, checks, env):
-    """判 \`skip\` 列表：**按顺序**，命中第一条即跳过本条。
-
-    每一项是 \`{when: <Python 表达式>, reason?: <文案>}\`——表达式与 \`compute\` / \`triggers\`
-    同一套语法。写了 \`reason\` 就记一条 skipped（报告里能看到"为什么没跑"），**不写则静默**
-    跳过（既不 ran 也不 skipped，用于"这本来就跟我无关"的场合）。
-
-    会被调**两轮**：compute 之前一轮（此时 \`no_data\` 为假），compute 失败后再一轮
-    （\`env["no_data"]\` 已置真）。所以"数据不足"也只是列表里的一条普通条件，
-    不必再单设一个字段。
-
-    返回 True 表示本条规则不该继续跑。
-    """
-    for spec in rule.get("skip") or []:
-        when = spec.get("when")
-        if not when:
-            continue
-        try:
-            hit = _eval_expr(when, env)
-        except Exception:
-            hit = False
-        if not hit:
-            continue
-        reason = spec.get("reason")
-        if reason:
-            for check in checks:
-                skipped(check, reason)
-        return True
-    return False
 
 
 def _run_rules(group):
@@ -2862,55 +2984,63 @@ def _run_rules(group):
         elif not isinstance(_checks, list):
             _checks = [_checks]
         _env = _rule_env()
-        # 适用范围两轴先判：固件 / 机架。**写成表达式**（不限就写 True），与 compute /
-        # triggers 同一套语法——不再另设 "any" / ">=1.15" 这类小语言。
-        # 不匹配则静默：既不 ran 也不 skipped（这是最外层的门，"这条经验根本不属于本机"
-        # 不值得在报告里刷一条）。要留痕就把它写进 skip 列表。
+        # 适用范围（\`conditions\`）依次判：固件 / 机架 / 先决条件 / 依赖的 topic。
+        # 固件那轴与 provider.match_version 同一套语法（any / ">=1.15" / ">=1.14,<1.15"），
+        # 机架那轴是 \`any\` / 机架名 / 列表。
+        # **不满足一律记一条 skipped 并带上自动文案**：报告里要能看出"这条为什么没跑"，
+        # 而不是让读者以为它跑过了、或者根本没人写过这条经验。
+        # （轴约束写成了解析不了的串时静默退出——那是规则的笔误，构建期本来就会拦。）
+        _not_applicable = None
         try:
-            _axis_ok = bool(_eval_expr(_rule["firmware"], _env)) and bool(_eval_expr(_rule["airframe"], _env))
+            if not provider.match_version(_rule["firmware"]):
+                _not_applicable = "固件不满足 %s" % _rule["firmware"]
+            elif not _match_airframe(_rule["airframe"], _env):
+                _not_applicable = "机架不适用 %s" % _airframe_label(_rule["airframe"])
         except Exception:
-            _axis_ok = False
-        if not _axis_ok:
-            continue
-        # 再判「不适用」声明（机型未知、无 armed 段、缺某 topic …）：命中即跳过本条。
-        # 写了文案的记一条 skipped——报告里能看到"为什么没跑"；不写的静默。
-        if _rule_skipped(_rule, _checks, _env):
-            continue
-        # topic 在就 ran（与原过程式块一致：ran() 在块首，数据不足只代表不发射 finding）。
-        # ran_on_success：原实现把 ran() 放在数据判定**之后**（如 motor_balance 只在
-        # 活跃通道 >= 4 时才算“跑过”），这类规则改为 compute 成功后再记 ran。
-        _ran_late = bool(_rule.get("ran_on_success")) or _rule.get("ran_when") is not None
-        if not _ran_late:
+            _not_applicable = None
+        if _not_applicable:
             for _check in _checks:
-                ran(_check)
-
+                skipped(_check, _not_applicable)
+            continue
+        # 依赖的 topic：缺了记一条（文案自动生成，见 _missing_topics）
+        _missing = _missing_topics(_rule.get("topics"))
+        if _missing:
+            for _check in _checks:
+                skipped(_check, _missing)
+            continue
+        # 先决条件：命中的那条条件原文就是原因（它本来就是作者写的一句判据）
+        _pre = _precheck_hit(_rule.get("precheck"), _env)
+        if _pre:
+            for _check in _checks:
+                skipped(_check, "先决条件命中：%s" % _pre)
+            continue
+        # ── 三步里的第二步：算 ──
+        # 算不出来就记一条 skipped（"数据不足"），所以 ran() 只能放在 compute **成功之后**——
+        # 同一条 check 不能既是 ran 又是 skipped。原先靠 \`ran_on_success\` 表达的那半边
+        # （原实现把 ran() 放在数据判定之后）现在成了默认，那个字段已删。
         _ok = True
         for _stmt in _rule.get("compute") or []:
             # compute 是**表达式**，求值出来的名字进 _env，供后面的表达式与 triggers / outputs 引用。
             try:
                 _eval_compute(_stmt, _env)
             except Exception:
-                # 数据不足（或该表达式在这份日志上求不出来）：按"数据不足"中止本条规则——
-                # 不发射 finding
                 _ok = False
                 break
         if not _ok:
-            # 数据不足也要能留痕：把 no_data 置真再判一轮 skip（原 skip_reason_no_data 的职责）
-            _env["no_data"] = True
-            _rule_skipped(_rule, _checks, _env)
+            for _check in _checks:
+                skipped(_check, "数据不足，本条没算出结论")
             continue
-        if _ran_late:
-            # 原实现把 ran() 放在数据判定**之后**（如 motor_balance 只在活跃通道 >= 4 时
-            # 才算“跑过”、attitude 只在机动段样本足够时才算）。ran_when 可再给条件。
-            _ran_ok = True
-            if _rule.get("ran_when") is not None:
-                try:
-                    _ran_ok = bool(_eval_expr(_rule["ran_when"], _env))
-                except Exception:
-                    _ran_ok = False
-            if _ran_ok:
-                for _check in _checks:
-                    ran(_check)
+        # ran_when：算出来了、但还不算"跑过"（如姿态那条要有足够的机动段样本）。
+        # 不满足就静默——它跟"数据不足"不是一回事。
+        _ran_ok = True
+        if _rule.get("ran_when") is not None:
+            try:
+                _ran_ok = bool(_eval_expr(_rule["ran_when"], _env))
+            except Exception:
+                _ran_ok = False
+        if _ran_ok:
+            for _check in _checks:
+                ran(_check)
 
         _out = _rule["outputs"]
         # outputs.guard_tags：按条件产生的数据质量标签（等价于原过程式的 guard_tags.append，
@@ -3144,4 +3274,5 @@ def run_all():
 `
   .replace("__FAULT_KB__", JSON.stringify(faultKbJson.entries))
   .replace("__RULES__", JSON.stringify(rules))
-  .replace("__FACTS__", JSON.stringify(facts));
+  .replace("__FACTS__", JSON.stringify(facts))
+  .replace("__FIELD_UNITS__", JSON.stringify(fieldUnits));

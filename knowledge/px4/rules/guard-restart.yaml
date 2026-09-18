@@ -6,9 +6,6 @@ name: 数据质量-中途重启
 group: guards
 order: 1
 
-firmware: "True"
-airframe: "True"
-
 outputs:
   guard_tags:
-    - {when: "restart_detected", tag: restart_detected}
+    - {when: "RESTART_DETECTED", tag: restart_detected}

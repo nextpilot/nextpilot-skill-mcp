@@ -8,13 +8,10 @@ group: logged_messages
 order: 2
 version: 1.0.1
 
-firmware: "True"
-airframe: "True"
-
 compute:
-  - n = count_items(messages, key="level_name", eq="WARNING")
+  - n = count_items(MESSAGES, key="level_name", eq="WARNING")
   - >-
-      samples = take_items(messages, key="level_name", eq="WARNING", limit=5,
+      samples = take_items(MESSAGES, key="level_name", eq="WARNING", limit=5,
       clip={"message": 200}, drop=["level", "level_name"])
 
 triggers:

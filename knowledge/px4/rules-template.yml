@@ -1,0 +1,138 @@
+# 一条检查经验的完整骨架 —— 复制成 rules/<名字>.yaml 后逐项填。
+# 字段级权威参考：站内 /guide/knowledge-write-rule；改完跑：
+#   cd web && pnpm build:kb                      # 构建 + 校验（写错就构建失败）
+#   python tools/calibrate/compare_baseline.py   # 6 条真实日志与冻结基线逐字段比对
+#
+# **必填只有四个**：id / name / group / compute（guard 类经验连 compute 都不要，
+# 见文件末尾）。其余每一项都能省，省掉的含义写在各自注释里。
+
+# ── 身份 ──
+id: px4-xxx                    # finding.ruleId，全局唯一；故障库与报告都引用它
+name: 中文名                    # 报告里显示的名字
+group: xxx                     # 执行分组：决定执行顺序与 finding 编号（F01、F02…）。
+                               # 必须已登记在 facts.yaml 的 group_order 与 rule_meta.by_group
+order: 1                       # 同 group 内的次序（缺省 100000，再按 id 兜底）
+# 下面这些可省，缺省按 group 从 facts.yaml 的 rule_meta 派生，只在确实偏离时才写：
+#   category / version / status / license / author / outputs.check / doc
+# doc: https://docs.px4.io/main/en/...   # 整条规则的官方文档链接 → finding.docUrl
+# version: 1.1.0                         # 经验自身版本
+
+# ── 适用范围：整块可省（省 = 什么都适用、没有数据依赖）。**任一键不满足都会记一条 skipped**
+#    并带上自动文案（`固件不满足 >=1.15` / `机架不适用 fixed_wing` / `先决条件命中：not HAS_ARMED`
+#    / `X not in log`）——报告里要能看出"这条为什么没跑"。
+conditions:
+  # 固件：any（缺省）/ ">=1.15" / "<1.15" / ">=1.14,<1.15"（逗号 = 与）。
+  # **这是"哪一版"唯一的写法**——引用上没有版本条件（字段换代用候选组按存在性挑）。
+  firmware: any
+  # 机架：any（缺省）/ 机架名 / 机架名列表。词表见 facts.yaml 的 vehicle_types
+  # （rotary_wing / fixed_wing / rover / airship，另有 unknown）；简写 mc / fw 也认
+  # （facts.yaml 的 airframe_aliases），构建期换成规范名，产物里只留规范名。
+  airframe: any
+  # 数据依赖：日志里得有这些 topic，缺了记一条 skipped（文案自动生成 "X not in log"）。
+  # 项内 `||` = **其中任意一个在日志里就够**（"改名/另有别名"用它），项间 = 都要有。
+  # 只列"缺了就不该判"的 topic——走过 _try 的可选字段别列进来，那会把能跑的规则变成跳过。
+  topics:
+    - vehicle_status
+    - estimator_wind || wind_estimate
+  # 先决条件：命中任意一条就不跑本条（文案就是命中的那句原文）。
+  # 在 compute **之前**求值 → 只认内置变量（大写）与 has_topic()，拿不到 compute 的输出。
+  # 放"不用算就知道跟我无关"的场合（如没有 armed 段就谈不上飞行中的判定）；
+  # "数据不足"不写这里——compute 失败会自动留痕。
+  precheck:
+    - "not HAS_ARMED"
+
+# ── 取值：一串表达式，自上而下求值；输出的名字供后面与 triggers 引用 ──
+# 表达式写法（Python 的真子集，与 triggers.when 同一套）：
+#   a, b = f(x, kw=1)      赋值 / 多左值解包（个数须等于算子的输出数）
+#   pct = frac * 100       算术 + - * / % **
+#   x if cond else y       三元
+#   a and b / a or b / not a       逻辑；  x in S / x is None   比较
+#   算不出来（表达式抛异常）→ 整条中止，并**自动**记一条 skipped「数据不足，本条没算出结论」。
+#   要容错就用 _try(...)：内层出错或得 None 时结果为 None，不让整条中止。
+#
+# 字段引用（**完整形态 `topic[N].field[M]`**：第 N 个实例的字段的第 M 个元素。
+# 两个下标各自可省，省掉的含义不同，别混）：
+#   topic[N].field[M]             —— 完整形态（两个下标一起用也合法）
+#   topic[N].field                —— 只取第 N 个实例（N 可为负，按 Python 语义从末尾数）
+#   topic.field[M]                —— 数组字段的第 M 个元素（如 vehicle_attitude.q[0]）
+#   topic.field 或 topic[:].field —— **所有实例**（两种写法等效）：多实例给「每实例一组」
+#                                   交给会分组的算子；单实例就是那一条序列
+#
+# 裸写还是包 ref(...)：**不需要修饰就用裸写**——`vehicle_status.nav_state` 与
+# `ref("vehicle_status.nav_state")` 完全等价，包了是白写；要指定实例、或挂 alias /
+# unit / 候选组时才写 ref。两条硬规则：
+#   · ref 的第一个参数必须是**字符串**。写成 ref(battery_status.remaining) 是错的——
+#     那样 Python 会先把字段读出来当参数传，修饰就来不及生效了。
+#   · **裸写不能带实例下标**：`cpuload[0].load` 构建期就报错并提示改写。原因是表达式走
+#     Python `ast` 白名单求值，而裸写的中括号是个 Subscript 节点（等于开了"任意下标"
+#     这个能力），白名单不给；实例信息只能装在字符串里、由 ref 去解析。
+#
+# ref 能挂的三样修饰：
+#   ref("新名", "旧名")                      候选组：按顺序取第一个存在的（改名一律用它）
+#   ref("latitude_deg", "lat", unit="deg")   改名**且**改了单位：取到谁都换算成 deg
+#   ref("...", alias="clipping")             备用命名，等价于放进候选组
+#   ↑ **没有"这条引用只适用于某版本"这种写法**：升级换代就是老名字没了、新名字在，按存在性
+#     挑就够。要按版本分段的是**语义**差异（比如同一字段换了单位/口径），那种拆成两条规则。
+#   ↑ unit= 只在写了它时才换算：源单位从 meta/<tag>.json 查（经 meta/topic-map.yaml 换
+#     字典键），查不到会**告警**（不是失败），补一行到
+#     knowledge/px4/meta/topic-overrides.yaml 的 units 里即可。
+compute:
+  - >-
+      vibe_mean, vibe_p95, vibe_max, imu_idx = worst_mean_stats(
+      ref("vehicle_imu_status[:].accel_vibration_metric"))
+  - >-
+      step = _try(adjacent_speed_mps(
+      ref("vehicle_gps_position.latitude_deg", "vehicle_gps_position.lat", unit="deg"),
+      ref("vehicle_gps_position.longitude_deg", "vehicle_gps_position.lon", unit="deg"),
+      ref("vehicle_gps_position.timestamp")))
+  - n = count_above(step, gt=50.0)
+
+# ── 副产品（整块可省）：喂故障库的标签、写进「关键数据」的统计、按条件打的数据质量标签 ──
+outputs:
+  check: xxx                   # ran/skipped 用的 check 名；缺省 = group
+  tag: xxx                     # 喂故障库匹配的异常标签（trigger 没写 tag 时回退到它）
+  stats:                       # → 报告「关键数据」；var 是 compute 里的变量名
+    xxxCount: {var: n, round: 3}
+  guard_tags:                  # 条件性数据质量标签：不依赖是否发出 finding，算出来就带上
+    - {when: "n > 0", tag: temperature_change_large}
+
+# ── 判定：自上而下，命中第一条即发一条 finding（guard 类经验可整块省）──
+# 数据缺失要让条件自己为假——表达式里的异常按"未命中"处理
+# （如 airspeed 的 `has_invalid and invalid_frac >= 0.50`）
+triggers:
+  - when: "n >= 3"                 # 必填
+    severity: warning              # 必填：critical | warning | info
+    title: "……{n}……"               # 必填；可用 {变量} 占位
+    field: "some_topic.some_field" # 必填：证据字段（evidence.field）
+    value: f"{n:.3f}"              # 证据值，表达式（f-string 管格式化）
+    threshold: 3                   # 阈值（evidence.threshold）
+    unit: 次                       # 单位（evidence.unit）
+    tag: xxx                       # 本条 finding 的标签（缺省 = outputs.tag；写 null = 不产标签）
+    suggestion: "结合故障库 F0xx：……"     # 结论建议（也可用 {变量} 占位）
+    evidence_extra: {samples: samples}   # 额外证据：{evidence 键: 变量名}
+
+# ── 可选：事件类经验（一次事件一条 finding，如每次失效保护边沿）──
+#   compute 里用事件算子产出列表（rising_edge_events / step_into_events），再按它展开：
+# foreach: {var: events, keys: [t_s, name]}   # keys 声明事件 dict 的键，供构建期校验占位符
+#
+# ── 可选：算出来了、但还不算"跑过"（如机动段样本不足）──
+# ran_when: "seg_ok"
+
+# ── 一个 YAML 装多条经验：顶层写成数组。只有形态完全相同的兄弟经验才合并
+#    （如 failsafe.yaml 的 6 条：5 个布尔事件 + 导航状态）
+# - id: px4-xxx-failsafe
+#   name: ...
+#   group: failsafe
+#   order: 1
+#   compute: [...]
+#   triggers: [...]
+# - id: px4-xxx-rc-lost
+#   ...
+
+# ── guard 类经验（只打数据质量标签，不发 finding）：没有 compute / triggers / check ──
+# id: px4-guard-xxx
+# name: 数据质量-xxx
+# group: guards                # 或 guards_early（要最早执行、且它的标签排第一时用）
+# outputs:
+#   guard_tags:
+#     - {when: "DROPOUT_MS > 1000", tag: log_dropouts_high}

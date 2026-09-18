@@ -7,12 +7,10 @@ id: px4-cpu-load
 group: cpu
 name: CPU 负载
 
-# ── 适用范围（三个轴，不限也必须显式写 any）──
-firmware: "True"
-airframe: "True"
-# ── 数据依赖：缺 topic 则 skipped，不误报 ──
-skip:
-  - {when: "not has_topic('cpuload')", reason: cpuload not in log}
+# ── 适用范围：不限就整个省掉；依赖的 topic 缺了记一条 skipped，不误报 ──
+conditions:
+  topics:
+    - cpuload
 
 # ── 计算：算子节点数据流（输出命名进环境，供表达式引用）──
 compute:

@@ -70,6 +70,8 @@ def main() -> int:
     final = final.replace("__RULES__", json.dumps(extract_json_const(src, "rules"), ensure_ascii=False))
     # 数据配置同样在 .replace 链里；它的装配规则（facts.yaml + plot/track.yml）与本地回归共用一处
     final = final.replace("__FACTS__", json.dumps(runner.load_facts_payload(), ensure_ascii=False))
+    # 字段单位表（ref(..., unit=) 的源单位）同样从产物里取，与本地回归共用一处
+    final = final.replace("__FIELD_UNITS__", json.dumps(runner.load_field_units(), ensure_ascii=False))
 
     try:
         ast.parse(final)

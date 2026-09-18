@@ -102,23 +102,22 @@ def builtin_table() -> str:
     body = m.group(1) if m else ""
     keys = re.findall(r'^\s{4}"([A-Za-z_0-9]+)":', body, re.M)
     note = {
-        "fw_minor": "固件次版本号（int 或 None）——版本分支最常用，`None` = 这份日志没写版本号",
-        "airframe": "机型字符串：`rotary_wing` / `fixed_wing` / `rover` / `airship` / `unknown`",
-        "is_fixed_wing": "机型别名（比 `airframe == 'fixed_wing'` 好读）",
-        "duration_s": "日志总时长（秒）",
-        "armed_s": "armed 总时长（秒）",
-        "armed_intervals": "armed 区间列表 `[(start_us, end_us)]`，升序不重叠；`end=None` 表示持续到日志结束。时序算子按它切窗",
-        "t0_us": "日志起点时间戳（us），事件类算子算相对时刻用",
-        "has_armed": "是否存在 armed 段（布尔）",
-        "restart_detected": "是否有 topic 时间戳回退（疑似中途重启）",
-        "dropout_ms": "全日志丢包累计（毫秒）",
-        "messages": "日志消息条目列表 `[{tSec, message, level, level_name}]`",
+        "FW_MINOR": "固件次版本号（int 或 None）——版本分支最常用，`None` = 这份日志没写版本号",
+        "AIRFRAME": "机型字符串：`rotary_wing` / `fixed_wing` / `rover` / `airship` / `unknown`",
+        "IS_FIXED_WING": "机型别名（比 `AIRFRAME == 'fixed_wing'` 好读）",
+        "DURATION_S": "日志总时长（秒）",
+        "ARMED_S": "armed 总时长（秒）",
+        "ARMED_INTERVALS": "armed 区间列表 `[(start_us, end_us)]`，升序不重叠；`end=None` 表示持续到日志结束。时序算子按它切窗",
+        "T0_US": "日志起点时间戳（us），事件类算子算相对时刻用",
+        "HAS_ARMED": "是否存在 armed 段（布尔）",
+        "RESTART_DETECTED": "是否有 topic 时间戳回退（疑似中途重启）",
+        "DROPOUT_MS": "全日志丢包累计（毫秒）",
+        "MESSAGES": "日志消息条目列表 `[{tSec, message, level, level_name}]`",
     }
     rows = ["| 变量 | 含义 |", "| --- | --- |"]
     for k in keys:
         rows.append("| `%s` | %s |" % (k, note.get(k, "—")))
-    # 框架自己补的两个（不属于 provider，但同样可以直接引用）
-    rows.append("| `no_data` | compute 是否算不出来：初值 False，compute 失败后置真（`skip` 列表里用它记一条 skipped） |")
+    # 框架自己补的（不属于 provider，但同样可以直接引用）
     rows.append(
         "| `has_topic('x')` | 日志里有没有这个 topic，如 `not has_topic('cpuload')`；"
         "表达式里**唯一**允许的函数调用（其余函数一律不给） |"

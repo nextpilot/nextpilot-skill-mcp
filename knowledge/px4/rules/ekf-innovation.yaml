@@ -9,25 +9,24 @@ name: EKF 创新检验
 group: ekf_innovations
 order: 1
 
-firmware: "True"
-airframe: "True"
-skip:
-  - {when: "not has_topic('estimator_status')", reason: estimator_status not in log}
+conditions:
+  topics:
+    - estimator_status
 
 compute:
   # 每个 estimator 实例一组；主信号（位掩码）非空时用它，否则逐一比对各路 *_test_ratio。
   # 字段名、位名、通道名全部由本文件给出（算子不认识任何具体 topic/字段）。
   - >-
     frac, names, inst = worst_reject_ratio(
-      ref("estimator_status.innovation_check_flags", per_instance=True),
-      ref("estimator_status.vel_test_ratio", per_instance=True),
-      ref("estimator_status.pos_test_ratio", per_instance=True),
-      ref("estimator_status.hgt_test_ratio", per_instance=True),
-      ref("estimator_status.hdg_test_ratio", per_instance=True),
-      ref("estimator_status.mag_test_ratio", per_instance=True),
-      ref("estimator_status.tas_test_ratio", per_instance=True),
-      ref("estimator_status.hagl_test_ratio", per_instance=True),
-      ref("estimator_status.beta_test_ratio", per_instance=True),
+      ref("estimator_status[:].innovation_check_flags"),
+      ref("estimator_status[:].vel_test_ratio"),
+      ref("estimator_status[:].pos_test_ratio"),
+      ref("estimator_status[:].hgt_test_ratio"),
+      ref("estimator_status[:].hdg_test_ratio"),
+      ref("estimator_status[:].mag_test_ratio"),
+      ref("estimator_status[:].tas_test_ratio"),
+      ref("estimator_status[:].hagl_test_ratio"),
+      ref("estimator_status[:].beta_test_ratio"),
       primary_min=3,
       primary_names=["速度", "水平位置", "垂直位置", "磁罗盘 X", "磁罗盘 Y", "磁罗盘 Z",
                      "航向", "空速", "侧滑", "离地高度", "光流 X", "光流 Y"],

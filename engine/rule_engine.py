@@ -14,6 +14,8 @@
 
 import json
 import ast
+import math
+import re
 import numpy as np
 
 
@@ -27,6 +29,12 @@ RULES = json.loads(r"""__RULES__""")
 # 码表、文案、展示口径、规则元数据、执行顺序都在里面；引擎只提供机制。
 # 它同时也是 provider 的数据源（随 open_log 一起传进去）。
 FACTS = __FACTS__
+
+# ---------------- 字段单位表（构建期查好的，只含写了 unit= 的引用涉及的字段）----------------
+# 源单位从 meta/<tag>.json 查（经 meta/topic-map.yaml 换字典键）、meta/topic-overrides.yaml
+# 可补/纠。查不到的构建期会告警并在产物里留空——这里拿不到就**不换算**。
+# 键是 `topic.field`（日志里的名字，不是字典键），值是规范化后的单位名（见 _UNIT_FACTORS）。
+FIELD_UNITS = __FIELD_UNITS__
 
 # 同一 group 内多条规则按 order 字段排序（缺省 100000，再按 id 兜底）。
 # **跨 group 的顺序不在这里决定**：由 facts.yaml 的 group_order 决定（见文件末尾的执行循环），
@@ -171,25 +179,173 @@ def _eval_expr(expr, env):
     return eval(compile(tree, "<rule>", "eval"), {"__builtins__": {}}, env)
 
 
-def _ref(name, per_instance=False, instance=None, alias=None, when_fw=None):
+def _precheck_hit(spec, env):
+    """`conditions.precheck`：一串先决条件，命中任意一条就不跑本条。
+
+    与 `topics` 的分工：`topics` 只回答"日志里有没有这个 topic"，这里放**要算一遍才知道的
+    适用范围**——如 `not HAS_ARMED`（没有 armed 段就谈不上零偏判定、机动段统计）。
+    在 compute **之前**求值，所以只认内置变量与 `has_topic()`，拿不到 compute 的输出。
+
+    **返回命中的那条表达式原文**（没命中返回 None）——它就是 skipped 的原因文案：作者写的
+    本来就是一句可读的判据，不必再翻译一遍。表达式本身出错（名字写错、取值缺失）当作
+    **未命中**：宁可多跑一条，也别把整条误杀。
+
+    注意这里**没有**"数据不足"这条：compute 算不出来本来就会留痕，见 `_run_rules`。
+    """
+    for when in spec or []:
+        try:
+            if _eval_expr(when, env):
+                return when
+        except Exception:
+            continue
+    return None
+
+
+def _airframe_label(spec):
+    """机架约束的展示写法（只用于 skipped 文案）：列表用 ` / ` 连接。"""
+    if isinstance(spec, list):
+        return " / ".join(str(s).strip() for s in spec)
+    return str(spec).strip()
+
+
+def _match_airframe(spec, env):
+    """机架适用范围：`any` ｜ 单个机架名 ｜ 列表（如 `[fixed_wing, unknown]`）。
+
+    **只做字符串精确比对，不解释语义**：拿 provider 在 `builtin_variables()` 里报的
+    `AIRFRAME` 值去比（PX4 报 rotary_wing / fixed_wing / vtol / rover / unknown）。
+    所以换一种日志格式不用改这里——它的机架词表由它自己的适配器定义。
+
+    写成 `IS_FIXED_WING or AIRFRAME == 'unknown'` 那种表达式是旧写法，构建期已拦。
+    """
+    if isinstance(spec, str):
+        name = spec.strip()
+        if name == "any":
+            return True
+        wanted = [name]
+    elif isinstance(spec, list):
+        if not spec:
+            raise ValueError("airframe 列表为空（不限就写 any）")
+        wanted = [str(s).strip() for s in spec]
+    else:
+        raise ValueError("airframe 必须是 any / 机架名 / 列表，收到 %r" % (spec,))
+    current = (env or {}).get("AIRFRAME")
+    return current is not None and str(current) in wanted
+
+
+def _missing_topics(spec):
+    """`conditions.topics` 的判定：每项是「候选 topic」，项间是「都要有」。
+
+    一项里有多个候选（YAML 里写成 `vehicle_gps_position || sensor_gps`）时，
+    **其中任意一个在日志里就算满足**；两个都不在才跳过。命中第一项即中止——
+    与过去 skip 列表命中第一条的语义相同。
+
+    返回缺失项的原因文案（`"a / b not in log"`），全都有则返回 None。
+    文案只在这里生成一处：构建期只负责把 `a || b` 拆成候选列表，不认识语义。
+    """
+    for candidates in spec or []:
+        if not any(provider.has_topic(t) for t in candidates):
+            return " / ".join(candidates) + " not in log"
+    return None
+
+
+def _ref(name, *more, alias=None, unit=None):
     """字段取数：表达式里的 `ref("topic.field", ...)` 与裸写的 `topic.field` 都走这里。
 
-    修饰与老节点上的同名选项一一对应，只是作用域从「整个节点」收窄到「这一个引用」：
-      per_instance —— 按实例分组读（每实例一组），交给需要分组的算子
-      instance     —— 只取第 N 个实例
-      alias        —— 字段的备用命名（旧固件改过名）
-      when_fw      —— 固件版本不满足就返回 None（交给 coalesce 选另一个分支）
+    字段名有两种下标，别混：
+      `topic.field` / `topic[:].field` —— **所有实例**（两种写法等效）。多实例时给
+                          「每实例一组」的列表，交给需要分组的算子；**只有一个实例时
+                          就是那一条序列**（与写 `[0]` 同形），所以单实例字段照旧直接算
+      `topic[N].field` —— 只取第 N 个实例（N 可为负）
+      `topic.field[N]` —— 数组字段的元素下标（如 `vehicle_attitude.q[0]`）
 
-    取数本身由 provider 实现（契约：取不到返回 None，不抛异常）。
+    **位置参数可以给多个**：`ref("新名", "旧名")` 是候选组——按顺序取第一个在日志里
+    存在的；都没有返回 None，由数据流自己中止。改名的场合一律用它，**没有"这个引用只
+    适用于某版本"这种写法**（升级换代就是"老名字没了、新名字在"，按存在性挑就够——
+    真需要按版本分流的语义差异，交给算子或拆成两条规则）。
+
+    修饰：
+      alias    —— 字段的备用命名（旧固件改过名），等价于放进候选组
+      unit     —— **期望输出的单位**：源单位由构建期从 meta/override 查好，这里只做一次
+                  乘法。不写就是不换算（无量纲字段）。源单位查不到时构建期已告警，这里
+                  按原样给——宁可不换算，也别悄悄乘错系数。
+
+    取数本身由 provider 实现（契约：取不到返回 None，不抛异常）——存在性判据就是它。
     """
-    if when_fw is not None and not provider.match_version(when_fw):
+    for cand in (name, *more):
+        bare, inst = _split_ref(cand)
+        series = provider.get_series(bare, instance=inst, alias=alias)
+        if series is None:
+            continue
+        if unit is not None:
+            scale = _unit_scale(FIELD_UNITS.get(bare), unit)
+            if scale is not None:
+                series = _scale_series(series, scale)
+        return series
+    return None
+
+
+def _split_ref(ref):
+    """`"topic[:].field"` → ("topic.field", slice(None, None))；`[N]` → int；不写 → 0。
+
+    实例说明交给 provider 直接用下标取（Python 的 int/切片语义），这里只负责拆开。
+    """
+    m = re.match(r"^([a-z][a-z0-9_]*)(?:\[([-]?\d*(?::-?\d*)?)\])?\.(.+)$", str(ref))
+    if not m:
+        return str(ref), 0
+    return "%s.%s" % (m.group(1), m.group(3)), _parse_inst(m.group(2))
+
+
+def _parse_inst(txt):
+    """`[2]` → int；`[:]` / `[1:3]` / **不写** → slice（不写就是"所有实例"）。形状由构建期保证。"""
+    if txt is None or txt == "":
+        return slice(None, None)
+    if ":" in txt:
+        a, _, b = txt.partition(":")
+        return slice(int(a) if a else None, int(b) if b else None)
+    return int(txt)
+
+
+# ---------------- 单位换算 ----------------
+# 只服务 `ref(..., unit="期望单位")`。按「到族基准单位的因子」定义：族内可换、跨族不行
+# （跨族在构建期就报错了）。键是**规范化后**的单位名——构建期把 meta 里那些自由文本
+# （"metres" / "radians" / "us"…）统一成这一套，运行期不再认别名的拼法。
+_UNIT_FACTORS = {
+    # 长度（基准 m）
+    "m": ("len", 1.0),
+    "mm": ("len", 1e-3),
+    "cm": ("len", 1e-2),
+    # 角度（基准 rad）。degE7 = 度 × 1e7，PX4 经纬度的老口径
+    "rad": ("angle", 1.0),
+    "deg": ("angle", math.pi / 180),
+    "dege7": ("angle", 1e-7 * math.pi / 180),
+    # 时间（基准 s）
+    "s": ("time", 1.0),
+    "ms": ("time", 1e-3),
+    "us": ("time", 1e-6),
+}
+
+
+def _unit_scale(src, dst):
+    """从 src 换到 dst 的乘数；任一边认不出、或跨族 → None（构建期已经查过一遍）。"""
+    a = _UNIT_FACTORS.get(str(src or "").strip().lower())
+    b = _UNIT_FACTORS.get(str(dst or "").strip().lower())
+    if not a or not b or a[0] != b[0]:
         return None
-    return provider.get_series(name, instance=instance, alias=alias, per_instance=per_instance)
+    return a[1] / b[1]
+
+
+def _scale_series(x, scale):
+    """按因子缩放一条序列。数组字段是「每元素一列」，分组取数是「每实例一组」——都递归下去。"""
+    if x is None:
+        return None
+    if isinstance(x, list):
+        return [_scale_series(v, scale) for v in x]
+    return np.asarray(x, dtype=float) * scale
 
 
 # ---------------- compute 表达式求值 ----------------
 # 产物里存的**就是作者写的原文**：
-#   vibe_mean, vibe_p95, ..., imu_idx = worst_mean_stats(ref("...", per_instance=True), min_mean=0)
+#   vibe_mean, vibe_p95, ..., imu_idx = worst_mean_stats(ref("...[:]"), min_mean=0)
 #   pct = frac * 100
 #   p99_stat = p99 if seg_n > 50 else None
 #
@@ -314,48 +470,14 @@ _COMPUTE_GLOBALS["has_topic"] = provider.has_topic
 
 
 def _rule_env():
-    """一条规则求值时的名字空间：内置变量（provider 给）+ 框架补的两个。
+    """一条规则求值时的名字空间：内置变量（provider 给）+ 框架补的一个。
 
     每次都要新的一份：compute 的输出直接写进这个 dict。
-      no_data     —— compute 是否算不出来。初值 False；compute 失败后置真，再判一轮 `skip`。
-                     于是"数据不足要记一条 skipped"不必再单设字段。
       has_topic() —— 表达式里唯一放行的函数调用，指向 provider.has_topic
     """
     env = provider.builtin_variables()
     env["has_topic"] = provider.has_topic
-    env["no_data"] = False
     return env
-
-
-def _rule_skipped(rule, checks, env):
-    """判 `skip` 列表：**按顺序**，命中第一条即跳过本条。
-
-    每一项是 `{when: <Python 表达式>, reason?: <文案>}`——表达式与 `compute` / `triggers`
-    同一套语法。写了 `reason` 就记一条 skipped（报告里能看到"为什么没跑"），**不写则静默**
-    跳过（既不 ran 也不 skipped，用于"这本来就跟我无关"的场合）。
-
-    会被调**两轮**：compute 之前一轮（此时 `no_data` 为假），compute 失败后再一轮
-    （`env["no_data"]` 已置真）。所以"数据不足"也只是列表里的一条普通条件，
-    不必再单设一个字段。
-
-    返回 True 表示本条规则不该继续跑。
-    """
-    for spec in rule.get("skip") or []:
-        when = spec.get("when")
-        if not when:
-            continue
-        try:
-            hit = _eval_expr(when, env)
-        except Exception:
-            hit = False
-        if not hit:
-            continue
-        reason = spec.get("reason")
-        if reason:
-            for check in checks:
-                skipped(check, reason)
-        return True
-    return False
 
 
 def _run_rules(group):
@@ -374,55 +496,63 @@ def _run_rules(group):
         elif not isinstance(_checks, list):
             _checks = [_checks]
         _env = _rule_env()
-        # 适用范围两轴先判：固件 / 机架。**写成表达式**（不限就写 True），与 compute /
-        # triggers 同一套语法——不再另设 "any" / ">=1.15" 这类小语言。
-        # 不匹配则静默：既不 ran 也不 skipped（这是最外层的门，"这条经验根本不属于本机"
-        # 不值得在报告里刷一条）。要留痕就把它写进 skip 列表。
+        # 适用范围（`conditions`）依次判：固件 / 机架 / 先决条件 / 依赖的 topic。
+        # 固件那轴与 provider.match_version 同一套语法（any / ">=1.15" / ">=1.14,<1.15"），
+        # 机架那轴是 `any` / 机架名 / 列表。
+        # **不满足一律记一条 skipped 并带上自动文案**：报告里要能看出"这条为什么没跑"，
+        # 而不是让读者以为它跑过了、或者根本没人写过这条经验。
+        # （轴约束写成了解析不了的串时静默退出——那是规则的笔误，构建期本来就会拦。）
+        _not_applicable = None
         try:
-            _axis_ok = bool(_eval_expr(_rule["firmware"], _env)) and bool(_eval_expr(_rule["airframe"], _env))
+            if not provider.match_version(_rule["firmware"]):
+                _not_applicable = "固件不满足 %s" % _rule["firmware"]
+            elif not _match_airframe(_rule["airframe"], _env):
+                _not_applicable = "机架不适用 %s" % _airframe_label(_rule["airframe"])
         except Exception:
-            _axis_ok = False
-        if not _axis_ok:
-            continue
-        # 再判「不适用」声明（机型未知、无 armed 段、缺某 topic …）：命中即跳过本条。
-        # 写了文案的记一条 skipped——报告里能看到"为什么没跑"；不写的静默。
-        if _rule_skipped(_rule, _checks, _env):
-            continue
-        # topic 在就 ran（与原过程式块一致：ran() 在块首，数据不足只代表不发射 finding）。
-        # ran_on_success：原实现把 ran() 放在数据判定**之后**（如 motor_balance 只在
-        # 活跃通道 >= 4 时才算“跑过”），这类规则改为 compute 成功后再记 ran。
-        _ran_late = bool(_rule.get("ran_on_success")) or _rule.get("ran_when") is not None
-        if not _ran_late:
+            _not_applicable = None
+        if _not_applicable:
             for _check in _checks:
-                ran(_check)
-
+                skipped(_check, _not_applicable)
+            continue
+        # 依赖的 topic：缺了记一条（文案自动生成，见 _missing_topics）
+        _missing = _missing_topics(_rule.get("topics"))
+        if _missing:
+            for _check in _checks:
+                skipped(_check, _missing)
+            continue
+        # 先决条件：命中的那条条件原文就是原因（它本来就是作者写的一句判据）
+        _pre = _precheck_hit(_rule.get("precheck"), _env)
+        if _pre:
+            for _check in _checks:
+                skipped(_check, "先决条件命中：%s" % _pre)
+            continue
+        # ── 三步里的第二步：算 ──
+        # 算不出来就记一条 skipped（"数据不足"），所以 ran() 只能放在 compute **成功之后**——
+        # 同一条 check 不能既是 ran 又是 skipped。原先靠 `ran_on_success` 表达的那半边
+        # （原实现把 ran() 放在数据判定之后）现在成了默认，那个字段已删。
         _ok = True
         for _stmt in _rule.get("compute") or []:
             # compute 是**表达式**，求值出来的名字进 _env，供后面的表达式与 triggers / outputs 引用。
             try:
                 _eval_compute(_stmt, _env)
             except Exception:
-                # 数据不足（或该表达式在这份日志上求不出来）：按"数据不足"中止本条规则——
-                # 不发射 finding
                 _ok = False
                 break
         if not _ok:
-            # 数据不足也要能留痕：把 no_data 置真再判一轮 skip（原 skip_reason_no_data 的职责）
-            _env["no_data"] = True
-            _rule_skipped(_rule, _checks, _env)
+            for _check in _checks:
+                skipped(_check, "数据不足，本条没算出结论")
             continue
-        if _ran_late:
-            # 原实现把 ran() 放在数据判定**之后**（如 motor_balance 只在活跃通道 >= 4 时
-            # 才算“跑过”、attitude 只在机动段样本足够时才算）。ran_when 可再给条件。
-            _ran_ok = True
-            if _rule.get("ran_when") is not None:
-                try:
-                    _ran_ok = bool(_eval_expr(_rule["ran_when"], _env))
-                except Exception:
-                    _ran_ok = False
-            if _ran_ok:
-                for _check in _checks:
-                    ran(_check)
+        # ran_when：算出来了、但还不算"跑过"（如姿态那条要有足够的机动段样本）。
+        # 不满足就静默——它跟"数据不足"不是一回事。
+        _ran_ok = True
+        if _rule.get("ran_when") is not None:
+            try:
+                _ran_ok = bool(_eval_expr(_rule["ran_when"], _env))
+            except Exception:
+                _ran_ok = False
+        if _ran_ok:
+            for _check in _checks:
+                ran(_check)
 
         _out = _rule["outputs"]
         # outputs.guard_tags：按条件产生的数据质量标签（等价于原过程式的 guard_tags.append，

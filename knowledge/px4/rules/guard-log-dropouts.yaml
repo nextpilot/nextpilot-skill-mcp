@@ -6,9 +6,6 @@ name: 数据质量-日志丢包
 group: guards
 order: 3
 
-firmware: "True"
-airframe: "True"
-
 outputs:
   guard_tags:
-    - {when: "dropout_ms > 1000", tag: log_dropouts_high}
+    - {when: "DROPOUT_MS > 1000", tag: log_dropouts_high}

@@ -47,6 +47,19 @@ def _load_rules() -> list:
     return json.loads(m.group(1))
 
 
+def load_field_units() -> dict:
+    """字段单位表（`ref(..., unit=)` 的源单位）——同样从产物里取，与浏览器用的是同一份。
+
+    它是构建期按 meta/<tag>.json + meta/topic-overrides.yaml 查好的；本地这边不重算
+    （那要再实现一遍查表逻辑），直接读产物，保证两边一致。
+    """
+    src = CHECK_SCRIPT.read_text(encoding="utf-8")
+    m = re.search(r"^const fieldUnits = (.*?);$", src, re.M | re.S)
+    if not m:
+        raise RuntimeError("产物里找不到 `const fieldUnits = ...`，先 cd web && pnpm build:kb")
+    return json.loads(m.group(1))
+
+
 def load_facts_payload() -> dict:
     """provider 拿到的那份数据配置 —— **facts.yaml + plot/track.yml**。
 
@@ -77,6 +90,7 @@ def _load_checks() -> str:
 
     # 数据配置（facts.yaml + plot/track.yml），与构建期内联的是同一份
     body = body.replace("__FACTS__", json.dumps(load_facts_payload(), ensure_ascii=False))
+    body = body.replace("__FIELD_UNITS__", json.dumps(load_field_units(), ensure_ascii=False))
     return body
 
 

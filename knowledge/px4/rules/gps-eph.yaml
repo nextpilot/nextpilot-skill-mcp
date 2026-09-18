@@ -6,10 +6,9 @@ name: GPS 水平位置误差
 group: gps_health
 order: 1                 # gps_health group 内次序：eph=1, sats=2, jump=3
 
-firmware: "True"
-airframe: "True"
-skip:
-  - {when: "not has_topic('vehicle_gps_position')", reason: vehicle_gps_position not in log}
+conditions:
+  topics:
+    - vehicle_gps_position
 
 compute:
   # 数据缺失/全为 0 时整条规则中止（不写 stats、不发 finding），与原过程式一致

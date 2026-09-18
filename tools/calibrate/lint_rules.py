@@ -8,11 +8,14 @@
 判据是**版本感知**的（每条经验都声明了 `firmware`，就按它的版本范围去查对应来源）：
   1. 回归日志实测字段：每条日志按基线里的 firmware 归类，只与经验版本范围相符的才算数
   2. 上游固件字典：knowledge/px4/meta/<tag>.json，tag 名即版本（main 视为最新）
-任一命中即算存在。分类：
+任一命中即算存在。
+
+引用按**候选组**判：`ref("新名", "旧名")` 或 `ref("名", alias="旧名")` 是一组，
+**组内任意一个**在某版本存在即可（同义改名用候选组表达，不再需要白名单）。
+分类：
   OK            在适用版本里能找到
-  version-gap   适用版本里没有、但别的版本里有 → 该经验在现代/旧固件上其实不生效，
-                要改 firmware 范围、补版本分支（ref(..., when_fw=)），或改用新字段名
-  legacy        alias / known_legacy 已声明，只汇总
+  version-gap   适用版本里没有、但别的版本里有 → 该经验在这些固件上其实不生效，
+                要改 firmware 范围、补 when_fw 分支，或改用候选组
   suspicious    哪里都没有 → 大概率拼错
 
 规则取自**构建产物**（compute 已是表达式，老节点写法在构建期被编译掉了）。
@@ -38,6 +41,7 @@ META_DIR = REPO_ROOT / "knowledge" / "px4" / "meta"
 LOG_DIR = Path(__file__).resolve().parent / "logs"  # 校准用真实日志（不入库，需自备）
 BASELINE_DIR = Path(__file__).resolve().parent / "baseline"
 ARRAY_SUFFIX = re.compile(r"\[\d+\]$")
+INSTANCE_SUFFIX = re.compile(r"\[[^\]]*\]$")  # topic 后的实例写法：estimator_status[:].field
 MAIN_VERSION = (99, 0)  # main = 开发主干，当作最新
 
 
@@ -129,62 +133,63 @@ def fields_by_version_from_meta() -> dict[tuple[int, int], dict[str, set[str]]]:
     return out
 
 
-def bases(name: str) -> set[str]:
-    """数组字段可能写成 field 或 field[i]；两者都算存在。"""
-    return {name, ARRAY_SUFFIX.sub("", name)}
+def has_field(index, version, topic: str, fld: str) -> bool:
+    """某版本里有没有这个字段。
+
+    **两边都归一化到基名再比**：日志侧存的是 `states[0]` 这样的带下标名，字典侧（上游 .msg）
+    存的是裸名 `states`；只在引用那一侧剥下标，会让"数组字段"在日志里永远匹配不上
+    （踩过：`estimator_status.states` 明明在 1.11 日志里，却被判成"哪里都没有"）。
+    """
+    want = ARRAY_SUFFIX.sub("", fld)
+    return any(ARRAY_SUFFIX.sub("", got) == want for got in (index.get(version, {}).get(topic) or set()))
 
 
 # ─────────────────────────── 规则里的引用 ───────────────────────────
 
 
-def field_refs(expr: str) -> list[tuple[str, str | None, bool]]:
-    """从一条 compute 表达式里取出字段引用。
+def field_refs(expr: str) -> list[list[str]]:
+    """从一条 compute 表达式里取出字段引用（**候选组**）。
 
-    返回 [(字段名, 引用级版本约束 or None, 是否用 alias 声明了遗留)]：
-      - ref("topic.field", when_fw=">=1.15", alias="old_name") → 带约束、已声明遗留
-      - 裸写的 topic.field                                     → 无约束
+    返回 [[候选字段名, …], …]：
+      - ref("新名", "旧名")           → 候选组：运行期取第一个存在的
+      - ref("名", alias="旧名")       → 候选组（alias 是"备用命名"的另一种写法）
+      - 裸写的 topic.field            → 单元素组
+
+    组内**任意一个**在某版本存在，这条引用就算在那个版本成立——它表达的是"同义改名"，
+    与版本无关（"哪个版本该用哪个字段"不另设写法：升级换代就是老名字没了、新名字在）。
     """
-    out: list[tuple[str, str | None, bool]] = []
+    out: list[list[str]] = []
     for node in ast.walk(ast.parse(expr, mode="exec")):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "ref":
-            if not node.args or not isinstance(node.args[0], ast.Constant):
-                continue
-            name = node.args[0].value
-            when_fw = None
-            aliased = False
+            names: list[str] = []
+            for a in node.args:
+                if isinstance(a, ast.Constant) and isinstance(a.value, str):
+                    names.append(a.value)
             for kw in node.keywords:
-                if kw.arg == "when_fw" and isinstance(kw.value, ast.Constant):
-                    when_fw = kw.value.value
-                elif kw.arg == "alias":
-                    aliased = True
-            out.append((str(name), when_fw, aliased))
+                if kw.arg == "alias" and isinstance(kw.value, ast.Constant):
+                    v = kw.value.value
+                    names += list(v) if isinstance(v, list) else [v]
+            if names:
+                out.append(names)
         elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
-            out.append(("%s.%s" % (node.value.id, node.attr), None, False))
+            out.append(["%s.%s" % (node.value.id, node.attr)])
     return out
 
 
-def rule_refs() -> list[tuple[str, str, str, bool, list]]:
-    """(规则 id, topic, field, 是否已声明遗留, 生效的版本约束列表)。
+def rule_refs() -> list[tuple[str, list[str], list]]:
+    """(规则 id, 候选字段名, 生效的版本约束列表)。
 
-    规则来自构建产物（compute 已是表达式）。版本约束取「规则级 firmware」与
-    「引用级 when_fw」的交集（两者都要满足）；引用级条件正是"同一字段在不同固件
-    换了名字/topic"时用来分流的写法。
+    规则来自构建产物（compute 已是表达式）。版本约束**只有规则级的 `firmware`**
+    （引用上不再有 when_fw）：一条经验服务哪个版本段，写在 `conditions.firmware` 上。
     """
     out = []
     for raw in runner._load_rules():
-        known = set(raw.get("known_legacy") or [])
         rule_fw = raw.get("firmware")
         for expr in raw.get("compute") or []:
-            for ref, when_fw, aliased in field_refs(expr):
-                topic, _, fld = ref.partition(".")
-                constraints = [c for c in (rule_fw, when_fw) if c]
-                declared = aliased or ref in known
-                out.append((raw["id"], topic, fld, declared, constraints))
+            for names in field_refs(expr):
+                constraints = [c for c in (rule_fw,) if c]
+                out.append((raw["id"], names, constraints))
     return out
-
-
-def found_in(index, version, topic, fld) -> bool:
-    return any(b in (index.get(version, {}).get(topic) or set()) for b in bases(fld))
 
 
 def main(argv: list[str]) -> int:
@@ -203,44 +208,47 @@ def main(argv: list[str]) -> int:
             "      %s 下有 .ulg、且 baseline/*.json 的 result.facts.firmware 有值。" % LOG_DIR
         )
 
-    ok = gaps = legacy = suspicious = 0
-    gap_rows: list[tuple[str, str, str, str, list[str]]] = []
-    legacy_rows: list[tuple[str, str, str]] = []
-    bad_rows: list[tuple[str, str, str]] = []
-    for rid, topic, fld, declared, constraints in rule_refs():
+    ok = gaps = suspicious = 0
+    gap_rows: list[tuple[str, str, str, list[str]]] = []
+    bad_rows: list[tuple[str, str]] = []
+
+    def any_found(index, version, names: list[str]) -> bool:
+        """候选组里任意一个命中即算命中。"""
+        for n in names:
+            topic, _, fld = n.partition(".")
+            # 实例写法写在 topic 后（`estimator_status[:].vel_test_ratio`），查字段时要去掉
+            topic = INSTANCE_SUFFIX.sub("", topic)
+            if has_field(index, version, topic, fld):
+                return True
+        return False
+
+    def label(names: list[str]) -> str:
+        return " 或 ".join(names)
+
+    for rid, names, constraints in rule_refs():
         applicable = [v for v in versions if all(fw_matches(c, v) for c in constraints)]
-        if any(found_in(logs, v, topic, fld) or found_in(meta, v, topic, fld) for v in applicable):
+        if any(any_found(logs, v, names) or any_found(meta, v, names) for v in applicable):
             ok += 1
             continue
-        elsewhere = [fmt(v) for v in versions if found_in(logs, v, topic, fld) or found_in(meta, v, topic, fld)]
-        if declared:
-            legacy += 1
-            legacy_rows.append((rid, topic, fld))
-        elif elsewhere:
+        elsewhere = [fmt(v) for v in versions if any_found(logs, v, names) or any_found(meta, v, names)]
+        if elsewhere:
             gaps += 1
-            gap_rows.append((rid, topic, fld, " 且 ".join(constraints) or "any", elsewhere))
+            gap_rows.append((rid, label(names), " 且 ".join(constraints) or "any", elsewhere))
         else:
             suspicious += 1
-            bad_rows.append((rid, topic, fld))
+            bad_rows.append((rid, label(names)))
 
-    print(
-        "\n字段引用 %d 处：适用版本内命中 %d ｜ 版本错配 %d ｜ 已声明遗留 %d ｜ 可疑 %d"
-        % (ok + gaps + legacy + suspicious, ok, gaps, legacy, suspicious)
-    )
+    print("\n字段引用 %d 处：适用版本内命中 %d ｜ 版本错配 %d ｜ 可疑 %d" % (ok + gaps + suspicious, ok, gaps, suspicious))
 
-    if legacy_rows:
-        print("\n已声明 aliases / known_legacy 的遗留字段（只汇总）：")
-        for rid, topic, fld in legacy_rows:
-            print("   %-28s %s.%s" % (rid, topic, fld))
     if gap_rows:
         print("\n版本错配：声明的 firmware 范围内找不到这些字段（该经验在这些固件上不会生效）")
-        print("    修法：改 firmware 范围 / 用 pick_newer 或带 fw_minor 入参的算子补版本分支 / 改用新字段名")
-        for rid, topic, fld, fw, elsewhere in gap_rows:
-            print("   %-28s %-42s firmware=%s ｜ 仅存在于 %s" % (rid, "%s.%s" % (topic, fld), fw, ", ".join(elsewhere)))
+        print('    修法：改 firmware 范围 / 补 when_fw 分支 / 改用候选组 ref("新名", "旧名")')
+        for rid, names, fw, elsewhere in gap_rows:
+            print("   %-28s %-42s firmware=%s ｜ 仅存在于 %s" % (rid, names, fw, ", ".join(elsewhere)))
     if bad_rows:
         print("\n可疑引用（哪里都没找到，多半是拼错）：")
-        for rid, topic, fld in bad_rows:
-            print("   %-28s %s.%s" % (rid, topic, fld))
+        for rid, names in bad_rows:
+            print("   %-28s %s" % (rid, names))
     failed = gaps + suspicious
     if failed == 0:
         print("\n检查通过：所有引用都在其版本范围内找得到")

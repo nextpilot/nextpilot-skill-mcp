@@ -7,10 +7,7 @@ name: 数据质量-短日志
 group: guards_early           # 在原过程式位置执行：尽早打标签，且要排在其它 guard 之前
 order: 1
 
-firmware: "True"
-airframe: "True"
-
 outputs:
   guard_tags:
-    - {when: "armed_s > 0 and armed_s < 60", tag: insufficient_data}
-    - {when: "armed_s == 0 and duration_s < 60", tag: insufficient_data}
+    - {when: "ARMED_S > 0 and ARMED_S < 60", tag: insufficient_data}
+    - {when: "ARMED_S == 0 and DURATION_S < 60", tag: insufficient_data}

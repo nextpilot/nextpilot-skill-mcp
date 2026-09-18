@@ -6,10 +6,9 @@ name: 飞行模式抖动
 group: mode_thrash
 order: 1
 
-firmware: "True"
-airframe: "True"
-skip:
-  - {when: "not has_topic('vehicle_status')", reason: vehicle_status not in log}
+conditions:
+  topics:
+    - vehicle_status
 
 compute:
   - n_changes_raw = edges_count(vehicle_status.nav_state)

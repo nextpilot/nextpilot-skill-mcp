@@ -16,7 +16,8 @@
  *   a and b / a or b / not a          逻辑
  *   x in S / x is None                比较
  *   topic.field                       裸字段引用
- *   ref("topic.field", per_instance=True, instance=0, alias="x", when_fw=">=1.15")
+ *   ref("topic[:].field", alias="x", unit="deg")
+ *   ref("新名", "旧名")               候选组：取第一个存在的（同义改名用它）
  *   _try(expr)                        容错：内层出错或得 None 时结果为 None
  *   worst_mean_stats(...)             算子调用
  *
@@ -29,14 +30,129 @@ const PUNCT = [
 ];
 const KEYWORDS = new Set(["and", "or", "not", "in", "is", "if", "else", "True", "False", "None"]);
 
-/** 固件约束串（与 rule_engine._match_firmware / 老节点 when_fw 的写法一致） */
+/** 固件约束串：`any` / 空 / 逗号分隔的版本比较（逗号 = 与）。与 provider.match_version 同一套 */
+const FW_ANY = /^\s*any\s*$/;
 const FW_SPEC = /^\s*(>=|<=|==|>|<)?\s*\d+(\.\d+)?\s*(,\s*(>=|<=|==|>|<)?\s*\d+(\.\d+)?\s*)*$/;
 
-/** ref() 认识的修饰键（与老节点的节点级选项一一对应） */
-const REF_KEYS = new Set(["per_instance", "instance", "alias", "when_fw"]);
+/** 固件约束串是否合法——规则级 `firmware` 轴与节点级 `when_fw` 共用这一个判据 */
+export function isFirmwareSpec(v) {
+  return typeof v === "string" && (FW_ANY.test(v) || FW_SPEC.test(v));
+}
 
-/** 字段引用必须是这种形状：两段小写 snake_case，可带一个数组下标（如 vehicle_attitude.q[0]） */
-const FIELD_REF = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*(\[\d+\])?$/;
+/** 机架适用范围：`any` ｜ 机架名 ｜ 机架名列表（如 [fixed_wing, unknown]） */
+const AIRFRAME_NAME = /^[a-z][a-z0-9_]*$/;
+
+export function isAirframeSpec(v) {
+  if (typeof v === "string") return v.trim() === "any" || AIRFRAME_NAME.test(v.trim());
+  return (
+    Array.isArray(v) &&
+    v.length > 0 &&
+    v.every((x) => typeof x === "string" && x.trim() !== "any" && AIRFRAME_NAME.test(x.trim()))
+  );
+}
+
+/** 日志 topic 名（uORB 风格的小写 snake_case） */
+const TOPIC_NAME = /^[a-z][a-z0-9_]*$/;
+
+/**
+ * `conditions.topics` 的一项：`vehicle_status` ｜ `vehicle_gps_position || sensor_gps`。
+ *
+ * `||` 表示**其中任意一个在日志里就够**（两个都不在才跳过）；返回候选名列表，
+ * 运行期由引擎按这个语义判。这里只拆写法、校验名字，不认识语义。
+ */
+export function parseTopicReq(v) {
+  if (typeof v !== "string") {
+    throw new Error(`topics 的每一项都必须是字符串（如 vehicle_gps_position || sensor_gps），实际是 ${JSON.stringify(v)}`);
+  }
+  const names = v.split("||").map((s) => s.trim());
+  for (const n of names) {
+    if (!TOPIC_NAME.test(n)) {
+      throw new Error(`topics 项「${v}」写法不对：每一段都要是 topic 名（小写 snake_case，如 vehicle_gps_position），多个用 || 分隔`);
+    }
+  }
+  if (new Set(names).size !== names.length) {
+    throw new Error(`topics 项「${v}」里有重复的 topic`);
+  }
+  return names;
+}
+
+/**
+ * 单位词表：`unit=` 能写的**规范名**，以及 meta/<tag>.json 里那些自由文本（`metres` /
+ * `radians` / `us`…）怎么归到规范名上。
+ *
+ * 规范名必须与 `engine/rule_engine.py` 的 `_UNIT_FACTORS` 键**完全一致**（那边存的是
+ * 到族基准的因子）——构建期会比对这两份，对不上直接构建失败，免得各改各的。
+ */
+export const UNIT_ALIASES = {
+  // 长度（基准 m）
+  m: "m", metre: "m", metres: "m", meter: "m", meters: "m",
+  mm: "mm", millimetre: "mm", millimetres: "mm", millimeter: "mm", millimeters: "mm",
+  cm: "cm", centimetre: "cm", centimetres: "cm", centimeter: "cm", centimeters: "cm",
+  // 角度（基准 rad）。degE7 = 度 × 1e7，PX4 经纬度的老口径
+  rad: "rad", radian: "rad", radians: "rad",
+  deg: "deg", degree: "deg", degrees: "deg",
+  dege7: "degE7", "deg*1e7": "degE7",
+  // 时间（基准 s）
+  s: "s", sec: "s", second: "s", seconds: "s",
+  ms: "ms", millisecond: "ms", milliseconds: "ms",
+  us: "us", microsecond: "us", microseconds: "us",
+};
+
+/** 单位名（可能是别名）→ 规范名；认不出返回 null */
+export function normalizeUnit(u) {
+  return UNIT_ALIASES[String(u ?? "").trim().toLowerCase()] ?? null;
+}
+
+/** 规范名 → 量纲族（跨族不能换算，构建期就拦） */
+export const UNIT_KIND = {
+  m: "len", mm: "len", cm: "len",
+  rad: "angle", deg: "angle", degE7: "angle",
+  s: "time", ms: "time", us: "time",
+};
+
+/** ref() 认识的修饰键 */
+const REF_KEYS = new Set(["alias", "unit"]);
+
+/**
+ * 字段引用：`topic.field`，两段各自可以带一个下标。
+ *   · `topic[:]` / `topic[N]` / `topic[A:B]`，**以及什么都不写** —— **实例**：切片按 Python
+ *      语义（`[:]` = 所有实例，与不写等效；多实例时给"每实例一组"，单实例时就是那一条，
+ *      交给会归约的算子；`[0]` / `[-1]` = 第一个 / 最后一个）
+ *   · `topic.field[N]` —— 数组字段的元素下标（如 `vehicle_attitude.q[0]`）
+ * 两个下标位置不同、含义不同，别混。
+ */
+const FIELD_REF = /^[a-z][a-z0-9_]*(\[[-]?\d*(?::-?\d*)?\])?\.[a-z][a-z0-9_]*(\[\d+\])?$/;
+
+/** 拆开字段引用 → {topic, inst, field}（inst 是 int 或 slice；**不写 = 所有实例**） */
+export function splitFieldRef(s) {
+  const m = /^([a-z][a-z0-9_]*)(?:\[([-]?\d*(?::-?\d*)?)\])?\.([a-z][a-z0-9_]*)(?:\[(\d+)\])?$/.exec(
+    String(s).trim(),
+  );
+  if (!m) return null;
+  return {
+    topic: m[1],
+    inst: parseInstance(m[2]),
+    field: m[3],
+    // 数组元素下标原样保留（它是字段名的一部分，取数时按 'field[i]' 找列）
+    fieldIndex: m[4] === undefined ? null : Number(m[4]),
+  };
+}
+
+/** `[2]` → int；`[:]` / `[1:3]` / **不写** → slice（不写就是"所有实例"，与 `[:]` 等效） */
+function parseInstance(txt) {
+  if (txt === undefined || txt === "") return { slice: [null, null] };
+  if (txt.includes(":")) {
+    const [a, b] = txt.split(":");
+    const num = (x) => (x === "" || x === undefined ? null : Number(x));
+    return { slice: [num(a), num(b)] };
+  }
+  return Number(txt);
+}
+
+/** 取数的实例说明 → 判定是不是"分组取数"（切片一律按分组给） */
+function isGroupInst(inst) {
+  return inst !== null && typeof inst === "object" && Array.isArray(inst.slice);
+}
 
 function fail(msg, src, pos) {
   const col = (pos ?? 0) + 1;
@@ -235,6 +351,13 @@ function Parser(src, toks) {
         if (at("punct", ".")) fail("字段引用只能有一段点号（topic.field）", src, peek().pos);
         return { k: "attr", topic: t.v, field: f.v, pos: t.pos };
       }
+      if (at("punct", "[")) {
+        fail(
+          '裸写的字段引用不能带实例下标——要指定实例请写成 ref("topic[2].field")（[:] = 所有实例，不写 = 第 0 个）',
+          src,
+          peek().pos,
+        );
+      }
       return { k: "name", name: t.v, pos: t.pos };
     }
     if (at("punct", "(")) {
@@ -313,7 +436,7 @@ export function parseCompute(src) {
 /** 粗类型：够用来抓「三元两分支一个是列表一个是标量」这类明显错误 */
 const T_SCALAR = "scalar";
 const T_LIST = "list";
-const T_GROUPS = "groups";       // per_instance=True 的引用：每实例一组
+const T_GROUPS = "groups";       // 切片取数（topic[:]）的引用：每实例一组
 const T_UNKNOWN = "unknown";
 
 function mergeType(a, b, ctx, pos) {
@@ -328,12 +451,12 @@ function sub(node, ctx) {
 }
 
 /**
- * 分组取数（per_instance）是「每实例一组」的列表，只在**算子的直接输入位置**有意义；
- * 参与四则/比较/三元一定是写错了（老写法里它也从来不能这么用）。
+ * 分组取数（`topic[:]`）是「每实例一组」的列表，只在**算子的直接输入位置**有意义；
+ * 参与四则/比较/三元一定是写错了。
  */
 function noGroups(type, ctx, node, what) {
   if (type === T_GROUPS) {
-    fail(`${what}不能用分组取数（per_instance 的结果是每实例一组的列表）`, ctx.src, node.pos);
+    fail(`${what}不能用分组取数（topic[:] 的结果是每实例一组的列表）`, ctx.src, node.pos);
   }
 }
 
@@ -479,36 +602,52 @@ function inferCall(node, ctx) {
 
 function checkRef(node, ctx) {
   const { args, kwargs } = node;
-  if (args.length !== 1) fail("ref() 只接受一个位置参数：字段名字符串", ctx.src, node.pos);
-  const target = args[0];
-  if (target.k !== "str") {
-    fail('ref() 的第一个参数必须是字段名字符串，如 ref("vehicle_imu_status.accel_clipping", per_instance=True)', ctx.src, target.pos);
-  }
-  if (!FIELD_REF.test(target.v)) {
-    fail(`ref() 的字段名必须是 topic.field 形式（两段小写名字），实际是 ${JSON.stringify(target.v)}`, ctx.src, target.pos);
+  if (args.length < 1) fail("ref() 至少要给一个字段名", ctx.src, node.pos);
+  // 位置参数可以给多个：按顺序取第一个在日志里存在的（同义改名的候选组）。
+  // 候选组必须**同实例**——实例写法写在字段名里（`topic[2].field` / `topic[:].field`）。
+  const given = new Set();
+  const instForms = new Set();
+  let inst = 0;
+  args.forEach((a, i) => {
+    if (a.k !== "str") {
+      fail('ref() 的每个位置参数都必须是字段名字符串，如 ref("vehicle_imu_status[:].accel_clipping")', ctx.src, a.pos);
+    }
+    const parsed = splitFieldRef(a.v);
+    if (!parsed) {
+      fail(
+        `ref() 的字段名必须是 topic.field 形式（实例写在 topic 后：topic[2].field / topic[:].field），` +
+          `实际是 ${JSON.stringify(a.v)}`,
+        ctx.src,
+        a.pos,
+      );
+    }
+    if (given.has(a.v)) fail(`ref() 的候选里有重复的字段名 ${a.v}`, ctx.src, a.pos);
+    given.add(a.v);
+    instForms.add(JSON.stringify(parsed.inst));
+    if (i === 0) inst = parsed.inst;
+  });
+  if (instForms.size > 1) {
+    fail("ref() 候选组里的实例写法不一致（要么都写 [N]/[:]，要么都不写）", ctx.src, node.pos);
   }
   for (const [k, v] of Object.entries(kwargs)) {
     if (!REF_KEYS.has(k)) {
-      fail(`ref() 不认识修饰键 ${k}（可用：${[...REF_KEYS].join(" / ")}）`, ctx.src, v.pos);
+      fail(
+        `ref() 不认识修饰键 ${k}（可用：${[...REF_KEYS].join(" / ")}；` +
+          `要指定实例请写进字段名：ref("topic[2].field")，[:] = 所有实例）`,
+        ctx.src,
+        v.pos,
+      );
     }
-    if (k === "when_fw") {
-      if (v.k !== "str" || !FW_SPEC.test(v.v)) {
-        fail('ref(..., when_fw=) 必须是固件约束串（如 ">=1.15" / "<1.15" / ">=1.14,<1.15"）', ctx.src, v.pos);
-      }
-    } else if (k === "alias") {
+    if (k === "alias") {
       const ok = v.k === "str" || (v.k === "list" && v.items.every((x) => x.k === "str"));
       if (!ok) fail("ref(..., alias=) 必须是字符串或字符串列表", ctx.src, v.pos);
-    } else if (k === "instance") {
-      if (v.k !== "num" || !Number.isInteger(v.v) || v.v < 0) {
-        fail("ref(..., instance=) 必须是非负整数", ctx.src, v.pos);
-      }
-    } else if (k === "per_instance") {
-      if (v.k !== "const" || typeof v.v !== "boolean") {
-        fail("ref(..., per_instance=) 必须是 True / False", ctx.src, v.pos);
+    } else if (k === "unit") {
+      if (v.k !== "str" || !v.v.trim()) {
+        fail('ref(..., unit=) 必须是单位名字符串（如 "deg" / "m"），表示**期望输出的单位**；不写就是不换算', ctx.src, v.pos);
       }
     }
   }
-  return kwargs.per_instance?.v === true ? T_GROUPS : T_UNKNOWN;
+  return isGroupInst(inst) ? T_GROUPS : T_UNKNOWN;
 }
 
 /** 剥掉最外层的 _try(...)（多输出算子写在 _try 里时，它仍是「顶层调用」） */
@@ -521,17 +660,17 @@ function unwrapTry(node) {
 }
 
 /** 只有"日志里写了 ver_sw_release"时才有值的固件版本号；老日志上它们是 None */
-const FW_VERSION_VARS = new Set(["fw_minor", "fw_major"]);
+const FW_VERSION_VARS = new Set(["FW_MINOR", "FW_MAJOR"]);
 
 /**
  * 固件版本号必须判 None 才能做大小比较。
  *
- * 为什么：`ver_sw_release` 只有较新的 PX4 才写进日志，老日志这一项是空的、`fw_minor` 就是 None，
+ * 为什么：`ver_sw_release` 只有较新的 PX4 才写进日志，老日志这一项是空的、`FW_MINOR` 就是 None，
  * 而 `None >= 15` 在 Python 里**抛异常** → 整条规则被判成"算不出来" → 那条经验在这类日志上
  * 静默失效（不报错、也不出结论，正是最难发现的一种坏）。
  *
- * 所以 `a if fw_minor >= 15 else b` 这种写法构建期就拦下，逼你补上另一半：
- *     a if (fw_minor is None or fw_minor >= 15) else b
+ * 所以 `a if FW_MINOR >= 15 else b` 这种写法构建期就拦下，逼你补上另一半：
+ *     a if (FW_MINOR is None or FW_MINOR >= 15) else b
  * （"版本未知当作新版"与引擎 `_match_firmware` 的口径一致；老写法里的 ref(..., when_fw=)
  * 由引擎内部处理这档，不需要外部补。）
  */
@@ -661,8 +800,41 @@ export function validateComputeList(list, ctx) {
   return types;
 }
 
-/** 收集表达式里引用到的**裸变量名**（不含字段引用的 topic、不含算子名） */
-function collectNames(node, out = new Set()) {
+/**
+ * 抽出表达式里的**字段引用**（`ref(...)` 与裸写的 `topic.field`），供构建期做字段级查表
+ * （目前是 `unit=` 的源单位解析）。
+ *
+ * 返回 `[{fields: ["topic.field", …], instance?, alias?, when_fw?, unit?}, …]`：
+ * 一条 ref 就是一项，`fields` 是它的候选组（按书写顺序）。
+ */
+export function collectRefs(src) {
+  const { value } = parseCompute(String(src).trim());
+  const out = [];
+  (function walk(n) {
+    if (!n || typeof n !== "object") return;
+    if (Array.isArray(n)) {
+      n.forEach(walk);
+      return;
+    }
+    if (n.k === "call" && n.fn === "ref") {
+      const item = { fields: n.args.filter((a) => a.k === "str").map((a) => a.v) };
+      for (const [k, v] of Object.entries(n.kwargs)) {
+        if (v.k === "str" || v.k === "num" || v.k === "const") item[k] = v.v;
+        else if (k === "alias") item.alias = v.k === "list" ? v.items.map((x) => x.v) : v.v;
+      }
+      if (item.fields.length) out.push(item);
+    } else if (n.k === "attr") {
+      out.push({ fields: [`${n.topic}.${n.field}`] });
+    }
+    for (const [k, v] of Object.entries(n)) {
+      if (k === "pos" || k === "k") continue;
+      walk(v);
+    }
+  })(value);
+  return out;
+}
+
+/** 收集表达式里引用到的**裸变量名**（不含字段引用的 topic、不含算子名） */function collectNames(node, out = new Set()) {
   if (!node || typeof node !== "object") return out;
   if (Array.isArray(node)) { node.forEach((x) => collectNames(x, out)); return out; }
   if (node.k === "name") { out.add(node.name); return out; }
@@ -687,7 +859,7 @@ export function normalizeCompute(raw, where) {
     throw new Error(
       `${where}: compute 的每一项都必须是字符串表达式（写法见指南的「如何编写一条规则」§4）。` +
         `算子节点写法已移除——\`- {out: x, from: a.b, op: max}\` 请改写成 \`- x = max(a.b)\`；` +
-        `取数修饰写在 ref(...) 上：\`- y = f(ref("a.b", per_instance=True))\``,
+        `取数修饰写在 ref(...) 上：\`- y = f(ref("a.b[:]"))\``,
     );
   }
   const text = raw.trim();

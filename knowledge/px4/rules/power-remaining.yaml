@@ -5,13 +5,13 @@ name: 电池剩余电量
 group: battery
 order: 3                 # battery group 内的次序：cell-voltage=1, sag=2, remaining=3
 
-firmware: "True"
-airframe: "True"
-skip:
-  - {when: "not has_topic('battery_status')", reason: battery_status not in log}
+conditions:
+  topics:
+    - battery_status
 
 compute:
-  - rem = min_ge(battery_status.remaining, ge=0)      # remaining ∈ [0,1]，-1 = 未知，滤掉
+  # remaining ∈ [0,1]，-1 = 未知，滤掉。**只看第 0 块电池**（见 power-cell-voltage 的说明）
+  - rem = min_ge(ref("battery_status[0].remaining"), ge=0)
   - rem_pct = rem * 100
 
 outputs:

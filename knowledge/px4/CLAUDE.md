@@ -117,11 +117,11 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 | 改了什么 | 前 | 后 |
 | --- | --- | --- |
 | `compute` | 算子节点链 `- {out: x, from: a.b, op: max}`，构建期编译成表达式 | **直接写表达式** `- x = max(a.b)`；节点写法已从构建期移除（写了会报错并提示改写）。85 个节点 → 70 条表达式 |
-| `requires` / `not_applicable` / `silent_when` / `skip_reason_no_data` | 四个字段各管一摊 | 合成 **一个 `skip` 列表** `[{when: 表达式, reason?: 文案}]`（**不写 `reason` = 静默**）；"数据不足"靠新增内置变量 `no_data` 表达 |
+| `requires` / `not_applicable` / `silent_when` / `skip_reason_no_data` | 四个字段各管一摊 | 合成 **一个 `skip` 列表** `[{when: 表达式, reason?: 文案}]`（**不写 `reason` = 静默**）；"数据不足"靠新增内置变量 `no_data` 表达。— **2026-09-18 起 `skip` 与 `no_data` 都已退役**，见上一节 |
 | `firmware` / `airframe` | `any` ｜ `">=1.15"` ｜ `fixed_wing` 这类自造小语言 | **Python 表达式**（`"True"` / `"is_fixed_wing"`），在 compute 之前求值、只认内置变量 |
 | `slot` | 槽位（技术隐喻） | **`group`**；`facts.yaml` 的 `slot_order` → `group_order`，`nav_groups` → `nav_state_groups`（消歧义） |
 | `version`/`category`/`status`/`author`/`license`/`changelog`/`outputs.check`/`doc` | 每条规则各写一遍 | **按 `group` 从 `facts.yaml` 的 `rule_meta` 派生**，偏离时才显式写。每条规则顶层字段 17 → 10 |
-| `_run_rules` 的判定顺序 | 不适用声明 → 轴 → 依赖 | **轴先判**（"这台机器根本不适用"仍静默），再判 `skip` 映射；compute 失败后再判一轮（`no_data`） |
+| `_run_rules` 的判定顺序 | 不适用声明 → 轴 → 依赖 | **轴先判**（"这台机器根本不适用"仍静默），再判 `skip` 映射；compute 失败后再判一轮（`no_data`）。— **2026-09-18 起**：轴 → `topics` → ran → compute，没有第二轮了 |
 
 验证口径没变：以上每一步都要求 `compare_baseline.py` 6 条日志逐字段一致，外加一次
 "派生的 `category/version/status/license/author/outputs.check/doc` 与改动前逐条相同"的核对
@@ -171,6 +171,159 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
   「故障库与规则的分工」等节里的 `emit` / `emit.fault_tags` / `emit.related_faults` 是**最初设计**的
   记录（那些字段多数从未落地）。**当前实际键名一律是 `outputs`**，别照着历史段写规则。
 
+**2026-09-18 追加：适用范围收进 `conditions`，`skip` 与 `no_data` 退役，内置变量全大写**
+
+规则头部从"两个平铺的轴 + 一坨 `skip`"改成一个 `conditions` 块（`rules-template.yml` 是骨架）：
+
+```yaml
+conditions:                       # 整块可省
+  firmware: any                   # any / ">=1.15" / ">=1.14,<1.15"；省 = any
+  airframe: any                   # any / 机架名 / 机架名列表；省 = any
+  topics:                         # 项内 `||` = 其中任意一个在日志里就够，项间 = 都要有
+    - vehicle_gps_position || sensor_gps
+  precheck:                       # 先决条件：命中即不跑（文案就是命中的那句）
+    - "not HAS_ARMED"
+```
+
+四个键的分工：`firmware` / `airframe` 判"这台机器是不是本来就无关"，`topics` 判"日志里
+有没有这份数据"，`precheck` 放"不用算就知道跟我无关"的场合（如 `not HAS_ARMED` 就谈不上
+飞行中的零偏判定）。`precheck` 在 compute **之前**求值，所以只认内置变量与 `has_topic()`——
+**没有 `no_data`**："数据不足"由 compute 抛异常自己表达。
+
+**四个键不满足一律记一条 skipped**（2026-09-18 追加第五段改的，原先静默）：报告里要能看出
+"这条为什么没跑"。自动文案分别是 `固件不满足 >=1.15` / `机架不适用 fixed_wing` /
+`先决条件命中：not HAS_ARMED` / `X not in log`。
+
+- **`skip` 整个字段没了**，三类条件各有去向：缺 topic 写进 `conditions.topics`；"有没有数据"
+  这类改成 `conditions.precheck`（命中即不跑）；`no_data` 由 compute 抛异常自己表达。
+  三者**都会留痕**，文案由引擎生成（`X not in log` / `先决条件命中：…` / `数据不足，本条没算出结论`）。
+- 引擎侧 `_rule_skipped()` 与 `no_data`（`_rule_env` 里那个）**已删除**，换成 `_missing_topics(spec)`
+  原生判 `topics`。`skip` 在 YAML / 产物 / 引擎里都不存在；`has_topic()` 保留（guard 与将来的
+  表达式仍可用）。
+- **构建期**：`requiredKeys` 去掉两轴；`conditions` 有未知键、`topics` 项不是 topic 名、
+  `firmware`/`airframe` 不合规一律构建失败；**顶层残留 `skip` 会明确报错**，不静默忽略。
+  归一化后产物里仍是两个平铺的 `firmware` / `airframe` + 新的 `topics` 嵌套列表
+  （`lint_rules.py` 读产物取 `firmware`，所以它不用改）。
+- **基线差异**（这一轮重冻结的依据，全部落在 `checksSkipped`）：`motor-balance` 的
+  `no_data` 行消失（6 份日志里都有）、`imu-bias` 的 `not has_armed` 行消失、
+  attitude 两条的缺 topic 文案从手写的 `vehicle_attitude(_setpoint) 或 armed 段缺失`
+  变成自动生成的 `vehicle_attitude_setpoint not in log`、sample 上 `vtol_transition`
+  从"静默"变成一条记录（过去被前面那条静默的 `not has_armed` 挡住了）。
+  `findings` / `checksRun` / `metrics` / `tags` 一处未动。
+- **`imu-bias` 那处要留神**：它的 `gyro_bias_worst(...)` 原本包着 `_try`，而 `gyro_bias_worst`
+  在没有 armed 区间时返回 `None`——`_try` 把它吞成四个 `None` 之后，原先充当门控的
+  `abs_gate = require_true(...)` **其实是个空转**（`require_true` 只返回 `None`，且没人引用
+  `abs_gate`）。于是去掉 `not has_armed` 后这条规则会在没有 armed 段的日志上"跑成功"、
+  多吐一个 `gyroBiasSource` 指标。**现在"没有 armed 段"写进 `conditions.precheck`
+  （`not HAS_ARMED`）显式拦下**，那层 `_try` 仍去掉——它现在只负责"整份日志都没有零偏数据"
+  这一种中止。顺带一提：`require_true` 的"门控"语义只有在**下游真的引用了那个变量**时才成立，
+  这是个容易踩的坑（airspeed 的 `cruise_ok` 同样没人引用）。
+- **内置变量一律大写**（`FW_MINOR` / `AIRFRAME` / `IS_FIXED_WING` / `DURATION_S` / `ARMED_S` /
+  `ARMED_INTERVALS` / `T0_US` / `HAS_ARMED` / `RESTART_DETECTED` / `DROPOUT_MS` / `MESSAGES`）：
+  规则里自己赋的变量是小写，一眼分得清"这个数是引擎给的还是自己算的"。事实源是
+  `engine/providers/api.py` 的 `BUILTIN_VARIABLES`（`tools/px4/gen_rule_reference.py` 的
+  §6.1 表从它派生、`build-knowledge.mjs` 的 `BUILTIN_VARS` 也派生自它）。`has_topic()` 是函数，
+  不大写。`web/scripts/lib/rule-expr.mjs` 里那个"版本号必须先判 `None`"的护栏跟着改成
+  `FW_MINOR` / `FW_MAJOR`。
+- **这一轮动了 `rule_engine.py`**（删 skip 机制、加 `_missing_topics`），所以 `derived-version`
+  会变、用户本机存档打开时自动重解析一次（AI 报告保留）——这是设计内的行为。
+
+**2026-09-18 追加（第二段）：引擎回到三步走，字段的版本差异交给候选组**
+
+目标流程写死为 **conditions 拦 → compute 算 → 判定**，前两步的失败一律**自动留痕**、
+不用作者写文案：
+
+| 步骤 | 不满足时 |
+| --- | --- |
+| `conditions.firmware` / `airframe` / `precheck` | **记一条 skipped + 自动文案**（原先静默，2026-09-18 起改） |
+| `conditions.topics` | 记一条 skipped，文案自动生成（`X not in log`） |
+| **compute 抛异常** | **记一条 skipped：`数据不足，本条没算出结论`** |
+
+- 因此 **`ran()` 统一挪到 compute 成功之后**——同一条 check 不能既 ran 又 skipped。
+  `ran_on_success` 字段**已删**（它想要的就是这个行为，现在成了默认）；`ran_when` 保留
+  （算出来了、但样本不够不算跑过，如 attitude 的 `seg_ok`）。构建期会拒绝残留的
+  `ran_on_success` / `known_legacy` / `skip`，不静默忽略。
+- **`ref(...)` 的位置参数可以给多个** = 候选组：按顺序取第一个在日志里存在的，都没有返回
+  `None`（存在性判据就是 `provider.get_series(...) is not None`，没给 provider 契约加新东西）。
+  `alias=` 与它是同一个东西的两种写法（`ref("名", alias="旧名")` ≈ `ref("名", "旧名")`）。
+- **`known_legacy` 字段已删**。字段的版本差异只有三种表达：整条规则写死 `conditions.firmware`、
+  同义改名用候选组、同名换单位/语义配 `unit=` 或拆规则。**没有白名单**。
+- **lint 的数组盲点已修**（`tools/calibrate/lint_rules.py` 的 `has_field`）：原先只在引用那一侧
+  剥下标，而日志侧字段名是 `states[0]` 这种带下标的、字典侧是裸名，于是**数组字段在日志里永远
+  匹配不上**——`estimator_status.states` 明明就在 1.11 的日志里，却被判成"哪里都没有"，
+  当初 `known_legacy` 就是为它加的。现在两边都归一化到基名再比。
+  教训：**"哪里都没有"的结论要交叉验证**（我一开始按精确名比对，跟着旧逻辑一起得出了错的结论）。
+- **删掉了 `rules/vibration-stddev.yaml`**：它引用的 `stddev_accel_x_m_s2`（含 alias
+  `stddev_accel_x`）在 4 份日志 + 3 份字典里都不存在，而它的前提"旧固件没有
+  `accel_vibration_metric`"被最老那份日志（1.11.2）证伪——那份里就有。等于一条永远不可能
+  生效的经验。删除它不影响 finding 编号（它从没发射过 finding）。
+- **`imu-bias` 的多源取数没问题**，不用改：1.11 那份日志里 `estimator_status.states[0..23]`
+  是存在的，算子走"状态槽"那条路，基线里 `gyroBiasSource: estimator_status.states[10..12]`
+  就是证据（这一条也是被上面那个 lint 盲点误导后重新核实的）。
+- **`ekf-faults` 删掉了 `nan_flags`**（那个字段 1.11.2 起就叫 `n_states`，不是同一个量；
+  我们的样本里没有任何版本有 `nan_flags`）。触发条件化简为 `crit_bits`，证据文案去掉 `nan=`
+  ——所以那几条命中它的日志，基线里 finding 的 `evidence` 会变。
+- **基线差异**（这一轮重冻结的依据）：`checksRun` 缩（算不出来的不算跑过）、`checksSkipped`
+  长（多出「数据不足」）、`ekf-faults` 证据文案变化、`vibration-stddev` 那行消失。
+  `findings` 的其余字段一处未改。
+
+**2026-09-18 追加（第三段）：算子不认识固件版本**
+
+- **算子的入参里不再有 `fw_minor`**。`att_tracking_stats` 与 `gyro_bias_series` 原来各自用
+  `fw_minor >= 15` 决定取哪一路数据——这条判断现在**挪到规则上**：哪个版本用哪个字段，
+  写在 `ref(...)` 的候选组上（有谁用谁）；算子只**按"谁有数据用谁"**挑，挑的时候看的是
+  数据本身（样本够不够、是不是全零），不是版本号。算子签名随之变化
+  （`gyro_bias_series` 7→6、`att_tracking_stats` 8→7）。
+  判据：**算子只做运算，版本相关的处理在算子外面做好**。
+- 两条经验的写法因此从"传版本号进去让它自己分叉"变成"把候选来源都递进去"：
+  `attitude-oscillation` / `attitude-overshoot` 的指令源（`q_d` 优先、没有才用
+  `roll_body`/`pitch_body`）、`imu-bias` 的三路零偏来源。**行为一字未变**（基线零差异）。
+  中途曾把版本门写到引用上（`when_fw=`），随后**整个移除**（见第五段）——同一件事改由
+  "数据本身够不够"判，算子挑来源时看的是样本数与是否全零，不是版本号。
+- `FW_MINOR` 保留为内置变量（现在**没有任何规则用到它**）：它是表达式里做**数值**版本比较的
+  唯一手段，也是构建期那条"版本号必须先判 `None`"护栏的判据。**优先用 `when_fw` / 候选组**，
+  只有当你要写真正的大小比较（`FW_MINOR >= 15`）时才请它出场。
+  （**字段换代别用它**——那不是版本问题，是"老名字没了、新名字在"，用候选组。）
+
+**2026-09-18 追加（第四段）：取数说清"哪个实例、什么单位"**
+
+三件事一起做，都是为了"读一条数据要把话说完"：
+
+1. **实例写进字段名**：`ref("estimator_status[0].vel_test_ratio")`（第 0 个）、
+   `ref("estimator_status[:].vel_test_ratio")`（所有实例）。
+   **切片按 Python 语义，且"不写下标"与 `[:]` 等效**：所有实例——多实例时给"每实例一组"
+   交给会归约的算子；**单实例时就是那一条序列**（否则单实例字段得处处写 `[0]`，而 `q`
+   这种"每元素一列"的数组字段会被多包一层、直接读不出来）。`[N]` = 第 N 个。
+   （`provider.get_series` 的默认值因此是 `slice(None)`；`_read_concat` 已删。）
+   中间那版曾把它做成 `instance=` 修饰键，随即改成写进名字——字段引用本身就该自带
+   "读哪一份"，而不是在旁边挂个参数。两种下标位置别混：`topic[N].field` 是实例、
+   `topic.field[N]` 是数组元素。
+   裸写的字段引用**不能**带实例下标（`cpuload[0].load` 会报错并提示改写）。
+2. **`provider._read_concat` 删除**：以前"不加修饰 = 所有实例拼成一条"是默认语义，
+   隐性且危险（一条曲线里混着几个传感器的数据）。现在必须写明要哪个实例。
+3. **机架名支持简写**：`airframe: mc` / `fw`（表在 `facts.yaml` 的 `airframe_aliases`），
+   **构建期归一化成规范名**，产物里只留 `rotary_wing` / `fixed_wing`——引擎与适配器都不认识别名。
+4. **`ref(..., unit="期望单位")`**：把取到的值换算成声明的单位再交给算子。
+   - 源单位**不在规则里猜**：构建期按 `meta/topic-map.yaml` 找到字典键、去 `meta/<tag>.json`
+     查 `unit`；查不到就**告警**（不是失败），补一行到新建的
+     `knowledge/px4/meta/topic-overrides.yaml` 的 `units` 里。量纲不一致（长度↔角度）直接报错。
+   - 换算**在运行期做一次乘法**（meta 不进产物是既定架构）：构建期把"**写了 `unit=` 的引用**
+     涉及的字段 → 规范单位"烘成一张小表（`__FIELD_UNITS__`），
+     引擎侧一张常量表（`_UNIT_FACTORS`）给"规范单位 → 到族基准的因子"。
+     两份表都只在**规范化后的名字**上对齐，构建期会比一次、对不上就构建失败。
+   - 于是 `adjacent_speed_mps` 的 `unit=` 参数**退休**，gps-jump 也不再需要两条 `when_fw`
+     分支：`ref("latitude_deg", "lat", unit="deg")` 一句话把"改名 + 改单位"说完。
+5. **算子不认识固件版本**：`att_tracking_stats` 与 `gyro_bias_series` 的 `fw_minor` 入参
+   已删。**版本判断在算子外面做好**——规则把候选来源都递进去，算子按"谁有数据用谁"挑
+   （看样本数与是否全零，不看版本号）。判据：**算子只做运算**。
+6. **删掉了 `rules/vibration-stddev.yaml`**：它引用的 `stddev_accel_x_m_s2`（含 alias）
+   在 4 份日志 + 3 份字典里都不存在，前提"旧固件没有 `accel_vibration_metric`"又被最老的
+   1.11.2 日志证伪。
+7. **已知缺口**：**"跨实例取最差"现在没有写法**（双电池的 `battery_status`、多 EKF 的
+   `estimator_wind` 都只看第 0 个实例了）。要做得让相应算子吃 `[−1]` 的分组输入
+   （`cell_voltage_min` / `min_ge` / `rows_aggregate` …）——那是另一笔。
+   这一轮 6 份基线零差异，是因为那几条规则用的是 min 类统计、第 0 个实例本来就持有极值。
+
 **与设计的落地差异**（都是有原因的选择，不是遗漏）：
 
 | 设计 | 实际做法 | 为什么 |
@@ -186,8 +339,10 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 **已知的次要行为差异**（都不在基线覆盖范围内，已在对应经验文件里注释标明）：
 
 - attitude：姿态/指令字段缺失时静默不适用（原实现会留一条 skip）
-- motor_balance：通道数不足（<4 列）与活跃通道不足（<4 个）共用同一条 skip 文案
-- airspeed：缺 `airspeed_validated` 与无固定翼巡航段共用同一条 skip 文案
+- motor_balance：通道数不足（<4 列）与活跃通道不足（<4 个）**一律静默**（`skip` 已退役，两条路径
+  合并成同一种表现）
+- airspeed：缺 `airspeed_validated` 与无固定翼巡航段**一律静默**（同上；只有缺 topic 会记一条
+  skipped，文案由 `conditions.topics` 自动生成）
 
 ### 版本分支：规则级 `firmware` + 节点级 `when_fw`
 

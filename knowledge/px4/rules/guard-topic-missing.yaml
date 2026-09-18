@@ -6,9 +6,6 @@ name: 数据质量-关键 topic 缺失
 group: guards
 order: 2
 
-firmware: "True"
-airframe: "True"
-
 outputs:
   guard_tags:
     - {when: "not has_topic('vehicle_status')", tag: "topic_missing:vehicle_status"}

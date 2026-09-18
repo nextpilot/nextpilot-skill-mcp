@@ -8,13 +8,10 @@
   group: failsafe
   order: 1                 # failsafe group 内次序与原过程式 bool_fields 列表一致
 
-  firmware: "True"
-  airframe: "True"
-
   compute:
     - >-
         events = rising_edge_events(vehicle_status.failsafe, vehicle_status.timestamp,
-        armed_intervals, t0_us)
+        ARMED_INTERVALS, T0_US)
 
   foreach: {var: events, keys: [t_s]}
   triggers:
@@ -31,13 +28,10 @@
   group: failsafe
   order: 2
 
-  firmware: "True"
-  airframe: "True"
-
   compute:
     - >-
         events = rising_edge_events(vehicle_status.rc_signal_lost, vehicle_status.timestamp,
-        armed_intervals, t0_us)
+        ARMED_INTERVALS, T0_US)
 
   foreach: {var: events, keys: [t_s]}
   triggers:
@@ -54,13 +48,10 @@
   group: failsafe
   order: 3
 
-  firmware: "True"
-  airframe: "True"
-
   compute:
     - >-
         events = rising_edge_events(vehicle_status.data_link_lost, vehicle_status.timestamp,
-        armed_intervals, t0_us)
+        ARMED_INTERVALS, T0_US)
 
   foreach: {var: events, keys: [t_s]}
   triggers:
@@ -77,13 +68,10 @@
   group: failsafe
   order: 4
 
-  firmware: "True"
-  airframe: "True"
-
   compute:
     - >-
         events = rising_edge_events(vehicle_status.engine_failure, vehicle_status.timestamp,
-        armed_intervals, t0_us)
+        ARMED_INTERVALS, T0_US)
 
   foreach: {var: events, keys: [t_s]}
   triggers:
@@ -100,13 +88,10 @@
   group: failsafe
   order: 5
 
-  firmware: "True"
-  airframe: "True"
-
   compute:
     - >-
         events = rising_edge_events(vehicle_status.mission_failure, vehicle_status.timestamp,
-        armed_intervals, t0_us)
+        ARMED_INTERVALS, T0_US)
 
   foreach: {var: events, keys: [t_s]}
   triggers:
@@ -123,15 +108,14 @@
   group: failsafe
   order: 6                 # 原实现里 nav 分支在 5 个布尔字段之后
 
-  firmware: "True"
-  airframe: "True"
-  skip:
-    - {when: "not has_topic('vehicle_status')", reason: vehicle_status not in log}
+  conditions:
+    topics:
+      - vehicle_status
 
   compute:
     - >-
         events = step_into_events(vehicle_status.nav_state, vehicle_status.timestamp,
-        armed_intervals, t0_us, codes={5: "AUTO_RTL", 12: "DESCEND", 13: "TERMINATION", 18: "LAND"})
+        ARMED_INTERVALS, T0_US, codes={5: "AUTO_RTL", 12: "DESCEND", 13: "TERMINATION", 18: "LAND"})
 
   foreach: {var: events, keys: [t_s, code, name]}
   triggers:

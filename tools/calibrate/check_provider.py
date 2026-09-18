@@ -77,7 +77,7 @@ def check_provider(ns: dict, path: Path) -> None:
 
     # ---- 3. armed_intervals 的形状：升序、不重叠、只有最后一段可以开口 ----
     sem = p.builtin_variables()
-    iv = sem["armed_intervals"]
+    iv = sem["ARMED_INTERVALS"]
     check(isinstance(iv, list), "%s: armed_intervals 应当是 list" % where)
     last_end = None
     for i, seg in enumerate(iv):
@@ -103,22 +103,22 @@ def check_provider(ns: dict, path: Path) -> None:
         fallback = max(ends) if ends else iv[-1][0]
         total = sum(((e if e is not None else fallback) - s) for s, e in iv)
         check(
-            abs(total / 1e6 - sem["armed_s"]) < 0.2,
-            "%s: armed_s=%s 与 armed_intervals 加起来的秒数对不上" % (where, sem["armed_s"]),
+            abs(total / 1e6 - sem["ARMED_S"]) < 0.2,
+            "%s: armed_s=%s 与 armed_intervals 加起来的秒数对不上" % (where, sem["ARMED_S"]),
         )
-    check(sem["has_armed"] == bool(iv), "%s: has_armed 与 armed_intervals 矛盾" % where)
+    check(sem["HAS_ARMED"] == bool(iv), "%s: has_armed 与 armed_intervals 矛盾" % where)
 
     # ---- 4. get_report_facts() 与 builtin_variables() 不矛盾 ----
     facts = p.get_report_facts()
     check(isinstance(facts, dict) and facts, "%s: get_report_facts() 为空" % where)
     if "vehicleType" in facts:
         check(
-            facts["vehicleType"] == sem["airframe"],
+            facts["vehicleType"] == sem["AIRFRAME"],
             "%s: get_report_facts().vehicleType 与 builtin_variables().airframe 不一致（%r vs %r）"
-            % (where, facts["vehicleType"], sem["airframe"]),
+            % (where, facts["vehicleType"], sem["AIRFRAME"]),
         )
     check(
-        facts.get("armedDurationSec", sem["armed_s"]) == sem["armed_s"],
+        facts.get("armedDurationSec", sem["ARMED_S"]) == sem["ARMED_S"],
         "%s: get_report_facts().armedDurationSec 与 builtin_variables().armed_s 不一致" % where,
     )
     if "phases" in facts:
@@ -133,7 +133,7 @@ def check_provider(ns: dict, path: Path) -> None:
     # ---- 6. match_version：any / 边界 / 非法串 ----
     # 版本未知（老日志没写版本号）时约定"不因版本排除任何东西"，所以下面两条的期望值
     # 随 fw_minor 是否为 None 而不同——这正是契约要写清楚的地方。
-    unknown_fw = sem["fw_minor"] is None
+    unknown_fw = sem["FW_MINOR"] is None
     check(p.match_version("any") is True, "%s: match_version('any') 应当为真" % where)
     check(p.match_version("") is True, "%s: match_version('') 应当为真" % where)
     check(

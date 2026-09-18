@@ -7,12 +7,10 @@ name: VTOL 转换姿态越限
 group: vtol_transition
 order: 1
 
-firmware: "True"
-airframe: "True"
 # 原实现的外层条件是「有 vehicle_status 且有 armed 段」，不成立时静默（既不 ran 也不 skipped）
-skip:
-  - {when: "not has_armed or not has_topic('vehicle_status')"}
-  - {when: "not has_topic('vtol_vehicle_status')", reason: vtol_vehicle_status not in log}
+conditions:
+  topics:
+    - vtol_vehicle_status
 
 compute:
   # 转换段样本数（判"这段日志里到底有没有转换"）

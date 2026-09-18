@@ -7,39 +7,31 @@ name: EKF 融合硬故障
 group: ekf_faults
 order: 1
 
-firmware: "True"
-airframe: "True"
-skip:
-  - {when: "not has_topic('estimator_status')", reason: estimator_status not in log}
-# nan_flags 是很早期的字段（1.11 起的日志与 1.15+ 字典里都没有），属已知遗留：
-# lint-rules.py 据此不再把它列为可疑引用
-known_legacy: [estimator_status.nan_flags]
+conditions:
+  topics:
+    - estimator_status
 
 compute:
   # 位掩码跨实例合并置位；缺失按 0 处理（与原实现一致）
   - >-
       fault_raw = _try(bit_or_max(
-      ref("estimator_status.filter_fault_flags", per_instance=True)))
-  - >-
-      nan_raw = _try(max_of_max(
-      ref("estimator_status.nan_flags", per_instance=True)))
+      ref("estimator_status[:].filter_fault_flags")))
   - fault_union = _try(coalesce(fault_raw, 0))
-  - nan_max = _try(to_int(coalesce(nan_raw, 0)))
   - crit_bits = _try(has_bits(fault_union, 63))
 
 outputs:
   tag: ekf_innovation_failure
 
 triggers:
-  - when: "nan_max > 0 or crit_bits"
+  - when: "crit_bits"
     severity: critical
     threshold: 0
-    value: f"fault={fault_union},nan={nan_max}"
-    field: "estimator_status.filter_fault_flags/nan_flags"
-    title: "EKF 报告核心融合硬故障（filter_fault_flags={fault_union}, nan_flags={nan_max}）"
-    suggestion: "估计器出现硬故障/NaN，建议停飞排查传感器与振动后重新标定。"
-  # 仅非核心位（如未启用视觉）且无 NaN：给 info 提示，不当作故障
-  - when: "fault_union > 0 and not crit_bits and nan_max == 0"
+    value: f"fault={fault_union}"
+    field: "estimator_status.filter_fault_flags"
+    title: "EKF 报告核心融合硬故障（filter_fault_flags={fault_union}）"
+    suggestion: "估计器出现硬故障，建议停飞排查传感器与振动后重新标定。"
+  # 仅非核心位（如未启用视觉）且无核心故障：给 info 提示，不当作故障
+  - when: "fault_union > 0 and not crit_bits"
     severity: info
     tag: null
     threshold: 0

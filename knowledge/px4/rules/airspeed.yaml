@@ -7,24 +7,19 @@ name: 空速健康
 group: airspeed
 order: 1
 
-firmware: "True"
-# 原实现只对固定翼判空速；旋翼/Rover 既不 ran 也不 skipped（静默）
-# 机型未知时给一条 skip 记录（与原实现的 elif 分支一致）——所以"未知"要放行机架轴，
-# 交给下面 skip 里的 `airframe == 'unknown'` 去留痕
-airframe: "is_fixed_wing or airframe == 'unknown'"
-# 机型未知时给一条 skip 记录（与原实现的 elif 分支一致）
-# 原外层条件还要求存在 vehicle_attitude_setpoint，缺失时静默
-skip:
-  - {when: "airframe == 'unknown'", reason: 机型未知，无法判定固定翼巡航段}
-  - {when: "not has_topic('vehicle_attitude_setpoint')"}
-  - {when: "no_data", reason: 无固定翼巡航段或未记录 airspeed_validated}
-  - {when: "not has_topic('airspeed_validated')", reason: 无固定翼巡航段或未记录 airspeed_validated}
+# 原实现只对固定翼判空速；旋翼/Rover 既不 ran 也不 skipped（静默）。
+# 机型未知过去靠机架轴放行 + 一条 skip 记录留痕，现在 skip 已退役——未知直接被轴挡在门外。
+# 原外层条件还要求存在 vehicle_attitude_setpoint（本经验并不读它），该条件一并去掉。
+conditions:
+  airframe: fixed_wing
+  topics:
+    - airspeed_validated
 
 compute:
   # 固定翼巡航段：armed 区间内 nav_state 出现过 3/8；不成立则整条中止（原 require_true 门控）
   - >-
       cruise_ok = require_true(masked_any_in(vehicle_status.nav_state,
-      vehicle_status.timestamp, armed_intervals, codes=[3, 8]))
+      vehicle_status.timestamp, ARMED_INTERVALS, codes=[3, 8]))
   # 无效样本占比；字段缺失时保持可选（此时只用下面 tas 的统计，与原实现一致）
   - >-
       invalid_frac = _try(ratio_equal(

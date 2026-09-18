@@ -100,27 +100,40 @@ class Px4Provider:
         d = self._find_topic(topic, instance)
         return d.data if d is not None else None
 
-    def get_series(self, ref, instance=None, alias=None, per_instance=False):
+    def get_series(self, ref, instance=slice(None, None), alias=None):
         """按 `"topic.field"` 取一条序列（与规则里写的引用形一致）。
 
         **取不到或字段不存在一律返回 None，不抛异常。** 形态：
-          · 默认（instance=None 且 per_instance=False）—— 该字段在各实例上的值**拼接**成一条
-            （多实例 topic 的主流用法，如 estimator_status 每个 IMU 一个实例）
-          · per_instance=True —— 返回「每实例一组」的列表，交给需要分组的算子
-          · instance=N —— 只取第 N 个实例
+          · instance=slice（规则里写 `topic[:].field`，**不写下标也一样**）—— 所有实例。
+            多实例时返回「每实例一组」的列表；**只有一个实例时返回那一条序列本身**
+            （否则单实例字段就得处处写 `[0]`，而且 `q` 这种"每元素一列"的数组字段会被
+            多包一层而读不出来）
+          · instance=N（规则里写 `topic[N].field`，N 可为负，按 Python 语义从末尾数）
+            —— 只取第 N 个实例
           · alias —— 该字段的备用命名（旧固件改过名），可给字符串或字符串列表
         定长数组字段（如 float32[3] accel_clipping）：pyulog 按 'field[i]' 暴露，
         这里返回**每元素一列的列表**，缺的元素位置为 None。
+
+        **没有"把所有实例拼成一条"这个形态**（曾经有，默认就是它）：一条曲线里混着几个
+        传感器的数据，读的人看不出来。要哪个实例就写哪个；多实例归约用 `[:]`
+        交给会分组的算子。
         """
         aliases = None
         if alias is not None:
             aliases = [alias] if isinstance(alias, str) else list(alias)
-        if per_instance or instance is not None:
-            groups = self._read_grouped(ref, aliases)
-            if instance is not None:
-                return groups[instance] if groups and len(groups) > instance else None
-            return groups
-        return self._read_concat(ref, aliases)
+        if instance is None:
+            instance = slice(None, None)
+        groups = self._read_grouped(ref, aliases)
+        if not groups:
+            return None
+        try:
+            picked = groups[instance]
+        except (IndexError, TypeError):
+            return None
+        if isinstance(instance, slice):
+            # 单实例：直接给那一条（与 `[0]` 同形），别让调用方无谓地拆一层
+            return picked[0] if len(picked) == 1 else picked
+        return picked
 
     def get_first_existing_column(self, topic, names):
         """只取第一个实例、按候选名取第一个存在的**原样列**（概览指标兜底取数用）。"""
@@ -139,7 +152,8 @@ class Px4Provider:
     def match_version(self, spec):
         """固件约束串：any / ">=1.15" / "<1.15" / ">=1.14,<1.15"（逗号=与）。
 
-        只给 `ref(..., when_fw=)` 用（规则级的适用范围轴已经是表达式了）。
+        规则级的适用范围轴与节点级 `ref(..., when_fw=)` **共用这一个**（同一个概念、
+        同一套语法）；写错了先抛出来，别被下面"版本未知就放行"盖过去。
         版本未知（老日志没写版本号）时不因版本排除——与迁移前"按字段存在性判定"一致。
         """
         if not spec or spec == "any":
@@ -181,23 +195,26 @@ class Px4Provider:
         return [dict(m) for m in self._logged_messages]
 
     def builtin_variables(self):
-        """内置变量表。**每次返回新 dict**（引擎会往里写 compute 的输出）。"""
+        """内置变量表。**每次返回新 dict**（引擎会往里写 compute 的输出）。
+
+        键一律大写（见 api.py 的 BUILTIN_VARIABLES）：规则里自己赋的变量是小写。
+        """
         return {
-            "fw_minor": self.fw_minor,
-            "airframe": self.vehicle_type,
-            "is_fixed_wing": self.vehicle_type == "fixed_wing",
-            "duration_s": self.duration_s if self.duration_s is not None else 0,
-            "armed_s": self.armed_duration_s,
+            "FW_MINOR": self.fw_minor,
+            "AIRFRAME": self.vehicle_type,
+            "IS_FIXED_WING": self.vehicle_type == "fixed_wing",
+            "DURATION_S": self.duration_s if self.duration_s is not None else 0,
+            "ARMED_S": self.armed_duration_s,
             # 时序算子（如 head_tail_median_drop）按 armed 区间切窗用
-            "armed_intervals": list(self.armed_intervals),
+            "ARMED_INTERVALS": list(self.armed_intervals),
             # 事件类算子的相对时间（t=xx.x s）基准
-            "t0_us": self.t0_us,
-            "has_armed": bool(self.armed_intervals),
+            "T0_US": self.t0_us,
+            "HAS_ARMED": bool(self.armed_intervals),
             # 数据质量事实（guards 类经验用）
-            "restart_detected": self.restart_topics > 0,
-            "dropout_ms": self.dropout_total_ms,
+            "RESTART_DETECTED": self.restart_topics > 0,
+            "DROPOUT_MS": self.dropout_total_ms,
             # 日志消息：供「日志消息聚合」类经验按级别筛选
-            "messages": self.get_logged_messages(),
+            "MESSAGES": self.get_logged_messages(),
         }
 
     def get_report_facts(self):
@@ -540,50 +557,13 @@ class Px4Provider:
                 return v
         return None
 
-    def _read_concat(self, ref, aliases):
-        """'topic.field' → 该字段在各实例上的值（多实例拼接）；topic/字段缺失返回 None。"""
-        topic, _, field = ref.partition(".")
-        ds = self._find_topic_all(topic)
-        if not ds:
-            return None
-        aliases = list(aliases or [])
-
-        def gather(get_one):
-            vals = []
-            for d in ds:
-                v = get_one(d)
-                if v is not None and len(v):
-                    vals.append(np.asarray(v, dtype=float))
-            if not vals:
-                return None
-            return np.concatenate(vals) if len(vals) > 1 else vals[0]
-
-        direct = gather(lambda d: self._first_field(d, field, *aliases))
-        if direct is not None:
-            return direct
-
-        def gather_cell(idx):
-            # pyulog 对定长数组通常暴露为 'field[0]'，个别构建为 'field_0'
-            return gather(
-                lambda d: next(
-                    (
-                        v
-                        for v in (self._first_field(d, f"{stem}[{idx}]", f"{stem}_{idx}") for stem in [field] + aliases)
-                        if v is not None
-                    ),
-                    None,
-                )
-            )
-
-        if gather_cell(0) is None:
-            return None
-        columns = [gather_cell(i) for i in range(32)]
-        while columns and columns[-1] is None:
-            columns.pop()
-        return columns
-
     def _read_grouped(self, ref, aliases):
-        """per_instance 取数：返回「每个 topic 实例一组」的列表（不跨实例拼接）。"""
+        """'topic.field' → 「每个 topic 实例一组」的列表；topic 不存在返回 None。
+
+        实例顺序 = `_find_topic_all()` 的顺序（与 topic meta 一致），所以 `instance=N` 的
+        N 就是标题里那个实例序号。缺字段的实例留一个 None 占位，**不剔除**——剔了会让
+        后面的实例序号整体前移。
+        """
         topic, _, field = ref.partition(".")
         ds = self._find_topic_all(topic)
         if not ds:

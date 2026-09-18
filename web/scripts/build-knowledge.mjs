@@ -28,7 +28,17 @@ import { dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readdirSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
-import { normalizeCompute, validateComputeList } from "./lib/rule-expr.mjs";
+import {
+  normalizeCompute,
+  validateComputeList,
+  isFirmwareSpec,
+  isAirframeSpec,
+  parseTopicReq,
+  collectRefs,
+  normalizeUnit,
+  UNIT_ALIASES,
+  UNIT_KIND,
+} from "./lib/rule-expr.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
@@ -163,8 +173,10 @@ function toRawTemplate(text) {
   return text.replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
 }
 
-// 框架自己往求值环境里补的名字（不属于 provider，见 providers/api.py 末尾的说明）
-const FRAMEWORK_VARS = ["no_data", "has_topic"];
+// 框架自己往求值环境里补的名字（不属于 provider，见 providers/api.py 末尾的说明）。
+// `no_data` 曾经在这儿——它随 skip 机制一起退役了（compute 失败现在自动记一条 skipped），
+// 留着会让引用了它的规则构建期放行、运行期 NameError → 那条规则静默失效。
+const FRAMEWORK_VARS = ["has_topic"];
 
 /**
  * 规则表达式能引用的内置变量 = provider 契约的 BUILTIN_VARIABLES + 框架补的两个。
@@ -251,7 +263,7 @@ function parseProviderApi(py) {
 }
 
 /** 校验并加载 rules/*.yaml；任何不完整都构建失败（杜绝"空洞经验"） */
-function loadRules(dir, signatures, ruleMeta) {
+function loadRules(dir, signatures, ruleMeta, airframes) {
   const files = readdirSync(dir).filter((f) => f.endsWith(".yaml")).sort();
   if (files.length === 0) throw new Error("rules/ 下没有规则文件");
   const rules = [];
@@ -280,12 +292,11 @@ function loadRules(dir, signatures, ruleMeta) {
     const hasCompute = Array.isArray(raw.compute) && raw.compute.length > 0;
     const hasTriggers = Array.isArray(raw.triggers) && raw.triggers.length > 0;
     const isGuardRule = Array.isArray(guardTags) && guardTags.length > 0 && !hasCompute && !hasTriggers;
-    // 必填项：即使不限也必须显式写 any（隐式豁免正是空洞条目的入口）。
+    // 必填项：身份 + 规则的“实质”。适用范围（conditions）整块可省——不限就什么都不用写。
     // 不含 outputs——check / doc 现在都是派生的，没有 tag/stats 的规则确实没什么可声明。
     const requiredKeys = isGuardRule
-      ? ["id", "group", "name", "firmware", "airframe"]
-      : ["id", "group", "name", "firmware", "airframe", "compute", "triggers"];
-    if (!isGuardRule === false) { /* noop：保持下面结构简单 */ }
+      ? ["id", "group", "name"]
+      : ["id", "group", "name", "compute", "triggers"];
     for (const key of requiredKeys) {
       if (raw[key] === undefined || raw[key] === null || raw[key] === "") {
         throw new Error(`${where}: 缺少必填字段 ${key}`);
@@ -294,35 +305,74 @@ function loadRules(dir, signatures, ruleMeta) {
     if (raw.outputs !== undefined && (typeof raw.outputs !== "object" || raw.outputs === null || Array.isArray(raw.outputs))) {
       throw new Error(`${where}: outputs 必须是对象`);
     }
-    // 适用范围两轴与 skip 都是**表达式**（与 compute / triggers 同一套语法，不再是
-    // "any" / ">=1.15" 这类自造小语言）。它们在 compute **之前**求值，所以只认得内置变量。
-    for (const axis of ["firmware", "airframe"]) {
-      if (typeof raw[axis] !== "string" || !raw[axis].trim()) {
-        throw new Error(`${where}: ${axis} 必须是表达式字符串（不限就写 "True"）`);
+    // ── 适用范围：一个 conditions 块，三个键都能省 ──
+    //   firmware —— 固件约束串（any / ">=1.15" / ">=1.14,<1.15"）。与节点级 ref(..., when_fw=)
+    //               同一套语法，由 provider.match_version 解释；省 = any。
+    //   airframe —— any / 机架名 / 机架名列表（机架词表由各格式的适配器定义，引擎只做字符串比对）；省 = any。
+    //   topics   —— 日志里得有这些 topic，缺了记一条 skipped。`||` = 其中任意一个在日志里就够，
+    //               项间 = 都要有。省 = 没有依赖。
+    // 下面归一化成运行期的形态：两个平铺的轴 + 嵌套的 topics。**没有 skip 这个键**
+    // （原来那坨 no_data / not has_armed 的判定已退役，理由见 knowledge/px4/CLAUDE.md）。
+    // 退役的顶层键：不静默忽略，写错了要当场知道
+    for (const [key, hint] of [
+      ["skip", "缺 topic 改写进 conditions.topics；no_data / not has_armed 这类按需改成 precheck，或直接删"],
+      ["ran_on_success", "ran() 现在统一在 compute 成功之后记（算不出来会记一条「数据不足」），这个字段已删"],
+      ["known_legacy", '字段的跨版本差异改用候选组表达：ref("新名", "旧名") 取第一个存在的'],
+    ]) {
+      if (raw[key] !== undefined) throw new Error(`${where}: ${key} 已移除——${hint}`);
+    }
+    const cond = raw.conditions ?? {};
+    if (typeof cond !== "object" || cond === null || Array.isArray(cond)) {
+      throw new Error(`${where}: conditions 必须是对象（可用键：firmware / airframe / topics）`);
+    }
+    for (const k of Object.keys(cond)) {
+      if (!["firmware", "airframe", "topics", "precheck"].includes(k)) {
+        throw new Error(`${where}: conditions 里有未知键 ${k}（可用：firmware / airframe / topics / precheck）`);
       }
     }
-    if (raw.skip !== undefined) {
-      if (!Array.isArray(raw.skip)) {
-        throw new Error(`${where}: skip 必须是数组：[{when: 表达式, reason: 文案?}, …]`);
+    if (cond.firmware !== undefined && !isFirmwareSpec(cond.firmware)) {
+      throw new Error(
+        `${where}: conditions.firmware 必须是固件约束串（any / ">=1.15" / "<1.15" / ">=1.14,<1.15"），` +
+          `实际是 ${JSON.stringify(cond.firmware)}`,
+      );
+    }
+    if (cond.airframe !== undefined && !isAirframeSpec(cond.airframe)) {
+      throw new Error(
+        `${where}: conditions.airframe 必须是 any / 机架名 / 机架名列表（如 [fixed_wing, unknown]），` +
+          `实际是 ${JSON.stringify(cond.airframe)}`,
+      );
+    }
+    if (cond.topics !== undefined && !Array.isArray(cond.topics)) {
+      throw new Error(`${where}: conditions.topics 必须是数组（每项一个 topic，多个候选用 || 分隔）`);
+    }
+    if (Array.isArray(cond.topics) && cond.topics.length === 0) {
+      throw new Error(`${where}: conditions.topics 是空数组（没有依赖就整个删掉）`);
+    }
+    const topics = (cond.topics ?? []).map((t) => {
+      try {
+        return parseTopicReq(t);
+      } catch (err) {
+        throw new Error(`${where}: ${err.message}`);
       }
-      for (const s of raw.skip) {
-        if (!s || typeof s.when !== "string" || !s.when.trim()) {
-          throw new Error(`${where}: skip 每一项都要有 when（Python 表达式）`);
+    });
+    // precheck：compute 之前求值的先决条件，命中即静默不跑。只认内置变量与 has_topic()，
+    // 因为它在 compute 之前求值（拿不到 compute 的输出）——写别的名字这里就拦下。
+    if (cond.precheck !== undefined) {
+      if (!Array.isArray(cond.precheck) || cond.precheck.length === 0) {
+        throw new Error(`${where}: conditions.precheck 必须是非空数组（每项一条表达式，没有就整个删掉）`);
+      }
+      for (const w of cond.precheck) {
+        if (typeof w !== "string" || !w.trim()) {
+          throw new Error(`${where}: conditions.precheck 的每一项都要是非空表达式字符串`);
         }
-        if (s.reason !== undefined && typeof s.reason !== "string") {
-          throw new Error(`${where}: skip 的 reason 必须是字符串（不写该键 = 静默跳过）`);
-        }
-        for (const k of Object.keys(s)) {
-          if (!["when", "reason"].includes(k)) {
-            throw new Error(`${where}: skip 项里有未知键 ${k}（可用：when / reason）`);
-          }
-        }
-        checkBuiltinOnly(s.when, where, `skip 条件「${s.when}」`);
+        checkBuiltinOnly(w, where, `precheck 条件「${w}」`);
       }
     }
-    for (const axis of ["firmware", "airframe"]) {
-      checkBuiltinOnly(raw[axis], where, `${axis}「${raw[axis]}」`);
-    }
+    delete raw.conditions;
+    raw.firmware = cond.firmware ?? "any";
+    raw.airframe = normalizeAirframe(cond.airframe ?? "any", airframes, where);
+    if (topics.length) raw.topics = topics;
+    if (cond.precheck !== undefined) raw.precheck = cond.precheck.map((s) => s.trim());
     if (seen.has(raw.id)) throw new Error(`${where}: 规则 id 重复 ${raw.id}`);
     seen.add(raw.id);
 
@@ -494,15 +544,120 @@ function pyRepr(v) {
 const listOr = (v, fallback) =>
   Array.isArray(v) ? v.join(",") : v === undefined || v === null ? fallback : String(v);
 
+/**
+ * `ref(..., unit="deg")` 的**源单位**从哪来：`meta/<tag>.json`（经 `meta/topic-map.yaml`
+ * 换字典键），`meta/topic-overrides.yaml` 可补/纠——meta 是生成的，单位常缺失或直接是
+ * `.msg` 注释里的自由文本（`metres` / `radians` / `'stop the motors'` 混在一起）。
+ *
+ * **只收录写了 `unit=` 的引用**涉及的字段：没写的一个都不查，所以 meta 的脏数据卡不住
+ * 现有规则。查不到 → **告警**（不是失败）：那条留空，运行期按原样给、不换算。
+ * 目标单位（作者写的那个）认不出、或与源单位不同量纲 → 构建失败。
+ */
+function resolveFieldUnits(rules, metaDir) {
+  const topicMap = parseYaml(read(resolve(metaDir, "topic-map.yaml"))).topics ?? {};
+  const overridePath = resolve(metaDir, "topic-overrides.yaml");
+  const overrides = existsSync(overridePath) ? parseYaml(read(overridePath)).units ?? {} : {};
+
+  // 逐 tag 读成 {字典键.字段: [原始单位…]}，main 在前（它的口径最新，优先采信）
+  const metaUnits = new Map();
+  const tags = readdirSync(metaDir).filter((f) => f.endsWith(".json")).sort();
+  for (const f of tags) {
+    const doc = JSON.parse(read(resolve(metaDir, f)));
+    for (const [key, spec] of Object.entries(doc.topics ?? {})) {
+      for (const [name, def] of Object.entries(spec.fields ?? {})) {
+        if (!def || !def.unit) continue;
+        const k = `${key}.${name}`;
+        if (!metaUnits.has(k)) metaUnits.set(k, []);
+        metaUnits.get(k).push(String(def.unit));
+      }
+    }
+  }
+
+  // 先把"谁要单位、要哪个单位"收齐
+  const wanted = new Map();   // "topic.field" -> Set(规范目标单位)
+  for (const raw of rules) {
+    for (const expr of raw.compute ?? []) {
+      for (const r of collectRefs(expr)) {
+        if (r.unit === undefined) continue;
+        const dst = normalizeUnit(r.unit);
+        if (!dst) {
+          throw new Error(
+            `${raw.id}: ref(..., unit="${r.unit}") 里那个单位认不出（可用：` +
+              `${[...new Set(Object.values(UNIT_ALIASES))].sort().join(" / ")}）`,
+          );
+        }
+        for (const fld of r.fields) {
+          if (!wanted.has(fld)) wanted.set(fld, new Set());
+          wanted.get(fld).add(dst);
+        }
+      }
+    }
+  }
+
+  const out = {};
+  const unknown = [];
+  for (const fldRaw of [...wanted.keys()].sort()) {
+    // 实例号写在 topic 后（`vehicle_gps_position[-1].lat`）——单位表的键去掉它
+    const fld = fldRaw.replace(/\[[^\]]*\]\./, ".");
+    const [topic, field] = fld.split(".");
+    const dictKey = topicMap[topic] ?? topic;
+    const raw_ = overrides[fld] ?? (metaUnits.get(`${dictKey}.${field}`) ?? [])[0];
+    const src = normalizeUnit(raw_);
+    if (!src) {
+      unknown.push(fld);
+      continue;
+    }
+    for (const dst of wanted.get(fld)) {
+      if (UNIT_KIND[src] !== UNIT_KIND[dst]) {
+        throw new Error(
+          `${fld} 的单位是 ${src}（${UNIT_KIND[src]}），而规则要它输出 ${dst}（${UNIT_KIND[dst]}）` +
+            `——量纲不同不能换算。要改单位请改 meta/topic-overrides.yaml 的 units，` +
+            `或者改 ref(..., unit=) 的期望单位`,
+        );
+      }
+    }
+    out[fld] = src;
+  }
+  if (unknown.length) {
+    console.warn(
+      `  ! 这些字段在 meta 里查不到单位，unit= 不做换算：${unknown.join("、")}\n` +
+        `    补法：在 knowledge/px4/meta/topic-overrides.yaml 的 units 里加一行（字段名 → 真实单位）`,
+    );
+  }
+  return out;
+}
+
+/**
+
+/**
+ * 机架名归一化：`mc` / `fw` 这类简写换成规范名（表在 facts.yaml 的 `airframe_aliases`）。
+ *
+ * 简写只是**书写方便**：产物里只留规范名，所以引擎 `_match_airframe` 与各适配器都不用
+ * 认识别名——"同一个意思只留一种写法"这条在运行时那边成立。
+ * 表里没有、又不在合法机架名集合（facts.yaml 的 `vehicle_types` 值 + unknown）里的 → 报错，
+ * 不静默放过（写错的机架名会让那条经验**永远不跑**，最难发现的一种坏）。
+ */
+function normalizeAirframe(spec, airframes, where) {
+  const canon = (name) => {
+    const n = String(name).trim();
+    if (airframes.aliases[n]) return airframes.aliases[n];
+    if (airframes.valid.has(n)) return n;
+    throw new Error(
+      `${where}: conditions.airframe 里的「${n}」不认识（可用：${[...airframes.valid].sort().join(" / ")}；` +
+        `简写见 facts.yaml 的 airframe_aliases）`,
+    );
+  };
+  if (typeof spec === "string") return spec.trim() === "any" ? "any" : canon(spec);
+  return spec.map(canon);
+}
+
 function fmtApplicability(raw) {
   const parts = [];
-  // 适用范围两轴现在是表达式（不限写 "True"）
-  if (raw.firmware !== "True") parts.push("固件 " + raw.firmware);
-  if (raw.airframe !== "True") parts.push("机架 " + raw.airframe);
-  // skip 列表：写了 reason 的记一条 skipped，不写 reason 的静默跳过
-  for (const s of raw.skip ?? []) {
-    parts.push((s.reason ? "不适用当 " : "静默当 ") + s.when);
-  }
+  // conditions 的三个键（不限就整个省掉）：固件 / 机架 / 依赖的 topic
+  if (raw.firmware !== "any") parts.push("固件 " + raw.firmware);
+  if (raw.airframe !== "any") parts.push("机架 " + listOr(raw.airframe, ""));
+  for (const cand of raw.topics ?? []) parts.push("需要 " + cand.join(" 或 "));
+  for (const w of raw.precheck ?? []) parts.push("不跑当 " + w);
   return parts.join(" ｜ ") || "总是适用";
 }
 
@@ -633,8 +788,14 @@ if (!plotTrack || !plotTrack.topic) {
   throw new Error("knowledge/px4/plot/track.yml 缺少 track.topic");
 }
 facts.track = plotTrack;
-const { rules, sources } = loadRules(RULES_DIR, signatures, facts.rule_meta ?? {});
+const airframes = {
+  // 简写 → 规范名（facts.yaml 里的人工数据）；合法名 = vehicle_types 的值 + unknown
+  aliases: facts.airframe_aliases ?? {},
+  valid: new Set([...Object.values(facts.vehicle_types ?? {}).map(String), "unknown"]),
+};
+const { rules, sources } = loadRules(RULES_DIR, signatures, facts.rule_meta ?? {}, airframes);
 // guards 类经验没有 compute（其判定在 outputs.guard_tags），逐条校验已在 loadRules 里做
+const fieldUnits = resolveFieldUnits(rules, resolve(KN, "meta"));
 
 const ruleEnginePy = read(PY_RULE_ENGINE);
 if (!ruleEnginePy.includes("__FAULT_KB__")) {
@@ -645,6 +806,24 @@ if (!ruleEnginePy.includes("__RULES__")) {
 }
 if (!ruleEnginePy.includes("__FACTS__")) {
   throw new Error("rule_engine.py 必须保留 __FACTS__ 占位符");
+}
+if (!ruleEnginePy.includes("__FIELD_UNITS__")) {
+  throw new Error("rule_engine.py 必须保留 __FIELD_UNITS__ 占位符");
+}
+// 单位词表在两边各有一份（构建期管"别名 → 规范名"，运行期管"规范名 → 换算因子"），
+// 规范名必须一模一样。各改各的会静默换算出错数，所以在这里比一次。
+{
+  const pyUnits = ruleEnginePy.slice(ruleEnginePy.indexOf("_UNIT_FACTORS"));
+  const names = [...pyUnits.matchAll(/^\s{4}"([a-z0-9]+)":\s*\(/gm)].map((m) => m[1]);
+  const js = Object.keys(UNIT_KIND).map((x) => x.toLowerCase());
+  const missing = js.filter((u) => !names.includes(u));
+  const extra = names.filter((u) => !js.includes(u));
+  if (missing.length || extra.length) {
+    throw new Error(
+      `engine/rule_engine.py 的 _UNIT_FACTORS 与 web/scripts/lib/rule-expr.mjs 的 UNIT_KIND 对不上` +
+        `（规则侧多：${missing.join(",") || "无"}；引擎侧多：${extra.join(",") || "无"}）`,
+    );
+  }
 }
 // facts.yaml：那一种格式的数据（码表 / 文案 / 展示口径 / 规则元数据）。
 // 键名是引擎与 provider 约定的，缺一个就构建失败（宁可构建失败，也不要在浏览器里
@@ -740,12 +919,17 @@ writeArtifact(
     "const facts = " +
     JSON.stringify(facts) +
     ";\n\n" +
+    // 字段单位表：只含写了 unit= 的引用涉及的字段；本地回归脚本也从这一行取（与 rules 同款）
+    "const fieldUnits = " +
+    JSON.stringify(fieldUnits) +
+    ";\n\n" +
     "export const PY_ULG_CHECKS = String.raw`" +
     toRawTemplate(pyWithOperators) +
     "`\n" +
     '  .replace("__FAULT_KB__", JSON.stringify(faultKbJson.entries))\n' +
     '  .replace("__RULES__", JSON.stringify(rules))\n' +
-    '  .replace("__FACTS__", JSON.stringify(facts));\n',
+    '  .replace("__FACTS__", JSON.stringify(facts))\n' +
+    '  .replace("__FIELD_UNITS__", JSON.stringify(fieldUnits));\n',
 );
 
 // 3) 数据层 .ts
