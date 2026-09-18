@@ -50,8 +50,8 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
   **单位与类型一律查它，不要在别处抄**。它的键是上游 `.msg` 名，与日志 topic 名不一一对应，
   所以新增了 `meta/topic-map.yaml`（日志 topic → 字典键，构建期专用、不进产物）。
 - 本轮**明确不做**（都留着后续）：用 meta 做构建期字段校验（rules 与 plot 的每个
-  `topic.field`）、`meta` 与 `facts.yaml` 码表的一致性对账、`plot` 的单位改由 meta 派生、
-  内置变量全大写、ArduPilot 适配器。
+  `topic.field`）、`meta` 与 `facts.yaml` 码表的一致性对账、内置变量全大写、ArduPilot 适配器。
+  （**2026-09-18 起 plot 的单位已改由 meta 派生**，见下面第五段——这条从"不做"里划掉。）
 
 验证口径同前：`compare_baseline.py` 6 条日志**逐字段零差异**（这次是纯搬家，
 出现任何差异都说明搬错了），外加新增的 `check_provider.py`（契约测试）。
@@ -344,40 +344,67 @@ conditions:                       # 整块可省
 - airspeed：缺 `airspeed_validated` 与无固定翼巡航段**一律静默**（同上；只有缺 topic 会记一条
   skipped，文案由 `conditions.topics` 自动生成）
 
-### 版本分支：规则级 `firmware` + 节点级 `when_fw`
+### 版本分支：**只有一种写法**——候选组 + 规则级 `firmware`
 
-同一语义在不同固件里会换 topic / 字段名，所以两级版本条件都要有：
-
-| 层级 | 字段 | 作用 |
-| --- | --- | --- |
-| 规则 | `firmware: ">=1.15"` | 整条经验是否适用于该日志（不适用则既不 ran 也不产 finding） |
-| 节点 | `when_fw: ">=1.15"` | 单个 compute 节点是否执行；不满足就跳过、输出置 `None`，由后续 `coalesce` 选另一支 |
-
-写法示例（`rules/wind-estimate.yaml`，同一物理量的新旧 topic）：
+升级换代就是"老名字没了、新名字在"，所以**取数按存在性挑**，不按版本号分流：
 
 ```yaml
-compute:
-  - >-
-    w_p95 = percentile(
-      hypot(coalesce(ref("estimator_wind.windspeed_north", when_fw=">=1.15"),
-                     ref("wind_estimate.windspeed_north", when_fw="<1.15")),
-            coalesce(ref("estimator_wind.windspeed_east", when_fw=">=1.15"),
-                     ref("wind_estimate.windspeed_east", when_fw="<1.15"))),
-      p=95)
+w_p95 = percentile(hypot(ref("estimator_wind.windspeed_north", "wind_estimate.windspeed_north"), …))
 ```
 
-`when_fw` 只写在**取数**（`ref(...)`）上，不再是节点级选项；不满足条件的引用返回 `None`，
-由 `coalesce` 选另一支。另一种写法是三元（`a if fw_minor is None or fw_minor >= 15 else b`，
-`fw_minor` 必须判 `None`，构建期会拦漏写）。
+规则级 `firmware: ">=1.15"` 还在，但它管的是"**整条经验**适不适用"（连同 `airframe` / `topics`
+一起进 `conditions`），不是"该读哪个字段"。
 
-这样"哪个固件用哪个字段"就写在经验文件里，人可读、机器可查；需要算子内部处理更复杂
-版本差异时（如陀螺零偏的双固件取源、姿态指令 q_d 与 roll/pitch_body 的选源），
-把 `fw_minor` 作为算子入参传进去即可（复合算子 `gyro_bias_series` / `att_tracking_stats`）。
+**已经删掉的两样**（别再写回去）：节点级 `when_fw=`（同一字段换了**语义**就拆成两条规则，
+不该用版本门在一条规则里分叉）、`known_legacy`（白名单挡不住漏，字段能不能取到由存在性说话）。
 
-**字段校验（`tools/calibrate/lint-rules.py`）按这两级版本条件判定**：对每个引用，取
-「规则 `firmware` ∩ 节点 `when_fw`」圈定的版本范围，在该范围的**回归日志实测字段**与
-**上游字典**里找，分类为 命中 / 版本错配 / 已声明遗留（`aliases`、`known_legacy`）/ 可疑。
-自检过：把 `wind_estimate` 那支错标成 `>=1.15` 会精确报出"仅存在于 1.11"。
+**字段校验（`tools/calibrate/lint_rules.py`）**按规则级 `firmware` 圈定的版本范围，在
+**回归日志实测字段**与**上游字典**里找，分类为 命中 / 版本错配 / 可疑。自检过：把
+`wind_estimate` 那支错标成 `>=1.15` 会精确报出"仅存在于 1.11"。
+
+**2026-09-18 追加（第五段）：绘图预设换成同一套取数语言（曲线与地图合成一件事）**
+
+动机：`plot/` 下原本是**两套语言**——曲线用 `panels/topic/instance/fields/op`（前端搭面板、前端按
+"topic + 原始列名"取数），地图轨迹用 `{field, scale}` 候选列表（provider 自己挑候选与换算）。
+于是"字段换代、改了量纲"在图上与规则里要各写一遍，单位更是三处不同口径。这一轮把两边合成
+**一份预设 = `conditions` + `compute` + `outputs[]`**，取数一律走 `ref(...)`：
+
+- **曲线也走 `ref`**：`np_series` 从"收 topic + 列名"改成**收整份取数声明**（`{instance, xdata,
+  ydata, compute}`），引擎侧求值、单位换算、降采样都在引擎里做——这才叫"前端不画数学"。
+  返回的 `series` 与 `ydata` **同序等长**（取不到的那项是 `null`），前端按预设里写好的
+  label/color 逐项对齐即可，不用靠字段名反查。
+- **`_ref` 抽出 `_pick_ref`**：候选循环同一份实现，`_pick_ref` 多回传一个"命中的 bare 字段名"。
+  地图要它——时间戳与 `fix_type` 必须跟坐标来自**同一个话题的同一个实例**，否则三路采样率不同、
+  数组长度不一致，画出来是错的。`_ref` 现在是它的薄壳（规则侧行为零变化）。
+- **`compute` 节点**：预设里的换算与规则的 `compute` **同一套**（同一个构建期校验器
+  `validateComputeList`、同一个运行期 `_eval_compute`）。`attitude.yml` 的"四元数→欧拉角"由此
+  从容器级 `op` 改成 `compute` 里一行 `roll, pitch, yaw = quat_to_euler(ref("vehicle_attitude.q[…]"), …)`。
+  实测：与改造前 `op` 路径在**共同时间戳上逐值零差异**（约 3 万次比较），只有 LTTB 的采样点不同
+  （参考序列从 `q[0]` 变成 `roll`）。
+- **单位表扩到预设**：`resolveFieldUnits` 不再只遍历规则的 compute，而是收"规则 + 预设"两边的
+  引用（预设侧在**编译时登记**，不靠事后遍历产物猜形状——地图坐标编译后不是同一个形状，遍历会漏）。
+  顺带修了一个潜伏 bug：表键带实例（`topic[0].field`）时，量纲检查取了剥掉实例的名字、
+  `wanted.get()` 拿到 undefined。**只在需要换算时写 `unit=`**（字段本来就是目标单位就别写，
+  不写 = 不换算也不查表），所以 eph/epv 这类保持原样、不产生告警。
+- **地图支持多条轨道**：`container: map` 的 children 各是一条轨道（`label` 是图例名）。
+  一条 → 沿用海拔渐变着色 + 左侧色带；多条 → 每条纯色 + 可点选隐藏的图例，起终点 marker 只画第一条。
+  轨迹返回形状随之变成 `{title, legend, tracks: […]}`，单条取不到就跳过、全取不到才给 `error`。
+- **sensor_gps 优先（用户选定）**：1.16/1.17 的日志里 `sensor_gps` 与 `vehicle_gps_position`
+  **同时存在**，前者采样少得多（181/43/309 vs 1390/436/3095）——**轨迹点数会明显变少、更"粗"**，
+  这是明知的取舍（宁可要新话题的原始 GNSS）。曲线那边**故意反过来**（`vehicle_gps_position` 优先），
+  为的是与改造前画的是同一份数据。
+- **`FACTS` 改成按 JSON 解析**（`json.loads(r"""…""")`，与 `RULES` 同款）：预设里出现 `legend: true`
+  之后，当 Python 字面量注入直接 `NameError: name 'true' is not defined`。**凡是有布尔/空值的
+  JSON 载荷都不能当 Python 字面量注入。**
+- **哨兵护栏已就位**（同一天早些时候的另一笔）：产物用 JS `.replace()` **只换第一处**，源文件注释里
+  写出哨兵原名会让真正的赋值留在替换范围外 → 浏览器 `NameError`、整份日志解析不了；而本地回归
+  用 Python 的 `str.replace`（全换）所以全绿。现在构建期按"每个哨兵**恰好一次**"卡住。
+
+**没做的**（`docs/architecture/plot-schema.md` 里的设计，留给后续）：`breaks`（中途丢星时把路径
+**断开**而不是只剔除——现在前后两段会被连成一条横穿地图的假直线，这是真 bug）、点解析
+（`t: first/last/{max_of: alt}/{finding: critical}`，把图上标记点与规则命中时刻打通）、
+`kind/geometry` 判别式联合（`path/points/segments/area`）、具名 `sources` 注册表。
+本轮按"`container` × `mode`"落地，是因为它与现有代码最近、改动面最小。
 
 一个必须记住的现实：**同一物理量在不同固件下可能是不同的 topic（不是改名），也可能真的是改名**。
 两类都要处理，且不能凭名字相似去猜：

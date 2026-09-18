@@ -1,29 +1,100 @@
-# plot/ —— 结果页曲线预设（一组图一个文件）
+# plot/ —— 结果页绘图预设（曲线与地图**同一套声明**）
 
-每个 YAML 描述结果页「曲线」tab 里的一组图：**读哪个 topic 的哪些字段、怎么画、参考线画在哪**。
-用户加/改图只改这里，不用碰前端代码——构建期由 `web/scripts/build-knowledge.mjs` 生成
-`web/lib/knowledge/plots.generated.ts`，页面读它渲染（**不经 Pyodide，纯前端**）。
+每个 YAML 描述报告页里的一组图。**曲线**与**地图轨迹**用的是同一套结构，差别只在
+`container`：`axes` 进「数据图表」tab，`map` 渲染在常驻地图区。加/改图只改这里，不用碰前端代码。
+
+构建期由 `web/scripts/build-knowledge.mjs` 编译并校验，两处产物：
+
+| 产物 | 消费者 | 内容 |
+| --- | --- | --- |
+| `web/lib/knowledge/plots.generated.ts` | 前端（`lib/chart-presets.ts` 解析布局） | 全部预设（曲线 + 地图声明） |
+| `web/workers/ulog-check-script.ts` 里的 `facts.track` | 引擎（`engine/providers/px4.py` 取轨迹） | `container: map` 那一份 |
+
+写错了**构建就失败**（`pnpm build:kb`）：字段引用过不了校验、`label` 个数与 `ydata` 对不上、
+一张图里混了两种单位、两个预设都声明地图……都在这里拦住，别指望运行期报错。
+
+## 骨架
+
+照抄 `plot-template.yml`（`*-template.yml` 不参与加载）。最简的一份：
+
+```yaml
+id: power
+title: 电源
+description: 电压 / 电流 / 剩余电量，多面板共享时间轴。
+order: 5
+conditions:
+  topics: [battery_status]
+outputs:
+  - container: axes
+    title: 电压
+    ylabel: V
+    children:
+      - mode: TimeSeries
+        ydata: ref("battery_status[0].voltage_v")
+```
 
 ## 字段
 
+### 顶层
+
 | 键 | 必填 | 说明 |
 | --- | --- | --- |
-| `id` | ✓ | 锚点与去重用，别改（页面里 tab 内定位靠它） |
+| `id` | ✓ | 锚点与去重；别改（页面内定位靠它） |
 | `title` / `description` | ✓ | 卡片标题与一句话说明 |
-| `panels[]` | ✓ | 一组面板（共享时间轴） |
-| `panels[].title` | ✓ | 面板标题，可用占位符 `{instance}`、`{topic}` |
-| `panels[].yLabel` | ✓ | y 轴单位 |
-| `panels[].topic` | ✓ | 读哪个 topic |
-| `panels[].topics` | | 候选 topic 列表，取**第一个存在**的（新老固件话题改名时用，与 `topic` 二选一） |
-| `panels[].instance` | | `first`（缺省，只画第一个实例）｜`all`（每个实例一个面板，如每个 IMU） |
-| `panels[].op` | | **预处理算子**：图上要先换算时用（如 `{name: quat_to_euler, labels: [Roll, Pitch, Yaw]}`）。算子必须是 `engine/operators.py` 里注册的，**换算在引擎侧做，前端只画**——别在前端写数学 |
-| `panels[].fields[]` | ✓ | 画哪些线。两种写法：字符串（图例=字段名）｜`{label: 中文名, fields: [候选…]}`（取第一个存在的字段，图例用 label） |
-| `fields[].only_when_missing` | | 回退写法：仅当这个字段**不存在**时才画本条（如老固件没有 `hdg_test_ratio` 才画 `mag_test_ratio`） |
-| `panels[].hlines[]` | | 参考线：`{value, level: ok\|warning\|critical, label}`（颜色由前端按 level 取，别在这里写色值） |
+| `order` | | 页面上这组图的先后（缺省 999） |
+| `conditions` | | **与规则同形**：`firmware` / `airframe` / `topics` / `precheck`。图上一般只用 `topics`（项内 `\|\|` = 任意一个存在即可） |
+| `compute` | | 换算节点，与规则的 `compute` 是**同一套**（Python 子集 + `engine/operators.py` 的算子）。算出来的变量给 `ydata` 引用 |
+| `outputs` | ✓ | 见下 |
+
+### `outputs[]`（容器）
+
+| 键 | 必填 | 说明 |
+| --- | --- | --- |
+| `container` | ✓ | `axes`（一张曲线图）｜`map`（地图轨迹，**全局最多一个**） |
+| `title` | | 这张图的标题；`axes` 里可用 `{instance}` 占位（`per_instance` 时） |
+| `ylabel` | ✓（axes） | 这张图的 y 轴标签。**一张图只画一个量纲**：同一图里写了 `unit=` 的引用必须目标单位相同 |
+| `xlabel` | | 缺省「秒（相对日志开始）」；`xyplot` 时写你的横轴名 |
+| `legend` / `grid` | | 缺省 `true` |
+| `flipx` / `flipy` | | 缺省 `false` |
+| `range` | | `[x0,x1]` 或 `[x0,x1,y0,y1]`；缺省自动适配 |
+| `hlines` | | 水平参考线 `{value, level: ok\|warning\|critical, label}` |
+| `per_instance` | | `true` 时把写了 `[:]` 的引用按实例拆成多张图（如每个 IMU 一张） |
+| `children` | ✓ | 见下 |
+
+### `children[]`（取数）
+
+`axes` 的 child：
+
+| 键 | 必填 | 说明 |
+| --- | --- | --- |
+| `mode` | ✓ | `TimeSeries`（横轴=时间）｜`xyplot`（横轴=你给的 `xdata`） |
+| `xdata` | | `xyplot` 必填；`TimeSeries` 缺省用命中字段那个话题的 `timestamp` |
+| `ydata` | ✓ | 要画的线，**逗号分隔**。每一项要么是字段引用（`ref(...)` 或裸写 `topic.field`），要么是 `compute` 算出来的变量名 |
+| `label` / `style` / `color` | | 与 `ydata` **逐项对齐**（个数不等就构建失败）。`style` 取 `solid｜dashed｜dotted`；`color` 是 `#rrggbb`，**用块标量写**（YAML 不允许标量以引号开头，而 `#` 不加引号会被当注释） |
+
+`map` 的 child：`mode: track` + `label` + `max_points` + `lat` / `lon` / `alt`（各一个字段引用，
+**必须写明实例**：同一条轨道的时间戳与 `fix_type` 要跟坐标来自同一个话题的同一个实例）。
+
+## 取数语言：与规则完全一致
+
+字段引用就是规则里那套（见 `content/guide/knowledge-write-rule.md`）：
+
+```yaml
+ydata: ref("sensor_gps[0].latitude_deg", "vehicle_gps_position[0].latitude_deg", unit="deg")
+```
+
+- **候选组**按顺序取第一个在日志里存在的：字段改名（`ref("新名", "旧名")`）、话题改名
+  （`ref("sensor_gps[0].x", "vehicle_gps_position[0].x")`）都用它——**老固件少个字段不用写回退规则**，
+  取不到那条线就是 `null`，前端自动不画。
+- **`unit=` 是期望输出单位**，源单位构建期从 `meta/` 查（查不到会告警，补一行到
+  `meta/topic-overrides.yaml` 即可）。**只在需要换算时才写**：字段本来就是目标单位就别写
+  （不写 = 不换算、也不查表）。
+- 实例写进字段名：`topic[N].field` 取第 N 个实例；不写或 `[:]` 是所有实例（要配 `per_instance`
+  或用会归约的算子，图上直接用会报错）。
 
 ## 约定
 
-- **字段可选**：某个字段在日志里不存在时自动跳过；若一个面板一条线都没有，该面板不显示；
-  一组图一个面板都不剩，该组整体不显示（所以老固件缺话题不会报错，只是不画）。
-- 这里只声明**画什么**；数据由 Worker 里的 `np_series`（LTTB 降采样；带 `op` 时先算后采样）按需取，图表交互在 `web/components/LogCharts.tsx`。
-- 需要新算子（如滤波、积分、夹角）就加在 `engine/operators.py`，规则与图共用同一套。
+- 图上的**换算一律在引擎侧**（`compute` 节点或 `unit=`）：前端只画，不写数学。
+- 抽稀（`max_points`）与"剔除未定位采样"是**引擎侧**的事（轨迹）；曲线走 LTTB 降采样。
+- 颜色不写就按站点调色板（`lib/chart-presets.ts` 的 `SERIES_COLORS_*`）顺序取；
+  **别在 YAML 里写死一堆色值**，换主题时会打架。

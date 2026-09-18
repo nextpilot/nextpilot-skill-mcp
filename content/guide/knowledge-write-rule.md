@@ -525,3 +525,41 @@ outputs:
 | 多实例取数 | 多实例 topic **必须写明要哪个实例**：`ref("estimator_status[2].vel_test_ratio")` 取第 3 个；不写（或写 `[:]`）就是**所有实例**——多实例给"每实例一组"、单实例就是那一条，交给会归约的算子。以前"不加修饰＝所有实例拼成一条"的隐式语义已去掉——那种曲线里混着几个传感器的数据，读的人看不出来 |
 | 字典名 ≠ 日志 topic 名 | `meta/<tag>.json` 按上游 `.msg` **文件名**收录；日志里的 topic 名由固件发布决定。`sensor_gps`（原始 GPS）与 `vehicle_gps_position`（处理后的位置）是两个不同的东西，不是改名 |
 | 生成物不要手改 | `web/workers/*.ts`、`web/lib/knowledge/*.generated.js` 都是产物，改 `knowledge/` 后重新构建。本页 §4.1 与 §6.1 两张表由 `python tools/px4/gen_rule_reference.py` 注入，改完算子/内置变量请重跑它 |
+
+## 9. 报告页的曲线与地图：同一套取数语言
+
+「数据图表」tab 的曲线与地图上的轨迹**不是手写的**，由 `knowledge/px4/plot/*.yml` 声明、
+构建期编译并校验（写错就构建失败）。它们用的是**与经验完全一样**的字段引用——`ref(...)` 候选组、
+`unit=` 期望单位、实例写进字段名——所以"字段换代、改了量纲"在这里与在 `compute` 里是同一种写法。
+
+```yaml
+id: power
+title: 电源
+description: 电压 / 电流 / 剩余电量。
+conditions:
+  topics: [battery_status]           # 与规则的 conditions 同形
+compute:                             # 与规则的 compute 同一套表达式与算子
+  - remaining_pct = remaining * 100
+outputs:
+  - container: axes                  # 一张曲线图（container: map 是地图轨迹）
+    title: 电压
+    ylabel: V
+    hlines: [{value: 4.905, level: warning, label: "4.905（警告）"}]
+    children:
+      - mode: TimeSeries
+        ydata: >-
+          ref("battery_status[0].voltage_v"),
+          ref("battery_status[0].voltage_filtered_v"),
+          remaining_pct
+        label: 电压, 滤波后电压, 剩余电量
+        style: solid, dashed, solid
+```
+
+几条与规则一致的约定：
+
+- `label` / `style` / `color` 与 `ydata` **逐项对齐**（个数不等构建期就报错，并指出第几项）；
+- 老固件少个字段**不用写回退**：那条线取到 `null`，前端自动不画；要换名字继续画就写进候选组；
+- 一张图只画**一个量纲**（同一图里写了 `unit=` 的引用必须目标单位相同）；
+- 图上的换算（`compute` 节点、`unit=`）一律在引擎侧做，前端只画——"前端不写数学"。
+
+细节见 `knowledge/px4/plot/README.md`（骨架可抄 `plot-template.yml`）。

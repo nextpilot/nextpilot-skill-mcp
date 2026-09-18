@@ -1,0 +1,89 @@
+# 一份绘图预设的完整骨架 —— 复制成 plot/<名字>.yml 后逐项填。
+# 字段级权威参考：knowledge/px4/plot/README.md；改完跑：
+#   cd web && pnpm build:kb                      # 构建 + 校验（写错就构建失败）
+#   python tools/calibrate/check_provider.py     # 取数契约（可选，需真日志）
+#
+# **必填只有四个**：id / title / description / outputs。其余每一项都能省，省掉的含义写在各自注释里。
+# 这个文件本身**不会被加载**（`*-template.yml` 是给人抄的骨架）。
+
+# ── 身份 ──
+id: xxx                        # 锚点与去重；页面里这组图的标识
+title: 中文名                  # 卡片标题
+description: 一句话说明这张图看什么   # 卡片副标题
+order: 5                       # 可选，页面里这组图的先后（缺省 999）
+
+# ── 适用范围：整块可省（省 = 总是适用）。**与规则同形**（同一份校验代码）
+conditions:
+  topics: [battery_status]             # 项内 `||` = 任意一个存在即可；项间 = 都要有
+  # firmware / airframe / precheck 同样可用（图上一般只用 topics）
+
+# ── 换算节点：可选，整块可省。与规则的 compute **同一套表达式与算子**（engine/operators.py）
+#    用途：图上要先算再画（四元数→欧拉角、多字段合成、按版本分流…）。算出来的变量供 ydata 引用。
+#    算式写在引擎侧、前端只画——"前端不写数学"是硬规矩。
+compute:
+  - roll, pitch, yaw = quat_to_euler(
+      ref("vehicle_attitude.q[0]"), ref("vehicle_attitude.q[1]"),
+      ref("vehicle_attitude.q[2]"), ref("vehicle_attitude.q[3]"))
+
+# ── 输出：至少一个。容器两种 —— axes（一张曲线图）｜map（地图轨迹）──
+outputs:
+  - container: axes            # 一张图 = 一个面板
+    title: 电压                # 可选 → 预设 title；可用 {instance} 占位（per_instance 时）
+    ylabel: V                  # **必填**：这张图的 y 轴标签（一张图只画一个量纲）
+    xlabel: 秒（相对日志开始）    # 可选 → 就是这句；xyplot 时写你的横轴名
+    legend: true               # 可选，默认 true
+    grid: true                 # 可选，默认 true
+    flipx: false               # 可选，默认 false（flipy 同）
+    range: [0, 100, 4, 5.2]    # 可选，默认自动适配。[x0,x1] 或 [x0,x1,y0,y1]
+    hlines:                    # 可选：水平参考线（颜色由 level 定）
+      - {value: 4.905, level: warning, label: "4.905（警告）"}
+    per_instance: false        # 可选，默认 false；置 true 时下面写 [:] 的线按实例拆成多张图
+    children:                  # 至少一条 child：每条 child 一组取数
+      - mode: TimeSeries       # TimeSeries（横轴=时间）｜xyplot（横轴=你给的 xdata）
+        xdata: >-              # xyplot 必填；TimeSeries 可省（省 = 时间戳）
+          ref("vehicle_gps_position[0].latitude_deg", "vehicle_gps_position[0].lat", unit="deg")
+        # ydata：要画的线，逗号分隔。每一项要么是字段引用，要么是上面 compute 算出来的变量名。
+        # 字段引用与规则**同一套**语言：候选组按存在性挑第一个；unit= 是**期望输出单位**
+        # （源单位构建期从 meta/ 查，查不到会告警，补一行到 meta/topic-overrides.yaml 即可）。
+        # 只在**需要换算**时写 unit=；字段本来就是目标单位就别写（不写 = 不换算、也不查表）。
+        ydata: >-
+          ref("battery_status[0].voltage_v"),
+          ref("battery_status[0].voltage_filtered_v"),
+          remaining_pct
+        # label / style / color 与 ydata **逐项对齐**（个数不等就构建失败，报错指出第几项）
+        label: 电压, 滤波后电压, 剩余电量
+        style: solid, dashed, solid      # solid｜dashed｜dotted（缺省 solid）
+        # 颜色是 `#rrggbb`：**必须以引号开头**，而 YAML 不允许标量以引号开头，所以用块标量写。
+        # 不写就按站点调色板顺序取。
+        color: >-
+          "#409eff", "#ff4d4f"
+        # 老固件少个字段怎么办：**什么都不用写** —— 那条线取到 null，前端自动不画；
+        # 要"换个名字继续画"就把它放进候选组：ref("新名", "旧名")。
+
+  # ── 地图：全局最多一个（报告页只有一块常驻地图，多个预设各声明一份谁都画不了）──
+  - container: map
+    title: 轨迹
+    legend: true
+    children:
+      - mode: track            # 地图上的 child 固定是 track
+        label: gps             # 图例名；可省 → 第一个话题名
+        max_points: 1500       # 可省 → 1500（抽稀到多少点；抽稀是**图元级**的）
+        # 三个坐标各是一个字段引用（**不支持 compute 的输出**），且**必须写明实例**：
+        # 同一条轨道的时间戳与 fix_type 要跟坐标来自同一个 topic 的同一个实例，
+        # 否则三路采样率不同、数组长度不一致，画出来是错的。
+        # 候选顺序即优先级，第一个"三样都能给齐"的话题生效（这里 sensor_gps 优先）。
+        lat: >-
+          ref("sensor_gps[0].latitude_deg", "vehicle_gps_position[0].latitude_deg",
+          "vehicle_gps_position[0].lat", unit="deg")
+        lon: >-
+          ref("sensor_gps[0].longitude_deg", "vehicle_gps_position[0].longitude_deg",
+          "vehicle_gps_position[0].lon", unit="deg")
+        alt: >-
+          ref("sensor_gps[0].altitude_msl_m", "vehicle_gps_position[0].altitude_msl_m",
+          "vehicle_gps_position[0].alt", unit="m")
+      # 第二条轨道就是再写一项（多条叠在同一张地图上，图例可点选隐藏）
+      # - mode: track
+      #   label: ekf
+      #   lat: ref("vehicle_global_position[0].lat", unit="deg")
+      #   lon: ref("vehicle_global_position[0].lon", unit="deg")
+      #   alt: ref("vehicle_global_position[0].alt", unit="m")
