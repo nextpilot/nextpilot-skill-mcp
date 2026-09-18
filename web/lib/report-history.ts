@@ -88,9 +88,24 @@ export interface ReportData {
 type StoredReport = SavedReport & { savedAt?: number; };
 
 /** 老版本写入的记录可能缺字段（如早期没有 findings）；在读取边界补默认值，
- *  避免 UI 里 r.findings.length 之类直接抛错（真机上出现过 crash）。 */
-function normalize(raw: Partial<SavedReport> | null | undefined): SavedReport {
-  const r = raw ?? {};
+ *  避免 UI 里 r.findings.length 之类直接抛错（真机上出现过 crash）。
+ *
+ * ⚠️ 这是**所有外部来源**进入 `SavedReport` 的唯一闸门，不只是索引库的：
+ *    · 索引库里躺着上上个版本写下的记录（早期没有 findings 字段），
+ *      还有从 localStorage 迁移进来的更老的记录；
+ *    · 云端 KV 里的记录也一样——`explain.js` 保证新写的带 findings，
+ *      但 TTL 是 7 天，**旧版本部署写下的记录仍在有效期内**，取回来照样是缺字段的 JSON。
+ *    两者到了前端都只是 JSON，TypeScript 拦不住，只有过这道函数才安全。
+ *
+ * 所以：新增读取入口必须过这里，**不要再写 `xxx as SavedReport`**——
+ * 那句强转把类型检查关掉了，缺字段要到渲染时才炸（`GeneralInfo` 的 `findings.filter` 就这么炸过）。
+ *
+ * 名字刻意不叫 `normalize`：`lib/error-policy.js` 已经有一个 `normalize`（正则替换，
+ * 给错误消息脱敏用的），两者同名不同义正是 §6.4 第⑤条禁的那种迷惑。 */
+export function normalizeSavedReport(raw: unknown): SavedReport {
+  // 入参刻意是 unknown 而不是 Partial<SavedReport>：边界上拿到的本来就是"没有类型的东西"，
+  // 写成 Partial 只会让调用方以为字段已经对上了（§6.5）。强转集中在这一行。
+  const r = (raw ?? {}) as Partial<SavedReport>;
   return {
     id: String(r.id ?? ""),
     fileName: String(r.fileName ?? ""),
@@ -237,7 +252,7 @@ async function migrateFromLocalStorage(): Promise<void> {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
       for (const item of parsed) {
-        const rec = normalize(item as Partial<SavedReport>);
+        const rec = normalizeSavedReport(item);
         if (!rec.id) continue;
         // 库里已有同 id 的不覆盖（新结构优先）
         const exists = await get<StoredReport>(STORE_REPORTS, rec.id);
@@ -280,7 +295,7 @@ async function doInitReportStore(): Promise<void> {
       req.onerror = () => reject(req.error);
     });
     mirror = all
-      .map((x) => normalize(x))
+      .map((x) => normalizeSavedReport(x))
       .sort((a, b) => b.analyzedAt.localeCompare(a.analyzedAt));
   } catch {
     // IndexedDB 不可用（隐私模式等）：退化为"仅本次会话内存有效"
@@ -291,7 +306,7 @@ async function doInitReportStore(): Promise<void> {
 // ─────────────────────────── 结论记录（同步接口 + 异步落库）───────────────────────────
 
 export function saveReport(report: SavedReport): void {
-  const rec = normalize(report);
+  const rec = normalizeSavedReport(report);
   const idx = mirror.findIndex((r) => r.id === rec.id);
   if (idx >= 0) mirror[idx] = rec;
   else mirror.unshift(rec);

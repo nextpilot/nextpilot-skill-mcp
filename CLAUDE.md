@@ -200,7 +200,7 @@
 | 检查结论 | `AnalyzeReport.tsx` 内 | findings + 故障知识库命中条目 |
 | AI 中文解读 | `AnalyzeReport.tsx` 内 | DeepSeek 报告 |
 
-报告页之外还有两块常驻区域：**飞行阶段条**（`PhaseStrip.tsx`）紧贴 **飞行轨迹地图**（`LogFlightMap.tsx`，高德瓦片：国内可达；轨迹按 WGS-84 → GCJ-02 换算后绘制，换算见 `lib/coord.ts`）。
+报告页之外还有两块常驻区域：**飞行阶段条**（`LogPhaseStrip.tsx`）紧贴 **飞行轨迹地图**（`LogFlightMap.tsx`，高德瓦片：国内可达；轨迹按 WGS-84 → GCJ-02 换算后绘制，换算见 `lib/coord.ts`）。
 
 时间口径全站统一：**开机以来的秒数**，显示成 `hh:MM:ss`（与 Flight Review 一致）。数据层的硬规则与坑（事件解码、多值信息拼接、参数默认值怎么来、派生数据版本）见 **`knowledge/px4/CLAUDE.md` 的「报告页数据层」**——改 `engine/report_data.py` 前必读。
 
@@ -310,12 +310,36 @@
 | React 组件 | PascalCase + `.tsx` | `LogAnalyzer.tsx`、`SkillCard.tsx` |
 | 分析页 tab 组件 | 一个 tab 一个文件：`Log<用途>Msg.tsx` | `LogEventsMsg.tsx`、`LogParamsMsg.tsx`、`LogSystemMsg.tsx`、`LogFlightMap.tsx` |
 | 库 / 类型 / 常量 | kebab-case + `.ts` | `chart-presets.ts`、`types.ts`、`constants.ts` |
+| **两侧共用**的库（浏览器 + 边缘函数都引） | kebab-case + **`.js`**（例外：边缘那 22 个文件全是 `.js`，`.ts` 能否被 EdgeOne 打包器吃下本地验证不了） | `lib/error-policy.js` |
 | Web Worker 入口 | kebab-case + `-worker.ts` | `ulog-worker.ts` |
 | Worker 内嵌脚本 / helper | kebab-case + `-script.ts` | 现由 `build-knowledge.mjs` **生成**，不手改 |
 | Next.js 路由 | `page.tsx` / `route.ts` / `layout.tsx`（目录即路由） | `app/analyze/page.tsx`、`app/api/explain/route.ts` |
 | Python 模块 | snake_case + `.py` | `engine/rule_engine.py`、`engine/operators.py`、`engine/report_data.py` |
 | 知识 / 经验文件 | 见 `knowledge/README.md`；规则 `rules/*.yaml`、故障库 `px4-fault-kb.yaml` | `rules/vibration.yaml`、`px4-fault-kb.yaml` |
 | 文档 | kebab-case + `.md` | `llm/gjb841-system-prompt.md` |
+| 边缘函数（`web/functions/`） | kebab-case + `.js`，**文件名即路由**（`functions/api/x.js` → `/api/x`） | `api/me.js`、`api/issues.js`、`_lib/issue-filer.js` |
+
+**名字要能望文生义**（只满足上面那张表的"类型规则"不够——它只告诉你后缀是 `.ts` 还是 `.tsx`，看不出这个文件干什么）：
+
+1. **一条功能链上，每个文件占一个不重复的角色词**，名字连起来要能读成一句"谁采 → 谁收 → 谁建单"。
+   例：`lib/issue-bridge.ts`（浏览器采集 + 投递）→ `functions/api/issues.js`（边缘入口，只接收）
+   → `functions/_lib/issue-filer.js`（边缘，判定 + 建单）。
+2. **禁止只差词序 / 单复数的孪生名**：`error-reporter` 与 `report-error` 这样的名字真的并排出现过，
+   读的人分不出哪个是模块、哪个是路由。同理不要 `foo-bar` / `bar-foo` 并存。
+3. **领域词先查有没有被占用**：本仓库 `report` 已指"飞行分析报告"（`/api/reports`、`lib/report-history.ts`），
+   所以"线上报错自动建单"这条链统一用 **`issue`** 词根，不用 `report`。
+   （也曾试过 `telemetry`：它不撞任何词根，但**语义比实际宽**——这条链只装错误上报这一件事，
+   叫"遥测"是名不副实，读者会以为里面还有性能/使用统计。**泛词当避让词用，终究要还债。**）
+4. **运行时由目录表达**，不要在文件名里重复编码侧别：`web/lib/`＝浏览器、`web/functions/`＝边缘。
+   也别用 `-edge` / `-route` 这类**位置后缀**去补区分——`functions/` 整个目录就是边缘、
+   `api/x.js` 的文件名本身就是路由，再写一遍纯属冗余；而且位置是这堆东西里**最会变的一维**，
+   文件一挪后缀就开始撒谎（职责不会挪）。
+   分工靠这个组合：一条链共用**同一个领域词根**，每个文件各占一个**不重复的角色词**
+   （`issue-bridge` 桥接 → `issues` 入口 → `issue-filer` 建单）。
+   **词根认亲，角色词分工**——少了词根，看不出三个文件是一条链上的；少了角色词，
+   就只能靠位置后缀硬分，又回到上面那句。
+5. **同一目录里不许出现"开头一样、意思不同"的名字**（`/api/reports` 与 `/api/report-error` 前缀相同、
+   一个名词一个动词，并列在 `functions/api/` 里）。
 
 > 注意：Worker 相关文件统一用连字符（`ulog-worker.ts`），不要用点号（❌ `ulog.worker.ts`）。
 >
@@ -348,6 +372,87 @@
 > 派生数据版本（`web/lib/knowledge/derived-version.generated.ts`，构建期算的引擎源文件哈希）：
 > 改了 `engine/report_data.py` / `engine/rule_engine.py` / `facts.yaml` / `plot/*.yml`，用户本机存档
 > 会在打开时**自动重解析一次**（facts / findings 一并刷新，AI 报告保留），不用挨个提醒重新上传。
+
+---
+
+### 6.5 外部数据的读取边界（只许一个归一函数，禁止 `as`）
+
+**适用判据一句话：写入方与读取方可能不是同一版本。** 静态站与边缘函数分开部署、KV 记录能跨版本
+活 7 天、IndexedDB / localStorage 里躺着几个月前老代码写的记录——只要数据能跨部署存活，它读回来时
+就可能缺字段、多字段、甚至换了个形状。而 **TypeScript 在这里一点用都没有**：类型是编译期的，JSON 是运行期的。
+
+不在这一列的是 Worker / 引擎的 `postMessage`：同一次构建、与页面同时发布，不存在版本错位
+（跨版本失效已由 `derived-version.generated.ts` 的自动重解析兜住）。
+
+规则：
+
+1. **一个外部形状，一个 `normalizeXxx(raw: unknown): T`**，且在**唯一入口**调用一次。
+   入参写 `unknown` 而不是 `Partial<T>`——边界上的 JSON 本来就没有类型，写 `Partial` 只是让读者
+   误以为字段已经对上了。禁止 `as T`：强转把类型检查关掉，缺字段的值会一路走到 UI 才炸，
+   而**炸在入口有文件名和行号，炸在 UI 只有一句 `Cannot read properties of undefined`**。
+2. **归一只做三件事**：补默认值、收窄类型（`typeof x === "number"`）、丢掉坏记录（返回 `null` 或过滤）。
+   它不抛错、不校验业务——一条坏数据只该让那一条不显示，不该让整个页面白屏。
+3. **内部代码信任类型**，不在各处补 `?? []`。逐字段兜底是治标，还会掩盖"边界没归一"这个真问题。
+   （例外：类型上本来就**可选**的字段，如 `report.metrics`，照常用 `?.`——那是类型允许的缺失，性质不同。）
+4. `as Record<string, unknown>` / `as unknown` **允许**，但只许出现在归一函数**内部**——
+   它是把"无类型"变成"可检查"的桥，不是绕过检查的后门。
+5. **同一形状不许有两份归一实现**：两份必然分叉，分叉之后没人知道该信哪份（同 §6.4 第①条的病）。
+
+现有归一函数（新增外部形状时照着写）：
+
+| 外部形状 | 归一函数 | 唯一入口 |
+| --- | --- | --- |
+| 报告存档 `SavedReport`（索引库 / localStorage / `/api/reports/:id`） | `lib/report-history.ts` `normalizeSavedReport` | `hooks/useLogAnalyzer.ts` `openSaved()` |
+| 收藏 / 评分 / 排行榜（`/api/favorite`、`/api/rating`、`/api/download/track`） | `lib/community-stats.ts` `normalizeFavoriteStats` / `normalizeRatingStats` / `normalizeLeaderboard` | 该文件里各自的 fetch 包装函数 |
+| 内部接口（`/internal/users/upsert`、`/internal/otp/set`、`/internal/otp/consume`） | `lib/internal-kv.ts` `normalizeInternalUser` / `normalizeOtpRequest` / `normalizeOtpConsume` | 该文件里各自的调用包装函数 |
+
+**与形状无关的通用判断**（`asRecord` / `toCount`）收在 `lib/json-boundary.ts`，别在各自文件里重写；
+"缺哪个字段、缺了当什么"则是那个形状自己的知识，留在上表那些模块里。这个文件不叫 `normalize.ts`——
+`lib/error-policy.js` 已经导出一个 `normalize`（脱敏用的正则替换），同名不同义正是 §6.4 第⑤条禁的迷惑。
+
+> 由来（同一形状栽过两次，报告存档那次是线上白屏）：构建期的 `__FACTS__` 哨兵——Python 全量
+> `replace` 与 JS 只换一处，两条替换路径只有一条被机器校验；报告存档——`SavedReport` 有一半来自
+> 外部 JSON，但兜底只装在了本地一侧（索引库），云端一侧靠 `as SavedReport` 接住，于是线上炸在
+> `AnalyzeReport` 的 `report.findings.filter`（`GeneralInfo` 白屏）。
+> **两次都不是"少写一个 `?.`"，都是"同一份数据有两个入口，只有一个被校验"。**
+>
+> 守住这条的是 `web/scripts/test-issue-filer.mjs` §[10]：全仓库扫 `.ts/.tsx`，**同一行里同时出现
+> `.json()` 与 `as <具名类型>`** 即红（`as unknown` / `as Record<…>` 放行，它们只该活在归一函数里），
+> 另外单独禁止 `as SavedReport`，并检查归一函数仍被导出、唯一入口仍在调用。
+
+---
+
+### 6.6 守卫自己也要被校验（判空查的名字必须真实存在）
+
+**适用判据一句话：凡是你写了一个"有没有 X"的判断，X 必须真的有机器能证明它在。**
+守卫写错的代价不是崩溃，而是**某个功能永远不可用**，或者更糟——**静默取到别的数据**：
+它不抛异常、不进错误上报，用户看到的是一句听起来很合理的提示。这类 bug 比崩溃难查一个量级。
+
+规则：
+
+1. **判据要落在真值来源上，别凭记忆写名字。** 想知道"引擎解析过了没有"，就查 bootstrap
+   真正建立的全局名；写完用 `grep` 核一遍它真的被赋值或被导入过。
+2. **每加一个守卫，同时交付一个能证明它会红的检查**（写的时候先让它红一次，再让它绿）。
+   恒真的守卫和没写守卫的区别，只有这个检查能看出来。
+3. **跨语言的名字（Python 全局、环境变量、KV 键、URL 段）必须由机器核对**：人眼看得懂
+   `provider` 和 `ulog` 长得很像，编译器看得懂，解释器也看得懂——只有"没这个变量"这件事，
+   JS 侧查不出来（Pyodide 的 `globals.get("不存在的名字")` 返回 `undefined`，不报错）。
+4. **守卫要答两件不同的事时，两件必须一起成立。** 例：`track`/`series` 请求既要"命名空间装载了"
+   又要"装的就是这一份日志"——少后半句，工作区里装着日志 A 时打开没有轨迹存档的报告 B，
+   会把 A 的航线画成 B 的飞行记录（`web/workers/ulog-worker.ts` 的 `logNotLoadedReason`）。
+
+> 由来（**同一形状栽过三次**，前两次见 §6.5）：`__FACTS__` 哨兵、`as SavedReport`、
+> 以及 2026-09-18 的 `pyodide.globals.get("ulog")`——产物里从来没有名为 `ulog` 的全局
+> （bootstrap 那行是 `provider = open_log(...)`，`from pyulog import ULog` 只带来 `ULog`）。
+> 于是守卫恒真，轨迹请求**永远**返回"这份日志还没在解析过，重选文件即可恢复"：
+> 轨迹画不出来、也从未进过存档，界面还一直叫用户重选文件——照做一遍回来看到同一句，
+> 因为复解析是成功的，被挡掉的是紧跟其后的 track 请求。
+> **三次都不是"少写一个判断"，都是"判断本身没有被任何东西检查过"。**
+>
+> 守住这条的是 `tools/calibrate/check_artifact.py`：它真执行编译产物，把 `ulog-worker.ts` 里
+> 所有 `pyodide.globals.get("…")` 的名字**逐个拿到那个命名空间里核**（核对前先按 worker 的顺序
+> 调一遍 `np_report` / `np_manifest` / `np_log_info` / `np_track`，`__result` 这类由函数内部
+> `global` 摆出来的名字才真的存在），不存在即红并打印命名空间里真实存在的名字。
 
 ---
 

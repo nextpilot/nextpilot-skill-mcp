@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { reportManual } from "@/lib/issue-bridge";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -36,7 +38,7 @@ import type { StoredPlotPanel, StoredPlotSeries } from "@/lib/chart-presets";
 import { LogEventsMsg } from "./LogEventsMsg";
 import { LogParamsMsg } from "./LogParamsMsg";
 import { LogSystemMsg } from "./LogSystemMsg";
-import { PhaseStrip } from "./PhaseStrip";
+import { LogPhaseStrip } from "./LogPhaseStrip";
 import { formatDateTime, formatFirmware } from "@/lib/format";
 import { vehicleTypeLabel } from "@/lib/vehicle-type";
 import { isDarkTheme, modeStyle } from "@/lib/phase-colors";
@@ -168,7 +170,7 @@ export function AnalyzeReport({
 
       {/* 飞行阶段时间轴 */}
       {info?.phases?.length ? (
-        <PhaseStrip phases={info.phases} />
+        <LogPhaseStrip phases={info.phases} />
       ) : report.facts?.phases?.length ? (
         <div className="mb-5">
           <TagRow label="飞行阶段">
@@ -351,6 +353,102 @@ function SummaryTab({ report }: { report: AnalysisReport }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      <ReportIssueButton report={report} />
+    </div>
+  );
+}
+
+/**
+ * 用户主动反馈"结论不对 / 漏判 / 看不懂"。
+ *
+ * 自动上报只能看见崩溃，看不见"结论算错了"——而后者恰恰是日志分析最容易出的问题，
+ * 所以这个入口的价值不低于自动上报。
+ *
+ * 代价是要让用户提交内容，与"原始日志不上传"的卖点需要划清界限：只提交**结构性信息**
+ * （命中的规则 id、结论条数、固件版本、平台、路由）与用户自己写的一段话，
+ * **不含**日志内容、字段数值、文件名与账号信息。界面上把这一点明说。
+ */
+function ReportIssueButton({ report }: { report: AnalysisReport }) {
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const [sent, setSent] = useState(false);
+
+  const ruleIds = report.findings.map((f) => f.ruleId).filter(Boolean);
+  const severityCounts = {
+    critical: report.findings.filter((f) => f.severity === "critical").length,
+    warning: report.findings.filter((f) => f.severity === "warning").length,
+    info: report.findings.filter((f) => f.severity === "info").length,
+  };
+
+  const submit = () => {
+    reportManual({
+      ruleIds,
+      findingCount: report.findings.length,
+      severityCounts,
+      note: note.trim() || undefined,
+      platform: report.platform,
+      firmware: report.verSw,
+      parserVersion: report.parserVersion,
+    });
+    setSent(true);
+  };
+
+  if (sent) {
+    return (
+      <p className="mt-6 flex items-start gap-2 rounded-lg border border-border bg-surface-2 p-4 text-xs leading-5 text-muted">
+        <Info className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>已提交，谢谢。提交内容只含命中的规则与结论条数，不含日志内容与数值。</span>
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-6 rounded-lg border border-dashed border-border-strong p-4">
+      {open ? (
+        <>
+          <p className="text-sm font-medium">这份报告哪里不对？</p>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={3}
+            maxLength={500}
+            placeholder="例如：振动结论与实飞现象不符 / 漏判了 EKF 问题 / 提示看不懂（选填）"
+            className="mt-2 w-full rounded-lg border border-border bg-background p-2 text-sm"
+          />
+          <p className="mt-2 text-xs leading-5 text-muted">
+            将提交：命中的规则 {ruleIds.length} 条、结论 {report.findings.length} 条（critical{" "}
+            {severityCounts.critical} / warning {severityCounts.warning}）、固件版本、平台与你写的这段话。
+            <strong className="font-medium text-text">不会提交</strong>
+            日志内容、字段数值、文件名与账号信息。
+          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <button type="button" onClick={submit} className="btn-primary">
+              提交反馈
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="rounded-lg border border-border px-3 py-1.5 text-sm"
+            >
+              取消
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted">
+            结论看起来不对、漏判了，或者提示看不懂？反馈给我们。
+          </p>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-surface-2"
+          >
+            反馈问题
+          </button>
         </div>
       )}
     </div>

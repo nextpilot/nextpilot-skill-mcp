@@ -23,6 +23,7 @@ import {
     listReports,
     newReportId,
     makeTrackThumb,
+    normalizeSavedReport,
     patchReport,
     saveReport,
     saveReportData,
@@ -33,6 +34,7 @@ import { DERIVED_DATA_VERSION } from "@/lib/knowledge/derived-version.generated"
 import { fallbackLogKey, hashLogBytes } from "@/lib/log-hash";
 import { cacheUsage, cachedLogHashes, getCachedLog, putCachedLog } from "@/lib/log-cache";
 import type { HistoryItem } from "@/components/HistoryList";
+import { reportError } from "@/lib/issue-bridge";
 
 /**
  * Worker 跨路由复用（模块级单例）。
@@ -61,11 +63,19 @@ function getSharedWorker(): Worker | null {
         w.onmessage = (e: MessageEvent) => {
             for (const l of sharedListeners) l(e.data);
         };
-        w.onerror = (e) =>
+        w.onerror = (e) => {
             broadcastError(
                 `本地解析引擎加载失败：${e.message || "无法加载 Worker 脚本"}。` +
                     `若是网络原因（Pyodide 从 CDN 加载），请检查网络后重试。`,
             );
+            // Worker 内未捕获异常：整份日志都解析不了，最该上报的一类
+            reportError({
+                level: "fatal",
+                type: "WorkerLoadError",
+                message: e.message || "无法加载 Worker 脚本",
+                stack: e.error?.stack ?? "",
+            });
+        };
         w.onmessageerror = () => broadcastError("本地解析引擎消息解析失败，请刷新页面重试。");
         sharedWorker = w;
         return w;
@@ -313,6 +323,9 @@ export function useLogAnalyzer() {
                     // 取数声明整份发给引擎（字段引用 + 候选组 + 单位 + 换算节点）：
                     // 前端不解释它，只在 np_series 里原样用（见 report_data.py）
                     request: req,
+                    // Worker 是共享的、跨报告存活：带上"要哪一份日志"的指纹，
+                    // 里面装着别的日志时它宁可回错误，也别静默给别的日志的曲线
+                    logId: pendingHashRef.current,
                 });
             });
         },
@@ -326,7 +339,8 @@ export function useLogAnalyzer() {
         const reqId = `t${reqIdRef.current++}`;
         return new Promise((resolve) => {
             pendingRef.current.set(reqId, (data) => resolve(data as TrackData));
-            worker.postMessage({ type: "track", reqId });
+            // 同上：轨迹也要说清是哪一份日志的——装错日志时画出来的是**别人**的航线
+            worker.postMessage({ type: "track", reqId, logId: pendingHashRef.current });
         });
     }, []);
 
@@ -376,11 +390,32 @@ export function useLogAnalyzer() {
         return requestTrack();
     }, [requestTrack, storedTrack]);
 
+    /**
+     * 换了一份日志：丢掉上一份的派生数据（曲线、轨迹）。
+     *
+     * 这两样都必须按**日志身份**清，不能留在 state 里跨报告用：
+     *   · 曲线的键是 `presetId#面板序号`——**与日志无关**（预设是静态的），
+     *     于是 LogCharts 会直接命中上一份的序列画出来，看起来完全正常，实际是别人的数据；
+     *   · 轨迹更直白：画出来就是另一份日志的航线。
+     * 分析刚完成到抽完曲线之间有几秒，抽失败（`extractPlots` 的 catch）时这个错会一直留着。
+     *
+     * 判据用报告 id（= 日志内容指纹）：**就地复解析**（`recoverWithFile`、打开存档补齐）
+     * 的 id 不变 → 不清，那种情况下"旧数据先渲染着、后台补"正是想要的。
+     */
+    const dropOtherReportData = useCallback((nextId: string): void => {
+        if (reportIdRef.current === nextId) return;
+        setStoredPlots(null);
+        setStoredTrack(null);
+    }, []);
+
     const viewSaved = useCallback((saved: SavedReport) => {
         setError(null);
         setManifest(null);
         setInfo(null);
         setAiMarkdown(saved.aiMarkdown);
+        // 换了报告就把上一份的派生数据丢掉再换 id：这两步必须挨着，
+        // 否则"当前显示的 id"与"state 里的曲线轨迹"会各说各话
+        dropOtherReportData(saved.id);
         reportIdRef.current = saved.id;
         pendingHashRef.current = saved.logHash ?? "";
         setReport({
@@ -398,7 +433,7 @@ export function useLogAnalyzer() {
             analyzedAt: saved.analyzedAt,
         });
         setStage("done");
-    }, []);
+    }, [dropOtherReportData]);
 
     const findExistingByHash = useCallback(
         async (hash: string): Promise<HistoryItem | null> => {
@@ -429,6 +464,15 @@ export function useLogAnalyzer() {
             } else if (m.type === "error") {
                 setError(m.message ?? "解析失败");
                 setStage("idle");
+                // 解析失败是"整份日志都读不了"级别的错误，也是最容易藏起来的一类：
+                // Pyodide 里的 Python 异常只在用户机器上出现，本地回归覆盖不到
+                // （上一轮那个 NameError: __FACTS__ 就是这么漏到线上的）。
+                // Pyodide 会把整个 Python traceback 塞进 message，那就是最有用的证据。
+                reportError({
+                    level: "fatal",
+                    type: "ParseError",
+                    message: m.message ?? "解析失败",
+                });
             } else if (m.type === "done") {
                 const r = m.report as AnalysisReport;
                 r.fileName = pendingFileRef.current.name;
@@ -527,13 +571,16 @@ export function useLogAnalyzer() {
             pendingHashRef.current = meta.hash;
             pendingAiRef.current = meta.priorAi;
             pendingBytesRef.current = bytes;
+            // 换的是另一份日志就丢掉上一份的派生数据（见 dropOtherReportData）；
+            // 就地复解析同一个报告时 id 不变，留着旧曲线继续渲染正是想要的
+            dropOtherReportData(meta.reportId);
             reportIdRef.current = meta.reportId;
             setAiMarkdown(meta.priorAi);
             setPendingBytes(null);
             setStage("loading-runtime");
-            worker.postMessage({ type: "analyze", file: bytes });
+            worker.postMessage({ type: "analyze", file: bytes, logId: meta.hash });
         },
-        [ensureWorker],
+        [dropOtherReportData, ensureWorker],
     );
 
     /** 读存档的派生数据并填充 UI；告诉调用方"参数/消息"与"曲线"各有没有、是不是旧引擎生成的 */
@@ -587,27 +634,33 @@ export function useLogAnalyzer() {
      */
     const openSaved = useCallback(
         async (
-            saved: SavedReport,
+            saved: Partial<SavedReport>,
         ): Promise<{ reparsing: boolean; stale: boolean; incomplete: boolean }> => {
-            viewSaved(saved);
-            reportIdRef.current = saved.id;
-            if (adoptLiveAnalysis(saved.id)) {
+            // **归一放在这里，不放在调用方。** openSaved 是"打开一份存档"的唯一入口，
+            // 四个调用点里有三个是外部数据：索引库旧记录、云端列表摘要、/api/reports/:id
+            // 取回的完整记录（后者是 7 天 TTL 内的任意历史版本写的，字段可能缺）。
+            // 以前这几处各自 `as SavedReport` 强转，类型检查被关掉，
+            // 缺 findings 的记录一路走到 GeneralInfo 的 `findings.filter` 才炸。
+            const rec = normalizeSavedReport(saved);
+            // viewSaved 里换 id（并丢掉上一份的派生数据），这里不再重复设
+            viewSaved(rec);
+            if (adoptLiveAnalysis(rec.id)) {
                 return { reparsing: false, stale: false, incomplete: false };
             }
-            const { hasPlots, hasTrack, stale } = await loadReportData(saved.id);
+            const { hasPlots, hasTrack, stale } = await loadReportData(rec.id);
             // 曲线或轨迹缺了：存档本身补不回来，只有重新解析原始日志
             const incomplete = !hasPlots || !hasTrack;
             // 曲线、轨迹都齐了、且是当前引擎生成的，才算"不必解析"
             if (!incomplete && !stale) return { reparsing: false, stale: false, incomplete: false };
-            if (saved.logHash) {
-                const cached = await getCachedLog(saved.logHash);
+            if (rec.logHash) {
+                const cached = await getCachedLog(rec.logHash);
                 if (cached) {
                     parseBytes(cached.bytes, {
-                        name: cached.name || saved.fileName,
+                        name: cached.name || rec.fileName,
                         size: cached.bytes.byteLength,
-                        hash: saved.logHash,
-                        reportId: saved.id,
-                        priorAi: saved.aiMarkdown,
+                        hash: rec.logHash,
+                        reportId: rec.id,
+                        priorAi: rec.aiMarkdown,
                     });
                     return { reparsing: true, stale, incomplete };
                 }
@@ -655,7 +708,7 @@ export function useLogAnalyzer() {
                             const resp = await fetch(`/api/reports/${existing.id}`);
                             if (resp.ok) {
                                 const data = await resp.json();
-                                if (data.report) opened = await openSaved(data.report as SavedReport);
+                                if (data.report) opened = await openSaved(data.report);
                             }
                         } catch {
                             // 取不到就只提示"已分析过"，不阻断

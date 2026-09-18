@@ -80,7 +80,8 @@ export function LogFlightMap({
   const [legend, setLegend] = useState<{ label: string; color: string }[]>([]);
   const [hidden, setHidden] = useState<string[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  /** 错误种类（见 TrackData.code）：`not-parsed` 才给「重新选择文件」按钮 */
+  /** 错误种类（见 TrackData.code）：`log-not-loaded` 才给「重新选择文件」按钮
+   *  （= Worker 里没装着这份日志；重选文件解析一次就能恢复。别的错误重选也没用） */
   const [errorCode, setErrorCode] = useState<TrackData["code"]>(undefined);
   /** "在高德地图打开起点"的链接（用换算后的 GCJ-02 坐标，点开就落在正确位置） */
   const [amapUrl, setAmapUrl] = useState<string | null>(null);
@@ -411,7 +412,7 @@ export function LogFlightMap({
               // 只写一句"重新选择该 .ulg 文件"的话，用户得自己猜到要回列表页再选一次
               <div className="flex flex-col items-center gap-2">
                 <span>{errorMsg ?? "无法加载 GPS 轨迹数据"}</span>
-                {errorCode === "not-parsed" && onRestore && (
+                {errorCode === "log-not-loaded" && onRestore && (
                   <button
                     type="button"
                     onClick={onRestore}

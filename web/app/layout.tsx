@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { SessionProvider } from "@/components/SessionProvider";
 import { RuntimeCacheRegistrar } from "@/components/RuntimeCacheRegistrar";
+import { IssueBridgeMount } from "@/components/IssueBridgeMount";
 import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
 import "./globals.css";
 
@@ -23,6 +24,8 @@ export default function RootLayout({
         <RuntimeCacheRegistrar />
         <LanguageProvider>
           <SessionProvider>
+            {/* 客户端错误兜底（未捕获异常 / 未处理的 Promise 拒绝）→ /api/issues */}
+            <IssueBridgeMount />
             <SiteHeader />
             <main className="pb-20">{children}</main>
             <SiteFooter />

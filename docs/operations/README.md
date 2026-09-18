@@ -17,6 +17,8 @@
        /api/reports、/api/reports/[id]   云端报告 CRUD（免费版保留 7 天，惰性过期）
        /internal/otp/set|consume   仅 Node 侧（x-internal-secret）调用
        /internal/users/upsert
+       /api/issues           浏览器报错入口（公开，按 IP 日限流）→ 去重后提 issue
+       /issue-probe                上报链路自检探针
        /ping、/kv-probe            阶段 0 兼容性探针（验证完可删）
 ```
 
@@ -60,6 +62,9 @@ openssl rand -hex 24      # AUTH_INTERNAL_SECRET
 | `SITE_URL` | 公网源站，Node 侧同源调内部函数用，如 `https://skill.nextpilot.org` |
 | `SMTP_*` | QQ/163 SMTP，`SMTP_PASS` 填**邮箱授权码**（QQ 邮箱 → 设置 → 账户 → 开启 SMTP） |
 | `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL` | 边缘函数 `/api/explain` 读取 |
+| `ISSUE_ENABLED` | 置 `1` 才开启报错上报；不配则整个上报层 no-op（本地开发天然安全） |
+| `ISSUE_PROVIDER` / `ISSUE_REPO` / `ISSUE_TOKEN` | 目标：`gitee`（默认）或 `github`；`owner/repo`；令牌**只在边缘函数使用**，浏览器永不接触 |
+| `ISSUE_LABELS` / `ISSUE_DEBUG` | 可选。标签（逗号分隔）；`ISSUE_DEBUG=1` 时 `/issue-probe?write=1` 可做真实写入自检 |
 
 ### GitHub OAuth App
 
@@ -104,6 +109,9 @@ KV key 规则（代码见 `functions/_lib/kv.js`）：
 | `use_{uid}_{yyyyMMDD}_{事件}` | 每日配额唯一键（前缀列举计数，登录 10/天、匿名 3/天） |
 | `anuse_{设备}_{yyyyMMDD}_{事件}` | 匿名设备日计数（另有 `anip_{ip}_{日}` 防刷） |
 | `rpt_{uid}_{reportId}` | 报告记录（7 天惰性过期，含 `logHash` 日志指纹） |
+| `err_{指纹}` | 上报去重：issue 号、累计次数、首末时间、上次评论时间 |
+| `errx_{毫秒}_{随机}` | 上报失败记录（`/issue-probe` 展示最近 5 条） |
+| `errrl_{ipHash}_{日}_{事件}` | `/api/issues` 的按 IP 日限流计数 |
 
 注意：最终一致（60s 全球同步），写后不要立即回读；配额计数容忍短暂不一致。
 
@@ -125,3 +133,27 @@ KV key 规则（代码见 `functions/_lib/kv.js`）：
 | `/internal/*` 403 | `AUTH_INTERNAL_SECRET` 未配或不一致 |
 | KV 报 binding missing | KV 命名空间（`nextpilot_skill_mcp`）未绑定到 Pages 项目；绑定后需重新部署 |
 | 配额数不准 | KV 最终一致，60s 内可能滞后；唯一键设计保证不会重复计数 |
+| 报错没生成 issue | 访问 `/issue-probe`，看 `enabled` / `repo` / `tokenSet` 与 `recentFailures`。**Gitee 的写接口与读接口表现可能不一致**（读 200、写 404 `project or enterprise`），所以必须用 `?write=1` 真发一次才能确认 |
+| 报错 issue 刷屏 | 不应发生：同指纹只建一条、后续追加评论，可恢复类每天最多一条。若真刷屏，检查 `/issue-probe` 里 `recentFailures`——多半是建单成功但去重记录没写进 KV（KV 最终一致，60s 内可能出现一次重复） |
+
+## 7. 线上报错自动提 issue
+
+完整设计与护栏见 `docs/architecture/error-reporting.md`，这里只留运维要点。
+
+链路：浏览器（未捕获异常 / 未处理的 Promise / Worker 解析失败 / React 渲染崩溃）或边缘函数（LLM 调用失败）
+→ `/api/issues` 或进程内直调 → **分级 → 指纹去重 → 白名单脱敏 → 硬限流** → Gitee issue。
+
+三条必须记住的：
+
+1. **token 只在边缘函数**。浏览器只 POST 到 `/api/issues`，拿不到 issue 写权限。
+2. **上报失败不影响任何功能**。默认走 `waitUntil`，全量 try/catch，静默降级；失败原因写进 KV（`errx_`），用 `/issue-probe` 查。
+3. **脱敏是白名单**。只上报错误类型、消息、栈、路由、版本与（人工反馈的）规则 id；**不含**日志内容、字段数值、文件名、邮箱、uid。Gitee 仓库是公开的，"原始日志不上传"这条卖点不能被上报通道破掉。
+
+部署后自检顺序：
+
+```
+GET  /issue-probe            确认 enabled=true、repo/tokenSet 正确、readRepo.ok=true
+GET  /issue-probe?write=1    确认写入真的通（需要 ISSUE_DEBUG=1）——会建一个 [自动上报] SelfCheck issue
+```
+
+`write=1` 走正常上报路径，反复自检只会建**一个** issue（同指纹后续都是评论），验完手动关掉即可。

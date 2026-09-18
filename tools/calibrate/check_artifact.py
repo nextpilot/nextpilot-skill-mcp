@@ -5,6 +5,9 @@
 三处替换）。只有这一步能证明"真正进 Pyodide 的东西"是合法的——否则语法错误只能在
 用户浏览器里炸出来。
 
+四道检查，从松到紧：语法 → `.replace` 链按浏览器语义（只换第一处）复现 → compute
+表达式 Python 侧可解析 → **真执行**（含"worker 守卫查的全局名真的存在"）。
+
 用法：python tools/calibrate/check-artifact.py
 """
 
@@ -143,6 +146,34 @@ def main() -> int:
         f"产物执行检查通过：{log.name} → findings={len(result.get('findings', []))}, "
         f"checksRun={len(result.get('checksRun', []))}, tags={result.get('tags')}"
     )
+
+    # 「产物跑得通」不等于「worker 问得到东西」：worker 是拿**名字**去这个命名空间里取的
+    # （pyodide.globals.get("...")），名字写错了守卫就恒真/恒假，语法与执行检查都看不见。
+    # 2026-09-18 线上就栽在这：ulog-worker.ts 的守卫写的是 globals.get("ulog")，
+    # 而产物里从来没有名为 `ulog` 的全局（bootstrap 那行是 `provider = open_log(...)`，
+    # `from pyulog import ULog` 只带来 `ULog`）——于是守卫恒真，track/series 请求**永远**
+    # 被判成"这份日志没解析过"：轨迹画不出来、也从没进过存档，界面还一直叫用户重选文件。
+    # 名字对不对，只有拿真执行出来的命名空间核一遍才算数。
+    worker_src = (REPO_ROOT / "web" / "workers" / "ulog-worker.ts").read_text(encoding="utf-8")
+    asked = sorted(set(re.findall(r'globals\.get\("([A-Za-z_$][\w$]*)"\)', worker_src)))
+    set_by_worker = set(re.findall(r'globals\.set\("([A-Za-z_$][\w$]*)"', worker_src))
+    # 按 worker 的顺序把入口都调一遍：`__result` 是入口函数内部 `global __result` 摆出来的，
+    # 只 exec 不调用时它并不存在——直接核名字会把 `__result` 误判成不存在的名字。
+    produced: dict[str, object] = {}
+    for entry in ("np_report", "np_manifest", "np_log_info", "np_track"):
+        if entry not in ns:
+            continue
+        ns[entry]()
+        produced[entry] = json.loads(ns["__result"])
+    unknown = [n for n in asked if n not in ns and n not in set_by_worker]
+    if unknown:
+        available = sorted(k for k in ns if not k.startswith("__"))
+        print(f"worker 查的全局名在产物命名空间里不存在：{unknown}")
+        print(f"  产物里真实存在的顶层名字：{available}")
+        print("  这种守卫恒真/恒假：要么取数据永远失败，要么静默拿到另一份日志的数据")
+        return 1
+    track_n = len((produced.get("np_track") or {}).get("tracks") or [])  # type: ignore[union-attr]
+    print(f"worker 守卫的全局名核对通过：{asked}（np_track 跑出 {track_n} 条轨迹）")
     return 0
 
 

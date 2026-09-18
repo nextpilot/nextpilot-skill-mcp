@@ -229,9 +229,12 @@ export interface TrackData {
   tracks: TrackSeries[];
   error?: string;
   /** 出错的**种类**（有 error 时才有）。
-   *  `not-parsed` = 这份日志本次会话还没解析过，重新选择该 .ulg 文件就能恢复——
-   *  界面据此给出「重新选择 .ulg 文件」按钮；其它错误（日志里没有轨迹等）重选也没用。 */
-  code?: "not-parsed";
+   *  `log-not-loaded` = 这个 Worker 里没装着这份日志（从没解析过，或装的是另一份）——
+   *  重新选择该 .ulg 文件解析一次就能恢复，界面据此给出「重新选择 .ulg 文件」按钮；
+   *  其它错误（日志里本来就没有 GPS 等）重选也没用，不给按钮。
+   *  名字说的是**Worker 的状态**，不是这份日志的历史：报告页上的轨迹缺了，往往是
+   *  "轨迹没进存档 + 本页没解析过"，而不是"这份日志没被解析过"。 */
+  code?: "log-not-loaded";
 }
 
 export interface LogMessage {

@@ -13,8 +13,9 @@
 | `ruff format --check` / `ruff check` | Python 风格漂移与真 bug（见仓库根 `pyproject.toml`） |
 | `build:kb --check` | 产物与 `knowledge/` 不一致、契约写漏、字段/算子引用错 |
 | `gen_rule_reference.py` + `git diff` | 指南页里的算子/内置变量表与 `engine/` 源码漂移 |
-| `check_artifact.py` | 产物不是合法 Python、`compute` 表达式 Python 侧解析不了、`.replace` 链缺名字 |
+| `check_artifact.py` | 产物不是合法 Python、`compute` 表达式 Python 侧解析不了、`.replace` 链缺名字、**worker 守卫查的全局名在产物命名空间里不存在**（恒真/恒假的守卫，语法与执行检查都看不见） |
 | `tsc --noEmit` | 类型 |
+| `test-issue-filer.mjs` | ① 报错上报的指纹归一化、脱敏正则、白名单 —— 写错了要么去重失效、要么把用户信息泄进公开 issue；② §[9]~[11] 防回潮守卫：两侧共用政策只许有一份，外部 JSON（网络响应 / 存档）必须过归一函数、不许 `as` 强转（§6.5），派生数据（曲线 / 轨迹）必须按报告身份清理 |
 | `next build`（`--with-build`） | 真编译 —— CI 才跑，本地太慢 |
 
 需要日志（**云端 CI 跑不了**）：`tools/calibrate/logs/*.ulg` 含真实 GPS 轨迹，
@@ -175,6 +176,13 @@ def main(argv: list[str]) -> int:
         gate(
             "类型检查（tsc --noEmit）",
             [NODE, "node_modules/typescript/bin/tsc", "--noEmit"],
+            cwd=WEB,
+        )
+    )
+    results.append(
+        gate(
+            "报错上报自测（指纹 / 脱敏 / 白名单 / 边界守卫）",
+            [NODE, "scripts/test-issue-filer.mjs"],
             cwd=WEB,
         )
     )

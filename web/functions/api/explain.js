@@ -20,6 +20,7 @@ import {
 } from "../_lib/kv.js";
 import { getSessionUser } from "../_lib/auth.js";
 import { jsonResponse, readJson } from "../_lib/http.js";
+import { reportIssue } from "../_lib/issue-filer.js";
 // 思考范式与空结论文案的单一事实源在 knowledge/px4/llm/，由 build-knowledge.mjs 生成
 import {
   GJB841_SYSTEM_PROMPT as SYSTEM_PROMPT,
@@ -198,12 +199,44 @@ ${JSON.stringify(body.matchedFaults ?? [], null, 2)}
     });
     if (!resp.ok) {
       const detail = await resp.text().catch(() => "");
+      // 上游抖动属高频可恢复错误：只报状态码，绝不把上游响应体（detail 里可能夹带
+      // 本次请求的 findings，等同用户数据）带进公开 issue
+      waitUntil?.(
+        reportIssue(env, {
+          kind: "server-error",
+          level: "recoverable",
+          type: "LLMUpstreamError",
+          message: `DeepSeek 返回 ${resp.status}`,
+          route: "/api/explain",
+        }),
+      );
       return jsonResponse({ error: `LLM 服务异常（${resp.status}）`, detail }, 502);
     }
     const data = await resp.json();
     markdown = data?.choices?.[0]?.message?.content?.trim();
-    if (!markdown) return jsonResponse({ error: "LLM 返回为空" }, 502);
+    if (!markdown) {
+      waitUntil?.(
+        reportIssue(env, {
+          kind: "server-error",
+          level: "recoverable",
+          type: "LLMEmptyResponse",
+          message: "DeepSeek 返回空内容",
+          route: "/api/explain",
+        }),
+      );
+      return jsonResponse({ error: "LLM 返回为空" }, 502);
+    }
   } catch (err) {
+    waitUntil?.(
+      reportIssue(env, {
+        kind: "server-error",
+        level: "recoverable",
+        type: "LLMFetchFailed",
+        message: String(err?.message ?? err),
+        stack: err?.stack ?? "",
+        route: "/api/explain",
+      }),
+    );
     return jsonResponse({ error: "调用 LLM 失败", detail: String(err?.message ?? err) }, 502);
   }
   if (mockMode) markdown = `> ⚠ 本地模拟报告（LLM_MOCK）

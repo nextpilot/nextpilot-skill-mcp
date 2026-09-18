@@ -4,9 +4,13 @@
  * Pyodide（WASM CPython）在浏览器内运行 pyulog，原始日志不离开本机。
  *
  * 协议：
- * - 入站 analyze {file}：加载运行时（只一次）→ 解析 → 规则 → done
- * - 入站 series {reqId, request}：按预设的取数声明懒抽取降采样时序（换算在引擎侧）
- * - 出站 done {report, manifest, info} / series {reqId, data} / stage / error
+ * - 入站 analyze {file, logId}：加载运行时（只一次）→ 解析 → 规则 → done
+ * - 入站 series {reqId, request, logId}：按预设的取数声明懒抽取降采样时序（换算在引擎侧）
+ * - 入站 track {reqId, logId}：GPS 轨迹（多条）
+ * - 出站 done {report, manifest, info} / series {reqId, data} / track {reqId, data} / stage / error
+ *
+ * 请求都带 `logId`（日志内容指纹）：这个 Worker 是**共享**的、跨报告存活，
+ * 一旦里面装的是另一份日志，取数据会静默拿错——见 logNotLoadedReason 的说明。
  */
 import { PY_ULG_CHECKS } from "./ulog-check-script";
 import { PY_ULG_DATA_HELPERS } from "./ulog-data-script";
@@ -30,13 +34,14 @@ export type WorkerStage =
   | "done";
 
 export type WorkerInMessage =
-  | { type: "analyze"; file: Uint8Array; }
-  | { type: "track"; reqId: string; }
+  | { type: "analyze"; file: Uint8Array; logId: string; }
+  | { type: "track"; reqId: string; logId: string; }
   | {
     type: "series";
     reqId: string;
     /** 取数声明（前端从预设拼好，引擎解释）：字段引用 + 候选组 + 单位 + 换算节点 */
     request: SeriesRequest;
+    logId: string;
   };
 
 export type WorkerOutMessage =
@@ -149,6 +154,46 @@ async function runJson(pyodide: Pyodide, code: string): Promise<unknown> {
   return JSON.parse(raw);
 }
 
+/** 当前装在工作区里的是**哪一份**日志（内容指纹，analyze 成功后记下）。
+ *  null = 这个 Worker 从建立起还没成功解析过任何日志。 */
+let loadedLogId: string | null = null;
+
+/**
+ * 这次请求要的日志，现在答得了吗？答不了就返回给人看的理由。
+ *
+ * 两件事必须**同时**成立，所以放在一个函数里答——少了哪一条都会出问题：
+ *
+ * 1. **引擎命名空间装载了没有。** 规则脚本与数据层是每次 analyze 时 exec 进同一个
+ *    `__main__` 命名空间的，没跑过分析就调 `np_track()` / `np_series()` 会是 NameError。
+ *    这里探的名字必须和 bootstrap 真建的名字一致：产物里那行是 `provider = open_log(...)`，
+ *    所以查 `provider`。**2026-09-18 的事故就是这里查了个不存在的名字**——写的是 `ulog`，
+ *    而全仓库从来没有名为 `ulog` 的全局（pyulog 的 ULog 对象挂在 provider 上，`from pyulog
+ *    import ULog` 只带来 `ULog`）。守卫于是恒真：轨迹请求**永远**被判成"没解析过"，
+ *    轨迹画不出来、也从没进过存档，界面还一直说"重选文件即可恢复"——
+ *    用户照做一遍，回到报告页看到同一句（复解析是成功的，只是 track 请求又被这道守卫挡了）。
+ *    `tools/calibrate/check_artifact.py` 现在会真执行产物、拿命名空间核对这里查的名字。
+ *
+ * 2. **装的就是这一份。** 探到 provider 就直接发数据的话，工作区里装着日志 A、
+ *    用户打开没有轨迹存档的报告 B 时，会把 A 的轨迹画成 B 的飞行记录——
+ *    错得静悄悄，比报错难查得多。系列曲线同理。
+ *
+ * 指纹对不上**不算异常**：判成"要重选文件"，界面给按钮，复解析这份日志即可恢复。
+ */
+function logNotLoadedReason(pyodide: Pyodide, logId: string): string | null {
+  if (!pyodide.globals.get("provider")) {
+    return "这份日志本次还没解析过，重新选择该 .ulg 文件即可恢复。";
+  }
+  if (!logId) {
+    // 极老的记录没有日志指纹（内容哈希是后加的）：无从比对。这里说的是"确认不了"，
+    // 而不是"装的是另一份"——后者是替用户下一个我们并不知道的结论
+    return "这份报告没有记录日志指纹，无法确认当前解析的就是它，重新选择该 .ulg 文件即可恢复。";
+  }
+  if (logId !== loadedLogId) {
+    return "当前解析的是另一份日志，重新选择该 .ulg 文件即可恢复。";
+  }
+  return null;
+}
+
 self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
   const msg = event.data;
   try {
@@ -156,18 +201,14 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
 
     if (msg.type === "track") {
       try {
-        // Python 侧（规则 + 数据层）是每次 analyze 时 exec 出来的：没跑过分析时命名空间里
-        // 连 ulog 都没有，直接调 np_track() 会是 NameError。这里先探一下，给人话错误。
-        if (!pyodide.globals.get("ulog")) {
+        const why = logNotLoadedReason(pyodide, msg.logId);
+        if (why) {
           post({
             type: "track",
             reqId: msg.reqId,
             // code 让界面能区分"重选文件就能救回来"与"这份日志本来就没有轨迹"：
             // 前者要给按钮，后者给按钮是误导（再选一次还是同样的结果）
-            data: {
-              error: "这份日志还没在本机解析过，重新选择该 .ulg 文件即可恢复轨迹。",
-              code: "not-parsed",
-            },
+            data: { error: why, code: "log-not-loaded" },
           });
           return;
         }
@@ -186,6 +227,13 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
 
     if (msg.type === "series") {
       try {
+        // 与 track 同一道闸门：没有 provider 时直接跑 np_series 只会抛 NameError 给用户看，
+        // 而装的是另一份日志时会**静默**取到别的日志的曲线（见 logNotLoadedReason）
+        const why = logNotLoadedReason(pyodide, msg.logId);
+        if (why) {
+          post({ type: "series", reqId: msg.reqId, data: { error: why } });
+          return;
+        }
         // 取数声明整份由前端从预设拼好（字段引用/候选组/单位/换算节点），这里只转发给引擎：
         // np_series 自己解释它（见 engine/report_data.py）。入参经 json.dumps 字符串传入，
         // 避免 Python 侧注入问题。
@@ -215,6 +263,9 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
     const manifest = (await runJson(pyodide, "np_manifest()")) as TopicManifest;
     const info = (await runJson(pyodide, "np_log_info()")) as LogInfo;
 
+    // **成功之后**才记"现在装的是这一份"：解析中途失败时命名空间里可能还留着上一份的
+    // provider，先记就会让 track / series 把旧日志的数据当成新日志的交出去
+    loadedLogId = msg.logId;
     post({ type: "done", report, manifest, info });
   } catch (err) {
     post({

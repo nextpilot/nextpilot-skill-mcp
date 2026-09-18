@@ -7,6 +7,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { getDeviceId } from "./device-id";
+import { asRecord, toCount } from "./json-boundary";
 
 export type Kind = "skill" | "mcp";
 
@@ -26,13 +27,47 @@ export interface FavoriteStats {
   favorited: boolean;
 }
 
+/* ── 外部 JSON → 内部类型的唯一闸门（见 CLAUDE.md §6.5）─────────────────────────────
+ * 这几个响应由边缘函数（`functions/api/*.js`）产生，而**静态站与边缘函数是分开部署的**：
+ * 页面更新到新版本时，请求可能还落在旧版本函数上（反之亦然）。直接 `as FavoriteStats`
+ * 只是把类型检查关掉，缺字段的响应会一路走到 UI 才现形（"undefined 收藏"、NaN 评分）。
+ * 所以边界处一律过归一，函数内部信任类型。 */
+
+/** `/api/favorite` → `{count, favorited}`；形状不对返回 null（调用方按"取不到"处理） */
+function normalizeFavoriteStats(raw: unknown): FavoriteStats | null {
+  const r = asRecord(raw);
+  if (!r) return null;
+  return { count: toCount(r.count), favorited: r.favorited === true };
+}
+
+/** `/api/rating` → `{avg, count, mine}`；`mine` 在"KV 未绑定"分支里确实会缺，必须兜 */
+function normalizeRatingStats(raw: unknown): RatingStats | null {
+  const r = asRecord(raw);
+  if (!r) return null;
+  const avg = typeof r.avg === "number" && Number.isFinite(r.avg) ? r.avg : 0;
+  return { avg, count: toCount(r.count), mine: toCount(r.mine) };
+}
+
+/** `/api/download/track?kind=…` 的 `leaderboard` → 条目数组；坏条目丢掉，不整条失败 */
+function normalizeLeaderboard(raw: unknown): LeaderboardEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const out: LeaderboardEntry[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const { slug, delta } = entry as Record<string, unknown>;
+    if (typeof slug !== "string" || typeof delta !== "number" || !Number.isFinite(delta)) continue;
+    out.push({ slug, delta });
+  }
+  return out;
+}
+
 export async function getFavorite(kind: Kind, slug: string): Promise<FavoriteStats | null> {
   try {
     const resp = await fetch(`/api/favorite?kind=${kind}&slug=${encodeURIComponent(slug)}`, {
       headers: { "x-device-id": getDeviceId() },
     });
     if (!resp.ok) return null;
-    return (await resp.json()) as FavoriteStats;
+    return normalizeFavoriteStats(await resp.json());
   } catch {
     return null;
   }
@@ -46,7 +81,7 @@ export async function toggleFavorite(kind: Kind, slug: string): Promise<Favorite
       body: JSON.stringify({ kind, slug, deviceId: getDeviceId() }),
     });
     if (!resp.ok) return null;
-    return (await resp.json()) as FavoriteStats;
+    return normalizeFavoriteStats(await resp.json());
   } catch {
     return null;
   }
@@ -80,7 +115,7 @@ export async function submitRating(
       body: JSON.stringify({ kind, slug, stars, deviceId: getDeviceId() }),
     });
     if (!resp.ok) return null;
-    return (await resp.json()) as RatingStats;
+    return normalizeRatingStats(await resp.json());
   } catch {
     return null;
   }
@@ -92,7 +127,7 @@ export async function getRating(kind: Kind, slug: string): Promise<RatingStats |
       headers: { "x-device-id": getDeviceId() },
     });
     if (!resp.ok) return null;
-    return (await resp.json()) as RatingStats;
+    return normalizeRatingStats(await resp.json());
   } catch {
     return null;
   }
@@ -111,10 +146,12 @@ export function useLeaderboard(kind: Kind) {
     fetch(`/api/download/track?kind=${kind}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (!cancelled && d?.leaderboard) {
-          cache[key] = { ts: Date.now(), data: d.leaderboard };
-          setEntries(d.leaderboard);
-        }
+        // 形状不对（拿不到 leaderboard 数组）就不写缓存，留到下次挂载重试
+        const raw: unknown = d?.leaderboard;
+        if (cancelled || !Array.isArray(raw)) return;
+        const board = normalizeLeaderboard(raw);
+        cache[key] = { ts: Date.now(), data: board };
+        setEntries(board);
       })
       .catch(() => {});
     return () => {

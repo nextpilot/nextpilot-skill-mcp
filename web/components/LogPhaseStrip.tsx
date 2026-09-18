@@ -11,7 +11,7 @@ function secLabel(v: number, digits = 0): string {
   return (r === 0 ? 0 : r).toFixed(digits);
 }
 
-export function PhaseStrip({ phases }: { phases: FlightPhase[] }) {
+export function LogPhaseStrip({ phases }: { phases: FlightPhase[] }) {
   if (!phases || phases.length === 0) return null;
 
   const dark = isDarkTheme();
