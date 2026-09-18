@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { TrackData } from "@/lib/types";
-import { Loader2, MapPin } from "lucide-react";
+import { FileUp, Loader2, MapPin } from "lucide-react";
 import { wgs84ToGcj02 } from "@/lib/coord";
 import {
   AMAP_ATTRIBUTION,
@@ -45,9 +45,13 @@ async function getLeaflet(): Promise<LeafletModule> {
 
 export function LogFlightMap({
   loadTrack,
+  onRestore,
 }: {
   /** 取轨迹：存档里有就直接给（打开历史时不必解析），否则问 Worker 要 */
   loadTrack: () => Promise<TrackData>;
+  /** 「重新选择该 .ulg 文件」：由报告页打开文件选择框，选完就地重解析补齐轨迹。
+   *  只在"这份日志本次会话还没解析过"时给按钮——那种情况重选确实能救回来。 */
+  onRestore?: () => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
@@ -58,6 +62,8 @@ export function LogFlightMap({
   /** 被剔除的未定位采样数（GPS 没定位时 PX4 会记 lat=lon=0，画进来就是一条飞出非洲的直线） */
   const [droppedCount, setDroppedCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  /** 错误种类（见 TrackData.code）：`not-parsed` 才给「重新选择文件」按钮 */
+  const [errorCode, setErrorCode] = useState<TrackData["code"]>(undefined);
   /** "在高德地图打开起点"的链接（用换算后的 GCJ-02 坐标，点开就落在正确位置） */
   const [amapUrl, setAmapUrl] = useState<string | null>(null);
   /** 底图瓦片加载失败（域名不通 / 被拦）：要说出来，不然只剩一片灰说不清 */
@@ -68,6 +74,11 @@ export function LogFlightMap({
     let LModule: LeafletModule | null = null;
 
     async function load() {
+      // 重新取一次就回到"加载中"：补解析完成后 loadTrack 会换新引用、这里会重跑，
+      // 不重置的话上一轮的错误文案会一直挂着，看起来像按钮没生效
+      setState("loading");
+      setErrorMsg(null);
+      setErrorCode(undefined);
       try {
         LModule = await getLeaflet();
 
@@ -77,6 +88,7 @@ export function LogFlightMap({
 
         if (track.error || !track.lat?.length || !track.lon?.length) {
           setErrorMsg(track.error ?? "日志里没有可用的 GPS 轨迹");
+          setErrorCode(track.code);
           setState("error");
           return;
         }
@@ -302,7 +314,21 @@ export function LogFlightMap({
                 加载 GPS 轨迹…
               </span>
             ) : (
-              (errorMsg ?? "无法加载 GPS 轨迹数据")
+              // 说清是什么问题 + （能救回来时）给个**就地**重选文件的按钮。
+              // 只写一句"重新选择该 .ulg 文件"的话，用户得自己猜到要回列表页再选一次
+              <div className="flex flex-col items-center gap-2">
+                <span>{errorMsg ?? "无法加载 GPS 轨迹数据"}</span>
+                {errorCode === "not-parsed" && onRestore && (
+                  <button
+                    type="button"
+                    onClick={onRestore}
+                    className="btn-ghost gap-1.5 px-2.5 py-1 text-xs"
+                  >
+                    <FileUp className="h-3.5 w-3.5" />
+                    重新选择该 .ulg 文件
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}

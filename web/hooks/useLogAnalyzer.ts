@@ -575,16 +575,25 @@ export function useLogAnalyzer() {
      * 3) 否则读存档的派生数据：**齐全且版本一致**就不用解析；
      * 4) 缺曲线/轨迹，或派生数据是旧版本引擎生成的（造型改过），就退回"拿本机缓存的原始字节
      *    重新解析"补齐——旧数据先渲染着，解析完自动换成新的。
-     * 返回 reparsing / stale 供调用方决定提示文案与是否补一次解析。
+     * 返回 reparsing / stale / incomplete 供调用方决定提示文案与是否补一次解析
+     * （`incomplete` = 存档里缺曲线或轨迹：本机缓存还在时这里就自己补了；缓存不在时
+     *  **只有调用方手里的原始字节能补**——回一句"已载入历史结论"就完事，等于让那句
+     *  "重新选择该 .ulg 文件即可恢复"变成空话）。
      */
     const openSaved = useCallback(
-        async (saved: SavedReport): Promise<{ reparsing: boolean; stale: boolean }> => {
+        async (
+            saved: SavedReport,
+        ): Promise<{ reparsing: boolean; stale: boolean; incomplete: boolean }> => {
             viewSaved(saved);
             reportIdRef.current = saved.id;
-            if (adoptLiveAnalysis(saved.id)) return { reparsing: false, stale: false };
+            if (adoptLiveAnalysis(saved.id)) {
+                return { reparsing: false, stale: false, incomplete: false };
+            }
             const { hasPlots, hasTrack, stale } = await loadReportData(saved.id);
+            // 曲线或轨迹缺了：存档本身补不回来，只有重新解析原始日志
+            const incomplete = !hasPlots || !hasTrack;
             // 曲线、轨迹都齐了、且是当前引擎生成的，才算"不必解析"
-            if (hasPlots && hasTrack && !stale) return { reparsing: false, stale: false };
+            if (!incomplete && !stale) return { reparsing: false, stale: false, incomplete: false };
             if (saved.logHash) {
                 const cached = await getCachedLog(saved.logHash);
                 if (cached) {
@@ -595,10 +604,10 @@ export function useLogAnalyzer() {
                         reportId: saved.id,
                         priorAi: saved.aiMarkdown,
                     });
-                    return { reparsing: true, stale };
+                    return { reparsing: true, stale, incomplete };
                 }
             }
-            return { reparsing: false, stale };
+            return { reparsing: false, stale, incomplete };
         },
         [adoptLiveAnalysis, loadReportData, parseBytes, viewSaved],
     );
@@ -630,7 +639,11 @@ export function useLogAnalyzer() {
                     fallbackLogKey(file.name, file.size, file.lastModified);
                 const existing = await findExistingByHash(hash);
                 if (existing) {
-                    let opened: { reparsing: boolean; stale: boolean } = { reparsing: false, stale: false };
+                    let opened: { reparsing: boolean; stale: boolean; incomplete: boolean; } = {
+                        reparsing: false,
+                        stale: false,
+                        incomplete: false,
+                    };
                     if (existing.source === "cloud") {
                         // 云端列表只给了摘要，先取回完整记录再走统一的打开路径
                         try {
@@ -645,10 +658,13 @@ export function useLogAnalyzer() {
                     } else {
                         opened = await openSaved(existing);
                     }
-                    // 存档是旧引擎生成的、而原始日志又不在本机缓存里（被淘汰或来自别的设备）：
-                    // 手里正好有新上传的字节，直接重新解析一遍补上，别让用户看旧格式
+                    // 存档是旧引擎生成的、或存档里缺曲线/轨迹，而原始日志又不在本机缓存里
+                    // （被容量淘汰、或这份记录来自别的设备）：
+                    // 手里正好有刚选中的字节，就用它重新解析一遍补上。
+                    // 少了后半条判断，"重新选择该 .ulg 文件即可恢复轨迹"就成了一句空话——
+                    // 用户照做一遍，回到报告页看到的是同一句提示（存档没变，轨迹还是缺）。
                     let reparsing = opened.reparsing;
-                    if (opened.stale && !reparsing) {
+                    if (!reparsing && (opened.stale || opened.incomplete)) {
                         parseBytes(bytes, {
                             name: file.name,
                             size: file.size,
@@ -660,9 +676,11 @@ export function useLogAnalyzer() {
                     }
                     setPendingBytes({ name: file.name, size: file.size, hash, bytes });
                     setDedupeNotice(
-                        reparsing
-                            ? "这份日志此前已分析过，但那份存档是旧版本引擎生成的（消息/参数的呈现方式已更新），已重新解析一遍。"
-                            : "这份日志此前已分析过（内容一致），已直接载入历史结论，未重复解析。",
+                        !reparsing
+                            ? "这份日志此前已分析过（内容一致），已直接载入历史结论，未重复解析。"
+                            : opened.stale
+                                ? "这份日志此前已分析过，但那份存档是旧版本引擎生成的（消息/参数的呈现方式已更新），已重新解析一遍。"
+                                : "这份日志此前已分析过，但本机存档里缺图表或轨迹数据，已用你选择的文件重新解析补齐（AI 报告保留）。",
                     );
                     return existing.id;
                 }
@@ -689,6 +707,58 @@ export function useLogAnalyzer() {
             }
         },
         [findExistingByHash, openSaved, parseBytes],
+    );
+
+    /**
+     * 报告页的「重新选择该 .ulg 文件」：**就地**用选中的这份字节重解析当前报告，
+     * 把缺的图表/轨迹补齐（报告页不跳走、不清空已渲染的结论）。
+     *
+     * 为什么另写一个而不复用 handleFile：handleFile 是"上传新日志"的入口——开头会把
+     * report/info/manifest 清空（报告页会闪一下"未找到该分析报告"），且查重命中时默认不再解析。
+     * 这里的前提正好相反：页面已经开着这份报告（id 就是日志指纹），缺的只是派生数据。
+     *
+     * 指纹对不上就不解析：把另一份日志的结论写进这份存档，比什么都不做更糟。
+     * （极老的记录没有 logHash，无从比对，按"用户选的就是这一份"处理。）
+     */
+    const recoverWithFile = useCallback(
+        async (file: File): Promise<boolean> => {
+            setError(null);
+            if (!file.name.toLowerCase().endsWith(".ulg")) {
+                setError("只支持 PX4 .ulg 日志，请选择要恢复的那份 .ulg 文件。");
+                return false;
+            }
+            if (file.size === 0) {
+                setError("日志文件为空，请选择有效的 PX4 .ulg 文件。");
+                return false;
+            }
+            try {
+                const bytes = new Uint8Array(await file.arrayBuffer());
+                const hash =
+                    (await hashLogBytes(bytes)) ||
+                    fallbackLogKey(file.name, file.size, file.lastModified);
+                if (report?.logHash && hash && hash !== report.logHash) {
+                    setError(
+                        `这份文件和当前报告不是同一份日志（内容指纹不同）。当前报告来自 ${report.fileName}，请选择那一份。`,
+                    );
+                    return false;
+                }
+                // priorAi：重新解析必须沿用已有的 AI 报告，否则会把花过额度生成的解读覆盖成空
+                parseBytes(bytes, {
+                    name: file.name,
+                    size: file.size,
+                    hash: hash || report?.logHash || "",
+                    reportId: reportIdRef.current,
+                    priorAi: aiMarkdown,
+                });
+                return true;
+            } catch (err) {
+                setError(
+                    `日志读取失败：${err instanceof Error ? err.message : String(err)}。请确认文件未损坏后重试。`,
+                );
+                return false;
+            }
+        },
+        [aiMarkdown, parseBytes, report],
     );
 
     const clearLocal = useCallback(() => {
@@ -758,6 +828,7 @@ export function useLogAnalyzer() {
         openSaved,
         loadReportData,
         handleFile,
+        recoverWithFile,
         clearLocal,
         deleteLocal,
         deleteCloud,

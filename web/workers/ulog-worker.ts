@@ -164,7 +164,12 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
           post({
             type: "track",
             reqId: msg.reqId,
-            data: { error: "这份日志还没在本机解析过，重新选择该 .ulg 文件即可恢复轨迹。" },
+            // code 让界面能区分"重选文件就能救回来"与"这份日志本来就没有轨迹"：
+            // 前者要给按钮，后者给按钮是误导（再选一次还是同样的结果）
+            data: {
+              error: "这份日志还没在本机解析过，重新选择该 .ulg 文件即可恢复轨迹。",
+              code: "not-parsed",
+            },
           });
           return;
         }

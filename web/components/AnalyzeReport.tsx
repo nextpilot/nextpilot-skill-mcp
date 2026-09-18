@@ -19,6 +19,7 @@ import {
   Loader2,
   CalendarClock,
   HardDrive,
+  FileUp,
 } from "lucide-react";
 import type {
   AnalysisReport,
@@ -85,6 +86,7 @@ export function AnalyzeReport({
   info,
   requestSeries,
   loadTrack,
+  onRestore,
   explaining,
   loggedIn,
   quota,
@@ -102,6 +104,9 @@ export function AnalyzeReport({
   requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
   /** 取 GPS 轨迹（存档优先，否则问 Worker） */
   loadTrack: () => Promise<TrackData>;
+  /** 「重新选择该 .ulg 文件」：打开文件选择框，选完**就地**重解析，把缺的图表/轨迹补齐
+   *  （不跳走、不清空当前报告；AI 报告沿用存档里那份，不重复花额度） */
+  onRestore: () => void;
   explaining: boolean;
   loggedIn: boolean;
   logCached: boolean;
@@ -157,7 +162,7 @@ export function AnalyzeReport({
       {info && (
         <section className="mb-5 rounded-lg bg-surface-2 p-4">
           <h3 className="mb-1 text-sm font-semibold">飞行轨迹</h3>
-          <LogFlightMap loadTrack={loadTrack} />
+          <LogFlightMap loadTrack={loadTrack} onRestore={onRestore} />
         </section>
       )}
 
@@ -179,10 +184,11 @@ export function AnalyzeReport({
       {/* 纯历史（只有结论与 AI 文本，没有任何派生数据）：说明怎么把图表/参数/消息捞回来 */}
       {!info && (
         <p className="mb-5 rounded-lg bg-surface-2 p-4 text-xs leading-5 text-muted">
-          这份报告只存档了检查结论与 AI 解读（原始日志从不上传）。图表、消息与参数需要重新解析原始日志——
+          这份报告只存档了检查结论与 AI 解读（原始日志从不上传）。图表、消息、参数与轨迹需要重新解析原始日志——
           {logCached
-            ? "这份日志本机有缓存，重新选择该 .ulg 文件即可恢复（之后就秒开）。"
+            ? "这份日志本机有缓存，点下面的按钮即可恢复（之后就秒开）。"
             : "本机没有它的缓存（已被容量淘汰或来自其他设备），重新选择该 .ulg 文件即可恢复。"}
+          <RestoreButton onRestore={onRestore} />
         </p>
       )}
 
@@ -192,8 +198,9 @@ export function AnalyzeReport({
           这份报告的<strong className="font-medium text-text">曲线数据没有缓存</strong>
           （旧版本生成的报告，或上次的分析被中断）——
           {logCached
-            ? "重新选择该 .ulg 文件（或在左侧历史条目上点「完整数据」）解析一次即可补齐，之后就一直有了。"
+            ? "本机有缓存，点下面的按钮解析一次即可补齐，之后就一直有了。"
             : "本机也没有它的原始日志缓存，重新选择该 .ulg 文件即可恢复图表与轨迹。"}
+          <RestoreButton onRestore={onRestore} />
         </p>
       )}
 
@@ -689,6 +696,30 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * 「重新选择该 .ulg 文件」：三处"数据没缓存"的提示（轨迹 / 曲线 / 纯历史）共用它。
+ * 以前这些提示只写了这句话，但页面上根本没有选文件的入口——用户得自己猜出"回列表页再选一次"，
+ * 而那条路以前也不会重新解析（存档不缺"版本"就跳过解析，见 useLogAnalyzer.handleFile）。
+ */
+function RestoreButton({
+  onRestore,
+  label = "重新选择该 .ulg 文件",
+}: {
+  onRestore: () => void;
+  label?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onRestore}
+      className="btn-ghost ml-1.5 inline-flex gap-1.5 px-2.5 py-1 text-xs"
+    >
+      <FileUp className="h-3.5 w-3.5" />
+      {label}
+    </button>
   );
 }
 

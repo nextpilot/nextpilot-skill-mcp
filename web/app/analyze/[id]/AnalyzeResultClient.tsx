@@ -39,6 +39,8 @@ export function AnalyzeResultClient() {
     requestSeries,
     loadTrack,
     openSaved,
+    recoverWithFile,
+    inputRef,
   } = useLogAnalyzer();
 
   const [loading, setLoading] = useState(true);
@@ -79,6 +81,9 @@ export function AnalyzeResultClient() {
       void explain(report, id);
     }
   };
+
+  /** 「重新选择该 .ulg 文件」：报告页上的提示与轨迹地图共用这一个入口 */
+  const handleRestoreClick = () => inputRef.current?.click();
 
   if (loading) {
     return (
@@ -161,6 +166,21 @@ export function AnalyzeResultClient() {
         </div>
       )}
 
+      {/* 「重新选择该 .ulg 文件」用的选择框：报告页唯一的上传入口，选完**就地**重解析补齐
+          图表/轨迹（不跳回列表页）。选完清空 value——同一份文件要能连选两次（上次没成功能再试），
+          不清的话第二次选同一个文件不会触发 onChange。 */}
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".ulg,.ULG"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (f) void recoverWithFile(f);
+        }}
+      />
+
       {/* 主分析报告 */}
       <div className="card p-5 sm:p-6">
         <AnalyzeReport
@@ -171,6 +191,7 @@ export function AnalyzeResultClient() {
           info={info}
           requestSeries={requestSeries}
           loadTrack={loadTrack}
+          onRestore={handleRestoreClick}
           explaining={stage === "explaining"}
           loggedIn={loggedIn}
           quota={quota}

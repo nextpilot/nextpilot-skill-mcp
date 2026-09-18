@@ -212,6 +212,10 @@ export interface TrackData {
   /** 被剔除的未定位采样数（lat=lon=0 或 fix_type < 3）；>0 时界面要说明 */
   dropped?: number;
   error?: string;
+  /** 出错的**种类**（有 error 时才有）。
+   *  `not-parsed` = 这份日志本次会话还没解析过，重新选择该 .ulg 文件就能恢复——
+   *  界面据此给出「重新选择 .ulg 文件」按钮；其它错误（日志里没有轨迹等）重选也没用。 */
+  code?: "not-parsed";
 }
 
 export interface LogMessage {
