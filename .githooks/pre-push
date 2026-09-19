@@ -1,33 +1,21 @@
 #!/bin/bash
-# Pre-push hook — 在每次 git push 前执行测试
-# 如果 push 太慢，可设置环境变量跳过 E2E：
-#   SKIP_E2E=1 git push         # 只跑 knowledge + tsc，跳过全部 E2E
-#   SKIP_LOG_ANALYSIS=1 git push  # 跳过日志分析测试（页面渲染仍跑）
+# Pre-push hook — single entry through check_all.py
+#   SKIP_E2E=1 git push          # check_all.py only, no E2E
+#   SKIP_LOG_ANALYSIS=1 git push  # skip log-analysis smoke E2E
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-WEB_DIR="$SCRIPT_DIR/../web"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# powershell.exe 是 Windows 原生程序，认不了 Git Bash 的 MSYS 路径（/d/xxx），
-# 必须给 D:\xxx——否则报「-File 形式参数的实际参数不存在」而 push 被拦。
-# cygpath 最稳；没有就退回 Git for Windows 自带的 pwd -W。
-if command -v cygpath >/dev/null 2>&1; then
-  HOOK_PS1="$(cygpath -w "$SCRIPT_DIR/pre-push.ps1")"
-else
-  HOOK_PS1="$(cd "$(dirname "$0")" && pwd -W)/pre-push.ps1"
-fi
-
-# 快速模式
 if [ "$SKIP_E2E" = "1" ]; then
-  echo "===== SKIP_E2E=1: knowledge + tsc only ====="
-  cd "$WEB_DIR"
-  node scripts/build-knowledge.mjs
-  pnpm exec tsc --noEmit
+  echo "===== SKIP_E2E=1: check_all.py only ====="
+  cd "$REPO_ROOT"
+  python tools/ci/check_all.py
   echo "===== OK ====="
   exit 0
 fi
 
-# 完整检查：调用 PowerShell 脚本
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$HOOK_PS1"
-exit $?
+echo "===== pre-push check (check_all.py --with-e2e) ====="
+cd "$REPO_ROOT"
+python tools/ci/check_all.py --with-e2e

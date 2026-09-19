@@ -35,7 +35,7 @@ import { scrub, SCRUB_RULES } from "../lib/error-policy.js";
 let failed = 0;
 function check(name, cond, extra = "") {
   if (cond) {
-    console.log(`  ok    ${name}`);
+    console.log(`  OK    ${name}`);
   } else {
     failed += 1;
     console.log(`  FAIL  ${name}${extra ? `  → ${extra}` : ""}`);
@@ -736,5 +736,5 @@ console.log("\n[16] 轨迹取不到要说清缺什么（不许再退回一句空
   );
 }
 
-console.log(failed === 0 ? "\n全部通过\n" : `\n${failed} 项失败\n`);
+console.log(failed === 0 ? "\n=== issue-filer 测试全部通过 ===" : `\n=== ${failed} 项失败 ===`);
 process.exit(failed === 0 ? 0 : 1);

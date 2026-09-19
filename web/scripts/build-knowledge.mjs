@@ -1729,7 +1729,8 @@ if (!CHECK) {
 
 if (CHECK) {
   if (drifted.length > 0) {
-    console.error("CHECK FAIL: 以下产物与 knowledge/ 不一致，重跑 pnpm build:kb\n  " + drifted.join("\n  "));
+    console.error("FAIL 以下产物与 knowledge/ 不一致，重跑 pnpm build:kb");
+    for (const d of drifted) console.error(`  · ${d}`);
     process.exitCode = 1;
   } else {
     console.log("OK 全部产物与 knowledge/ 一致");

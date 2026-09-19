@@ -396,28 +396,28 @@ export function LogFlightMap({
             放在右上角图层控件**下面**（top-20），避免两个控件叠在一起 */}
         {state === "ready" && legend.length > 1 && (
           <div className="absolute top-20 right-3 z-[700] flex flex-col gap-1 rounded-md bg-surface-2/90 px-2 py-1.5 text-[11px] backdrop-blur-sm">
-            {legend.map((it) => (
+            {legend.map((r) => (
               <button
-                key={it.label}
+                key={r.label}
                 type="button"
-                onClick={() => toggleTrack(it.label)}
-                title={hidden.includes(it.label) ? "点击显示这条轨道" : "点击隐藏这条轨道"}
+                onClick={() => toggleTrack(r.label)}
+                title={hidden.includes(r.label) ? "点击显示这条轨道" : "点击隐藏这条轨道"}
                 className={`flex items-center gap-1.5 text-left transition-colors hover:text-text ${
-                  hidden.includes(it.label) ? "text-faint line-through" : "text-muted"
+                  hidden.includes(r.label) ? "text-faint line-through" : "text-muted"
                 }`}
               >
                 <span
-                  className="inline-block h-2 w-2 shrink-0 rounded-sm"
-                  style={{ background: it.color }}
+                  className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: r.color }}
                 />
-                {it.label}
+                {r.label}
               </button>
             ))}
           </div>
         )}
 
         {state !== "ready" && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-surface-2 p-4 text-center text-xs text-muted">
+          <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-surface-2 p-4 text-center text-xs text-critical">
             {state === "loading" ? (
               <span className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -454,7 +454,7 @@ export function LogFlightMap({
       </div>
 
       {state === "ready" && tileError && (
-        <p className="mt-2 text-[11px] text-muted">
+        <p className="mt-2 text-[11px] text-warning">
           底图瓦片加载失败（网络不可达或被拦）——轨迹与起终点仍然有效，可切到右上角的「街道图」重试。
         </p>
       )}

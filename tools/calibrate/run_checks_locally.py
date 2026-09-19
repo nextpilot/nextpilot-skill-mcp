@@ -189,21 +189,24 @@ def main(argv: list[str]) -> int:
     if not args:
         print(__doc__)
         return 2
+    mode = "探针数据（probe-data）" if probe else "本地回归"
+    print(f"=== {mode}：{len(args)} 份日志 ===")
     failed = 0
     for name in args:
         path = Path(name)
-        print(f"\n=== {path.name} ===")
+        print(f"\n· {path.name}")
         try:
             if probe:
                 print(json.dumps(probe_one(path), ensure_ascii=False, indent=2))
             else:
                 print(json.dumps(run_one(path), ensure_ascii=False, indent=2))
         except Exception as exc:
-            # 打印错误**并且计数**。以前这里只打印、最后无条件 `return 0` —— 于是
-            # `--probe-data` 对每一份日志都 ERROR 也照样报 OK（`check_all.py` 只看退出码）。
-            # 恒绿的守卫比没写守卫更糟：它让人以为这一项是绿的（见 CLAUDE.md §6.6）。
             failed += 1
             print(f"ERROR: {type(exc).__name__}: {exc}")
+    if failed:
+        print(f"\n=== {failed} 份日志出错 ===")
+    else:
+        print(f"\n=== {len(args)} 份日志全部完成 ===")
     return 1 if failed else 0
 
 

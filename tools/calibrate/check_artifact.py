@@ -78,6 +78,8 @@ def extract_json_const(src: str, name: str):
 
 
 def main() -> int:
+    print("=== 产物校验（check_artifact） ===")
+    failed = False
     src = TS.read_text(encoding="utf-8")
     m = re.search(r"String\.raw`(.*)`\n", src, re.S)
     if not m:
@@ -140,7 +142,7 @@ def main() -> int:
         return 1
 
     rules = extract_json_const(src, "rules")
-    print(f"产物语法检查通过：{len(final.splitlines())} 行，含 {len(rules)} 条经验规则")
+    print(f"OK 产物语法检查通过：{len(final.splitlines())} 行，含 {len(rules)} 条经验规则")
 
     # 地图预设的适用范围（`conditions.topics`）是**构建期**从 plot/track.yml 搬到 `facts.track` 的。
     # 这一步曾经无声漏掉：`compileMap` 只搬了 `children`，`conditions` 留在原地 → 引擎收不到
@@ -158,7 +160,7 @@ def main() -> int:
         print(f"  产物：{got_topics}")
         print("  构建期把这份声明丢了 —— 引擎侧就没有「缺哪个 topic」这道闸门了")
         return 1
-    print(f"地图预设的适用范围搬运检查通过：conditions.topics = {got_topics}")
+    print(f"OK 地图预设的适用范围搬运检查通过：conditions.topics = {got_topics}")
 
     # compute 表达式是**构建期用 JS 校验**（web/scripts/lib/rule-expr.mjs）、**运行期用 Python
     # ast 求值**的。两侧是两套实现，中间就有缝：JS 放行而 Python 解析不了的写法会构建通过、
@@ -175,7 +177,7 @@ def main() -> int:
             if len(tree.body) != 1 or not isinstance(tree.body[0], ast.Assign):
                 print(f"规则 {r['id']} 的 compute 不是一条赋值：{expr}")
                 return 1
-    print(f"compute 表达式检查通过：{n_expr} 条，Python 侧都能解析")
+    print(f"OK compute 表达式检查通过：{n_expr} 条，Python 侧都能解析")
 
     # 仅语法检查不够：NameError / KeyError 这类只有**真执行**才暴露
     # （曾漏掉"operators.py 没被内联"导致 Pyodide 里 OPERATORS 未定义）。
@@ -185,7 +187,7 @@ def main() -> int:
         raise SystemExit("数据层产物里找不到 String.raw 模板")
     logs = sorted((Path(__file__).resolve().parent / "logs").glob("*.ulg"), key=lambda p: p.stat().st_size)
     if not logs:
-        print("（没有回归日志，跳过执行检查）")
+        print("SKIP 没有回归日志，跳过执行检查（caller 用 check_all.py 会自动跳过）")
         return 0
     log = logs[0]
     ns: dict = {"ulog_bytes": log.read_bytes()}
@@ -213,7 +215,7 @@ def main() -> int:
         print(f"findings 不是数组，而是 {type(result['findings']).__name__}")
         return 1
     print(
-        f"产物执行检查通过：{log.name} → findings={len(result['findings'])}, "
+        f"OK 产物执行检查通过：{log.name} → findings={len(result['findings'])}, "
         f"checksRun={len(result.get('checksRun', []))}, tags={result.get('tags')}"
     )
 
@@ -243,7 +245,7 @@ def main() -> int:
         print("  这种守卫恒真/恒假：要么取数据永远失败，要么静默拿到另一份日志的数据")
         return 1
     track_n = len((produced.get("np_track") or {}).get("tracks") or [])  # type: ignore[union-attr]
-    print(f"worker 守卫的全局名核对通过：{asked}（np_track 跑出 {track_n} 条轨迹）")
+    print(f"OK worker 守卫的全局名核对通过：{asked}（np_track 跑出 {track_n} 条轨迹）")
 
     # 轨迹取不到时**必须**逐条给出原因（`errorReasons`）——界面就是拿它当列表渲染的。
     # 这条契约曾经没有：只给一句"声明里的坐标候选都不在日志里"，而那一句只对应六种原因里的
@@ -258,12 +260,12 @@ def main() -> int:
                 print(f"  errorReasons = {reasons!r}")
                 print("  界面只能显示那句概括，而概括往往会说错（见 CLAUDE.md §6.8）")
                 return False
-            print(f"轨迹失败的返回体契约通过（{case}）：error 带 {len(reasons)} 条具体原因")
+            print(f"  OK 轨迹失败的返回体契约通过（{case}）：error 带 {len(reasons)} 条具体原因")
             return True
         if not payload.get("tracks"):
-            print(f"轨迹既没有 tracks 也没有 error（{case}）——返回体形状不对，前端会当成解析器缺陷")
+            print(f"  FAIL 轨迹既没有 tracks 也没有 error（{case}）——返回体形状不对，前端会当成解析器缺陷")
             return False
-        print(f"轨迹成功的返回体契约通过（{case}）：{len(payload['tracks'])} 条轨道")
+        print(f"  OK 轨迹成功的返回体契约通过（{case}）：{len(payload['tracks'])} 条轨道")
         return True
 
     if not check_track_contract(produced.get("np_track") or {}, f"{log.name} 实跑"):
@@ -308,7 +310,7 @@ def main() -> int:
         print(f"  该认出来的漏了：{sorted(set(should) - set(got))}")
         print(f"  不该认的认了：{got_not}")
         return 1
-    print(f"经纬度判据检查通过：认出 {len(should)} 个（含 `previous.lat` 这类嵌套），挡掉 {len(should_not)} 个干扰名")
+    print(f"OK 经纬度判据检查通过：认出 {len(should)} 个（含 `previous.lat` 这类嵌套），挡掉 {len(should_not)} 个干扰名")
 
     # **守卫自己也要被校验**（CLAUDE.md §6.6）：上面这条契约只在"取不到"时生效，而回归用的
     # 这条日志有 GPS —— 光跑它，"error 不带原因"这个 bug 一次都不会被抓到（守卫恒绿）。
@@ -353,6 +355,8 @@ def main() -> int:
         print("失败原因里没提是哪个 topic / 哪个字段取不到——用户没法照着改")
         print(f"  errorReasons = {broke.get('errorReasons')!r}")
         return 1
+    print("  OK 逼出的字段失败路径契约通过")
+    print("\n=== 产物校验全部通过 ===")
     return 0
 
 

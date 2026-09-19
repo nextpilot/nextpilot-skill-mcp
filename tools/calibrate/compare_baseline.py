@@ -70,7 +70,7 @@ def main(argv: list[str]) -> int:
     if not paths:
         print("没有基线文件，先跑 dump-baseline.py")
         return 2
-
+    print("=== 基线比对 ===")
     failures = 0
     for p in paths:
         if not p.exists():
@@ -86,7 +86,7 @@ def main(argv: list[str]) -> int:
                 print(d)
         else:
             print(f"OK   {slug}")
-    print(f"\n{'全部与基线一致' if failures == 0 else f'{failures} 项不一致'}")
+    print(f"\n=== 基线比对{'全部通过' if failures == 0 else f'{failures} 项不一致'} ===")
     return 1 if failures else 0
 
 

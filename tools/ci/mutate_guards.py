@@ -331,7 +331,7 @@ _PENDING: tuple[Path, bytes] | None = None
 
 
 def _restore_pending() -> None:
-    """把 `_PENDING` 里那个文件按字节还原。"""
+    """Restore the file in _PENDING byte-for-byte."""
     global _PENDING
     if _PENDING is None:
         return
@@ -339,9 +339,9 @@ def _restore_pending() -> None:
     _PENDING = None
     try:
         path.write_bytes(snapshot)
-        print(f"\n[中断] 已还原 {path.name}", flush=True)
+        print(f"\n[interrupted] restored {path.name}", flush=True)
     except OSError as exc:
-        print(f"\n[中断] 还原 {path.name} 失败：{exc} —— 手动把它改回去", flush=True)
+        print(f"\n[interrupted] restore {path.name} failed: {exc} -- fix it manually", flush=True)
 
 
 def _install_signal_guard() -> None:
@@ -390,8 +390,12 @@ def _run_guard(key: str) -> tuple[int, str]:
     显式 `encoding="utf-8"`：不写的话按 locale 解码（Windows 上是 GBK），而守卫的输出
     是 UTF-8 —— 碰到 GBK 里没有的字节会在读线程里抛 UnicodeDecodeError，`stdout` 直接
     变成 `None`，于是**最该看的那段输出什么都不打印**。同一个坑在 `check_all.py` 踩过。
+
+    `PYTHONIOENCODING=utf-8` 确保子进程的 Python 也用 UTF-8 写 stdout/stderr，而不是
+    Windows 默认的 GBK。否则子进程写 GBK、父进程用 UTF-8 读 = 满屏乱码。
     """
     argv, cwd, _, _ = GUARDS[key]
+    env = {**_os.environ, "PYTHONIOENCODING": "utf-8"}
     proc = subprocess.run(
         [str(x) for x in argv],
         cwd=str(cwd),
@@ -399,6 +403,7 @@ def _run_guard(key: str) -> tuple[int, str]:
         text=True,
         encoding="utf-8",
         errors="replace",
+        env=env,
     )
     return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
 
@@ -481,14 +486,14 @@ def main(argv: list[str]) -> int:
     _install_signal_guard()  # 跑之前先装上：变异一旦落盘，中断也必须还原
 
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--list", action="store_true", help="只打印注册表")
-    ap.add_argument("--only", default="", help="只跑名字里含这个词的变异")
-    ap.add_argument("--guard", default="", help=f"只跑某一层守卫的变异：{' / '.join(sorted(GUARDS))}")
-    ap.add_argument("--skip-baseline", action="store_true", help="跳过基线（调试用；正常别加）")
+    ap.add_argument("--list", action="store_true", help="print registry only")
+    ap.add_argument("--only", default="", help="only run mutations whose name contains this string")
+    ap.add_argument("--guard", default="", help=f"only run mutations for one guard layer: {' / '.join(sorted(GUARDS))}")
+    ap.add_argument("--skip-baseline", action="store_true", help="skip baseline (debug only; don't use normally)")
     args = ap.parse_args(argv[1:])
 
     if args.guard and args.guard not in GUARDS:
-        print(f"FAIL --guard {args.guard!r} 不是已知的守卫层：{' / '.join(sorted(GUARDS))}")
+        print(f"FAIL --guard={args.guard!r} is not a known guard layer: {' / '.join(sorted(GUARDS))}")
         return 1
 
     picked = list(MUTATIONS)
@@ -497,40 +502,40 @@ def main(argv: list[str]) -> int:
     if args.only:
         picked = [m for m in picked if args.only in m.name]
     if (args.only or args.guard) and not picked:
-        print(f"FAIL --only {args.only!r} --guard {args.guard!r} 没匹配到任何变异")
+        print(f"FAIL --only={args.only!r} --guard={args.guard!r} matched zero mutations")
         return 1
 
     if args.list:
-        print(f"注册表 {len(picked)} 条：")
+        print(f"Registry ({len(picked)} entries):")
         for i, m in enumerate(picked, 1):
-            print(f"  [{i:>2}] {m.name}")
+            print(f"  [{i:>2}] {_safe(m.name)}")
             print(f"       {m.path}")
-            print(f"       守卫 {GUARDS[m.guard][2]} -> 期望变红于：{m.expect}")
+            print(f"       guard {GUARDS[m.guard][2]} -> expected red on: {m.expect}")
             if m.note:
-                print(f"       为什么要守：{m.note}")
+                print(f"       why: {_safe(m.note)}")
         return 0
 
-    print(f"=== 守卫自证（{len(picked)} 条变异，每条都必须让它守的那条红）===")
+    print(f"=== Guard self-proof ({len(picked)} mutations, each must turn its guard red) ===")
     blocked = _missing_tools()
 
-    # 基线：跑了哪些守卫、各自是否绿。不是绿的就先修基线——否则后面分不清是谁红。
+    # Baseline: run each guard, must be all-green before mutating
     usable: set[str] = set()
     if not args.skip_baseline:
         for key in sorted({m.guard for m in picked}):
             label = GUARDS[key][2]
             if key in blocked:
-                print(f"\n· 基线：{label}")
+                print(f"\n  baseline: {label}")
                 print(f"SKIP {blocked[key]}")
                 continue
             code, out = _run_guard(key)
             if code != 0:
-                print(f"\n· 基线：{label}")
-                print("FAIL 基线就是红的，先修它（否则后面分不清是谁红的）：")
+                print(f"\n  baseline: {label}")
+                print("FAIL baseline is red -- fix it first (can't tell who turned red after mutation):")
                 print("\n".join("  " + _safe(ln) for ln in out.splitlines()[-25:]))
                 return 1
             usable.add(key)
-            print(f"\n· 基线：{label}")
-            print("OK 基线绿")
+            print(f"\n  baseline: {label}")
+            print("OK baseline green")
     else:
         usable = {m.guard for m in picked} - set(blocked)
 
@@ -541,79 +546,75 @@ def main(argv: list[str]) -> int:
     dirty_before = _porcelain(touched)
 
     for i, m in enumerate(picked, 1):
-        print(f"\n--- [{i}/{len(picked)}] {m.name}")
+        print(f"\n--- [{i}/{len(picked)}] {_safe(m.name)}")
         if m.guard not in usable:
-            print(f"SKIP 守卫不可用 —— {blocked.get(m.guard, '原因见上')}")
-            skipped.append(m.name)
+            print(f"SKIP guard unavailable -- {blocked.get(m.guard, 'see above')}")
+            skipped.append(_safe(m.name))
             continue
         if m.note:
-            print(f"  守的是：{m.note}")
+            print(f"   guards: {_safe(m.note)}")
         path = ROOT / m.path
         try:
             snapshot = _apply(path, m.old, m.new)
         except AnchorError as exc:
             print(f"FAIL {exc}")
-            failures.append(f"{m.name}（锚点对不上，脚本写坏了）")
+            failures.append(f"{_safe(m.name)} (anchor mismatch, script bug)")
             continue
-        _PENDING = (path, snapshot)  # 交给信号兜底：被 Ctrl-C / 超时杀掉时也能还原
+        _PENDING = (path, snapshot)
         try:
             code, out = _run_guard(m.guard)
         finally:
-            # 无条件还原：写在 finally 里，而且不依赖"变异是否成功"——
-            # 还原失败会让后面每一条都跟着误报（一次跑出四条 BAD，看着像守卫坏了，其实是脏状态）。
             _PENDING = None
             path.write_bytes(snapshot)
 
         if path.read_bytes() != snapshot:
-            print(f"FAIL 还原失败：{m.path} 与快照逐字节不一致")
-            failures.append(f"{m.name}（还原失败）")
+            print(f"FAIL restore failed: {m.path} byte mismatch vs snapshot")
+            failures.append(f"{_safe(m.name)} (restore failed)")
             continue
 
         if code == 0:
-            print("FAIL 守卫**没红**（退出码 0）—— 这条变异没人守，守卫恒绿")
+            print("FAIL guard did NOT turn red (exit 0) -- mutation not guarded, guard always-green")
             print("\n".join("  " + _safe(ln) for ln in out.splitlines()[-15:]))
-            failures.append(f"{m.name}（守卫恒绿）")
+            failures.append(f"{_safe(m.name)} (guard always-green)")
             continue
         red = _failed_names(m.guard, out)
         if m.expect not in red:
-            print(f"FAIL 红了，但不是预期的原因：红了 {sorted(red) or ['（数不出来）']}，期望「{m.expect}」")
+            print(
+                f"FAIL turned red, but wrong reason: red={[_safe(r) for r in sorted(red)] or ['(unable to count)']}  expected={_safe(m.expect)!r}"
+            )
             print("\n".join("  " + _safe(ln) for ln in out.splitlines()[-15:]))
-            failures.append(f"{m.name}（红的不是它）")
+            failures.append(f"{_safe(m.name)} (red but wrong reason)")
             continue
-        # 断言「恰好一条」而不是「预期那条在里面」：牵连说明守卫之间有耦合，
-        # 以后任何一次正常改动都会连带报错，人就会开始忽略它们。
-        # 排除 expect 与自己相同的那些：两条变异合法地指向同一条检查（一条守 Python 半边、
-        # 一条守 JS 半边）时，那不算牵连。
         if len(red) > 1:
-            print("FAIL 牵连了别的守卫（变异改到了它守的东西）：")
+            print("FAIL cross-contaminated other guards (mutation hit something else):")
             for one in sorted(red - {m.expect}):
-                print(f"   还红了：{_safe(one)}")
-            failures.append(f"{m.name}（牵连 {len(red) - 1} 条）")
+                print(f"    also red: {_safe(one)}")
+            failures.append(f"{_safe(m.name)} (contaminated {len(red) - 1} others)")
             continue
 
         ran[m.guard] = ran.get(m.guard, 0) + 1
-        print(f"OK 恰好这一条红（退出码 {code}）")
-        print("OK 已还原（逐字节一致）")
+        print(f"OK exactly this one red (exit {code})")
+        print("OK restored (byte-identical to snapshot)")
 
     # 自证不该在仓库里留下任何痕迹。逐字节还原只证明"变异过的那个文件"复原了；万一守卫
     # 自己写了**别的**文件（生成器、缓存、产物），只有这一步看得见。
     # 注意比的是"跑前 vs 跑后"，不是"脏不脏"——仓库里经常挂着别人没提交的改动。
     for path, code in sorted(_porcelain(touched).items()):
         if dirty_before.get(path) != code:
-            print(f"FAIL 自证在仓库里留下了改动：{path}  {dirty_before.get(path, '  ')} -> {code}")
-            failures.append(f"{path}（自证写脏）")
+            print(f"FAIL self-proof left changes in repo: {path}  {dirty_before.get(path, '  ')} -> {code}")
+            failures.append(f"{path} (self-proof dirtied repo)")
 
-    print("\n=== 汇总 ===")
+    print("\n=== Summary ===")
     for key in sorted(ran):
-        print(f"  OK   {GUARDS[key][2]}：{ran[key]} 条变异各自独立变红")
+        print(f"  OK   {GUARDS[key][2]}: {ran[key]} mutations each independently turned red")
     for name in skipped:
-        print(f"  SKIP {name}")
+        print(f"  SKIP {_safe(name)}")
     if failures:
-        print(f"\nFAIL {len(failures)} 条没能自证：")
+        print(f"\nFAIL {len(failures)} mutation(s) could not self-prove:")
         for name in failures:
-            print(f"  - {name}")
+            print(f"  - {_safe(name)}")
         return 1
-    print(f"\nOK {sum(ran.values())} 条变异全部自证通过（各自恰好一条红、还原逐字节一致）。")
+    print(f"\nOK all {sum(ran.values())} mutations self-proved (each exactly one red, restore byte-identical).")
     return 0
 
 

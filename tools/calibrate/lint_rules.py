@@ -197,7 +197,7 @@ def main(argv: list[str]) -> int:
     logs = fields_by_version_from_logs()
     meta = fields_by_version_from_meta()
     versions = sorted(set(logs) | set(meta))
-    print("来源版本：%s（日志实测 %d 个版本，字典 %d 个版本）" % (", ".join(fmt(v) for v in versions), len(logs), len(meta)))
+    print(f"=== 经验规则字段引用检查 ===\n来源版本：{'，'.join(fmt(v) for v in versions)}（日志实测 {len(logs)} 个版本，字典 {len(meta)} 个版本）")
     if not logs:
         # 别让这一行被划过去：日志侧一旦空转，判定就只剩上游字典一个来源，
         # 日志里真实存在的旧固件字段会被整片误报成"可疑"（假阳性），
@@ -251,7 +251,7 @@ def main(argv: list[str]) -> int:
             print("   %-28s %s" % (rid, names))
     failed = gaps + suspicious
     if failed == 0:
-        print("\n检查通过：所有引用都在其版本范围内找得到")
+        print("\n=== 经验规则字段引用检查通过：所有引用都在其版本范围内找得到 ===")
     return 1 if (strict and failed) else 0
 
 
