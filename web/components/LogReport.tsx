@@ -228,6 +228,7 @@ export function LogReport({
             key={t.key}
             type="button"
             role="tab"
+            data-testid={`tab-${t.key}`}
             aria-selected={effectiveTab === t.key}
             disabled={t.disabled}
             aria-label={t.label}

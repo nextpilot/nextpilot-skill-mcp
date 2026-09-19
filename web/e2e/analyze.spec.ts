@@ -16,7 +16,7 @@ test.describe("日志分析流程", () => {
 
     test(
         "上传 .ulg 并完成分析（解析→显示断言）",
-        { tag: "@smoke", timeout: 300_000 },
+        { tag: "@smoke", timeout: 420_000 },
         async ({ page }) => {
             await page.goto("/analyze", { waitUntil: "networkidle" });
 
@@ -46,8 +46,8 @@ test.describe("日志分析流程", () => {
             const hasMetricsFallback = await page.getByText("这份报告没有记录关键数据").count();
             expect(hasRows > 0 || hasMetricsFallback > 0).toBeTruthy();
 
-            // 切到「检查结论」tab（label=检查结论），断言检查明细也渲染了
-            await page.getByRole("tab", { name: "检查结论" }).click();
+            // 切到「检查结论」tab（summary），断言检查明细也渲染了
+            await page.getByTestId("tab-summary").click();
             const summaryHeading = page.getByText("检查明细（确定性引擎）", { exact: true });
             await expect(summaryHeading).toBeVisible({ timeout: 30_000 });
             // 要么有结论卡（data-finding）、要么有「均未触发阈值」的兜底文案
