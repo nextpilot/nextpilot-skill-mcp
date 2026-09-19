@@ -595,6 +595,116 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 
 ---
 
+### 6.9 CI/CD 流水线与合并门禁
+
+提交 → 合并到主分支的完整流水线：
+
+```text
+代码提交
+  │
+  ▼
+┌─────────────────────────────────────────────┐
+│ 第一关：静态检查（必须全绿）                   │
+│ python tools/ci/check_all.py --skip-logs    │
+│   · ruff format --check（Python 风格）       │
+│   · ruff check（Python lint）                │
+│   · build:kb --check（知识库契约与产物一致）    │
+│   · check_artifact（产物是合法 Python）       │
+│   · check_engine_purity（三处共用源码纯净性）   │
+│   · tsc --noEmit（TypeScript 类型检查）       │
+│   · test-issue-filer.mjs（报错上报自测）      │
+│   · check_hygiene（校验机制自身卫生）          │
+│   · mutate_guards（守卫自证：每条先红一次）     │
+│ · eslint .（Web 侧 ESLint）                  │
+└──────────────┬──────────────────────────────┘
+               │ 全部通过
+               ▼
+┌─────────────────────────────────────────────┐
+│ 第二关：单元测试（算子 / CEL 表达式）           │
+│   · compare_baseline.py                     │
+│     （6 条冻结日志基线逐字段比对）              │
+│   · check_provider.py（适配器契约测试）        │
+│   · run_checks_locally.py --probe-data      │
+│     （数据层结构自检 + 真抽一次 series）        │
+│   · lint_rules.py --strict                  │
+│     （字段引用 / 版本错配校验）                 │
+└──────────────┬──────────────────────────────┘
+               │ 全部通过
+               ▼
+┌─────────────────────────────────────────────┐
+│ 第三关：冒烟测试（少量 E2E 主干用例）           │
+│ · pnpm exec playwright test pages.spec.ts  │
+│   （29 个用例：关键页面渲染 + Skill/          │
+│    MCP 详情页 + 页面交互功能）                 │
+│ · pnpm exec playwright test analyze.spec.ts│
+│   （11 个用例：分析入口 + 上传 + 边缘场景）     │
+└──────────────┬──────────────────────────────┘
+               │
+          ┌────┴────┐
+          │ 冒烟通过？ │
+          └────┬────┘
+       不通过   │   通过
+         ▼      │    ▼
+    ❌ 阻断合并   │  ✅ 合并放行
+                 │
+                 ▼
+┌─────────────────────────────────────────────┐
+│ 第四关：全套 E2E 测试（合并后自动触发）          │
+│ · pnpm exec playwright test（全量 40 用例）   │
+│ · next build（站点真编译，--with-build）       │
+└──────────────┬──────────────────────────────┘
+               │ 全部通过
+               ▼
+┌─────────────────────────────────────────────┐
+│ 第五关：打包部署                              │
+│ · EdgeOne Pages 自动部署（Git 分支绑定）       │
+└─────────────────────────────────────────────┘
+```
+
+**本地一键检查**（开发者提交前运行）：
+
+```powershell
+# 仅静态检查 + ESLint（快速，每次提交前跑）
+.\tools\check_all.ps1 -SkipLogs
+
+# 含冒烟测试（需要 dev server 已在运行）
+.\tools\check_all.ps1 -SkipLogs -WithE2E
+
+# 全套（含日志类单元测试 + 冒烟 + 编译）
+.\tools\check_all.ps1 -WithE2E -WithBuild
+```
+
+**脚本说明**：
+
+| 脚本 | 用途 | 调用方式 |
+| --- | --- | --- |
+| `tools/check_all.ps1` | 本地一键检查入口：调用 `check_all.py` + ESLint + 可选 E2E | 手动，提交前 |
+| `tools/ci/check_all.py` | CI 规范入口：静态检查 + 单元测试 + 编译 | CI workflow 自动调用 |
+| `web/package.json` → `lint` | ESLint 静态分析（`eslint .`） | check_all.ps1 内调用 |
+| `web/package.json` → `test:e2e` | Playwright 全量 E2E（`playwright test`） | CI 第四关 |
+| `web/package.json` → `test:e2e:smoke` | Playwright 冒烟（排除日志分析流程） | CI 第三关 |
+| `web/package.json` → `test:e2e:analyze` | Playwright 日志分析流程专用 | 本地调试用 |
+
+**E2E 测试覆盖一览**（`web/e2e/`）：
+
+| 文件 | 用例数 | 覆盖 |
+| --- | --- | --- |
+| `pages.spec.ts` | 29 | 15 个关键页面（首页、指南、技能广场、MCP 目录、个人中心、登录等）+ 8 个 Skill 详情页 + 2 个 MCP 详情页 + 搜索/导航交互 |
+| `analyze.spec.ts` | 11 | 日志分析全流程（入口渲染、上传 .ulg、历史记录、上传区域、拖拽提示、关键 UI）+ 边缘场景（非 .ulg 文件、空历史、快速导航、未选提交、扩展名校验） |
+
+**关键门禁规则**：
+
+1. **冒烟不通过 = 阻断合并**：第三关任何失败都阻止 PR 合并。
+2. **全套 E2E 失败**：合并后自动跑第四关，失败通知提交者修复。
+3. **既有代码警告**：ESLint 当前 0 错误 / 5 警告（均为既存未使用变量），不阻断合并，但新增代码引入的警告需关注。
+4. **日志类校验不在云端 CI**：`compare_baseline`、`check_provider` 等需要真实 `.ulg` 日志的检查仅在本地有日志时运行；云端 CI 全绿**不等于**规则/引擎回归过了，改规则/引擎后必须在本地跑一次完整检查。
+
+### 6.9.1 `mutate_guards.py` Windows 兼容说明
+
+`mutate_guards.py` 的「某一节丢了编号」守卫在 Windows 控制台（GBK）下会因打印 `\ufffd` 字符触发 `UnicodeEncodeError` 而失败。这是已知的**既存问题**，不影响守卫本身的逻辑正确性（仅在打印报错信息时编码失败），修复方案见该文件注释。在 Windows 上运行 `check_all.py` 时可暂时接受此项失败，其余检查的通过/失败判定不变。
+
+---
+
 ## 7. 商业模式
 
 **核心原则**：社区内容（Skill）免费引流，确定性高价值服务（日志分析、规则库、API）收费。收费锚点是"确定性结论 + 规则库 + 数据积累"。

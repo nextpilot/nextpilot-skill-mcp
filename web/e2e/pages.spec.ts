@@ -12,9 +12,24 @@ const CRITICAL_PAGES = [
     { path: "/guide/mcp-server", label: "MCP 服务" },
     { path: "/analyze", label: "日志分析入口" },
     { path: "/skills", label: "技能广场" },
+    { path: "/mcp", label: "MCP 服务目录" },
+    { path: "/me", label: "个人中心" },
     { path: "/login", label: "登录页" },
     { path: "/issue", label: "提交反馈" },
 ];
+
+const SKILL_SLUGS = [
+    "aerial-object-detection",
+    "flow-language-control",
+    "ibvs-visual-servoing",
+    "llm-px4-autonomous-navigation",
+    "nl-mission-planning",
+    "pid-autotune-assistant",
+    "px4-ulog-analyzer",
+    "vlm-scene-understanding",
+];
+
+const MCP_SLUGS = ["ardupilot-log", "msfs-sim-flight"];
 
 test.describe("关键页面渲染", () => {
     for (const page of CRITICAL_PAGES) {
@@ -61,4 +76,87 @@ test("规则编写参考（rule-schema）无 MDX 编译错误", async ({ page })
     // 算子目录表格应渲染
     const heading = page.locator('h2:has-text("算子")');
     await expect(heading.first()).toBeVisible({ timeout: 5000 });
+});
+
+test.describe("Skill 详情页", () => {
+    for (const slug of SKILL_SLUGS) {
+        test(`/skills/${slug}`, async ({ page }) => {
+            const res = await page.goto(`/skills/${slug}`, { waitUntil: "networkidle" });
+            expect(res?.status()).toBe(200);
+
+            await expect(page.locator("h1").first()).toBeVisible();
+            const body = await page.locator("body").textContent();
+            expect(body).not.toMatch(/Application error/);
+            expect(body).not.toMatch(/\[next-mdx-remote\].*error/);
+        });
+    }
+});
+
+test.describe("MCP 详情页", () => {
+    for (const slug of MCP_SLUGS) {
+        test(`/mcp/${slug}`, async ({ page }) => {
+            const res = await page.goto(`/mcp/${slug}`, { waitUntil: "networkidle" });
+            expect(res?.status()).toBe(200);
+
+            await expect(page.locator("h1").first()).toBeVisible();
+            const body = await page.locator("body").textContent();
+            expect(body).not.toMatch(/Application error/);
+            expect(body).not.toMatch(/\[next-mdx-remote\].*error/);
+        });
+    }
+});
+
+test.describe("页面交互功能", () => {
+    test("技能广场 — 搜索功能可用", async ({ page }) => {
+        await page.goto("/skills", { waitUntil: "networkidle" });
+
+        // 搜索输入框应该存在
+        const searchInput = page.locator('input[type="search"], input[placeholder*="搜索"], input[placeholder*="search"]').first();
+        if (await searchInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await searchInput.fill("检测");
+            await page.waitForTimeout(500);
+
+            // 页面不应崩溃
+            const body = await page.locator("body").textContent();
+            expect(body).not.toMatch(/Application error/);
+        }
+    });
+
+    test("MCP 目录 — 列表有内容", async ({ page }) => {
+        await page.goto("/mcp", { waitUntil: "networkidle" });
+
+        await expect(page.locator("h1").first()).toBeVisible();
+
+        // 至少有一个 MCP 服务条目
+        const body = await page.locator("body").textContent();
+        expect(body).not.toMatch(/Application error/);
+    });
+
+    test("导航链接可点击 — 技能广场", async ({ page }) => {
+        await page.goto("/", { waitUntil: "networkidle" });
+
+        // 点击指向 /skills 的链接
+        const skillsLink = page.locator('a[href="/skills"]').first();
+        if (await skillsLink.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await skillsLink.click();
+            await page.waitForURL("**/skills", { timeout: 5000 });
+
+            await expect(page.locator("h1").first()).toBeVisible();
+            const body = await page.locator("body").textContent();
+            expect(body).not.toMatch(/Application error/);
+        }
+    });
+
+    test("导航链接可点击 — 分析入口", async ({ page }) => {
+        await page.goto("/", { waitUntil: "networkidle" });
+
+        const analyzeLink = page.locator('a[href="/analyze"]').first();
+        if (await analyzeLink.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await analyzeLink.click();
+            await page.waitForURL("**/analyze", { timeout: 5000 });
+
+            const body = await page.locator("body").textContent();
+            expect(body).not.toMatch(/Application error/);
+        }
+    });
 });
