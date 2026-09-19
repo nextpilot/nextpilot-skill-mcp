@@ -22,6 +22,11 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger()
+
 # 数据配置的装配规则与本地回归共用一处（facts.yaml + plot/track.yml）——
 # 别在这里再手写一遍，两边不一致时本地跑得出、浏览器跑不出。
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -78,7 +83,7 @@ def extract_json_const(src: str, name: str):
 
 
 def main() -> int:
-    print("=== 产物校验（check_artifact） ===")
+    log.info("=== 产物校验（check_artifact） ===")
     failed = False
     src = TS.read_text(encoding="utf-8")
     m = re.search(r"String\.raw`(.*)`\n", src, re.S)
@@ -137,12 +142,12 @@ def main() -> int:
     try:
         ast.parse(final)
     except SyntaxError as e:
-        print(f"生成产物不是合法 Python：{e}")
-        print("  " + "\n  ".join(final.splitlines()[max(0, (e.lineno or 1) - 2) : (e.lineno or 1) + 1]))
+        log.error(f"生成产物不是合法 Python：{e}")
+        log.error("  " + "\n  ".join(final.splitlines()[max(0, (e.lineno or 1) - 2) : (e.lineno or 1) + 1]))
         return 1
 
     rules = extract_json_const(src, "rules")
-    print(f"OK 产物语法检查通过：{len(final.splitlines())} 行，含 {len(rules)} 条经验规则")
+    log.info(f"OK 产物语法检查通过：{len(final.splitlines())} 行，含 {len(rules)} 条经验规则")
 
     # 地图预设的适用范围（`conditions.topics`）是**构建期**从 plot/track.yml 搬到 `facts.track` 的。
     # 这一步曾经无声漏掉：`compileMap` 只搬了 `children`，`conditions` 留在原地 → 引擎收不到
@@ -151,16 +156,16 @@ def main() -> int:
     # 用户拿不到任何能自己判断的线索。**搬家的丢失只在产物里看得见**，所以在这里核一遍。
     declared_topics = _declared_track_topics(TRACK_YML.read_text(encoding="utf-8"))
     if not declared_topics:
-        print(f"{TRACK_YML.name} 里没有 conditions.topics 声明（守卫看不见判据，先确认是不是有意去掉的）")
+        log.error(f"{TRACK_YML.name} 里没有 conditions.topics 声明（守卫看不见判据，先确认是不是有意去掉的）")
         return 1
     got_topics = (runner.load_facts_payload().get("track") or {}).get("conditions", {}).get("topics")
     if got_topics != declared_topics:
-        print("facts.track 里的 conditions.topics 与 plot/track.yml 的声明不一致：")
-        print(f"  声明：{declared_topics}")
-        print(f"  产物：{got_topics}")
-        print("  构建期把这份声明丢了 —— 引擎侧就没有「缺哪个 topic」这道闸门了")
+        log.error("facts.track 里的 conditions.topics 与 plot/track.yml 的声明不一致：")
+        log.error(f"  声明：{declared_topics}")
+        log.error(f"  产物：{got_topics}")
+        log.error("  构建期把这份声明丢了 —— 引擎侧就没有「缺哪个 topic」这道闸门了")
         return 1
-    print(f"OK 地图预设的适用范围搬运检查通过：conditions.topics = {got_topics}")
+    log.info(f"OK 地图预设的适用范围搬运检查通过：conditions.topics = {got_topics}")
 
     # compute 表达式是**构建期用 JS 校验**（web/scripts/lib/rule-expr.mjs）、**运行期用 Python
     # ast 求值**的。两侧是两套实现，中间就有缝：JS 放行而 Python 解析不了的写法会构建通过、
@@ -172,12 +177,12 @@ def main() -> int:
             try:
                 tree = ast.parse(expr, mode="exec")
             except SyntaxError as e:
-                print(f"规则 {r['id']} 的 compute 表达式不是合法 Python：{e}\n    {expr}")
+                log.error(f"规则 {r['id']} 的 compute 表达式不是合法 Python：{e}\n    {expr}")
                 return 1
             if len(tree.body) != 1 or not isinstance(tree.body[0], ast.Assign):
-                print(f"规则 {r['id']} 的 compute 不是一条赋值：{expr}")
+                log.error(f"规则 {r['id']} 的 compute 不是一条赋值：{expr}")
                 return 1
-    print(f"OK compute 表达式检查通过：{n_expr} 条，Python 侧都能解析")
+    log.info(f"OK compute 表达式检查通过：{n_expr} 条，Python 侧都能解析")
 
     # 仅语法检查不够：NameError / KeyError 这类只有**真执行**才暴露
     # （曾漏掉"operators.py 没被内联"导致 Pyodide 里 OPERATORS 未定义）。
@@ -187,7 +192,7 @@ def main() -> int:
         raise SystemExit("数据层产物里找不到 String.raw 模板")
     logs = sorted((Path(__file__).resolve().parent / "logs").glob("*.ulg"), key=lambda p: p.stat().st_size)
     if not logs:
-        print("SKIP 没有回归日志，跳过执行检查（caller 用 check_all.py 会自动跳过）")
+        log.warning("SKIP 没有回归日志，跳过执行检查（caller 用 check_all.py 会自动跳过）")
         return 0
     log = logs[0]
     ns: dict = {"ulog_bytes": log.read_bytes()}
@@ -197,24 +202,20 @@ def main() -> int:
         ns["np_report"]()
         result = json.loads(ns["__result"])
     except Exception as e:  # noqa: BLE001
-        print(f"产物执行失败（{log.name}）：{type(e).__name__}: {e}")
+        log.error(f"产物执行失败（{log.name}）：{type(e).__name__}: {e}")
         import traceback
 
         traceback.print_exc(limit=3)
         return 1
-    # 交付给前端的报告：关键字段必须**在**，不能"取不到就当空"。
-    # `result.get('findings', [])` 对「字段缺了」和「本来就没有告警」给出同一个 0——
-    # 2026-09-18 报告页那个 `report.findings.filter` 白屏，正是这一格没兜住：
-    # 前端拿到缺 findings 的报告，GeneralInfo 直接抛 TypeError，整页白。
     required = ("findings", "facts", "metrics", "checksRun", "tags", "guardTags", "matchedFaults")
     missing_fields = [k for k in required if k not in result]
     if missing_fields:
-        print(f"产物执行通过，但交付的报告缺字段：{missing_fields}（实际键：{sorted(result)}）")
+        log.error(f"产物执行通过，但交付的报告缺字段：{missing_fields}（实际键：{sorted(result)}）")
         return 1
     if not isinstance(result["findings"], list):
-        print(f"findings 不是数组，而是 {type(result['findings']).__name__}")
+        log.error(f"findings 不是数组，而是 {type(result['findings']).__name__}")
         return 1
-    print(
+    log.info(
         f"OK 产物执行检查通过：{log.name} → findings={len(result['findings'])}, "
         f"checksRun={len(result.get('checksRun', []))}, tags={result.get('tags')}"
     )
@@ -240,12 +241,12 @@ def main() -> int:
     unknown = [n for n in asked if n not in ns and n not in set_by_worker]
     if unknown:
         available = sorted(k for k in ns if not k.startswith("__"))
-        print(f"worker 查的全局名在产物命名空间里不存在：{unknown}")
-        print(f"  产物里真实存在的顶层名字：{available}")
-        print("  这种守卫恒真/恒假：要么取数据永远失败，要么静默拿到另一份日志的数据")
+        log.error(f"worker 查的全局名在产物命名空间里不存在：{unknown}")
+        log.error(f"  产物里真实存在的顶层名字：{available}")
+        log.error("  这种守卫恒真/恒假：要么取数据永远失败，要么静默拿到另一份日志的数据")
         return 1
     track_n = len((produced.get("np_track") or {}).get("tracks") or [])  # type: ignore[union-attr]
-    print(f"OK worker 守卫的全局名核对通过：{asked}（np_track 跑出 {track_n} 条轨迹）")
+    log.info(f"OK worker 守卫的全局名核对通过：{asked}（np_track 跑出 {track_n} 条轨迹）")
 
     # 轨迹取不到时**必须**逐条给出原因（`errorReasons`）——界面就是拿它当列表渲染的。
     # 这条契约曾经没有：只给一句"声明里的坐标候选都不在日志里"，而那一句只对应六种原因里的
@@ -255,17 +256,17 @@ def main() -> int:
         if payload.get("error"):
             reasons = payload.get("errorReasons")
             if not isinstance(reasons, list) or not reasons or not all(isinstance(r, str) and r for r in reasons):
-                print(f"轨迹取不到却没有给出逐条原因（{case}）：")
-                print(f"  error = {payload.get('error')!r}")
-                print(f"  errorReasons = {reasons!r}")
-                print("  界面只能显示那句概括，而概括往往会说错（见 CLAUDE.md §6.8）")
+                log.error(f"轨迹取不到却没有给出逐条原因（{case}）：")
+                log.error(f"  error = {payload.get('error')!r}")
+                log.error(f"  errorReasons = {reasons!r}")
+                log.error("  界面只能显示那句概括，而概括往往会说错（见 CLAUDE.md §6.8）")
                 return False
-            print(f"  OK 轨迹失败的返回体契约通过（{case}）：error 带 {len(reasons)} 条具体原因")
+            log.info(f"  OK 轨迹失败的返回体契约通过（{case}）：error 带 {len(reasons)} 条具体原因")
             return True
         if not payload.get("tracks"):
-            print(f"  FAIL 轨迹既没有 tracks 也没有 error（{case}）——返回体形状不对，前端会当成解析器缺陷")
+            log.error(f"  FAIL 轨迹既没有 tracks 也没有 error（{case}）——返回体形状不对，前端会当成解析器缺陷")
             return False
-        print(f"  OK 轨迹成功的返回体契约通过（{case}）：{len(payload['tracks'])} 条轨道")
+        log.info(f"  OK 轨迹成功的返回体契约通过（{case}）：{len(payload['tracks'])} 条轨道")
         return True
 
     if not check_track_contract(produced.get("np_track") or {}, f"{log.name} 实跑"):
@@ -279,7 +280,7 @@ def main() -> int:
     # 纯函数，直接拿引擎源码 exec 出来的那个函数核——它和运行期是同一份实现。
     latlon = ns.get("_latlon_fields")
     if not callable(latlon):
-        print("产物里找不到 _latlon_fields（对照物的判据）——_coord_field_topics_note 的实现换了？")
+        log.error("产物里找不到 _latlon_fields（对照物的判据）——_coord_field_topics_note 的实现换了？")
         return 1
     should = [
         "lat",
@@ -306,11 +307,11 @@ def main() -> int:
     ]
     got, got_not = latlon(should), latlon(should_not)
     if got != should or got_not:
-        print("「像经纬度」的判据错了（对照物会列出与坐标无关的 topic）：")
-        print(f"  该认出来的漏了：{sorted(set(should) - set(got))}")
-        print(f"  不该认的认了：{got_not}")
+        log.error("「像经纬度」的判据错了（对照物会列出与坐标无关的 topic）：")
+        log.error(f"  该认出来的漏了：{sorted(set(should) - set(got))}")
+        log.error(f"  不该认的认了：{got_not}")
         return 1
-    print(f"OK 经纬度判据检查通过：认出 {len(should)} 个（含 `previous.lat` 这类嵌套），挡掉 {len(should_not)} 个干扰名")
+    log.info(f"OK 经纬度判据检查通过：认出 {len(should)} 个（含 `previous.lat` 这类嵌套），挡掉 {len(should_not)} 个干扰名")
 
     # **守卫自己也要被校验**（CLAUDE.md §6.6）：上面这条契约只在"取不到"时生效，而回归用的
     # 这条日志有 GPS —— 光跑它，"error 不带原因"这个 bug 一次都不会被抓到（守卫恒绿）。
@@ -320,20 +321,20 @@ def main() -> int:
     cfg = getattr(provider, "_cfg", None)
     track_spec = (cfg or {}).get("track") if isinstance(cfg, dict) else None
     if not isinstance(track_spec, dict) or "conditions" not in track_spec:
-        print("产物里的 provider 拿不到 track 声明（`provider._cfg['track']`）——对不上就构造不出反向用例")
+        log.error("产物里的 provider 拿不到 track 声明（`provider._cfg['track']`）——对不上就构造不出反向用例")
         return 1
     track_spec["conditions"]["topics"] = [["__no_such_topic_regression_probe__"]]
     ns["np_track"]()
     forced = json.loads(ns["__result"])
     if not forced.get("error"):
-        print("声明了一个日志里没有的 topic，引擎却没报错——闸门没生效（conditions.topics 被忽略了）")
-        print(f"  返回体：{json.dumps(forced, ensure_ascii=False)[:200]}")
+        log.error("声明了一个日志里没有的 topic，引擎却没报错——闸门没生效（conditions.topics 被忽略了）")
+        log.error(f"  返回体：{json.dumps(forced, ensure_ascii=False)[:200]}")
         return 1
     if not check_track_contract(forced, "逼出的失败路径"):
         return 1
     if "__no_such_topic_regression_probe__" not in (forced.get("errorReasons") or [""])[0]:
-        print("失败原因里没提声明的 topic 名——用户看不出到底缺哪个（引擎没复用 _missing_topics）")
-        print(f"  errorReasons = {forced.get('errorReasons')!r}")
+        log.error("失败原因里没提声明的 topic 名——用户看不出到底缺哪个（引擎没复用 _missing_topics）")
+        log.error(f"  errorReasons = {forced.get('errorReasons')!r}")
         return 1
 
     # 第二道反向用例：闸门**过了**、却取不到坐标。这条和上面那道是**两条**产出原因的路径
@@ -345,18 +346,18 @@ def main() -> int:
     ns["np_track"]()
     broke = json.loads(ns["__result"])
     if not broke.get("error"):
-        print("候选字段全取不到，引擎却没报错——逐候选的原因那条路没接上")
-        print(f"  返回体：{json.dumps(broke, ensure_ascii=False)[:200]}")
+        log.error("候选字段全取不到，引擎却没报错——逐候选的原因那条路没接上")
+        log.error(f"  返回体：{json.dumps(broke, ensure_ascii=False)[:200]}")
         return 1
     if not check_track_contract(broke, "逼出的字段失败路径"):
         return 1
     joined = " ".join(broke.get("errorReasons") or [])
     if "__no_such_topic_regression_probe__" not in joined:
-        print("失败原因里没提是哪个 topic / 哪个字段取不到——用户没法照着改")
-        print(f"  errorReasons = {broke.get('errorReasons')!r}")
+        log.error("失败原因里没提是哪个 topic / 哪个字段取不到——用户没法照着改")
+        log.error(f"  errorReasons = {broke.get('errorReasons')!r}")
         return 1
-    print("  OK 逼出的字段失败路径契约通过")
-    print("\n=== 产物校验全部通过 ===")
+    log.info("  OK 逼出的字段失败路径契约通过")
+    log.info("\n=== 产物校验全部通过 ===")
     return 0
 
 

@@ -10,6 +10,11 @@ import ast
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger()
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from run_checks_locally import build_namespace  # noqa: E402
 
@@ -52,13 +57,13 @@ def probe_expr(ns, expr_src, env):
             continue
         try:
             val = eval(compile(ast.Expression(body=node), "<probe>", "eval"), ns["_COMPUTE_GLOBALS"], env)
-            print("    %-28s = %s" % (src_of(node, expr_src)[:28], describe(val)))
+            log.info("    %-28s = %s" % (src_of(node, expr_src)[:28], describe(val)))
         except Exception as err:
-            print("    %-28s ! %s: %s" % (src_of(node, expr_src)[:28], type(err).__name__, err))
+            log.warning("    %-28s ! %s: %s" % (src_of(node, expr_src)[:28], type(err).__name__, err))
     try:
         ns["_eval_compute"](expr_src, env)
         outs = [t.id for t in (assign.targets[0].elts if isinstance(assign.targets[0], ast.Tuple) else [assign.targets[0]])]
-        print(
+        log.info(
             "  -> %s = %s"
             % (
                 ", ".join(outs),
@@ -67,7 +72,7 @@ def probe_expr(ns, expr_src, env):
         )
         return True, guarded
     except Exception as err:
-        print("  -> 中止（%s: %s）%s" % (type(err).__name__, err, "（_try 包裹，实际会置 None）" if guarded else ""))
+        log.warning("  -> 中止（%s: %s）%s" % (type(err).__name__, err, "（_try 包裹，实际会置 None）" if guarded else ""))
         return False, guarded
 
 
@@ -82,28 +87,28 @@ def main(argv):
     ns = build_namespace(log)
     rule = next((r for r in ns["RULES"] if r["id"] == rule_id), None)
     if rule is None:
-        print("找不到规则 %s；现有：%s" % (rule_id, ", ".join(r["id"] for r in ns["RULES"])))
+        log.warning("找不到规则 %s；现有：%s" % (rule_id, ", ".join(r["id"] for r in ns["RULES"])))
         return 2
     env = ns["_rule_env"]()
-    print("rule %s  group=%s  checks=%s" % (rule_id, rule.get("group"), (rule.get("outputs") or {}).get("check")))
-    print("  firmware=%s airframe=%s skip=%s" % (rule.get("firmware"), rule.get("airframe"), rule.get("skip")))
+    log.info("rule %s  group=%s  checks=%s" % (rule_id, rule.get("group"), (rule.get("outputs") or {}).get("check")))
+    log.info("  firmware=%s airframe=%s skip=%s" % (rule.get("firmware"), rule.get("airframe"), rule.get("skip")))
     declared = []
     for i, expr in enumerate(rule.get("compute") or [], 1):
-        print("\n  [%d] %s" % (i, expr))
+        log.info("\n  [%d] %s" % (i, expr))
         ok, _ = probe_expr(ns, expr, env)
         if not ok:
-            print("  （数据不足：按引擎语义，这条规则不出结论）")
+            log.warning("  （数据不足：按引擎语义，这条规则不出结论）")
             return 0
         declared.extend(targets_of(expr))
-    print("\n  变量：")
+    log.info("\n  变量：")
     for k in declared:
         v = env.get(k)
-        print("    %-14s = %s" % (k, round(v, 4) if isinstance(v, float) else v))
+        log.info("    %-14s = %s" % (k, round(v, 4) if isinstance(v, float) else v))
     for t in rule.get("triggers") or []:
         try:
-            print("  trigger %-34s -> %s" % (t["when"], ns["_eval_expr"](t["when"], env)))
+            log.info("  trigger %-34s -> %s" % (t["when"], ns["_eval_expr"](t["when"], env)))
         except Exception as err:
-            print("  trigger %-34s -> EXC %s: %s" % (t["when"], type(err).__name__, err))
+            log.warning("  trigger %-34s -> EXC %s: %s" % (t["when"], type(err).__name__, err))
     return 0
 
 

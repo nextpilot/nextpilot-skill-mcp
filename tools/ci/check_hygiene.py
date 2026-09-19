@@ -58,6 +58,11 @@ import sys
 import tokenize
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger()
+
 ROOT = Path(__file__).resolve().parents[2]
 WEB = ROOT / "web"
 PY = sys.executable
@@ -243,7 +248,7 @@ def check_section_refs() -> list[str]:
                 )
             )
 
-    print(
+    log.info(
         f"  {len(refs)} 处 § 引用；解析路径：本文档 {how_counts['本文档']} / "
         f"点名文档 {how_counts['点名文档']} / 全局 {how_counts['全局']}；"
         f"编号文档 {len(sections)} 份"
@@ -534,7 +539,7 @@ def check_bad_input_exit() -> list[str]:
             tail = " / ".join(out.strip().splitlines()[-2:])[:120]
             problems.append(f"{probe.name}：退出了（{proc.returncode}）但没有 {probe.marker!r} —— 红的不是预期的原因：{tail}")
         else:
-            print(f"  {probe.name}：退出码 {proc.returncode}，输出含 {probe.marker!r}")
+            log.info(f"  {probe.name}：退出码 {proc.returncode}，输出含 {probe.marker!r}")
     return problems
 
 
@@ -551,12 +556,12 @@ CHECKS: list[tuple[str, object]] = [
 
 def _print_index() -> None:
     sections = _indexed_docs()
-    print(f"编号文档索引（{'/'.join(DOC_SUFFIXES)}，≥{MIN_SECTIONS} 个编号标题）—— {len(sections)} 份：")
+    log.info(f"编号文档索引（{'/'.join(DOC_SUFFIXES)}，≥{MIN_SECTIONS} 个编号标题）—— {len(sections)} 份：")
     for rel, nums in sorted(sections.items()):
-        print(f"  {rel}  {len(nums)} 节：{', '.join(sorted(nums)[:8])}{' …' if len(nums) > 8 else ''}")
-    print(f"\n探针 {len(PROBES)} 条：")
+        log.info(f"  {rel}  {len(nums)} 节：{', '.join(sorted(nums)[:8])}{' …' if len(nums) > 8 else ''}")
+    log.info(f"\n探针 {len(PROBES)} 条：")
     for probe in PROBES:
-        print(f"  {' '.join(str(x) for x in probe.argv[1:])}  期望退出码非零且输出含 {probe.marker!r}")
+        log.info(f"  {' '.join(str(x) for x in probe.argv[1:])}  期望退出码非零且输出含 {probe.marker!r}")
 
 
 def main(argv: list[str]) -> int:
@@ -571,38 +576,38 @@ def main(argv: list[str]) -> int:
         _print_index()
         return 0
 
-    print("=== 校验机制自身的卫生 ===")
+    log.info("=== 校验机制自身的卫生 ===")
     failed: list[str] = []
     skipped: list[str] = []
     for name, fn in CHECKS:
-        print(f"\n· {name}")
+        log.info(f"\n· {name}")
         try:
             problems = fn()  # type: ignore[operator]
         except Skip as exc:
-            print(f"SKIP {name}  -> {exc}")
+            log.warning(f"SKIP {name}  -> {exc}")
             skipped.append(name)
             continue
         if problems:
             # 这一行的格式有意义：`FAIL <名字>  -> <一句话>` 是 tools/ci/mutate_guards.py
             # 从输出里数"红了几条"的依据，名字要与注册表里的 expect 逐字一致。
-            print(f"FAIL {name}  -> {problems[0]}" + (f"（共 {len(problems)} 处）" if len(problems) > 1 else ""))
+            log.error(f"FAIL {name}  -> {problems[0]}" + (f"（共 {len(problems)} 处）" if len(problems) > 1 else ""))
             for one in problems:
-                print(f"      {one}")
+                log.error(f"      {one}")
             failed.append(name)
         else:
-            print(f"OK {name}")
+            log.info(f"OK {name}")
 
-    print("\n=== 汇总 ===")
+    log.info("\n=== 汇总 ===")
     for name, _ in CHECKS:
         mark = "FAIL" if name in failed else ("SKIP" if name in skipped else "OK  ")
-        print(f"  {mark} {name}")
+        log.info(f"  {mark} {name}")
     if failed:
         # 这句**不能**写成 `FAIL <名字>` 的形状：tools/ci/mutate_guards.py 逐行取 "FAIL 后面的东西"
         # 当检查名，那句总结会被它当成一条检查名，于是每条变异都多报一次"牵连"。
         # （被那套跑手解析的守卫都有这条格式契约，见它的 _failed_names。）
-        print(f"\n{len(failed)} 项卫生检查未过 —— 逐项看上面的输出。")
+        log.error(f"\n{len(failed)} 项卫生检查未过 —— 逐项看上面的输出。")
         return 1
-    print(f"\nOK 全部通过（{len(CHECKS) - len(skipped)} 项，跳过的已说明原因）。")
+    log.info(f"\nOK 全部通过（{len(CHECKS) - len(skipped)} 项，跳过的已说明原因）。")
     return 0
 
 

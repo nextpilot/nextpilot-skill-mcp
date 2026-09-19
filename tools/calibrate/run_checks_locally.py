@@ -22,6 +22,11 @@ from pathlib import Path
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger()
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 KN_PX4 = REPO_ROOT / "knowledge" / "px4"  # 规则与阈值（知识）
 ENGINE = REPO_ROOT / "engine"  # 引擎源码（通用算子与框架）
@@ -187,26 +192,26 @@ def main(argv: list[str]) -> int:
     if probe:
         args = args[1:]
     if not args:
-        print(__doc__)
+        log.info(__doc__)
         return 2
     mode = "探针数据（probe-data）" if probe else "本地回归"
-    print(f"=== {mode}：{len(args)} 份日志 ===")
+    log.info(f"=== {mode}：{len(args)} 份日志 ===")
     failed = 0
     for name in args:
         path = Path(name)
-        print(f"\n· {path.name}")
+        log.info(f"\n· {path.name}")
         try:
             if probe:
-                print(json.dumps(probe_one(path), ensure_ascii=False, indent=2))
+                log.info(json.dumps(probe_one(path), ensure_ascii=False, indent=2))
             else:
-                print(json.dumps(run_one(path), ensure_ascii=False, indent=2))
+                log.info(json.dumps(run_one(path), ensure_ascii=False, indent=2))
         except Exception as exc:
             failed += 1
-            print(f"ERROR: {type(exc).__name__}: {exc}")
+            log.error(f"ERROR: {type(exc).__name__}: {exc}")
     if failed:
-        print(f"\n=== {failed} 份日志出错 ===")
+        log.error(f"\n=== {failed} 份日志出错 ===")
     else:
-        print(f"\n=== {len(args)} 份日志全部完成 ===")
+        log.info(f"\n=== {len(args)} 份日志全部完成 ===")
     return 1 if failed else 0
 
 

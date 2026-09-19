@@ -27,6 +27,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger()
+
 ROOT = Path(__file__).resolve().parents[2]
 WEB = ROOT / "web"
 LOG_DIR = ROOT / "tools" / "calibrate" / "logs"
@@ -67,8 +72,8 @@ def run_gate(name: str, cmd: list, cwd: Path, step: int, total: int) -> tuple[st
     indent = "      "
 
     # Header
-    print(f"\n  {tag} {name}")
-    print(f"{indent}$ {' '.join(str(c) for c in cmd)}")
+    log.info(f"\n  {tag} {name}")
+    log.info(f"{indent}$ {' '.join(str(c) for c in cmd)}")
 
     # Run and capture -- print output line by line with indent
     # PYTHONIOENCODING=utf-8: subprocess Python writes UTF-8 stdout/stderr,
@@ -87,7 +92,7 @@ def run_gate(name: str, cmd: list, cwd: Path, step: int, total: int) -> tuple[st
     assert proc.stdout is not None
     for line in proc.stdout:
         stripped = line.rstrip("\n\r")
-        print(f"{indent}| {stripped}")
+        log.info(f"{indent}| {stripped}")
     proc.wait()
 
     code = proc.returncode
@@ -96,8 +101,11 @@ def run_gate(name: str, cmd: list, cwd: Path, step: int, total: int) -> tuple[st
     # Result line: pad name to a fixed width so OK/FAIL are vertically aligned
     SEP_WIDTH = 48
     dots = "." * max(2, SEP_WIDTH - len(name) - len(tag) - 2)
-    print(f"  {tag} {name}  {dots}  {status}")
-    print()
+    if code == 0:
+        log.info(f"  {tag} {name}  {dots}  {status}")
+    else:
+        log.error(f"  {tag} {name}  {dots}  {status}")
+    log.info("")
 
     return name, ("ok" if code == 0 else "fail")
 
@@ -110,7 +118,10 @@ def run_prereq(name: str, cmd: list, cwd: Path, step: int, total: int) -> tuple[
     SEP_WIDTH = 48
     dots = "." * max(2, SEP_WIDTH - len(name) - len(tag) - 2)
     status = "OK" if ok else "MISSING"
-    print(f"  {tag} {name}  {dots}  {status}")
+    if ok:
+        log.info(f"  {tag} {name}  {dots}  {status}")
+    else:
+        log.warning(f"  {tag} {name}  {dots}  {status}")
     return name, ok
 
 
@@ -152,9 +163,9 @@ def check_toolchain(logs: list[Path], step_start: int) -> tuple[int, int]:
                 hints.append(f"  => pip install {name}")
 
     if hints:
-        print(f"  {' ' * 40}  ----")
+        log.info(f"  {' ' * 40}  ----")
         for h in sorted(set(hints)):
-            print(h)
+            log.info(h)
 
     # Node_modules file-existence checks (avoid subprocess cwd issues)
     if NODE:
@@ -165,12 +176,15 @@ def check_toolchain(logs: list[Path], step_start: int) -> tuple[int, int]:
             tag = f"[{step_no:>2}/{step_start + total - 1:<2}]"
             dots = "." * max(2, SEP_WIDTH - len(display) - len(tag) - 2)
             status = "OK" if ok else "MISSING"
-            print(f"  {tag} {display}  {dots}  {status}")
+            if ok:
+                log.info(f"  {tag} {display}  {dots}  {status}")
+            else:
+                log.warning(f"  {tag} {display}  {dots}  {status}")
             step_no += 1
             if not ok:
                 failed += 1
         if not TSC.exists() or not NEXT.exists():
-            print("  => cd web && pnpm install")
+            log.info("  => cd web && pnpm install")
 
     return failed, step_no
 
@@ -249,11 +263,11 @@ def main(argv: list[str]) -> int:
     logs = sorted(LOG_DIR.glob("*.ulg")) + sorted(LOG_DIR.glob("*.bin")) if not args.skip_logs else []
 
     # ---- Header ----
-    print()
-    print(SEP)
-    print("  check_all.py")
-    print("  Repository validation -- CI / pre-push / local")
-    print(SEP)
+    log.info("")
+    log.info(SEP)
+    log.info("  check_all.py")
+    log.info("  Repository validation -- CI / pre-push / local")
+    log.info(SEP)
 
     all_results: list[tuple[str, str]] = []
     all_skipped: list[str] = []
@@ -261,23 +275,23 @@ def main(argv: list[str]) -> int:
     step = 1
 
     # ============ Phase 1: Toolchain ============
-    print("\n  Phase 1 / Toolchain prerequisites")
-    print(f"  {'-' * 46}")
+    log.info("\n  Phase 1 / Toolchain prerequisites")
+    log.info(f"  {'-' * 46}")
     failed_prereq, step = check_toolchain(logs, step)
     if failed_prereq:
-        print(f"\n  FAIL: {failed_prereq} toolchain item(s) missing. Install per hints above.")
+        log.error(f"\n  FAIL: {failed_prereq} toolchain item(s) missing. Install per hints above.")
         return 1
 
     # ============ Phase 2: Static checks ============
-    print("\n\n  Phase 2 / Static checks (no .ulg log; blocks every CI commit)")
-    print(f"  {'-' * 46}")
+    log.info("\n\n  Phase 2 / Static checks (no .ulg log; blocks every CI commit)")
+    log.info(f"  {'-' * 46}")
     r, step = run_phase("static", STATIC_GATES, step)
     all_results += r
 
     # ============ Phase 3: Site build (optional) ============
     if args.with_build:
-        print("\n\n  Phase 3 / Site build (--with-build)")
-        print(f"  {'-' * 46}")
+        log.info("\n\n  Phase 3 / Site build (--with-build)")
+        log.info(f"  {'-' * 46}")
         r, step = run_phase("build", BUILD_GATES, step)
         all_results += r
     else:
@@ -285,10 +299,10 @@ def main(argv: list[str]) -> int:
 
     # ============ Phase 4: E2E (optional) ============
     if args.with_e2e:
-        print("\n\n  Phase 4 / E2E smoke tests (--with-e2e)")
-        print(f"  {'-' * 46}")
+        log.info("\n\n  Phase 4 / E2E smoke tests (--with-e2e)")
+        log.info(f"  {'-' * 46}")
         if os.environ.get("SKIP_LOG_ANALYSIS") == "1":
-            print("  SKIP_LOG_ANALYSIS=1: excluding log-analysis smoke cases")
+            log.info("  SKIP_LOG_ANALYSIS=1: excluding log-analysis smoke cases")
             E2E_GATES[0] = (E2E_GATES[0][0], E2E_GATES[0][1] + ["--grep-invert", "日志分析流程"], E2E_GATES[0][2])
         r, step = run_phase("e2e", E2E_GATES, step)
         all_results += r
@@ -296,17 +310,17 @@ def main(argv: list[str]) -> int:
         all_skipped.append("E2E smoke (Playwright) -- add --with-e2e to include")
 
     # ============ Phase 5: Log-dependent checks ============
-    print("\n\n  Phase 5 / Log-dependent checks (need real .ulg; local only)")
-    print(f"  {'-' * 46}")
+    log.info("\n\n  Phase 5 / Log-dependent checks (need real .ulg; local only)")
+    log.info(f"  {'-' * 46}")
     if not logs:
         reason = "skipped via --skip-logs" if args.skip_logs else f"no .ulg under {LOG_DIR.relative_to(ROOT)} (expected in CI)"
-        print(f"  SKIP  ({reason})")
+        log.warning(f"  SKIP  ({reason})")
         all_skipped.append(f"Log-dependent checks -- {reason}")
-        print("  NOTE: these are hard gates for rule/engine changes.")
-        print("        A green CI does NOT mean regression-tested.")
-        print("        Run locally: python tools/ci/check_all.py")
+        log.info("  NOTE: these are hard gates for rule/engine changes.")
+        log.info("        A green CI does NOT mean regression-tested.")
+        log.info("        Run locally: python tools/ci/check_all.py")
     else:
-        print(f"  Using {len(logs)} log(s): {', '.join(p.name for p in logs)}")
+        log.info(f"  Using {len(logs)} log(s): {', '.join(p.name for p in logs)}")
         lg = _logs_gates_with_logs(logs)
         r, step = run_phase("logs", lg, step)
         all_results += r
@@ -315,30 +329,30 @@ def main(argv: list[str]) -> int:
     passed = [(n, r) for n, r in all_results if r == "ok"]
     failed = [(n, r) for n, r in all_results if r == "fail"]
 
-    print(f"\n\n{SEP}")
-    print("  Summary")
-    print(SEP)
-    print(f"  Total : {len(all_results)} checks ran, {len(all_skipped)} skipped")
-    print()
+    log.info(f"\n\n{SEP}")
+    log.info("  Summary")
+    log.info(SEP)
+    log.info(f"  Total : {len(all_results)} checks ran, {len(all_skipped)} skipped")
+    log.info("")
 
     if passed:
-        print(f"  PASSED ({len(passed)})")
+        log.info(f"  PASSED ({len(passed)})")
         for name, _ in passed:
-            print(f"    [OK   ] {name}")
+            log.info(f"    [OK   ] {name}")
     if failed:
-        print(f"\n  FAILED ({len(failed)})")
+        log.error(f"\n  FAILED ({len(failed)})")
         for name, _ in failed:
-            print(f"    [FAIL ] {name}")
+            log.error(f"    [FAIL ] {name}")
     if all_skipped:
-        print(f"\n  SKIPPED ({len(all_skipped)})")
+        log.info(f"\n  SKIPPED ({len(all_skipped)})")
         for s in all_skipped:
-            print(f"    [SKIP ] {s}")
+            log.warning(f"    [SKIP ] {s}")
 
-    print()
+    log.info("")
     if failed:
-        print(f"  RESULT: {len(failed)} check(s) FAILED -- see output above for details.")
+        log.error(f"  RESULT: {len(failed)} check(s) FAILED -- see output above for details.")
         return 1
-    print(f"  RESULT: all {len(all_results)} checks passed.")
+    log.info(f"  RESULT: all {len(all_results)} checks passed.")
     return 0
 
 

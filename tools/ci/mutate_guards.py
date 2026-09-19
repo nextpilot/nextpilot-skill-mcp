@@ -56,6 +56,11 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger()
+
 
 def _safe(text: str) -> str:
     """把控制台编码（Windows 默认 GBK / cp936）编不出的字符（典型如 U+FFFD 替换符）换成 '?'，
@@ -339,9 +344,9 @@ def _restore_pending() -> None:
     _PENDING = None
     try:
         path.write_bytes(snapshot)
-        print(f"\n[interrupted] restored {path.name}", flush=True)
+        log.warning(f"\n[interrupted] restored {path.name}")
     except OSError as exc:
-        print(f"\n[interrupted] restore {path.name} failed: {exc} -- fix it manually", flush=True)
+        log.warning(f"\n[interrupted] restore {path.name} failed: {exc} -- fix it manually")
 
 
 def _install_signal_guard() -> None:
@@ -493,7 +498,7 @@ def main(argv: list[str]) -> int:
     args = ap.parse_args(argv[1:])
 
     if args.guard and args.guard not in GUARDS:
-        print(f"FAIL --guard={args.guard!r} is not a known guard layer: {' / '.join(sorted(GUARDS))}")
+        log.error(f"FAIL --guard={args.guard!r} is not a known guard layer: {' / '.join(sorted(GUARDS))}")
         return 1
 
     picked = list(MUTATIONS)
@@ -502,20 +507,20 @@ def main(argv: list[str]) -> int:
     if args.only:
         picked = [m for m in picked if args.only in m.name]
     if (args.only or args.guard) and not picked:
-        print(f"FAIL --only={args.only!r} --guard={args.guard!r} matched zero mutations")
+        log.error(f"FAIL --only={args.only!r} --guard={args.guard!r} matched zero mutations")
         return 1
 
     if args.list:
-        print(f"Registry ({len(picked)} entries):")
+        log.info(f"Registry ({len(picked)} entries):")
         for i, m in enumerate(picked, 1):
-            print(f"  [{i:>2}] {_safe(m.name)}")
-            print(f"       {m.path}")
-            print(f"       guard {GUARDS[m.guard][2]} -> expected red on: {m.expect}")
+            log.info(f"  [{i:>2}] {_safe(m.name)}")
+            log.info(f"       {m.path}")
+            log.info(f"       guard {GUARDS[m.guard][2]} -> expected red on: {m.expect}")
             if m.note:
-                print(f"       why: {_safe(m.note)}")
+                log.info(f"       why: {_safe(m.note)}")
         return 0
 
-    print(f"=== Guard self-proof ({len(picked)} mutations, each must turn its guard red) ===")
+    log.info(f"=== Guard self-proof ({len(picked)} mutations, each must turn its guard red) ===")
     blocked = _missing_tools()
 
     # Baseline: run each guard, must be all-green before mutating
@@ -524,18 +529,19 @@ def main(argv: list[str]) -> int:
         for key in sorted({m.guard for m in picked}):
             label = GUARDS[key][2]
             if key in blocked:
-                print(f"\n  baseline: {label}")
-                print(f"SKIP {blocked[key]}")
+                log.info(f"\n  baseline: {label}")
+                log.warning(f"SKIP {blocked[key]}")
                 continue
             code, out = _run_guard(key)
             if code != 0:
-                print(f"\n  baseline: {label}")
-                print("FAIL baseline is red -- fix it first (can't tell who turned red after mutation):")
-                print("\n".join("  " + _safe(ln) for ln in out.splitlines()[-25:]))
+                log.info(f"\n  baseline: {label}")
+                log.error("FAIL baseline is red -- fix it first (can't tell who turned red after mutation):")
+                for ln in out.splitlines()[-25:]:
+                    log.error("  " + _safe(ln))
                 return 1
             usable.add(key)
-            print(f"\n  baseline: {label}")
-            print("OK baseline green")
+            log.info(f"\n  baseline: {label}")
+            log.info("OK baseline green")
     else:
         usable = {m.guard for m in picked} - set(blocked)
 
@@ -546,18 +552,18 @@ def main(argv: list[str]) -> int:
     dirty_before = _porcelain(touched)
 
     for i, m in enumerate(picked, 1):
-        print(f"\n--- [{i}/{len(picked)}] {_safe(m.name)}")
+        log.info(f"\n--- [{i}/{len(picked)}] {_safe(m.name)}")
         if m.guard not in usable:
-            print(f"SKIP guard unavailable -- {blocked.get(m.guard, 'see above')}")
+            log.warning(f"SKIP guard unavailable -- {blocked.get(m.guard, 'see above')}")
             skipped.append(_safe(m.name))
             continue
         if m.note:
-            print(f"   guards: {_safe(m.note)}")
+            log.info(f"   guards: {_safe(m.note)}")
         path = ROOT / m.path
         try:
             snapshot = _apply(path, m.old, m.new)
         except AnchorError as exc:
-            print(f"FAIL {exc}")
+            log.error(f"FAIL {exc}")
             failures.append(f"{_safe(m.name)} (anchor mismatch, script bug)")
             continue
         _PENDING = (path, snapshot)
@@ -568,53 +574,55 @@ def main(argv: list[str]) -> int:
             path.write_bytes(snapshot)
 
         if path.read_bytes() != snapshot:
-            print(f"FAIL restore failed: {m.path} byte mismatch vs snapshot")
+            log.error(f"FAIL restore failed: {m.path} byte mismatch vs snapshot")
             failures.append(f"{_safe(m.name)} (restore failed)")
             continue
 
         if code == 0:
-            print("FAIL guard did NOT turn red (exit 0) -- mutation not guarded, guard always-green")
-            print("\n".join("  " + _safe(ln) for ln in out.splitlines()[-15:]))
+            log.error("FAIL guard did NOT turn red (exit 0) -- mutation not guarded, guard always-green")
+            for ln in out.splitlines()[-15:]:
+                log.error("  " + _safe(ln))
             failures.append(f"{_safe(m.name)} (guard always-green)")
             continue
         red = _failed_names(m.guard, out)
         if m.expect not in red:
-            print(
+            log.error(
                 f"FAIL turned red, but wrong reason: red={[_safe(r) for r in sorted(red)] or ['(unable to count)']}  expected={_safe(m.expect)!r}"
             )
-            print("\n".join("  " + _safe(ln) for ln in out.splitlines()[-15:]))
+            for ln in out.splitlines()[-15:]:
+                log.error("  " + _safe(ln))
             failures.append(f"{_safe(m.name)} (red but wrong reason)")
             continue
         if len(red) > 1:
-            print("FAIL cross-contaminated other guards (mutation hit something else):")
+            log.error("FAIL cross-contaminated other guards (mutation hit something else):")
             for one in sorted(red - {m.expect}):
-                print(f"    also red: {_safe(one)}")
+                log.error(f"    also red: {_safe(one)}")
             failures.append(f"{_safe(m.name)} (contaminated {len(red) - 1} others)")
             continue
 
         ran[m.guard] = ran.get(m.guard, 0) + 1
-        print(f"OK exactly this one red (exit {code})")
-        print("OK restored (byte-identical to snapshot)")
+        log.info(f"OK exactly this one red (exit {code})")
+        log.info("OK restored (byte-identical to snapshot)")
 
     # 自证不该在仓库里留下任何痕迹。逐字节还原只证明"变异过的那个文件"复原了；万一守卫
     # 自己写了**别的**文件（生成器、缓存、产物），只有这一步看得见。
     # 注意比的是"跑前 vs 跑后"，不是"脏不脏"——仓库里经常挂着别人没提交的改动。
     for path, code in sorted(_porcelain(touched).items()):
         if dirty_before.get(path) != code:
-            print(f"FAIL self-proof left changes in repo: {path}  {dirty_before.get(path, '  ')} -> {code}")
+            log.error(f"FAIL self-proof left changes in repo: {path}  {dirty_before.get(path, '  ')} -> {code}")
             failures.append(f"{path} (self-proof dirtied repo)")
 
-    print("\n=== Summary ===")
+    log.info("\n=== Summary ===")
     for key in sorted(ran):
-        print(f"  OK   {GUARDS[key][2]}: {ran[key]} mutations each independently turned red")
+        log.info(f"  OK   {GUARDS[key][2]}: {ran[key]} mutations each independently turned red")
     for name in skipped:
-        print(f"  SKIP {_safe(name)}")
+        log.warning(f"  SKIP {_safe(name)}")
     if failures:
-        print(f"\nFAIL {len(failures)} mutation(s) could not self-prove:")
+        log.error(f"\nFAIL {len(failures)} mutation(s) could not self-prove:")
         for name in failures:
-            print(f"  - {_safe(name)}")
+            log.error(f"  - {_safe(name)}")
         return 1
-    print(f"\nOK all {sum(ran.values())} mutations self-proved (each exactly one red, restore byte-identical).")
+    log.info(f"\nOK all {sum(ran.values())} mutations self-proved (each exactly one red, restore byte-identical).")
     return 0
 
 

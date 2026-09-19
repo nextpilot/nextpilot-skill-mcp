@@ -17,6 +17,11 @@ import json
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger()
+
 # 复用同一套加载/执行逻辑，保证"基线跑的是什么，比对跑的就是什么"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import run_checks_locally as runner  # noqa: E402
@@ -64,7 +69,7 @@ def dump_one(path: Path) -> Path:
     out.write_text(json.dumps(envelope, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     n_findings = len(result.get("findings", []))
     n_faults = len(result.get("matchedFaults", []))
-    print(f"  {envelope['slug']:14} ← {path.name}  findings={n_findings} faults={n_faults}  → {out.name}")
+    log.info(f"  {envelope['slug']:14} ← {path.name}  findings={n_findings} faults={n_faults}  → {out.name}")
     return out
 
 
@@ -72,16 +77,16 @@ def main(argv: list[str]) -> int:
     args = argv[1:]
     logs = [Path(a) for a in args] if args else sorted(LOG_DIR.glob("*.ulg"))
     if not logs:
-        print("没有可冻结的日志（tools/calibrate/logs/*.ulg）")
+        log.warning("没有可冻结的日志（tools/calibrate/logs/*.ulg）")
         return 2
-    print(f"冻结 {len(logs)} 个日志的引擎输出到 {BASELINE_DIR.relative_to(REPO_ROOT)}/")
+    log.info(f"冻结 {len(logs)} 个日志的引擎输出到 {BASELINE_DIR.relative_to(REPO_ROOT)}/")
     for p in logs:
         try:
             dump_one(p)
         except Exception as exc:  # noqa: BLE001
-            print(f"  ERROR {p.name}: {type(exc).__name__}: {exc}")
+            log.error(f"  ERROR {p.name}: {type(exc).__name__}: {exc}")
             return 1
-    print("完成。")
+    log.info("完成。")
     return 0
 
 

@@ -52,6 +52,11 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger()
+
 ROOT = Path(__file__).resolve().parents[2]
 ENGINE = ROOT / "engine"
 
@@ -116,7 +121,7 @@ def check_engine_is_pure_python() -> list[str]:
                         f"三处共用的一份源码，不能含只在一个运行时里成立的东西"
                     )
     if not problems:
-        print(f"  {len(files)} 个 .py，0 处 Pyodide / JS 桥接 / 浏览器全局")
+        log.info(f"  {len(files)} 个 .py，0 处 Pyodide / JS 桥接 / 浏览器全局")
     return problems
 
 
@@ -157,31 +162,31 @@ def main(argv: list[str]) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(line_buffering=True)  # 与 check_all.py 同理：重定向时不与子进程输出交错
 
-    print("=== engine/ 纯 Python 守卫 ===")
+    log.info("=== engine/ 纯 Python 守卫 ===")
     failed: list[str] = []
     for name, fn in CHECKS:
-        print(f"\n· {name}")
+        log.info(f"\n· {name}")
         problems = fn()  # type: ignore[operator]
         if problems:
             # 这一行的格式有意义：`FAIL <名字>  -> <一句话>` 是 tools/ci/mutate_guards.py
             # 从输出里数"红了几条"的依据，名字要与注册表里的 expect 逐字一致。
-            print(f"FAIL {name}  -> {problems[0]}" + (f"（共 {len(problems)} 处）" if len(problems) > 1 else ""))
+            log.error(f"FAIL {name}  -> {problems[0]}" + (f"（共 {len(problems)} 处）" if len(problems) > 1 else ""))
             for one in problems:
-                print(f"      {one}")
+                log.error(f"      {one}")
             failed.append(name)
         else:
-            print(f"OK {name}")
+            log.info(f"OK {name}")
 
-    print("\n=== 汇总 ===")
+    log.info("\n=== 汇总 ===")
     for name, _ in CHECKS:
-        print(f"  {'FAIL' if name in failed else 'OK  '} {name}")
+        log.info(f"  {'FAIL' if name in failed else 'OK  '} {name}")
     if failed:
         # 这句**不能**写成 `FAIL <名字>` 的形状：tools/ci/mutate_guards.py 逐行取
         # "FAIL 后面的东西"当检查名，那句总结会被它当成一条检查名，
         # 于是每条变异都多报一次"牵连"。
-        print(f"\n{len(failed)} 项未过 —— 逐项看上面的输出。")
+        log.error(f"\n{len(failed)} 项未过 —— 逐项看上面的输出。")
         return 1
-    print(f"\nOK 全部通过（{len(CHECKS)} 项）。")
+    log.info(f"\nOK 全部通过（{len(CHECKS)} 项）。")
     return 0
 
 

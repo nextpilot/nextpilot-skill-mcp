@@ -18,6 +18,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger()
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import run_checks_locally as runner  # noqa: E402
 
@@ -192,16 +197,16 @@ def check_provider(ns: dict, path: Path) -> None:
 def main(argv: list[str]) -> int:
     args = argv[1:]
     if not args or args[0] in ("-h", "--help"):
-        print(__doc__)
+        log.info(__doc__)
         return 2
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(line_buffering=True)
 
-    print("=== 适配器契约测试（对每份日志跑同一套断言） ===")
+    log.info("=== 适配器契约测试（对每份日志跑同一套断言） ===")
     total = 0
     for name in args:
         path = Path(name)
-        print(f"\n· {path.name}")
+        log.info(f"\n· {path.name}")
         try:
             ns = runner.build_namespace(path)
         except Exception as exc:
@@ -210,13 +215,12 @@ def main(argv: list[str]) -> int:
         check_provider(ns, path)
         total += 1
     if FAILED:
-        print(f"\n=== 汇总：{len(FAILED)} 条失败 ===")
+        log.error(f"\n=== 汇总：{len(FAILED)} 条失败 ===")
         for m in FAILED:
-            print(f"  FAIL {m}")
+            log.error(f"  FAIL {m}")
         return 1
-    ok_count = total * 8  - len([f for f in FAILED if "打不开" not in f])
     lines = [f"{total} 份日志全部通过" if not FAILED else f"{len(FAILED)} 条失败 / {total} 份日志跑完"]
-    print(f"\n=== 契约测试{'通过' if not FAILED else '失败'}：{'；'.join(lines)} ===")
+    log.info(f"\n=== 契约测试{'通过' if not FAILED else '失败'}：{'；'.join(lines)} ===")
     return 1 if FAILED else 0
 
 

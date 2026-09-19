@@ -17,6 +17,11 @@ import json
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger()
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import run_checks_locally as runner  # noqa: E402
 
@@ -68,25 +73,25 @@ def main(argv: list[str]) -> int:
     else:
         paths = sorted(BASELINE_DIR.glob("*.json"))
     if not paths:
-        print("没有基线文件，先跑 dump-baseline.py")
+        log.warning("没有基线文件，先跑 dump-baseline.py")
         return 2
-    print("=== 基线比对 ===")
+    log.info("=== 基线比对 ===")
     failures = 0
     for p in paths:
         if not p.exists():
-            print(f"SKIP（基线不存在）: {p.name}")
+            log.warning(f"SKIP（基线不存在）: {p.name}")
             failures += 1
             continue
         diffs = compare_one(p)
         slug = p.stem
         if diffs:
             failures += 1
-            print(f"FAIL {slug}: {len(diffs)} 处差异")
+            log.error(f"FAIL {slug}: {len(diffs)} 处差异")
             for d in diffs:
-                print(d)
+                log.error(d)
         else:
-            print(f"OK   {slug}")
-    print(f"\n=== 基线比对{'全部通过' if failures == 0 else f'{failures} 项不一致'} ===")
+            log.info(f"OK   {slug}")
+    log.info(f"\n=== 基线比对{'全部通过' if failures == 0 else f'{failures} 项不一致'} ===")
     return 1 if failures else 0
 
 

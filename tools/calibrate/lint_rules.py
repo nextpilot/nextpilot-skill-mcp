@@ -32,6 +32,11 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger()
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import run_checks_locally as runner  # noqa: E402
 
@@ -86,7 +91,7 @@ def fields_by_version_from_logs() -> dict[tuple[int, int], dict[str, set[str]]]:
     try:
         from pyulog import ULog
     except ImportError:  # pragma: no cover
-        print("需要 pyulog 才能读日志字段（pip install pyulog）")
+        log.warning("需要 pyulog 才能读日志字段（pip install pyulog）")
         return {}
     # 日志 → 版本：基线里记着 firmware
     log_fw: dict[str, tuple[int, int]] = {}
@@ -115,7 +120,7 @@ def fields_by_version_from_logs() -> dict[tuple[int, int], dict[str, set[str]]]:
         try:
             ulog = ULog(str(path))
         except Exception as exc:  # noqa: BLE001
-            print("  跳过 %s：%s" % (path.name, exc))
+            log.warning("  跳过 %s：%s" % (path.name, exc))
             continue
         bucket = out.setdefault(ver, {})
         for d in ulog.data_list:
@@ -197,13 +202,9 @@ def main(argv: list[str]) -> int:
     logs = fields_by_version_from_logs()
     meta = fields_by_version_from_meta()
     versions = sorted(set(logs) | set(meta))
-    print(f"=== 经验规则字段引用检查 ===\n来源版本：{'，'.join(fmt(v) for v in versions)}（日志实测 {len(logs)} 个版本，字典 {len(meta)} 个版本）")
+    log.info(f"=== 经验规则字段引用检查 ===\n来源版本：{'，'.join(fmt(v) for v in versions)}（日志实测 {len(logs)} 个版本，字典 {len(meta)} 个版本）")
     if not logs:
-        # 别让这一行被划过去：日志侧一旦空转，判定就只剩上游字典一个来源，
-        # 日志里真实存在的旧固件字段会被整片误报成"可疑"（假阳性），
-        # 而报告看起来跟"真查出问题"一模一样。曾因固件版本取错路径踩过：
-        # 6 份日志在，18 条可疑全是假的。
-        print(
+        log.warning(
             "警告：日志侧字段源为空 —— 上面那些'可疑引用'会大量假阳性，先确认\n"
             "      %s 下有 .ulg、且 baseline/*.json 的 result.facts.firmware 有值。" % LOG_DIR
         )
@@ -238,20 +239,20 @@ def main(argv: list[str]) -> int:
             suspicious += 1
             bad_rows.append((rid, label(names)))
 
-    print("\n字段引用 %d 处：适用版本内命中 %d ｜ 版本错配 %d ｜ 可疑 %d" % (ok + gaps + suspicious, ok, gaps, suspicious))
+    log.info("\n字段引用 %d 处：适用版本内命中 %d ｜ 版本错配 %d ｜ 可疑 %d" % (ok + gaps + suspicious, ok, gaps, suspicious))
 
     if gap_rows:
-        print("\n版本错配：声明的 firmware 范围内找不到这些字段（该经验在这些固件上不会生效）")
-        print('    修法：改 firmware 范围 / 补 when_fw 分支 / 改用候选组 ref("新名", "旧名")')
+        log.warning("\n版本错配：声明的 firmware 范围内找不到这些字段（该经验在这些固件上不会生效）")
+        log.warning('    修法：改 firmware 范围 / 补 when_fw 分支 / 改用候选组 ref("新名", "旧名")')
         for rid, names, fw, elsewhere in gap_rows:
-            print("   %-28s %-42s firmware=%s ｜ 仅存在于 %s" % (rid, names, fw, ", ".join(elsewhere)))
+            log.warning("   %-28s %-42s firmware=%s ｜ 仅存在于 %s" % (rid, names, fw, ", ".join(elsewhere)))
     if bad_rows:
-        print("\n可疑引用（哪里都没找到，多半是拼错）：")
+        log.error("\n可疑引用（哪里都没找到，多半是拼错）：")
         for rid, names in bad_rows:
-            print("   %-28s %s" % (rid, names))
+            log.error("   %-28s %s" % (rid, names))
     failed = gaps + suspicious
     if failed == 0:
-        print("\n=== 经验规则字段引用检查通过：所有引用都在其版本范围内找得到 ===")
+        log.info("\n=== 经验规则字段引用检查通过：所有引用都在其版本范围内找得到 ===")
     return 1 if (strict and failed) else 0
 
 
