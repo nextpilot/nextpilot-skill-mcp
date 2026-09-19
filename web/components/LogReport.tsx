@@ -222,11 +222,13 @@ export function LogReport({
       )}
 
       {/* tabs */}
-      <div className="flex gap-1 border-b border-border">
+      <div role="tablist" className="flex gap-1 border-b border-border">
         {tabs.map((t) => (
           <button
             key={t.key}
             type="button"
+            role="tab"
+            aria-selected={effectiveTab === t.key}
             disabled={t.disabled}
             aria-label={t.label}
             title={t.label}
