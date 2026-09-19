@@ -5,7 +5,7 @@
 
 ## 1. 现象
 
-`tools/check-upload.mjs` 通过 CDP（Chrome DevTools Protocol）驱动无头 Chrome 做端到端自检：
+`tools/browser/check-upload.mjs` 通过 CDP（Chrome DevTools Protocol）驱动无头 Chrome 做端到端自检：
 打开 `/analyze` → 清空本机历史（绕过「此前已分析过」去重）→ 把一个真实 `.ulg` 塞进
 `<input type="file">` 并派发 `change` → 等待报告渲染 → 截图。
 
@@ -43,7 +43,7 @@ cd web && pnpm dev
 # 2) 用上面的命令行起 headless Chrome（远程调试 9222）
 
 # 3) 跑 e2e（脚本会自己开一个干净标签页、清历史、上传、等结果、截图）
-node tools/check-upload.mjs \
+node tools/browser/check-upload.mjs \
   tools/calibrate/logs/ce302d3b-06bc-43ab-9c2a-027d29fcefd3.ulg /tmp/shot.png
 ```
 

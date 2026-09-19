@@ -5,14 +5,15 @@
 // 这里借已跑着的 headless Chrome 出 PNG（抗锯齿由浏览器负责），再用 Node 内置 zlib 之外的
 // 纯拼装写 ICO——ICO 允许条目直接内嵌 PNG，不需要 BMP 编码。
 //
-// 用法: 先以 --remote-debugging-port=9222 启动 Chrome，再 node scripts/make-icons.mjs
+// 用法: 先以 --remote-debugging-port=9222 启动 Chrome，再 node tools/browser/make-icons.mjs
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+// 本文件在 tools/browser/ 下，故需向上两级才到仓库根（tools/browser/ -> tools/ -> 仓库根）。
+const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const ICON_SVG = join(root, "web", "app", "icon.svg");
 
 const icoSizes = [16, 32, 48];
