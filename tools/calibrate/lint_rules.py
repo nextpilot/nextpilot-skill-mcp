@@ -202,7 +202,9 @@ def main(argv: list[str]) -> int:
     logs = fields_by_version_from_logs()
     meta = fields_by_version_from_meta()
     versions = sorted(set(logs) | set(meta))
-    log.info(f"=== 经验规则字段引用检查 ===\n来源版本：{'，'.join(fmt(v) for v in versions)}（日志实测 {len(logs)} 个版本，字典 {len(meta)} 个版本）")
+    log.info(
+        f"=== 经验规则字段引用检查 ===\n来源版本：{'，'.join(fmt(v) for v in versions)}（日志实测 {len(logs)} 个版本，字典 {len(meta)} 个版本）"
+    )
     if not logs:
         log.warning(
             "警告：日志侧字段源为空 —— 上面那些'可疑引用'会大量假阳性，先确认\n"

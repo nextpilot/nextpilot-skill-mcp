@@ -84,7 +84,6 @@ def extract_json_const(src: str, name: str):
 
 def main() -> int:
     log.info("=== 产物校验（check_artifact） ===")
-    failed = False
     src = TS.read_text(encoding="utf-8")
     m = re.search(r"String\.raw`(.*)`\n", src, re.S)
     if not m:
@@ -194,15 +193,15 @@ def main() -> int:
     if not logs:
         log.warning("SKIP 没有回归日志，跳过执行检查（caller 用 check_all.py 会自动跳过）")
         return 0
-    log = logs[0]
-    ns: dict = {"ulog_bytes": log.read_bytes()}
+    log_file = logs[0]
+    ns: dict = {"ulog_bytes": log_file.read_bytes()}
     try:
         exec(compile(final + "\n" + m2.group(1), "<artifact>", "exec"), ns)
         # 判定产物走具名入口（np_report 把结果摆到 __result）；以前靠"执行脚本的副作用"留下
         ns["np_report"]()
         result = json.loads(ns["__result"])
     except Exception as e:  # noqa: BLE001
-        log.error(f"产物执行失败（{log.name}）：{type(e).__name__}: {e}")
+        log.error(f"产物执行失败（{log_file.name}）：{type(e).__name__}: {e}")
         import traceback
 
         traceback.print_exc(limit=3)
@@ -216,7 +215,7 @@ def main() -> int:
         log.error(f"findings 不是数组，而是 {type(result['findings']).__name__}")
         return 1
     log.info(
-        f"OK 产物执行检查通过：{log.name} → findings={len(result['findings'])}, "
+        f"OK 产物执行检查通过：{log_file.name} → findings={len(result['findings'])}, "
         f"checksRun={len(result.get('checksRun', []))}, tags={result.get('tags')}"
     )
 
@@ -269,7 +268,7 @@ def main() -> int:
         log.info(f"  OK 轨迹成功的返回体契约通过（{case}）：{len(payload['tracks'])} 条轨道")
         return True
 
-    if not check_track_contract(produced.get("np_track") or {}, f"{log.name} 实跑"):
+    if not check_track_contract(produced.get("np_track") or {}, f"{log_file.name} 实跑"):
         return 1
 
     # 「像经纬度」的判据必须**独立成段**。裸子串会把 `relative_test_ratio` /

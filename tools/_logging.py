@@ -10,6 +10,7 @@ Usage:
 
 Colors: ERROR → red, WARNING → yellow, INFO/DEBUG → default.
 """
+
 from __future__ import annotations
 
 import logging
