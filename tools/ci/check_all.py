@@ -11,6 +11,7 @@
 | 校验 | 拦什么 |
 | --- | --- |
 | `ruff format --check` / `ruff check` | Python 风格漂移与真 bug（见仓库根 `pyproject.toml`） |
+| `pytest engine/tests` | 算子求值与 CEL 沙箱（表达式白名单 / 空 `__builtins__`）—— 改 `engine/operators.py`、`rule_engine.py` 的硬门槛，不需要真实日志、CI 能跑 |
 | `build:kb --check` | 产物与 `knowledge/` 不一致、契约写漏、字段/算子引用错 |
 | `check_artifact.py` | 产物不是合法 Python、`compute` 表达式 Python 侧解析不了、`.replace` 链缺名字、**worker 守卫查的全局名在产物命名空间里不存在**（恒真/恒假的守卫，语法与执行检查都看不见）、**地图预设的适用范围（`conditions.topics`）没搬进 `facts.track`**（搬丢了引擎就少了"缺哪个 topic"那道闸门）、**轨迹取不到时的返回体没带逐条原因**（界面只能显示一句常常说错的概括） |
 | `check_engine_purity.py` | `engine/` 里出现 Pyodide / JS 桥接 / 浏览器全局 —— 它是浏览器（Pyodide）、本机 `tools/calibrate/` 与将来的服务端**三处共用**的一份源码，含了只在某一处成立的东西，另外两处会在**跑到那一行**时才炸（没人看着就会破，破了之后只能复制一份出去改） |
@@ -93,6 +94,10 @@ def check_toolchain(logs: list[Path]) -> int:
 
     if capture([PY, "-m", "ruff", "--version"]).returncode != 0:
         problems.append("没装 ruff —— 装法：python -m pip install -r requirements-dev.txt")
+    # 单元测试工具链（CI 与本地都要）：pytest 跑 engine/tests，numpy 是算子/引擎依赖
+    for mod in ("pytest", "numpy"):
+        if capture([PY, "-c", f"import {mod}"]).returncode != 0:
+            problems.append(f"没装 {mod} —— 装法：python -m pip install -r requirements-dev.txt")
     if not NODE:
         problems.append("PATH 里没有 node —— 先装 Node.js 22+（见 README「快速开始」）")
     else:
@@ -101,9 +106,9 @@ def check_toolchain(logs: list[Path]) -> int:
                 problems.append(f"web/node_modules 里没有 {name} —— 先跑：cd web && pnpm install")
                 break
     if logs:
-        missing = [mod for mod in ("pyulog", "numpy", "yaml") if capture([PY, "-c", f"import {mod}"]).returncode != 0]
+        missing = [mod for mod in ("pyulog", "yaml") if capture([PY, "-c", f"import {mod}"]).returncode != 0]
         if missing:
-            problems.append(f"本地日志类校验需要 {' / '.join(missing)} —— 装法：python -m pip install pyulog numpy pyyaml")
+            problems.append(f"本地日志类校验需要 {' / '.join(missing)} —— 装法：python -m pip install pyulog pyyaml")
 
     for p in problems:
         print(f"FAIL {p}")
@@ -144,6 +149,12 @@ def main(argv: list[str]) -> int:
     print("\n--- 不需要日志（CI 覆盖这一段）---")
     results.append(gate("Python 风格（ruff format --check）", [PY, "-m", "ruff", "format", "--check", "."]))
     results.append(gate("Python lint（ruff check）", [PY, "-m", "ruff", "check", "."]))
+    results.append(
+        gate(
+            "算子/CEL 沙箱单元测试（pytest，不需要真实日志）",
+            [PY, "-m", "pytest", "engine/tests"],
+        )
+    )
     results.append(
         gate(
             "构建期契约与产物一致 + 指南页与 engine 源码一致（build:kb --check）",

@@ -13,7 +13,13 @@ ruff==0.16.7
 # 读 facts.yaml 与 plot/track.yml。**CI 也要这一条**，所以不能只写在 calibrate 那边。
 PyYAML==6.0
 
+# 单元测试（engine/tests：算子求值 + CEL 沙箱）。不需要真实日志，CI 与本地都跑，
+# 是「代码提交 → 单元测试」这道门禁的落地项（见 tools/ci/check_all.py）。
+pytest==8.3.4
+# 算子与拼进 Pyodide 的引擎都依赖 numpy；CI 用这份，浏览器侧由 Pyodide 自带。
+numpy==2.1.3
+
 # 需要真实日志的那组校验（冻结基线比对 / 契约测试 / probe-data）另外还要：
-#   pip install pyulog numpy
+#   pip install pyulog
 # 它们跑不了 CI——原始 .ulg 含 GPS 轨迹、按隐私规则不入库——故不列在这里强制安装。
 # 见 .gitignore 与 tools/ci/check_all.py 的文档。

@@ -290,7 +290,7 @@ function MetricsTab({ report }: { report: AnalysisReport }) {
         </p>
       ) : (
         <div className="overflow-hidden rounded-lg border border-border">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm" data-testid="metrics-table">
             <tbody>
               {metrics.map((m) => (
                 <tr key={m.key} className="border-b border-border/60 last:border-0">
@@ -546,7 +546,7 @@ function FindingCard({ finding }: { finding: Finding }) {
   const tone = TONES[finding.severity];
 
   return (
-    <div className={`rounded-r-lg border-l-2 p-3.5 ${tone.cls}`}>
+    <div className={`rounded-r-lg border-l-2 p-3.5 ${tone.cls}`} data-finding>
       <div className="flex items-center gap-2">
         {tone.icon}
         <span className="text-xs text-muted">{finding.id}</span>

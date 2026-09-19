@@ -56,6 +56,28 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+
+def _safe(text: str) -> str:
+    """把控制台编码（Windows 默认 GBK / cp936）编不出的字符（典型如 U+FFFD 替换符）换成 '?'，
+    避免 print 时 UnicodeEncodeError 直接崩脚本。
+
+    守卫输出是从子进程按 utf-8 读来的、可能夹带坏字节（解码时 errors="replace" 会把坏字节
+    变成 U+FFFD）。**只用于打印**：同一份原始 out 仍拿去和注册表的 expect 文案做匹配，不受
+    影响。
+    """
+    enc = getattr(sys.stdout, "encoding", None) or "utf-8"
+    if enc.lower().replace("-", "") == "utf8":
+        return text  # 已经是 UTF-8 终端（CI / 新 PowerShell），U+FFFD 编得出，无需替换
+    buf: list[str] = []
+    for ch in text:
+        try:
+            ch.encode(enc)
+            buf.append(ch)
+        except UnicodeEncodeError:
+            buf.append("?")
+    return "".join(buf)
+
+
 ROOT = Path(__file__).resolve().parents[2]
 WEB = ROOT / "web"
 LOG_DIR = ROOT / "tools" / "calibrate" / "logs"
@@ -504,7 +526,7 @@ def main(argv: list[str]) -> int:
             if code != 0:
                 print(f"\n· 基线：{label}")
                 print("FAIL 基线就是红的，先修它（否则后面分不清是谁红的）：")
-                print("\n".join("  " + ln for ln in out.splitlines()[-25:]))
+                print("\n".join("  " + _safe(ln) for ln in out.splitlines()[-25:]))
                 return 1
             usable.add(key)
             print(f"\n· 基线：{label}")
@@ -549,13 +571,13 @@ def main(argv: list[str]) -> int:
 
         if code == 0:
             print("FAIL 守卫**没红**（退出码 0）—— 这条变异没人守，守卫恒绿")
-            print("\n".join("  " + ln for ln in out.splitlines()[-15:]))
+            print("\n".join("  " + _safe(ln) for ln in out.splitlines()[-15:]))
             failures.append(f"{m.name}（守卫恒绿）")
             continue
         red = _failed_names(m.guard, out)
         if m.expect not in red:
             print(f"FAIL 红了，但不是预期的原因：红了 {sorted(red) or ['（数不出来）']}，期望「{m.expect}」")
-            print("\n".join("  " + ln for ln in out.splitlines()[-15:]))
+            print("\n".join("  " + _safe(ln) for ln in out.splitlines()[-15:]))
             failures.append(f"{m.name}（红的不是它）")
             continue
         # 断言「恰好一条」而不是「预期那条在里面」：牵连说明守卫之间有耦合，
@@ -565,7 +587,7 @@ def main(argv: list[str]) -> int:
         if len(red) > 1:
             print("FAIL 牵连了别的守卫（变异改到了它守的东西）：")
             for one in sorted(red - {m.expect}):
-                print(f"   还红了：{one}")
+                print(f"   还红了：{_safe(one)}")
             failures.append(f"{m.name}（牵连 {len(red) - 1} 条）")
             continue
 

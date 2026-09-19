@@ -55,7 +55,7 @@ jobs:
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
       || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       DEPLOY_ENV: ${{ github.event.inputs.env || 'production' }}
       # workflow_run 的 checkout 默认落在 master 上，而不是触发它的那次提交；
@@ -96,23 +96,26 @@ jobs:
           PROJECT: ${{ vars.EDGEONE_PROJECT }}
         run: npx --yes edgeone pages deploy -n "$PROJECT" -t "$TOKEN" -e "$DEPLOY_ENV"
 
-      - name: 部署后冒烟
+      # 部署后**全套 E2E**（真实 Playwright，打线上站点 SMOKE_BASE_URL）。
+      # 替代原来只 curl /ping 的弱冒烟：端到端验证线上构建产物——
+      # 含真实上传 .ulg → Pyodide 解析 → 显示，因此也是「升级后的部署后冒烟」。
+      # 仅生产环境且配置了 SMOKE_BASE_URL 时跑；跑挂了说明线上有问题，部署被视为失败。
+      - name: 装 pnpm + Playwright 浏览器
         if: vars.SMOKE_BASE_URL != '' && env.DEPLOY_ENV == 'production'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+
+      - name: 部署后全套 E2E（真实 Playwright，打线上站点）
+        if: vars.SMOKE_BASE_URL != '' && env.DEPLOY_ENV == 'production'
+        working-directory: web
         env:
           SMOKE_BASE_URL: ${{ vars.SMOKE_BASE_URL }}
         run: |
-          set -uo pipefail
-          for i in $(seq 1 20); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' "$SMOKE_BASE_URL/ping" || echo 000)
-            if [ "$code" = "200" ]; then
-              echo "OK /ping 200（第 $i 次探测）"
-              exit 0
-            fi
-            echo "第 $i 次 /ping -> $code，15s 后重试"
-            sleep 15
-          done
-          echo "::error::冒烟失败：5 分钟内 /ping 一直不是 200。可能是 CLI 报成功但产物没生效，去 EdgeOne 控制台看部署状态"
-          exit 1
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+          pnpm exec playwright test --config playwright.live.config.ts
 
       - name: 摘要
         if: always()
