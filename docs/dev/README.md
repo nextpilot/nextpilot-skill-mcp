@@ -11,7 +11,7 @@
 | 日志分析的检查经验（阈值 / 判定条件 / 算子） | [`knowledge/px4/rules/*.yaml`](../../knowledge/px4/rules) → 网站 [`/guide/rule-catalogue`](https://skill.nextpilot.org/guide/rule-catalogue) |
 | 怎么**写**一条检查经验 | 网站 `/guide/rule-schema`（由 `web/scripts/build-knowledge.mjs` 从 `engine/` 源码生成 `web/.generated/guide/rule-schema.mdx`） |
 | 规则体系的设计动机、实施状态与已知缺口 | [`knowledge/px4/CLAUDE.md`](../../knowledge/px4/CLAUDE.md)（给 AI 与维护者，不发布到网站） |
-| 故障根因 / 排查步骤 / 禁忌 | [`knowledge/px4/px4-fault-kb.yaml`](../../knowledge/px4/px4-fault-kb.yaml) |
+| 故障根因 / 排查步骤 / 禁忌 | [`knowledge/px4/fault-kb.yaml`](../../knowledge/px4/fault-kb.yaml) |
 | 平台定位、商业模式、路线图 | 仓库根 [`CLAUDE.md`](../../CLAUDE.md) |
 
 ## 目录

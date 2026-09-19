@@ -85,7 +85,7 @@ export interface Finding {
   suggestion?: string;
 }
 
-/** 第三层确定性匹配到的故障知识库条目（见 knowledge/px4/px4-fault-kb.yaml） */
+/** 第三层确定性匹配到的故障知识库条目（见 knowledge/px4/fault-kb.yaml） */
 export interface MatchedFault {
   faultId: string;
   faultTag: string;

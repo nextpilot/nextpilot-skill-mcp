@@ -506,7 +506,7 @@ w_p95 = percentile(hypot(ref("estimator_wind.windspeed_north", "wind_estimate.wi
 | 经验类型 | 载体 | 谁执行 |
 | --- | --- | --- |
 | ① 量化阈值（振动多大算异常） | `rules/*.yaml` 的 `compute` + `triggers[].threshold` | 确定性引擎判定，产出标签 |
-| ② 故障树（多条件耦合、排查优先级、禁忌） | `px4-fault-kb.yaml` 条目（字段定义见该文件头注释） | 引擎按 标签 / 阶段 / 排除标签 匹配，只把命中条目喂 LLM |
+| ② 故障树（多条件耦合、排查优先级、禁忌） | `fault-kb.yaml` 条目（字段定义见该文件头注释） | 引擎按 标签 / 阶段 / 排除标签 匹配，只把命中条目喂 LLM |
 | ③ 推理逻辑（工程师怎么想） | `llm/gjb841-system-prompt.md` | LLM 遵守 |
 | ④ 边界 / 禁忌（什么情况下不许下结论） | `rules/*.yaml` 的 `outputs.guard_tags` → guard 标签（如 `insufficient_data`） | 引擎先拦（命中即可短路），Prompt 兜底 |
 
@@ -578,7 +578,7 @@ from pyulog import ULog
 RULES      = json.loads(r'''__RULES__''')       # 由 rules/*.yaml 编译而来
 GUARDS     = json.loads(r'''__GUARDS__''')      # 由 guards/*.yaml 编译而来
 TOPICS     = json.loads(r'''__TOPICS__''')      # meta/<tag>.json 与 topic-overrides.yaml 合并编译而来
-FAULT_KB   = __FAULT_KB__                       # 由 px4-fault-kb.yaml 编译而来
+FAULT_KB   = __FAULT_KB__                       # 由 fault-kb.yaml 编译而来
 
 # ── 预定函数（operators.py 内联）──
 def fn_mean(vals, **kw):  ...
@@ -1061,9 +1061,9 @@ fields:
 每个算子在 `operators.py` 用 `@operator(in_arity=…, out_arity=…, out_names=[…])` 注册签名，
 **构建期按签名校验规则里 `in`/`out` 的数量与命名**——多输入/多输出不靠约定，靠校验。
 
-## 故障库与规则的分工（`px4-fault-kb.yaml` 保留，但要划清边界）
+## 故障库与规则的分工（`fault-kb.yaml` 保留，但要划清边界）
 
-有人会问：既然规则文件已经能写"建议/下一步"，`px4-fault-kb.yaml` 还有必要吗？**有必要**，
+有人会问：既然规则文件已经能写"建议/下一步"，`fault-kb.yaml` 还有必要吗？**有必要**，
 因为它与规则是**两种不同的知识**、且是**多对多**关系：
 
 - **多对多**：F001（高频振动）会被三条规则指向（振动均值、stddev、削波）；合并进规则就要
@@ -1079,7 +1079,7 @@ fields:
 | 文件 | 只回答 | 归谁维护 |
 | --- | --- | --- |
 | `rules/*.yaml` | **怎么发现**：读哪些 `topic.field`、用什么算子、满足什么条件触发 | 检测 / 数据工程 |
-| `px4-fault-kb.yaml` | **发现之后意味着什么**：可能根因（按排查优先级）、排查步骤（由简到繁）、风险等级、禁忌 | 领域 / 故障分析 |
+| `fault-kb.yaml` | **发现之后意味着什么**：可能根因（按排查优先级）、排查步骤（由简到繁）、风险等级、禁忌 | 领域 / 故障分析 |
 | `meta/<tag>.json` | 字段与参数字典：**一 tag 一份**，`topics` 由 uORB `.msg` 生成、`parameters` 由 `parameters.json` 生成 | 跟固件版本的人 |
 
 **去重动作**：规则里现在那些"结合故障库 F001 排查桨叶/电机"的文案要删掉，规则只留
@@ -1256,7 +1256,7 @@ knowledge/px4/
   topic-overrides.yaml  # 跨 tag 人工语义层：aliases 别名、groups 命名集合、invalid、单位修正
   engine/operators.py   # 预定函数（白名单注册表）
   engine/rule_engine.py # 瘦身为框架：基础事实层 + 加载经验 + 取数 + 算子 + 表达式求值 + 发射（原 ulog_checks.py）
-  px4-fault-kb.yaml
+  fault-kb.yaml
   px4-ulog-rules.md
 ```
 
@@ -1267,7 +1267,7 @@ knowledge/px4/
 > 站内 /guide/rule-schema，差异清单见本文开头的
 > 「实施状态与落地差异」。
 
-`px4-fault-kb.yaml` 保持单文件（故障模式会有几十条）。`topics/` 为生成物（提交进仓库，
+`fault-kb.yaml` 保持单文件（故障模式会有几十条）。`topics/` 为生成物（提交进仓库，
 便于离线与 CI），人工语义放 `topic-overrides.yaml`；两者在构建期合并，顺带合并现有
 `NAV_*` 与 failsafe `{5:"AUTO_RTL",...}` 两份重复定义。
 
@@ -1292,7 +1292,7 @@ knowledge/px4/
 2. **等价回归（核心）**：`compare_baseline.py` 要求 5 个日志输出与冻结基线逐条逐字段完全相同。
    基线：ce302d3b=9/F004、39f26cce=4/F001·F006·F009、95b077d9=0、两个 sample=0
 3. `run_checks_locally.py --probe-data` 结构不变
-4. `tsc --noEmit` + `pnpm build`；`node tools/check-upload.mjs <ulog> <png>` 浏览器端跑通
+4. `tsc --noEmit` + `pnpm build`；`node tools/browser/check-upload.mjs <ulog> <png>` 浏览器端跑通
 5. 抽查：改 `rules/vibration.yaml` 的阈值 → 报告页 finding 文案随之变化
 
 ## 风险与边界

@@ -62,7 +62,7 @@ const providerFiles = readdirSync(PROVIDER_DIR)
   .filter((f) => f.endsWith(".py") && f !== "api.py")
   .sort();
 if (providerFiles.length === 0) throw new Error("engine/providers/ 下没有任何适配器");
-const YAML_PATH = resolve(KN, "px4-fault-kb.yaml");
+const YAML_PATH = resolve(KN, "fault-kb.yaml");
 const FACTS_PATH = resolve(KN, "facts.yaml");   // PX4 的数据：码表 / 文案 / 展示口径 / 规则元数据
 const RULES_DIR = resolve(KN, "rules");
 const OPERATORS_PY = resolve(ENGINE, "operators.py");

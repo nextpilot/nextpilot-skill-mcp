@@ -315,7 +315,7 @@
 | Worker 内嵌脚本 / helper | kebab-case + `-script.ts` | 现由 `build-knowledge.mjs` **生成**，不手改 |
 | Next.js 路由 | `page.tsx` / `route.ts` / `layout.tsx`（目录即路由） | `app/analyze/page.tsx`、`app/api/explain/route.ts` |
 | Python 模块 | snake_case + `.py` | `engine/rule_engine.py`、`engine/operators.py`、`engine/report_data.py` |
-| 知识 / 经验文件 | 见 `knowledge/README.md`；规则 `rules/*.yaml`、故障库 `px4-fault-kb.yaml` | `rules/vibration.yaml`、`px4-fault-kb.yaml` |
+| 知识 / 经验文件 | 见 `knowledge/README.md`；规则 `rules/*.yaml`、故障库 `fault-kb.yaml` | `rules/vibration.yaml`、`fault-kb.yaml` |
 | 文档 | kebab-case + `.md` | `llm/gjb841-system-prompt.md` |
 | 边缘函数（`web/functions/`） | kebab-case + `.js`，**文件名即路由**（`functions/api/x.js` → `/api/x`） | `api/me.js`、`api/issues.js`、`_lib/issue-filer.js` |
 
@@ -360,7 +360,7 @@
 > 注意：Worker 相关文件统一用连字符（`ulog-worker.ts`），不要用点号（❌ `ulog.worker.ts`）。
 >
 > **日志分析的人工经验（阈值 / 故障树 / 检查逻辑 / LLM 范式 / 事实层绑定与码表）单一事实源在仓库根
-> `knowledge/px4/`**（= `rules/*.yaml` + `px4-fault-kb.yaml` + `facts.yaml` + `llm/*.md`；
+> `knowledge/px4/`**（= `rules/*.yaml` + `fault-kb.yaml` + `facts.yaml` + `llm/*.md`；
 > 引擎机制在 `engine/`，同样不含业务数据），web 与未来 MCP 服务都只消费其派生产物（`web/workers/*`、
 > `web/lib/knowledge/*.generated.js`、`web/.generated/guide/*.md` **后者必须按普通 markdown 渲染**
 > ——`web/components/GuideBody.tsx` 按扩展名分流，`.md` 走 react-markdown；那些文档里有 `{占位符}`、
