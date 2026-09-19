@@ -13,6 +13,7 @@
 | `ruff format --check` / `ruff check` | Python 风格漂移与真 bug（见仓库根 `pyproject.toml`） |
 | `build:kb --check` | 产物与 `knowledge/` 不一致、契约写漏、字段/算子引用错 |
 | `check_artifact.py` | 产物不是合法 Python、`compute` 表达式 Python 侧解析不了、`.replace` 链缺名字、**worker 守卫查的全局名在产物命名空间里不存在**（恒真/恒假的守卫，语法与执行检查都看不见）、**地图预设的适用范围（`conditions.topics`）没搬进 `facts.track`**（搬丢了引擎就少了"缺哪个 topic"那道闸门）、**轨迹取不到时的返回体没带逐条原因**（界面只能显示一句常常说错的概括） |
+| `check_engine_purity.py` | `engine/` 里出现 Pyodide / JS 桥接 / 浏览器全局 —— 它是浏览器（Pyodide）、本机 `tools/calibrate/` 与将来的服务端**三处共用**的一份源码，含了只在某一处成立的东西，另外两处会在**跑到那一行**时才炸（没人看着就会破，破了之后只能复制一份出去改） |
 | `tsc --noEmit` | 类型 |
 | `test-issue-filer.mjs` | ① 报错上报的指纹归一化、脱敏正则、白名单 —— 写错了要么去重失效、要么把用户信息泄进公开 issue；② §[9]~[16] 防回潮守卫：两侧共用政策只许有一份，外部 JSON（网络响应 / 存档 / worker 消息）必须过归一函数、不许 `as` 强转（§6.5），派生数据（曲线 / 轨迹）必须按报告身份清理，取数据前必须先把当前这份日志装进共享 Worker（§6.7），`functions/` 下每个端点都必须在本地 dev 垫片里可达（漏一个 = 本地整条静默 404），指南正文只许有一个渲染入口（防止再裂成一对近音名 + 两份分叉的标题文本规则），组件名跟着家族不变量走（`Log*` = 某一份日志；列很多份的用数据模型的词），轨迹取不到时界面要把引擎给的逐条原因显示出来 |
 | `next build`（`--with-build`） | 真编译 —— CI 才跑，本地太慢 |
@@ -151,6 +152,7 @@ def main(argv: list[str]) -> int:
         )
     )
     results.append(gate("产物是合法 Python（check_artifact）", [PY, "tools/calibrate/check_artifact.py"]))
+    results.append(gate("engine/ 是三处共用的纯 Python（check_engine_purity）", [PY, "tools/ci/check_engine_purity.py"]))
     results.append(
         gate(
             "类型检查（tsc --noEmit）",

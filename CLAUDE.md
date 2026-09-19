@@ -362,7 +362,7 @@
 > **日志分析的人工经验（阈值 / 故障树 / 检查逻辑 / LLM 范式 / 事实层绑定与码表）单一事实源在仓库根
 > `knowledge/px4/`**（= `rules/*.yaml` + `px4-fault-kb.yaml` + `facts.yaml` + `llm/*.md`；
 > 引擎机制在 `engine/`，同样不含业务数据），web 与未来 MCP 服务都只消费其派生产物（`web/workers/*`、
-> `web/lib/knowledge/*.generated.js`、`content/guide/knowledge-*.md` **后者必须按普通 markdown 渲染**
+> `web/lib/knowledge/*.generated.js`、`web/.generated/guide/*.md` **后者必须按普通 markdown 渲染**
 > ——`web/components/GuideBody.tsx` 按扩展名分流，`.md` 走 react-markdown；那些文档里有 `{占位符}`、
 > `meta/<tag>.json`，交给 MDX 会被当 JSX 表达式解析。改经验只改
 > `knowledge/`，然后 `cd web && pnpm build:kb`（只比对不写入：`cd web && pnpm build:kb --check`）。

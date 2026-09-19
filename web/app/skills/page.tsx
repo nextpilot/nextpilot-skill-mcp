@@ -12,10 +12,12 @@ export const metadata: Metadata = {
 /**
  * ⚠️ 这一页**必须保持静态**（不要接 `searchParams` / `headers` 这类动态 API）。
  *
- * Skill 清单来自 `content/skills/*.mdx`，由 `lib/skills.ts` 直接读文件系统
- * （`process.cwd()/../content/skills`）。构建期读没问题；一旦页面变成按需渲染，
- * 这段读盘就发生在线上运行时——那里没有这个目录，`getAllSkills()` 返回空数组，
- * 页面就成了"0 个 Skill"（2026-09-16 线上实测到的就是这个：RSC 里 skills: []）。
+ * Skill 清单的真源在 `knowledge/skills/*.mdx`（`web/` 之外），构建期由
+ * `scripts/sync-content.mjs` 拷进 `web/.generated/skills/`，`lib/skills.ts` 读的是那里。
+ * 以前读的是 `process.cwd()/../content/skills`——那个目录不在部署包里，页面一旦变成
+ * 按需渲染，读盘就发生在线上运行时，`getAllSkills()` 返回空数组、页面成了"0 个 Skill"
+ * （2026-09-16 线上实测到的就是这个：RSC 里 skills: []）。挪进 `.generated/` 之后
+ * 这个坑填上了，但**静态页仍然更快**：清单每次构建就那么几个文件，没必要每次请求读盘。
  *
  * 所以 `?category=` 的预选改由 SkillExplorer 在浏览器端读 location.search 完成，
  * 首页那几个分类入口照样能跳进对应筛选。

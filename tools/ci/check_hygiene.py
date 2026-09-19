@@ -292,14 +292,19 @@ def _code_only(path: Path) -> str:
     """
     src = _read(path)
     if path.suffix == ".py":
-        return _py_code_only(src)
+        return py_code_only(src)
     if path.suffix in (".mjs", ".js", ".ts", ".tsx"):
         return _js_code_only(src)
     return src
 
 
-def _py_code_only(src: str) -> str:
-    """Python：先按 AST 抠掉 docstring 所在的行，再用 tokenize 丢掉注释。"""
+def py_code_only(src: str) -> str:
+    """Python：先按 AST 抠掉 docstring 所在的行，再用 tokenize 丢掉注释。
+
+    **不是本文件私有**：`check_engine_purity.py` 也从这里导入它。两边共用一份"什么算代码"
+    的定义是刻意的——各写一份就会出现第二个答案，而"注释里写着标识符"正是裸子串守卫
+    被喂饱、进而恒绿的根因。改动这里等于同时改两条守卫的判据。
+    """
     try:
         tree = ast.parse(src)
     except SyntaxError:

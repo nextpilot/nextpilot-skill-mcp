@@ -15,8 +15,11 @@
  *   web/workers/ulog-data-script.ts    （导出 PY_ULG_DATA_HELPERS）
  *   web/workers/fault-kb.generated.json
  *   web/lib/knowledge/prompts.generated.js（ESM，供边缘函数 import）
- *   content/guide/rule-catalogue.mdx      （指南「知识库」分组的规则清单页）
- *   content/guide/rule-schema.mdx         （指南「知识库」分组的规则编写参考页）
+ *   web/.generated/guide/rule-catalogue.mdx（指南「知识库」分组的规则清单页）
+ *   web/.generated/guide/rule-schema.mdx   （指南「知识库」分组的规则编写参考页）
+ *
+ * 最后两页落在 .generated/ 里（与 sync-content.mjs 拷进来的人工页面同一处，
+ * 运行期只读那里），所以**不入库**，`--check` 也不比对它们。
  *
  * 用法（在 web/ 下）：
  *   node scripts/build-knowledge.mjs           生成（= pnpm build:kb）
@@ -65,7 +68,9 @@ const RULES_DIR = resolve(KN, "rules");
 const OPERATORS_PY = resolve(ENGINE, "operators.py");
 const PROMPT_PATH = resolve(KN, "llm/gjb841-system-prompt.md");
 const EMPTY_PATH = resolve(KN, "llm/report-empty.md");
-const GUIDES_DIR = resolve(webRoot, "../content/guide");   // 站点内容在仓库根 content/
+// 指南页的运行期目录：sync-content.mjs 把 docs/guide 拷进来，本脚本再往里补两页生成物。
+// 写在这里而不是仓库根，是因为部署包只有 web/ 一个目录（详见 sync-content.mjs 顶部）。
+const GUIDES_DIR = resolve(webRoot, ".generated/guide");
 const PLOT_DIR = resolve(KN, "plot");                    // 结果页曲线预设（纯前端，不经 Pyodide）
 
 const read = (p) => readFileSync(p, "utf8");
@@ -1714,9 +1719,13 @@ writeArtifact(
 );
 
 // 5) 指南的「知识库」分组：规则清单 + 规则编写参考（改规则/算子/内置变量后自动跟上，不用谁记得手动同步）
-if (!CHECK) mkdirSync(GUIDES_DIR, { recursive: true });
-writeArtifact(resolve(GUIDES_DIR, "rule-catalogue.mdx"), renderCataloguePage(rules, sources));
-writeArtifact(resolve(GUIDES_DIR, "rule-schema.mdx"), renderSchemaPage(rules.length));
+//    这两页**不是**提交进仓库的产物（落在不入库的 .generated/ 里），所以用 writeFileSync
+//    而不是 writeArtifact：--check 比对的是"入库产物有没有跟上 knowledge/"，这里没有可比的对象。
+if (!CHECK) {
+  mkdirSync(GUIDES_DIR, { recursive: true });
+  writeFileSync(resolve(GUIDES_DIR, "rule-catalogue.mdx"), renderCataloguePage(rules, sources), "utf8");
+  writeFileSync(resolve(GUIDES_DIR, "rule-schema.mdx"), renderSchemaPage(rules.length), "utf8");
+}
 
 if (CHECK) {
   if (drifted.length > 0) {

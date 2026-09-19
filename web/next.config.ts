@@ -7,6 +7,20 @@ const nextConfig: NextConfig = {
   experimental: {},
   // 仓库根目录已有 CLAUDE.md，关闭 Next 16 自动生成 AGENTS.md/CLAUDE.md
   agentRules: false,
+  // Turbopack 应用根钉在 web/ 自身：仓库根有一个空的 pnpm-lock.yaml（根 package.json
+  // 零依赖、纯转发壳），与 web/ 里真正有依赖的 lockfile 撞车，Turbopack 向上推断会误选
+  // 仓库根并警告 "inferred workspace root may not be correct"。显式给定 root 后不再自动
+  // 推断；本仓库所有 next 命令都经根 package.json 的 `pnpm -C web` 转发，运行 cwd 就是 web/。
+  turbopack: {
+    root: process.cwd(),
+  },
+  // 站点内容在构建期由 scripts/sync-content.mjs 拷进 .generated/，运行期只读那里。
+  // 它不在模块图里（是 fs.readdirSync 读的），打包器不会自动跟踪：默认输出是把整个
+  // web/ 传上去所以没事，一旦将来切成 `output: "standalone"`，少了这一行部署包里就
+  // 没有内容目录，线上会**静默**变成"0 篇指南 / 0 个 Skill"，而不是报错。
+  outputFileTracingIncludes: {
+    "/**": ["./.generated/**"],
+  },
   // 仅开发环境：Next 路由未命中的 /api、/internal 转给边缘函数垫片（app/edge-dev）。
   // afterFiles 保证 /api/auth/*（NextAuth）等真实路由优先，生产构建不注册这些 rewrite。
   async rewrites() {

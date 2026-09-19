@@ -2,8 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
 import { splitHeading, headingId } from "./heading";
-
-const GUIDE_DIR = path.join(process.cwd(), "..", "content", "guide");
+import { GUIDE_DIR } from "./content-dir";
 
 export interface GuideHeading {
   id: string;

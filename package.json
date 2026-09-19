@@ -1,0 +1,20 @@
+{
+  "name": "nextpilot-skill-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "license": "BSD-3-Clause",
+  "description": "仓库根：只做命令转发，不装任何依赖。真正的依赖在各自的子项目里（web/ 是 Next.js 项目，server/ 将来是 Python，走 pyproject.toml）。不要往这里加 dependencies——加了就等于在仓库根又长出一个 Node 项目。",
+  "scripts": {
+    "dev": "pnpm -C web dev",
+    "build": "pnpm -C web build",
+    "start": "pnpm -C web start",
+    "build:kb": "pnpm -C web build:kb",
+    "sync:content": "pnpm -C web sync:content",
+    "sync:watch": "pnpm -C web sync:watch",
+    "lint": "pnpm -C web lint",
+    "typecheck": "pnpm -C web typecheck",
+    "test:e2e": "pnpm -C web test:e2e",
+    "test:e2e:smoke": "pnpm -C web test:e2e:smoke",
+    "test:e2e:analyze": "pnpm -C web test:e2e:analyze"
+  }
+}

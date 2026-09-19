@@ -11,7 +11,7 @@ import type { GuideDoc } from "@/lib/guide";
  * 指南正文。**一个入口、两个解析器**——选哪个由**文件扩展名**决定（`lib/guide.ts` 的
  * `renderer`），不在这里判断：
  *
- * - `.md`（`content/guide/knowledge-*.md`，由 `knowledge/px4/` 派生）→ react-markdown。
+ * - `.md`（由 `knowledge/px4/` 派生的那些文档）→ react-markdown。
  *   那些文档里有 `{invalid_frac:.0%}`、`meta/<tag>.json` 这类内容，MDX 会把花括号当
  *   JSX 表达式、尖括号当标签，**必须**按普通 markdown 原样输出。
  * - `.mdx`（手写页面）→ MDX，可用 `<Callout>` / `<Zh>` / `<En>`。

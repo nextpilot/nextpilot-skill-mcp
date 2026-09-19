@@ -47,8 +47,10 @@ Windows 控制台默认 GBK，`✓ ✗ ▶` 这类字符会直接 UnicodeEncodeE
 from __future__ import annotations
 
 import argparse
+import os as _os
 import re as _re
 import shutil
+import signal as _signal
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -75,6 +77,8 @@ GUARDS = {
     "artifact": ([PY, "tools/calibrate/check_artifact.py"], ROOT, "产物侧（check_artifact）", "prose"),
     "ui": ([NODE, "scripts/test-issue-filer.mjs"], WEB, "界面侧（test-issue-filer）", "fail-lines"),
     "hygiene": ([PY, "tools/ci/check_hygiene.py"], ROOT, "卫生检查（check_hygiene）", "fail-lines"),
+    # 引擎纯度：只扫 engine/ 的源码文本，无依赖、无网络、不需要日志 —— 快，所以每次都跑
+    "engine": ([PY, "tools/ci/check_engine_purity.py"], ROOT, "引擎纯度（check_engine_purity）", "fail-lines"),
 }
 
 
@@ -261,11 +265,82 @@ MUTATIONS: list[Mutation] = [
         expect="坏输入必须非零退出",
         note="静态规则看不见这一半：确实 return 1 了，但那条路根本没被走到过",
     ),
+    # ---- 引擎侧：engine/ 是三处共用的纯 Python（2026-09-19） ----
+    #
+    # 这两条守的不是"某段代码在不在"，而是**一份源码能同时跑在三个运行时里**这个前提。
+    # 第 1 条是正向的（不许出现只在一处成立的东西），第 2、3 条是"前提还在"——
+    # 消费者只剩一个时，这条约束就失去意义了，而它会安静地绿着。
+    Mutation(
+        name="engine/ 里写一行 js 桥接",
+        path="engine/report_data.py",
+        old="import json",
+        new="import json\nimport js",
+        guard="engine",
+        expect="engine/ 是纯 Python（不碰 Pyodide / JS 桥接 / 浏览器全局）",
+        note="js 是 Pyodide 注入的全局：浏览器能跑，本机 tools/calibrate 用 CPython 要到那一行才 NameError",
+    ),
+    Mutation(
+        name="浏览器不再把 engine/ 拼进 Pyodide 产物",
+        path="web/scripts/build-knowledge.mjs",
+        old='resolve(webRoot, "../engine")',
+        new='resolve(webRoot, "../engine_moved")',
+        guard="engine",
+        expect="engine/ 仍被浏览器与本机共用（纯 Python 的前提还在）",
+        note="防「前提消失」：不再共用之后，「纯 Python」只剩「写得干净」这一层意义，而规则会继续绿着",
+    ),
+    Mutation(
+        name="本机校准工具不再直接指到 engine/",
+        path="tools/calibrate/run_checks_locally.py",
+        old='ENGINE = REPO_ROOT / "engine"',
+        new='ENGINE = REPO_ROOT / "engine_moved"',
+        guard="engine",
+        expect="engine/ 仍被浏览器与本机共用（纯 Python 的前提还在）",
+        note="同上：另一侧消费者也消失时，这条规则该被删掉而不是继续绿",
+    ),
 ]
 
 
 class AnchorError(RuntimeError):
     """锚点对不上——脚本写坏了，不是守卫坏了。"""
+
+
+# 当前**已被变异、还没还原**的那个文件。信号兜底要用它，所以放在模块级而不是闭包里。
+_PENDING: tuple[Path, bytes] | None = None
+
+
+def _restore_pending() -> None:
+    """把 `_PENDING` 里那个文件按字节还原。"""
+    global _PENDING
+    if _PENDING is None:
+        return
+    path, snapshot = _PENDING
+    _PENDING = None
+    try:
+        path.write_bytes(snapshot)
+        print(f"\n[中断] 已还原 {path.name}", flush=True)
+    except OSError as exc:
+        print(f"\n[中断] 还原 {path.name} 失败：{exc} —— 手动把它改回去", flush=True)
+
+
+def _install_signal_guard() -> None:
+    """被中断时也要还原 —— `finally` 挡不住 SIGTERM / Ctrl-C。
+
+    `finally` 只在异常/正常返回时执行；SIGTERM 的默认处理是**立刻终止进程**，不走 finally。
+    2026-09-19 真踩到了：全量自证跑到第 17 条被超时杀掉，`run_checks_locally.py` 的
+    `return 1 if failed else 0` 就留在了 `return 0` 的状态——下一次跑**任何**守卫，
+    看到的都是一条假的基线失败（而且提示指向的方向完全不对）。
+    """
+
+    def handler(signum: int, _frame: object) -> None:
+        _restore_pending()
+        _signal.signal(signum, _signal.SIG_DFL)  # 还原完再按默认语义退出
+        _os.kill(_os.getpid(), signum)
+
+    for sig in (_signal.SIGTERM, _signal.SIGINT):
+        try:
+            _signal.signal(sig, handler)
+        except (ValueError, OSError):
+            pass  # 非主线程等场景装不上 —— 尽力而为，不值得为此失败
 
 
 def _apply(path: Path, old: str, new: str) -> bytes:
@@ -378,8 +453,10 @@ def _porcelain(paths: list[str]) -> dict[str, str]:
 
 
 def main(argv: list[str]) -> int:
+    global _PENDING
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(line_buffering=True)
+    _install_signal_guard()  # 跑之前先装上：变异一旦落盘，中断也必须还原
 
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--list", action="store_true", help="只打印注册表")
@@ -456,11 +533,13 @@ def main(argv: list[str]) -> int:
             print(f"FAIL {exc}")
             failures.append(f"{m.name}（锚点对不上，脚本写坏了）")
             continue
+        _PENDING = (path, snapshot)  # 交给信号兜底：被 Ctrl-C / 超时杀掉时也能还原
         try:
             code, out = _run_guard(m.guard)
         finally:
             # 无条件还原：写在 finally 里，而且不依赖"变异是否成功"——
             # 还原失败会让后面每一条都跟着误报（一次跑出四条 BAD，看着像守卫坏了，其实是脏状态）。
+            _PENDING = None
             path.write_bytes(snapshot)
 
         if path.read_bytes() != snapshot:

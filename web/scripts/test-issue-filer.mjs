@@ -588,7 +588,7 @@ console.log("\n[14] 指南正文只有一个渲染入口（防止再裂成一对
 {
   // 由来：`GuideMarkdown.tsx` / `GuideMdx.tsx` 曾并排存在，两个名字只差一个字母、
   // 读起来像「基础版 / 升级版」——于是看起来 MDX 那份是超集，可以把另一份删掉。
-  // **恰好相反**：`content/guide/knowledge-*.md` 里有 `{invalid_frac:.0%}`、`meta/<tag>.json`，
+  // **恰好相反**：`knowledge/px4/` 派生过来的 .md 里有 `{invalid_frac:.0%}`、`meta/<tag>.json`，
   // MDX 会把花括号当 JSX 表达式解析，所以普通 markdown 那份才是不能删的那份。
   //
   // 更要命的是两个文件**各抄了一份 `textOf`**（把标题子节点还原成原始 markdown 文本）。

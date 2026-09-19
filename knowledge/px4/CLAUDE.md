@@ -127,7 +127,7 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 "派生的 `category/version/status/license/author/outputs.check/doc` 与改动前逐条相同"的核对
 （基线只覆盖 6 份日志，**在那上面没触发的规则比不到**，所以那次核对是必需的）。
 
-字段级权威参考（写经验时看这份）：站内 **[规则编写参考](/guide/rule-schema)**（由 `build-knowledge.mjs` 从 `engine/` 源码生成 `content/guide/rule-schema.mdx`）；
+字段级权威参考（写经验时看这份）：站内 **[规则编写参考](/guide/rule-schema)**（由 `web/scripts/build-knowledge.mjs` 从 `engine/` 源码生成 `web/.generated/guide/rule-schema.mdx`，不入库）；
 经验索引（站内页面，构建时生成）：**[/guide/rule-catalogue](/guide/rule-catalogue)**；迁移过程中顺带修掉的 6 处
 真实缺陷见提交 `6a081d5` 的说明（最要紧的一条：日志消息级别判据按 ASCII 语义修正后，
 `Kill engaged / Flight termination active`、`no barometer found` 这类"冒烟的枪"才浮出来）。
@@ -137,7 +137,8 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 - **改名的理由**：`emit` 的名字暗示"发出 finding"，但 finding 全部由 `triggers` 经 `add()` 发出，
   `emit` 一个 finding 都不发——它实际是**规则的页脚**。而它装的每个键最终都落进结果 JSON
   （`check`→`checksRun`/`checksSkipped`、`tag`→`finding`、`stats`→`metrics`、
-  `guard_tags`→`guardTags`），所以 `outputs` 名实相符，也与指南页 §5.2 的标题「输出与副作用」对齐。
+  `guard_tags`→`guardTags`），所以 `outputs` 名实相符，也与站内「规则编写参考」页（构建期生成、
+  不入库，所以这里不写小节号）里讲 `outputs` 那一节的标题「输出与副作用」对齐。
   改动范围：24 个规则文件 + `engine/rule_engine.py`（局部变量 `_emit` → `_out`）+
   `tools/calibrate/probe_rule.py` + `web/scripts/build-knowledge.mjs` + 指南页 + `engine/README.md` +
   `facts.yaml` 注释。

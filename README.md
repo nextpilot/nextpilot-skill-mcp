@@ -14,17 +14,19 @@
 ├── CLAUDE.md        # 项目说明（定位、架构、路线图、决策依据）
 ├── LICENSE          # BSD-3-Clause 许可证
 ├── README.md
-├── content/         # ★ 站点内容源（MDX）：guide/ 使用指南、skills/ Skill 卡片、mcp/
-├── docs/            # 架构、运维手册（operations/ 是真实可用的部署运行手册）
+├── package.json     # 纯转发壳：pnpm -C web dev/build，这里不装任何依赖
+├── docs/            # 文档：guide/ 面向用户（发布到站内 /guide）、dev/ 面向开发与运维
 ├── engine/          # ★ 确定性引擎源码：operators / rule_engine / report_data
-├── knowledge/       # ★ 日志分析的经验与字典：rules/*.yaml / 故障库 / LLM 提示词 / meta
+├── knowledge/       # ★ 日志分析的经验与字典：px4/（rules/*.yaml / 故障库 / LLM 提示词 / meta）
+│                    #   另有站点展示内容：skills/ Skill 卡片、mcp/ MCP 条目
 ├── tools/           # 手动运行的工具：px4/ 上游同步与文档生成、calibrate/ 回归校准、ci/ 校验入口
-└── web/             # Next.js 站点 + Pages Functions（当前冲刺代码）
+└── web/             # Next.js 站点 + Pages Functions（独立项目，有自己的 package.json）
+    ├── .generated/  # 构建期从仓库拷进来的站点内容（不入库）：guide/ skills/ mcp/
     ├── app/         # 页面与 /api/auth 路由
     ├── components/
     ├── functions/   # EdgeOne 边缘函数（KV、配额、DeepSeek 转发）
     ├── lib/
-    ├── scripts/     # 构建期脚本（build-knowledge.mjs，由 pnpm dev/build 前置调用）
+    ├── scripts/     # 构建期脚本（sync-content.mjs + build-knowledge.mjs，pnpm dev/build 前置调用）
     └── workers/     # Pyodide Worker（手写）+ **生成**的 Python 规则脚本（勿手改）
 ```
 
@@ -45,7 +47,7 @@ pnpm dev
 
 - `/` 首页与精选 Skill
 - `/guide` Skill / MCP 帮助文档与提交使用指南
-- `/skills` Skill 技能库（构建期读取 `content/skills/*.mdx`，Fuse.js 客户端搜索）
+- `/skills` Skill 技能库（内容源 `knowledge/skills/*.mdx`，Fuse.js 客户端搜索）
 - `/analyze` PX4 日志分析（Pyodide + pyulog 在 Web Worker 中本地解析）
 
 ## 架构
@@ -62,7 +64,9 @@ pnpm dev
 - **第二层 规则检查**：YAML 声明式规则 → 构建期编译为 Python → 内联进 `web/workers/ulog-check-script.ts`，覆盖振动、EKF、电源、GPS、姿态、失效保护等 16 个检查维度
 - **第三层 LLM 解释**：`web/functions/api/explain.js`，只接收 findings，system prompt 禁止编造数值
 
-新增 Skill：在 `content/skills/` 添加一个 `.mdx` 文件并补全 frontmatter（字段规范见 CLAUDE.md 3.1）。
+新增 Skill：在 `knowledge/skills/` 添加一个 `.mdx` 文件并补全 frontmatter（字段规范见 CLAUDE.md 3.1）；
+新增指南页同理，放 `docs/guide/`。两者都在 `web/` 之外，构建期由 `pnpm sync:content` 拷进
+`web/.generated/`（改完页面没变化，先查这一步跑没跑）。
 
 ## 校验与 CI
 
