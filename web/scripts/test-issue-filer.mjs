@@ -15,7 +15,9 @@
 //         remark 插件——MDX 侧漏了 `remark-gfm`，GFM 表格会静默退化成纯文本（线上 5 张表）；
 //   §[15] 组件名跟着家族不变量走（`Log*` = 某一份日志；一次列很多份的用数据模型的词）；
 //   §[16] 轨迹取不到时界面要把引擎给的**逐条原因**显示出来（一句概括只对六种原因里的一种，
-//         另外五种下它是错的——"空洞"的代价是用户拿不到任何能自己判断的线索）。
+//         另外五种下它是错的——"空洞"的代价是用户拿不到任何能自己判断的线索）；
+//   §[17] 两类条目共用的详情页组件不许带某一类的前缀（`Skill*` 出现在 `/mcp/[slug]` 里就是
+//         名字在说谎，而照名字去"修正"会复制出 `Mcp*` 孪生组件，改一边漏一边）。
 // 这几类问题都属于"同一件事有两条路径、只有一条被校验"，本仓库已经因此出过几次事故，
 // 光靠人记没用，所以做成机器能拦的守卫。
 //
@@ -733,6 +735,45 @@ console.log("\n[16] 轨迹取不到要说清缺什么（不许再退回一句空
   check(
     "引擎没给原因时明说是解析器缺陷",
     /引擎没有返回任何轨道，也没给出原因/.test(map),
+  );
+}
+
+console.log("\n[17] 两类条目共用的详情页组件不许带某一类的前缀（Skill* / Mcp* 都在说谎）");
+{
+  // 背景：`/skills/[slug]` 与 `/mcp/[slug]` 共用一组详情页组件。它们原名叫 SkillContentTabs /
+  // SkillSidebar / SkillComments / SkillHeaderMeta —— 而导航里「Skill 技能」与「MCP 服务」是
+  // **并列**的两类内容，MCP 页面用 `Skill*` 组件，名字就在说谎。
+  //
+  // 说谎的代价不是观感：下一个人看见 `SkillSidebar` 出现在 MCP 页面，合理的"修正"是复制一份
+  // `McpSidebar`——于是长出一对只差前缀的孪生组件，改一边漏一边（本仓库栽过五次的就是这个形状）。
+  // 所以共用组件统一走中立家族 `Entry*`（"收录条目"是两类共有的上位词），类间差异全走参数。
+  //
+  // 判据只看 import，且必须 `stripComments`：注释里会原样出现这些标识符，裸扫会被注释喂饱。
+  const imports = (rel) =>
+    [
+      ...stripComments(readFileSync(join(WEB, rel), "utf8")).matchAll(
+        /from "@\/components\/([A-Za-z0-9_]+)"/g,
+      ),
+    ].map((m) => m[1]);
+
+  const skillDeps = imports("app/skills/[slug]/page.tsx");
+  const mcpDeps = imports("app/mcp/[slug]/page.tsx");
+  const shared = skillDeps.filter((n) => mcpDeps.includes(n));
+
+  // 先判"共用集合非空"：若哪天两个页面被彻底拆开，下面两条会变成空集上的恒真判定，
+  // 那时该删掉的是这两条规则本身，而不是让它们继续绿着。
+  check("两个详情页确实共用组件（判据自身不能是空的）", shared.length >= 4, `实际 ${shared.length} 个`);
+  const prefixed = shared.filter((n) => /^(Skill|Mcp)/.test(n));
+  check(
+    "共用组件不带 Skill / Mcp 前缀",
+    prefixed.length === 0,
+    prefixed.length ? `带类前缀：${prefixed.join(", ")}` : "",
+  );
+  const mcpSkill = mcpDeps.filter((n) => /^Skill/.test(n));
+  check(
+    "MCP 详情页不引用 Skill* 组件",
+    mcpSkill.length === 0,
+    mcpSkill.length ? `引用了：${mcpSkill.join(", ")}` : "",
   );
 }
 

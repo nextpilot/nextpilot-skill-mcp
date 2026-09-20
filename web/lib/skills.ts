@@ -2,59 +2,103 @@ import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
 import type { SkillMeta } from "./types";
-import { parseChangelog } from "./changelog";
+import { parseChangelogFromMarkdown } from "./changelog";
 import { SKILLS_DIR } from "./content-dir";
 
 export interface Skill extends SkillMeta {
-  /** MDX 正文（System Prompt、示例、参考资料） */
-  body: string;
+  /** README.md 正文：给人看，站点「概述」Tab */
+  readme: string;
+  /** SKILL.md 全文（含 frontmatter）：给 AI 看，站点「SKILL.md」Tab + 复制 / 下载 */
+  skillMd: string;
 }
 
+/**
+ * 一个 Skill = 一个目录，目录名即 slug，里面三份文件各管一件事：
+ *
+ *   <slug>/SKILL.md       给 AI 看。frontmatter 只放 Agent Skills 规范字段
+ *                         （name / description / license / metadata），站点卡片
+ *                         需要的额外字段一律收进 `metadata`（规范规定 metadata 是
+ *                         string→string 映射，所以列表写成逗号分隔、数字写成字符串）。
+ *                         好处：整个目录拷进 `.claude/skills/` 就能被 Claude 直接用。
+ *   <slug>/README.md      给人看，站点「概述」Tab。
+ *   <slug>/CHANGELOG.md   给人看，站点「版本历史」Tab，同时是 version / updatedAt
+ *                         的唯一真源（frontmatter 里不再存，避免两份分叉）。
+ *
+ * 以前是 `knowledge/skills/*.mdx` 平铺、给人看与给 AI 看混在一份正文里；
+ * 2026-09-20 改成上面的结构，规范依据记在 `scripts/migrate-skills-to-spec.mjs` 文件头。
+ */
+function readFileOrThrow(dir: string, name: string): string {
+  const full = path.join(dir, name);
+  if (!fs.existsSync(full)) {
+    // 缺哪份就说缺哪份：三份文件的用途不同，一句"内容不完整"让人无从下手
+    throw new Error(`Skill ${path.basename(dir)} 缺少 ${name}（真源目录：knowledge/skills/${path.basename(dir)}/）`);
+  }
+  return fs.readFileSync(full, "utf8");
+}
 
-function parseSkillFile(fileName: string): Skill {
-  const fullPath = path.join(SKILLS_DIR, fileName);
-  const raw = fs.readFileSync(fullPath, "utf8");
-  const { data, content } = matter(raw);
-  const slug = fileName.replace(/\.mdx$/, "");
+function parseSkillDir(dirName: string): Skill {
+  const dir = path.join(SKILLS_DIR, dirName);
+  const skillMd = readFileOrThrow(dir, "SKILL.md");
+  const readme = readFileOrThrow(dir, "README.md");
+  const changelogMd = readFileOrThrow(dir, "CHANGELOG.md");
+
+  const { data } = matter(skillMd);
+  const meta = (data.metadata ?? {}) as Record<string, string>;
+  const changelog = parseChangelogFromMarkdown(changelogMd);
+  const latest = changelog[0];
 
   return {
-    slug,
-    name: String(data.name ?? slug),
+    slug: dirName,
+    // 站点标题用中文展示名；规范要求的英文 `name` 就等于目录名，不在这里重复暴露
+    name: meta.display_name ?? String(data.name ?? dirName),
     description: String(data.description ?? ""),
-    category: data.category as SkillMeta["category"],
-    platforms: (data.platforms ?? []) as SkillMeta["platforms"],
-    models: (data.models ?? []) as string[],
-    tags: (data.tags ?? []) as string[],
-    clients: (data.clients ?? []) as string[],
-    rating: Number(data.rating ?? 0),
-    downloads: Number(data.downloads ?? 0),
-    featured: Boolean(data.featured),
-    sourceUrl: data.sourceUrl ? String(data.sourceUrl) : undefined,
-    paperUrl: data.paperUrl ? String(data.paperUrl) : undefined,
+    category: meta.category as SkillMeta["category"],
+    platforms: splitList(meta.platforms) as SkillMeta["platforms"],
+    models: splitList(meta.models),
+    tags: splitList(meta.tags),
+    clients: splitList(meta.clients),
+    rating: Number(meta.seed_rating ?? 0),
+    downloads: Number(meta.seed_downloads ?? 0),
+    featured: meta.featured === "true",
+    sourceUrl: meta.source_url,
+    paperUrl: meta.paper_url,
     license: data.license ? String(data.license) : undefined,
-    icon: data.icon ? String(data.icon) : undefined,
-    version: data.version ? String(data.version) : undefined,
-    changelog: parseChangelog(data.changelog, data.version, data.updatedAt),
-    updatedAt: String(data.updatedAt ?? ""),
-    body: content.trim(),
+    icon: meta.icon,
+    version: latest?.version,
+    changelog,
+    updatedAt: latest?.date ?? "",
+    readme: readme.trim(),
+    skillMd: skillMd.trimEnd(),
   };
+}
+
+/** metadata 只允许 string→string，列表在写入时被转成 `A, B, C`，这里拆回来 */
+function splitList(v: string | undefined): string[] {
+  if (!v) return [];
+  return v
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export function getAllSkills(): Skill[] {
   if (!fs.existsSync(SKILLS_DIR)) return [];
-  const files = fs.readdirSync(SKILLS_DIR).filter((f) => f.endsWith(".mdx"));
-  return files
-    .map(parseSkillFile)
+  const dirs = fs
+    .readdirSync(SKILLS_DIR, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && fs.existsSync(path.join(SKILLS_DIR, d.name, "SKILL.md")))
+    .map((d) => d.name);
+  return dirs
+    .map(parseSkillDir)
     .sort((a, b) => b.rating - a.rating || b.downloads - a.downloads);
 }
 
 export function getSkillBySlug(slug: string): Skill | undefined {
-  const fullPath = path.join(SKILLS_DIR, `${slug}.mdx`);
-  if (!fs.existsSync(fullPath)) return undefined;
-  return parseSkillFile(`${slug}.mdx`);
+  const dir = path.join(SKILLS_DIR, slug);
+  if (!fs.existsSync(path.join(dir, "SKILL.md"))) return undefined;
+  return parseSkillDir(slug);
 }
 
 /** 提供给客户端 Fuse.js 的轻量索引（不含正文） */
 export function getSkillIndex(): SkillMeta[] {
-  return getAllSkills().map(({ body: _body, ...meta }) => meta);
+  return getAllSkills().map(({ readme: _readme, skillMd: _skillMd, ...meta }) => meta);
 }
