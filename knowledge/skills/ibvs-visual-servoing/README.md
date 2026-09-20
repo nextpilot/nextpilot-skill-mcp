@@ -1,18 +1,13 @@
----
-icon: "🎥"
-name: IBVS 基于图像的视觉伺服
-description: 不依赖 GPS 和全局定位，直接以图像特征误差驱动速度指令，实现室内 / 近距离对目标的对准、跟踪与降落
-category: control
-platforms: ["PX4", "ArduPilot", "通用"]
-models: ["经典视觉（特征点/AprilTag）", "深度网络特征"]
-tags: ["视觉伺服", "IBVS", "室内飞行", "无GPS"]
-clients: ["Claude", "Cursor"]
-rating: 4.5
-downloads: 1050
-featured: true
-version: "1.0.0"
-updatedAt: "2026-08-30"
----
+# IBVS 基于图像的视觉伺服
+
+> 不依赖 GPS 和全局定位，直接以图像特征误差驱动速度指令，实现室内 / 近距离对目标的对准、跟踪与降落
+
+| 项 | 值 |
+| --- | --- |
+| 分类 | 控制 |
+| 适用平台 | PX4, ArduPilot, 通用 |
+| 依赖模型 | 经典视觉（特征点/AprilTag）, 深度网络特征 |
+| 适用客户端 | Claude, Cursor |
 
 ## 解决什么问题
 
@@ -50,3 +45,7 @@ GPS 拒止环境（室内、桥下、仓库）中无法用位置控制。IBVS（
 - 务必做**深度 / 高度通道的限幅**，纯 IBVS 在深度未知时可能产生激进的 z 轴指令。
 - 视觉延迟大时要降低增益或加观测器，否则容易振荡。
 - 相关的"神经-解析控制蒸馏"工作用小模型学生逼近 IBVS 解析解，推理速度可提升一个数量级，适合机载实时部署。
+
+---
+
+本页内容来自本 Skill 的 `README.md`，AI 可读的指令原文见 `SKILL.md`，版本历史见 `CHANGELOG.md`。

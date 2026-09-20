@@ -1,20 +1,15 @@
----
-icon: "🗣️"
-name: 北航 Flow 语言引导精细飞行
-description: 北航 Flow 范式——用自然语言原子动作直接控制无人机（如"环绕我飞""穿过拱门"），语言指令映射为可执行的技能原语
-category: control
-platforms: ["PX4", "通用"]
-models: ["开源语言模型", "视觉模型"]
-tags: ["语言控制", "原子动作", "精细飞行", "论文"]
-clients: ["Claude", "GPT-4o"]
-rating: 4.6
-downloads: 880
-featured: true
-paperUrl: "https://arxiv.org/abs/2403.05266"
-license: "学术参考"
-version: "1.0.0"
-updatedAt: "2026-09-02"
----
+# 北航 Flow 语言引导精细飞行
+
+> 北航 Flow 范式——用自然语言原子动作直接控制无人机（如"环绕我飞""穿过拱门"），语言指令映射为可执行的技能原语
+
+| 项 | 值 |
+| --- | --- |
+| 分类 | 控制 |
+| 适用平台 | PX4, 通用 |
+| 依赖模型 | 开源语言模型, 视觉模型 |
+| 适用客户端 | Claude, GPT-4o |
+| 许可证 | 学术参考 |
+| 论文 | https://arxiv.org/abs/2403.05266 |
 
 ## 解决什么问题
 
@@ -46,3 +41,7 @@ updatedAt: "2026-09-02"
 
 - 收录本 Skill 的价值在于**范式参考**：复杂语言指令落到少量确定性控制原语，安全可验证。
 - 自己实现时先只开放 3-5 个原语，每个原语有明确的速度 / 距离包络。
+
+---
+
+本页内容来自本 Skill 的 `README.md`，AI 可读的指令原文见 `SKILL.md`，版本历史见 `CHANGELOG.md`。

@@ -1,32 +1,13 @@
----
-icon: "🎯"
-name: 航拍图像目标检测
-description: 在无人机航拍画面中识别人员、车辆、塔架等目标，输出类别、位置与置信度，用于搜救和电力巡检
-category: perception
-platforms: ["PX4", "ArduPilot", "通用"]
-models: ["YOLOv8/YOLOv11", "RT-DETR"]
-tags: ["目标检测", "搜救", "巡检", "CV"]
-clients: ["Claude", "ChatGPT", "Cursor", "Qwen"]
-rating: 4.7
-downloads: 1280
-featured: true
-version: "1.2.0"
-changelog:
-  - version: "1.2.0"
-    date: "2026-09-01"
-    notes:
-      - 补充跨帧去重逻辑，避免同一目标重复告警
-      - 增加巡检场景的置信度阈值建议（≥0.7）
-  - version: "1.1.0"
-    date: "2026-07-18"
-    notes:
-      - 增加 RT-DETR 备选方案与推理耗时对比
-  - version: "1.0.0"
-    date: "2026-06-02"
-    notes:
-      - 首次收录
-updatedAt: "2026-09-01"
----
+# 航拍图像目标检测
+
+> 在无人机航拍画面中识别人员、车辆、塔架等目标，输出类别、位置与置信度，用于搜救和电力巡检
+
+| 项 | 值 |
+| --- | --- |
+| 分类 | 感知 |
+| 适用平台 | PX4, ArduPilot, 通用 |
+| 依赖模型 | YOLOv8/YOLOv11, RT-DETR |
+| 适用客户端 | Claude, ChatGPT, Cursor, Qwen |
 
 ## 解决什么问题
 
@@ -59,3 +40,7 @@ updatedAt: "2026-09-01"
 - 模型尽量跑在机载端（Jetson Orin Nano / RK3588），只回传结构化结果，省图传带宽。
 - 俯拍视角与普通 COCO 数据分布差异大，务必用航拍数据微调，否则召回率会明显下降。
 - 告警阈值按任务调：搜救宁可误报（confidence ≥ 0.35），巡检统计宁可漏报（≥ 0.7）。
+
+---
+
+本页内容来自本 Skill 的 `README.md`，AI 可读的指令原文见 `SKILL.md`，版本历史见 `CHANGELOG.md`。

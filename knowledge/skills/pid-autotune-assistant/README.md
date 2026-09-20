@@ -1,18 +1,13 @@
----
-icon: "🎛️"
-name: PID 参数智能调参
-description: 针对多旋翼 / 固定翼的姿态与速率环，结合阶跃响应数据推荐 PID 初值并迭代修正，降低手动调参门槛
-category: control
-platforms: ["PX4", "ArduPilot", "Betaflight", "通用"]
-models: ["DeepSeek-V3", "Qwen2.5"]
-tags: ["PID", "调参", "系统辨识"]
-clients: ["Claude", "ChatGPT", "Cursor"]
-rating: 4.1
-downloads: 1520
-featured: false
-version: "1.0.0"
-updatedAt: "2026-08-15"
----
+# PID 参数智能调参
+
+> 针对多旋翼 / 固定翼的姿态与速率环，结合阶跃响应数据推荐 PID 初值并迭代修正，降低手动调参门槛
+
+| 项 | 值 |
+| --- | --- |
+| 分类 | 控制 |
+| 适用平台 | PX4, ArduPilot, Betaflight, 通用 |
+| 依赖模型 | DeepSeek-V3, Qwen2.5 |
+| 适用客户端 | Claude, ChatGPT, Cursor |
 
 ## 解决什么问题
 
@@ -46,3 +41,7 @@ LLM **不凭空给数值**：先由确定性脚本从日志中算出特征量（
 
 - 输出必须经飞手确认后才写入参数；每次只改一个轴、一个变量。
 - 调参规则表是本 Skill 的核心资产，应随机型（轴距、桨寸）积累，而非依赖模型记忆。
+
+---
+
+本页内容来自本 Skill 的 `README.md`，AI 可读的指令原文见 `SKILL.md`，版本历史见 `CHANGELOG.md`。

@@ -1,33 +1,14 @@
----
-icon: "📊"
-name: PX4 ULog 日志分析（工具链入口）
-description: 开源 PX4 .ulg 日志分析器：确定性 pyulog 解析 + 规则检查 + LLM 只做解释。本平台端侧日志分析的首发 fork 底座
-category: toolchain
-platforms: ["PX4"]
-models: ["DeepSeek", "GPT-4o-mini", "GLM"]
-tags: ["MCP", "ULog", "日志分析", "PX4", "开源"]
-clients: ["Claude", "Cursor", "Claude Code"]
-rating: 4.6
-downloads: 720
-featured: true
-sourceUrl: "https://github.com/robotto-xyz"
-version: "1.3.0"
-changelog:
-  - version: "1.3.0"
-    date: "2026-09-10"
-    notes:
-      - 新增故障知识库确定性匹配（根因按排查优先级排序）
-      - EKF 硬故障位按位语义分级，消除视觉位误报
-  - version: "1.2.0"
-    date: "2026-08-22"
-    notes:
-      - 补充电池剩余电量、CPU 负载与 GPS 健康检查
-  - version: "1.0.0"
-    date: "2026-05-30"
-    notes:
-      - 首次收录（pyulog 解析 + 振动/EKF/电源三项检查）
-updatedAt: "2026-09-08"
----
+# PX4 ULog 日志分析（工具链入口）
+
+> 开源 PX4 .ulg 日志分析器：确定性 pyulog 解析 + 规则检查 + LLM 只做解释。本平台端侧日志分析的首发 fork 底座
+
+| 项 | 值 |
+| --- | --- |
+| 分类 | 系统与工具链 |
+| 适用平台 | PX4 |
+| 依赖模型 | DeepSeek, GPT-4o-mini, GLM |
+| 适用客户端 | Claude, Cursor, Claude Code |
+| 来源 | https://github.com/robotto-xyz |
 
 ## 解决什么问题
 
@@ -63,3 +44,7 @@ pyulog 确定性解析 → 插件化检查器（输出严重度排序 findings�
 
 - 平台冲刺 1 直接 fork 其解析与检查器逻辑，改造为 Pyodide 包在浏览器端运行。
 - 每条 finding 必须保留字段名、阈值和官方文档链接，LLM 只解释、不改数值。
+
+---
+
+本页内容来自本 Skill 的 `README.md`，AI 可读的指令原文见 `SKILL.md`，版本历史见 `CHANGELOG.md`。

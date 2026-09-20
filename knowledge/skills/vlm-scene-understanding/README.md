@@ -1,18 +1,13 @@
----
-icon: "👁️"
-name: 视觉语言场景理解（VLM）
-description: 让无人机用语言描述相机看到的场景，支持"东边田里有没有人"这类自然语言提问，基于 Qwen-VL / LLaVA
-category: perception
-platforms: ["通用"]
-models: ["Qwen2-VL", "LLaVA-1.6", "GPT-4o"]
-tags: ["VLM", "场景描述", "视觉问答"]
-clients: ["Claude", "ChatGPT", "Gemini"]
-rating: 4.4
-downloads: 760
-featured: false
-version: "1.0.0"
-updatedAt: "2026-08-28"
----
+# 视觉语言场景理解（VLM）
+
+> 让无人机用语言描述相机看到的场景，支持"东边田里有没有人"这类自然语言提问，基于 Qwen-VL / LLaVA
+
+| 项 | 值 |
+| --- | --- |
+| 分类 | 感知 |
+| 适用平台 | 通用 |
+| 依赖模型 | Qwen2-VL, LLaVA-1.6, GPT-4o |
+| 适用客户端 | Claude, ChatGPT, Gemini |
 
 ## 解决什么问题
 
@@ -39,3 +34,7 @@ updatedAt: "2026-08-28"
 - 不要逐帧调用 VLM（慢且贵），先用轻量检测器触发，再让 VLM 对关键帧做语义解释。
 - prompt 中强制"只描述可见内容、不推测"，降低幻觉。
 - 边缘部署可量化后跑 Qwen2-VL-2B；地面站或云端可用更大模型。
+
+---
+
+本页内容来自本 Skill 的 `README.md`，AI 可读的指令原文见 `SKILL.md`，版本历史见 `CHANGELOG.md`。

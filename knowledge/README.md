@@ -32,11 +32,92 @@ px4/
 
 **站点内容也有一部分挂在这里**（给人读的展示内容，不做计算——与上面的"经验与字典"是两回事）：
 
-- `skills/*.mdx` —— Skill 卡片（8 个种子），对应站内 `/skills`
-- `mcp/*.mdx` —— MCP 条目，对应站内 `/mcp`
+- `skills/<slug>/` —— Skill（8 个种子），对应站内 `/skills`
+- `mcp/<slug>/` —— 收录的第三方 MCP 服务，对应站内 `/mcp`
 
 构建期由 `web/scripts/sync-content.mjs` 拷进 `web/.generated/{skills,mcp}/`，
 运行期 `web/lib/{skills,mcp}.ts` 只读那里（`web/` 部署时只上传自己这一个目录）。
+
+### skills/ 一个 Skill 一个目录
+
+```text
+skills/<slug>/
+  SKILL.md        给 AI 看：YAML frontmatter + 指令正文
+  README.md       给人看：站点详情页「概述」Tab
+  CHANGELOG.md    给人看：站点「版本历史」Tab，同时是 version / updatedAt 的唯一真源
+```
+
+`SKILL.md` 按 **Agent Skills 规范**写（依据：`https://agentskills.io/specification`，
+即 Anthropic 官方仓库 `anthropics/skills` README 指向的规范站）。硬约束：
+
+| 项 | 约束 |
+| --- | --- |
+| `name` | 1–64 字符，仅小写字母数字与单个连字符，不以连字符开头/结尾；**必须等于目录名**；不得含保留字 `claude` / `anthropic` |
+| `description` | 同时写清「做什么」与「什么时候用」（正文要等触发后才加载，"何时用"只能写在这里）；≤ 200 字符 |
+| 顶层字段 | 只允许 `name` / `description` / `license` / `compatibility` / `metadata` / `allowed-tools` |
+| `metadata` | string→string 映射：列表写成 `"A, B"`、数字写成 `"4.6"`，不能放数组或数字 |
+| 正文 | 建议 < 500 行 |
+
+**站点卡片需要的字段（分类、平台、标签、评分…）一律收进 `metadata`**，不散在顶层。
+这样每个目录拷进 `.claude/skills/<slug>/` 就能被 Claude 直接加载，不必先过一遍我们的站点。
+
+`description` 的长度取的是**严值**：规范站给 1024，`support.claude.com` 给 200，取 200 两边都过。
+
+`metadata.seed_rating` / `seed_downloads` 是**过渡期的种子值**——社区指标最终会迁到
+EdgeOne KV（站点已按「种子 + KV 增量」合并）。迁走后这两项从 `SKILL.md` 删除，
+它们本来就不属于 Skill 的内容。
+
+**README.md / CHANGELOG.md 与规范的关系**：规范建议"可分发的技能包"里不要带这类文件
+（省 token、避免与指令混淆）。这里是**发布前的源目录**，三份文件用途已经分开，
+站点三个 Tab 各读一份，所以保留。将来若做「下载为 skill zip」的打包脚本，**只打
+`SKILL.md`**，这两份留在仓库不进包。
+
+改完跑：
+
+```bash
+cd web && pnpm check:skills     # 合规校验（CI 里也跑，见 tools/ci/check_all.py）
+```
+
+三份文件都能在仓库里直接改、提 PR：详情页每个内容 Tab 右上角就是**那一份文件**的编辑入口
+（地址集中在 `web/lib/constants.ts` 的 `CONTENT_REPO`，换仓库只改一处）。
+
+### mcp/ 一个 MCP 服务一个目录（**与 skills/ 不是同一份规范**）
+
+```text
+mcp/<slug>/
+  server.json     给机器看：MCP Registry manifest（上游在哪、怎么装、走什么传输）
+  README.md       给人看：站点详情页「概述」Tab + 卡片展示字段
+  CHANGELOG.md    给人看：站点「版本历史」Tab，同时是 version / updatedAt 的唯一真源
+```
+
+两者最容易互相抄错的地方：
+
+| | Skill（`skills/`） | MCP（`mcp/`） |
+| --- | --- | --- |
+| 规范 | Agent Skills（agentskills.io） | MCP Registry（registry.modelcontextprotocol.io） |
+| 规范文件 | `SKILL.md` | `server.json` |
+| `name` | kebab 小写，**必须等于目录名** | **反向 DNS** `io.github.<owner>/<repo>` |
+| `description` | ≤ 200（两份官方口径取严值） | ≤ 100 |
+| 独有概念 | 渐进披露、`allowed-tools` | `tools` / `transport` / `readOnly` / `packages[]` |
+
+两边的 `name` 规则**互斥**——同一个名字不可能同时满足。所以两个目录各有各的守卫
+（`check-skill-spec.mjs` / `check-mcp-spec.mjs`），别合成一个，合了必然有一边是错的。
+
+`server.json` 必填 `$schema` / `name` / `description` / `version` / `packages[]`；
+`packages[]` 每项要 `registryType` / `identifier` / `version` / `transport.type`
+（`stdio` / `streamable-http` / `sse`）。
+
+**上游没核实的条目不填 manifest**——填了就是编造，客户端照着装会装到一个不存在的包。
+在 README frontmatter 写 `upstream_status: "pending"` 可以暂时免交 `server.json`：
+校验会放过这一条，但每次都把它列在 `SKIP` 行里，不会悄悄变成永久状态。
+核实后补上 `server.json`，并删掉 `upstream_status` 与 frontmatter 里的 `transport`
+（传输方式只以 `server.json` 的 `packages[].transport` 为真源，留两份会被判双真源）。
+
+改完跑：
+
+```bash
+cd web && pnpm check:mcp
+```
 
 **「知识库」分组的两个页面不在这个目录里**（构建期写在 `web/.generated/guide/`，`/guide` 站内可见）：
 
@@ -48,6 +129,8 @@ px4/
 | 我要…… | 看 / 改 |
 | --- | --- |
 | 了解整套规则体系为什么这么设计 | [px4/CLAUDE.md](px4/CLAUDE.md)（给 AI 与维护者的设计上下文） |
+| **新增 / 改一个 Skill** | `knowledge/skills/<slug>/` 三份文件（结构见上节），改完 `pnpm check:skills` |
+| **新增 / 改一个 MCP 条目** | `knowledge/mcp/<slug>/`（结构见上节；规范与 Skill **不同**），改完 `pnpm check:mcp` |
 | **写一条新规则 / 改一条现有规则** | 站内 `/guide/rule-schema`（字段、算子、常见坑；构建期生成，仓库里不留拷贝） |
 | 弄清自己这类经验该写在哪 | [px4/CLAUDE.md](px4/CLAUDE.md) 的「四类经验 → 四种载体」 |
 | 查现在有哪些规则、各自读什么字段、什么条件触发 | 网站 `/guide/rule-catalogue`（构建时从 `rules/*.yaml` 生成，仓库里不留拷贝） |

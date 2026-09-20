@@ -1,18 +1,13 @@
----
-icon: "🗺️"
-name: 自然语言飞行任务规划
-description: 把"去东边那块田巡一圈再回来"这类口语指令自动分解为带航点和动作的结构化飞行计划，供飞控执行前确认
-category: decision
-platforms: ["PX4", "ArduPilot", "通用"]
-models: ["DeepSeek-V3", "Qwen2.5", "GPT-4o"]
-tags: ["任务规划", "自然语言", "航点"]
-clients: ["Claude", "ChatGPT", "Cursor"]
-rating: 4.5
-downloads: 930
-featured: true
-version: "1.0.0"
-updatedAt: "2026-09-05"
----
+# 自然语言飞行任务规划
+
+> 把"去东边那块田巡一圈再回来"这类口语指令自动分解为带航点和动作的结构化飞行计划，供飞控执行前确认
+
+| 项 | 值 |
+| --- | --- |
+| 分类 | 决策与规划 |
+| 适用平台 | PX4, ArduPilot, 通用 |
+| 依赖模型 | DeepSeek-V3, Qwen2.5, GPT-4o |
+| 适用客户端 | Claude, ChatGPT, Cursor |
 
 ## 解决什么问题
 
@@ -52,3 +47,7 @@ updatedAt: "2026-09-05"
 
 - **LLM 只规划、不致动**；任务必须经飞手确认，并在仿真中先验证。
 - 涉及坐标的部分让 LLM 输出相对方位 + 由地图组件补坐标，避免幻觉经纬度。
+
+---
+
+本页内容来自本 Skill 的 `README.md`，AI 可读的指令原文见 `SKILL.md`，版本历史见 `CHANGELOG.md`。
