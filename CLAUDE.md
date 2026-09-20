@@ -47,6 +47,17 @@
 
 ### 3.1 Skill 卡片规范
 
+> **内容的存放形态**：每个 Skill 是 `knowledge/skills/<slug>/` 下的一个目录，
+> `SKILL.md`（给 AI，按 Agent Skills 规范）/ `README.md`（给人）/ `CHANGELOG.md`（版本历史唯一真源）。
+> 字段约束、为什么这么放、校验怎么跑，见 **`knowledge/README.md` 的「skills/ 一个 Skill 一个目录」**，
+> 不在本节重复（本节只说卡片上要有哪几类信息）。
+> 三份文件都能在仓库里直接改、提 PR：详情页每个内容 Tab 右上角就是**那一份文件**的编辑入口。
+
+**MCP 条目是另一回事，别照抄上面这套。** 它也拆成了 `knowledge/mcp/<slug>/`，但规范文件是
+`server.json`（MCP Registry）而不是 `SKILL.md`——`name` 是反向 DNS（`io.github.<owner>/<repo>`），
+与 Skill 的 kebab 命名**互斥**，所以两个目录各有各的守卫（`check-skill-spec.mjs` /
+`check-mcp-spec.mjs`），合并必然有一边不合规。见 `knowledge/README.md` 的「mcp/ 一个 MCP 服务一个目录」。
+
 每个 Skill 卡片必须包含以下字段，宁缺毋滥：
 
 | 字段 | 说明 / 示例 |
@@ -356,6 +367,19 @@
    - 判据：**这条记录能不能比它依赖的东西活得久**。报告能——字节被 `REPORT_DATA_KEEP` 淘汰、
      或报告本来就来自别的设备（`source: "cloud"`），此时只剩结论；日志字节不能。所以给列表挂
      `Log` 词根是在承诺"日志在这"，而那张表里恰恰经常没有。名字读出的承诺必须是数据模型能兑现的。
+7. **被并列的多类内容共用的组件，不许挂其中任何一类的名字**。站内「Skill 技能」与「MCP 服务」
+   是并列的两类，详情页共用 `EntryContentTabs` / `EntrySidebar` / `EntryComments` /
+   `EntryHeaderMeta` —— 家族名取两类共有的上位词"收录条目"，两类差异全部走参数：`kind`
+   决定统计接口与文案口径，`skillMdRaw` / `editUrls.skillMd` 这类可选参数决定"有没有
+   SKILL.md 那一格"（MCP 走 server.json，没有这一格），所以组件本身不含任何 `if (是 Skill)`
+   的分支。**不带 `kind` 的那个（`EntryContentTabs`）不是漏了，是它压根不需要知道类别**
+   ——按"有没有这份文件"分就够了。
+   它们曾叫 `SkillContentTabs` 等：MCP 页面用着 `Skill*` 组件，名字在读的人眼里就是说
+   "这个组件只服务 Skill"，而照名字去"修正"的正解是复制一份 `McpContentTabs`——于是长出
+   一对只差前缀的孪生组件，改一边漏一边（2026-09-20 已改，守卫 §[17] 钉住）。
+   判据：**这个名字出现在另一类内容的页面上时，读起来是不是假的**。
+   同理反向也成立：只服务一类的（列表页 `SkillExplorer` / `McpGrid`）**不要**为了"统一"
+   改成中立名——那会让"这是哪一类的列表"从名字里消失。
 
 > 注意：Worker 相关文件统一用连字符（`ulog-worker.ts`），不要用点号（❌ `ulog.worker.ts`）。
 >

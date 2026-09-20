@@ -47,7 +47,8 @@ pnpm dev
 
 - `/` 首页与精选 Skill
 - `/guide` Skill / MCP 帮助文档与提交使用指南
-- `/skills` Skill 技能库（内容源 `knowledge/skills/*.mdx`，Fuse.js 客户端搜索）
+- `/skills` Skill 技能库（内容源 `knowledge/skills/<slug>/`，Fuse.js 客户端搜索）
+- `/mcp` 收录的 MCP 服务（内容源 `knowledge/mcp/<slug>/`，**另一份规范**：`server.json`）
 - `/analyze` PX4 日志分析（Pyodide + pyulog 在 Web Worker 中本地解析）
 
 ## 架构
@@ -64,8 +65,12 @@ pnpm dev
 - **第二层 规则检查**：YAML 声明式规则 → 构建期编译为 Python → 内联进 `web/workers/ulog-check-script.ts`，覆盖振动、EKF、电源、GPS、姿态、失效保护等 16 个检查维度
 - **第三层 LLM 解释**：`web/functions/api/explain.js`，只接收 findings，system prompt 禁止编造数值
 
-新增 Skill：在 `knowledge/skills/` 添加一个 `.mdx` 文件并补全 frontmatter（字段规范见 CLAUDE.md 3.1）；
-新增指南页同理，放 `docs/guide/`。两者都在 `web/` 之外，构建期由 `pnpm sync:content` 拷进
+新增 Skill：在 `knowledge/skills/` 下建一个以 slug 命名的目录，里面放三份文件
+（`SKILL.md` 给 AI 看、`README.md` 给人看、`CHANGELOG.md` 是版本历史的唯一真源），
+目录结构与字段约束见 `knowledge/README.md`，由 `pnpm check:skills` 校验；
+新增 MCP 条目同理，放 `knowledge/mcp/<slug>/`，但**走的是另一份规范**（MCP Registry 的
+`server.json`，name 为反向 DNS，与 Skill 的 kebab 命名互斥），由 `pnpm check:mcp` 校验；
+新增指南页同理，放 `docs/guide/`。三者都在 `web/` 之外，构建期由 `pnpm sync:content` 拷进
 `web/.generated/`（改完页面没变化，先查这一步跑没跑）。
 
 ## 校验与 CI
