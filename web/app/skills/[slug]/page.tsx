@@ -1,13 +1,13 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { MDXRemote } from "next-mdx-remote/rsc";
 import { Sparkles } from "lucide-react";
 import { getAllSkills, getSkillBySlug } from "@/lib/skills";
-import { CATEGORY_GLYPH, CATEGORY_LABEL } from "@/lib/constants";
-import { CommunityStatLine, SkillMetaGroups } from "@/components/SkillHeaderMeta";
-import { SkillSidebar } from "@/components/SkillSidebar";
-import { SkillContentTabs } from "@/components/SkillContentTabs";
-import { SkillComments } from "@/components/SkillComments";
+import { CATEGORY_GLYPH, CATEGORY_LABEL, skillEditUrls } from "@/lib/constants";
+import { GuideBody } from "@/components/GuideBody";
+import { CommunityStatLine, EntryMetaGroups } from "@/components/EntryHeaderMeta";
+import { EntrySidebar } from "@/components/EntrySidebar";
+import { EntryContentTabs } from "@/components/EntryContentTabs";
+import { EntryComments } from "@/components/EntryComments";
 import { ChangelogList } from "@/components/ChangelogList";
 import { CopyChip } from "@/components/CopyChip";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -36,15 +36,13 @@ export default async function SkillDetailPage({
   const skill = getSkillBySlug(slug);
   if (!skill) notFound();
 
-  // 可直接粘贴给 AI 助手的完整文本（标题 + 描述 + 正文）
-  const copyText = `# ${skill.name}\n\n${skill.description}\n\n${skill.body}`;
-
   // 同类推荐（同分类下取前 4 个，排除自身）
   const related = getAllSkills()
     .filter((s) => s.slug !== skill.slug && s.category === skill.category)
     .slice(0, 4)
     .map((s) => ({ slug: s.slug, name: s.name, description: s.description, icon: s.icon }));
 
+  const editUrls = skillEditUrls(skill.slug);
 
   return (
     <div className="page-shell pt-4 pb-10 sm:pt-5">
@@ -53,7 +51,7 @@ export default async function SkillDetailPage({
       {/* 两栏：左栏 = 标题 + 内容（纵向堆叠），右栏 = 粘性侧栏（对应 SkillHub 的 390px 侧栏） */}
       <div className="flex flex-col gap-4 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">
         <div className="card min-w-0 p-5 sm:p-6">
-          {/* 标题区：图标 + 标题 + slug，其后按组展示头部信息（见 SkillHeaderMeta） */}
+          {/* 标题区：图标 + 标题 + slug，其后按组展示头部信息（见 EntryHeaderMeta） */}
           <header className="mb-8">
             <div className="flex items-start gap-4">
               <span
@@ -104,7 +102,7 @@ export default async function SkillDetailPage({
               </div>
             )}
 
-            <SkillMetaGroups
+            <EntryMetaGroups
               platforms={skill.platforms}
               clients={skill.clients}
               models={skill.models}
@@ -114,30 +112,34 @@ export default async function SkillDetailPage({
             />
           </header>
 
-          {/* 内容区：概述 / 评论 / 版本历史 */}
-          <SkillContentTabs
+          {/* 内容区：概述 / SKILL.md / 版本历史 / 评论
+              三个内容 Tab 各对应 skills/<slug>/ 下的一份文件，各自带一个仓库编辑入口 */}
+          <EntryContentTabs
             overview={
               <article className="prose-skill">
-                <MDXRemote source={skill.body} />
+                <GuideBody renderer="md" source={skill.readme} />
               </article>
             }
-            comments={<SkillComments kind="skill" slug={skill.slug} />}
+            skillMdRaw={skill.skillMd}
             changelog={
               <ChangelogList entries={skill.changelog ?? []} currentVersion={skill.version} />
             }
+            comments={<EntryComments kind="skill" slug={skill.slug} />}
             changelogCount={skill.changelog?.length ?? 0}
+            editUrls={editUrls}
           />
         </div>
 
         {/* 右栏 */}
         <aside className="lg:self-start">
-          <SkillSidebar
+          <EntrySidebar
             kind="skill"
             slug={skill.slug}
             name={skill.name}
             baseDownloads={skill.downloads}
-            copyText={copyText}
-            installHint="复制下方全部内容，粘贴到 Claude / ChatGPT / Cursor 等对话里，或作为 System Prompt 使用；原始 .ulg 等数据始终留在你自己的设备上。"
+            copyText={skill.skillMd}
+            editUrl={editUrls.skillMd}
+            installHint="复制下方全部内容，粘贴到 Claude / ChatGPT / Cursor 等对话里，或作为 System Prompt 使用；也可把整个目录放进 .claude/skills/ 直接作为 Skill 加载。原始 .ulg 等数据始终留在你自己的设备上。"
             related={related}
           />
         </aside>

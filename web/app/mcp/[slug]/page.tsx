@@ -1,12 +1,15 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { MDXRemote } from "next-mdx-remote/rsc";
+// MCP 正文与 Skill 一样走 `renderer="md"`（react-markdown + GFM），不走 MDX：
+// README 里可以有 HTML 注释（维护者说明，remarkDropComments 会丢掉），花括号也不会被当 JSX。
+import { GuideBody } from "@/components/GuideBody";
 import { Eye, Sparkles, Zap } from "lucide-react";
 import { getAllMcpServers, getMcpServerBySlug } from "@/lib/mcp";
-import { CommunityStatLine, SkillMetaGroups } from "@/components/SkillHeaderMeta";
-import { SkillSidebar } from "@/components/SkillSidebar";
-import { SkillContentTabs } from "@/components/SkillContentTabs";
-import { SkillComments } from "@/components/SkillComments";
+import { contentEditUrl } from "@/lib/constants";
+import { CommunityStatLine, EntryMetaGroups } from "@/components/EntryHeaderMeta";
+import { EntrySidebar } from "@/components/EntrySidebar";
+import { EntryContentTabs } from "@/components/EntryContentTabs";
+import { EntryComments } from "@/components/EntryComments";
 import { ChangelogList } from "@/components/ChangelogList";
 import { CopyChip } from "@/components/CopyChip";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -110,7 +113,7 @@ export default async function McpDetailPage({
               </div>
             )}
 
-            <SkillMetaGroups
+            <EntryMetaGroups
               platforms={server.platforms}
               clients={server.clients}
               models={server.models}
@@ -147,22 +150,26 @@ export default async function McpDetailPage({
             />
           </header>
 
-          <SkillContentTabs
+          <EntryContentTabs
             overview={
               <article className="prose-skill">
-                <MDXRemote source={server.body} />
+                <GuideBody renderer="md" source={server.body} />
               </article>
             }
-            comments={<SkillComments kind="mcp" slug={server.slug} />}
+            comments={<EntryComments kind="mcp" slug={server.slug} />}
             changelog={
               <ChangelogList entries={server.changelog ?? []} currentVersion={server.version} />
             }
             changelogCount={server.changelog?.length ?? 0}
+            editUrls={{
+              readme: contentEditUrl("mcp", server.slug, "README.md"),
+              changelog: contentEditUrl("mcp", server.slug, "CHANGELOG.md"),
+            }}
           />
         </div>
 
         <aside className="lg:self-start">
-          <SkillSidebar
+          <EntrySidebar
             kind="mcp"
             slug={server.slug}
             name={server.name}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Bookmark, BookmarkCheck, Check, Download, Sparkles } from "lucide-react";
+import { Bookmark, BookmarkCheck, Check, Download, Pencil, Sparkles } from "lucide-react";
 import {
   getFavorite,
   toggleFavorite,
@@ -10,19 +10,31 @@ import {
   type FavoriteStats,
   type Kind,
 } from "@/lib/community-stats";
+import { contentHostLabel } from "@/lib/constants";
 
 /**
  * 详情页右栏（390px 粘性），版式参照腾讯 SkillHub：
  * 安装卡（复制/下载/收藏）→ 统计与评分 → 相关推荐；元信息在左栏分组表内。
+ *
+ * **Skill 与 MCP 两类条目共用**，所以家族名是 `Entry*` 而不是 `Skill*`：叫 `SkillSidebar`
+ * 会宣称它只服务 Skill 一类，而 `/mcp/[slug]` 也在用（详见 `EntryContentTabs.tsx` 顶部）。
+ * 两类差异全部走参数（`kind` 决定统计接口，`installTitle` / `installHint` 决定文案）。
  */
-export function SkillSidebar({
+export function EntrySidebar({
   kind,
   slug,
   name,
   baseDownloads,
   copyText,
   installHint,
-  installTitle = "把提示词发给你的 AI，即可使用该 Skill",
+  /** 下面这个默认值是 Skill 的文案；MCP 由详情页另传一份（"该 MCP 服务"） */
+  installTitle = "把这个 Skill 交给你的 AI，即可使用",
+  /**
+   * 内容在仓库里的编辑入口。只有 Skill 传（指向 `SKILL.md`）；
+   * MCP 的编辑入口放在 `EntryContentTabs` 的每个 Tab 上（它有三份文件，侧栏一个入口
+   * 指不清是哪份），所以这里不传就不渲染。
+   */
+  editUrl,
   related,
 }: {
   kind: Kind;
@@ -33,6 +45,7 @@ export function SkillSidebar({
   installHint: string;
   /** 安装卡标题（MCP 用「该 MCP 服务」） */
   installTitle?: string;
+  editUrl?: string;
   related: { slug: string; name: string; description: string; icon?: string }[];
 }) {
   const [fav, setFav] = useState<FavoriteStats>({ count: 0, favorited: false });
@@ -64,11 +77,13 @@ export function SkillSidebar({
   }
 
   function download() {
+    // 文件名必须是 SKILL.md：这是 Agent Skills 规范定的名字，落到 .claude/skills/<slug>/
+    // 才能被加载。写成 <slug>.md 就只是"一份格式像 Skill 的文档"，加载不了。
     const blob = new Blob([copyText], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${slug}.md`;
+    a.download = "SKILL.md";
     a.click();
     URL.revokeObjectURL(url);
     setDownloaded(true);
@@ -100,7 +115,7 @@ export function SkillSidebar({
           className="btn-ghost mt-2 w-full py-2.5 text-muted"
         >
           {downloaded ? <Check className="h-4 w-4 text-ok" /> : <Download className="h-4 w-4" />}
-          {downloaded ? "已下载" : `下载 ${slug}.md`}
+          {downloaded ? "已下载" : "下载 SKILL.md"}
         </button>
 
         <button
@@ -119,6 +134,18 @@ export function SkillSidebar({
           {fav.favorited ? "已收藏" : "收藏"}
           {fav.count > 0 && <span className="text-xs">· {fav.count}</span>}
         </button>
+
+        {editUrl && (
+          <a
+            href={editUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-ghost mt-2 w-full py-2.5 text-muted"
+          >
+            <Pencil className="h-4 w-4" />
+            {`在 ${contentHostLabel()} 上编辑`}
+          </a>
+        )}
       </section>
 
 

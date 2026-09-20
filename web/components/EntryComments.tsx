@@ -21,8 +21,12 @@ function fmtTime(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** 评论区（对齐 SkillHub：列表 + 发布 + 回复 + 删除自己的评论） */
-export function SkillComments({ kind, slug }: { kind: Kind; slug: string }) {
+/**
+ * 评论区（对齐 SkillHub：列表 + 发布 + 回复 + 删除自己的评论）。
+ * Skill 与 MCP 两类条目共用，`kind` 决定打向哪个接口（`Entry*` 家族名的由来见
+ * `EntryContentTabs.tsx` 顶部）。
+ */
+export function EntryComments({ kind, slug }: { kind: Kind; slug: string }) {
   const { data: session } = useSession();
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);

@@ -118,8 +118,11 @@ export function CommunityStatLine({
 
 /**
  * 头部分组信息：分类 / 徽章 / 标签 / 适用平台 / 适用范围，逐行带标签摆放。
+ *
+ * Skill 与 MCP 两类条目共用（`Entry*` 家族名的由来见 `EntryContentTabs.tsx` 顶部）；
+ * MCP 特有的行（工具 / 传输方式 / 致动能力）走 `extraRows`。
  */
-export function SkillMetaGroups({
+export function EntryMetaGroups({
   platforms,
   clients,
   models,

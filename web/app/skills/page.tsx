@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 /**
  * ⚠️ 这一页**必须保持静态**（不要接 `searchParams` / `headers` 这类动态 API）。
  *
- * Skill 清单的真源在 `knowledge/skills/*.mdx`（`web/` 之外），构建期由
+ * Skill 清单的真源在 `knowledge/skills/<slug>/SKILL.md`（`web/` 之外），构建期由
  * `scripts/sync-content.mjs` 拷进 `web/.generated/skills/`，`lib/skills.ts` 读的是那里。
  * 以前读的是 `process.cwd()/../content/skills`——那个目录不在部署包里，页面一旦变成
  * 按需渲染，读盘就发生在线上运行时，`getAllSkills()` 返回空数组、页面成了"0 个 Skill"
