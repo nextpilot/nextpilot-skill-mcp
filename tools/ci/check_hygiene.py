@@ -414,7 +414,7 @@ def check_freshness_gate_alive() -> list[str]:
 # 退出码仍是 0。
 # ---------------------------------------------------------------------------
 
-PY_FAIL_PRINT_RE = re.compile(r"""print\(\s*f?["']\s*(?:FAIL|ERROR)\b""")
+PY_FAIL_PRINT_RE = re.compile(r"""(?:print|log\.(?:error|warning))\(\s*f?["']\s*(?:FAIL|ERROR)\b""")
 JS_FAIL_PRINT_RE = re.compile(r"""console\.(?:error|warn|log)\(\s*[`"']\s*(?:CHECK\s+)?(?:FAIL|ERROR)\b""")
 
 # 取"等号右边/括号里"**再看它是不是常量 0**，而不是把 `(?!0)` 写在 `\s*` 后面：
