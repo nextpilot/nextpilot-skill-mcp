@@ -25,6 +25,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -75,6 +76,8 @@ def run_gate(name: str, cmd: list, cwd: Path, step: int, total: int) -> tuple[st
     log.info(f"\n  {tag} {name}")
     log.info(f"{indent}$ {' '.join(str(c) for c in cmd)}")
 
+    t0 = time.perf_counter()
+
     # Run and capture -- print output line by line with indent
     # PYTHONIOENCODING=utf-8: subprocess Python writes UTF-8 stdout/stderr,
     # otherwise Windows defaults to GBK and we read GBK as UTF-8 = garbled text.
@@ -96,15 +99,17 @@ def run_gate(name: str, cmd: list, cwd: Path, step: int, total: int) -> tuple[st
     proc.wait()
 
     code = proc.returncode
+    elapsed = time.perf_counter() - t0
     status = "OK" if code == 0 else f"FAIL (exit {code})"
 
     # Result line: pad name to a fixed width so OK/FAIL are vertically aligned
-    SEP_WIDTH = 48
-    dots = "." * max(2, SEP_WIDTH - len(name) - len(tag) - 2)
+    SEP_WIDTH = 56
+    elapsed_str = f"{elapsed:.1f}s"
+    dots = "." * max(2, SEP_WIDTH - len(name) - len(tag) - len(elapsed_str) - 4)
     if code == 0:
-        log.info(f"  {tag} {name}  {dots}  {status}")
+        log.info(f"  {tag} {name}  {dots}  [{elapsed_str}]  {status}")
     else:
-        log.error(f"  {tag} {name}  {dots}  {status}")
+        log.error(f"  {tag} {name}  {dots}  [{elapsed_str}]  {status}")
     log.info("")
 
     return name, ("ok" if code == 0 else "fail")
@@ -113,15 +118,18 @@ def run_gate(name: str, cmd: list, cwd: Path, step: int, total: int) -> tuple[st
 def run_prereq(name: str, cmd: list, cwd: Path, step: int, total: int) -> tuple[str, bool]:
     """Run a toolchain prereq check. Returns (name, available)."""
     tag = f"[{step:>2}/{total:<2}]"
+    t0 = time.perf_counter()
     proc = capture(cmd, cwd)
+    elapsed = time.perf_counter() - t0
     ok = proc.returncode == 0
-    SEP_WIDTH = 48
-    dots = "." * max(2, SEP_WIDTH - len(name) - len(tag) - 2)
+    SEP_WIDTH = 56
+    elapsed_str = f"{elapsed:.1f}s"
+    dots = "." * max(2, SEP_WIDTH - len(name) - len(tag) - len(elapsed_str) - 4)
     status = "OK" if ok else "MISSING"
     if ok:
-        log.info(f"  {tag} {name}  {dots}  {status}")
+        log.info(f"  {tag} {name}  {dots}  [{elapsed_str}]  {status}")
     else:
-        log.warning(f"  {tag} {name}  {dots}  {status}")
+        log.warning(f"  {tag} {name}  {dots}  [{elapsed_str}]  {status}")
     return name, ok
 
 
@@ -202,19 +210,27 @@ def run_phase(phase_label: str, gates: list[tuple[str, list, Path]], step_start:
 
 # ---- Gate definitions ----
 
-STATIC_GATES: list[tuple[str, list, Path]] = [
+# Fast static gates -- run on every pre-push (~5s total)
+PRE_PUSH_GATES: list[tuple[str, list, Path]] = [
     ("Python style (ruff format --check)", [PY, "-m", "ruff", "format", "--check", "."], ROOT),
     ("Python lint (ruff check)", [PY, "-m", "ruff", "check", "."], ROOT),
     ("Operator / CEL sandbox unit tests (pytest)", [PY, "-m", "pytest", "engine/tests"], ROOT),
-    ("Build contract vs artifact parity (build:kb --check)", [NODE, "scripts/build-knowledge.mjs", "--check"], WEB),
     ("Artifact is valid Python (check_artifact)", [PY, "tools/calibrate/check_artifact.py"], ROOT),
     ("engine/ stays pure Python shared by 3 sites (check_engine_purity)", [PY, "tools/ci/check_engine_purity.py"], ROOT),
     ("Type checking (tsc --noEmit)", [NODE, "node_modules/typescript/bin/tsc", "--noEmit"], WEB),
     ("TypeScript lint (eslint)", [NODE, "node_modules/eslint/bin/eslint.js", "."], WEB),
-    ("Issue-filer self-test (fingerprint / scrub / allowlist / guards)", [NODE, "scripts/test-issue-filer.mjs"], WEB),
     ("Validator hygiene (check_hygiene)", [PY, "tools/ci/check_hygiene.py"], ROOT),
+]
+
+# Heavy static gates -- CI only (~3 min total)
+CI_GATES: list[tuple[str, list, Path]] = [
+    ("Build contract vs artifact parity (build:kb --check)", [NODE, "scripts/build-knowledge.mjs", "--check"], WEB),
+    ("Issue-filer self-test (fingerprint / scrub / allowlist / guards)", [NODE, "scripts/test-issue-filer.mjs"], WEB),
     ("Guard self-proof -- each guard must fail once", [PY, "tools/ci/mutate_guards.py"], ROOT),
 ]
+
+# All static gates combined for full run
+STATIC_GATES: list[tuple[str, list, Path]] = PRE_PUSH_GATES + CI_GATES
 
 BUILD_GATES: list[tuple[str, list, Path]] = [
     ("Site build (next build)", [NODE, "node_modules/next/dist/bin/next", "build"], WEB),
@@ -258,6 +274,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--with-build", action="store_true", help="include phase: site build (CI; slow)")
     ap.add_argument("--with-e2e", action="store_true", help="include phase: E2E smoke (pre-push)")
     ap.add_argument("--skip-logs", action="store_true", help="skip the log-dependent phase")
+    ap.add_argument("--pre-push", action="store_true", help="fast mode: skip heavy static checks (mutate_guards, test-issue-filer, build:kb)")
     args = ap.parse_args(argv[1:])
 
     logs = sorted(LOG_DIR.glob("*.ulg")) + sorted(LOG_DIR.glob("*.bin")) if not args.skip_logs else []
@@ -285,8 +302,14 @@ def main(argv: list[str]) -> int:
     # ============ Phase 2: Static checks ============
     log.info("\n\n  Phase 2 / Static checks (no .ulg log; blocks every CI commit)")
     log.info(f"  {'-' * 46}")
-    r, step = run_phase("static", STATIC_GATES, step)
-    all_results += r
+    if args.pre_push:
+        r, step = run_phase("static", PRE_PUSH_GATES, step)
+        all_results += r
+        for name, _, _ in CI_GATES:
+            all_skipped.append(f"{name} -- skipped (heavy; run full check_all for CI)")
+    else:
+        r, step = run_phase("static", STATIC_GATES, step)
+        all_results += r
 
     # ============ Phase 3: Site build (optional) ============
     if args.with_build:

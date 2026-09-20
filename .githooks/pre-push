@@ -1,21 +1,29 @@
 #!/bin/bash
-# Pre-push hook — single entry through check_all.py
-#   SKIP_E2E=1 git push          # check_all.py only, no E2E
+# Pre-push hook — fast mode (skip heavy static checks)
+#   SKIP_E2E=1 git push          # also skip E2E
 #   SKIP_LOG_ANALYSIS=1 git push  # skip log-analysis smoke E2E
+#   FULL_PUSH=1 git push          # run everything (like CI)
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-if [ "$SKIP_E2E" = "1" ]; then
-  echo "===== SKIP_E2E=1: check_all.py only ====="
-  cd "$REPO_ROOT"
-  python tools/ci/check_all.py
+cd "$REPO_ROOT"
+
+if [ "$FULL_PUSH" = "1" ]; then
+  echo "===== FULL_PUSH=1: full check_all.py (like CI) ====="
+  python tools/ci/check_all.py --with-e2e
   echo "===== OK ====="
   exit 0
 fi
 
-echo "===== pre-push check (check_all.py --with-e2e) ====="
-cd "$REPO_ROOT"
-python tools/ci/check_all.py --with-e2e
+if [ "$SKIP_E2E" = "1" ]; then
+  echo "===== SKIP_E2E=1: check_all.py --pre-push only ====="
+  python tools/ci/check_all.py --pre-push
+  echo "===== OK ====="
+  exit 0
+fi
+
+echo "===== pre-push check (check_all.py --pre-push --with-e2e) ====="
+python tools/ci/check_all.py --pre-push --with-e2e
