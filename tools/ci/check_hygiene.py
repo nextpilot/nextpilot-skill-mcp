@@ -80,6 +80,7 @@ SKIP_FILES = frozenset(
         "web/workers/ulog-check-script.ts",
         "web/workers/ulog-data-script.ts",
         "web/workers/prompts.generated.js",
+        "tools/_logging.py",
     }
 )
 
