@@ -11,7 +11,6 @@ import {
   LogOut,
   Mail,
   ShieldAlert,
-  Zap,
 } from "lucide-react";
 import { signOut, useSession } from "@/components/SessionProvider";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -38,30 +37,28 @@ const PLAN_LABEL: Record<string, string> = {
 export function MeClient() {
   const { data: session, status } = useSession();
 
-  const [quota, setQuota] = useState<{ used: number; limit: number; day: string } | null>(null);
   const [cloud, setCloud] = useState<CloudReport[] | null>(null);
   /** 本机报告（IndexedDB，只在这台设备）：null 表示还在初始化 */
   const [localCount, setLocalCount] = useState<number | null>(null);
   const [localCritical, setLocalCritical] = useState(0);
 
-  // 账号信息与额度（登录后才有意义）
+  // 云端报告（登录后才有意义）
   useEffect(() => {
     if (status !== "authenticated") {
-      setQuota(null);
       setCloud(null);
       return;
     }
     let cancelled = false;
     void (async () => {
+      // 这一发请求只为「让服务端认识这台设备/这个用户」——它原先还负责取 quota，
+      // 但次数展示 2026-09-21 已全线撤掉（次数以后由后台配置），故不再读它的响应体。
+      // 别因为"响应没人用"就删掉：服务端可能在这里建号/登记设备，删了会不会有别的
+      // 后果得先跟后台确认。
       try {
-        const resp = await fetch("/api/me", {
+        await fetch("/api/me", {
           cache: "no-store",
           headers: { "x-device-id": getDeviceId() },
         });
-        if (resp.ok && !cancelled) {
-          const data = await resp.json();
-          if (data.quota) setQuota(data.quota);
-        }
       } catch {
         // 边缘函数不可用时不阻断页面
       }
@@ -113,8 +110,8 @@ export function MeClient() {
           </p>
           <p className="mt-2 text-sm leading-6 text-muted">
             <LocalizedText
-              zh="登录后可以在这里查看账号信息、AI 解读额度与云端报告。"
-              en="Sign in to see your account, AI quota and cloud reports."
+              zh="登录后可以在这里查看账号信息与云端报告。"
+              en="Sign in to see your account and cloud reports."
             />
           </p>
           <Link
@@ -130,7 +127,6 @@ export function MeClient() {
 
   const name = session.user.name || session.user.email || "飞手";
   const plan = PLAN_LABEL[session.user.plan] ?? session.user.plan;
-  const quotaLeft = quota ? Math.max(quota.limit - quota.used, 0) : null;
 
   return (
     <div className="page-shell pt-4 pb-10 sm:pt-5">
@@ -139,7 +135,10 @@ export function MeClient() {
         <LocalizedText zh="我的" en="My account" />
       </h1>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+      {/* 原来是「账号信息 + 今日 AI 解读额度」两栏；额度卡撤掉后只剩一栏，
+          就不要再留 lg:grid-cols-2（只剩一个子项时它会缩在左半边，右边一整块空白）。
+          以后后台把次数配好、额度卡回来时，把这里的 grid 一并改回两列。 */}
+      <div className="mt-6">
         {/* 账号信息 */}
         <div className="card p-5">
           <div className="flex items-start gap-4">
@@ -194,38 +193,8 @@ export function MeClient() {
           </div>
         </div>
 
-        {/* 今日 AI 解读额度 */}
-        <div className="card p-5">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Zap className="h-4 w-4 text-primary" />
-            <LocalizedText zh="今日 AI 解读额度" en="Today's AI quota" />
-          </div>
-          {quota ? (
-            <>
-              <div className="mt-3 flex items-baseline gap-2">
-                <span
-                  className={`text-2xl font-bold ${quotaLeft === 0 ? "text-critical" : "text-text"}`}
-                >
-                  {quotaLeft}
-                </span>
-                <span className="text-sm text-muted">/ {quota.limit} 次</span>
-                <span className="ml-auto text-xs text-faint">每日 0 点（UTC）重置</span>
-              </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-2">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    quotaLeft === 0 ? "bg-critical" : "bg-primary"
-                  }`}
-                  style={{ width: `${Math.min((quota.used / quota.limit) * 100, 100)}%` }}
-                />
-              </div>
-            </>
-          ) : (
-            <p className="mt-3 text-sm text-muted">
-              <LocalizedText zh="额度信息暂不可用" en="Quota unavailable" />
-            </p>
-          )}
-        </div>
+        {/* 这里原先是「今日 AI 解读额度」卡（进度条 + 剩余 N 次），2026-09-21 撤掉：
+            次数上限以后由后台配置，前端不先替它报一个写死的数字。 */}
       </div>
 
       {/* 报告概览 */}

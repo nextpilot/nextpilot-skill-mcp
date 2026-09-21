@@ -106,7 +106,6 @@ export function LogReport({
   onRestore,
   explaining,
   loggedIn,
-  quota,
   logCached,
   onGenerateAi,
   activeTab,
@@ -127,7 +126,6 @@ export function LogReport({
   explaining: boolean;
   loggedIn: boolean;
   logCached: boolean;
-  quota: { used: number; limit: number; anonymous?: boolean; loginLimit?: number } | null;
   onGenerateAi: () => void;
   activeTab: TabKey;
   onTabChange: (tab: TabKey) => void;
@@ -258,7 +256,6 @@ export function LogReport({
             aiMarkdown={aiMarkdown}
             explaining={explaining}
             loggedIn={loggedIn}
-            quota={quota}
             onGenerateAi={onGenerateAi}
           />
         )}
@@ -477,13 +474,11 @@ function AiTab({
   aiMarkdown,
   explaining,
   loggedIn,
-  quota,
   onGenerateAi,
 }: {
   aiMarkdown: string | null;
   explaining: boolean;
   loggedIn: boolean;
-  quota: { used: number; limit: number; anonymous?: boolean; loginLimit?: number } | null;
   onGenerateAi: () => void;
 }) {
   return (
@@ -513,14 +508,13 @@ function AiTab({
             <Sparkles className="h-4 w-4" />
             生成 AI 中文报告
           </button>
+          {/* 这里原先报「今日免费 N 次，剩余 N 次」/「匿名可免费试用 3 次/天」，
+              2026-09-21 撤掉：次数上限以后由后台配置，前端不先替它报一个写死的数字。
+              只留"这报告是什么、登录有什么用"，这两句不依赖次数。 */}
           <p className="mt-2 text-xs text-muted">
             {loggedIn
-              ? `由 DeepSeek 基于上述结构化检查结果生成，今日免费 ${quota?.limit ?? 10} 次${
-                  quota
-                    ? `，剩余 ${Math.max(quota.limit - quota.used, 0)} 次`
-                    : ""
-                }`
-              : `匿名可免费试用 ${quota?.limit ?? 3} 次/天，登录后 ${quota?.loginLimit ?? 10} 次/天并同步云端历史`}
+              ? "由 DeepSeek 基于上述结构化检查结果生成，只把结论讲成人话，不参与数值判断。"
+              : "登录后可把报告存到云端，换设备也能接着看。"}
           </p>
         </div>
       )}

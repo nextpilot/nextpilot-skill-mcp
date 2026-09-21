@@ -3,7 +3,8 @@ import { LanguageProvider } from "@/components/LanguageProvider";
 import { SessionProvider } from "@/components/SessionProvider";
 import { RuntimeCacheRegistrar } from "@/components/RuntimeCacheRegistrar";
 import { IssueBridgeMount } from "@/components/IssueBridgeMount";
-import { SiteFooter, SiteHeader } from "@/components/SiteHeader";
+import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
 import "./globals.css";
 
 export const metadata: Metadata = {

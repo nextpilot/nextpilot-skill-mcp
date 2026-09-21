@@ -149,26 +149,5 @@ export function SiteHeader() {
   );
 }
 
-export function SiteFooter() {
-  const { t } = useLanguage();
-
-  return (
-    <footer className="border-t border-border/80 py-8 text-sm text-muted">
-      <div className="page-shell flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <p>NextPilot Skill · {t("让无人机更智能", "Making aircraft smarter")}</p>
-          <p className="text-xs">
-            {/* 通用反馈入口。报告页里还有一个「反馈问题」，那个带着命中的规则与结论条数，
-                是另一回事——两者都走 /api/issues，别把入口合并掉。 */}
-            <Link href="/issue" className="underline underline-offset-2 hover:text-text">
-              {t("提交反馈 / 报告问题", "Report an issue")}
-            </Link>
-          </p>
-        </div>
-        <p className="text-xs">
-          {t("分析结果为辅助判读，不替代人工排查 · 平台永不直接致动真实载具", "Analysis supports, but does not replace, human review · No direct actuation")}
-        </p>
-      </div>
-    </footer>
-  );
-}
+// 页脚原先也写在这个文件里（`SiteHeader.tsx` 导出 `SiteFooter`）——文件名说的是 Header，
+// 读的人在 components/ 里找不到页脚在哪。2026-09-21 拆到 `components/SiteFooter.tsx`。

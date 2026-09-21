@@ -1,8 +1,54 @@
 import type { NextConfig } from "next";
+import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 
 const isDev = process.env.NODE_ENV === "development";
 
+/**
+ * 站点版本：footer 要显示「版本号 + 日期」，这两样都不该由人手写在组件里（写在那里的
+ * 版本号一定会忘记改，而它偏偏是"看起来一直正常"的那种错）。
+ *
+ *   · 版本号 ← web/package.json 的 `version`（发版时 `pnpm version` 改它，一处生效）
+ *   · 日期 / 短哈希 ← 构建时的 git HEAD
+ *
+ * 取不到 git（有的托管构建环境没有）时日期退回构建当天、哈希留空：**宁可少一个提交号，
+ * 也不要显示"未知"**——日期那格空掉会让 footer 一整块看着像没做完。
+ * 读取口只有 `lib/site-version.ts` 一处（全站不许再直接读 NEXT_PUBLIC_APP_*，见
+ * `scripts/test-issue-filer.mjs` §[18]）。
+ */
+function siteEnv(): Record<string, string> {
+  const git = (args: string[]): string => {
+    try {
+      return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    } catch {
+      return "";
+    }
+  };
+  let version = "";
+  try {
+    version = String(JSON.parse(readFileSync("package.json", "utf8")).version ?? "");
+  } catch {
+    version = "";
+  }
+  // 本地时区的「年-月-日 时:分:秒」：日期只到天会让人分不清两次构建谁新谁旧（一天内
+  // 可能构建很多次），精确到秒才能对上"刚发的那版"。format-local 按构建机时区换算，
+  // git 取不到（托管环境没有 .git）时退回构建当下的本地时间，口径一致。
+  const nowStamp = (): string => {
+    const p = (n: number): string => String(n).padStart(2, "0");
+    const d = new Date();
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  };
+  return {
+    NEXT_PUBLIC_APP_VERSION: version,
+    NEXT_PUBLIC_APP_COMMIT: git(["rev-parse", "--short", "HEAD"]),
+    NEXT_PUBLIC_APP_COMMIT_DATE:
+      git(["log", "-1", "--format=%ad", "--date=format-local:%Y-%m-%d %H:%M:%S"]) || nowStamp(),
+  };
+}
+
 const nextConfig: NextConfig = {
+  // 站点版本的构建期注入（见 siteEnv 的说明）；NEXT_PUBLIC_* 会被内联进客户端产物
+  env: siteEnv(),
   // Pyodide 运行时与 .ulg 文件较大，放开静态资源体积告警
   experimental: {},
   // 仓库根目录已有 CLAUDE.md，关闭 Next 16 自动生成 AGENTS.md/CLAUDE.md

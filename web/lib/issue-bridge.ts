@@ -21,6 +21,7 @@
 //      客户端先脱一层只是"少传一点东西出浏览器"，权威判定在边缘侧。
 
 import { MAX_MESSAGE, MAX_STACK, MAX_TYPE, clip, normalize, scrub } from "./error-policy.js";
+import { SITE_VERSION } from "./site-version";
 
 export type ReportLevel = "fatal" | "recoverable";
 
@@ -106,7 +107,9 @@ function basePayload() {
     route: typeof location !== "undefined" ? location.pathname : "",
     ua: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 120) : "",
     loggedIn,
-    version: process.env.NEXT_PUBLIC_APP_VERSION ?? "",
+    // 站点版本的唯一读取口（构建期由 next.config.ts 注入）。以前这里直接读环境变量，
+    // 而全仓库没人给它赋值 → version 恒为空串、上报里那栏直接不打印。
+    version: SITE_VERSION.version,
   };
 }
 

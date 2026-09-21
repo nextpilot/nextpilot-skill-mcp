@@ -353,7 +353,10 @@ export function useLogAnalyzer() {
                 });
                 const data = await resp.json();
                 if (resp.status === 429) {
-                    markdown = `> ${data.error ?? "今日免费额度已用完"}。额度每日 0 点（UTC）重置。`;
+                    // 429 的两种来路：额度用完，或**限流**（来得太快）。服务端给了 error
+                    // 就用它；没给时不许替它编"额度已用完"——那是其中一种，另一种下这句
+                    // 是错的，用户按它去等第二天重置，其实重试一下就行（同 §6.8 的教训）。
+                    markdown = `> ${data.error ?? "请求过于频繁或已达上限，请稍后重试"}`;
                 } else if (!resp.ok) {
                     markdown = `> AI 解释暂不可用：${data.error ?? resp.statusText}`;
                 } else {
@@ -1048,6 +1051,9 @@ export function useLogAnalyzer() {
         info,
         aiMarkdown,
         history,
+        // 配额数据继续留在这里（/api/me、explain 响应都在更新它），但**暂无任何界面消费**：
+        // 次数展示 2026-09-21 全线撤掉（上传卡 / AI 解读页 / 我的页），上限以后由后台配置。
+        // 后台配好之后 UI 直接从这里取，不用再动 hook 和取数逻辑——所以别把它当死代码删。
         quota,
         loggedIn,
         cloudItems,

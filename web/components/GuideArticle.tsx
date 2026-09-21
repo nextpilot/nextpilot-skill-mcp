@@ -15,7 +15,10 @@ export function GuideArticle({ doc }: { doc: GuideDoc }) {
   const { prev, next } = getGuideNeighbors(doc.slug);
 
   return (
-    <div className="flex min-w-0 gap-10">
+    // gap-8（32px）而不是 gap-10（40px）：与外层「侧栏↔正文」那道间距同宽，
+    // 省下的 8px 归正文。右目录列宽跟标题文字走（见 GuideOutline 的 aside），
+    // 中文页通常 ~112px，正文一般能顶到 max-w-3xl 的 768 上限。
+    <div className="flex min-w-0 gap-8">
       <article className="min-w-0 max-w-3xl flex-1">
         <GuideMobileNav groups={getGuideNav()} headings={doc.headings} />
 

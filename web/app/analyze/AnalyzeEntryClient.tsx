@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { LocalizedText } from "@/components/LocalizedText";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { ANALYSIS_DISCLAIMER, LOG_PRIVACY_NOTE } from "@/lib/log-analysis-notes";
 import type { HistoryItem } from "@/components/ReportHistoryList";
 
 const STAGE_TEXT: Record<string, string> = {
@@ -32,7 +33,8 @@ export function AnalyzeEntryClient() {
     error,
     report,
     history,
-    quota,
+    // 这里不取 `quota`：上传卡上不再显示「匿名试用 3/3 次」——次数限制改由后台配置，
+    // 前端不先替后台报一个写死的数。要用时从 useLogAnalyzer() 取回来即可。
     cloudItems,
     cachedHashes,
     cacheInfo,
@@ -120,28 +122,35 @@ export function AnalyzeEntryClient() {
           ) : (
             <UploadCloud className="mb-4 h-10 w-10 text-primary" />
           )}
+          {/* 三行：标题带容量上限 → 隐私承诺 → 免责声明。容量上限并进标题，是为了让用户
+              先看"能不能传"，再看"传上去安不安全"——这两句要在用户交出日志之前就看到。
+              文案本体在 lib/log-analysis-notes.ts，这里只管排版，别在组件里手写措辞。 */}
           <p className="text-lg font-semibold">
-            {busy ? STAGE_TEXT[stage] ?? "处理中…" : "选择或拖入 PX4 .ulg 日志"}
+            {busy ? (
+              STAGE_TEXT[stage] ?? "处理中…"
+            ) : (
+              <LocalizedText
+                zh="选择或拖入 PX4 .ulg 日志，最大支持300MB"
+                en="Drop or choose a PX4 .ulg log — up to 300 MB"
+              />
+            )}
           </p>
           <p className="mt-2 max-w-md text-sm leading-relaxed text-muted">
-            {busy
-              ? "首次运行需下载约十余 MB 的 Pyodide 运行时，请稍候"
-              : "检查在本地浏览器完成，原始文件不上传。支持最大 300MB"}
+            {busy ? (
+              "首次运行需下载约十余 MB 的 Pyodide 运行时，请稍候"
+            ) : (
+              <LocalizedText zh={`${LOG_PRIVACY_NOTE.zh}。`} en={`${LOG_PRIVACY_NOTE.en}.`} />
+            )}
           </p>
-          {quota && (
-            <p className="mt-3 text-xs text-faint">
-              {quota.anonymous ? "匿名试用" : "AI"}：
-              <span
-                className={
-                  quota.used >= quota.limit
-                    ? "font-semibold text-critical"
-                    : "font-semibold text-text"
-                }
-              >
-                {Math.max(quota.limit - quota.used, 0)}/{quota.limit} 次
-              </span>
+          {!busy && (
+            // 与上面那句同等字号（两句是并列的说明，不是"一句正文 + 一行脚注"）
+            <p className="mt-1.5 max-w-md text-sm leading-relaxed text-muted">
+              <LocalizedText zh={`${ANALYSIS_DISCLAIMER.zh}。`} en={`${ANALYSIS_DISCLAIMER.en}.`} />
             </p>
           )}
+          {/* 这里原先还有一行「匿名试用：3/3 次」，2026-09-21 撤掉了：
+              次数上限以后由后台配置，前端不先报一个写死的数字。上传卡现在只保留
+              容量上限 + 隐私承诺 + 免责三行。 */}
           <input
             ref={inputRef}
             type="file"

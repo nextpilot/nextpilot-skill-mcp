@@ -64,8 +64,13 @@ export function GuideOutline({ headings }: { headings: GuideHeading[] }) {
 
   return (
     <>
-      {/* 桌面端：右侧粘性目录 */}
-      <aside className="hidden w-56 shrink-0 xl:block">
+      {/* 桌面端：右侧粘性目录。
+          宽度跟标题文字走（w-max），和左侧栏同一套规矩：写死 w-56 时目录文字只有 ~85px，
+          列内右侧常年空 126px；上限 max-w-56（标题再长也不许反过来挤正文，换行）。
+          断点必须是 lg（1024）而不是 xl（1280）：1280 的窗口扣掉滚动条只剩 ~1263，
+          xl 踩不准，目录整列消失，正文右缘到内容区右缘量出 176px 死白（1152/1200/1240/1263
+          全是 176）。降到 lg 后最窄 1024 时正文仍有 ~672px，可读；1263 时正文能到 768 上限。 */}
+      <aside className="hidden w-max min-w-28 max-w-56 shrink-0 lg:block">
         <nav className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pb-10">
           <p className="mb-3 text-xs font-semibold tracking-wider text-muted">
             <span className="inline-flex min-w-0 items-center gap-2 truncate">

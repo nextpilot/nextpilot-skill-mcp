@@ -31,7 +31,7 @@ export function AnalyzeResultClient() {
     info,
     aiMarkdown,
     storedPlots,
-    quota,
+    // 不取 `quota`：AI 解读页不再显示次数（次数以后由后台配置）。
     loggedIn,
     cachedHashes,
     busy,
@@ -194,7 +194,6 @@ export function AnalyzeResultClient() {
           onRestore={handleRestoreClick}
           explaining={stage === "explaining"}
           loggedIn={loggedIn}
-          quota={quota}
           logCached={Boolean(report.logHash && cachedHashes.has(report.logHash))}
           onGenerateAi={handleGenerateAi}
           activeTab={tab}
