@@ -1,27 +1,19 @@
 """Shared colored logging for CI/calibrate scripts.
 
 Usage:
-    from _logging import get_logger, ok_, fail_, skip_, bullet, phase
+    from _logging import get_logger
     log = get_logger()
 
     log.info("OK check passed")
     log.warning("SKIP no log files")
     log.error("FAIL expected 3, got 2")
 
-    # Using standalone helpers (auto-colored):
-    log.info(ok_("all checks passed"))
-    log.warning(skip_("no logs found"))
-    log.error(fail_("expected 3, got 2"))
-
-    # Phase headers:
-    log.info(phase("Phase 2 / Static checks"))
-
-    # Logger helpers (handy for check_all.py):
-    log.print_header("check Python/Node prerequisites", "$ pip ...")
+    # Logger helpers:
+    log.print_header("check Python/Node prerequisites")
     log.print_step(1, 10, "ruff available", "$ ruff --version", 0, "")
     log.print_summary(results, skipped)
 
-Colors: ERROR \u2192 red, WARNING \u2192 yellow, INFO/DEBUG \u2192 default.
+Colors: ERROR → red, WARNING → yellow, INFO/DEBUG → default.
 """
 
 from __future__ import annotations
@@ -33,11 +25,11 @@ RED = "\033[91m"
 YELLOW = "\033[93m"
 GREEN = "\033[92m"
 CYAN = "\033[96m"
-MAGENTA = "\033[95m"
 RESET = "\033[0m"
 BOLD = "\033[1m"
 
-_SEP = "=" * 60
+_SEP1 = "=" * 100
+_SEP2 = "-" * 100
 _COLOR_MAP = {
     logging.ERROR: RED,
     logging.WARNING: YELLOW,
@@ -52,36 +44,9 @@ def _is_tty() -> bool:
 
 
 def _c(color: str, text: str) -> str:
-    """Apply color if stdout is a TTY."""
     if _is_tty():
         return f"{color}{text}{RESET}"
     return text
-
-
-# ── standalone helpers (pass to log.info/warning/error) ──────────────
-
-
-def ok_(msg: str) -> str:
-    return _c(GREEN, msg)
-
-
-def fail_(msg: str) -> str:
-    return _c(RED, msg)
-
-
-def skip_(msg: str) -> str:
-    return _c(YELLOW, msg)
-
-
-def bullet(msg: str) -> str:
-    return _c(CYAN, f"\u2022 {msg}")
-
-
-def phase(title: str, subtitle: str = "") -> str:
-    out = _c(BOLD, f"\n  {title}")
-    if subtitle:
-        out += f"\n    {subtitle}"
-    return out
 
 
 # ── helpers that write via a logger instance ─────────────────────────
@@ -89,10 +54,12 @@ def phase(title: str, subtitle: str = "") -> str:
 
 def _print_header(logger: logging.Logger, title: str, command: str = "") -> None:
     """Print a section header."""
-    logger.info(_c(BOLD, f"\n  {title}"))
+    logger.info("")
+    logger.info(_SEP1)
+    logger.info("Function: " + title)
     if command:
-        logger.info(f"    {command}")
-    logger.info(_c(CYAN, f"  {'-' * 46}"))
+        logger.info("Command:  " + command)
+    logger.info(_SEP1)
 
 
 def _print_step(
@@ -104,19 +71,36 @@ def _print_step(
     returncode: int,
     stdout: str,
 ) -> None:
-    """Print a single step result with command and output."""
+    """Print a single step result.
+
+    Format:
+    ----------------------------------------------------------------------------------------------------
+    [k/N]  xxxxxx
+    ----------------------------------------------------------------------------------------------------
+    | command: xxxx
+    | result:  xxxxxxx
+    ----------------------------------------------------------------------------------------------------
+    | 子进程的输出
+    """
     tag = f"[{step:>2}/{total:<2}]"
-    indent = "      "
+    status = "OK" if returncode == 0 else f"FAIL (exit {returncode})"
 
-    logger.info(f"\n  {tag} {name}")
-    logger.info(f"{indent}$ {command}")
+    logger.info("")
+    logger.info(_SEP2)
+    logger.info(_c(CYAN, f"{tag}  {name}"))
+    logger.info(_SEP2)
+    logger.info(f"| Command: {command}")
+    result_color = GREEN if returncode == 0 else RED
+    logger.info(_c(result_color, f"| Result:  {status}"))
+    logger.info(_SEP2)
+    if stdout.strip():
+        for line in stdout.strip().splitlines():
+            logger.info("| " + line)
+    logger.info(_SEP2)
+ 
 
-    if stdout:
-        for line in stdout.rstrip("\n").split("\n"):
-            logger.info(f"{indent}| {line}")
 
-
-def _print_summary(logger: logging.Logger, results: list[tuple[str, str]], skipped: list[str]) -> None:
+def _print_summary(logger: logging.Logger, results: list[tuple[str, str]], skipped: list[str]) -> int:
     """Print a structured summary block.
 
     ``results`` is a list of ``(name, status)`` where status is
@@ -124,39 +108,46 @@ def _print_summary(logger: logging.Logger, results: list[tuple[str, str]], skipp
 
     ``skipped`` is a list of free-text descriptions for items that were
     not run (e.g. optional phases).
+
+    Returns ``1`` if any check failed, ``0`` otherwise.
     """
     passed = [(n, s) for n, s in results if s == "ok"]
     failed = [(n, s) for n, s in results if s == "fail"]
 
-    logger.info(f"\n\n{_SEP}")
-    logger.info(_c(BOLD, "  Summary"))
-    logger.info(_SEP)
-    logger.info(f"  Total : {len(results)} checks ran, {len(skipped)} skipped")
     logger.info("")
+    logger.info(_SEP2)
+    logger.info(_c(CYAN, "Summary"))
+    logger.info(_SEP2)
+    logger.info(f"Total : {len(results)} checks ran, {len(skipped)} skipped")
 
     if passed:
-        logger.info(_c(GREEN, f"  PASSED ({len(passed)})"))
+        logger.info(_c(GREEN, f"\nPASSED ({len(passed)})"))
         for name, _ in passed:
-            logger.info(f"    {_c(GREEN, '[OK   ]')} {name}")
+            logger.info(_c(GREEN, f"  [OK   ] {name}"))
     if failed:
-        logger.info("")
-        logger.info(_c(RED, f"  FAILED ({len(failed)})"))
+        logger.info(_c(RED, f"\nFAILED ({len(failed)})"))
         for name, _ in failed:
-            logger.error(f"    {_c(RED, '[FAIL ]')} {name}")
+            logger.info(_c(RED, f"  [FAIL ] {name}"))
     if skipped:
-        logger.info("")
-        logger.info(_c(YELLOW, f"  SKIPPED ({len(skipped)})"))
+        logger.info(_c(YELLOW, f"\nSKIPPED ({len(skipped)})"))
         for s in skipped:
-            logger.warning(f"    {_c(YELLOW, '[SKIP ]')} {s}")
+            logger.info(_c(YELLOW, f"  [SKIP ] {s}"))
 
     logger.info("")
+    if failed:
+        logger.info(_c(RED, f"RESULT: {len(failed)} check(s) FAILED -- see output above for details."))
+        logger.info(_SEP2)
+        return 1
+    logger.info(_c(GREEN, f"RESULT: all {len(results)} checks passed."))
+    logger.info(_SEP2)
+    return 0
 
 
 # ── extended logger class ────────────────────────────────────────────
 
 
 class _CheckLogger(logging.Logger):
-    """Logger subclass that adds ``print_header`` / ``print_step`` / ``print_summary`` methods."""
+    """Logger subclass with convenience methods."""
 
     def print_header(self, title: str, command: str = "") -> None:
         _print_header(self, title, command)
@@ -173,9 +164,7 @@ class _CheckLogger(logging.Logger):
         _print_step(self, step, total, name, command, returncode, stdout)
 
     def print_summary(self, results: list[tuple[str, str]], skipped: list[str]) -> int:
-        _print_summary(self, results, skipped)
-        failed = sum(1 for _, s in results if s == "fail")
-        return 1 if failed else 0
+        return _print_summary(self, results, skipped)
 
 
 class _ColoredFormatter(logging.Formatter):
@@ -193,9 +182,8 @@ def get_logger(name: str | None = None) -> _CheckLogger:
     """Get a logger configured for colored console output.
 
     The returned logger has ``print_header`` / ``print_step`` / ``print_summary``
-    convenience methods for structured check output.
+    convenience methods.
     """
-    # Use our subclass so we can attach print_header etc.
     logging.setLoggerClass(_CheckLogger)
     logger = logging.getLogger(name or "ci")
     if logger.handlers:

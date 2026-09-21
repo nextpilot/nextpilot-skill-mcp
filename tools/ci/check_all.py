@@ -12,26 +12,24 @@ Output is phased, sequentially numbered across all phases, and ASCII-only
 (never garbles on a GBK console).
 
 Usage:
-  python tools/ci/check_all.py                          # phases 1-2 + 5 if logs present
-  python tools/ci/check_all.py --pre-push               # fast static + 5 if logs present
-  python tools/ci/check_all.py --with-build             # also phase 3 (CI)
-  python tools/ci/check_all.py --with-e2e               # also phase 4 (pre-push)
-  python tools/ci/check_all.py --skip-logs              # phases 1-2 only
+  python tools/ci/check_all.py                 # phases 1-2 + 5 if logs present
+  python tools/ci/check_all.py --pre-push      # fast static + 5 if logs present
+  python tools/ci/check_all.py --with-build    # also phase 3 (CI)
+  python tools/ci/check_all.py --with-e2e      # also phase 4 (pre-push)
+  python tools/ci/check_all.py --skip-logs     # phases 1-2 only
 """
 
 from __future__ import annotations
 
 import argparse
-import logging
 import os
 import shutil
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from _logging import get_logger, ok_, fail_, skip_, phase  # noqa: E402
+from _logging import get_logger  # noqa: E402
 
 log = get_logger()
 
@@ -63,76 +61,36 @@ def capture(cmd: list, cwd: Path = ROOT) -> subprocess.CompletedProcess:
 
 
 def run_gate(name: str, cmd: list, cwd: Path, step: int, total: int) -> tuple[str, str]:
-    """Run one gate, print its status and timing.
-
-    Returns ``(name, "ok" | "fail")``.
-    """
-    tag = f"[{step:>2}/{total:<2}]"
-    indent = "      "
-
-    log.info(f"\n  {tag} {name}")
-    log.info(f"{indent}$ {' '.join(str(c) for c in cmd)}")
-
-    t0 = time.perf_counter()
-
-    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
-    proc = subprocess.Popen(
-        [str(c) for c in cmd],
-        cwd=str(cwd),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        env=env,
-    )
-    assert proc.stdout is not None
-    for line in proc.stdout:
-        stripped = line.rstrip("\n\r")
-        log.info(f"{indent}| {stripped}")
-    proc.wait()
-
-    code = proc.returncode
-    elapsed = time.perf_counter() - t0
-    status = ok_("OK") if code == 0 else fail_(f"FAIL (exit {code})")
-    elapsed_str = f"[{elapsed:.1f}s]"
-
-    SEP_WIDTH = 56
-    dots = "." * max(2, SEP_WIDTH - len(name) - len(tag) - len(elapsed_str) - 4)
-    log.log(logging.INFO if code == 0 else logging.ERROR, f"  {tag} {name}  {dots}  {elapsed_str}  {status}")
-    log.info("")
-
-    return name, ("ok" if code == 0 else "fail")
+    """Run one check, print its status via log.print_step."""
+    proc = capture(cmd, cwd)
+    cmd_display = " ".join(str(c) for c in cmd)
+    log.print_step(step, total, name, cmd_display, proc.returncode, proc.stdout)
+    return name, ("ok" if proc.returncode == 0 else "fail")
 
 
 def run_prereq(name: str, cmd: list, cwd: Path, step: int, total: int) -> tuple[str, bool]:
-    """Run a toolchain prereq check. Returns ``(name, available)``."""
-    tag = f"[{step:>2}/{total:<2}]"
-    t0 = time.perf_counter()
+    """Run a toolchain prereq check. Returns (name, available)."""
     proc = capture(cmd, cwd)
-    elapsed = time.perf_counter() - t0
-    ok = proc.returncode == 0
-
-    SEP_WIDTH = 56
-    elapsed_str = f"[{elapsed:.1f}s]"
-    dots = "." * max(2, SEP_WIDTH - len(name) - len(tag) - len(elapsed_str) - 4)
-    status = ok_("OK") if ok else fail_("MISSING")
-    log.log(logging.INFO if ok else logging.WARNING, f"  {tag} {name}  {dots}  {elapsed_str}  {status}")
-    return name, ok
+    cmd_display = " ".join(str(c) for c in cmd)
+    log.print_step(step, total, name, cmd_display, proc.returncode, proc.stdout)
+    return name, proc.returncode == 0
 
 
 def check_toolchain(logs: list[Path], step_start: int) -> tuple[int, int]:
-    """Prereq checks -- return ``(count_of_failures, next_step_number)``."""
+    """Prereq checks -- return (count_of_failures, next_step_number)."""
     items: list[tuple[str, list]] = [
         ("ruff", [PY, "-m", "ruff", "--version"]),
         ("pytest", [PY, "-c", "import pytest"]),
         ("numpy", [PY, "-c", "import numpy"]),
-    ] + ([("pyulog", [PY, "-c", "import pyulog"]), ("yaml", [PY, "-c", "import yaml"])] if logs else [])
-
+    ]
     if NODE:
-        items.insert(0, ("node", [str(NODE), "--version"]))
+        items.append(("node", [str(NODE), "--version"]))
     else:
-        items.insert(0, ("node", ["nonexistent-node-check"]))
+        items.append(("node", ["nonexistent-node-check"]))
+
+    if logs:
+        for mod in ("pyulog", "yaml"):
+            items.append((mod, [PY, "-c", f"import {mod}"]))
 
     n = len(items)
     total = n + (2 if NODE else 0)  # extra 2: node_modules file checks
@@ -147,40 +105,38 @@ def check_toolchain(logs: list[Path], step_start: int) -> tuple[int, int]:
         if not ok:
             failed += 1
             if name == "ruff":
-                hints.append("  => pip install -r requirements-dev.txt")
+                hints.append(" => pip install -r requirements-dev.txt")
             elif name in ("pytest", "numpy"):
-                hints.append(f"  => pip install {name}")
+                hints.append(f" => pip install {name}")
             elif name == "node":
-                hints.append("  => Install Node.js 22+ (see README)")
+                hints.append(" => Install Node.js 22+ (see README)")
             elif name in ("pyulog", "yaml"):
-                hints.append(f"  => pip install {name}")
+                hints.append(f" => pip install {name}")
 
     if hints:
-        log.info(f"  {' ' * 40}  ----")
         for h in sorted(set(hints)):
             log.info(h)
 
-    # Node_modules file-existence checks
+    # Node_modules file-existence checks (avoid subprocess cwd issues)
     if NODE:
         for lbl, p in (("node_modules (typescript)", TSC), ("node_modules (next)", NEXT)):
             display = f"check {lbl} installed"
             ok = p.exists()
-            tag = f"[{step_no:>2}/{step_start + total - 1:<2}]"
-            SEP_WIDTH = 48
-            dots = "." * max(2, SEP_WIDTH - len(display) - len(tag) - 2)
-            status = ok_("OK") if ok else fail_("MISSING")
-            log.log(logging.INFO if ok else logging.WARNING, f"  {tag} {display}  {dots}  {status}")
+            total_steps = step_start + total - 1
+            cmd_display = f"stat {p}"
+            rc = 0 if ok else 1
+            log.print_step(step_no, total_steps, display, cmd_display, rc, "")
             step_no += 1
             if not ok:
                 failed += 1
         if not TSC.exists() or not NEXT.exists():
-            log.info("  => cd web && pnpm install")
+            log.info(" => cd web && pnpm install")
 
     return failed, step_no
 
 
 def run_phase(phase_label: str, gates: list[tuple[str, list, Path]], step_start: int) -> tuple[list[tuple[str, str]], int]:
-    """Run a list of gates, return ``(results, next_step_number)``."""
+    """Run a list of gates, return (results, next_step_number)."""
     total = len(gates)
     results: list[tuple[str, str]] = []
     for i, (name, cmd, cwd) in enumerate(gates):
@@ -230,25 +186,22 @@ LOGS_GATES: list[tuple[str, list, Path]] = [
     ("Frozen baseline field-by-field diff (compare_baseline)", [PY, "tools/calibrate/compare_baseline.py"], ROOT),
     ("Adapter contract test (check_provider)", [], ROOT),
     ("Data-layer structure self-check (--probe-data)", [], ROOT),
-    ("Field-reference lint (lint_rules --strict)", [], ROOT),
+    ("Field-reference lint (lint_rules --strict)", [PY, "tools/calibrate/lint_rules.py", "--strict"], ROOT),
 ]
 
 
 def _logs_gates_with_logs(logs: list[Path]) -> list[tuple[str, list, Path]]:
-    """Populate parameterised log gates with actual log paths."""
-    out: list[tuple[str, list, Path]] = []
-    for name, _cmd, cwd in LOGS_GATES:
-        if not _cmd:
-            continue
-        cmd = list(_cmd)
-        if name.startswith("Adapter"):
-            cmd.append(str(logs[-1]))
-        elif name.startswith("Data-layer"):
-            cmd.extend(["--probe-data", str(logs[-1])])
-        elif name.startswith("Field-reference"):
-            cmd.append("--strict")
-        out.append((name, cmd, cwd))
-    return out
+    """Insert log file paths into the log-dependent gate commands."""
+    return [
+        ("Frozen baseline field-by-field diff (compare_baseline)", [PY, "tools/calibrate/compare_baseline.py"], ROOT),
+        ("Adapter contract test (check_provider)", [PY, "tools/calibrate/check_provider.py", *[str(p) for p in logs]], ROOT),
+        (
+            "Data-layer structure self-check (--probe-data)",
+            [PY, "tools/calibrate/run_checks_locally.py", "--probe-data", *[str(p) for p in logs]],
+            ROOT,
+        ),
+        ("Field-reference lint (lint_rules --strict)", [PY, "tools/calibrate/lint_rules.py", "--strict"], ROOT),
+    ]
 
 
 def main(argv: list[str]) -> int:
@@ -259,29 +212,26 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--with-build", action="store_true", help="include phase: site build (CI; slow)")
     ap.add_argument("--with-e2e", action="store_true", help="include phase: E2E smoke (pre-push)")
     ap.add_argument("--skip-logs", action="store_true", help="skip the log-dependent phase")
-    ap.add_argument(
-        "--pre-push",
-        action="store_true",
-        help="fast mode: skip heavy static checks (mutate_guards, test-issue-filer, build:kb)",
-    )
+    ap.add_argument("--pre-push", action="store_true", help="fast mode: skip heavy static checks (3 min)")
     args = ap.parse_args(argv[1:])
 
     logs = sorted(LOG_DIR.glob("*.ulg")) + sorted(LOG_DIR.glob("*.bin")) if not args.skip_logs else []
 
+    # ---- Header ----
+    log.print_header("check_all.py", "Repository validation -- CI / pre-push / local")
+
     all_results: list[tuple[str, str]] = []
     all_skipped: list[str] = []
+
     step = 1
 
     # ============ Phase 1: Toolchain ============
-    log.info(phase("Phase 1 / Toolchain prerequisites"))
     failed_prereq, step = check_toolchain(logs, step)
     if failed_prereq:
-        log.info("")
-        log.error(fail_(f"{failed_prereq} toolchain item(s) missing. Install per hints above."))
+        log.error(f"\nFAIL: {failed_prereq} toolchain item(s) missing. Install per hints above.")
         return 1
 
     # ============ Phase 2: Static checks ============
-    log.info(phase("Phase 2 / Static checks (no .ulg log; blocks every CI commit)"))
     if args.pre_push:
         r, step = run_phase("static", PRE_PUSH_GATES, step)
         all_results += r
@@ -293,7 +243,6 @@ def main(argv: list[str]) -> int:
 
     # ============ Phase 3: Site build (optional) ============
     if args.with_build:
-        log.info(phase("Phase 3 / Site build (--with-build)"))
         r, step = run_phase("build", BUILD_GATES, step)
         all_results += r
     else:
@@ -301,9 +250,8 @@ def main(argv: list[str]) -> int:
 
     # ============ Phase 4: E2E (optional) ============
     if args.with_e2e:
-        log.info(phase("Phase 4 / E2E smoke tests (--with-e2e)"))
         if os.environ.get("SKIP_LOG_ANALYSIS") == "1":
-            log.info(skip_("SKIP_LOG_ANALYSIS=1: excluding log-analysis smoke cases"))
+            log.info("SKIP_LOG_ANALYSIS=1: excluding log-analysis smoke cases")
             E2E_GATES[0] = (E2E_GATES[0][0], E2E_GATES[0][1] + ["--grep-invert", "日志分析流程"], E2E_GATES[0][2])
         r, step = run_phase("e2e", E2E_GATES, step)
         all_results += r
@@ -311,16 +259,15 @@ def main(argv: list[str]) -> int:
         all_skipped.append("E2E smoke (Playwright) -- add --with-e2e to include")
 
     # ============ Phase 5: Log-dependent checks ============
-    log.info(phase("Phase 5 / Log-dependent checks (need real .ulg; local only)"))
     if not logs:
         reason = "skipped via --skip-logs" if args.skip_logs else f"no .ulg under {LOG_DIR.relative_to(ROOT)} (expected in CI)"
-        log.warning(skip_(f"SKIP  ({reason})"))
+        log.warning(f"SKIP  ({reason})")
         all_skipped.append(f"Log-dependent checks -- {reason}")
-        log.info(skip_("NOTE: these are hard gates for rule/engine changes."))
-        log.info(skip_("      A green CI does NOT mean regression-tested."))
-        log.info(skip_("      Run locally: python tools/ci/check_all.py"))
+        log.info("NOTE: these are hard gates for rule/engine changes.")
+        log.info("      A green CI does NOT mean regression-tested.")
+        log.info("      Run locally: python tools/ci/check_all.py")
     else:
-        log.info(f"  Using {len(logs)} log(s): {', '.join(p.name for p in logs)}")
+        log.info(f"Using {len(logs)} log(s): {', '.join(p.name for p in logs)}")
         lg = _logs_gates_with_logs(logs)
         r, step = run_phase("logs", lg, step)
         all_results += r
