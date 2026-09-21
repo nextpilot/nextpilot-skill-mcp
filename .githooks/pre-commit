@@ -1,0 +1,51 @@
+#!/usr/bin/env python
+"""Pre-commit hook: auto-format staged Python files with ruff.
+
+If formatting changes any file, the changes are re-staged automatically.
+To bypass this hook: git commit --no-verify
+"""
+
+import subprocess
+import sys
+
+
+def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
+    return subprocess.run(cmd, check=False, capture_output=True, text=True, **kwargs)
+
+
+def main() -> int:
+    # Get list of staged Python files
+    result = run(["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"])
+    staged_files = [f for f in result.stdout.splitlines() if f.endswith(".py")]
+
+    if not staged_files:
+        return 0
+
+    print("[pre-commit] Formatting staged Python files with ruff...")
+
+    # Format only staged files
+    fmt = run([sys.executable, "-m", "ruff", "format"] + staged_files)
+    if fmt.returncode != 0:
+        print(fmt.stdout)
+        print(fmt.stderr, file=sys.stderr)
+        return 1
+
+    # Re-stage any files that were modified by formatting
+    add = run(["git", "add"] + staged_files)
+    if add.returncode != 0:
+        print(add.stderr, file=sys.stderr)
+        return 1
+
+    print("[pre-commit] Running ruff check...")
+    chk = run([sys.executable, "-m", "ruff", "check"] + staged_files)
+    if chk.returncode != 0:
+        print(chk.stdout)
+        print(chk.stderr, file=sys.stderr)
+        return 1
+
+    print("[pre-commit] Done.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

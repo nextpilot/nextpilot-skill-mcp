@@ -1,4 +1,4 @@
-"""Repository validation -- single entry point for CI, pre-push hook, and local runs.
+"""Repository validation -- single entry point for CI, pre-push hook, and local runs .
 
 All checks live in tools/ci/checklist.yml; hooks and workflows only call this script.
 
@@ -159,7 +159,7 @@ def _build_placeholders(args: argparse.Namespace, has_logs: bool, log_paths: lis
         "LOGS": log_paths,
     }
 
-    # {ARGS.xxx} -> "--xxx" if args.xxx is True, else ""
+    # {ARGS.xxx} -> "--xxx" if args.xxx is True, else "" if value is False, else str(value)
     for attr in dir(args):
         if attr.startswith("_"):
             continue
