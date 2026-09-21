@@ -1,0 +1,173 @@
+# tools/ci/checklist.yml
+# Repository validation checklist
+#
+# Each stage has:
+#   stage       - stage display name
+#   description - optional stage description
+#   critical    - if true, stage failure stops execution immediately
+#   steps       - list of check steps
+#
+# Each step has:
+#   id          - stable identifier (used by Python code for matching; never change)
+#   name        - short description (printed in step header; can be changed freely)
+#   when        - optional Python expression (see below; omit = always run)
+#   workdir     - working directory ({ROOT} or {WEB})
+#   command     - command list (YAML array of strings)
+#   hint        - printed on failure ("" or omit = no hint)
+#   timeout     - optional timeout in seconds (omit = no timeout)
+#   env         - optional dict of extra environment variables for this step
+#
+# Placeholders (resolved at runtime):
+#   {PYTHON}   - Python interpreter path (sys.executable)
+#   {NODE}     - Node.js executable (shutil.which("node"))
+#   {ROOT}     - repository root directory
+#   {WEB}      - ROOT / "web"
+#   {LOGS}     - log file paths (space-separated, for log-dependent steps)
+#   {ARGS.xxx} - CLI argument placeholder: "--xxx" if flag is True, else ""
+#   {ENV.XXX}  - Environment variable placeholder (empty string if unset)
+#
+# `when` values: Python expressions evaluated with `args` (argparse.Namespace) and `has_logs` (bool)
+#   Examples:
+#     "True"                              - always run (same as omitting when)
+#     "not args.pre_push"                 - skip in pre-push mode
+#     "args.with_build"                   - only with --with-build
+#     "args.with_e2e and has_logs"        - compound condition (AND)
+#     "args.with_build or args.with_e2e"  - compound condition (OR)
+#
+# To add a new check: add a step entry here, that's it.
+
+jobs:
+  - stage: "Toolchain prerequisites"
+    description: "Verify that all required tools and SDKs are installed with correct versions"
+    critical: true
+    steps:
+      - id: "check_prereq"
+        name: "Toolchain prerequisites"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "tools/ci/check_prereq.py", "{ENV.WITH_LOGS}"]
+        hint: "One or more required tools are missing or have incorrect versions. Install the missing prerequisites as listed above, then re-run."
+
+  - stage: "Static checks"
+    description: "Code style, linting, type checking, and project-structure validations"
+    steps:
+      - id: "ruff-format"
+        name: "Python style (ruff format --check)"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "-m", "ruff", "format", "--check", "."]
+        hint: "Run `python -m ruff format .` to auto-format all files."
+
+      - id: "ruff-lint"
+        name: "Python lint (ruff check)"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "-m", "ruff", "check", "."]
+        hint: "Run `python -m ruff check --fix .` to auto-fix fixable issues, then review remaining items manually."
+
+      - id: "pytest-engine"
+        name: "Operator / CEL sandbox unit tests (pytest)"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "-m", "pytest", "engine/tests"]
+        hint: "Review the pytest output above. Run `python -m pytest engine/tests -v` locally for detailed failure info."
+
+      - id: "check-artifact"
+        name: "Artifact is valid Python (check_artifact)"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "tools/calibrate/check_artifact.py"]
+        hint: "The artifact file contains invalid Python syntax. Check the error output above for the exact location."
+
+      - id: "check-engine-purity"
+        name: "engine/ stays pure Python (check_engine_purity)"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "tools/ci/check_engine_purity.py"]
+        hint: "The engine/ directory contains non-Pyodide-safe code. Review the violations above; engine/ must work in both browser (Pyodide) and native CPython."
+
+      - id: "tsc"
+        name: "Type checking (tsc --noEmit)"
+        workdir: "{WEB}"
+        command: ["{NODE}", "node_modules/typescript/bin/tsc", "--noEmit"]
+        hint: "Fix the TypeScript errors listed above. Run `npx tsc --noEmit --pretty` locally for detailed output."
+
+      - id: "eslint"
+        name: "TypeScript lint (eslint)"
+        workdir: "{WEB}"
+        command: ["{NODE}", "node_modules/eslint/bin/eslint.js", "."]
+        hint: "Fix the ESLint errors listed above. Run `npx eslint . --fix` to auto-fix where possible."
+
+      - id: "check-hygiene"
+        name: "Validator hygiene (check_hygiene)"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "tools/ci/check_hygiene.py"]
+        hint: "Review the hygiene violations listed above and fix them. Common issues: dangling section references, silent failures, stale freshness gates."
+
+      - id: "build-kb-parity"
+        name: "Build contract vs artifact parity (build:kb --check)"
+        when: "not args.pre_push"
+        workdir: "{WEB}"
+        command: ["{NODE}", "scripts/build-knowledge.mjs", "--check"]
+        hint: "The built knowledge base differs from the committed artifact. Run `node scripts/build-knowledge.mjs` locally and commit the updated artifact."
+
+      - id: "test-issue-filer"
+        name: "Issue-filer self-test (fingerprint / scrub / allowlist / guards)"
+        when: "not args.pre_push"
+        workdir: "{WEB}"
+        command: ["{NODE}", "scripts/test-issue-filer.mjs"]
+        hint: "Review the test output above for specific failures in fingerprint / scrub / allowlist / guard logic."
+
+      - id: "mutate-guards"
+        name: "Guard self-proof -- each guard must fail once"
+        when: "args.with_mutate"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "tools/ci/mutate_guards.py"]
+        hint: "Not all guards triggered as expected. Each registered mutation must cause exactly one guard to fail. Review the mutation test output above."
+
+  - stage: "Site build"
+    description: "Full Next.js production build (CI only, slow)"
+    steps:
+      - id: "next-build"
+        name: "Site build (next build)"
+        when: "args.with_build"
+        timeout: 300
+        workdir: "{WEB}"
+        command: ["{NODE}", "node_modules/next/dist/bin/next", "build"]
+        hint: "Review the Next.js build errors above. Run `npx next build` locally for detailed output."
+
+  - stage: "E2E smoke"
+    description: "Playwright smoke tests on critical user paths"
+    steps:
+      - id: "playwright-smoke"
+        name: "E2E smoke (Playwright @smoke)"
+        when: "args.with_e2e"
+        timeout: 180
+        workdir: "{WEB}"
+        command: ["{NODE}", "node_modules/@playwright/test/cli.js", "test", "--grep", "@smoke", "{ENV.SKIP_LOG_ANALYSIS}"]
+        hint: "Review the Playwright test output above. Run `npx playwright test --grep @smoke` locally to reproduce."
+
+  - stage: "Log-dependent checks"
+    description: "Regression tests that require real PX4 flight logs (.ulg/.bin)"
+    steps:
+      - id: "compare-baseline"
+        name: "Frozen baseline field-by-field diff (compare_baseline)"
+        when: "has_logs"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "tools/calibrate/compare_baseline.py"]
+        hint: "The baseline has changed unexpectedly. Review the diff output above. If the change is intentional, re-baseline by running the comparison tool."
+
+      - id: "check-provider"
+        name: "Adapter contract test (check_provider)"
+        when: "has_logs"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "tools/calibrate/check_provider.py", "{LOGS}"]
+        hint: "One or more log files failed the adapter contract test. Check the output above for which adapter and what contract was violated."
+
+      - id: "probe-data"
+        name: "Data-layer structure self-check (--probe-data)"
+        when: "has_logs"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "tools/calibrate/run_checks_locally.py", "--probe-data", "{LOGS}"]
+        hint: "The data layer structure is inconsistent. Review the probe output above for details."
+
+      - id: "lint-rules"
+        name: "Field-reference lint (lint_rules --strict)"
+        when: "has_logs"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "tools/calibrate/lint_rules.py", "--strict"]
+        hint: "Field reference linting found violations. Review the output above and fix the referenced fields."

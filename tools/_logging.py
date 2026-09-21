@@ -97,7 +97,13 @@ def _print_step(
         for line in stdout.strip().splitlines():
             logger.info("| " + line)
     logger.info(_SEP2)
- 
+
+
+def _print_hint(logger: logging.Logger, hint: str) -> None:
+    """Print a fix hint after a failed step."""
+    logger.info(_c(CYAN, f"| {'─' * 100}"))
+    logger.info(_c(CYAN, f"| Hint: {hint}"))
+    logger.info(_c(CYAN, f"| {'─' * 100}"))
 
 
 def _print_summary(logger: logging.Logger, results: list[tuple[str, str]], skipped: list[str]) -> int:
@@ -162,6 +168,9 @@ class _CheckLogger(logging.Logger):
         stdout: str = "",
     ) -> None:
         _print_step(self, step, total, name, command, returncode, stdout)
+
+    def print_hint(self, hint: str) -> None:
+        _print_hint(self, hint)
 
     def print_summary(self, results: list[tuple[str, str]], skipped: list[str]) -> int:
         return _print_summary(self, results, skipped)

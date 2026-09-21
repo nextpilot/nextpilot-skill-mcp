@@ -1,12 +1,12 @@
 """Repository validation -- single entry point for CI, pre-push hook, and local runs.
 
-All checks live here; hooks and workflows only call this one script.
+All checks live in tools/ci/checklist.yml; hooks and workflows only call this script.
 
-Phase 1  Toolchain prerequisites
-Phase 2  Static checks (no .ulg log; blocks every CI commit)
-Phase 3  Site build (--with-build only)
-Phase 4  E2E smoke tests (--with-e2e only)
-Phase 5  Log-dependent checks (need real .ulg; local only)
+Stage 1  Toolchain prerequisites
+Stage 2  Static checks (no .ulg log; blocks every CI commit)
+Stage 3  Site build (--with-build only)
+Stage 4  E2E smoke tests (--with-e2e only)
+Stage 5  Log-dependent checks (need real .ulg; local only)
 
 Output is phased, sequentially numbered across all phases, and ASCII-only
 (never garbles on a GBK console).
@@ -14,19 +14,25 @@ Output is phased, sequentially numbered across all phases, and ASCII-only
 Usage:
   python tools/ci/check_all.py                 # phases 1-2 + 5 if logs present
   python tools/ci/check_all.py --pre-push      # fast static + 5 if logs present
-  python tools/ci/check_all.py --with-build    # also phase 3 (CI)
-  python tools/ci/check_all.py --with-e2e      # also phase 4 (pre-push)
+  python tools/ci/check_all.py --with-mutate   # also guard self-proof mutation tests (modifies files temporarily)
+  python tools/ci/check_all.py --with-build    # also stage 3 (CI)
+  python tools/ci/check_all.py --with-e2e      # also stage 4 (pre-push)
   python tools/ci/check_all.py --skip-logs     # phases 1-2 only
+
+To add a new check: edit tools/ci/checklist.yml, that's it.
 """
 
 from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from _logging import get_logger  # noqa: E402
@@ -34,174 +40,203 @@ from _logging import get_logger  # noqa: E402
 log = get_logger()
 
 ROOT = Path(__file__).resolve().parents[2]
-WEB = ROOT / "web"
-LOG_DIR = ROOT / "tools" / "calibrate" / "logs"
-
 PY = sys.executable
 NODE = shutil.which("node")
-TSC = WEB / "node_modules" / "typescript" / "bin" / "tsc"
-ESLINT = WEB / "node_modules" / "eslint" / "bin" / "eslint.js"
-NEXT = WEB / "node_modules" / "next" / "dist" / "bin" / "next"
-PLAYWRIGHT = WEB / "node_modules" / "@playwright" / "test" / "cli.js"
+WEB = ROOT / "web"
 
-SEP = "=" * 60
+CHECKLIST_PATH = Path(__file__).resolve().parent / "checklist.yml"
+
+# ── helpers ──────────────────────────────────────────────────────────
 
 
-def capture(cmd: list, cwd: Path = ROOT) -> subprocess.CompletedProcess:
+class _TimeoutProc:
+    """Fake subprocess.CompletedProcess returned when a command times out."""
+
+    returncode = -1
+    stdout = ""
+    stderr = ""
+
+    def __init__(self, timeout: int) -> None:
+        self.stdout = f"\n\u23f1  Timed out after {timeout}s\n"
+
+
+def capture(
+    cmd: list, workdir: Path, *, timeout: int | None = None, extra_env: dict | None = None
+) -> subprocess.CompletedProcess:
+    """Run *cmd* in *workdir*, return the CompletedProcess.
+
+    Optional *timeout* (seconds) and *extra_env* (per-step env vars merged
+    on top of the current process environment) are supported.
+    """
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
-    return subprocess.run(
-        [str(c) for c in cmd],
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        env=env,
-    )
+    if extra_env:
+        env.update(extra_env)
+    try:
+        return subprocess.run(
+            [str(c) for c in cmd],
+            cwd=str(workdir),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=env,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return _TimeoutProc(timeout)
 
 
-def run_gate(name: str, cmd: list, cwd: Path, step: int, total: int) -> tuple[str, str]:
-    """Run one check, print its status via log.print_step."""
-    proc = capture(cmd, cwd)
-    cmd_display = " ".join(str(c) for c in cmd)
-    log.print_step(step, total, name, cmd_display, proc.returncode, proc.stdout)
+def run_step(
+    name: str,
+    command: list,
+    workdir: Path,
+    hint: str,
+    step_num: int,
+    total: int,
+    *,
+    timeout: int | None = None,
+    extra_env: dict | None = None,
+) -> tuple[str, str]:
+    """Run one step, print its status, return (name, "ok"|"fail").
+
+    Supports optional *timeout* and *extra_env* forwarded to ``capture()``.
+    """
+    proc = capture(command, workdir, timeout=timeout, extra_env=extra_env)
+    cmd_display = " ".join(str(c) for c in command)
+    log.print_step(step_num, total, name, cmd_display, proc.returncode, proc.stdout)
+    if proc.returncode != 0 and hint:
+        log.print_hint(hint)
     return name, ("ok" if proc.returncode == 0 else "fail")
 
 
-def run_prereq(name: str, cmd: list, cwd: Path, step: int, total: int) -> tuple[str, bool]:
-    """Run a toolchain prereq check. Returns (name, available)."""
-    proc = capture(cmd, cwd)
-    cmd_display = " ".join(str(c) for c in cmd)
-    log.print_step(step, total, name, cmd_display, proc.returncode, proc.stdout)
-    return name, proc.returncode == 0
+def _resolve(val: str | list, placeholders: dict[str, str | list]) -> str | list:
+    """Replace placeholders like {PYTHON}, {ROOT}, {LOGS}, {ARGS.xxx}, {ENV.XXX} in a string or list.
+
+    Supports list-valued placeholders (e.g., {LOGS}) which are expanded inline
+    when the input itself is a list.
+    """
+    if isinstance(val, str):
+        for key, value in placeholders.items():
+            if isinstance(value, str):
+                val = val.replace(f"{{{key}}}", value)
+        # Handle {ENV.XXX} placeholders dynamically
+        for match in re.finditer(r"\{ENV\.([^}]+)\}", val):
+            env_name = match.group(1)
+            env_value = os.environ.get(env_name, "")
+            val = val.replace(match.group(0), env_value)
+        return val
+    if isinstance(val, list):
+        resolved: list[str] = []
+        for item in val:
+            # Check if item is exactly a list-valued placeholder like "{LOGS}"
+            if isinstance(item, str) and item.startswith("{") and item.endswith("}"):
+                key = item[1:-1]
+                if key in placeholders and isinstance(placeholders[key], list):
+                    resolved.extend(str(v) for v in placeholders[key])
+                    continue
+            r = _resolve(item, placeholders)
+            if isinstance(r, list):
+                resolved.extend(str(v) for v in r)
+            elif r != "":
+                resolved.append(str(r))
+        return resolved
+    return val
 
 
-def check_toolchain(logs: list[Path], step_start: int) -> tuple[int, int]:
-    """Prereq checks -- return (count_of_failures, next_step_number)."""
-    items: list[tuple[str, list]] = [
-        ("ruff", [PY, "-m", "ruff", "--version"]),
-        ("pytest", [PY, "-c", "import pytest"]),
-        ("numpy", [PY, "-c", "import numpy"]),
-    ]
-    if NODE:
-        items.append(("node", [str(NODE), "--version"]))
-    else:
-        items.append(("node", ["nonexistent-node-check"]))
+def _build_placeholders(args: argparse.Namespace, has_logs: bool, log_paths: list[str]) -> dict[str, str | list]:
+    """Build the placeholder dictionary for _resolve().
 
-    if logs:
-        for mod in ("pyulog", "yaml"):
-            items.append((mod, [PY, "-c", f"import {mod}"]))
+    Includes:
+      - {PYTHON}, {NODE}, {ROOT}, {WEB}, {LOGS}
+      - {ARGS.xxx} for CLI arguments (dash to underscore)
+      - {ENV.XXX} for environment variables (replaced at resolve time)
+    """
+    placeholders: dict[str, str | list] = {
+        "PYTHON": PY,
+        "NODE": NODE or "node",
+        "ROOT": str(ROOT),
+        "WEB": str(WEB),
+        "LOGS": log_paths,
+    }
 
-    n = len(items)
-    total = n + (2 if NODE else 0)  # extra 2: node_modules file checks
-    failed = 0
-    hints: list[str] = []
-    step_no = step_start
+    # {ARGS.xxx} -> "--xxx" if args.xxx is True, else ""
+    for attr in dir(args):
+        if attr.startswith("_"):
+            continue
+        value = getattr(args, attr)
+        flag_name = attr.replace("_", "-")
+        placeholders[f"ARGS.{attr}"] = (
+            f"--{flag_name}" if value is True else str(value) if value is not None and value is not False else ""
+        )
 
-    for name, cmd in items:
-        display = f"check {name} available"
-        _, ok = run_prereq(display, cmd, ROOT, step_no, step_start + total - 1)
-        step_no += 1
-        if not ok:
-            failed += 1
-            if name == "ruff":
-                hints.append(" => pip install -r requirements-dev.txt")
-            elif name in ("pytest", "numpy"):
-                hints.append(f" => pip install {name}")
-            elif name == "node":
-                hints.append(" => Install Node.js 22+ (see README)")
-            elif name in ("pyulog", "yaml"):
-                hints.append(f" => pip install {name}")
-
-    if hints:
-        for h in sorted(set(hints)):
-            log.info(h)
-
-    # Node_modules file-existence checks (avoid subprocess cwd issues)
-    if NODE:
-        for lbl, p in (("node_modules (typescript)", TSC), ("node_modules (next)", NEXT)):
-            display = f"check {lbl} installed"
-            ok = p.exists()
-            total_steps = step_start + total - 1
-            cmd_display = f"stat {p}"
-            rc = 0 if ok else 1
-            log.print_step(step_no, total_steps, display, cmd_display, rc, "")
-            step_no += 1
-            if not ok:
-                failed += 1
-        if not TSC.exists() or not NEXT.exists():
-            log.info(" => cd web && pnpm install")
-
-    return failed, step_no
+    # {ENV.XXX} -> os.environ.get("XXX", "")
+    # These are resolved lazily in _resolve by looking up os.environ
+    return placeholders
 
 
-def run_phase(phase_label: str, gates: list[tuple[str, list, Path]], step_start: int) -> tuple[list[tuple[str, str]], int]:
-    """Run a list of gates, return (results, next_step_number)."""
-    total = len(gates)
-    results: list[tuple[str, str]] = []
-    for i, (name, cmd, cwd) in enumerate(gates):
-        step = step_start + i
-        name2, result = run_gate(name, cmd, cwd, step, step_start + total - 1)
-        results.append((name2, result))
-    return results, step_start + total
+def _eval_when(when: str | list | None, args: argparse.Namespace, has_logs: bool) -> bool:
+    """Evaluate a step's 'when' condition as a Python expression.
+
+    Supports both a single string and a list (AND semantics — all must be true).
+    If when is None, the step is always enabled.
+    Available in expression context:
+      - args: argparse.Namespace (CLI arguments)
+      - has_logs: bool (whether .ulg/.bin log files exist)
+    """
+    if when is None:
+        return True
+    if isinstance(when, list):
+        return all(_eval_when(w, args, has_logs) for w in when)
+
+    context = {"args": args, "has_logs": has_logs}
+    return eval(when, {"__builtins__": {}}, context)
 
 
-# ---- Gate definitions ----
+def _load_checklist(
+    args: argparse.Namespace,
+    has_logs: bool,
+    log_paths: list[str],
+) -> list[tuple[str, str, bool, list[dict]]]:
+    """Load checklist.yml, resolve placeholders and conditions.
 
-# Fast static gates -- run on every pre-push (~5 s total)
-PRE_PUSH_GATES: list[tuple[str, list, Path]] = [
-    ("Python style (ruff format --check)", [PY, "-m", "ruff", "format", "--check", "."], ROOT),
-    ("Python lint (ruff check)", [PY, "-m", "ruff", "check", "."], ROOT),
-    ("Operator / CEL sandbox unit tests (pytest)", [PY, "-m", "pytest", "engine/tests"], ROOT),
-    ("Artifact is valid Python (check_artifact)", [PY, "tools/calibrate/check_artifact.py"], ROOT),
-    ("engine/ stays pure Python shared by 3 sites (check_engine_purity)", [PY, "tools/ci/check_engine_purity.py"], ROOT),
-    ("Type checking (tsc --noEmit)", [NODE, "node_modules/typescript/bin/tsc", "--noEmit"], WEB),
-    ("TypeScript lint (eslint)", [NODE, "node_modules/eslint/bin/eslint.js", "."], WEB),
-    ("Validator hygiene (check_hygiene)", [PY, "tools/ci/check_hygiene.py"], ROOT),
-]
+    Returns [(stage_name, stage_description, critical, [step_dict, ...]), ...]
+    where each step_dict has keys:
+      id, name, command (resolved list), workdir (resolved Path),
+      hint, enabled (bool),
+      timeout (int | None), extra_env (dict | None).
+    Only stages with at least one step are returned.
+    """
+    placeholders = _build_placeholders(args, has_logs, log_paths)
 
-# Heavy static gates -- CI only (~3 min total)
-CI_GATES: list[tuple[str, list, Path]] = [
-    ("Build contract vs artifact parity (build:kb --check)", [NODE, "scripts/build-knowledge.mjs", "--check"], WEB),
-    ("Issue-filer self-test (fingerprint / scrub / allowlist / guards)", [NODE, "scripts/test-issue-filer.mjs"], WEB),
-    ("Guard self-proof -- each guard must fail once", [PY, "tools/ci/mutate_guards.py"], ROOT),
-]
+    with open(CHECKLIST_PATH, encoding="utf-8") as f:
+        raw = yaml.safe_load(f)
 
-# All static gates combined for full run
-STATIC_GATES: list[tuple[str, list, Path]] = PRE_PUSH_GATES + CI_GATES
+    stages: list[tuple[str, str, bool, list[dict]]] = []
+    for stage in raw["jobs"]:
+        steps: list[dict] = []
+        for step in stage["steps"]:
+            enabled = _eval_when(step.get("when"), args, has_logs)
+            command = _resolve(step["command"], placeholders)
+            workdir_str = _resolve(step["workdir"], placeholders)
 
-BUILD_GATES: list[tuple[str, list, Path]] = [
-    ("Site build (next build)", [NODE, "node_modules/next/dist/bin/next", "build"], WEB),
-]
-
-E2E_GATES: list[tuple[str, list, Path]] = [
-    (
-        "E2E smoke (Playwright @smoke: upload .ulg -> parse -> display)",
-        [NODE, "node_modules/@playwright/test/cli.js", "test", "--grep", "@smoke"],
-        WEB,
-    ),
-]
-
-LOGS_GATES: list[tuple[str, list, Path]] = [
-    ("Frozen baseline field-by-field diff (compare_baseline)", [PY, "tools/calibrate/compare_baseline.py"], ROOT),
-    ("Adapter contract test (check_provider)", [], ROOT),
-    ("Data-layer structure self-check (--probe-data)", [], ROOT),
-    ("Field-reference lint (lint_rules --strict)", [PY, "tools/calibrate/lint_rules.py", "--strict"], ROOT),
-]
+            steps.append(
+                {
+                    "id": step["id"],
+                    "name": step["name"],
+                    "command": command,
+                    "workdir": Path(workdir_str),
+                    "hint": step.get("hint", ""),
+                    "timeout": step.get("timeout"),
+                    "extra_env": step.get("env"),
+                    "enabled": enabled,
+                }
+            )
+        if steps:
+            stages.append((stage["stage"], stage.get("description", ""), stage.get("critical", False), steps))
+    return stages
 
 
-def _logs_gates_with_logs(logs: list[Path]) -> list[tuple[str, list, Path]]:
-    """Insert log file paths into the log-dependent gate commands."""
-    return [
-        ("Frozen baseline field-by-field diff (compare_baseline)", [PY, "tools/calibrate/compare_baseline.py"], ROOT),
-        ("Adapter contract test (check_provider)", [PY, "tools/calibrate/check_provider.py", *[str(p) for p in logs]], ROOT),
-        (
-            "Data-layer structure self-check (--probe-data)",
-            [PY, "tools/calibrate/run_checks_locally.py", "--probe-data", *[str(p) for p in logs]],
-            ROOT,
-        ),
-        ("Field-reference lint (lint_rules --strict)", [PY, "tools/calibrate/lint_rules.py", "--strict"], ROOT),
-    ]
+# ── main ─────────────────────────────────────────────────────────────
 
 
 def main(argv: list[str]) -> int:
@@ -209,70 +244,98 @@ def main(argv: list[str]) -> int:
         sys.stdout.reconfigure(line_buffering=True)
 
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--with-build", action="store_true", help="include phase: site build (CI; slow)")
-    ap.add_argument("--with-e2e", action="store_true", help="include phase: E2E smoke (pre-push)")
-    ap.add_argument("--skip-logs", action="store_true", help="skip the log-dependent phase")
+    ap.add_argument("--with-build", action="store_true", help="include stage: site build (CI; slow)")
+    ap.add_argument("--with-e2e", action="store_true", help="include stage: E2E smoke (pre-push)")
+    ap.add_argument(
+        "--with-mutate", action="store_true", help="include guard self-proof mutation tests (modifies files temporarily; slow)"
+    )
+    ap.add_argument("--skip-logs", action="store_true", help="skip the log-dependent stage")
     ap.add_argument("--pre-push", action="store_true", help="fast mode: skip heavy static checks (3 min)")
     args = ap.parse_args(argv[1:])
 
-    logs = sorted(LOG_DIR.glob("*.ulg")) + sorted(LOG_DIR.glob("*.bin")) if not args.skip_logs else []
+    log_dir = ROOT / "tools" / "calibrate" / "logs"
+    logs = sorted(log_dir.glob("*.ulg")) + sorted(log_dir.glob("*.bin")) if not args.skip_logs else []
+    has_logs = bool(logs)
+    log_paths = [str(p) for p in logs]
+    logs_skip_reason = (
+        "skipped via --skip-logs" if args.skip_logs else f"no .ulg under {log_dir.relative_to(ROOT)} (expected in CI)"
+    )
 
     # ---- Header ----
-    log.print_header("check_all.py", "Repository validation -- CI / pre-push / local")
+    cmd_parts = ["python tools/ci/check_all.py"]
+    if args.pre_push:
+        cmd_parts.append("--pre-push")
+    if args.with_build:
+        cmd_parts.append("--with-build")
+    if args.with_e2e:
+        cmd_parts.append("--with-e2e")
+    if args.with_mutate:
+        cmd_parts.append("--with-mutate")
+    if args.skip_logs:
+        cmd_parts.append("--skip-logs")
+    log.print_header("Repository validation -- CI / pre-push / local", " ".join(cmd_parts))
+
+    # ====================================================================
+    # 1. Load checklist from YAML
+    # ====================================================================
+
+    stages = _load_checklist(args, has_logs, log_paths)
+
+    # ====================================================================
+    # 2. Flatten (stage_name, stage_desc, stage_critical, step_dict) for ordered execution
+    # ====================================================================
+
+    all_steps: list[tuple[str, str, bool, dict]] = [(pn, pd, pc, s) for pn, pd, pc, ss in stages for s in ss]
+    grand_total = sum(1 for _, _, _, s in all_steps if s["enabled"])
+
+    # ====================================================================
+    # 3. Execute
+    # ====================================================================
 
     all_results: list[tuple[str, str]] = []
     all_skipped: list[str] = []
+    step_num = 0
+    current_stage: str | None = None
 
-    step = 1
+    for stage_name, stage_desc, stage_critical, step in all_steps:
+        # Print stage description when entering a new stage
+        if stage_name != current_stage:
+            current_stage = stage_name
+            if stage_desc:
+                log.info(f"# {stage_name} \u2014 {stage_desc}")
 
-    # ============ Phase 1: Toolchain ============
-    failed_prereq, step = check_toolchain(logs, step)
-    if failed_prereq:
-        log.error(f"\nFAIL: {failed_prereq} toolchain item(s) missing. Install per hints above.")
-        return 1
+        if not step["enabled"]:
+            all_skipped.append(f"{step['name']} -- skipped")
+            continue
 
-    # ============ Phase 2: Static checks ============
-    if args.pre_push:
-        r, step = run_phase("static", PRE_PUSH_GATES, step)
-        all_results += r
-        for name, _, _ in CI_GATES:
-            all_skipped.append(f"{name} -- skipped (heavy; run full check_all for CI)")
-    else:
-        r, step = run_phase("static", STATIC_GATES, step)
-        all_results += r
+        step_num += 1
+        name, status = run_step(
+            step["name"],
+            step["command"],
+            step["workdir"],
+            step["hint"],
+            step_num,
+            grand_total,
+            timeout=step["timeout"],
+            extra_env=step["extra_env"],
+        )
+        all_results.append((name, status))
 
-    # ============ Phase 3: Site build (optional) ============
-    if args.with_build:
-        r, step = run_phase("build", BUILD_GATES, step)
-        all_results += r
-    else:
-        all_skipped.append("Site build (next build) -- add --with-build to include")
+        # Critical stage failure -> exit immediately (toolchain missing, nothing else will work)
+        if stage_critical and status == "fail":
+            log.error(f"\nFAIL: critical stage '{stage_name}' failed. See output above.")
+            return 1
 
-    # ============ Phase 4: E2E (optional) ============
-    if args.with_e2e:
-        if os.environ.get("SKIP_LOG_ANALYSIS") == "1":
-            log.info("SKIP_LOG_ANALYSIS=1: excluding log-analysis smoke cases")
-            E2E_GATES[0] = (E2E_GATES[0][0], E2E_GATES[0][1] + ["--grep-invert", "日志分析流程"], E2E_GATES[0][2])
-        r, step = run_phase("e2e", E2E_GATES, step)
-        all_results += r
-    else:
-        all_skipped.append("E2E smoke (Playwright) -- add --with-e2e to include")
-
-    # ============ Phase 5: Log-dependent checks ============
-    if not logs:
-        reason = "skipped via --skip-logs" if args.skip_logs else f"no .ulg under {LOG_DIR.relative_to(ROOT)} (expected in CI)"
-        log.warning(f"SKIP  ({reason})")
-        all_skipped.append(f"Log-dependent checks -- {reason}")
+    # Stage 5 extra NOTE messages when skipped
+    if not has_logs:
+        log.warning(f"SKIP  ({logs_skip_reason})")
         log.info("NOTE: these are hard gates for rule/engine changes.")
         log.info("      A green CI does NOT mean regression-tested.")
         log.info("      Run locally: python tools/ci/check_all.py")
-    else:
-        log.info(f"Using {len(logs)} log(s): {', '.join(p.name for p in logs)}")
-        lg = _logs_gates_with_logs(logs)
-        r, step = run_phase("logs", lg, step)
-        all_results += r
 
-    # ============ Summary ============
+    # ====================================================================
+    # 4. Summary
+    # ====================================================================
     return log.print_summary(all_results, all_skipped)
 
 
