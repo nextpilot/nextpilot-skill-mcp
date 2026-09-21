@@ -4,7 +4,7 @@
 //   3. 白名单是否真挡住额外字段（前端或第三方可以随便往 payload 里塞东西）
 //   4. 超长文本截断后，末尾的关键行是否还在（Python traceback 的异常行在最后）
 //
-// 末尾八节（§[9]~§[16]）性质不同：它们不测行为，而是**扫源码防架构回潮**——
+// 末尾十二节（§[9]~§[20]）性质不同：它们不测行为，而是**扫源码防架构回潮**——
 //   §[9]  两侧共用的政策只许有一份实现（防止再长出第二份，悄悄分叉）；
 //   §[10] 外部 JSON 进内部类型必须过归一、不许 `as` 强转（线上白屏过一次）；
 //   §[11] 派生数据（曲线/轨迹）必须按报告身份清理（切了日志还在用上一份的，静默错数据）；
@@ -17,7 +17,19 @@
 //   §[16] 轨迹取不到时界面要把引擎给的**逐条原因**显示出来（一句概括只对六种原因里的一种，
 //         另外五种下它是错的——"空洞"的代价是用户拿不到任何能自己判断的线索）；
 //   §[17] 两类条目共用的详情页组件不许带某一类的前缀（`Skill*` 出现在 `/mcp/[slug]` 里就是
-//         名字在说谎，而照名字去"修正"会复制出 `Mcp*` 孪生组件，改一边漏一边）。
+//         名字在说谎，而照名字去"修正"会复制出 `Mcp*` 孪生组件，改一边漏一边）；
+//   §[18] 站点版本（footer 的「版本 + 日期」）只许有一个读取口：next.config.ts 注入、
+//         lib/site-version.ts 读、别人不许再直接读环境变量（issue-bridge 曾经读了两年
+//         一个从来没人赋值的变量，上报里的版本恒为空串）；
+//   §[19] 指南页左右两栏的宽度都不许写死（写死 `w-48` 时侧栏内部凭空多出 27~54px 死白，
+//         写死 `w-56` 时右目录列内空 126px），两道栏间距不许回到 40px，右目录必须在 lg
+//         就显示（xl 断点被滚动条吃掉 17px 后踩不准，目录整列消失再留 176px 死白——
+//         都是没人会主动去查的静默退化）；
+//   §[20] 隐私承诺与免责声明这两句固定文案只有一个出处（lib/log-analysis-notes.ts），
+//         且只在上传卡渲染（页脚品牌区与底栏都不再重复——用户交日志的地方才是它们的落点）；
+//   §[21] 次数上限不在前端显示（上限以后由后台配置）。曾经同一个 3 次/天在上传卡、
+//         AI 解读区、「我的」页各露一次，而后台还没把配置口开出来——前端先替它报一个
+//         写死的数字，等于替后台做了个还没做的决定。
 // 这几类问题都属于"同一件事有两条路径、只有一条被校验"，本仓库已经因此出过几次事故，
 // 光靠人记没用，所以做成机器能拦的守卫。
 //
@@ -54,6 +66,21 @@ const WEB = fileURLToPath(new URL("..", import.meta.url));
  * 喂饱——把真代码删掉它照样绿。2026-09-18 连着踩了两次，才明白该修的是检查方式本身。
  */
 const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/[^\n]*/g, "$1");
+
+/**
+ * 列出 web/ 下所有要看的前端源码，路径相对 web/（`.ts` / `.tsx`）。
+ * 末尾几节的"全站扫"守卫共用它——**排除清单只此一份**，否则某个守卫忘了排除 `.next`
+ * 就会扫到几千个构建产物里的副本，报一堆假失败，然后被人把守卫注释掉。
+ */
+const walkSourceFiles = (root, sub = "", out = []) => {
+  for (const e of readdirSync(join(root, sub), { withFileTypes: true })) {
+    if (["node_modules", ".next", ".generated", "e2e", "playwright-report"].includes(e.name)) continue;
+    const rel = sub ? join(sub, e.name) : e.name;
+    if (e.isDirectory()) walkSourceFiles(root, rel, out);
+    else if (/\.tsx?$/.test(e.name)) out.push(rel);
+  }
+  return out;
+};
 
 console.log("\n[1] 指纹归一化（决定去重成不成立）");
 {
@@ -337,13 +364,11 @@ console.log("\n[10] 外部数据的读取边界（网络响应与存档一律过
     if (!/\.(ts|tsx)$/.test(rel)) continue;
     if (rel.includes("node_modules") || rel.includes(".next")) continue;
     const abs = nodePath.join(webDir, rel);
-    let isFile = false;
     try {
-      isFile = fs.statSync(abs).isFile();
+      if (!fs.statSync(abs).isFile()) continue;
     } catch {
       continue;
     }
-    if (!isFile) continue;
     const lines = fs.readFileSync(abs, "utf8").split("\n");
     lines.forEach((line, i) => {
       const code = line.trim();
@@ -774,6 +799,213 @@ console.log("\n[17] 两类条目共用的详情页组件不许带某一类的前
     "MCP 详情页不引用 Skill* 组件",
     mcpSkill.length === 0,
     mcpSkill.length ? `引用了：${mcpSkill.join(", ")}` : "",
+  );
+}
+
+console.log("\n[18] 站点版本只有一个读取口（footer 的「版本 + 日期」不许各处各读一次）");
+{
+  // 由来：footer 要显示站点版本与日期。两样都在**构建期**由 `next.config.ts` 注入
+  // `NEXT_PUBLIC_APP_*`（版本号来自 web/package.json，日期与短哈希来自构建时的 git HEAD）。
+  // 风险形态与 §[9] / §[10] 同源——同一件事有两条路径，只有一条接得上真源。
+  // 仓库里已经有过一次现成的裂缝：`lib/issue-bridge.ts` 一直在读 `NEXT_PUBLIC_APP_VERSION`，
+  // 而全仓库从来没人给它赋值，于是错误上报里的 version **恒为空串**（版本那栏直接不打印，
+  // "哪个版本出的问题"永远查不到，而且它不报错，谁也没发现）。
+  //
+  // 这里守的是三件事：注入方真的注入了三个值、只有一个文件读它们、footer 取到并且渲染出来。
+  // 少任何一条，footer 上的版本号都会变成"看起来一直正常、其实早就过期"的那类错。
+  const config = stripComments(readFileSync(join(WEB, "next.config.ts"), "utf8"));
+  const footer = stripComments(readFileSync(join(WEB, "components", "SiteFooter.tsx"), "utf8"));
+  const versionMod = stripComments(read("../lib/site-version.ts"));
+
+  // 注入方：三个键一个都不能少（少了就在静默退化成"版本未知"，而没人会去查为什么）
+  for (const key of [
+    "NEXT_PUBLIC_APP_VERSION",
+    "NEXT_PUBLIC_APP_COMMIT",
+    "NEXT_PUBLIC_APP_COMMIT_DATE",
+  ]) {
+    check(`next.config.ts 注入了 ${key}`, config.includes(`${key}:`));
+  }
+  // 注入的值必须真的被读走（next.config 里写了、但没人读 = 白写）
+  check("读取口在 lib/site-version.ts", versionMod.includes("process.env.NEXT_PUBLIC_APP_VERSION"));
+  // 提交时间精确到秒：只到天的日期在一天内多次构建时分不清谁新谁旧（2026-09-21 要求）
+  check("提交时间精确到秒（format-local 带时分秒）", config.includes("%Y-%m-%d %H:%M:%S"));
+
+  // 全站扫：除注入方与唯一读取口，不许再有第三处直接读 NEXT_PUBLIC_APP_*。
+  // 已剥注释——说明文字里原样出现的变量名不会把这条喂成恒绿。
+  const allowed = new Set(["next.config.ts", join("lib", "site-version.ts")]);
+  const offenders = [];
+  const walk = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (["node_modules", ".next", ".generated", "e2e", "playwright-report"].includes(e.name)) continue;
+      const p = join(dir, e.name);
+      if (e.isDirectory()) {
+        walk(p);
+      } else if (/\.tsx?$/.test(e.name)) {
+        const rel = p.slice(WEB.length).replace(/^[\\/]/, "");
+        if (allowed.has(rel)) continue;
+        if (stripComments(readFileSync(p, "utf8")).includes("NEXT_PUBLIC_APP_")) offenders.push(rel);
+      }
+    }
+  };
+  walk(WEB);
+  check(
+    "别处不许直接读 NEXT_PUBLIC_APP_*（读取口只许有一个）",
+    offenders.length === 0,
+    offenders.length ? `第三处读取：${offenders.join(", ")}` : "",
+  );
+
+  // 消费方：footer 必须从那一个口子取，并且真的显示出来（取了不渲染 = 用户看到的仍是空）
+  check("footer 从唯一读取口取版本", footer.includes('from "@/lib/site-version"'));
+  check("footer 把版本串渲染出来", footer.includes("{versionLabel}"));
+}
+
+console.log("\n[19] 指南页栏宽跟随内容、栏间距不许回到 40px");
+{
+  // 由来：指南页三栏（左导航 / 正文 / 右本页目录）挤在 page-shell 的 1120px 内容宽里。
+  // 原先左导航写死 `w-48`(192px)，而实测中文条目最宽 124px、英文 151px——侧栏**内部**
+  // 就空出 27~54px，再叠上 40px 间距，中文下「侧栏文字右边缘 → 正文左边缘」量到 94px。
+  // 同时两道各 40px 的间距 + 224px 右目录，把正文从 max-w-3xl(768px) 压到只有 624px。
+  //
+  // 这类错不报错、不白屏，只会"看起来有点空"，属于没人会主动去查的静默退化，
+  // 所以做成机器能拦的守卫：宽度必须跟内容走，且上下限都要有兜底。
+  const sidebar = stripComments(readFileSync(join(WEB, "components", "GuideSidebar.tsx"), "utf8"));
+  const layout = stripComments(read("../app/guide/layout.tsx"));
+  const article = stripComments(readFileSync(join(WEB, "components", "GuideArticle.tsx"), "utf8"));
+  const outlineSrc = stripComments(readFileSync(join(WEB, "components", "GuideOutline.tsx"), "utf8"));
+
+  // 只取那个 `<aside>` 自己的类名，别把注释/其他元素的类名混进来
+  const asideCls = (/<aside className="([^"]*)"/.exec(sidebar)?.[1] ?? "").split(/\s+/);
+  check("侧栏宽度跟导航文字走（w-max，不许写死）", asideCls.includes("w-max"));
+  check("侧栏宽度有上限兜底（max-w-*，条目名变长时不许挤正文）", asideCls.some((c) => /^max-w-/.test(c)));
+  check("侧栏宽度有下限兜底（min-w-*，条目名再短也留出可点宽度）", asideCls.some((c) => /^min-w-/.test(c)));
+
+  // 右目录同一套规矩。血泪数字：写死 `w-56` 时目录文字只占 ~85px，列内右侧常年空 126px；
+  // 断点写 xl(1280) 在真实浏览器踩不准——1280 的窗口扣掉滚动条只剩 ~1263，目录整列消失，
+  // 1152/1200/1240/1263 视口下正文右缘到内容区右缘全部量出 176px 死白（2026-09-22 用户圈的就是它）。
+  const outlineAside = (/<aside className="([^"]*)"/.exec(outlineSrc)?.[1] ?? "").split(/\s+/);
+  check("右目录宽度跟标题文字走（w-max，不许写死）", outlineAside.includes("w-max"));
+  check("右目录有上限兜底（max-w-*，标题变长时不许挤正文）", outlineAside.some((c) => /^max-w-/.test(c)));
+  check("右目录有下限兜底（min-w-*，边线和最短标题也有存在感）", outlineAside.some((c) => /^min-w-/.test(c)));
+  check("右目录从 lg 就显示（xl 断点在真实浏览器踩不准，目录消失会留 176px 死白）", outlineAside.includes("lg:block") && !outlineAside.includes("xl:block"));
+
+  // 两道栏间距：各 40px 会把正文从 768px 上限压到 624px
+  const outerRow = /<div className="([^"]*lg:flex-row[^"]*)"/.exec(layout)?.[1] ?? "";
+  check("侧栏与正文的间距收到 lg:gap-8", outerRow.includes("lg:gap-8") && !outerRow.includes("lg:gap-10"));
+
+  const innerRow = /<div className="([^"]*min-w-0[^"]*)"/.exec(article)?.[1] ?? "";
+  check("正文与右目录的间距收到 gap-8", innerRow.includes("gap-8") && !innerRow.includes("gap-10"));
+}
+
+console.log("\n[20] 两句固定文案只有一个出处（措辞不许各写各的）");
+{
+  // 由来：「日志只在本地解析」的隐私承诺原来写在页脚品牌区，而用户真正交出日志的上传卡上
+  // 只有另一句近似措辞（"检查在本地浏览器完成…"）——同一件事两份文案，各自演化。
+  // 现在两句（隐私承诺 + 免责声明）收进 lib/log-analysis-notes.ts，且只在上传卡渲染
+  // （2026-09-21 用户拍板：页脚的品牌区与底栏都不再重复这两句）。
+  // 这里守三件事：出处里两句都在、上传卡真的从出处取并渲染、全站任何别的文件不许手写
+  // 这两句的字面量（否则下次有人往别的页面贴，措辞又会各长各的）。
+  const notes = stripComments(read("../lib/log-analysis-notes.ts"));
+  const upload = stripComments(
+    readFileSync(join(WEB, "app", "analyze", "AnalyzeEntryClient.tsx"), "utf8"),
+  );
+
+  const zhPrivacy = "日志在浏览器本地解析，原始文件不上传";
+  const zhDisclaimer = "分析结果为辅助判读，不能完全替代人工排查";
+
+  check(
+    "唯一出处里定义了隐私承诺",
+    notes.includes("export const LOG_PRIVACY_NOTE") && notes.includes(zhPrivacy),
+  );
+  check(
+    "唯一出处里定义了免责声明",
+    notes.includes("export const ANALYSIS_DISCLAIMER") && notes.includes(zhDisclaimer),
+  );
+  check("上传区从唯一出处取文案", upload.includes('from "@/lib/log-analysis-notes"'));
+  check(
+    "上传区把两句话都渲染出来",
+    upload.includes("LOG_PRIVACY_NOTE.zh") && upload.includes("ANALYSIS_DISCLAIMER.zh"),
+  );
+
+  // 全站扫：除唯一出处本体，不许任何文件手写这两句的字面量。已剥注释——说明文字里
+  // 原样出现这两句不会把这条喂成恒绿（本节注释就刻意用了转述而非原文）。
+  const literals = [zhPrivacy, zhDisclaimer];
+  const notesRel = join("lib", "log-analysis-notes.ts");
+  const offenders = [];
+  for (const rel of walkSourceFiles(WEB)) {
+    if (rel === notesRel) continue;
+    const src = stripComments(readFileSync(join(WEB, rel), "utf8"));
+    if (literals.some((s) => src.includes(s))) offenders.push(rel);
+  }
+  check(
+    "别处不许手写这两句的字面量（措辞只许改一处）",
+    offenders.length === 0,
+    offenders.length ? `手写副本：${offenders.join(", ")}` : "",
+  );
+}
+
+console.log("\n[21] 次数上限不在前端显示（上限由后台配置，前端不许先报一个写死的数）");
+{
+  // 由来：匿名/登录用户"每天能白嫖几次 AI 解读"这件事，前端三处各露一次——
+  //   上传卡「匿名试用 3/3 次」、AI 解读区「今日免费 10 次，剩余 N 次」、
+  //   「我的」页一条额度进度条。三处都从同一份取数（/api/me 的 quota）来，但**默认值**
+  //   各写各的（3 / 10），后台上限一改就三处不一致。
+  // 2026-09-21 用户拍板：次数上限以后由后台配置，前端一处都不许显示。
+  //
+  // 守两层，缺一层都拦不住回潮：
+  //   ① 那几句**专属**次数文案的字面量在全站删干净了（"次/天"、"匿名试用"、"今日免费"…）。
+  //      这些词只服务于"报次数"，正常文案里不会出现，可以硬查。
+  //   ② 直接扫**写了 quota 的文件**里还有没有数字对（`/ ${…limit}`）或进度条（`width: ${…used…}%`），
+  //      再钉住消费 quota 的文件清单。为什么不能只查 `used`/`limit`/`quota` 这些词：
+  //      hooks/useLogAnalyzer.ts 的数据层**有意保留** quota（后台配好后 UI 直接取用），
+  //      词级扫描会连数据层一起误伤——那就只能注释掉守卫，等于没有守卫。
+  // 想看"原本长什么样"：`git show HEAD:web/<文件>`。
+  const CN_QUOTA_COPY = ["匿名试用", "次/天", "今日免费", "今日 AI 解读额度", "额度信息暂不可用"];
+  const renderedQuota = []; // 还在把 quota 渲染成数字/进度条的地方
+  const quotaConsumers = []; // 碰了 quota 这个标识符的文件（清单要与此精确一致）
+  for (const rel of walkSourceFiles(WEB)) {
+    const src = stripComments(readFileSync(join(WEB, rel), "utf8"));
+    if (/quota/i.test(src)) quotaConsumers.push(rel);
+    const left = CN_QUOTA_COPY.filter((w) => src.includes(w));
+    // `/ 10 次`、`/ ${q.limit} 次`：一条把上限印成数字的斜杠对
+    const slashPair = /\/\s*[\w.?()[\]]{0,24}limit[\w.?()[\]]{0,8}\s*次/i.test(src);
+    // `width: ${…used…}%`：额度进度条
+    const progressBar = /width:\s*`?\$\{[^}]*used[^}]*\}[^`]*%/.test(src);
+    const reasons = [];
+    if (left.length) reasons.push(`文案：${left.join("、")}`);
+    if (slashPair) reasons.push("数字对：/ …limit 次");
+    if (progressBar) reasons.push("进度条：width … used%");
+    // hooks/useLogAnalyzer.ts 是**取数层**：它自己既不渲染也不写次数文案，只把
+    // /api/me、explain 响应的 quota 存进 state。它命中上面任何一条都是误报，
+    // 说明判据写歪了——所以这里只跳过它的"渲染类"判据，文案判据照查。
+    const dataLayer = rel.endsWith(join("hooks", "useLogAnalyzer.ts"));
+    if (dataLayer && (slashPair || progressBar)) {
+      reasons.splice(reasons.indexOf("数字对：/ …limit 次"), 1);
+      reasons.splice(reasons.indexOf("进度条：width … used%"), 1);
+    }
+    if (reasons.length) renderedQuota.push(`${rel}（${reasons.join("；")}）`);
+  }
+  check(
+    "全站没有把额度渲染成数字/进度条的地方",
+    renderedQuota.length === 0,
+    renderedQuota.join("，"),
+  );
+
+  // 清单与实现精确一致：多一个文件 = 有新的界面在显示次数（回潮）；
+  // 少一个文件不报错（撤掉显示本来就该变少），但**取数层不许被删**——
+  // 它是后台配好上限之后唯一不用返工的地方。
+  const EXPECTED = [
+    join("app", "analyze", "[id]", "AnalyzeResultClient.tsx"),
+    join("app", "analyze", "AnalyzeEntryClient.tsx"),
+    join("app", "me", "MeClient.tsx"),
+    join("components", "LogReport.tsx"),
+    join("hooks", "useLogAnalyzer.ts"),
+  ];
+  const unexpected = quotaConsumers.filter((r) => !EXPECTED.includes(r));
+  check("没有新的文件在消费 quota（回潮信号）", unexpected.length === 0, unexpected.join(", "));
+  check(
+    "取数层仍然保留 quota（后台配好上限后 UI 直接取用）",
+    quotaConsumers.includes(join("hooks", "useLogAnalyzer.ts")),
+    "hooks/useLogAnalyzer.ts 已不再碰 quota",
   );
 }
 

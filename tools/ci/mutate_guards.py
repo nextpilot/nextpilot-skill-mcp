@@ -324,6 +324,232 @@ MUTATIONS: list[Mutation] = [
         expect="engine/ 仍被浏览器与本机共用（纯 Python 的前提还在）",
         note="同上：另一侧消费者也消失时，这条规则该被删掉而不是继续绿",
     ),
+    # ---- 界面侧：站点版本只有一个读取口（2026-09-21） ----
+    #
+    # footer 显示「版本 + 日期」，两样都是构建期注入。这类"看不见的常量"最典型的坏法不是报错，
+    # 而是**安静地过期**：手写在组件里的版本号永远绿、永远不刷新。同一形状在仓库里已经发生过
+    # 一次（issue-bridge 读了一个从来没人赋值的环境变量），所以四条路各自都要证明会红。
+    Mutation(
+        name="构建期不再注入提交日期（footer 的日期会静默空掉）",
+        path="web/next.config.ts",
+        old="NEXT_PUBLIC_APP_COMMIT_DATE:",
+        new="NEXT_PUBLIC_APP_COMMIT_DATE_OFF:",
+        guard="ui",
+        expect="next.config.ts 注入了 NEXT_PUBLIC_APP_COMMIT_DATE",
+        note="注入方少一个键时页面只显示『版本未知』——不报错，也没人看得出来缺的是哪个",
+    ),
+    Mutation(
+        name="footer 不再从唯一读取口取版本",
+        path="web/components/SiteFooter.tsx",
+        old='from "@/lib/site-version"',
+        new="",
+        guard="ui",
+        expect="footer 从唯一读取口取版本",
+        note="自己算一个版本串 = 第二份口径，迟早与构建期注入的那份对不上",
+    ),
+    Mutation(
+        name="footer 取到了版本却不再渲染",
+        path="web/components/SiteFooter.tsx",
+        old="{versionLabel}",
+        new='{"v0.0.0"}',
+        guard="ui",
+        expect="footer 把版本串渲染出来",
+        note="写死的版本号不会报错，只会安静地过期——正是本节要挡的那类错",
+    ),
+    Mutation(
+        name="又有别处直接读了一次环境变量",
+        path="web/lib/issue-bridge.ts",
+        old="version: SITE_VERSION.version,",
+        new='version: process.env.NEXT_PUBLIC_APP_VERSION ?? "",',
+        guard="ui",
+        expect="别处不许直接读 NEXT_PUBLIC_APP_*（读取口只许有一个）",
+        note="原形就是这一行：读了两年一个从没被赋值的变量，上报里的版本恒为空串",
+    ),
+    Mutation(
+        name="提交时间退回只精确到天",
+        path="web/next.config.ts",
+        old="--date=format-local:%Y-%m-%d %H:%M:%S",
+        new="--date=short",
+        guard="ui",
+        expect="提交时间精确到秒（format-local 带时分秒）",
+        note="只到天的日期在一天内多次构建时分不清谁新谁旧，页脚会安静地变回老样子",
+    ),
+    # ---- 界面侧：指南页栏宽跟随内容、栏间距不许回到 40px（2026-09-21） ----
+    #
+    # 这一节的坏法不报错、不白屏，只是"看起来有点空"：侧栏写死 192px 而中文条目只占 138px，
+    # 多出来的 54px 混在外层间距里，量出来是「侧栏→正文」94px；两道 40px 间距再把正文从
+    # 768px 上限压到 624px。没人会主动去查，所以五条路各自都要证明会红。
+    Mutation(
+        name="侧栏宽度又被写死成 w-48（中文下凭空多出 54px 死白）",
+        path="web/components/GuideSidebar.tsx",
+        old="w-max min-w-36 max-w-48",
+        new="w-48 min-w-36 max-w-48",
+        guard="ui",
+        expect="侧栏宽度跟导航文字走（w-max，不许写死）",
+        note="原形就是这一行：写死的宽度跟条目名长短无关，中文下侧栏内部空一大块",
+    ),
+    Mutation(
+        name="侧栏没了上限兜底（条目名变长时会反过来挤正文）",
+        path="web/components/GuideSidebar.tsx",
+        old="max-w-48 shrink-0",
+        new="shrink-0",
+        guard="ui",
+        expect="侧栏宽度有上限兜底（max-w-*，条目名变长时不许挤正文）",
+        note="只跟内容走而没有上限，等于把「以后条目名变长」的风险直接甩给正文栏宽",
+    ),
+    Mutation(
+        name="侧栏没了下限兜底（条目名一短就被压成一条）",
+        path="web/components/GuideSidebar.tsx",
+        old="min-w-36 max-w-48",
+        new="max-w-48",
+        guard="ui",
+        expect="侧栏宽度有下限兜底（min-w-*，条目名再短也留出可点宽度）",
+        note="下限不是装饰：侧栏窄到只剩文字宽时，那道左边框会贴着链接，可点区域也跟着缩",
+    ),
+    Mutation(
+        name="侧栏与正文的间距又回到 40px",
+        path="web/app/guide/layout.tsx",
+        old="lg:flex-row lg:gap-8",
+        new="lg:flex-row lg:gap-10",
+        guard="ui",
+        expect="侧栏与正文的间距收到 lg:gap-8",
+        note="page-shell 内容宽只有 1120px，两道 40px + 224px 右目录会把正文压到 624px",
+    ),
+    Mutation(
+        name="正文与右目录的间距又回到 40px",
+        path="web/components/GuideArticle.tsx",
+        old='className="flex min-w-0 gap-8"',
+        new='className="flex min-w-0 gap-10"',
+        guard="ui",
+        expect="正文与右目录的间距收到 gap-8",
+        note="同上：省下的 8px 归正文，正文越接近 max-w-3xl，右列目录越不像在空转",
+    ),
+    # 右目录的回潮有四种单点形态，各拆一条变异——合在一条里会同时打红四条检查，
+    # 「恰好一条红」的判据就没法用了（第一版就是这么写的，自证直接 FAIL）。
+    Mutation(
+        name="右目录宽度又写死 w-56",
+        path="web/components/GuideOutline.tsx",
+        old="hidden w-max min-w-28 max-w-56 shrink-0 lg:block",
+        new="hidden w-56 min-w-28 max-w-56 shrink-0 lg:block",
+        guard="ui",
+        expect="右目录宽度跟标题文字走（w-max，不许写死）",
+        note="列内死白的原形：目录文字只占 ~85px，写死 224 后右侧常年空 126px",
+    ),
+    Mutation(
+        name="右目录没了上限兜底",
+        path="web/components/GuideOutline.tsx",
+        old="hidden w-max min-w-28 max-w-56 shrink-0 lg:block",
+        new="hidden w-max min-w-28 shrink-0 lg:block",
+        guard="ui",
+        expect="右目录有上限兜底（max-w-*，标题变长时不许挤正文）",
+        note="标题一长就把正文挤窄，重蹈左侧栏写死宽度的覆辙",
+    ),
+    Mutation(
+        name="右目录没了下限兜底",
+        path="web/components/GuideOutline.tsx",
+        old="hidden w-max min-w-28 max-w-56 shrink-0 lg:block",
+        new="hidden w-max max-w-56 shrink-0 lg:block",
+        guard="ui",
+        expect="右目录有下限兜底（min-w-*，边线和最短标题也有存在感）",
+        note="条目极短时左边框线贴着内容缩成一条缝",
+    ),
+    Mutation(
+        name="右目录断点退回 xl",
+        path="web/components/GuideOutline.tsx",
+        old="hidden w-max min-w-28 max-w-56 shrink-0 lg:block",
+        new="hidden w-max min-w-28 max-w-56 shrink-0 xl:block",
+        guard="ui",
+        expect="右目录从 lg 就显示（xl 断点在真实浏览器踩不准，目录消失会留 176px 死白）",
+        note="1280 的窗口扣掉滚动条只剩 ~1263，xl 踩不准，目录整列消失、正文右侧空 176px",
+    ),
+    # ---- 界面侧：两句固定文案只有一个出处（2026-09-21） ----
+    #
+    # 隐私承诺与免责声明原来各写各的：页脚一句、上传卡一句近似的，同一件事两份措辞。
+    # 收进 lib/log-analysis-notes.ts 并统一只在上传卡渲染（页脚品牌区/底栏都已拿掉），
+    # 要防的回归是"有人嫌绕远、在组件里就地手写"——那不会报错，只会让措辞悄悄分叉。
+    # 四条路各自都要证明会红。
+    Mutation(
+        name="唯一出处的措辞被人就地改了",
+        path="web/lib/log-analysis-notes.ts",
+        old="日志在浏览器本地解析，原始文件不上传",
+        new="日志只在本地浏览器解析，原始文件不上传",
+        guard="ui",
+        expect="唯一出处里定义了隐私承诺",
+        note="出处本身被改而守卫仍按原句匹配 = 守卫盯着的是一句已经不存在的文案",
+    ),
+    Mutation(
+        name="上传区不再从唯一出处取文案",
+        path="web/app/analyze/AnalyzeEntryClient.tsx",
+        old='from "@/lib/log-analysis-notes"',
+        new="",
+        guard="ui",
+        expect="上传区从唯一出处取文案",
+        note="自己另写一份 = 回到两份措辞各自演化的原形",
+    ),
+    Mutation(
+        name="上传区取到了免责声明却不再渲染",
+        path="web/app/analyze/AnalyzeEntryClient.tsx",
+        old="zh={ANALYSIS_DISCLAIMER.zh}",
+        new='zh=""',
+        guard="ui",
+        expect="上传区把两句话都渲染出来",
+        note="导入了但没渲染 = 用户在交出日志前仍然看不到这句",
+    ),
+    Mutation(
+        name="组件里又手抄了一份措辞（上传区标题版）",
+        path="web/app/analyze/AnalyzeEntryClient.tsx",
+        old="选择或拖入 PX4 .ulg 日志，最大支持300MB",
+        new="选择或拖入 PX4 .ulg 日志，最大支持300MB。日志在浏览器本地解析，原始文件不上传。",
+        guard="ui",
+        expect="别处不许手写这两句的字面量（措辞只许改一处）",
+        note="原形就是这一类：字面量散回组件里，下一次改措辞必然漏一处",
+    ),
+    # ---- 界面侧：次数上限不在前端显示（2026-09-21） ----
+    #
+    # 上游是"匿名 3 次/天、登录 10 次/天"这几个写死的数字——上传卡、AI 解读区、
+    # 「我的」页各显一次，而后台还没有配置入口。用户拍板：次数以后由后台配，前端一处都不报。
+    # 要防的回归有三种形态（文案 / 数字对 / 进度条），三条路各自都要证明会红。
+    Mutation(
+        name="上传卡又把次数文案加回来了",
+        path="web/app/analyze/AnalyzeEntryClient.tsx",
+        old="<input",
+        new='<p className="mt-3 text-xs text-faint">匿名试用：3/3 次</p>\n          <input',
+        guard="ui",
+        expect="全站没有把额度渲染成数字/进度条的地方",
+        note="回潮的第一形态：一句纯文案，没有取数也没有进度条",
+    ),
+    Mutation(
+        name="「我的」页又把额度进度条加回来了",
+        path="web/app/me/MeClient.tsx",
+        old="<div className=\"mt-6\">",
+        new=(
+            '<div className="mt-6">\n'
+            '        <div className="mt-2 h-2 overflow-hidden rounded-full">\n'
+            '          <div style={{ width: `${Math.min((q.used / q.limit) * 100, 100)}%` }} />\n'
+            "        </div>"
+        ),
+        guard="ui",
+        expect="全站没有把额度渲染成数字/进度条的地方",
+        note="回潮的第二形态：进度条——只看文案词查不出来",
+    ),
+    Mutation(
+        name="AI 解读区又把上限印成数字对",
+        path="web/components/LogReport.tsx",
+        old="          生成 AI 中文报告",
+        new="          生成 AI 中文报告（今日免费 `${q.limit}` 次）",
+        guard="ui",
+        expect="全站没有把额度渲染成数字/进度条的地方",
+        note="回潮的第三形态：`/ N 次` 这种斜杠对，文案词与进度条都拦不住",
+    ),
+    Mutation(
+        name="又有一个新界面开始消费 quota",
+        path="web/components/SiteFooter.tsx",
+        old="export function SiteFooter()",
+        new="const quota = null;\nexport function SiteFooter()",
+        guard="ui",
+        expect="没有新的文件在消费 quota（回潮信号）",
+        note="清单守卫的意义：新长出来的第 6 个消费点会被点名，而不是等它显示歪了才发现",
+    ),
 ]
 
 
