@@ -78,16 +78,17 @@ def extract_json_const(src: str, name: str):
     """取出构建脚本写入的 `const <name> = <json>;`（JSON.stringify 产物，可直接 json.loads）。"""
     m = re.search(rf"^const {name} = (.*?);$", src, re.M | re.S)
     if not m:
-        raise SystemExit(f"生成产物里找不到 const {name} = ...")
+        raise RuntimeError(f"生成产物里找不到 const {name} = ...")
     return json.loads(m.group(1))
 
 
 def main() -> int:
-    log.info("=== 产物校验（check_artifact） ===")
+    log.info("=== 产物校验 ===")
     src = TS.read_text(encoding="utf-8")
     m = re.search(r"String\.raw`(.*)`\n", src, re.S)
     if not m:
-        raise SystemExit("生成产物里找不到 String.raw 模板")
+        log.error("FAIL 生成产物里找不到 String.raw 模板")
+        return 1
     body = m.group(1)
 
     # 占位符**应当**留在模板里：由生成文件里的 .replace(...) 链在模块加载时替换。
@@ -97,7 +98,8 @@ def main() -> int:
     in_template = set(re.findall(r"(__[A-Z_]+__)", body))
     missing = in_template - set(replaces)
     if missing:
-        raise SystemExit(f"生成产物的 .replace 链缺占位符：{sorted(missing)}")
+        log.error(f"FAIL 生成产物的 .replace 链缺占位符：{sorted(missing)}")
+        return 1
 
     # 浏览器端的替换链是 JS 的 String.replace——**只换第一处**；上面"覆盖了"的存在性检查
     # 抓不住同一占位符出现多次的情况。2026-09-17 的 NameError 就是这么漏的：providers/px4.py
@@ -110,10 +112,11 @@ def main() -> int:
         first_only = first_only.replace(tok, "null", 1)
     leftover = set(re.findall(r"(__[A-Z_]+__)", first_only))
     if leftover:
-        raise SystemExit(
-            f"占位符在模板里出现了多次，浏览器只换第一处会漏掉真正的赋值行（NameError）：{sorted(leftover)}；"
+        log.error(
+            f"FAIL 占位符在模板里出现了多次，浏览器只换第一处会漏掉真正的赋值行（NameError）：{sorted(leftover)}；"
             "把 engine/ 注释里提到占位符原文的地方改个说法，或查 build-knowledge.mjs 的拼接输入"
         )
+        return 1
 
     # .replace 链里引用的名字必须已在产物里声明（const X = ... / import X from ...）。
     # 踩过：加了 .replace("__FACTS__", JSON.stringify(facts)) 却忘了 const facts = ...，
@@ -127,7 +130,8 @@ def main() -> int:
         used |= set(re.findall(r"[A-Za-z_$][\w$]*", head)) - {"JSON", "stringify"}
     missing_names = sorted(used - declared)
     if missing_names:
-        raise SystemExit(f"生成产物的 .replace 链引用了未声明的名字：{missing_names}")
+        log.error(f"FAIL 生成产物的 .replace 链引用了未声明的名字：{missing_names}")
+        return 1
 
     # 用真实取值复现最终 Python 源码
     final = body
@@ -188,7 +192,8 @@ def main() -> int:
     data_ts = (REPO_ROOT / "web" / "workers" / "pyodide-px4log-data.ts").read_text(encoding="utf-8")
     m2 = re.search(r"String\.raw`(.*)`;", data_ts, re.S)
     if not m2:
-        raise SystemExit("数据层产物里找不到 String.raw 模板")
+        log.error("FAIL 数据层产物里找不到 String.raw 模板")
+        return 1
     logs = sorted((Path(__file__).resolve().parent / "logs").glob("*.ulg"), key=lambda p: p.stat().st_size)
     if not logs:
         log.warning("SKIP 没有回归日志，跳过执行检查（caller 用 check_all.py 会自动跳过）")
@@ -201,10 +206,10 @@ def main() -> int:
         ns["np_report"]()
         result = json.loads(ns["__result"])
     except Exception as e:  # noqa: BLE001
-        log.error(f"产物执行失败（{log_file.name}）：{type(e).__name__}: {e}")
-        import traceback
+        log.error(f"FAIL 产物执行失败（{log_file.name}）：{type(e).__name__}: {e}")
+        import traceback as _tb
 
-        traceback.print_exc(limit=3)
+        log.error(_tb.format_exc(limit=3).strip())
         return 1
     required = ("findings", "facts", "metrics", "checksRun", "tags", "guardTags", "matchedFaults")
     missing_fields = [k for k in required if k not in result]
