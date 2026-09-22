@@ -5,4 +5,6 @@
 # 所以这里显式拒绝执行，而不是留着待填的占位文本：
 # 占位文本会让 pnpm 每次 install 都以 ERR_PNPM_IGNORED_BUILDS 收尾。
 allowBuilds:
+    "@parcel/watcher": true
+    "@swc/core": true
     unrs-resolver: false

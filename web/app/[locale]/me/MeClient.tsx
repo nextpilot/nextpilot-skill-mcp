@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/routing";
 import { ChevronRight, Cloud, GitBranch, HardDrive, Loader2, LogOut, Mail, ShieldAlert } from "lucide-react";
 import { signOut, useSession } from "@/components/SessionProvider";
 import { Breadcrumbs } from "@/components/Breadcrumbs";

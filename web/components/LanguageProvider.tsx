@@ -12,15 +12,22 @@ type LanguageContextValue = {
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
-    const [language, setLanguageState] = useState<Language>("zh");
+export function LanguageProvider({
+    children,
+    initialLanguage,
+}: {
+    children: React.ReactNode;
+    initialLanguage?: Language;
+}) {
+    const [language, setLanguageState] = useState<Language>(initialLanguage ?? "zh");
 
     useEffect(() => {
+        if (initialLanguage) return;
         const stored = window.localStorage.getItem("nextpilot-language");
         const nextLanguage = stored === "en" || stored === "zh" ? stored : "zh";
         setLanguageState(nextLanguage);
         document.documentElement.lang = nextLanguage === "zh" ? "zh-CN" : "en";
-    }, []);
+    }, [initialLanguage]);
 
     function setLanguage(nextLanguage: Language) {
         setLanguageState(nextLanguage);

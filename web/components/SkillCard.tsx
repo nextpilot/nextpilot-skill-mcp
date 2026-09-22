@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/routing";
 import { Star, Download } from "lucide-react";
 import type { SkillMeta } from "@/lib/types";
 import { CATEGORY_LABEL } from "@/lib/constants";

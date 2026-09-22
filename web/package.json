@@ -34,6 +34,7 @@
     "lucide-react": "^1.45.0",
     "next": "^16.3.5",
     "next-auth": "5.0.0-beta.32",
+    "next-intl": "^4.14.5",
     "next-mdx-remote": "^6.0.0",
     "nodemailer": "^10.0.9",
     "plotly.js-basic-dist-min": "^4.1.0",

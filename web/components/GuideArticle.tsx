@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@/i18n/routing";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { LocalizedText } from "@/components/LocalizedText";
 import { GuideBody } from "@/components/GuideBody";

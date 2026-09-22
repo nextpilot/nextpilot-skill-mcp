@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link, usePathname } from "@/i18n/routing";
 import { ChevronDown, List } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import type { GuideNavGroup } from "@/lib/guide";

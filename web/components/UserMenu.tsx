@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link, usePathname } from "@/i18n/routing";
 import { useSession, signOut } from "next-auth/react";
 import { LogIn, LogOut } from "lucide-react";
 

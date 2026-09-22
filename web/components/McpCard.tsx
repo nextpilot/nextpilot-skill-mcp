@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/routing";
 import { Star, Download, Eye, Zap } from "lucide-react";
 import type { McpServerMeta } from "@/lib/types";
 import { LocalizedText } from "@/components/LocalizedText";

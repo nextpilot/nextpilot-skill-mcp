@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/routing";
 import { useLogAnalyzer } from "@/hooks/useLogAnalyzer";
 import { ReportHistoryList } from "@/components/ReportHistoryList";
 import { takePendingLog } from "@/lib/pending-log";

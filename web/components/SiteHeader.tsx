@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useEffect, useState, useCallback } from "react";
+import { Link, usePathname } from "@/i18n/routing";
 import { Code2, Languages, Menu, Radar, X } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
@@ -10,9 +9,14 @@ import { useLanguage } from "@/components/LanguageProvider";
 
 export function SiteHeader() {
     const { language, setLanguage, t } = useLanguage();
-    const nextLanguage = language === "zh" ? "en" : "zh";
     const pathname = usePathname();
     const [open, setOpen] = useState(false);
+
+    const switchLanguage = useCallback(() => {
+        const nextLang = language === "zh" ? "en" : "zh";
+        setLanguage(nextLang);
+        window.location.href = `/${nextLang}${pathname}`;
+    }, [language, pathname, setLanguage]);
 
     // 路由变化后自动收起移动端菜单
     useEffect(() => {
@@ -59,13 +63,13 @@ export function SiteHeader() {
                     <div className="flex items-center gap-2">
                         <button
                             type="button"
-                            onClick={() => setLanguage(nextLanguage)}
+                            onClick={switchLanguage}
                             className="language-toggle"
                             aria-label={t("切换到英文", "Switch to Chinese")}
                             title={t("English", "中文")}
                         >
                             <Languages className="h-[18px] w-[18px]" />
-                            <span>{nextLanguage === "en" ? "EN" : "中"}</span>
+                            <span>{language === "zh" ? "EN" : "中"}</span>
                         </button>
                         <ThemeToggle />
                     </div>
@@ -120,12 +124,12 @@ export function SiteHeader() {
                             <span>{t("语言", "Language")}</span>
                             <button
                                 type="button"
-                                onClick={() => setLanguage(nextLanguage)}
+                                onClick={switchLanguage}
                                 className="language-toggle"
                                 aria-label={t("切换到英文", "Switch to Chinese")}
                             >
                                 <Languages className="h-[18px] w-[18px]" />
-                                <span>{nextLanguage === "en" ? "EN" : "中"}</span>
+                                <span>{language === "zh" ? "EN" : "中"}</span>
                             </button>
                         </li>
                         <li className="flex items-center justify-between py-3 text-sm text-muted">

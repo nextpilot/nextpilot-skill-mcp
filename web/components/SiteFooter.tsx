@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/routing";
 import { Code2, ExternalLink, Radar } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { hasSiteVersion, siteVersionLabel, siteVersionTitle } from "@/lib/site-version";

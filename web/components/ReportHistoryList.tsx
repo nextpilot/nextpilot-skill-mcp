@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { Link, usePathname, useRouter } from "@/i18n/routing";
 import {
     Trash2,
     History,

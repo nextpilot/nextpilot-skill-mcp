@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/routing";
 import { Bookmark, BookmarkCheck, Check, Download, Pencil, Sparkles } from "lucide-react";
 import { getFavorite, toggleFavorite, trackDownload, type FavoriteStats, type Kind } from "@/lib/community-stats";
 import { contentHostLabel } from "@/lib/constants";

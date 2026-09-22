@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
+import { useParams } from "next/navigation";
+import { Link, useRouter } from "@/i18n/routing";
 import { useLogAnalyzer } from "@/hooks/useLogAnalyzer";
 import { LogReport } from "@/components/LogReport";
 import { getReport, initReportStore } from "@/lib/report-history";
