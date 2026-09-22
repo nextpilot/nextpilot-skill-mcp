@@ -146,3 +146,22 @@ curl -s -X POST -H "Accept: application/vnd.git-lfs+json" \
   连 `python.exe` 前那一节也要写 `C:/Users/.../python.exe`，反斜杠会被 sh 当转义符吃掉。
 
 
+
+## 开发服务器：`pnpm dev` 起两段热更新
+
+内容更新是**两段**，缺一段就「改了没反应」：
+
+| 改什么 | 谁负责 |
+| --- | --- |
+| `web/` 里的代码 | Next 自己热更新 |
+| `docs/guide`、`knowledge/skills`、`knowledge/mcp` | `sync-content --watch` 重拷进 `web/.generated/` |
+
+`pnpm dev` = `node scripts/dev.mjs`，**两段一起起**（2026-09-22 起）。
+`pnpm dev:no-watch` 是旧行为（不挂 watch）；`pnpm sync:watch` 单独开内容热拷贝。
+
+**Next 16 按目录判重 dev server**（不是按端口）：同目录已有 dev server 时直接报错退出，
+换 `PORT` 没用。测启动器前先确认没有旧 dev server 在跑。
+
+**本机工具注意事项**：`wmic` 被安全策略拉黑（用 `tasklist /FO CSV /NH` 代替）；
+Windows 上 Python 发 Ctrl+C 要 `CREATE_NEW_PROCESS_GROUP` + `CTRL_BREAK_EVENT`；
+`netstat` / `tasklist` 中文输出是 GBK，要 `decode('gbk')`。
