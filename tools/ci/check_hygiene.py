@@ -1,6 +1,6 @@
-"""校验机制**自身**的卫生：三处「不会报错的裂缝」。
+"""校验机制**自身**的卫生：四处「不会报错的裂缝」。
 
-这三项不是"再查一遍代码"，而是查**我们用来查代码的那套东西**有没有说谎。它们全是
+这四项不是"再查一遍代码"，而是查**我们用来查代码的那套东西**有没有说谎。前三项全是
 2026-09-18 那天真实踩出来的，共同点出奇地一致：坏掉的时候**没有任何输出**。
 
 | 检查 | 拦什么 | 那天的现场 |
@@ -8,14 +8,15 @@
 | 悬空 § 引用 | 注释里写"见 CLAUDE.md §6.8"，而那一节不存在 | 5 处注释指向 §6.8，而 §6.8 是那天才补上的——读者按图索骥，翻到的是一页空白 |
 | 产物新鲜度不许用 git 当判据 | 判据落在"git 工作区是否干净" | 门拿 `git diff` 跟 HEAD 比，把**人正常的手写文案**判成"与源码漂移"（作者只好回一句"是我手动修改的"） |
 | 打了 FAIL/ERROR 就要能非零退出 | 打印了红字，退出码却是 0 | `--probe-data` 对 6 份日志**全部**打 `ERROR`，最后报 `OK`；`series` 那一路早已不在检，没人知道 |
+| hook 不从阶段列表反推开关 | 开关被"再推导一次"，于是永远开不着 | `.githooks/pre-push` 用 `with_e2e and "ci" not in stages` 决定加不加 `--with-e2e`，而 E2E 步骤就住在 ci 里 → **每条路径都不成立**，`WITH_E2E=1` 静默不跑 E2E |
 
-为什么值得单独一个脚本：这三条**都不会自己报错**。悬空引用是人读到才发现；误报会让人
-去改没坏的东西；吞掉的失败则连"有人在看"这个前提都不成立。它们全靠人当时记得——而人
-会忘。所以把判据固化成可以重跑的检查（见 `CLAUDE.md` §6.6）。
+为什么值得单独一个脚本：这几条**都不会自己报错**。悬空引用是人读到才发现；误报会让人
+去改没坏的东西；吞掉的失败则连"有人在看"这个前提都不成立；开关没传则看着像跑了实则没跑。
+它们全靠人当时记得——而人会忘。所以把判据固化成可以重跑的检查（见 `CLAUDE.md` §6.6）。
 
 ## 判据
 
-三类裂缝，落成 5 项检查（后两项分别是"防目标消失"与"动态补静态之不足"）：
+四类裂缝，落成 6 项检查（后两项分别是"防目标消失"与"动态补静态之不足"）：
 
 1. **§ 引用必须有落点。** 解析顺序：引用的同一行如果**点名了某份文档** → 只在那份文档里找
    （最常见的是 `见 CLAUDE.md §6.4`，取离引用**最近**的那个名字，不是行内第一个）；否则本文档
@@ -33,6 +34,10 @@
 5. 第 4 项是**静态**的（看源码），所以再配一条**动态**探针：拿必然失败的输入真跑一次，
    断言「退出码非零**且**输出里有失败标记」——只要退出码非零是不够的，加载依赖失败、路径
    写错都非零，那会让探针绿得毫无意义。
+6. **`--with-*` 开关不许从阶段列表反推。** 开关控制的是阶段**内的步骤**（`when: args.with_e2e`），
+   与"跑哪些阶段"是正交的两件事，必须各自独立传给 `check_all.py`。一旦写成
+   `if with_e2e and "ci" not in stages`，而目标步骤又住在 ci 里，条件就永远不成立——
+   命令照常拼出、退出码照常为 0，只是那一步从来没跑。
 
 第 4、5 项都要留意一个格式契约：本脚本的**总结行不许写成 `FAIL <名字>` 的形状**，因为
 `tools/ci/mutate_guards.py` 逐行取 "FAIL 后面的东西" 当检查名（那条写在下面的 `main()` 里）。
@@ -397,10 +402,12 @@ def check_freshness_gate_alive() -> list[str]:
     ):
         if marker not in src:
             problems.append(f"{_rel(gen)} 里找不到 {marker!r} —— {why}")
-    ci = ROOT / "tools" / "ci" / "check_all.py"
-    ci_src = _read(ci) if ci.is_file() else ""
-    if "build-knowledge.mjs" not in ci_src or "--check" not in ci_src:
-        problems.append(f"{_rel(ci)} 里没有调用 build-knowledge.mjs --check —— 这道门没挂在统一入口上")
+    # 校验命令住在 checklist.yml，check_all.py 只做转发 —— 判据必须跟到同一处，
+    # 搜错地方就是恒红。
+    gate = ROOT / "tools" / "ci" / "checklist.yml"
+    gate_src = _read(gate) if gate.is_file() else ""
+    if "build-knowledge.mjs" not in gate_src or "--check" not in gate_src:
+        problems.append(f"{_rel(gate)} 里没有 build-knowledge.mjs --check 这一步 —— 这道门没挂在统一入口上")
     return problems
 
 
@@ -545,6 +552,50 @@ def check_bad_input_exit() -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# 5. 开关不许被"再推导一次"
+#
+# 原形：`.githooks/pre-push` 想用 `WITH_E2E=1` 打开 E2E，却把这个开关**用阶段列表又推了一遍**——
+# `if with_e2e and "ci" not in stages: cmd.append("--with-e2e")`。而 E2E 那两步住在 ci 阶段里，
+# 于是"想要 E2E"的每一条路径都恰好满足 `"ci" in stages`，那个 `append` **一次都不会执行**：
+# `WITH_E2E=1 git push` 打印出 `--stage push,ci`，看着像要跑 E2E，实际两步都被静默跳过。
+#
+# 为什么单独一条规则：这类错**没有任何输出**。命令拼得出来、退出码是 0、日志也正常，
+# 只有把参数打印出来逐条对照才发现少了东西。静态检查能看见它，人看不出来。
+#
+# 判据：`.githooks/pre-push` 里出现"把某个 `--with-*` 开关与阶段表达式绑在一起"的写法即违规。
+# 开关控制的是**阶段内的步骤**（`when: args.with_e2e`），与"跑哪些阶段"是两个正交的维度，
+# 必须各自独立地传给 check_all.py。
+# ---------------------------------------------------------------------------
+
+# 只看"`--with-xxx` / `with_xxx` 出现在某个条件里，而那个条件又在看阶段"。
+#
+# 字符类必须含数字：开关名是 `with_e2e`，`[a-z_]+` 匹配不到 `e2e` 里的 `2`——
+# 第一版就写成了 `with_[a-z_]+`，于是这条守卫在真 bug 上**恒绿**（本项目最忌讳的形状：
+# 一条永远不红的守卫比没有守卫更坏，因为它还让人以为有人在看）。自证时才发现。
+REFLAG_GUARD_RE = re.compile(
+    r"""(?:if|elif)\b[^\n]*\bwith_[a-z0-9_]+\b[^\n]*\b(?:in|not\s+in)\b[^\n]*\bstages\b"""
+    r"""|\bwith_[a-z0-9_]+\b\s+and\b[^\n]*\bstages\b"""
+)
+
+
+def check_hook_flags_not_rederived() -> list[str]:
+    """hook 不许从阶段列表反推 `--with-*` 开关 —— 那样开关永远开不着（见上面那段）。"""
+    problems: list[str] = []
+    for hook in sorted((ROOT / ".githooks").glob("*")):
+        if not hook.is_file() or hook.suffix in (".ps1", ".md"):
+            continue
+        code = _code_only(hook)
+        for m in REFLAG_GUARD_RE.finditer(code):
+            snippet = re.sub(r"\s+", " ", code[max(0, m.start() - 40) : m.end() + 80]).strip()
+            problems.append(
+                f"{_rel(hook)} 把 --with-* 开关与阶段条件绑在一起 —— …{snippet}…"
+                "\n        开关控制的是阶段**内的步骤**，与「跑哪些阶段」正交："
+                "从 stages 反推会让它在每条真实路径上都不成立，于是静默跳过"
+            )
+    return problems
+
+
+# ---------------------------------------------------------------------------
 
 CHECKS: list[tuple[str, object]] = [
     ("悬空 § 引用", check_section_refs),
@@ -552,6 +603,7 @@ CHECKS: list[tuple[str, object]] = [
     ("产物新鲜度门还在", check_freshness_gate_alive),
     ("打了 FAIL/ERROR 就要能非零退出", check_failure_visible),
     ("坏输入必须非零退出", check_bad_input_exit),
+    ("hook 不从阶段列表反推开关", check_hook_flags_not_rederived),
 ]
 
 

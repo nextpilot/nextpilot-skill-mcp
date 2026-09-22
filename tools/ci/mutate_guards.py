@@ -292,6 +292,19 @@ MUTATIONS: list[Mutation] = [
         expect="坏输入必须非零退出",
         note="静态规则看不见这一半：确实 return 1 了，但那条路根本没被走到过",
     ),
+    Mutation(
+        name="pre-push 从阶段列表反推 --with-e2e",
+        path=".githooks/pre-push",
+        # 锚点必须是**单行**：_apply 按字节读写，工作区里这个文件是 CRLF，
+        # 锚点里写 `\n` 会一个都匹配不到（多行锚点在这里天然失效）。
+        old="    if with_e2e:",
+        new='    if with_e2e and "ci" not in stages:',
+        guard="hygiene",
+        expect="hook 不从阶段列表反推开关",
+        # 说明里的引号是给读者看的字面量，不是字符串语法，故保留原样。
+        note='原形：E2E 步骤住在 ci 阶段里，所以 `"ci" not in stages` 在每条想要 E2E 的路径上都不成立——'
+        "WITH_E2E=1 打印出 --stage push,ci，看着像要跑，其实两步都被静默跳过",
+    ),
     # ---- 引擎侧：engine/ 是三处共用的纯 Python（2026-09-19） ----
     #
     # 这两条守的不是"某段代码在不在"，而是**一份源码能同时跑在三个运行时里**这个前提。
@@ -521,11 +534,11 @@ MUTATIONS: list[Mutation] = [
     Mutation(
         name="「我的」页又把额度进度条加回来了",
         path="web/app/me/MeClient.tsx",
-        old="<div className=\"mt-6\">",
+        old='<div className="mt-6">',
         new=(
             '<div className="mt-6">\n'
             '        <div className="mt-2 h-2 overflow-hidden rounded-full">\n'
-            '          <div style={{ width: `${Math.min((q.used / q.limit) * 100, 100)}%` }} />\n'
+            "          <div style={{ width: `${Math.min((q.used / q.limit) * 100, 100)}%` }} />\n"
             "        </div>"
         ),
         guard="ui",
