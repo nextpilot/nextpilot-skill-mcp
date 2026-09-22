@@ -164,10 +164,10 @@ jobs:
         command: ["{PYTHON}", "tools/calibrate/lint_rules.py", "--strict"]
         hint: "Field reference linting found violations. Review the output above and fix the referenced fields."
 
-  - id: ci
-    stage: "CI"
-    description: "Cloud-only checks: artifact parity, guard self-test, guard self-proof, dependency audit"
-    steps:
+      # 以下三项原本住在 ci 阶段跑。它们都只读源码、不碰日志、各不到 1s
+      # （实测 build:kb --check 0.63s / check-skill-spec 0.32s / check-mcp-spec 0.34s），
+      # 与 push 阶段里已有的秒级项同一量级，所以放在本地 pre-push 拦更早 ——
+      # 等云端 CI 才发现"产物忘了重新生成"要多等一个来回。
       - id: "build-kb-parity"
         name: "Build contract vs artifact parity (build:kb --check)"
         workdir: "{WEB}"
@@ -175,7 +175,7 @@ jobs:
         command: ["{NODE}", "scripts/build-knowledge.mjs", "--check"]
         hint: "The built knowledge base differs from the committed artifact. Run `node scripts/build-knowledge.mjs` locally and commit the updated artifact."
 
-      # 内容规范。两个脚本各自带反例自检，且跑完只要 ~1s。
+      # 内容规范。两个脚本各自带反例自检。
       - id: "check-skill-spec"
         name: "Skill directory spec (check-skill-spec)"
         workdir: "{WEB}"
@@ -188,6 +188,10 @@ jobs:
         command: ["{NODE}", "scripts/check-mcp-spec.mjs"]
         hint: "knowledge/mcp/ 下有目录不合 server.json（MCP Registry）规范。按上面的输出补齐；upstream_status: pending 的条目是 SKIP 不是放行，核实后要补 server.json 并删掉该字段。"
 
+  - id: ci
+    stage: "CI"
+    description: "Cloud-only checks: guard self-test, guard self-proof, dependency audit"
+    steps:
       - id: "test-issue-filer"
         name: "Issue-filer self-test (fingerprint / scrub / allowlist / guards)"
         workdir: "{WEB}"
