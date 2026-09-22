@@ -23,20 +23,29 @@ hooks 与 workflow 都只调 `check_all.py`。
 | 检查 | 实测 |
 | --- | --- |
 | ruff format --check / ruff check | 2s / 1s |
-| pytest engine/tests | 3s |
-| check_artifact / check_engine_purity / build:kb --check | 各 1s |
-| check-skill-spec / check-mcp-spec | 各 1s（自带反例自检） |
-| tsc --noEmit / eslint | 2s / 3s |
-| check_hygiene | 4s |
-| 日志回归四项（baseline/provider/probe/lint_rules） | 共 11s |
-| **test-issue-filer** | **42s** |
+| pytest engine/tests | 1.2s |
+| check_artifact / check_engine_purity | 1s / 0.6s |
+| build:kb --check / check-skill-spec / check-mcp-spec | 0.6s / 0.4s / 0.3s（后两者自带反例自检） |
+| tsc --noEmit / eslint / prettier --check | 2s / 3s / 3.7s |
+| check_hygiene / check_secrets | 4.2s / 1.3s |
+| 日志回归四项（baseline/provider/probe/lint_rules） | 各约 2~3s，共 11s |
+| **test-issue-filer** | **43.8s**（21 节 / 131 条断言） |
+| **pip-audit** | **40.6s**（曾误记为"秒级"，差一个量级） |
+| **pnpm audit** | **7.4s**（须带 `--registry=https://registry.npmjs.org/`） |
 | **next build** | **144s**（清单 timeout 300s，安全） |
 | **playwright-analyze（日志分析流程 11 条）** | **约 420s**（timeout 900，CI 里最长一步） |
-| **mutate_guards（43 条变异）** | **约 20 分钟**（27 条打在 test-issue-filer 上，42s×27） |
+| **mutate_guards（43 条变异）** | **约 20 分钟**（27 条打在 test-issue-filer 上，44s×27） |
 
 分档结论：本地只留秒级；分钟级的（E2E / build / 自证）全部放云端 CI。
+`--stage push` 全套实测 **30~40s**（14 项：10 无条件 + 4 需日志）。
 
 CI `checks` job 估算约 **17 分钟**（build + 冒烟 + analyze + 其余），预算 40 分钟，余量约 2.3 倍。
+
+**E2E 用例数（实测 `--list`）**：共 42 条（`pages.spec.ts` 31 + `analyze.spec.ts` 11）；
+其中 `@smoke` 16 条、`日志分析流程` 11 条。
+
+**面向新人的速查页是 `docs/dev/testing-at-a-glance.md`**（2026-09-22 新建）；
+`checks-by-stage.md` 保留为"为什么这样分档"的论证与实测档案。改检查体系时**两处都要同步**。
 
 ## 两处易混的 `sample.ulg`（动手前先分清）
 
@@ -78,8 +87,11 @@ CI `checks` job 估算约 **17 分钟**（build + 冒烟 + analyze + 其余）�
 - 项目 Python 是 `C:\Users\zhanfuyu\anaconda3\python.exe`（有 ruff/pytest/numpy/pyulog）。
   托管 Python 3.13 缺科学栈，`check_artifact` / `check_hygiene` 会假失败。
 - Bash 工具需先 `export PATH="/usr/bin:/bin:/mingw64/bin:$PATH"` 才能用。
+  不加会 `tail: command not found`（exit 127）。**`bc` 加了 PATH 也没有**——
+  计时一律用 Python `time.time()`，别用 shell 算。
 - 远端是 gitee 私仓 `https://gitee.com/nextpilot/nextpilot-skill-mcp.git`，
-  免提权能 `git ls-remote`；`git push` 实测要 **6 分钟**且中途零输出（别误判卡死）。
+  免提权能 `git ls-remote`；`git push` 实测 **33s**（含 pre-push 全套 14 项）。
+  曾记成"6 分钟零输出"，那是首次推送/网络状况，**不是常规预期**。
 - 本机**没有 `xz` 命令行工具**，但 Python 标准库有 `lzma`。
 
 ## gitee 的 Git LFS 不可用（实测，别再规划 LFS 方案）

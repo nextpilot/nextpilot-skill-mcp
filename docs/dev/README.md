@@ -14,10 +14,12 @@
 | 故障根因 / 排查步骤 / 禁忌 | [`knowledge/px4/fault-kb.yaml`](../../knowledge/px4/fault-kb.yaml) |
 | 平台定位、商业模式、路线图 | 仓库根 [`CLAUDE.md`](../../CLAUDE.md) |
 | 各阶段该跑哪些检查、各自耗时与分档依据 | [`checks-by-stage.md`](checks-by-stage.md) |
+| **只想快速知道"改完该跑什么、要等多久、红了看哪"** | [`testing-at-a-glance.md`](testing-at-a-glance.md)（三分钟速查） |
 
 ## 目录
 
 - `checks-by-stage.md` —— 检查的分类、分阶段安排与实测耗时（**已成文**）
+- `testing-at-a-glance.md` —— 测试流程速查：什么时候自动跑什么、耗时、红了怎么办（**已成文**；要论证看 `checks-by-stage.md`）
 - `architecture/` —— 系统边界与数据流（待写；现状速览暂在 `operations/README.md` 第 1 节）
 - `operations/` —— 本地开发、EdgeOne 部署、环境变量与故障排查（**已成文**）
 - `rules/` —— 规则文档（待写；规则清单已由网站 `/guide/rule-catalogue` 自动生成，此处只放不适合进网站的说明）
