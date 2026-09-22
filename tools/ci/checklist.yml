@@ -88,10 +88,26 @@ jobs:
         hint: "Run `python -m ruff check --fix .` to auto-fix fixable issues, then review remaining items manually."
 
       - id: "prettier-check"
-        name: "Frontend style (prettier --check)"
-        workdir: "{WEB}"
-        command: ["{NODE}", "node_modules/prettier/bin/prettier.cjs", "--check", "."]
-        hint: "Run `pnpm format` to format the frontend. Generated files are excluded via .prettierignore."
+        name: "Code style (prettier --check)"
+        workdir: "{ROOT}"
+        command: ["{NODE}", "web/node_modules/prettier/bin/prettier.cjs", "--check", ".", "--config", "web/.prettierrc"]
+        hint: "Run `npx prettier --write . --config web/.prettierrc` to auto-format all files. Auto-generated files are excluded via .prettierignore."
+
+      - id: "markdownlint"
+        name: "Markdown lint (markdownlint)"
+        workdir: "{ROOT}"
+        command:
+          [
+            "{NODE}",
+            "web/node_modules/markdownlint-cli/markdownlint.js",
+            "**/*.md",
+            "**/*.mdx",
+            "--config",
+            "web/.markdownlint.json",
+            "--ignore-path",
+            ".markdownlintignore",
+          ]
+        hint: "Fix the Markdown lint errors listed above. Auto-generated files are excluded via .markdownlintignore."
 
       - id: "pyright"
         name: "Python type checking (pyright)"

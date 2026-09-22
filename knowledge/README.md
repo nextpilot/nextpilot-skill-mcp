@@ -38,7 +38,7 @@ px4/
 构建期由 `web/scripts/sync-content.mjs` 拷进 `web/.generated/{skills,mcp}/`，
 运行期 `web/lib/{skills,mcp}.ts` 只读那里（`web/` 部署时只上传自己这一个目录）。
 
-### skills/ 一个 Skill 一个目录
+## skills/ 一个 Skill 一个目录
 
 ```text
 skills/<slug>/
@@ -50,13 +50,13 @@ skills/<slug>/
 `SKILL.md` 按 **Agent Skills 规范**写（依据：`https://agentskills.io/specification`，
 即 Anthropic 官方仓库 `anthropics/skills` README 指向的规范站）。硬约束：
 
-| 项 | 约束 |
-| --- | --- |
-| `name` | 1–64 字符，仅小写字母数字与单个连字符，不以连字符开头/结尾；**必须等于目录名**；不得含保留字 `claude` / `anthropic` |
-| `description` | 同时写清「做什么」与「什么时候用」（正文要等触发后才加载，"何时用"只能写在这里）；≤ 200 字符 |
-| 顶层字段 | 只允许 `name` / `description` / `license` / `compatibility` / `metadata` / `allowed-tools` |
-| `metadata` | string→string 映射：列表写成 `"A, B"`、数字写成 `"4.6"`，不能放数组或数字 |
-| 正文 | 建议 < 500 行 |
+| 项            | 约束                                                                                                                |
+| ------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `name`        | 1–64 字符，仅小写字母数字与单个连字符，不以连字符开头/结尾；**必须等于目录名**；不得含保留字 `claude` / `anthropic` |
+| `description` | 同时写清「做什么」与「什么时候用」（正文要等触发后才加载，"何时用"只能写在这里）；≤ 200 字符                        |
+| 顶层字段      | 只允许 `name` / `description` / `license` / `compatibility` / `metadata` / `allowed-tools`                          |
+| `metadata`    | string→string 映射：列表写成 `"A, B"`、数字写成 `"4.6"`，不能放数组或数字                                           |
+| 正文          | 建议 < 500 行                                                                                                       |
 
 **站点卡片需要的字段（分类、平台、标签、评分…）一律收进 `metadata`**，不散在顶层。
 这样每个目录拷进 `.claude/skills/<slug>/` 就能被 Claude 直接加载，不必先过一遍我们的站点。
@@ -92,13 +92,13 @@ mcp/<slug>/
 
 两者最容易互相抄错的地方：
 
-| | Skill（`skills/`） | MCP（`mcp/`） |
-| --- | --- | --- |
-| 规范 | Agent Skills（agentskills.io） | MCP Registry（registry.modelcontextprotocol.io） |
-| 规范文件 | `SKILL.md` | `server.json` |
-| `name` | kebab 小写，**必须等于目录名** | **反向 DNS** `io.github.<owner>/<repo>` |
-| `description` | ≤ 200（两份官方口径取严值） | ≤ 100 |
-| 独有概念 | 渐进披露、`allowed-tools` | `tools` / `transport` / `readOnly` / `packages[]` |
+|               | Skill（`skills/`）             | MCP（`mcp/`）                                     |
+| ------------- | ------------------------------ | ------------------------------------------------- |
+| 规范          | Agent Skills（agentskills.io） | MCP Registry（registry.modelcontextprotocol.io）  |
+| 规范文件      | `SKILL.md`                     | `server.json`                                     |
+| `name`        | kebab 小写，**必须等于目录名** | **反向 DNS** `io.github.<owner>/<repo>`           |
+| `description` | ≤ 200（两份官方口径取严值）    | ≤ 100                                             |
+| 独有概念      | 渐进披露、`allowed-tools`      | `tools` / `transport` / `readOnly` / `packages[]` |
 
 两边的 `name` 规则**互斥**——同一个名字不可能同时满足。所以两个目录各有各的守卫
 （`check-skill-spec.mjs` / `check-mcp-spec.mjs`），别合成一个，合了必然有一边是错的。
@@ -126,21 +126,21 @@ cd web && pnpm check:mcp
 
 ## 我要做什么 → 看哪里
 
-| 我要…… | 看 / 改 |
-| --- | --- |
-| 了解整套规则体系为什么这么设计 | [px4/CLAUDE.md](px4/CLAUDE.md)（给 AI 与维护者的设计上下文） |
-| **新增 / 改一个 Skill** | `knowledge/skills/<slug>/` 三份文件（结构见上节），改完 `pnpm check:skills` |
-| **新增 / 改一个 MCP 条目** | `knowledge/mcp/<slug>/`（结构见上节；规范与 Skill **不同**），改完 `pnpm check:mcp` |
-| **写一条新规则 / 改一条现有规则** | 站内 `/guide/rule-schema`（字段、算子、常见坑；构建期生成，仓库里不留拷贝） |
-| 弄清自己这类经验该写在哪 | [px4/CLAUDE.md](px4/CLAUDE.md) 的「四类经验 → 四种载体」 |
-| 查现在有哪些规则、各自读什么字段、什么条件触发 | 网站 `/guide/rule-catalogue`（构建时从 `rules/*.yaml` 生成，仓库里不留拷贝） |
-| **只是想"用网页看"这些内容** | 站点 `/guide` 的「知识库」分组（怎么写规则 / 现有规则两页） |
-| 调一条阈值 | 直接改 `px4/rules/<那条经验>.yaml` 的 `threshold` 与 `triggers[].expr` |
-| 改字段绑定 / 码值 / 阶段分组 / slot 执行顺序 / 关键数据的名字与顺序 | `px4/facts.yaml`（引擎不含业务数据，全在这里） |
-| 加一条故障模式（根因 / 排查步骤） | `px4/fault-kb.yaml`（trigger_tags 必须是引擎会产出的标签） |
-| 加一个可复用计算步骤 | `engine/operators.py`（`@operator` 声明 in/out arity），再在经验的 `compute` 里引用 |
-| 改 AI 报告口径 | `px4/llm/*.md` |
-| 同步固件元数据 | `python tools/px4/fetch_px4_uorb_msg.py --tags ...` → 生成物在 `px4/meta/<tag>.json` |
+| 我要……                                                              | 看 / 改                                                                              |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 了解整套规则体系为什么这么设计                                      | [px4/CLAUDE.md](px4/CLAUDE.md)（给 AI 与维护者的设计上下文）                         |
+| **新增 / 改一个 Skill**                                             | `knowledge/skills/<slug>/` 三份文件（结构见上节），改完 `pnpm check:skills`          |
+| **新增 / 改一个 MCP 条目**                                          | `knowledge/mcp/<slug>/`（结构见上节；规范与 Skill **不同**），改完 `pnpm check:mcp`  |
+| **写一条新规则 / 改一条现有规则**                                   | 站内 `/guide/rule-schema`（字段、算子、常见坑；构建期生成，仓库里不留拷贝）          |
+| 弄清自己这类经验该写在哪                                            | [px4/CLAUDE.md](px4/CLAUDE.md) 的「四类经验 → 四种载体」                             |
+| 查现在有哪些规则、各自读什么字段、什么条件触发                      | 网站 `/guide/rule-catalogue`（构建时从 `rules/*.yaml` 生成，仓库里不留拷贝）         |
+| **只是想"用网页看"这些内容**                                        | 站点 `/guide` 的「知识库」分组（怎么写规则 / 现有规则两页）                          |
+| 调一条阈值                                                          | 直接改 `px4/rules/<那条经验>.yaml` 的 `threshold` 与 `triggers[].expr`               |
+| 改字段绑定 / 码值 / 阶段分组 / slot 执行顺序 / 关键数据的名字与顺序 | `px4/facts.yaml`（引擎不含业务数据，全在这里）                                       |
+| 加一条故障模式（根因 / 排查步骤）                                   | `px4/fault-kb.yaml`（trigger_tags 必须是引擎会产出的标签）                           |
+| 加一个可复用计算步骤                                                | `engine/operators.py`（`@operator` 声明 in/out arity），再在经验的 `compute` 里引用  |
+| 改 AI 报告口径                                                      | `px4/llm/*.md`                                                                       |
+| 同步固件元数据                                                      | `python tools/px4/fetch_px4_uorb_msg.py --tags ...` → 生成物在 `px4/meta/<tag>.json` |
 
 ## 改完怎么验证
 

@@ -26,11 +26,11 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 固件解码与载具身份、`rules/*.yaml` 里裸写的字段、`plot/*.yml` 里裸写的字段）。
 现在的分工是"**机制 / 数据 / 格式**"三分：
 
-| 放哪 | 是什么 | 判据 |
-| --- | --- | --- |
-| `engine/providers/<格式>.py` | **唯一认识某一种日志的地方**：topic 名、字段名、固件版本怎么解码、取不到怎么回退、载具身份从哪来 | 有分支 / 回退 / 按版本挑 → 代码 |
-| `engine/{rule_engine,operators,report_data}.py` | 与格式无关的机制：调度、表达式求值、算子、报告数据层 | 里面 grep 不到 `vehicle_` / `ver_sw` / `cpuload` |
-| `knowledge/px4/facts.yaml` | 那一种格式的**纯数据**：码表、文案、展示口径、规则元数据、执行顺序 | 纯映射 → YAML（改它不该碰 Python） |
+| 放哪                                            | 是什么                                                                                           | 判据                                             |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| `engine/providers/<格式>.py`                    | **唯一认识某一种日志的地方**：topic 名、字段名、固件版本怎么解码、取不到怎么回退、载具身份从哪来 | 有分支 / 回退 / 按版本挑 → 代码                  |
+| `engine/{rule_engine,operators,report_data}.py` | 与格式无关的机制：调度、表达式求值、算子、报告数据层                                             | 里面 grep 不到 `vehicle_` / `ver_sw` / `cpuload` |
+| `knowledge/px4/facts.yaml`                      | 那一种格式的**纯数据**：码表、文案、展示口径、规则元数据、执行顺序                               | 纯映射 → YAML（改它不该碰 Python）               |
 
 - 契约本体是 `engine/providers/api.py` 的三张常量表（REQUIRED / OPTIONAL / SEMANTICS）。
   它同时是**构建期**（`build-knowledge.mjs` 派生 `BUILTIN_VARS`、查每个适配器有没有漏实现）、
@@ -114,14 +114,14 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 **2026-09-17 追加：规则写法全面换成 Python 子集**（本文档下面那些「算子节点」的例子
 只代表**最初设计**，现状见这一段）：
 
-| 改了什么 | 前 | 后 |
-| --- | --- | --- |
-| `compute` | 算子节点链 `- {out: x, from: a.b, op: max}`，构建期编译成表达式 | **直接写表达式** `- x = max(a.b)`；节点写法已从构建期移除（写了会报错并提示改写）。85 个节点 → 70 条表达式 |
-| `requires` / `not_applicable` / `silent_when` / `skip_reason_no_data` | 四个字段各管一摊 | 合成 **一个 `skip` 列表** `[{when: 表达式, reason?: 文案}]`（**不写 `reason` = 静默**）；"数据不足"靠新增内置变量 `no_data` 表达。— **2026-09-18 起 `skip` 与 `no_data` 都已退役**，见上一节 |
-| `firmware` / `airframe` | `any` ｜ `">=1.15"` ｜ `fixed_wing` 这类自造小语言 | **Python 表达式**（`"True"` / `"is_fixed_wing"`），在 compute 之前求值、只认内置变量 |
-| `slot` | 槽位（技术隐喻） | **`group`**；`facts.yaml` 的 `slot_order` → `group_order`，`nav_groups` → `nav_state_groups`（消歧义） |
-| `version`/`category`/`status`/`author`/`license`/`changelog`/`outputs.check`/`doc` | 每条规则各写一遍 | **按 `group` 从 `facts.yaml` 的 `rule_meta` 派生**，偏离时才显式写。每条规则顶层字段 17 → 10 |
-| `_run_rules` 的判定顺序 | 不适用声明 → 轴 → 依赖 | **轴先判**（"这台机器根本不适用"仍静默），再判 `skip` 映射；compute 失败后再判一轮（`no_data`）。— **2026-09-18 起**：轴 → `topics` → ran → compute，没有第二轮了 |
+| 改了什么                                                                           | 前                                                              | 后                                                                                                                                                                                           |
+| ---------------------------------------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `compute`                                                                          | 算子节点链 `- {out: x, from: a.b, op: max}`，构建期编译成表达式 | **直接写表达式** `- x = max(a.b)`；节点写法已从构建期移除（写了会报错并提示改写）。85 个节点 → 70 条表达式                                                                                   |
+| `requires` / `not_applicable` / `silent_when` / `skip_reason_no_data`              | 四个字段各管一摊                                                | 合成 **一个 `skip` 列表** `[{when: 表达式, reason?: 文案}]`（**不写 `reason` = 静默**）；"数据不足"靠新增内置变量 `no_data` 表达。— **2026-09-18 起 `skip` 与 `no_data` 都已退役**，见上一节 |
+| `firmware` / `airframe`                                                            | `any` ｜ `">=1.15"` ｜ `fixed_wing` 这类自造小语言              | **Python 表达式**（`"True"` / `"is_fixed_wing"`），在 compute 之前求值、只认内置变量                                                                                                         |
+| `slot`                                                                             | 槽位（技术隐喻）                                                | **`group`**；`facts.yaml` 的 `slot_order` → `group_order`，`nav_groups` → `nav_state_groups`（消歧义）                                                                                       |
+| `version`/`category`/`status`/`author`/`license`/`changelog`/`outputs.check`/`doc` | 每条规则各写一遍                                                | **按 `group` 从 `facts.yaml` 的 `rule_meta` 派生**，偏离时才显式写。每条规则顶层字段 17 → 10                                                                                                 |
+| `_run_rules` 的判定顺序                                                            | 不适用声明 → 轴 → 依赖                                          | **轴先判**（"这台机器根本不适用"仍静默），再判 `skip` 映射；compute 失败后再判一轮（`no_data`）。— **2026-09-18 起**：轴 → `topics` → ran → compute，没有第二轮了                            |
 
 验证口径没变：以上每一步都要求 `compare_baseline.py` 6 条日志逐字段一致，外加一次
 "派生的 `category/version/status/license/author/outputs.check/doc` 与改动前逐条相同"的核对
@@ -177,12 +177,12 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 规则头部从"两个平铺的轴 + 一坨 `skip`"改成一个 `conditions` 块（`rules-template.yml` 是骨架）：
 
 ```yaml
-conditions:                       # 整块可省
-  firmware: any                   # any / ">=1.15" / ">=1.14,<1.15"；省 = any
-  airframe: any                   # any / 机架名 / 机架名列表；省 = any
-  topics:                         # 项内 `||` = 其中任意一个在日志里就够，项间 = 都要有
+conditions: # 整块可省
+  firmware: any # any / ">=1.15" / ">=1.14,<1.15"；省 = any
+  airframe: any # any / 机架名 / 机架名列表；省 = any
+  topics: # 项内 `||` = 其中任意一个在日志里就够，项间 = 都要有
     - vehicle_gps_position || sensor_gps
-  precheck:                       # 先决条件：命中即不跑（文案就是命中的那句）
+  precheck: # 先决条件：命中即不跑（文案就是命中的那句）
     - "not HAS_ARMED"
 ```
 
@@ -235,11 +235,11 @@ conditions:                       # 整块可省
 目标流程写死为 **conditions 拦 → compute 算 → 判定**，前两步的失败一律**自动留痕**、
 不用作者写文案：
 
-| 步骤 | 不满足时 |
-| --- | --- |
+| 步骤                                            | 不满足时                                                   |
+| ----------------------------------------------- | ---------------------------------------------------------- |
 | `conditions.firmware` / `airframe` / `precheck` | **记一条 skipped + 自动文案**（原先静默，2026-09-18 起改） |
-| `conditions.topics` | 记一条 skipped，文案自动生成（`X not in log`） |
-| **compute 抛异常** | **记一条 skipped：`数据不足，本条没算出结论`** |
+| `conditions.topics`                             | 记一条 skipped，文案自动生成（`X not in log`）             |
+| **compute 抛异常**                              | **记一条 skipped：`数据不足，本条没算出结论`**             |
 
 - 因此 **`ran()` 统一挪到 compute 成功之后**——同一条 check 不能既 ran 又 skipped。
   `ran_on_success` 字段**已删**（它想要的就是这个行为，现在成了默认）；`ran_when` 保留
@@ -328,15 +328,15 @@ conditions:                       # 整块可省
 
 **与设计的落地差异**（都是有原因的选择，不是遗漏）：
 
-| 设计 | 实际做法 | 为什么 |
-| --- | --- | --- |
-| 一条经验一个 YAML | 一个 YAML 可装**多条**经验（顶层数组）；failsafe 的 6 条同构经验合并为一个文件 | 5 个布尔字段的失效保护经验只差字段/标签/文案，拆 6 个文件纯属噪音；一般情况仍一经验一文件 |
-| compute 用细粒度算子串起来 | 允许**复合算子**（多入多出），如 `att_tracking_stats`（对齐+掩码+统计）、`gyro_bias_series`（双固件取源）、`cell_voltage_min`（实测/回退/缺失三分支） | 30~40 个节点串成的链读不下去；把"取数→对齐→掩码→统计"这类固定套路收成一个算子后，姿态那条 30→4、陀螺零偏 41→6、全库平均 2.6 节点/条。算子仍**不认识具体字段**：字段名、阈值、文案都在 YAML |
-| `phase` 作为第三个适用轴 | 未启用 | 原实现里 phase 只参与故障库匹配，规则并未按阶段过滤；等真需要（例如只对大机动段判某条）再启用 |
-| `guards/*.yaml` 独立目录 | 放在 `rules/`，用 `slot: guards_early` / `guards` | 同一套 schema、同一套校验；分两级是因为 `insufficient_data` 必须是第一个 guard 标签 |
-| `min_samples`/`confidence`/`safety`/`thresholds_source`/`calibration`/`fixtures` | 暂未启用 | 本阶段验收标准是"等价迁移"；这些是校准期与规则市场期的字段 |
-| `meta/<tag>.json` 参与构建期字段校验 | **尚未接入（已知缺口）** | 现在字段名拼错不会构建失败，而是运行期取到 `None` → 该经验静默不生效（不崩，但也没有任何告警）。接入时要注意版本差异：`accel_clipping` 只存在于旧固件，不能按"必须存在于最新 tag"来判 |
-| 设计中未提及 `instance` | 新增 `instance: N` 取单个实例 | 原实现大量 `xxx_list[0]`；而默认的多实例拼接会改变语义——`estimator_sensor_bias` 每个 IMU 一个实例，拼接后样本 43→129，零偏统计直接算错 |
+| 设计                                                                             | 实际做法                                                                                                                                              | 为什么                                                                                                                                                                                     |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 一条经验一个 YAML                                                                | 一个 YAML 可装**多条**经验（顶层数组）；failsafe 的 6 条同构经验合并为一个文件                                                                        | 5 个布尔字段的失效保护经验只差字段/标签/文案，拆 6 个文件纯属噪音；一般情况仍一经验一文件                                                                                                  |
+| compute 用细粒度算子串起来                                                       | 允许**复合算子**（多入多出），如 `att_tracking_stats`（对齐+掩码+统计）、`gyro_bias_series`（双固件取源）、`cell_voltage_min`（实测/回退/缺失三分支） | 30~40 个节点串成的链读不下去；把"取数→对齐→掩码→统计"这类固定套路收成一个算子后，姿态那条 30→4、陀螺零偏 41→6、全库平均 2.6 节点/条。算子仍**不认识具体字段**：字段名、阈值、文案都在 YAML |
+| `phase` 作为第三个适用轴                                                         | 未启用                                                                                                                                                | 原实现里 phase 只参与故障库匹配，规则并未按阶段过滤；等真需要（例如只对大机动段判某条）再启用                                                                                              |
+| `guards/*.yaml` 独立目录                                                         | 放在 `rules/`，用 `slot: guards_early` / `guards`                                                                                                     | 同一套 schema、同一套校验；分两级是因为 `insufficient_data` 必须是第一个 guard 标签                                                                                                        |
+| `min_samples`/`confidence`/`safety`/`thresholds_source`/`calibration`/`fixtures` | 暂未启用                                                                                                                                              | 本阶段验收标准是"等价迁移"；这些是校准期与规则市场期的字段                                                                                                                                 |
+| `meta/<tag>.json` 参与构建期字段校验                                             | **尚未接入（已知缺口）**                                                                                                                              | 现在字段名拼错不会构建失败，而是运行期取到 `None` → 该经验静默不生效（不崩，但也没有任何告警）。接入时要注意版本差异：`accel_clipping` 只存在于旧固件，不能按"必须存在于最新 tag"来判      |
+| 设计中未提及 `instance`                                                          | 新增 `instance: N` 取单个实例                                                                                                                         | 原实现大量 `xxx_list[0]`；而默认的多实例拼接会改变语义——`estimator_sensor_bias` 每个 IMU 一个实例，拼接后样本 43→129，零偏统计直接算错                                                     |
 
 **已知的次要行为差异**（都不在基线覆盖范围内，已在对应经验文件里注释标明）：
 
@@ -372,7 +372,7 @@ w_p95 = percentile(hypot(ref("estimator_wind.windspeed_north", "wind_estimate.wi
 **一份预设 = `conditions` + `compute` + `outputs[]`**，取数一律走 `ref(...)`：
 
 - **曲线也走 `ref`**：`np_series` 从"收 topic + 列名"改成**收整份取数声明**（`{instance, xdata,
-  ydata, compute}`），引擎侧求值、单位换算、降采样都在引擎里做——这才叫"前端不画数学"。
+ydata, compute}`），引擎侧求值、单位换算、降采样都在引擎里做——这才叫"前端不画数学"。
   返回的 `series` 与 `ydata` **同序等长**（取不到的那项是 `null`），前端按预设里写好的
   label/color 逐项对齐即可，不用靠字段名反查。
 - **`_ref` 抽出 `_pick_ref`**：候选循环同一份实现，`_pick_ref` 多回传一个"命中的 bare 字段名"。
@@ -422,10 +422,10 @@ w_p95 = percentile(hypot(ref("estimator_wind.windspeed_north", "wind_estimate.wi
 一个必须记住的现实：**同一物理量在不同固件下可能是不同的 topic（不是改名），也可能真的是改名**。
 两类都要处理，且不能凭名字相似去猜：
 
-| 情形 | 例子 | 处理 |
-| --- | --- | --- |
+| 情形                                 | 例子                                                                                       | 处理                                                                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
 | **不同 topic，语义不同**（同时存在） | `sensor_gps`（GPS 原始数据）与 `vehicle_gps_position`（融合/处理后的位置）是两个不同的东西 | 规则要明确读哪一个：GPS 跳变判定取**处理后的位置**（飞控实际用的），原始数据的野值由 GPS 模块自己过滤 |
-| **真改名**（同义不同名/不同单位） | `lat`/`lon`（旧，1e7 度）→ `latitude_deg`/`longitude_deg`（1.15+，度） | 节点级 `when_fw` 分流 + 单位口径写在算子参数上（如 `adjacent_speed_mps` 的 `unit: degE7` / `deg`） |
+| **真改名**（同义不同名/不同单位）    | `lat`/`lon`（旧，1e7 度）→ `latitude_deg`/`longitude_deg`（1.15+，度）                     | 节点级 `when_fw` 分流 + 单位口径写在算子参数上（如 `adjacent_speed_mps` 的 `unit: degE7` / `deg`）    |
 
 字典（`meta/<tag>.json`）按上游 `.msg` **文件名**收录，与日志里的 topic 名并非一一对应，
 所以字段校验以**回归日志实测字段**为主要判据、字典为辅。若将来要以字典为硬判据，
@@ -447,29 +447,29 @@ w_p95 = percentile(hypot(ref("estimator_wind.windspeed_north", "wind_estimate.wi
 > 这一层的产出（`np_manifest` / `np_series` / `np_track` / `np_log_info`）直接决定报告页每个 tab 长什么样。
 > 下面每一条都是**实机日志逼出来的**，改之前先看一遍，别按"想当然"改回去。
 
-| 规则 | 为什么 |
-| --- | --- |
-| **时间基准 = 开机以来的秒数**（`_since_boot`，就是 `t/1e6`） | PX4 时间戳本身就是开机起的微秒。曾经减过 `ulog.start_timestamp`（= 开始记录的时刻，通常比开机晚几秒到几分钟），于是同一份日志在本站与 Flight Review 上整体差出那一段——FR 的 Logged Messages 和曲线横轴用的都是开机时间（`plotted_tables.time_str` 直接除 timestamp） |
-| **事件消息 = 事件解码 + 文本消息，合成一条时间轴**（`kind` 区分 `event`/`log`） | PX4 对同一个事件写两样：`event` topic（二进制）**加**一条等价的旧格式文本（**以 `\t` 结尾**，如 `[commander] Armed by Stick gesture\t`）。FR 的做法是跳过 `\t` 行、改用解码出来的文字。我们用 pyulog 的 `PX4Events`，定义取自**日志自带的 `metadata_events`**（那个 xz blob 就是这份固件的事件定义）——不联网、与固件版本严格对应；解不出的 ID 显示 `[Unknown event with ID N]`（与 FR 一致） |
-| 固件**没带** `metadata_events` 时**保留** `\t` 行 | 否则 armed / takeoff 这类关键节点会凭空消失。判据是"这次解出事件了吗"，不是"FR 怎么做" |
-| `lzma` 是 Pyodide 的**可加载包**（不是内置模块），单独 `loadPackage` 且**允许失败** | 拿不到就退化成"不解码事件"，不能因为它把整个解析挡在门外 |
-| 多值信息（'M'）组内怎么拼，看**形态**：任一段自带换行 → 直接拼接；否则用 `\n` 连接 | 逐行型（`perf_counter_*`、`perf_top_*`）每段是一行完整文本、PX4 不给行尾换行，不补 `\n` 就全黏成一行；流式型（`boot_console_output`）是一整段控制台文本按定长切片、换行在段**内部**且一行可能跨段，补 `\n` 会凭空断行。整组都是原始字节的（`metadata_events`）只报总字节数 |
-| 消息类型统计**逐字节走文件**（`[uint16 长度][uint8 类型]`），不读 pyulog 的解析结果 | 要回答的是"文件里究竟有多少条"，顺带当**文件是否被截断**的旁证（走不到 EOF 就是不完整）。可与 pyulog 交叉验证：`L` = `logged_messages`、`D` = 各话题采样点数之和、`S` = `_sync_seq_cnt` |
-| Information Message 字典带**中文名与说明**，取 `facts.yaml` 的 `info_key_docs` | 上游没有这份对照表（PX4 只在源码里写死这些 key）。表里没有的键留空——**不猜、不编** |
-| 参数「默认值」靠 **'Q' 消息的语义**推出来，不依赖外部字典 | PX4 只记录**与当前值不同**的默认值（`logger.cpp: write_parameter_defaults`）→ 没记录就说明当前值等于默认值。于是每一行都能给出具体数字，不需要"一致 / 已改"这类占位文字。取法：机架默认 → 固件默认 → 当前值 |
-| 参数「最小值 / 最大值 / 说明」来自 `knowledge/px4/meta/main.json` → `web/public/params/px4-main.json`（按需拉取，175 KB / gzip 33 KB） | 上游**只有 main 分支**产出 `parameters.json`（release tag 没有，见 `meta/v1.15.0.json` 的 `parametersNote`），所以这是"最新分支快照"，与老固件可能有出入——界面必须如实标注来源。放 `public/` 而不是内联进 Pyodide：这份字典与具体日志无关，内联等于每份日志都要多下它一遍 |
+| 规则                                                                                                                                   | 为什么                                                                                                                                                                                                                                                                                                                                                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **时间基准 = 开机以来的秒数**（`_since_boot`，就是 `t/1e6`）                                                                           | PX4 时间戳本身就是开机起的微秒。曾经减过 `ulog.start_timestamp`（= 开始记录的时刻，通常比开机晚几秒到几分钟），于是同一份日志在本站与 Flight Review 上整体差出那一段——FR 的 Logged Messages 和曲线横轴用的都是开机时间（`plotted_tables.time_str` 直接除 timestamp）                                                                                                                         |
+| **事件消息 = 事件解码 + 文本消息，合成一条时间轴**（`kind` 区分 `event`/`log`）                                                        | PX4 对同一个事件写两样：`event` topic（二进制）**加**一条等价的旧格式文本（**以 `\t` 结尾**，如 `[commander] Armed by Stick gesture\t`）。FR 的做法是跳过 `\t` 行、改用解码出来的文字。我们用 pyulog 的 `PX4Events`，定义取自**日志自带的 `metadata_events`**（那个 xz blob 就是这份固件的事件定义）——不联网、与固件版本严格对应；解不出的 ID 显示 `[Unknown event with ID N]`（与 FR 一致） |
+| 固件**没带** `metadata_events` 时**保留** `\t` 行                                                                                      | 否则 armed / takeoff 这类关键节点会凭空消失。判据是"这次解出事件了吗"，不是"FR 怎么做"                                                                                                                                                                                                                                                                                                       |
+| `lzma` 是 Pyodide 的**可加载包**（不是内置模块），单独 `loadPackage` 且**允许失败**                                                    | 拿不到就退化成"不解码事件"，不能因为它把整个解析挡在门外                                                                                                                                                                                                                                                                                                                                     |
+| 多值信息（'M'）组内怎么拼，看**形态**：任一段自带换行 → 直接拼接；否则用 `\n` 连接                                                     | 逐行型（`perf_counter_*`、`perf_top_*`）每段是一行完整文本、PX4 不给行尾换行，不补 `\n` 就全黏成一行；流式型（`boot_console_output`）是一整段控制台文本按定长切片、换行在段**内部**且一行可能跨段，补 `\n` 会凭空断行。整组都是原始字节的（`metadata_events`）只报总字节数                                                                                                                   |
+| 消息类型统计**逐字节走文件**（`[uint16 长度][uint8 类型]`），不读 pyulog 的解析结果                                                    | 要回答的是"文件里究竟有多少条"，顺带当**文件是否被截断**的旁证（走不到 EOF 就是不完整）。可与 pyulog 交叉验证：`L` = `logged_messages`、`D` = 各话题采样点数之和、`S` = `_sync_seq_cnt`                                                                                                                                                                                                      |
+| Information Message 字典带**中文名与说明**，取 `facts.yaml` 的 `info_key_docs`                                                         | 上游没有这份对照表（PX4 只在源码里写死这些 key）。表里没有的键留空——**不猜、不编**                                                                                                                                                                                                                                                                                                           |
+| 参数「默认值」靠 **'Q' 消息的语义**推出来，不依赖外部字典                                                                              | PX4 只记录**与当前值不同**的默认值（`logger.cpp: write_parameter_defaults`）→ 没记录就说明当前值等于默认值。于是每一行都能给出具体数字，不需要"一致 / 已改"这类占位文字。取法：机架默认 → 固件默认 → 当前值                                                                                                                                                                                  |
+| 参数「最小值 / 最大值 / 说明」来自 `knowledge/px4/meta/main.json` → `web/public/params/px4-main.json`（按需拉取，175 KB / gzip 33 KB） | 上游**只有 main 分支**产出 `parameters.json`（release tag 没有，见 `meta/v1.15.0.json` 的 `parametersNote`），所以这是"最新分支快照"，与老固件可能有出入——界面必须如实标注来源。放 `public/` 而不是内联进 Pyodide：这份字典与具体日志无关，内联等于每份日志都要多下它一遍                                                                                                                    |
 
 ### 「软件版本」的展示口径（`engine/rule_engine.py` 的 `facts.firmwareDisplay`）
 
 **照抄 FR 的 `_format_sw_version`**（`app/tornado_handlers/browse.py`，2026-09-16 从 upstream main 取回源码核过）。
 类型码 = `ver_sw_release & 0xFF`：
 
-| 类型码 | 展示 | 例 |
-| --- | --- | --- |
-| 255 正式版 | `vX.Y.Z`（无后缀、无哈希） | `v1.16.0` |
-| 64 / 128 / 192 alpha / beta / RC | `vX.Y.Z-alpha` 等（**带后缀、不带哈希**） | `v1.17.0-alpha` |
-| 0 未打标签的开发版 | `vX.Y.Z (短哈希)` | `v1.14.3 (08310a)` |
-| 无 `ver_sw_release`（老固件） | git 短哈希（`> 10` 位才截 6 位） | `fd4833` |
+| 类型码                           | 展示                                      | 例                 |
+| -------------------------------- | ----------------------------------------- | ------------------ |
+| 255 正式版                       | `vX.Y.Z`（无后缀、无哈希）                | `v1.16.0`          |
+| 64 / 128 / 192 alpha / beta / RC | `vX.Y.Z-alpha` 等（**带后缀、不带哈希**） | `v1.17.0-alpha`    |
+| 0 未打标签的开发版               | `vX.Y.Z (短哈希)`                         | `v1.14.3 (08310a)` |
+| 无 `ver_sw_release`（老固件）    | git 短哈希（`> 10` 位才截 6 位）          | `fd4833`           |
 
 **踩过的坑**：本机 `PX4-flight_review` 那份 checkout 是 2024-03 的，那会儿 browse.py 还只认正式版
 （`if release_type == 255` 才换发布号，其余一律给哈希）。照它改完，`v1.15.0 (479ee0)` 被改成 `479ee0`，
@@ -503,12 +503,12 @@ w_p95 = percentile(hypot(ref("estimator_wind.windspeed_north", "wind_estimate.wi
 
 工程师的经验不能整段丢给模型；按性质拆四类、各归其位，Agent 只负责检索 / 组装 / 翻译：
 
-| 经验类型 | 载体 | 谁执行 |
-| --- | --- | --- |
-| ① 量化阈值（振动多大算异常） | `rules/*.yaml` 的 `compute` + `triggers[].threshold` | 确定性引擎判定，产出标签 |
-| ② 故障树（多条件耦合、排查优先级、禁忌） | `fault-kb.yaml` 条目（字段定义见该文件头注释） | 引擎按 标签 / 阶段 / 排除标签 匹配，只把命中条目喂 LLM |
-| ③ 推理逻辑（工程师怎么想） | `llm/gjb841-system-prompt.md` | LLM 遵守 |
-| ④ 边界 / 禁忌（什么情况下不许下结论） | `rules/*.yaml` 的 `outputs.guard_tags` → guard 标签（如 `insufficient_data`） | 引擎先拦（命中即可短路），Prompt 兜底 |
+| 经验类型                                 | 载体                                                                          | 谁执行                                                 |
+| ---------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------ |
+| ① 量化阈值（振动多大算异常）             | `rules/*.yaml` 的 `compute` + `triggers[].threshold`                          | 确定性引擎判定，产出标签                               |
+| ② 故障树（多条件耦合、排查优先级、禁忌） | `fault-kb.yaml` 条目（字段定义见该文件头注释）                                | 引擎按 标签 / 阶段 / 排除标签 匹配，只把命中条目喂 LLM |
+| ③ 推理逻辑（工程师怎么想）               | `llm/gjb841-system-prompt.md`                                                 | LLM 遵守                                               |
+| ④ 边界 / 禁忌（什么情况下不许下结论）    | `rules/*.yaml` 的 `outputs.guard_tags` → guard 标签（如 `insufficient_data`） | 引擎先拦（命中即可短路），Prompt 兜底                  |
 
 "我这块经验该写成什么"按这张表判断；"我想做 X 去看哪个文件"见 `../README.md` 的导航表。
 
@@ -623,27 +623,27 @@ for rule in RULES + GUARDS:
 
 ### 第 1 层：身份与归属 —— 让经验可被引用、归属、分发
 
-| 字段 | 为什么必须有 |
-| --- | --- |
-| `id` | 稳定标识，即 `finding.ruleId`，被故障库 / 白名单 / 报告引用 |
-| `name` | 人读的名字 |
-| `version` | 经验自身版本；规则市场分发与更新需要 |
-| `category` | 分类（vibration/power/ekf/gps…），UI 分组与筛选 |
-| `status` | `draft`/`experimental`/`stable`/`deprecated`；新经验先观察期，可灰度 |
-| `author` | 分成主体（70/30 必须有署名与收款对象） |
-| `license` | CLAUDE.md 版权红线：只收录宽松许可 |
-| `changelog` | 经验演进史；改阈值要留痕 |
+| 字段        | 为什么必须有                                                         |
+| ----------- | -------------------------------------------------------------------- |
+| `id`        | 稳定标识，即 `finding.ruleId`，被故障库 / 白名单 / 报告引用          |
+| `name`      | 人读的名字                                                           |
+| `version`   | 经验自身版本；规则市场分发与更新需要                                 |
+| `category`  | 分类（vibration/power/ekf/gps…），UI 分组与筛选                      |
+| `status`    | `draft`/`experimental`/`stable`/`deprecated`；新经验先观察期，可灰度 |
+| `author`    | 分成主体（70/30 必须有署名与收款对象）                               |
+| `license`   | CLAUDE.md 版权红线：只收录宽松许可                                   |
+| `changelog` | 经验演进史；改阈值要留痕                                             |
 
 ### 第 2 层：适用范围 —— 比「固件 + 机架」更细的边界
 
-| 字段 | 为什么必须有 |
-| --- | --- |
-| `firmware` | 适用固件（`any` \| `">=1.15"` \| `"<1.15"` \| `">=1.14,<1.15"`） |
-| `airframe` | 适用机架（`any` \| `[rotary_wing, fixed_wing, vtol, rover]`） |
-| `phase` | 只在某些飞行阶段判定（与 `firmware`/`airframe` 并列的第三个适用轴）。节点级的 `scope.phase` 同名：同一个概念、更窄的作用域 |
-| `min_samples` | 样本不足不出结论，抗小样本误报 |
-| `requires` | **数据依赖**：缺哪些 topic/字段就 `skipped`。这是现在命令式 `skipped()` 的声明式版本——声明出来后不会再漏 |
-| `excludes_if` | **反向证据**：命中这些标签/条件时本条失效。故障库已有 `exclude_tags`，经验层一直缺 |
+| 字段          | 为什么必须有                                                                                                               |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `firmware`    | 适用固件（`any` \| `">=1.15"` \| `"<1.15"` \| `">=1.14,<1.15"`）                                                           |
+| `airframe`    | 适用机架（`any` \| `[rotary_wing, fixed_wing, vtol, rover]`）                                                              |
+| `phase`       | 只在某些飞行阶段判定（与 `firmware`/`airframe` 并列的第三个适用轴）。节点级的 `scope.phase` 同名：同一个概念、更窄的作用域 |
+| `min_samples` | 样本不足不出结论，抗小样本误报                                                                                             |
+| `requires`    | **数据依赖**：缺哪些 topic/字段就 `skipped`。这是现在命令式 `skipped()` 的声明式版本——声明出来后不会再漏                   |
+| `excludes_if` | **反向证据**：命中这些标签/条件时本条失效。故障库已有 `exclude_tags`，经验层一直缺                                         |
 
 ### 第 3 层：计算（数据流）—— 支持多输入 / 多输出 / 可串联
 
@@ -655,24 +655,37 @@ for rule in RULES + GUARDS:
 ```yaml
 compute:
   # ① 单字段 → 单变量（最常见，短写法）
-  - {out: vibe, from: vehicle_imu_status.accel_vibration_metric, op: mean, per_instance: worst}
+  - { out: vibe, from: vehicle_imu_status.accel_vibration_metric, op: mean, per_instance: worst }
 
   # ② 多字段 → 一个向量变量
-  - {out: q_att, from: [vehicle_attitude.q_0, vehicle_attitude.q_1,
-                        vehicle_attitude.q_2, vehicle_attitude.q_3], op: read}
+  - {
+      out: q_att,
+      from: [vehicle_attitude.q_0, vehicle_attitude.q_1, vehicle_attitude.q_2, vehicle_attitude.q_3],
+
+      op: read,
+    }
 
   # ③ 多输入 → 多输出：四元数 → 欧拉角（4 进 3 出）
-  - {op: quat_to_euler, in: [q_att], out: [roll_deg, pitch_deg, yaw_deg], unit: "°"}
+  - { op: quat_to_euler, in: [q_att], out: [roll_deg, pitch_deg, yaw_deg], unit: "°" }
 
   # ④ 跨 topic 联合输入 → 单输出（姿态指令也是四元数，同一算子复用）
-  - {out: q_sp, from: [vehicle_attitude_setpoint.q_d_0, vehicle_attitude_setpoint.q_d_1,
-                       vehicle_attitude_setpoint.q_d_2, vehicle_attitude_setpoint.q_d_3], op: read}
-  - {op: quat_to_euler, in: [q_sp], out: [roll_sp, pitch_sp, yaw_sp], unit: "°"}
-  - {op: angle_diff_deg, in: [pitch_deg, pitch_sp], out: pitch_err, unit: "°"}
+  - {
+      out: q_sp,
+      from:
+        [
+          vehicle_attitude_setpoint.q_d_0,
+          vehicle_attitude_setpoint.q_d_1,
+          vehicle_attitude_setpoint.q_d_2,
+          vehicle_attitude_setpoint.q_d_3,
+        ],
+      op: read,
+    }
+  - { op: quat_to_euler, in: [q_sp], out: [roll_sp, pitch_sp, yaw_sp], unit: "°" }
+  - { op: angle_diff_deg, in: [pitch_deg, pitch_sp], out: pitch_err, unit: "°" }
 
   # ⑤ 串联：对上一步的输出做时序统计（带作用域）
-  - {op: p99, in: [pitch_err], out: p99_err, scope: {when: "armed and phase == 'maneuver'"}}
-  - {op: zero_cross_hz, in: [pitch_err], out: osc_hz, scope: {when: "armed and phase == 'maneuver'"}}
+  - { op: p99, in: [pitch_err], out: p99_err, scope: { when: "armed and phase == 'maneuver'" } }
+  - { op: zero_cross_hz, in: [pitch_err], out: osc_hz, scope: { when: "armed and phase == 'maneuver'" } }
 
 triggers:
   - expr: "p99_err >= 30 or (p99_err >= 15 and osc_hz >= 4)"
@@ -702,6 +715,7 @@ triggers:
 
   规则里写成 `in: [q_att], out: [...]` 而算子声明是 `in_arity=1` 对不上 → `pnpm build:kb` 直接失败。
   **多输入/多输出不会被写成隐式约定，而是被签名强制校验。**
+
 - `out` 命名的变量在报告里可作为**中间量追溯**（校准阈值时能看到"欧拉角算出来是多少"），
   这也是调试一条经验是否正确的抓手。
 - **`scope` 只有一种写法**：`when: "<样本级表达式>"` + 窗口参数（`skip_first_s` / `tail_frac`），
@@ -713,13 +727,13 @@ triggers:
 
 ```yaml
 triggers:
-  - expr: "vibe >= 9.81"          # 满足表达式即触发
-    severity: critical            # critical | warning | info
-    confidence: high              # high | medium | low —— 报告里区分"确诊/疑似"
+  - expr: "vibe >= 9.81" # 满足表达式即触发
+    severity: critical # critical | warning | info
+    confidence: high # high | medium | low —— 报告里区分"确诊/疑似"
     title: "高频振动严重超标（IMU #{instance}）"
     suggestion: "..."
     next_action: "落地后先做桨叶目视与电机手感检查，再复飞"
-    safety: "未排查振动前禁止继续大机动"      # 安全约束（CLAUDE.md 红线：不给致炸机建议）
+    safety: "未排查振动前禁止继续大机动" # 安全约束（CLAUDE.md 红线：不给致炸机建议）
 ```
 
 `confidence` 与 `safety` 是现在完全没有的：报告里所有结论长得一样严重，
@@ -729,12 +743,12 @@ triggers:
 
 ```yaml
 emit:
-  fault_tags: [high_vibration]    # 喂故障库的异常标签
-  related_faults: [F001]          # 经验 ↔ 故障模式双向可查
+  fault_tags: [high_vibration] # 喂故障库的异常标签
+  related_faults: [F001] # 经验 ↔ 故障模式双向可查
   doc: https://docs.px4.io/...
   field_text: "vehicle_imu_status.accel_vibration_metric(均值)"
-  stats_keys: [imuAccelVibrationMean]   # 写入 stats 的键（UI 表格靠它）
-  llm_hint: "振动是机械问题的强指示；先排除机械再怀疑参数"   # 给 LLM 的解释要点
+  stats_keys: [imuAccelVibrationMean] # 写入 stats 的键（UI 表格靠它）
+  llm_hint: "振动是机械问题的强指示；先排除机械再怀疑参数" # 给 LLM 的解释要点
 ```
 
 `stats_keys` 现在是散在代码里的 `stats[...] = ...`，声明出来后 UI 与报告才知道画什么；
@@ -744,13 +758,13 @@ emit:
 
 ```yaml
 thresholds_source:
-  vibe_warn: {kind: documented, ref: "Flight Review 色带 0.5g", value: 4.905}
-  clip_warn: {kind: provisional, samples: 5}
-  cell_crit: {kind: calibrated, samples: 12, ref: "2026-09 校准批次"}
+  vibe_warn: { kind: documented, ref: "Flight Review 色带 0.5g", value: 4.905 }
+  clip_warn: { kind: provisional, samples: 5 }
+  cell_crit: { kind: calibrated, samples: 12, ref: "2026-09 校准批次" }
 calibration:
-  status: provisional             # provisional | calibrated
+  status: provisional # provisional | calibrated
   sample_size: 5
-  false_positive_rate: null       # 冲刺目标 <10%，这里变成可度量字段
+  false_positive_rate: null # 冲刺目标 <10%，这里变成可度量字段
   last_calibrated_at: 2026-09-14
 ```
 
@@ -762,9 +776,9 @@ calibration:
 ```yaml
 fixtures:
   positive:
-    - {log: tools/calibrate/logs/39f26cce-*.ulg, expect: {severity: warning, fault_tags: [high_vibration]}}
+    - { log: tools/calibrate/logs/39f26cce-*.ulg, expect: { severity: warning, fault_tags: [high_vibration] } }
   negative:
-    - {log: tools/calibrate/logs/95b077d9-*.ulg}
+    - { log: tools/calibrate/logs/95b077d9-*.ulg }
 ```
 
 没有这一层，第三方的规则无法被验证，70/30 分成也就无从谈起；
@@ -785,10 +799,10 @@ name: 高频振动 / IMU 削波
 version: 1.3.0
 category: vibration
 status: stable
-author: {name: NextPilot 内置}
+author: { name: NextPilot 内置 }
 license: CC-BY-4.0
 changelog:
-  - {version: 1.3.0, date: 2026-09-14, note: "削波阈值按 5 份真实日志校准"}
+  - { version: 1.3.0, date: 2026-09-14, note: "削波阈值按 5 份真实日志校准" }
 
 firmware: ">=1.14"
 airframe: any
@@ -800,15 +814,31 @@ excludes_if:
   tags: [collision_detected]
 
 compute:
-  - {out: vibe, from: vehicle_imu_status.accel_vibration_metric, op: mean,
-     per_instance: worst, unit: m/s^2,
-     fallback: {from: [vehicle_imu_status.stddev_accel_x_m_s2,
-                       vehicle_imu_status.stddev_accel_y_m_s2,
-                       vehicle_imu_status.stddev_accel_z_m_s2], op: rss_mean}}
-  - {out: clip, from: [vehicle_imu_status.accel_clipping_0,
-                       vehicle_imu_status.accel_clipping_1,
-                       vehicle_imu_status.accel_clipping_2],
-     op: delta_last_first, per_instance: worst, unit: count}
+  - {
+      out: vibe,
+      from: vehicle_imu_status.accel_vibration_metric,
+      op: mean,
+      per_instance: worst,
+      unit: m/s^2,
+      fallback:
+        {
+          from:
+            [
+              vehicle_imu_status.stddev_accel_x_m_s2,
+              vehicle_imu_status.stddev_accel_y_m_s2,
+              vehicle_imu_status.stddev_accel_z_m_s2,
+            ],
+          op: rss_mean,
+        },
+    }
+  - {
+      out: clip,
+      from:
+        [vehicle_imu_status.accel_clipping_0, vehicle_imu_status.accel_clipping_1, vehicle_imu_status.accel_clipping_2],
+      op: delta_last_first,
+      per_instance: worst,
+      unit: count,
+    }
 
 triggers:
   - expr: "vibe >= 9.81"
@@ -841,10 +871,10 @@ emit:
   llm_hint: "振动是机械问题的强指示；先排除机械再怀疑参数"
 
 thresholds_source:
-  vibe_warn: {kind: documented, ref: "Flight Review 色带 0.5g", value: 4.905}
-  vibe_crit: {kind: documented, ref: "Flight Review 色带 1g", value: 9.81}
-  clip_warn: {kind: provisional, samples: 5}
-  clip_crit: {kind: provisional, samples: 5}
+  vibe_warn: { kind: documented, ref: "Flight Review 色带 0.5g", value: 4.905 }
+  vibe_crit: { kind: documented, ref: "Flight Review 色带 1g", value: 9.81 }
+  clip_warn: { kind: provisional, samples: 5 }
+  clip_crit: { kind: provisional, samples: 5 }
 calibration:
   status: provisional
   sample_size: 5
@@ -853,10 +883,12 @@ calibration:
 
 fixtures:
   positive:
-    - {log: tools/calibrate/logs/39f26cce-337a-4f83-a967-45352f6e1e82.ulg,
-       expect: {severity: warning, fault_tags: [high_vibration]}}
+    - {
+        log: tools/calibrate/logs/39f26cce-337a-4f83-a967-45352f6e1e82.ulg,
+        expect: { severity: warning, fault_tags: [high_vibration] },
+      }
   negative:
-    - {log: tools/calibrate/logs/95b077d9-d719-45ea-bf91-5926170cbc52.ulg}
+    - { log: tools/calibrate/logs/95b077d9-d719-45ea-bf91-5926170cbc52.ulg }
 ```
 
 **统一用 YAML**（经验、guard、字典同一格式，详见下方「格式结论」一节）。
@@ -877,25 +909,25 @@ fixtures:
 基础事实层已经算出来的量，规则里**直接引用**，不必写进 `compute`。
 但必须**分层**——样本级的量只能在逐样本求值处用，日志级的量才能在聚合后的 `triggers.expr` 里用：
 
-| 层级 | 用在哪 | 可用变量 |
-| --- | --- | --- |
-| **样本级**（逐样本求值） | `scope.when` / `filter` | `armed`（布尔）、`nav_state`、`timestamp`、`t_sec`（相对起点秒）、`phase`（该样本所处阶段）、`hagl` |
-| **日志级**（聚合后求值） | `triggers[].expr` / `requires` / `excludes_if` | 下列全部 |
-| **变量级** | `triggers[].expr` | `compute` 里 `out:` 声明的名字 |
+| 层级                     | 用在哪                                         | 可用变量                                                                                            |
+| ------------------------ | ---------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| **样本级**（逐样本求值） | `scope.when` / `filter`                        | `armed`（布尔）、`nav_state`、`timestamp`、`t_sec`（相对起点秒）、`phase`（该样本所处阶段）、`hagl` |
+| **日志级**（聚合后求值） | `triggers[].expr` / `requires` / `excludes_if` | 下列全部                                                                                            |
+| **变量级**               | `triggers[].expr`                              | `compute` 里 `out:` 声明的名字                                                                      |
 
 **日志级内置变量**：
 
-| 变量 | 含义 |
-| --- | --- |
-| `firmware` `fw_major` `fw_minor` `fw_profile` | 固件版本对象 / 主次版本号 / `px4-1.15+`\|`px4-legacy` |
-| `airframe` `vehicle_type` | 机架字符串（`rotary_wing`…）/ PX4 原始码（1/2/3/4） |
-| `is_rotary_wing` `is_fixed_wing` `is_vtol` `is_rover` | 布尔别名，比 `airframe == 'fixed_wing'` 好读 |
-| `duration_s` `armed_s` | 日志总时长 / armed 总时长（`armed_s` 现由 guard 用） |
-| `dropout_ms` `restart_detected` | 丢包总时长 / 是否中途重启 |
-| `phases` | 本次日志出现过的阶段集合（`'hover' in phases`） |
-| `hardware` `sys_name` | `ver_hw`（如 `PX4_FMU_V6X`）/ 飞控名 |
-| `tags` `guard_tags` | 已命中的异常标签 / 数据质量标签集合 |
-| `armed_intervals` | armed 区间列表（供 `in_armed()` 用） |
+| 变量                                                  | 含义                                                  |
+| ----------------------------------------------------- | ----------------------------------------------------- |
+| `firmware` `fw_major` `fw_minor` `fw_profile`         | 固件版本对象 / 主次版本号 / `px4-1.15+`\|`px4-legacy` |
+| `airframe` `vehicle_type`                             | 机架字符串（`rotary_wing`…）/ PX4 原始码（1/2/3/4）   |
+| `is_rotary_wing` `is_fixed_wing` `is_vtol` `is_rover` | 布尔别名，比 `airframe == 'fixed_wing'` 好读          |
+| `duration_s` `armed_s`                                | 日志总时长 / armed 总时长（`armed_s` 现由 guard 用）  |
+| `dropout_ms` `restart_detected`                       | 丢包总时长 / 是否中途重启                             |
+| `phases`                                              | 本次日志出现过的阶段集合（`'hover' in phases`）       |
+| `hardware` `sys_name`                                 | `ver_hw`（如 `PX4_FMU_V6X`）/ 飞控名                  |
+| `tags` `guard_tags`                                   | 已命中的异常标签 / 数据质量标签集合                   |
+| `armed_intervals`                                     | armed 区间列表（供 `in_armed()` 用）                  |
 
 **内置函数**（并入表达式白名单）：
 
@@ -904,24 +936,31 @@ fixtures:
 > `ref(...)`（带修饰的取数）与 `_try(...)`（容错求值）；样本级筛选由算子自己的参数承担
 > （如 `masked_any_in` / `active_window_mask` 收 `armed_intervals` 与 `codes`）。
 
-| 函数 | 用途 |
-| --- | --- |
-| `has_topic('vehicle_imu_status')` | 数据依赖判定（`requires` 亦可写成 `any_of: [...]`） |
-| `in_armed(t_sec)` | 某时刻是否处于 armed 区间 |
-| `phase_at(t_sec)` | 某时刻的飞行阶段 |
-| `count(x)` `len(x)` `abs/min/max/round` | 通用数学（白名单内，非任意调用） |
+| 函数                                    | 用途                                                |
+| --------------------------------------- | --------------------------------------------------- |
+| `has_topic('vehicle_imu_status')`       | 数据依赖判定（`requires` 亦可写成 `any_of: [...]`） |
+| `in_armed(t_sec)`                       | 某时刻是否处于 armed 区间                           |
+| `phase_at(t_sec)`                       | 某时刻的飞行阶段                                    |
+| `count(x)` `len(x)` `abs/min/max/round` | 通用数学（白名单内，非任意调用）                    |
 
 **实际写法**（把现在命令式的 armed 掩码 / 阶段筛选收口）：
 
 ```yaml
 compute:
-  - {out: spread, from: actuator_motors.control_0..11, op: masked_spread,
-     scope: {when: "armed and nav_state in hover_ish"},   # ← 直接引用内置变量
-     min_channels: 4}
-  - {out: sag, from: battery_status.voltage_cell_v, op: head_tail_median_diff,
-     scope: {when: "armed", skip_first_s: 5}}
-  - {out: rem, from: battery_status.remaining, op: min,
-     filter: {when: "remaining >= 0"}}                    # -1 表示未知，过滤掉
+  - {
+      out: spread,
+      from: actuator_motors.control_0..11,
+      op: masked_spread,
+      scope: { when: "armed and nav_state in hover_ish" },
+      min_channels: 4,
+    } # ← 直接引用内置变量
+  - {
+      out: sag,
+      from: battery_status.voltage_cell_v,
+      op: head_tail_median_diff,
+      scope: { when: "armed", skip_first_s: 5 },
+    }
+  - { out: rem, from: battery_status.remaining, op: min, filter: { when: "remaining >= 0" } } # -1 表示未知，过滤掉
 
 requires:
   any_of: [vehicle_imu_status]
@@ -980,13 +1019,13 @@ fields:
 fields:
   eph:
     type: scalar
-    aliases: [eph_m]              # 新旧命名变体，引擎自动回退
+    aliases: [eph_m] # 新旧命名变体，引擎自动回退
     unit: mm
-    scale: 0.001                  # 换算为 m 后再比阈值
+    scale: 0.001 # 换算为 m 后再比阈值
     note: 水平位置误差
-  satellites_used: {type: uint8, unit: 颗}
-  lat:  {type: int32, unit: degE7}
-  lon:  {type: int32, unit: degE7}
+  satellites_used: { type: uint8, unit: 颗 }
+  lat: { type: int32, unit: degE7 }
+  lon: { type: int32, unit: degE7 }
 ```
 
 ```yaml
@@ -1015,29 +1054,29 @@ fields:
 # 1.15 及之后的 tag 的 meta/<tag>.json 里才有 topics.estimator_sensor_bias（零偏拆成独立 topic）
 topic: estimator_sensor_bias
 fields:
-  gyro_bias: {type: array, unit: rad/s, note: 可直读陀螺零偏}
+  gyro_bias: { type: array, unit: rad/s, note: 可直读陀螺零偏 }
 ```
 
 ```yaml
 # meta/<tag>.json 里 topics.battery_status
 topic: battery_status
 fields:
-  voltage_cell_v: {type: array, unit: V, note: 索引即电芯序号，0 表示未接}
-  cell_count:     {type: uint8}
-  remaining:      {type: scalar, unit: "0..1", invalid: -1, note: -1 表示未知，判定前需过滤}
+  voltage_cell_v: { type: array, unit: V, note: 索引即电芯序号，0 表示未接 }
+  cell_count: { type: uint8 }
+  remaining: { type: scalar, unit: "0..1", invalid: -1, note: -1 表示未知，判定前需过滤 }
 ```
 
 **字段级规则**（都在 topic 文件内声明，框架自动执行）：
 
-| 声明 | 作用 |
-| --- | --- |
-| `msg` | 对应的 PX4 `.msg` 文件名，便于与上游对照同步 |
-| `aliases` | 字段命名变体（`eph` ↔ `eph_m`），引擎自动回退 |
-| `scale` / `unit` | 单位换算；声明后阈值直接按换算后的单位写 |
+| 声明                        | 作用                                                                |
+| --------------------------- | ------------------------------------------------------------------- |
+| `msg`                       | 对应的 PX4 `.msg` 文件名，便于与上游对照同步                        |
+| `aliases`                   | 字段命名变体（`eph` ↔ `eph_m`），引擎自动回退                       |
+| `scale` / `unit`            | 单位换算；声明后阈值直接按换算后的单位写                            |
 | `values` / `bits` / `slots` | 枚举、位掩码、数组槽位的含义 → finding 里显示 `AUTO_RTL` 而不是 `5` |
-| `groups` | 命名集合，可在 `scope.when` / `phase` 里按名引用，避免码值散落 |
-| `invalid` | 无效值标记（如 `remaining = -1`），框架在判定前过滤 |
-| `msg` | 对应的 PX4 `.msg` 文件名，便于与上游对照同步 |
+| `groups`                    | 命名集合，可在 `scope.when` / `phase` 里按名引用，避免码值散落      |
+| `invalid`                   | 无效值标记（如 `remaining = -1`），框架在判定前过滤                 |
+| `msg`                       | 对应的 PX4 `.msg` 文件名，便于与上游对照同步                        |
 
 构建期校验：规则里引用的每个 `topic.field` **必须已在 `topics/` 登记**
 （否则报"未登记字段"并失败）；表达式/`phase` 里引用的集合名必须存在于某个 `groups`。
@@ -1046,17 +1085,17 @@ fields:
 
 ## 预定函数清单
 
-| 类别 | 函数 |
-| --- | --- |
-| 取数 | `read`（多字段打包成向量，如四元数 `[q_0..q_3]`） |
-| 标量统计 | `mean` `max` `min` `median` `p95` `p99` `std` `range` `abs_max` `rms` `rss_mean` |
-| 累计 / 计数 | `delta_last_first` `count_above(x)` `count_where(expr)` `ratio_above(x)` `ratio_equal_to(x)` |
-| 位掩码 | `bit_any(bits)` `bit_all(bits)` `bit_value` |
-| 数学变换（多进多出） | `quat_to_euler`(4→3) `angle_diff_deg`(2→1) `vec_norm`(n→1) `quat_error_p99`(2→1) |
-| 时序 | `head_tail_median_diff` `tail_median(frac)` `slope` `zero_cross_hz` `adjacent_rate_max` `adjacent_rate_count(limit)` |
-| 区间 / 掩码 | `masked_spread` `masked_absmax_range` `max_tilt_in_interval` `edge_true_count` `edge_in_set_count` |
-| 引擎事实 | `armed_duration_s` `duration_s` `total_duration_ms`（guard 用） |
-| 修饰 | `per_instance` `scope{armed,phase,skip_first_s,tail_frac}` `filter` `scale` |
+| 类别                 | 函数                                                                                                                 |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| 取数                 | `read`（多字段打包成向量，如四元数 `[q_0..q_3]`）                                                                    |
+| 标量统计             | `mean` `max` `min` `median` `p95` `p99` `std` `range` `abs_max` `rms` `rss_mean`                                     |
+| 累计 / 计数          | `delta_last_first` `count_above(x)` `count_where(expr)` `ratio_above(x)` `ratio_equal_to(x)`                         |
+| 位掩码               | `bit_any(bits)` `bit_all(bits)` `bit_value`                                                                          |
+| 数学变换（多进多出） | `quat_to_euler`(4→3) `angle_diff_deg`(2→1) `vec_norm`(n→1) `quat_error_p99`(2→1)                                     |
+| 时序                 | `head_tail_median_diff` `tail_median(frac)` `slope` `zero_cross_hz` `adjacent_rate_max` `adjacent_rate_count(limit)` |
+| 区间 / 掩码          | `masked_spread` `masked_absmax_range` `max_tilt_in_interval` `edge_true_count` `edge_in_set_count`                   |
+| 引擎事实             | `armed_duration_s` `duration_s` `total_duration_ms`（guard 用）                                                      |
+| 修饰                 | `per_instance` `scope{armed,phase,skip_first_s,tail_frac}` `filter` `scale`                                          |
 
 每个算子在 `operators.py` 用 `@operator(in_arity=…, out_arity=…, out_names=[…])` 注册签名，
 **构建期按签名校验规则里 `in`/`out` 的数量与命名**——多输入/多输出不靠约定，靠校验。
@@ -1076,11 +1115,11 @@ fields:
 
 ### 职责边界（互不重复）
 
-| 文件 | 只回答 | 归谁维护 |
-| --- | --- | --- |
-| `rules/*.yaml` | **怎么发现**：读哪些 `topic.field`、用什么算子、满足什么条件触发 | 检测 / 数据工程 |
-| `fault-kb.yaml` | **发现之后意味着什么**：可能根因（按排查优先级）、排查步骤（由简到繁）、风险等级、禁忌 | 领域 / 故障分析 |
-| `meta/<tag>.json` | 字段与参数字典：**一 tag 一份**，`topics` 由 uORB `.msg` 生成、`parameters` 由 `parameters.json` 生成 | 跟固件版本的人 |
+| 文件              | 只回答                                                                                                | 归谁维护        |
+| ----------------- | ----------------------------------------------------------------------------------------------------- | --------------- |
+| `rules/*.yaml`    | **怎么发现**：读哪些 `topic.field`、用什么算子、满足什么条件触发                                      | 检测 / 数据工程 |
+| `fault-kb.yaml`   | **发现之后意味着什么**：可能根因（按排查优先级）、排查步骤（由简到繁）、风险等级、禁忌                | 领域 / 故障分析 |
+| `meta/<tag>.json` | 字段与参数字典：**一 tag 一份**，`topics` 由 uORB `.msg` 生成、`parameters` 由 `parameters.json` 生成 | 跟固件版本的人  |
 
 **去重动作**：规则里现在那些"结合故障库 F001 排查桨叶/电机"的文案要删掉，规则只留
 `emit.related_faults: [F001]`；根因与排查步骤只存在于故障库。规则侧仅保留与该阈值直接
@@ -1138,26 +1177,26 @@ knowledge/px4/               # 知识产物，入库
 ```yaml
 # tags.yaml —— 引擎用日志的 ver_sw_release 找到 ≤ 它的最大 tag，再加载那个目录
 tags:
-  - {tag: v1.13.3, version: "1.13.3"}
-  - {tag: v1.14.4, version: "1.14.4"}
-  - {tag: v1.15.0, version: "1.15.0"}
-  - {tag: v1.16.0, version: "1.16.0"}
-  - {tag: main,    version: null}      # 开发主干，当作最新
+  - { tag: v1.13.3, version: "1.13.3" }
+  - { tag: v1.14.4, version: "1.14.4" }
+  - { tag: v1.15.0, version: "1.15.0" }
+  - { tag: v1.16.0, version: "1.16.0" }
+  - { tag: main, version: null } # 开发主干，当作最新
 ```
 
 **跨 tag 的人工语义层 `topic-overrides.yaml`**（上游生成不出来的部分，跨 tag 共享一份）：
 
 ```yaml
-aliases:                     # 字段改名 → 引擎自动回退（跨 tag diff 产出候选，人工确认）
+aliases: # 字段改名 → 引擎自动回退（跨 tag diff 产出候选，人工确认）
   vehicle_gps_position.eph: [eph_m]
   vehicle_imu_status.stddev_accel_x_m_s2: [stddev_accel_x]
-groups:                      # 命名集合 → 可在 scope.when / phase 里按名引用
+groups: # 命名集合 → 可在 scope.when / phase 里按名引用
   nav_state.hover_ish: [2, 4, 6, 14, 21]
-  nav_state.failsafe_nav: {5: AUTO_RTL, 12: DESCEND, 13: TERMINATION, 18: LAND}
+  nav_state.failsafe_nav: { 5: AUTO_RTL, 12: DESCEND, 13: TERMINATION, 18: LAND }
   filter_fault_flags.critical_union: [0, 1, 2, 3, 4, 5]
-invalid:                     # 无效值标记（判定前过滤）
+invalid: # 无效值标记（判定前过滤）
   battery_status.remaining: -1
-units:                       # 单位修正（上游注释缺失或不准时）
+units: # 单位修正（上游注释缺失或不准时）
   vehicle_imu_status.accel_vibration_metric: m/s^2
 ```
 
@@ -1181,9 +1220,9 @@ units:                       # 单位修正（上游注释缺失或不准时）
 
 **两类元数据 → 两份字典**：
 
-| 来源 | 生成 | 用途 |
-| --- | --- | --- |
-| `msg/*.msg` | `topics/<topic>.yaml` | 日志字段字典（读日志用） |
+| 来源              | 生成                  | 用途                                                                                                                  |
+| ----------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `msg/*.msg`       | `topics/<topic>.yaml` | 日志字段字典（读日志用）                                                                                              |
 | `parameters.json` | `params/<group>.yaml` | **参数字典**：名称、类型、默认值、取值范围、单位、适用机型、说明 —— "参数审计"类经验（配置是否合理/是否被改动）的前提 |
 
 参数字典字段精简为：`name / type / default / min / max / unit / reboot_required / airframes / description`。
@@ -1192,24 +1231,24 @@ units:                       # 单位修正（上游注释缺失或不准时）
 
 **解析规则**（uORB `.msg` → `topics/<topic>.yaml`）：
 
-| `.msg` 里的写法 | 生成到 YAML |
-| --- | --- |
-| `uint64 timestamp` | `fields.timestamp: {type: uint64, unit: us}` |
-| `float32 xyz[3]` | `fields.xyz: {type: array, len: 3}` |
-| `uint8 NAV_STATE_POSITION = 2` 等常量块 | `fields.nav_state.values: {2: Position, ...}`（按前缀归组） |
-| `# 水平位置误差 (m)` 尾部/行内注释 | `fields.eph.note` + 从注释里的 `(m)` 提取 `unit` |
-| `# [0] X  [1] Y  [2] Z` 数组槽位注释 | `fields.<name>.slots: {0: X, 1: Y, 2: Z}` |
-| `*_flags` / `fault_flags` 类字段 + 位常量 | `fields.<name>.bits: {0: ..., 1: ...}` |
-| 引用了另一个 msg（如 `VehicleStatus vehicle_status`） | `type: <msg 名>`，并在文件里保留 `file:` 上游路径 |
-| 文件名 `VehicleStatus.msg` | 输出 `topics/vehicle_status.yaml`（PX4 主题为 snake_case） |
+| `.msg` 里的写法                                       | 生成到 YAML                                                 |
+| ----------------------------------------------------- | ----------------------------------------------------------- |
+| `uint64 timestamp`                                    | `fields.timestamp: {type: uint64, unit: us}`                |
+| `float32 xyz[3]`                                      | `fields.xyz: {type: array, len: 3}`                         |
+| `uint8 NAV_STATE_POSITION = 2` 等常量块               | `fields.nav_state.values: {2: Position, ...}`（按前缀归组） |
+| `# 水平位置误差 (m)` 尾部/行内注释                    | `fields.eph.note` + 从注释里的 `(m)` 提取 `unit`            |
+| `# [0] X  [1] Y  [2] Z` 数组槽位注释                  | `fields.<name>.slots: {0: X, 1: Y, 2: Z}`                   |
+| `*_flags` / `fault_flags` 类字段 + 位常量             | `fields.<name>.bits: {0: ..., 1: ...}`                      |
+| 引用了另一个 msg（如 `VehicleStatus vehicle_status`） | `type: <msg 名>`，并在文件里保留 `file:` 上游路径           |
+| 文件名 `VehicleStatus.msg`                            | 输出 `topics/vehicle_status.yaml`（PX4 主题为 snake_case）  |
 
 **生成物 vs 人工补充**（与现有"生成物不手改"约定一致）：
 
-| 文件 | 性质 | 内容 |
-| --- | --- | --- |
-| `knowledge/px4/meta/<tag>.json` | **生成物**（提交进仓库） | 该版本字段字典 + 参数字典（一份文件里两块） |
-| `knowledge/px4/topic-overrides.yaml` | **人工维护** | 上游没有的语义：`groups`（如 `hover_ish`、`critical_union`）、单位修正、`invalid` 标记（如 `remaining = -1`）、补充 `note` |
-| `.cache/px4/<tag>/` | 本地缓存，不入库 | 一个 tag 一个文件夹：`msg/` + `parameters.json` |
+| 文件                                 | 性质                     | 内容                                                                                                                       |
+| ------------------------------------ | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `knowledge/px4/meta/<tag>.json`      | **生成物**（提交进仓库） | 该版本字段字典 + 参数字典（一份文件里两块）                                                                                |
+| `knowledge/px4/topic-overrides.yaml` | **人工维护**             | 上游没有的语义：`groups`（如 `hover_ish`、`critical_union`）、单位修正、`invalid` 标记（如 `remaining = -1`）、补充 `note` |
+| `.cache/px4/<tag>/`                  | 本地缓存，不入库         | 一个 tag 一个文件夹：`msg/` + `parameters.json`                                                                            |
 
 构建期把两者合并成最终的 `__TOPICS__`；冲突时 overrides 优先，并在构建输出里提示被覆盖的条目。
 
@@ -1221,13 +1260,13 @@ units:                       # 单位修正（上游注释缺失或不准时）
 
 拿本 schema 的形态逐条对比后的结论：**经验、guard、字典全部用 YAML，不再保留任何 TOML**。
 
-| 维度 | YAML | TOML |
-| --- | --- | --- |
-| 对象数组（`compute` / `triggers` 节点） | 一条规则一眼看完 | `[[triggers]]` 把属性块切开，要在文件里上下跳 |
-| 深层嵌套（`compute.in/out` + `fallback`） | 自然 | 需子表或行内表，行内表还不能跨行 |
-| 中文长文案（`suggestion`、排查步骤） | `\|` 块标量很舒服 | 多行字符串在嵌套表里受限，长句得拆表 |
-| 扁平字典（`nav_state` 码值） | 够用 | 略紧凑（唯一优势，差距很小） |
-| 评审 / 社区贡献友好度 | 高（CI/K8s 通用语） | 中 |
+| 维度                                      | YAML                | TOML                                          |
+| ----------------------------------------- | ------------------- | --------------------------------------------- |
+| 对象数组（`compute` / `triggers` 节点）   | 一条规则一眼看完    | `[[triggers]]` 把属性块切开，要在文件里上下跳 |
+| 深层嵌套（`compute.in/out` + `fallback`） | 自然                | 需子表或行内表，行内表还不能跨行              |
+| 中文长文案（`suggestion`、排查步骤）      | `\|` 块标量很舒服   | 多行字符串在嵌套表里受限，长句得拆表          |
+| 扁平字典（`nav_state` 码值）              | 够用                | 略紧凑（唯一优势，差距很小）                  |
+| 评审 / 社区贡献友好度                     | 高（CI/K8s 通用语） | 中                                            |
 
 决定性因素是**形态**：本 schema 是「深层嵌套 + 对象数组 + 中文长文案」，正是 YAML 的主场；
 TOML 的优势（扁平键值）恰好是已被否掉的"空洞经验"那种形态。

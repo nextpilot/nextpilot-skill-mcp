@@ -27,13 +27,10 @@ const svgSource = readFileSync(ICON_SVG, "utf8").replace(/<\?xml[^>]*\?>/, "");
  * iOS 的 apple-touch-icon 不要透明、不要自带圆角：系统自己会套圆角蒙版，
  * 我们留的透明圆角会被合成成黑边。
  */
-const appleSource = svgSource.replace(
-  /<rect width="64" height="64" rx="14"/,
-  '<rect width="64" height="64"',
-);
+const appleSource = svgSource.replace(/<rect width="64" height="64" rx="14"/, '<rect width="64" height="64"');
 
 const htmlFor = (source, size) =>
-  `<!doctype html><meta charset="utf-8"><style>
+    `<!doctype html><meta charset="utf-8"><style>
 html,body{margin:0;padding:0;background:transparent;width:${size}px;height:${size}px}
 #m{line-height:0;width:${size}px;height:${size}px}
 #m svg{display:block;width:${size}px;height:${size}px}
@@ -47,18 +44,18 @@ const ws = new WebSocket(target.webSocketDebuggerUrl);
 let id = 0;
 const pending = new Map();
 const send = (method, params = {}) =>
-  new Promise((res, rej) => {
-    const n = ++id;
-    pending.set(n, { res, rej });
-    ws.send(JSON.stringify({ id: n, method, params }));
-  });
+    new Promise((res, rej) => {
+        const n = ++id;
+        pending.set(n, { res, rej });
+        ws.send(JSON.stringify({ id: n, method, params }));
+    });
 ws.addEventListener("message", (e) => {
-  const m = JSON.parse(e.data);
-  if (m.id && pending.has(m.id)) {
-    const { res, rej } = pending.get(m.id);
-    pending.delete(m.id);
-    m.error ? rej(new Error(JSON.stringify(m.error))) : res(m.result);
-  }
+    const m = JSON.parse(e.data);
+    if (m.id && pending.has(m.id)) {
+        const { res, rej } = pending.get(m.id);
+        pending.delete(m.id);
+        m.error ? rej(new Error(JSON.stringify(m.error))) : res(m.result);
+    }
 });
 await new Promise((r) => ws.addEventListener("open", r, { once: true }));
 
@@ -67,7 +64,7 @@ await send("Page.enable");
 // PNG，Next 的 ICO 解码器会直接报 "The PNG is not in RGBA format"。显式给一个 alpha=0
 // 的底色覆盖，输出才会是 colorType 6（RGBA）。
 await send("Emulation.setDefaultBackgroundColorOverride", {
-  color: { r: 0, g: 0, b: 0, a: 0 },
+    color: { r: 0, g: 0, b: 0, a: 0 },
 });
 
 /**
@@ -76,24 +73,24 @@ await send("Emulation.setDefaultBackgroundColorOverride", {
  * （合成器对同一目标尺寸变化的处理不稳定）；每尺寸全新导航最稳。
  */
 async function raster(source, size) {
-  const file = join(tmpdir(), `icon-${size}.html`);
-  writeFileSync(file, htmlFor(source, size), "utf8");
+    const file = join(tmpdir(), `icon-${size}.html`);
+    writeFileSync(file, htmlFor(source, size), "utf8");
 
-  await send("Emulation.setDeviceMetricsOverride", {
-    width: size,
-    height: size,
-    deviceScaleFactor: 1,
-    mobile: false,
-  });
-  await send("Page.navigate", { url: pathToFileURL(file).href });
-  await new Promise((r) => setTimeout(r, 700));
+    await send("Emulation.setDeviceMetricsOverride", {
+        width: size,
+        height: size,
+        deviceScaleFactor: 1,
+        mobile: false,
+    });
+    await send("Page.navigate", { url: pathToFileURL(file).href });
+    await new Promise((r) => setTimeout(r, 700));
 
-  const shot = await send("Page.captureScreenshot", {
-    format: "png",
-    omitBackground: true,
-    clip: { x: 0, y: 0, width: size, height: size, scale: 1 },
-  });
-  return Buffer.from(shot.data, "base64");
+    const shot = await send("Page.captureScreenshot", {
+        format: "png",
+        omitBackground: true,
+        clip: { x: 0, y: 0, width: size, height: size, scale: 1 },
+    });
+    return Buffer.from(shot.data, "base64");
 }
 
 // ---------- ICO 封装 ----------
@@ -103,35 +100,35 @@ async function raster(source, size) {
  * 宽高字段为 1 字节，256 用 0 表示；条目数据直接用 PNG，省掉 BMP 编码。
  */
 function buildIco(images) {
-  const header = Buffer.alloc(6);
-  header.writeUInt16LE(0, 0); // reserved
-  header.writeUInt16LE(1, 2); // type: 1 = icon
-  header.writeUInt16LE(images.length, 4);
+    const header = Buffer.alloc(6);
+    header.writeUInt16LE(0, 0); // reserved
+    header.writeUInt16LE(1, 2); // type: 1 = icon
+    header.writeUInt16LE(images.length, 4);
 
-  let offset = 6 + images.length * 16;
-  const entries = [];
-  for (const { size, data } of images) {
-    const entry = Buffer.alloc(16);
-    entry.writeUInt8(size >= 256 ? 0 : size, 0);
-    entry.writeUInt8(size >= 256 ? 0 : size, 1);
-    entry.writeUInt8(0, 2); // 调色板数：真彩为 0
-    entry.writeUInt8(0, 3); // reserved
-    entry.writeUInt16LE(1, 4); // color planes
-    entry.writeUInt16LE(32, 6); // bits per pixel
-    entry.writeUInt32LE(data.length, 8);
-    entry.writeUInt32LE(offset, 12);
-    entries.push(entry);
-    offset += data.length;
-  }
+    let offset = 6 + images.length * 16;
+    const entries = [];
+    for (const { size, data } of images) {
+        const entry = Buffer.alloc(16);
+        entry.writeUInt8(size >= 256 ? 0 : size, 0);
+        entry.writeUInt8(size >= 256 ? 0 : size, 1);
+        entry.writeUInt8(0, 2); // 调色板数：真彩为 0
+        entry.writeUInt8(0, 3); // reserved
+        entry.writeUInt16LE(1, 4); // color planes
+        entry.writeUInt16LE(32, 6); // bits per pixel
+        entry.writeUInt32LE(data.length, 8);
+        entry.writeUInt32LE(offset, 12);
+        entries.push(entry);
+        offset += data.length;
+    }
 
-  return Buffer.concat([header, ...entries, ...images.map((i) => i.data)]);
+    return Buffer.concat([header, ...entries, ...images.map((i) => i.data)]);
 }
 
 // ---------- 产出 ----------
 
 const icoImages = [];
 for (const size of icoSizes) {
-  icoImages.push({ size, data: await raster(svgSource, size) });
+    icoImages.push({ size, data: await raster(svgSource, size) });
 }
 
 const ico = buildIco(icoImages);

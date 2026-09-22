@@ -2,12 +2,12 @@
 
 > 针对多旋翼 / 固定翼的姿态与速率环，结合阶跃响应数据推荐 PID 初值并迭代修正，降低手动调参门槛
 
-| 项         | 值                               |
-| ---------- | -------------------------------- |
-| 分类       | 控制                             |
-| 适用平台   | PX4, ArduPilot, Betaflight, 通用 |
-| 依赖模型   | DeepSeek-V3, Qwen2.5             |
-| 适用客户端 | Claude, ChatGPT, Cursor          |
+| 项 | 值 |
+| --- | --- |
+| 分类 | 控制 |
+| 适用平台 | PX4, ArduPilot, Betaflight, 通用 |
+| 依赖模型 | DeepSeek-V3, Qwen2.5 |
+| 适用客户端 | Claude, ChatGPT, Cursor |
 
 ## 解决什么问题
 

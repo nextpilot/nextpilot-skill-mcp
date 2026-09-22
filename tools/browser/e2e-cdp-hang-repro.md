@@ -24,7 +24,7 @@
 
 - Windows 10，Chrome `152.0.7977.84`，启动方式：
 
-  ```
+  ```shell
   chrome.exe --headless=new --remote-debugging-port=9222 --disable-gpu --hide-scrollbars \
     --user-data-dir=C:/Users/zhanfuyu/AppData/Local/Temp/cdp-profile about:blank
   ```
@@ -51,7 +51,7 @@ node tools/browser/check-upload.mjs \
 
 典型输出（在「已清空本机历史」之后再无任何进展，直到外部超时杀进程）：
 
-```
+```text
 新标签页: 49C60F31…
 页面已 hydrate（等待 0.5s）
 页面: /analyze

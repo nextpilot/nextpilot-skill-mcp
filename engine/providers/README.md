@@ -11,11 +11,11 @@
 
 ## 文件
 
-| 文件 | 是什么 |
-| --- | --- |
-| `api.py` | **契约本体**。三张常量表（REQUIRED / OPTIONAL / SEMANTICS）+ `open_log()` + 运行期自检 |
-| `px4.py` | PX4 `.ulg`（ULog）适配器。含固件解码、机型识别、armed 区间、飞行阶段、载具身份、轨迹取数、事件解码…… |
-| （未来）`ardupilot.py` | ArduPilot `.bin`（pymavlink）。加它就是加一个文件，引擎一行不改 |
+| 文件                   | 是什么                                                                                               |
+| ---------------------- | ---------------------------------------------------------------------------------------------------- |
+| `api.py`               | **契约本体**。三张常量表（REQUIRED / OPTIONAL / SEMANTICS）+ `open_log()` + 运行期自检               |
+| `px4.py`               | PX4 `.ulg`（ULog）适配器。含固件解码、机型识别、armed 区间、飞行阶段、载具身份、轨迹取数、事件解码…… |
+| （未来）`ardupilot.py` | ArduPilot `.bin`（pymavlink）。加它就是加一个文件，引擎一行不改                                      |
 
 ## 加一个适配器要做什么
 
@@ -28,11 +28,11 @@
 
 ## 契约怎么被确认（三道，缺一不可）
 
-| 那道 | 在哪 | 查什么 | 查不了什么 |
-| --- | --- | --- | --- |
-| 构建期 | `web/scripts/build-knowledge.mjs` | 每个适配器**定义了**契约要求的方法吗；`builtin_variables()` 的字典字面量键齐不齐 | 方法体里的事 |
-| 运行期自检 | `api.py` 的 `check_provider()`，`open_log()` 里立刻调 | 名字取得出来吗、`builtin_variables()` 的类型对吗、每次是不是新 dict | 值对不对 |
-| 契约测试 | `tools/calibrate/guard-px4log-provider.py` | **语义**：取不到必须返回 `None`、`get_topic_meta()` 与 `get_series()` 自洽、`armed_intervals` 的形状、`get_report_facts()` 与 `builtin_variables()` 不矛盾、`match_version` 的边界与非法串…… | — |
+| 那道       | 在哪                                                  | 查什么                                                                                                                                                                                       | 查不了什么   |
+| ---------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| 构建期     | `web/scripts/build-knowledge.mjs`                     | 每个适配器**定义了**契约要求的方法吗；`builtin_variables()` 的字典字面量键齐不齐                                                                                                             | 方法体里的事 |
+| 运行期自检 | `api.py` 的 `check_provider()`，`open_log()` 里立刻调 | 名字取得出来吗、`builtin_variables()` 的类型对吗、每次是不是新 dict                                                                                                                          | 值对不对     |
+| 契约测试   | `tools/calibrate/guard-px4log-provider.py`            | **语义**：取不到必须返回 `None`、`get_topic_meta()` 与 `get_series()` 自洽、`armed_intervals` 的形状、`get_report_facts()` 与 `builtin_variables()` 不矛盾、`match_version` 的边界与非法串…… | —            |
 
 为什么不写 `typing.Protocol` 靠 mypy 查：**两端都没有类型检查器**——构建期不执行 `engine/` 下的
 Python（只当文本搬运，见 `../README.md`），Pyodide 里也没有 mypy。写注解只会"看着有约束、

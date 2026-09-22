@@ -38,24 +38,27 @@ const ws = new WebSocket(page.webSocketDebuggerUrl);
 let id = 0;
 const pending = new Map();
 const send = (method, params = {}) =>
-  new Promise((res, rej) => {
-    const n = ++id;
-    pending.set(n, { res, rej });
-    ws.send(JSON.stringify({ id: n, method, params }));
-  });
+    new Promise((res, rej) => {
+        const n = ++id;
+        pending.set(n, { res, rej });
+        ws.send(JSON.stringify({ id: n, method, params }));
+    });
 ws.addEventListener("message", (e) => {
-  const m = JSON.parse(e.data);
-  if (m.id && pending.has(m.id)) {
-    const { res, rej } = pending.get(m.id);
-    pending.delete(m.id);
-    m.error ? rej(new Error(JSON.stringify(m.error))) : res(m.result);
-  }
+    const m = JSON.parse(e.data);
+    if (m.id && pending.has(m.id)) {
+        const { res, rej } = pending.get(m.id);
+        pending.delete(m.id);
+        m.error ? rej(new Error(JSON.stringify(m.error))) : res(m.result);
+    }
 });
 await new Promise((r) => ws.addEventListener("open", r, { once: true }));
 
 await send("Page.enable");
 await send("Emulation.setDeviceMetricsOverride", {
-  width: 900, height: 620, deviceScaleFactor: 3, mobile: false,
+    width: 900,
+    height: 620,
+    deviceScaleFactor: 3,
+    mobile: false,
 });
 await send("Page.navigate", { url: pathToFileURL(file).href });
 await new Promise((r) => setTimeout(r, 900));

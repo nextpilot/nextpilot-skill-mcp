@@ -2,13 +2,13 @@
 
 > 开源 PX4 .ulg 日志分析器：确定性 pyulog 解析 + 规则检查 + LLM 只做解释。本平台端侧日志分析的首发 fork 底座
 
-| 项         | 值                             |
-| ---------- | ------------------------------ |
-| 分类       | 系统与工具链                   |
-| 适用平台   | PX4                            |
-| 依赖模型   | DeepSeek, GPT-4o-mini, GLM     |
-| 适用客户端 | Claude, Cursor, Claude Code    |
-| 来源       | https://github.com/robotto-xyz |
+| 项 | 值 |
+| --- | --- |
+| 分类 | 系统与工具链 |
+| 适用平台 | PX4 |
+| 依赖模型 | DeepSeek, GPT-4o-mini, GLM |
+| 适用客户端 | Claude, Cursor, Claude Code |
+| 来源 | https://github.com/robotto-xyz |
 
 ## 解决什么问题
 

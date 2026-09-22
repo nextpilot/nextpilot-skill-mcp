@@ -59,14 +59,11 @@ def main() -> int:
             return 1
 
     if fe_files:
-        # Run from web/: prettier resolves .prettierrc there, and eslint needs the
-        # flat config next to it. Paths are relative to the repo root, so convert.
         web = root / "web"
         prettier = web / "node_modules" / "prettier" / "bin" / "prettier.cjs"
         if prettier.exists():
-            rel = [str((root / f).resolve().relative_to(web)).replace("\\", "/") for f in fe_files]
             print("[pre-commit] prettier --write on staged frontend files...")
-            pw = run([_node(), str(prettier), "--write", *rel], cwd=web)
+            pw = run([_node(), str(prettier), "--write", *fe_files, "--config", str(web / ".prettierrc")], cwd=root)
             if pw.returncode != 0:
                 print(pw.stdout)
                 print(pw.stderr, file=sys.stderr)
@@ -78,13 +75,14 @@ def main() -> int:
         web = root / "web"
         eslint = web / "node_modules" / "eslint" / "bin" / "eslint.js"
         if eslint.exists():
-            rel = [str((root / f).resolve().relative_to(web)).replace("\\", "/") for f in ts_files]
-            print("[pre-commit] eslint --fix on staged TS files...")
-            ef = run([_node(), str(eslint), "--fix", *rel], cwd=web)
-            if ef.returncode != 0:
-                print(ef.stdout)
-                print(ef.stderr, file=sys.stderr)
-                return 1
+            rel = [str((root / f).resolve().relative_to(web)).replace("\\", "/") for f in ts_files if (root / f).resolve().is_relative_to(web)]
+            if rel:
+                print("[pre-commit] eslint --fix on staged TS files...")
+                ef = run([_node(), str(eslint), "--fix", *rel], cwd=web)
+                if ef.returncode != 0:
+                    print(ef.stdout)
+                    print(ef.stderr, file=sys.stderr)
+                    return 1
         else:
             print("[pre-commit] eslint not installed in web/ -- skipping TS lint.")
 

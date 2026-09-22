@@ -15,11 +15,11 @@
  *   web/workers/pyodide-px4log-data.ts    （导出 PY_ULG_DATA_HELPERS）
  *   web/workers/fault-kb.generated.json
  *   web/lib/knowledge/prompts.generated.js（ESM，供边缘函数 import）
- *   web/.generated/guide/rule-catalogue.mdx（指南「知识库」分组的规则清单页）
- *   web/.generated/guide/rule-schema.mdx   （指南「知识库」分组的规则编写参考页）
+ *   web/content/guide/rule-catalogue.mdx（指南「知识库」分组的规则清单页）
+ *   web/content/guide/rule-schema.mdx   （指南「知识库」分组的规则编写参考页）
  *
- * 最后两页落在 .generated/ 里（与 sync-content.mjs 拷进来的人工页面同一处，
- * 运行期只读那里），所以**不入库**，`--check` 也不比对它们。
+ * 最后两页落在 content/guide/ 里（与 sync-content.mjs 拷进来的人工页面同一处），
+ * 全部入库，`--check` 只比对前 5 个产物。
  *
  * 用法（在 web/ 下）：
  *   node scripts/build-knowledge.mjs           生成（= pnpm build:kb）
@@ -1787,8 +1787,8 @@ function build() {
     // 5) 指南的「知识库」分组：规则清单 + 规则编写参考（改规则/算子/内置变量后自动跟上，不用谁记得手动同步）
     if (!CHECK) {
         mkdirSync(GUIDES_DIR, { recursive: true });
-        writeFileSync(resolve(GUIDES_DIR, "rule-catalogue.md"), renderCataloguePage(rules, sources), "utf8");
-        writeFileSync(resolve(GUIDES_DIR, "rule-schema.md"), renderSchemaPage(rules.length, providerApi), "utf8");
+        writeFileSync(resolve(GUIDES_DIR, "rule-catalogue.mdx"), renderCataloguePage(rules, sources), "utf8");
+        writeFileSync(resolve(GUIDES_DIR, "rule-schema.mdx"), renderSchemaPage(rules.length, providerApi), "utf8");
     }
 
     if (CHECK) {

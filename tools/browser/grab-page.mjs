@@ -13,21 +13,21 @@ let id = 0;
 const pending = new Map();
 const events = [];
 const send = (method, params = {}) =>
-  new Promise((res, rej) => {
-    const n = ++id;
-    pending.set(n, { res, rej });
-    ws.send(JSON.stringify({ id: n, method, params }));
-  });
+    new Promise((res, rej) => {
+        const n = ++id;
+        pending.set(n, { res, rej });
+        ws.send(JSON.stringify({ id: n, method, params }));
+    });
 
 ws.addEventListener("message", (e) => {
-  const msg = JSON.parse(e.data);
-  if (msg.id && pending.has(msg.id)) {
-    const { res, rej } = pending.get(msg.id);
-    pending.delete(msg.id);
-    msg.error ? rej(new Error(JSON.stringify(msg.error))) : res(msg.result);
-  } else if (msg.method) {
-    events.push(msg);
-  }
+    const msg = JSON.parse(e.data);
+    if (msg.id && pending.has(msg.id)) {
+        const { res, rej } = pending.get(msg.id);
+        pending.delete(msg.id);
+        msg.error ? rej(new Error(JSON.stringify(msg.error))) : res(msg.result);
+    } else if (msg.method) {
+        events.push(msg);
+    }
 });
 
 await new Promise((r) => ws.addEventListener("open", r, { once: true }));
@@ -38,19 +38,19 @@ await new Promise((r) => setTimeout(r, Number(waitMs)));
 
 // 正文 HTML（去掉 script/style，便于人读结构）
 const { result: htmlRes } = await send("Runtime.evaluate", {
-  expression: `(() => {
+    expression: `(() => {
     const el = document.querySelector('main') || document.body;
     const clone = el.cloneNode(true);
     clone.querySelectorAll('script,style,svg,link,noscript').forEach(n => n.remove());
     return clone.innerHTML;
   })()`,
-  returnByValue: true,
+    returnByValue: true,
 });
 writeFileSync(`${prefix}.html`, htmlRes.value ?? "", "utf8");
 
 // 可见文本（含层级），方便看信息组织顺序
 const { result: textRes } = await send("Runtime.evaluate", {
-  expression: `(() => {
+    expression: `(() => {
     const out = [];
     const walk = (n, depth) => {
       if (n.nodeType === 1) {
@@ -63,7 +63,7 @@ const { result: textRes } = await send("Runtime.evaluate", {
     walk(document.querySelector('main') || document.body, 0);
     return out.join('\\n');
   })()`,
-  returnByValue: true,
+    returnByValue: true,
 });
 writeFileSync(`${prefix}.txt`, textRes.value ?? "", "utf8");
 

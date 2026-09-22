@@ -54,17 +54,17 @@ openssl rand -base64 32   # AUTH_SECRET
 openssl rand -hex 24      # AUTH_INTERNAL_SECRET
 ```
 
-| 变量 | 说明 |
-| --- | --- |
-| `AUTH_SECRET` | 会话 JWE 密钥，Node 与边缘函数共享，改了全员掉线 |
-| `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET` | GitHub OAuth App |
-| `AUTH_INTERNAL_SECRET` | SSR ↔ `/functions/internal/*` 共享密钥 |
-| `SITE_URL` | 公网源站，Node 侧同源调内部函数用，如 `https://skill.nextpilot.org` |
-| `SMTP_*` | QQ/163 SMTP，`SMTP_PASS` 填**邮箱授权码**（QQ 邮箱 → 设置 → 账户 → 开启 SMTP） |
-| `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL` | 边缘函数 `/api/explain` 读取 |
-| `ISSUE_ENABLED` | 置 `1` 才开启报错上报；不配则整个上报层 no-op（本地开发天然安全） |
+| 变量                                            | 说明                                                                                     |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `AUTH_SECRET`                                   | 会话 JWE 密钥，Node 与边缘函数共享，改了全员掉线                                         |
+| `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET`         | GitHub OAuth App                                                                         |
+| `AUTH_INTERNAL_SECRET`                          | SSR ↔ `/functions/internal/*` 共享密钥                                                   |
+| `SITE_URL`                                      | 公网源站，Node 侧同源调内部函数用，如 `https://skill.nextpilot.org`                      |
+| `SMTP_*`                                        | QQ/163 SMTP，`SMTP_PASS` 填**邮箱授权码**（QQ 邮箱 → 设置 → 账户 → 开启 SMTP）           |
+| `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL`           | 边缘函数 `/api/explain` 读取                                                             |
+| `ISSUE_ENABLED`                                 | 置 `1` 才开启报错上报；不配则整个上报层 no-op（本地开发天然安全）                        |
 | `ISSUE_PROVIDER` / `ISSUE_REPO` / `ISSUE_TOKEN` | 目标：`gitee`（默认）或 `github`；`owner/repo`；令牌**只在边缘函数使用**，浏览器永不接触 |
-| `ISSUE_LABELS` / `ISSUE_DEBUG` | 可选。标签（逗号分隔）；`ISSUE_DEBUG=1` 时 `/issue-probe?write=1` 可做真实写入自检 |
+| `ISSUE_LABELS` / `ISSUE_DEBUG`                  | 可选。标签（逗号分隔）；`ISSUE_DEBUG=1` 时 `/issue-probe?write=1` 可做真实写入自检       |
 
 ### GitHub OAuth App
 
@@ -101,17 +101,17 @@ openssl rand -hex 24      # AUTH_INTERNAL_SECRET
 
 KV key 规则（代码见 `functions/_lib/kv.js`）：
 
-| key | 内容 |
-| --- | --- |
-| `usr_{uid}` | 用户资料（对齐远期 profiles 表） |
-| `em_{emailHash}` / `gh_{githubId}` | 登录方式 → uid 索引 |
-| `otp_` / `otprl_` / `otpd_` / `otpi_` | 验证码、60s 重发窗、每日限额 |
-| `use_{uid}_{yyyyMMDD}_{事件}` | 每日配额唯一键（前缀列举计数，登录 10/天、匿名 3/天） |
-| `anuse_{设备}_{yyyyMMDD}_{事件}` | 匿名设备日计数（另有 `anip_{ip}_{日}` 防刷） |
-| `rpt_{uid}_{reportId}` | 报告记录（7 天惰性过期，含 `logHash` 日志指纹） |
-| `err_{指纹}` | 上报去重：issue 号、累计次数、首末时间、上次评论时间 |
-| `errx_{毫秒}_{随机}` | 上报失败记录（`/issue-probe` 展示最近 5 条） |
-| `errrl_{ipHash}_{日}_{事件}` | `/api/issues` 的按 IP 日限流计数 |
+| key                                   | 内容                                                  |
+| ------------------------------------- | ----------------------------------------------------- |
+| `usr_{uid}`                           | 用户资料（对齐远期 profiles 表）                      |
+| `em_{emailHash}` / `gh_{githubId}`    | 登录方式 → uid 索引                                   |
+| `otp_` / `otprl_` / `otpd_` / `otpi_` | 验证码、60s 重发窗、每日限额                          |
+| `use_{uid}_{yyyyMMDD}_{事件}`         | 每日配额唯一键（前缀列举计数，登录 10/天、匿名 3/天） |
+| `anuse_{设备}_{yyyyMMDD}_{事件}`      | 匿名设备日计数（另有 `anip_{ip}_{日}` 防刷）          |
+| `rpt_{uid}_{reportId}`                | 报告记录（7 天惰性过期，含 `logHash` 日志指纹）       |
+| `err_{指纹}`                          | 上报去重：issue 号、累计次数、首末时间、上次评论时间  |
+| `errx_{毫秒}_{随机}`                  | 上报失败记录（`/issue-probe` 展示最近 5 条）          |
+| `errrl_{ipHash}_{日}_{事件}`          | `/api/issues` 的按 IP 日限流计数                      |
 
 注意：最终一致（60s 全球同步），写后不要立即回读；配额计数容忍短暂不一致。
 
@@ -124,17 +124,17 @@ KV key 规则（代码见 `functions/_lib/kv.js`）：
 
 ## 6. 故障排查
 
-| 现象 | 排查 |
-| --- | --- |
-| `/api/explain` 返回 401 | 未登录或 `AUTH_SECRET` 两端不一致 |
-| `/api/explain` 返回 503 | 边缘函数未配 `DEEPSEEK_API_KEY` |
-| 登录后仍 401 | 检查生产是否 HTTPS（cookie 名 `__Secure-` 前缀）；边缘函数与 SSR 的 `AUTH_SECRET` 是否一致 |
-| 验证码发不出 | `SMTP_*` 是否配置；QQ 授权码是否正确；Node 函数出网 465 是否可用 |
-| `/internal/*` 403 | `AUTH_INTERNAL_SECRET` 未配或不一致 |
-| KV 报 binding missing | KV 命名空间（`nextpilot_skill_mcp`）未绑定到 Pages 项目；绑定后需重新部署 |
-| 配额数不准 | KV 最终一致，60s 内可能滞后；唯一键设计保证不会重复计数 |
-| 报错没生成 issue | 访问 `/issue-probe`，看 `enabled` / `repo` / `tokenSet` 与 `recentFailures`。**Gitee 的写接口与读接口表现可能不一致**（读 200、写 404 `project or enterprise`），所以必须用 `?write=1` 真发一次才能确认 |
-| 报错 issue 刷屏 | 不应发生：同指纹只建一条、后续追加评论，可恢复类每天最多一条。若真刷屏，检查 `/issue-probe` 里 `recentFailures`——多半是建单成功但去重记录没写进 KV（KV 最终一致，60s 内可能出现一次重复） |
+| 现象                    | 排查                                                                                                                                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/explain` 返回 401 | 未登录或 `AUTH_SECRET` 两端不一致                                                                                                                                                                       |
+| `/api/explain` 返回 503 | 边缘函数未配 `DEEPSEEK_API_KEY`                                                                                                                                                                         |
+| 登录后仍 401            | 检查生产是否 HTTPS（cookie 名 `__Secure-` 前缀）；边缘函数与 SSR 的 `AUTH_SECRET` 是否一致                                                                                                              |
+| 验证码发不出            | `SMTP_*` 是否配置；QQ 授权码是否正确；Node 函数出网 465 是否可用                                                                                                                                        |
+| `/internal/*` 403       | `AUTH_INTERNAL_SECRET` 未配或不一致                                                                                                                                                                     |
+| KV 报 binding missing   | KV 命名空间（`nextpilot_skill_mcp`）未绑定到 Pages 项目；绑定后需重新部署                                                                                                                               |
+| 配额数不准              | KV 最终一致，60s 内可能滞后；唯一键设计保证不会重复计数                                                                                                                                                 |
+| 报错没生成 issue        | 访问 `/issue-probe`，看 `enabled` / `repo` / `tokenSet` 与 `recentFailures`。**Gitee 的写接口与读接口表现可能不一致**（读 200、写 404 `project or enterprise`），所以必须用 `?write=1` 真发一次才能确认 |
+| 报错 issue 刷屏         | 不应发生：同指纹只建一条、后续追加评论，可恢复类每天最多一条。若真刷屏，检查 `/issue-probe` 里 `recentFailures`——多半是建单成功但去重记录没写进 KV（KV 最终一致，60s 内可能出现一次重复）               |
 
 ## 7. 线上报错自动提 issue
 
@@ -151,7 +151,7 @@ KV key 规则（代码见 `functions/_lib/kv.js`）：
 
 部署后自检顺序：
 
-```
+```text
 GET  /issue-probe            确认 enabled=true、repo/tokenSet 正确、readRepo.ok=true
 GET  /issue-probe?write=1    确认写入真的通（需要 ISSUE_DEBUG=1）——会建一个 [自动上报] SelfCheck issue
 ```
@@ -162,10 +162,10 @@ GET  /issue-probe?write=1    确认写入真的通（需要 ISSUE_DEBUG=1）—�
 
 两个 workflow，分工是「CI 只判质量，Deploy 只管发布」：
 
-| 文件 | 触发 | 做什么 |
-| --- | --- | --- |
-| `.github/workflows/ci.yml` | push 到 master / PR / 手动 | 跑 `tools/ci/check_all.py --stage build,ci --with-e2e`（含 ruff、产物比对、`tsc --noEmit`、`next build`、E2E 冒烟、依赖审计） |
-| `.github/workflows/deploy.yml` | CI 跑完且成功（`workflow_run`）/ 手动 / 同仓 PR | `edgeone pages deploy` 到 EdgeOne Pages，生产环境加 `/ping` 冒烟 |
+| 文件                           | 触发                                            | 做什么                                                                                                                        |
+| ------------------------------ | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `.github/workflows/ci.yml`     | push 到 master / PR / 手动                      | 跑 `tools/ci/check_all.py --stage build,ci --with-e2e`（含 ruff、产物比对、`tsc --noEmit`、`next build`、E2E 冒烟、依赖审计） |
+| `.github/workflows/deploy.yml` | CI 跑完且成功（`workflow_run`）/ 手动 / 同仓 PR | `edgeone pages deploy` 到 EdgeOne Pages，生产环境加 `/ping` 冒烟                                                              |
 
 - **部署等 CI 绿了才发**：`workflow_run` 无法在 `on` 里过滤结果，判据写在 job 的 `if` 里（只认 `conclusion == 'success'`）。
 - **回滚 / 补发**走 Actions 页面手动触发 `Deploy`，`env` 选 `production`。
@@ -174,11 +174,11 @@ GET  /issue-probe?write=1    确认写入真的通（需要 ISSUE_DEBUG=1）—�
 
 需要配的仓库配置（Settings → Secrets and variables → Actions）：
 
-| 类型 | 名称 | 说明 |
-| --- | --- | --- |
-| Secret | `EDGEONE_API_TOKEN` | EdgeOne 控制台 → API Token |
-| Variable | `EDGEONE_PROJECT` | Pages 项目名。**填错会自动新建一个空项目**，首次跑前务必核对 |
-| Variable | `SMOKE_BASE_URL` | 可选。生产源站如 `https://skill.nextpilot.org`，不配则跳过冒烟 |
+| 类型     | 名称                | 说明                                                           |
+| -------- | ------------------- | -------------------------------------------------------------- |
+| Secret   | `EDGEONE_API_TOKEN` | EdgeOne 控制台 → API Token                                     |
+| Variable | `EDGEONE_PROJECT`   | Pages 项目名。**填错会自动新建一个空项目**，首次跑前务必核对   |
+| Variable | `SMOKE_BASE_URL`    | 可选。生产源站如 `https://skill.nextpilot.org`，不配则跳过冒烟 |
 
 > ⚠ **仓库托管方**：当前 `origin` 是 Gitee（默认分支 `master`），而 Gitee **不执行 `.github/workflows/`**，
 > 它有自己的流水线配置目录。要让上面两个文件真正跑起来，需要把仓库镜像/迁移到 GitHub，

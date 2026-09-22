@@ -1,7 +1,7 @@
 # 日志规则校准脚本
 
 用真实 `.ulg` 校准阈值（CLAUDE.md 4.3 / 8）的本地工具。
-它**直接跑 engine/ 下的 Python 引擎与 knowledge/px4/rules/*.yaml 中的规则**，
+它**直接跑 engine/ 下的 Python 引擎与 knowledge/px4/rules/\*.yaml 中的规则**，
 与浏览器端 Pyodide 执行的是同一份规则源码、同一套逻辑——改完 `knowledge/` 无需 Node 构建即可回归。
 
 - `px4log_engine_runner.py <file.ulg> ...`：输出完整 findings JSON（规则清单见站内
@@ -11,7 +11,7 @@
   与降采样点数。
 - `probe_stats.py <file.ulg> ...`：dump 三个关键消息的原始指标分布，用于定阈值。
 - `inspect_fields.py <file.ulg>`：打印 `vehicle_imu_status / estimator_status /
-  battery_status / sensor_imu` 的真实字段名（不同 PX4 版本字段差异很大）。
+battery_status / sensor_imu` 的真实字段名（不同 PX4 版本字段差异很大）。
 
 ## 冻结基线与等价比对（规则重构时必用）
 

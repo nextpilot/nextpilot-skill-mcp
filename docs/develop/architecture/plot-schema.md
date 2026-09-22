@@ -34,9 +34,9 @@ outputs:                     # 一屏里的若干画布
 
 1. **`container` 是扩展点，不是枚举。** 将来加 `polar` / `table` / `spectrogram`，只需新增一种容器类型和它的 children 变体，其余各层不动。反过来，若按"图表种类"分别设计子 schema（曲线一套 `panels`、地图一套 `overlays`、表格再来一套），每加一种渲染器就多一套词汇、一套校验、一套示例。
 2. **`container` + `children[].mode` 是判别式联合的正当用法。** 容器决定 `mode` 的合法取值域，这正是 `oneOf` + `const` 的标准写法，TypeScript 的 discriminated union 同理；非法组合由类型本身表达，不必另维护一张组合表。
-   *（本文档上一版把这一条列为「硬伤」，属误判：它批评的是"两个命名空间交叉"的表象，而判别式联合本来就是这么工作的。此处更正。）*
+   _（本文档上一版把这一条列为「硬伤」，属误判：它批评的是"两个命名空间交叉"的表象，而判别式联合本来就是这么工作的。此处更正。）_
 3. **`compute` / `conditions` 归文件级，而**不是**归某个容器。** 派生通道算一次给多个输出共用；"这份日志有没有 GPS"是整份配置的属性，不属于某个容器。
-   *（草案平级放在 `outputs` 旁是对的；上一版把它塞进单个输出里，反而退步。）*
+   _（草案平级放在 `outputs` 旁是对的；上一版把它塞进单个输出里，反而退步。）_
 
 ---
 
@@ -59,8 +59,8 @@ color: "#ff4d4f", "#409eff"
 
 ```yaml
 series:
-  - {field: [longitude_deg, lon], label: 经度, style: {color: series-1}}
-  - {field: [altitude_msl_m, alt], label: 海拔, style: {color: series-2}}
+  - { field: [longitude_deg, lon], label: 经度, style: { color: series-1 } }
+  - { field: [altitude_msl_m, alt], label: 海拔, style: { color: series-2 } }
 ```
 
 顺带 `style: -^` 这种"紧凑线型语言"（要自写解析器、写错了静默用默认样式）也换成结构字段：`{color, width, dash, marker}`。
@@ -74,13 +74,13 @@ series:
 ```yaml
 - container: axes
   title: GPS
-  x: time                      # 容器级默认，图元可覆盖
+  x: time # 容器级默认，图元可覆盖
   axes:
-    deg: {label: 度, range: [-180, 180]}
-    m:   {label: 高度}
+    deg: { label: 度, range: [-180, 180] }
+    m: { label: 高度 }
   children:
-    - {mode: series, y: deg, series: [{field: [latitude_deg, lat], label: 纬度}]}
-    - {mode: series, y: m,   series: [{field: [altitude_msl_m, alt], label: 海拔}]}
+    - { mode: series, y: deg, series: [{ field: [latitude_deg, lat], label: 纬度 }] }
+    - { mode: series, y: m, series: [{ field: [altitude_msl_m, alt], label: 海拔 }] }
 ```
 
 只有一个轴时省略 `y`（图元落到默认轴），写最短形式。
@@ -93,7 +93,7 @@ series:
 
 ```yaml
 - mode: xyplot
-  xdata: vehicle_gps_position.timestamp   # ← 这就是时间，例子自证不了区别
+  xdata: vehicle_gps_position.timestamp # ← 这就是时间，例子自证不了区别
   ydata: vehicle_gps_position.lon
 ```
 
@@ -104,8 +104,8 @@ series:
   # x 省略 → 时间轴（即原 TimeSeries）
 
 - mode: series
-  x: {channel: volt_v}         # x 是另一个通道 → 相图（即原 xyplot）
-  series: [{field: [current_a], label: 电流}]
+  x: { channel: volt_v } # x 是另一个通道 → 相图（即原 xyplot）
+  series: [{ field: [current_a], label: 电流 }]
 ```
 
 "电压 → 电流""滚转 → 俯仰"这类相图照样能画，只是它不再是一个 `mode`，而是 x 的一种取值。**同一件事只留一种写法**，也就不存在"声明了 x 又默认时间"的两套真相。
@@ -151,12 +151,12 @@ compute:
 
 `operators.py` 里 60+ 个算子按**输出形状**分四类，只有前两类能画：
 
-| 形状 | 例子 | 输出长度 | 能否进 `series` |
-|---|---|---|---|
-| 逐样本标量 | `abs_values` / `hypot` / `scale_series` / `larger` | == 输入 | ✅ |
-| 逐样本多输出 | `quat_to_euler` / `worst_named` | == 输入 | ✅ 每个输出一条线 |
-| 归约标量 | `max` / `percentile` / `range_of` / `count_above` | 1 | ❌ 它不是曲线，是 finding 的证据 |
-| 换域 / 变长 | FFT、按窗 RMS、`head_tail_median_drop` | ≠ 输入，轴不再是时间 | ❌ 需要另立输出类型（谱图 / 统计块） |
+| 形状         | 例子                                               | 输出长度             | 能否进 `series`                      |
+| ------------ | -------------------------------------------------- | -------------------- | ------------------------------------ |
+| 逐样本标量   | `abs_values` / `hypot` / `scale_series` / `larger` | == 输入              | ✅                                   |
+| 逐样本多输出 | `quat_to_euler` / `worst_named`                    | == 输入              | ✅ 每个输出一条线                    |
+| 归约标量     | `max` / `percentile` / `range_of` / `count_above`  | 1                    | ❌ 它不是曲线，是 finding 的证据     |
+| 换域 / 变长  | FFT、按窗 RMS、`head_tail_median_drop`             | ≠ 输入，轴不再是时间 | ❌ 需要另立输出类型（谱图 / 统计块） |
 
 构建期卡一条：**被 `series` 引用的 `compute` 节点，输出形状必须是「逐样本」**——由签名声明，不靠人记得。归约算子只服务 `rules/`。
 
@@ -170,11 +170,11 @@ compute:
 
 ## 3. 通道引用：x / y / source 吃同一种东西
 
-| 写法 | 含义 | 状态 |
-|---|---|---|
-| `{field: [latitude_deg, lat], unit: deg}` | 原始列，**候选列表**按顺序取第一个存在的（字段名随固件改过） | 已支持 |
-| `{channel: att.roll}` | `compute` 的产物 | 已支持（但今天靠位置引用） |
-| `{topic: battery_status, instance: 0, fields: [voltage_v]}` | 行内指定话题/实例，少量临时用 | 已支持 |
+| 写法                                                        | 含义                                                         | 状态                       |
+| ----------------------------------------------------------- | ------------------------------------------------------------ | -------------------------- |
+| `{field: [latitude_deg, lat], unit: deg}`                   | 原始列，**候选列表**按顺序取第一个存在的（字段名随固件改过） | 已支持                     |
+| `{channel: att.roll}`                                       | `compute` 的产物                                             | 已支持（但今天靠位置引用） |
+| `{topic: battery_status, instance: 0, fields: [voltage_v]}` | 行内指定话题/实例，少量临时用                                | 已支持                     |
 
 `x`、`y`、`series[].*`、地图坐标、`compute.in` 全部是这一种类型。**行内话题**之所以保留，是因为它让"只画一条、不建注册表"的简单场景不必绕路。
 
@@ -184,22 +184,22 @@ compute:
 
 ### `container: axes`
 
-| `mode` | 说明 |
-|---|---|
+| `mode`   | 说明                                     |
+| -------- | ---------------------------------------- |
 | `series` | 一条或多条线，x 为时间（省略）或另一通道 |
 
 ### `container: map`
 
 地图上的一切都是「拿到一串坐标，决定相邻的连不连」。**一个 map = 有序 children 列表**（顺序即绘制层级）：
 
-| `mode` | 连接方式 | 语义 | 输入形状 |
-|---|---|---|---|
-| `path` | 相邻相连，**缺口断开** | 连续轨迹（实飞航迹、融合位置、设定轨迹） | **一个时序源** |
-| `points` | 不连 | 标记点（起飞点、家、极值点、告警时刻） | **N 个单点** |
-| `segments` | 每段两点，段间不连 | 直线段（A→B 参考线、航段、距离线） | **N 对单点** |
-| `area` | 首尾闭合成环 | 围栏 / 多边形 | 同 `segments`（闭合） |
+| `mode`     | 连接方式               | 语义                                     | 输入形状              |
+| ---------- | ---------------------- | ---------------------------------------- | --------------------- |
+| `path`     | 相邻相连，**缺口断开** | 连续轨迹（实飞航迹、融合位置、设定轨迹） | **一个时序源**        |
+| `points`   | 不连                   | 标记点（起飞点、家、极值点、告警时刻）   | **N 个单点**          |
+| `segments` | 每段两点，段间不连     | 直线段（A→B 参考线、航段、距离线）       | **N 对单点**          |
+| `area`     | 首尾闭合成环           | 围栏 / 多边形                            | 同 `segments`（闭合） |
 
-**关键区别**：`path` 的输入是*一个序列*，`points` / `segments` 的输入是*若干单点*——两类不同的东西，所以各自一个 `mode`，而不是共用一个字段。
+**关键区别**：`path` 的输入是_一个序列_，`points` / `segments` 的输入是_若干单点_——两类不同的东西，所以各自一个 `mode`，而不是共用一个字段。
 
 坐标源声明一次、多处引用（每个坐标本身也是 §3 的通道引用，`alt` 完全可以来自 `compute`）：
 
@@ -207,18 +207,18 @@ compute:
 - container: map
   title: 轨迹
   sources:
-    raw:                       # 原始 GNSS
-      topic: [vehicle_gps_position, sensor_gps]     # 候选列表天然表达「或」
+    raw: # 原始 GNSS
+      topic: [vehicle_gps_position, sensor_gps] # 候选列表天然表达「或」
       instance: 0
-      lat: {field: [latitude_deg, lat], unit: deg}
-      lon: {field: [longitude_deg, lon], unit: deg}
-      alt: {field: [altitude_msl_m, alt], unit: m}
-    est:                       # EKF 融合后
+      lat: { field: [latitude_deg, lat], unit: deg }
+      lon: { field: [longitude_deg, lon], unit: deg }
+      alt: { field: [altitude_msl_m, alt], unit: m }
+    est: # EKF 融合后
       topic: vehicle_global_position
       instance: 0
-      lat: {field: lat, unit: deg}
-      lon: {field: lon, unit: deg}
-      alt: {field: alt, unit: m}
+      lat: { field: lat, unit: deg }
+      lon: { field: lon, unit: deg }
+      alt: { field: alt, unit: m }
   children: [...]
 ```
 
@@ -230,11 +230,11 @@ compute:
 
 「画一点」和「画直线」真正难的不在画，在**取一个坐标**。四种取法：
 
-| `t` | 含义 |
-|---|---|
-| `12.3` | 该时刻的采样（在 source 上按时间查表） |
-| `first` / `last` | 首个 / 末个有效样本 |
-| `{max_of: alt}` | 极值样本（如最高点） |
+| `t`                    | 含义                                        |
+| ---------------------- | ------------------------------------------- |
+| `12.3`                 | 该时刻的采样（在 source 上按时间查表）      |
+| `first` / `last`       | 首个 / 末个有效样本                         |
+| `{max_of: alt}`        | 极值样本（如最高点）                        |
 | `{finding: ekf-reset}` | **规则引擎命中的时刻** ← 与 findings 层的桥 |
 
 于是：**点** = 1 个 resolver，**线段** = 2 个 resolver 的有序对（arity 由 schema 强制，写不出"3 个端点的线段"），**path** = 一个 source。
@@ -264,33 +264,33 @@ compute:
 
 ## 7. 属性归哪一层
 
-```
+```yaml
 文件      conditions · compute · sources(可选)     ← 整份配置共享的：前置条件、派生通道
-  └─ 容器  container · title · x · axes · grid/legend  ← 画布：几个坐标系、默认 x、图例与网格开关
-       └─ 图元  mode · source|y · decimate · gap      ← 一组几何：抽稀、缺口阈值、挂在哪个轴上
-            └─ 序列  field|channel · unit · label · style   ← 一条线一个对象
+└─ 容器  container · title · x · axes · grid/legend  ← 画布：几个坐标系、默认 x、图例与网格开关
+└─ 图元  mode · source|y · decimate · gap      ← 一组几何：抽稀、缺口阈值、挂在哪个轴上
+└─ 序列  field|channel · unit · label · style   ← 一条线一个对象
 ```
 
-| 属性 | 归属 | 理由 |
-|---|---|---|
-| `unit` / `range` / `flip` | **轴**（`axes`） | 同一画布可放单位不同的量，轴才是它们的分界线 |
-| `x` | **容器**默认，**图元**可覆盖 | 同一屏通常同一时间轴；相图要单独指定 |
-| `label`（图例）/ `color` / `width` / `dash` | **序列** | 一条线一个对象，不靠下标对齐 |
-| `decimate` / `gap` | **图元** | 实飞轨迹要抽稀，计划航线只有几十个航点不能抽 |
-| 有序性（绘制层级） | **children 顺序** | 后声明的画在上层，不引入 `z` 字段 |
-| `grid` / `legend` | **容器** | 是画布开关，不是线属性 |
+| 属性                                        | 归属                         | 理由                                         |
+| ------------------------------------------- | ---------------------------- | -------------------------------------------- |
+| `unit` / `range` / `flip`                   | **轴**（`axes`）             | 同一画布可放单位不同的量，轴才是它们的分界线 |
+| `x`                                         | **容器**默认，**图元**可覆盖 | 同一屏通常同一时间轴；相图要单独指定         |
+| `label`（图例）/ `color` / `width` / `dash` | **序列**                     | 一条线一个对象，不靠下标对齐                 |
+| `decimate` / `gap`                          | **图元**                     | 实飞轨迹要抽稀，计划航线只有几十个航点不能抽 |
+| 有序性（绘制层级）                          | **children 顺序**            | 后声明的画在上层，不引入 `z` 字段            |
+| `grid` / `legend`                           | **容器**                     | 是画布开关，不是线属性                       |
 
 ---
 
 ## 8. 落到实现
 
-| 层 | 改动 |
-|---|---|
-| engine | `report_data.py`：`np_series` 换成"按 `compute` 图求值"（拓扑序执行、输出按**名字**入 `series`）；`px4.py` 新增 `get_map_layers()`（抽稀 / 断开 / 点解析都在 Python 侧） |
-| 契约 | `providers/api.py` 登记可选能力 `map_layers`；`np_series` 返回从「键 = `out_names`」改成「键 = YAML 给的名字」 |
-| 前端 | `LogCharts.tsx` 删掉 `opLabels[i]` 位置对齐、改按名字取图例；`LogFlightMap` 改成吃 `layers[]`，按 `mode` 分派到 Leaflet 的 `Polyline` / `CircleMarker` / 2 点 `Polyline` / `Polygon` |
-| 构建期校验 | 见下表——**声明式配置的成败在这**，否则"字段写错就跳过"的结果是页面少一条线、没人发现 |
-| 回归 | 沿用 `tools/calibrate/`：`guard-px4log-provider.py` 对 6 份冻结基线逐份校验 `map_layers` 契约；`compute` 求值进基线逐字段比对 |
+| 层         | 改动                                                                                                                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| engine     | `report_data.py`：`np_series` 换成"按 `compute` 图求值"（拓扑序执行、输出按**名字**入 `series`）；`px4.py` 新增 `get_map_layers()`（抽稀 / 断开 / 点解析都在 Python 侧）             |
+| 契约       | `providers/api.py` 登记可选能力 `map_layers`；`np_series` 返回从「键 = `out_names`」改成「键 = YAML 给的名字」                                                                       |
+| 前端       | `LogCharts.tsx` 删掉 `opLabels[i]` 位置对齐、改按名字取图例；`LogFlightMap` 改成吃 `layers[]`，按 `mode` 分派到 Leaflet 的 `Polyline` / `CircleMarker` / 2 点 `Polyline` / `Polygon` |
+| 构建期校验 | 见下表——**声明式配置的成败在这**，否则"字段写错就跳过"的结果是页面少一条线、没人发现                                                                                                 |
+| 回归       | 沿用 `tools/calibrate/`：`guard-px4log-provider.py` 对 6 份冻结基线逐份校验 `map_layers` 契约；`compute` 求值进基线逐字段比对                                                        |
 
 构建期必须卡住的：
 
