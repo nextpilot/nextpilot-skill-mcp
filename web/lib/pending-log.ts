@@ -8,52 +8,52 @@ const STORE = "pending";
 const KEY = "log";
 
 function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
 }
 
 export async function putPendingLog(file: File): Promise<boolean> {
-  if (typeof indexedDB === "undefined") return false;
-  try {
-    const db = await openDb();
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).put(file, KEY);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-    db.close();
-    return true;
-  } catch {
-    return false;
-  }
+    if (typeof indexedDB === "undefined") return false;
+    try {
+        const db = await openDb();
+        await new Promise<void>((resolve, reject) => {
+            const tx = db.transaction(STORE, "readwrite");
+            tx.objectStore(STORE).put(file, KEY);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+        db.close();
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 export async function takePendingLog(): Promise<File | null> {
-  if (typeof indexedDB === "undefined") return null;
-  try {
-    const db = await openDb();
-    const file = await new Promise<File | null>((resolve, reject) => {
-      const tx = db.transaction(STORE, "readwrite");
-      const store = tx.objectStore(STORE);
-      const get = store.get(KEY);
-      get.onsuccess = () => {
-        const value = get.result as File | undefined;
-        store.delete(KEY);
-        resolve(value instanceof File ? value : null);
-      };
-      get.onerror = () => reject(get.error);
-    });
-    db.close();
-    return file;
-  } catch {
-    return null;
-  }
+    if (typeof indexedDB === "undefined") return null;
+    try {
+        const db = await openDb();
+        const file = await new Promise<File | null>((resolve, reject) => {
+            const tx = db.transaction(STORE, "readwrite");
+            const store = tx.objectStore(STORE);
+            const get = store.get(KEY);
+            get.onsuccess = () => {
+                const value = get.result as File | undefined;
+                store.delete(KEY);
+                resolve(value instanceof File ? value : null);
+            };
+            get.onerror = () => reject(get.error);
+        });
+        db.close();
+        return file;
+    } catch {
+        return null;
+    }
 }

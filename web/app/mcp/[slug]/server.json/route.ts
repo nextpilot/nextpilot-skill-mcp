@@ -20,34 +20,34 @@ import { MCP_DIR } from "@/lib/content-dir";
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const JSON_HEADERS = {
-  "content-type": "application/json; charset=utf-8",
-  "cache-control": "public, max-age=300",
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "public, max-age=300",
 } as const;
 
 export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+    const { slug } = await params;
 
-  if (!SLUG_RE.test(slug)) {
-    return Response.json(
-      { error: `slug 不是合法目录名（只接受小写字母数字与连字符）：${slug}` },
-      { status: 400, headers: JSON_HEADERS },
-    );
-  }
+    if (!SLUG_RE.test(slug)) {
+        return Response.json(
+            { error: `slug 不是合法目录名（只接受小写字母数字与连字符）：${slug}` },
+            { status: 400, headers: JSON_HEADERS },
+        );
+    }
 
-  const file = path.join(MCP_DIR, slug, "server.json");
-  if (!fs.existsSync(file)) {
-    const dirExists = fs.existsSync(path.join(MCP_DIR, slug));
-    return Response.json(
-      {
-        error: dirExists
-          ? `${slug} 还没有 server.json：上游未核实（README frontmatter 的 upstream_status 为 pending），核实后才能填 manifest`
-          : `没有这个 MCP 条目：${slug}`,
-      },
-      { status: 404, headers: JSON_HEADERS },
-    );
-  }
+    const file = path.join(MCP_DIR, slug, "server.json");
+    if (!fs.existsSync(file)) {
+        const dirExists = fs.existsSync(path.join(MCP_DIR, slug));
+        return Response.json(
+            {
+                error: dirExists
+                    ? `${slug} 还没有 server.json：上游未核实（README frontmatter 的 upstream_status 为 pending），核实后才能填 manifest`
+                    : `没有这个 MCP 条目：${slug}`,
+            },
+            { status: 404, headers: JSON_HEADERS },
+        );
+    }
 
-  // 原样返回，不 JSON.parse 再 stringify：那会改掉缩进，也会把站点不认识的字段留成原样却
-  // 让人以为是"被处理过"的产物。文件本身已由 check-mcp-spec.mjs 保证是合法 JSON。
-  return new Response(fs.readFileSync(file, "utf8"), { status: 200, headers: JSON_HEADERS });
+    // 原样返回，不 JSON.parse 再 stringify：那会改掉缩进，也会把站点不认识的字段留成原样却
+    // 让人以为是"被处理过"的产物。文件本身已由 check-mcp-spec.mjs 保证是合法 JSON。
+    return new Response(fs.readFileSync(file, "utf8"), { status: 200, headers: JSON_HEADERS });
 }

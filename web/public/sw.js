@@ -23,67 +23,67 @@ const PYULOG_WHEEL = params.get("wheel") || "";
 
 /** 运行时资源的地址前缀（命中即缓存） */
 const RUNTIME_PREFIXES = [
-  PYODIDE_INDEX,
-  PYULOG_WHEEL,
-  // 没配自托管 wheel 时，micropip 会走 PyPI：索引页 no-cache，正是最该缓存的那一步
-  "https://pypi.org/simple/",
-  "https://files.pythonhosted.org/",
+    PYODIDE_INDEX,
+    PYULOG_WHEEL,
+    // 没配自托管 wheel 时，micropip 会走 PyPI：索引页 no-cache，正是最该缓存的那一步
+    "https://pypi.org/simple/",
+    "https://files.pythonhosted.org/",
 ].filter(Boolean);
 
 // 缓存名带上配置指纹：换源/升级后自动启用新缓存，旧的在 activate 里删掉
 const CONFIG_KEY = `${PYODIDE_INDEX}|${PYULOG_WHEEL}`;
 let configHash = 0;
 for (let i = 0; i < CONFIG_KEY.length; i++) {
-  configHash = (configHash * 31 + CONFIG_KEY.charCodeAt(i)) | 0;
+    configHash = (configHash * 31 + CONFIG_KEY.charCodeAt(i)) | 0;
 }
 const CACHE_NAME = `nextpilot-runtime-${(configHash >>> 0).toString(36)}`;
 
 const isRuntimeRequest = (url) => RUNTIME_PREFIXES.some((p) => url.startsWith(p));
 
 self.addEventListener("install", () => {
-  // 新版本立即接管，不阻塞在 waiting 状态（运行时不涉及数据迁移，安全）
-  self.skipWaiting();
+    // 新版本立即接管，不阻塞在 waiting 状态（运行时不涉及数据迁移，安全）
+    self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    (async () => {
-      // 只留当前配置的缓存
-      for (const key of await caches.keys()) {
-        if (key.startsWith("nextpilot-runtime-") && key !== CACHE_NAME) await caches.delete(key);
-      }
-      await self.clients.claim();
-    })(),
-  );
+    event.waitUntil(
+        (async () => {
+            // 只留当前配置的缓存
+            for (const key of await caches.keys()) {
+                if (key.startsWith("nextpilot-runtime-") && key !== CACHE_NAME) await caches.delete(key);
+            }
+            await self.clients.claim();
+        })(),
+    );
 });
 
 self.addEventListener("fetch", (event) => {
-  const req = event.request;
-  if (req.method !== "GET") return;
+    const req = event.request;
+    if (req.method !== "GET") return;
 
-  let url;
-  try {
-    url = new URL(req.url);
-  } catch {
-    return;
-  }
-  if (url.protocol !== "https:") return;
-  if (!isRuntimeRequest(req.url)) return; // 其余一律直连（不缓存站点资源与 API）
-  // 带 Range 的请求（部分取）不缓存：缓存整体响应会破坏后续按段请求的语义
-  if (req.headers.get("range")) return;
+    let url;
+    try {
+        url = new URL(req.url);
+    } catch {
+        return;
+    }
+    if (url.protocol !== "https:") return;
+    if (!isRuntimeRequest(req.url)) return; // 其余一律直连（不缓存站点资源与 API）
+    // 带 Range 的请求（部分取）不缓存：缓存整体响应会破坏后续按段请求的语义
+    if (req.headers.get("range")) return;
 
-  event.respondWith(
-    (async () => {
-      const cache = await caches.open(CACHE_NAME);
-      const hit = await cache.match(req);
-      if (hit) return hit;
+    event.respondWith(
+        (async () => {
+            const cache = await caches.open(CACHE_NAME);
+            const hit = await cache.match(req);
+            if (hit) return hit;
 
-      const resp = await fetch(req);
-      // 只存成功的响应；写缓存失败（配额等）不影响本次返回
-      if (resp && resp.ok) {
-        cache.put(req, resp.clone()).catch(() => {});
-      }
-      return resp;
-    })(),
-  );
+            const resp = await fetch(req);
+            // 只存成功的响应；写缓存失败（配额等）不影响本次返回
+            if (resp && resp.ok) {
+                cache.put(req, resp.clone()).catch(() => {});
+            }
+            return resp;
+        })(),
+    );
 });

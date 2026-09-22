@@ -6,11 +6,11 @@
  * 隐私承诺、免责声明。句尾不带标点，由落点自己补句号。
  */
 export const LOG_PRIVACY_NOTE = {
-  zh: "日志在浏览器本地解析，原始文件不上传",
-  en: "Logs are parsed locally in your browser; raw files are never uploaded",
+    zh: "日志在浏览器本地解析，原始文件不上传",
+    en: "Logs are parsed locally in your browser; raw files are never uploaded",
 } as const;
 
 export const ANALYSIS_DISCLAIMER = {
-  zh: "分析结果为辅助判读，不能完全替代人工排查",
-  en: "Analysis results assist interpretation and cannot fully replace human troubleshooting",
+    zh: "分析结果为辅助判读，不能完全替代人工排查",
+    en: "Analysis results assist interpretation and cannot fully replace human troubleshooting",
 } as const;

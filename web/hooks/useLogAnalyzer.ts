@@ -1,13 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type {
-    AnalysisReport,
-    LogInfo,
-    SeriesResponse,
-    TopicManifest,
-    TrackData,
-} from "@/lib/types";
+import type { AnalysisReport, LogInfo, SeriesResponse, TopicManifest, TrackData } from "@/lib/types";
 import type { WorkerOutMessage, WorkerStage } from "@/workers/ulog-worker";
 import {
     resolvePlotPanels,
@@ -157,7 +151,7 @@ let liveAnalysis: {
     id: string;
     manifest: TopicManifest;
     info: LogInfo;
-    storedPlots?: { panels: StoredPlotPanel[]; series: StoredPlotSeries; };
+    storedPlots?: { panels: StoredPlotPanel[]; series: StoredPlotSeries };
 } | null = null;
 
 export function useLogAnalyzer() {
@@ -165,7 +159,7 @@ export function useLogAnalyzer() {
     const pendingRef = useRef<Map<string, (data: unknown) => void>>(new Map());
     const reqIdRef = useRef(0);
     const reportIdRef = useRef<string>("");
-    const pendingFileRef = useRef<{ name: string; size: number; }>({ name: "", size: 0 });
+    const pendingFileRef = useRef<{ name: string; size: number }>({ name: "", size: 0 });
     const pendingHashRef = useRef<string>("");
     const pendingAiRef = useRef<string | null>(null);
     /** **当前显示的报告**带的那份 AI 解读，跟着 state 走。
@@ -216,7 +210,7 @@ export function useLogAnalyzer() {
     const lastInfoRef = useRef<LogInfo | null>(null);
     /** 轨迹（地图用）：存档里有就直接画，没有就问 Worker 要 */
     const [storedTrack, setStoredTrack] = useState<TrackData | null>(null);
-    const [cacheInfo, setCacheInfo] = useState<{ entries: number; bytes: number; }>({
+    const [cacheInfo, setCacheInfo] = useState<{ entries: number; bytes: number }>({
         entries: 0,
         bytes: 0,
     });
@@ -232,36 +226,34 @@ export function useLogAnalyzer() {
             const resp = await fetch("/api/reports", { cache: "no-store" });
             if (!resp.ok) return [];
             const data = await resp.json();
-            return (data.reports ?? []).map(
-                (r: Record<string, unknown>): HistoryItem => ({
-                    id: String(r.id),
-                    fileName: String(r.fileName ?? ""),
-                    fileSize: Number(r.fileSize ?? 0),
+            return (data.reports ?? []).map((r: Record<string, unknown>): HistoryItem => ({
+                id: String(r.id),
+                fileName: String(r.fileName ?? ""),
+                fileSize: Number(r.fileSize ?? 0),
+                durationSec: Number(r.durationSec ?? 0) || undefined,
+                platform: String(r.platform ?? "px4"),
+                vehicleType: (r.vehicleType as string) ?? undefined,
+                parserVersion: String(r.parserVersion ?? ""),
+                logHash: r.logHash ? String(r.logHash) : undefined,
+                verSw: r.verSw ? String(r.verSw) : undefined,
+                verHw: r.verHw ? String(r.verHw) : undefined,
+                facts: {
                     durationSec: Number(r.durationSec ?? 0) || undefined,
-                    platform: String(r.platform ?? "px4"),
-                    vehicleType: (r.vehicleType as string) ?? undefined,
-                    parserVersion: String(r.parserVersion ?? ""),
-                    logHash: r.logHash ? String(r.logHash) : undefined,
-                    verSw: r.verSw ? String(r.verSw) : undefined,
-                    verHw: r.verHw ? String(r.verHw) : undefined,
-                    facts: {
-                        durationSec: Number(r.durationSec ?? 0) || undefined,
-                        startUtc: typeof r.startUtc === "number" ? r.startUtc : undefined,
-                        airframeId: typeof r.airframeId === "number" ? r.airframeId : undefined,
-                        // 软件版本串跟着云端记录一起带回来，否则云端行会退回裸哈希、
-                        // 与同一份日志的本地行显示不一致（见 lib/format.ts 的 formatFirmware）
-                        firmwareDisplay: r.firmwareDisplay ? String(r.firmwareDisplay) : undefined,
-                        fwReleaseType: typeof r.fwReleaseType === "number" ? r.fwReleaseType : null,
-                        firmware: r.firmware ? String(r.firmware) : undefined,
-                    },
-                    findings: [],
-                    findingCount: Number(r.findingCount ?? 0),
-                    metrics: [],
-                    aiMarkdown: null,
-                    analyzedAt: String(r.analyzedAt),
-                    source: "cloud",
-                }),
-            );
+                    startUtc: typeof r.startUtc === "number" ? r.startUtc : undefined,
+                    airframeId: typeof r.airframeId === "number" ? r.airframeId : undefined,
+                    // 软件版本串跟着云端记录一起带回来，否则云端行会退回裸哈希、
+                    // 与同一份日志的本地行显示不一致（见 lib/format.ts 的 formatFirmware）
+                    firmwareDisplay: r.firmwareDisplay ? String(r.firmwareDisplay) : undefined,
+                    fwReleaseType: typeof r.fwReleaseType === "number" ? r.fwReleaseType : null,
+                    firmware: r.firmware ? String(r.firmware) : undefined,
+                },
+                findings: [],
+                findingCount: Number(r.findingCount ?? 0),
+                metrics: [],
+                aiMarkdown: null,
+                analyzedAt: String(r.analyzedAt),
+                source: "cloud",
+            }));
         } catch {
             return [];
         }
@@ -293,33 +285,29 @@ export function useLogAnalyzer() {
         }
     }, [refreshCloud]);
 
-
-    const persist = useCallback(
-        (r: AnalysisReport, id: string, ai: string | null, hash?: string) => {
-            saveReport({
-                id,
-                fileName: r.fileName,
-                fileSize: r.fileSize,
-                durationSec: r.facts?.durationSec,
-                platform: r.platform,
-                vehicleType: r.facts?.vehicleType,
-                verSw: r.verSw,
-                verHw: r.verHw,
-                parserVersion: r.parserVersion,
-                logHash: hash ?? r.logHash,
-                findings: r.findings,
-                facts: r.facts,
-                metrics: r.metrics,
-                tags: r.tags,
-                guardTags: r.guardTags,
-                matchedFaults: r.matchedFaults,
-                aiMarkdown: ai,
-                analyzedAt: r.analyzedAt,
-            });
-            setHistory(listReports());
-        },
-        [],
-    );
+    const persist = useCallback((r: AnalysisReport, id: string, ai: string | null, hash?: string) => {
+        saveReport({
+            id,
+            fileName: r.fileName,
+            fileSize: r.fileSize,
+            durationSec: r.facts?.durationSec,
+            platform: r.platform,
+            vehicleType: r.facts?.vehicleType,
+            verSw: r.verSw,
+            verHw: r.verHw,
+            parserVersion: r.parserVersion,
+            logHash: hash ?? r.logHash,
+            findings: r.findings,
+            facts: r.facts,
+            metrics: r.metrics,
+            tags: r.tags,
+            guardTags: r.guardTags,
+            matchedFaults: r.matchedFaults,
+            aiMarkdown: ai,
+            analyzedAt: r.analyzedAt,
+        });
+        setHistory(listReports());
+    }, []);
 
     const explain = useCallback(
         async (r: AnalysisReport, id: string) => {
@@ -420,55 +408,51 @@ export function useLogAnalyzer() {
      *
      * 同一份日志的并发请求共用一次解析（analyzeInFlight 去重），不会解析好几遍。
      */
-    const ensureLogLoaded = useCallback(
-        async (hash: string): Promise<boolean> => {
-            if (!hash) return false;
-            if (workerLoadedHash === hash) return true;
-            const running = analyzeInFlight.get(hash);
-            if (running) return running;
-            const job = (async () => {
-                const worker = getSharedWorker();
-                if (!worker) return false;
-                // 字节来源一：刚选中的那份（handleFile / recoverWithFile 都经过 parseBytes）
-                let bytes: Uint8Array | null =
-                    pendingBytesHashRef.current === hash ? pendingBytesRef.current : null;
-                let name = pendingFileRef.current.name;
-                if (!bytes) {
-                    // 字节来源二：本机日志缓存（从历史打开报告时走这条）
-                    const cached = await getCachedLog(hash);
-                    if (cached) {
-                        bytes = cached.bytes;
-                        name = cached.name || name;
-                    }
+    const ensureLogLoaded = useCallback(async (hash: string): Promise<boolean> => {
+        if (!hash) return false;
+        if (workerLoadedHash === hash) return true;
+        const running = analyzeInFlight.get(hash);
+        if (running) return running;
+        const job = (async () => {
+            const worker = getSharedWorker();
+            if (!worker) return false;
+            // 字节来源一：刚选中的那份（handleFile / recoverWithFile 都经过 parseBytes）
+            let bytes: Uint8Array | null = pendingBytesHashRef.current === hash ? pendingBytesRef.current : null;
+            let name = pendingFileRef.current.name;
+            if (!bytes) {
+                // 字节来源二：本机日志缓存（从历史打开报告时走这条）
+                const cached = await getCachedLog(hash);
+                if (cached) {
+                    bytes = cached.bytes;
+                    name = cached.name || name;
                 }
-                if (!bytes) return false;
-                const parsed = new Promise<boolean>((resolve) => {
-                    const list = analyzeWaitersRef.current.get(hash) ?? [];
-                    list.push(resolve);
-                    analyzeWaitersRef.current.set(hash, list);
-                });
-                // priorAi 沿用**当前显示的报告**那份解读：这次解析只是把数据装进 Worker，
-                // 不该把花过额度生成的 AI 报告覆盖成空。用 aiMarkdownRef 而不是 pendingAiRef——
-                // 后者是"上一次解析那份日志的 priorAi"，从历史打开另一份报告时它还是上一份的
-                // 值（常常是 null），拿它去补解析正好把这份报告的 AI 抹掉。
-                parseBytesRef.current?.(bytes, {
-                    name,
-                    size: bytes.byteLength,
-                    hash,
-                    reportId: reportIdRef.current,
-                    priorAi: aiMarkdownRef.current,
-                });
-                return parsed;
-            })();
-            analyzeInFlight.set(hash, job);
-            try {
-                return await job;
-            } finally {
-                analyzeInFlight.delete(hash);
             }
-        },
-        [],
-    );
+            if (!bytes) return false;
+            const parsed = new Promise<boolean>((resolve) => {
+                const list = analyzeWaitersRef.current.get(hash) ?? [];
+                list.push(resolve);
+                analyzeWaitersRef.current.set(hash, list);
+            });
+            // priorAi 沿用**当前显示的报告**那份解读：这次解析只是把数据装进 Worker，
+            // 不该把花过额度生成的 AI 报告覆盖成空。用 aiMarkdownRef 而不是 pendingAiRef——
+            // 后者是"上一次解析那份日志的 priorAi"，从历史打开另一份报告时它还是上一份的
+            // 值（常常是 null），拿它去补解析正好把这份报告的 AI 抹掉。
+            parseBytesRef.current?.(bytes, {
+                name,
+                size: bytes.byteLength,
+                hash,
+                reportId: reportIdRef.current,
+                priorAi: aiMarkdownRef.current,
+            });
+            return parsed;
+        })();
+        analyzeInFlight.set(hash, job);
+        try {
+            return await job;
+        } finally {
+            analyzeInFlight.delete(hash);
+        }
+    }, []);
 
     const requestSeries = useCallback(
         async (req: SeriesRequest): Promise<SeriesResponse> => {
@@ -573,32 +557,35 @@ export function useLogAnalyzer() {
         setStoredTrack(null);
     }, []);
 
-    const viewSaved = useCallback((saved: SavedReport) => {
-        setError(null);
-        setManifest(null);
-        setInfo(null);
-        setAiMarkdown(saved.aiMarkdown);
-        // 换了报告就把上一份的派生数据丢掉再换 id：这两步必须挨着，
-        // 否则"当前显示的 id"与"state 里的曲线轨迹"会各说各话
-        dropOtherReportData(saved.id);
-        reportIdRef.current = saved.id;
-        pendingHashRef.current = saved.logHash ?? "";
-        setReport({
-            fileName: saved.fileName,
-            fileSize: saved.fileSize,
-            platform: saved.platform as AnalysisReport["platform"],
-            parserVersion: saved.parserVersion,
-            logHash: saved.logHash,
-            findings: saved.findings,
-            facts: saved.facts,
-            metrics: saved.metrics,
-            tags: saved.tags,
-            guardTags: saved.guardTags,
-            matchedFaults: saved.matchedFaults,
-            analyzedAt: saved.analyzedAt,
-        });
-        setStage("done");
-    }, [dropOtherReportData]);
+    const viewSaved = useCallback(
+        (saved: SavedReport) => {
+            setError(null);
+            setManifest(null);
+            setInfo(null);
+            setAiMarkdown(saved.aiMarkdown);
+            // 换了报告就把上一份的派生数据丢掉再换 id：这两步必须挨着，
+            // 否则"当前显示的 id"与"state 里的曲线轨迹"会各说各话
+            dropOtherReportData(saved.id);
+            reportIdRef.current = saved.id;
+            pendingHashRef.current = saved.logHash ?? "";
+            setReport({
+                fileName: saved.fileName,
+                fileSize: saved.fileSize,
+                platform: saved.platform as AnalysisReport["platform"],
+                parserVersion: saved.parserVersion,
+                logHash: saved.logHash,
+                findings: saved.findings,
+                facts: saved.facts,
+                metrics: saved.metrics,
+                tags: saved.tags,
+                guardTags: saved.guardTags,
+                matchedFaults: saved.matchedFaults,
+                analyzedAt: saved.analyzedAt,
+            });
+            setStage("done");
+        },
+        [dropOtherReportData],
+    );
 
     const findExistingByHash = useCallback(
         async (hash: string): Promise<HistoryItem | null> => {
@@ -726,14 +713,15 @@ export function useLogAnalyzer() {
         };
     }, [handleWorkerMessage, refreshMe]);
 
-    /** 拿共享 Worker；本 hook 的监听器在挂载 effect 里注册（只注册一次） */    const ensureWorker = useCallback((): Worker | null => {
-        const worker = getSharedWorker();
-        if (!worker) {
-            setError("本地解析引擎无法启动（浏览器不支持 Web Worker？）");
-            setStage("idle");
-        }
-        return worker;
-    }, []);
+    /** 拿共享 Worker；本 hook 的监听器在挂载 effect 里注册（只注册一次） */ const ensureWorker =
+        useCallback((): Worker | null => {
+            const worker = getSharedWorker();
+            if (!worker) {
+                setError("本地解析引擎无法启动（浏览器不支持 Web Worker？）");
+                setStage("idle");
+            }
+            return worker;
+        }, []);
 
     const parseBytes = useCallback(
         (bytes: Uint8Array, meta: ParseBytesMeta) => {
@@ -777,9 +765,7 @@ export function useLogAnalyzer() {
 
     /** 读存档的派生数据并填充 UI；告诉调用方"参数/消息"与"曲线"各有没有、是不是旧引擎生成的 */
     const loadReportData = useCallback(
-        async (
-            id: string,
-        ): Promise<{ hasInfo: boolean; hasPlots: boolean; hasTrack: boolean; stale: boolean; }> => {
+        async (id: string): Promise<{ hasInfo: boolean; hasPlots: boolean; hasTrack: boolean; stale: boolean }> => {
             const data = await getReportData(id);
             if (!data) return { hasInfo: false, hasPlots: false, hasTrack: false, stale: false };
             // 派生数据的形状随引擎改（多值信息分行、新增 infoDict…）：版本不对就当作"得重新解析"，
@@ -825,9 +811,7 @@ export function useLogAnalyzer() {
      *  "重新选择该 .ulg 文件即可恢复"变成空话）。
      */
     const openSaved = useCallback(
-        async (
-            saved: Partial<SavedReport>,
-        ): Promise<{ reparsing: boolean; stale: boolean; incomplete: boolean }> => {
+        async (saved: Partial<SavedReport>): Promise<{ reparsing: boolean; stale: boolean; incomplete: boolean }> => {
             // **归一放在这里，不放在调用方。** openSaved 是"打开一份存档"的唯一入口，
             // 四个调用点里有三个是外部数据：索引库旧记录、云端列表摘要、/api/reports/:id
             // 取回的完整记录（后者是 7 天 TTL 内的任意历史版本写的，字段可能缺）。
@@ -884,12 +868,10 @@ export function useLogAnalyzer() {
             try {
                 const bytes = new Uint8Array(await file.arrayBuffer());
 
-                const hash =
-                    (await hashLogBytes(bytes)) ||
-                    fallbackLogKey(file.name, file.size, file.lastModified);
+                const hash = (await hashLogBytes(bytes)) || fallbackLogKey(file.name, file.size, file.lastModified);
                 const existing = await findExistingByHash(hash);
                 if (existing) {
-                    let opened: { reparsing: boolean; stale: boolean; incomplete: boolean; } = {
+                    let opened: { reparsing: boolean; stale: boolean; incomplete: boolean } = {
                         reparsing: false,
                         stale: false,
                         incomplete: false,
@@ -929,8 +911,8 @@ export function useLogAnalyzer() {
                         !reparsing
                             ? "这份日志此前已分析过（内容一致），已直接载入历史结论，未重复解析。"
                             : opened.stale
-                                ? "这份日志此前已分析过，但那份存档是旧版本引擎生成的（消息/参数的呈现方式已更新），已重新解析一遍。"
-                                : "这份日志此前已分析过，但本机存档里缺图表或轨迹数据，已用你选择的文件重新解析补齐（AI 报告保留）。",
+                              ? "这份日志此前已分析过，但那份存档是旧版本引擎生成的（消息/参数的呈现方式已更新），已重新解析一遍。"
+                              : "这份日志此前已分析过，但本机存档里缺图表或轨迹数据，已用你选择的文件重新解析补齐（AI 报告保留）。",
                     );
                     return existing.id;
                 }
@@ -950,9 +932,7 @@ export function useLogAnalyzer() {
                 return reportId;
             } catch (err) {
                 setStage("idle");
-                setError(
-                    `日志上传失败：${err instanceof Error ? err.message : String(err)}。请确认文件未损坏后重试。`,
-                );
+                setError(`日志上传失败：${err instanceof Error ? err.message : String(err)}。请确认文件未损坏后重试。`);
                 return null;
             }
         },
@@ -983,9 +963,7 @@ export function useLogAnalyzer() {
             }
             try {
                 const bytes = new Uint8Array(await file.arrayBuffer());
-                const hash =
-                    (await hashLogBytes(bytes)) ||
-                    fallbackLogKey(file.name, file.size, file.lastModified);
+                const hash = (await hashLogBytes(bytes)) || fallbackLogKey(file.name, file.size, file.lastModified);
                 if (report?.logHash && hash && hash !== report.logHash) {
                     setError(
                         `这份文件和当前报告不是同一份日志（内容指纹不同）。当前报告来自 ${report.fileName}，请选择那一份。`,
@@ -1002,9 +980,7 @@ export function useLogAnalyzer() {
                 });
                 return true;
             } catch (err) {
-                setError(
-                    `日志读取失败：${err instanceof Error ? err.message : String(err)}。请确认文件未损坏后重试。`,
-                );
+                setError(`日志读取失败：${err instanceof Error ? err.message : String(err)}。请确认文件未损坏后重试。`);
                 return false;
             }
         },

@@ -19,17 +19,17 @@ export const SITE_VERSION = { version, commit, updatedAt };
 
 /** 三个值都在（构建期把版本与日期都注入了）才算一份完整的版本信息 */
 export function hasSiteVersion(): boolean {
-  return Boolean(version && updatedAt);
+    return Boolean(version && updatedAt);
 }
 
 /** footer 徽标上的展示串：`v0.1.0 · 2026-09-21 23:59:26`（精确到秒，一天内多次构建才分得清先后）。缺哪一项就只给另一项，都不缺才拼在一起。 */
 export function siteVersionLabel(): string {
-  if (version && updatedAt) return `v${version} · ${updatedAt}`;
-  if (version) return `v${version}`;
-  return updatedAt;
+    if (version && updatedAt) return `v${version} · ${updatedAt}`;
+    if (version) return `v${version}`;
+    return updatedAt;
 }
 
 /** 悬停提示：把短哈希一并给出（版本号之外唯一能定位到"线上跑的是哪次构建"的信息） */
 export function siteVersionTitle(): string {
-  return commit ? `构建提交 ${commit}` : "";
+    return commit ? `构建提交 ${commit}` : "";
 }

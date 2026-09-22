@@ -3,7 +3,7 @@
 const encoder = new TextEncoder();
 
 function toBytes(input) {
-  return typeof input === "string" ? encoder.encode(input) : new Uint8Array(input);
+    return typeof input === "string" ? encoder.encode(input) : new Uint8Array(input);
 }
 
 /**
@@ -14,22 +14,16 @@ function toBytes(input) {
  * @returns {Promise<Uint8Array>}
  */
 export async function hkdf(ikmInput, salt, info, length = 64) {
-  const baseKey = await crypto.subtle.importKey(
-    "raw",
-    toBytes(ikmInput),
-    "HKDF",
-    false,
-    ["deriveBits"],
-  );
-  const bits = await crypto.subtle.deriveBits(
-    {
-      name: "HKDF",
-      hash: "SHA-256",
-      salt: toBytes(salt ?? ""),
-      info: toBytes(info ?? ""),
-    },
-    baseKey,
-    length * 8,
-  );
-  return new Uint8Array(bits);
+    const baseKey = await crypto.subtle.importKey("raw", toBytes(ikmInput), "HKDF", false, ["deriveBits"]);
+    const bits = await crypto.subtle.deriveBits(
+        {
+            name: "HKDF",
+            hash: "SHA-256",
+            salt: toBytes(salt ?? ""),
+            info: toBytes(info ?? ""),
+        },
+        baseKey,
+        length * 8,
+    );
+    return new Uint8Array(bits);
 }

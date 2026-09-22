@@ -1,2 +1,8 @@
+# pnpm 构建脚本审批表。
+#
+# unrs-resolver 是 typescript-eslint 的传递依赖。它的构建脚本只用于编译原生解析器，
+# 编译不出来时该包会退回纯 JS 实现——对本仓库的用途（跑 lint）没有影响。
+# 所以这里显式拒绝执行，而不是留着待填的占位文本：
+# 占位文本会让 pnpm 每次 install 都以 ERR_PNPM_IGNORED_BUILDS 收尾。
 allowBuilds:
-  unrs-resolver: set this to true or false
+    unrs-resolver: false

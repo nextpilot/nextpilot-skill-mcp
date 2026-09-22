@@ -26,40 +26,38 @@ const OUT = resolve(webRoot, ".generated");
 
 /** [仓库内的真源目录, 拷到 .generated/ 下的哪个子目录] —— 与 lib/content-dir.ts 一一对应 */
 const SOURCES = [
-  ["docs/guide", "guide"],
-  ["knowledge/skills", "skills"],
-  ["knowledge/mcp", "mcp"],
+    ["docs/guide", "guide"],
+    ["knowledge/skills", "skills"],
+    ["knowledge/mcp", "mcp"],
 ];
 
 function syncOne([srcRel, destName]) {
-  const src = resolve(repoRoot, srcRel);
-  // 真源没了就**构建失败**，别静默产出一个空站点：报清楚缺哪个目录、真源应该在哪
-  if (!existsSync(src)) {
-    throw new Error(
-      `内容源不存在：${srcRel}/（仓库根 ${repoRoot}）——真源被挪走了？改本脚本的 SOURCES`,
-    );
-  }
-  const dest = resolve(OUT, destName);
-  // 先清后拷：源里删掉的文件不该留在产物里。.generated 是一次性目录，不留历史。
-  rmSync(dest, { recursive: true, force: true });
-  mkdirSync(dest, { recursive: true });
-  cpSync(src, dest, { recursive: true });
-  return `${srcRel}/ → .generated/${destName}/`;
+    const src = resolve(repoRoot, srcRel);
+    // 真源没了就**构建失败**，别静默产出一个空站点：报清楚缺哪个目录、真源应该在哪
+    if (!existsSync(src)) {
+        throw new Error(`内容源不存在：${srcRel}/（仓库根 ${repoRoot}）——真源被挪走了？改本脚本的 SOURCES`);
+    }
+    const dest = resolve(OUT, destName);
+    // 先清后拷：源里删掉的文件不该留在产物里。.generated 是一次性目录，不留历史。
+    rmSync(dest, { recursive: true, force: true });
+    mkdirSync(dest, { recursive: true });
+    cpSync(src, dest, { recursive: true });
+    return `${srcRel}/ → .generated/${destName}/`;
 }
 
 function syncAll() {
-  console.log("content synced: " + SOURCES.map(syncOne).join("; "));
+    console.log("content synced: " + SOURCES.map(syncOne).join("; "));
 }
 
 syncAll();
 
 // 写内容时开着它：改 docs/guide 里的 mdx 不用重启 dev（recursive 在 Windows / Linux 都支持）
 if (process.argv.includes("--watch")) {
-  for (const [srcRel] of SOURCES) {
-    watch(resolve(repoRoot, srcRel), { recursive: true }, (_event, filename) => {
-      console.log(`[sync] ${srcRel}/${filename} 变了，重拷`);
-      syncAll();
-    });
-  }
-  console.log("watching " + SOURCES.map(([s]) => s).join(", ") + " …");
+    for (const [srcRel] of SOURCES) {
+        watch(resolve(repoRoot, srcRel), { recursive: true }, (_event, filename) => {
+            console.log(`[sync] ${srcRel}/${filename} 变了，重拷`);
+            syncAll();
+        });
+    }
+    console.log("watching " + SOURCES.map(([s]) => s).join(", ") + " …");
 }

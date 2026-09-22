@@ -12,22 +12,20 @@ import { useEffect } from "react";
  * 注册失败（非安全上下文、浏览器禁用、隐私模式）不影响使用：退回浏览器 HTTP 缓存。
  */
 export function RuntimeCacheRegistrar() {
-  useEffect(() => {
-    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+    useEffect(() => {
+        if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
 
-    const params = new URLSearchParams();
-    const pyodide = process.env.NEXT_PUBLIC_PYODIDE_URL;
-    const wheel = process.env.NEXT_PUBLIC_PYULOG_WHEEL;
-    if (pyodide) params.set("pyodide", pyodide);
-    if (wheel) params.set("wheel", wheel);
-    const qs = params.toString();
+        const params = new URLSearchParams();
+        const pyodide = process.env.NEXT_PUBLIC_PYODIDE_URL;
+        const wheel = process.env.NEXT_PUBLIC_PYULOG_WHEEL;
+        if (pyodide) params.set("pyodide", pyodide);
+        if (wheel) params.set("wheel", wheel);
+        const qs = params.toString();
 
-    void navigator.serviceWorker
-      .register(`/sw.js${qs ? `?${qs}` : ""}`)
-      .catch(() => {
-        // 静默失败：没有 SW 时行为与现在一致（靠浏览器 HTTP 缓存）
-      });
-  }, []);
+        void navigator.serviceWorker.register(`/sw.js${qs ? `?${qs}` : ""}`).catch(() => {
+            // 静默失败：没有 SW 时行为与现在一致（靠浏览器 HTTP 缓存）
+        });
+    }, []);
 
-  return null;
+    return null;
 }

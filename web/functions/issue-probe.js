@@ -17,45 +17,45 @@ import { jsonResponse } from "./_lib/http.js";
 import { probeConfig, reportIssue } from "./_lib/issue-filer.js";
 
 export async function onRequestGet({ request, env }) {
-  const url = new URL(request.url);
-  const out = await probeConfig(env);
+    const url = new URL(request.url);
+    const out = await probeConfig(env);
 
-  // 最近的上报失败：errx_{毫秒}_{随机}，同长度毫秒前缀的字典序即时间序，取尾部即可
-  const kv = getKv(env);
-  if (kv) {
-    try {
-      const keys = await listAll(kv, "errx_");
-      const recent = [];
-      for (const key of keys.slice(-5).reverse()) {
-        const raw = await kv.get(key).catch(() => null);
-        if (!raw) continue;
+    // 最近的上报失败：errx_{毫秒}_{随机}，同长度毫秒前缀的字典序即时间序，取尾部即可
+    const kv = getKv(env);
+    if (kv) {
         try {
-          recent.push(JSON.parse(raw));
+            const keys = await listAll(kv, "errx_");
+            const recent = [];
+            for (const key of keys.slice(-5).reverse()) {
+                const raw = await kv.get(key).catch(() => null);
+                if (!raw) continue;
+                try {
+                    recent.push(JSON.parse(raw));
+                } catch {
+                    recent.push({ stage: "unknown", raw: String(raw).slice(0, 200) });
+                }
+            }
+            out.recentFailures = recent;
         } catch {
-          recent.push({ stage: "unknown", raw: String(raw).slice(0, 200) });
+            out.recentFailures = [];
         }
-      }
-      out.recentFailures = recent;
-    } catch {
-      out.recentFailures = [];
     }
-  }
 
-  if (url.searchParams.get("write") === "1") {
-    if (String(env?.ISSUE_DEBUG ?? "") !== "1") {
-      out.writeTest = { skipped: "需要先设 ISSUE_DEBUG=1 再访问" };
-    } else {
-      out.writeTest = await reportIssue(env, {
-        kind: "server-error",
-        level: "fatal",
-        type: "SelfCheck",
-        message: "上报链路自检（来自 /issue-probe）",
-        stack: "at /issue-probe",
-        route: "/issue-probe",
-        version: "probe",
-      });
+    if (url.searchParams.get("write") === "1") {
+        if (String(env?.ISSUE_DEBUG ?? "") !== "1") {
+            out.writeTest = { skipped: "需要先设 ISSUE_DEBUG=1 再访问" };
+        } else {
+            out.writeTest = await reportIssue(env, {
+                kind: "server-error",
+                level: "fatal",
+                type: "SelfCheck",
+                message: "上报链路自检（来自 /issue-probe）",
+                stack: "at /issue-probe",
+                route: "/issue-probe",
+                version: "probe",
+            });
+        }
     }
-  }
 
-  return jsonResponse(out);
+    return jsonResponse(out);
 }

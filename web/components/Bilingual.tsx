@@ -8,11 +8,11 @@ import { useLanguage } from "./LanguageProvider";
  * 否则 MDX 不会把块内的 markdown 当正文解析。
  */
 export function Zh({ children }: { children: React.ReactNode }) {
-  const { language } = useLanguage();
-  return language === "zh" ? <>{children}</> : null;
+    const { language } = useLanguage();
+    return language === "zh" ? <>{children}</> : null;
 }
 
 export function En({ children }: { children: React.ReactNode }) {
-  const { language } = useLanguage();
-  return language === "en" ? <>{children}</> : null;
+    const { language } = useLanguage();
+    return language === "en" ? <>{children}</> : null;
 }

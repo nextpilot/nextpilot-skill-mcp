@@ -7,15 +7,15 @@
  * （飞行阶段的配色就吃过这个亏，所以才挪进 lib/）。
  */
 export const VEHICLE_TYPE_LABELS: Record<string, string> = {
-  rotary_wing: "旋翼",
-  fixed_wing: "固定翼",
-  rover: "Rover",
-  airship: "飞艇",
-  unknown: "未知机型",
+    rotary_wing: "旋翼",
+    fixed_wing: "固定翼",
+    rover: "Rover",
+    airship: "飞艇",
+    unknown: "未知机型",
 };
 
 /** 取中文名；码表里没有的（如 `unknown(7)`）原样返回，不猜 */
 export function vehicleTypeLabel(vehicleType?: string): string {
-  if (!vehicleType) return "—";
-  return VEHICLE_TYPE_LABELS[vehicleType] ?? vehicleType;
+    if (!vehicleType) return "—";
+    return VEHICLE_TYPE_LABELS[vehicleType] ?? vehicleType;
 }

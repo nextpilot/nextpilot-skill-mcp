@@ -33,18 +33,18 @@ import { fileURLToPath } from "node:url";
 import { readdirSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
 import {
-  normalizeCompute,
-  validateComputeList,
-  isFirmwareSpec,
-  isAirframeSpec,
-  parseTopicReq,
-  collectRefs,
-  normalizeUnit,
-  UNIT_ALIASES,
-  UNIT_KIND,
-  SEVERITIES,
-  checkFieldItem,
-  splitFieldRef,
+    normalizeCompute,
+    validateComputeList,
+    isFirmwareSpec,
+    isAirframeSpec,
+    parseTopicReq,
+    collectRefs,
+    normalizeUnit,
+    UNIT_ALIASES,
+    UNIT_KIND,
+    SEVERITIES,
+    checkFieldItem,
+    splitFieldRef,
 } from "./lib/rule-expr.mjs";
 import { buildRuleSchema } from "./lib/gen-rule-schema.mjs";
 
@@ -52,18 +52,18 @@ const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
 const KN = resolve(webRoot, "../knowledge/px4");
 
-const ENGINE = resolve(webRoot, "../engine");   // 确定性引擎源码（浏览器与本地工具共用一份）
-const PY_RULE_ENGINE = resolve(ENGINE, "rule_engine.py");        // 框架（与格式无关）
-const PY_REPORT_DATA = resolve(ENGINE, "report_data.py");        // 报告数据层（与格式无关）
-const PY_PROVIDER_API = resolve(ENGINE, "providers/api.py");     // provider 契约（常量表 + 自检）
+const ENGINE = resolve(webRoot, "../engine"); // 确定性引擎源码（浏览器与本地工具共用一份）
+const PY_RULE_ENGINE = resolve(ENGINE, "rule_engine.py"); // 框架（与格式无关）
+const PY_REPORT_DATA = resolve(ENGINE, "report_data.py"); // 报告数据层（与格式无关）
+const PY_PROVIDER_API = resolve(ENGINE, "providers/api.py"); // provider 契约（常量表 + 自检）
 // 日志格式适配器：每个文件都实现同一份契约，引擎不认识它们内部
 const PROVIDER_DIR = resolve(ENGINE, "providers");
 const providerFiles = readdirSync(PROVIDER_DIR)
-  .filter((f) => f.endsWith(".py") && f !== "api.py")
-  .sort();
+    .filter((f) => f.endsWith(".py") && f !== "api.py")
+    .sort();
 if (providerFiles.length === 0) throw new Error("engine/providers/ 下没有任何适配器");
 const YAML_PATH = resolve(KN, "fault-kb.yaml");
-const FACTS_PATH = resolve(KN, "facts.yaml");   // PX4 的数据：码表 / 文案 / 展示口径 / 规则元数据
+const FACTS_PATH = resolve(KN, "facts.yaml"); // PX4 的数据：码表 / 文案 / 展示口径 / 规则元数据
 const RULES_DIR = resolve(KN, "rules");
 const OPERATORS_PY = resolve(ENGINE, "operators.py");
 const PROMPT_PATH = resolve(KN, "llm/gjb841-system-prompt.md");
@@ -71,7 +71,7 @@ const EMPTY_PATH = resolve(KN, "llm/report-empty.md");
 // 指南页的运行期目录：sync-content.mjs 把 docs/guide 拷进来，本脚本再往里补两页生成物。
 // 写在这里而不是仓库根，是因为部署包只有 web/ 一个目录（详见 sync-content.mjs 顶部）。
 const GUIDES_DIR = resolve(webRoot, ".generated/guide");
-const PLOT_DIR = resolve(KN, "plot");                    // 结果页曲线预设（纯前端，不经 Pyodide）
+const PLOT_DIR = resolve(KN, "plot"); // 结果页曲线预设（纯前端，不经 Pyodide）
 
 const read = (p) => readFileSync(p, "utf8");
 
@@ -82,97 +82,97 @@ const read = (p) => readFileSync(p, "utf8");
 const CHECK = process.argv.includes("--check");
 const drifted = [];
 function writeArtifact(path, content) {
-  if (CHECK) {
-    if (!existsSync(path) || readFileSync(path, "utf8") !== content) drifted.push(relative(webRoot, path));
-    return;
-  }
-  writeFileSync(path, content, "utf8");
+    if (CHECK) {
+        if (!existsSync(path) || readFileSync(path, "utf8") !== content) drifted.push(relative(webRoot, path));
+        return;
+    }
+    writeFileSync(path, content, "utf8");
 }
 
 /** 极简 YAML 解析：只支持本故障库用到的子集，结构固定，宁可构建失败也不静默产出错 KB */
 function parseFaultKb(text) {
-  const lines = text.split(/\r?\n/);
-  const kb = [];
-  let item = null;
-  let listKey = null;
+    const lines = text.split(/\r?\n/);
+    const kb = [];
+    let item = null;
+    let listKey = null;
 
-  const scalar = (raw) => {
-    let v = raw.trim();
-    if (v === "[]") return [];
-    if (v === "") return "";
-    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
-      return v.slice(1, -1);
-    }
-    if (/^-?\d+$/.test(v)) return Number(v);
-    return v;
-  };
-
-  for (const rawLine of lines) {
-    const line = rawLine.replace(/\t/g, "  ");
-    if (!line.trim() || line.trim().startsWith("#")) continue;
-    if (/^fault_knowledge_base:\s*$/.test(line)) continue;
-
-    const itemHead = line.match(/^\s*-\s+fault_id:\s*(.+)$/);
-    if (itemHead) {
-      item = {
-        fault_id: "",
-        fault_tag: "",
-        trigger_tags: [],
-        flight_phase: [],
-        exclude_tags: [],
-        possible_root_cause: [],
-        troubleshooting_steps: [],
-        risk_level: "",
-      };
-      kb.push(item);
-      item.fault_id = scalar(itemHead[1]);
-      listKey = null;
-      continue;
-    }
-
-    if (!item) continue;
-    const indent = line.length - line.trimStart().length;
-
-    const listItem = line.match(/^\s+-\s+(.+)$/);
-    if (listItem && listKey && indent >= 6) {
-      item[listKey].push(scalar(listItem[1]));
-      continue;
-    }
-
-    const kv = line.match(/^\s{2,4}([a-z_]+):\s*(.*)$/);
-    if (kv) {
-      const [, key, valRaw] = kv;
-      if (key === "possible_root_cause" || key === "troubleshooting_steps") {
-        item[key] = [];
-        listKey = key;
-        if (valRaw.trim()) item[key].push(scalar(valRaw.replace(/^-\s*/, "")));
-      } else if (key === "trigger_tags" || key === "flight_phase" || key === "exclude_tags") {
-        listKey = null;
-        const inline = valRaw.trim();
-        if (inline.startsWith("[")) {
-          item[key] = inline
-            .slice(1, -1)
-            .split(",")
-            .map((s) => scalar(s))
-            .filter(Boolean);
-        } else {
-          item[key] = [];
+    const scalar = (raw) => {
+        let v = raw.trim();
+        if (v === "[]") return [];
+        if (v === "") return "";
+        if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+            return v.slice(1, -1);
         }
-      } else {
-        listKey = null;
-        item[key] = scalar(valRaw);
-      }
-    }
-  }
+        if (/^-?\d+$/.test(v)) return Number(v);
+        return v;
+    };
 
-  for (const it of kb) {
-    for (const req of ["fault_id", "fault_tag", "trigger_tags", "flight_phase", "risk_level"]) {
-      if (it[req] === "" || (Array.isArray(it[req]) && it[req].length === 0 && req !== "fault_tag")) {
-        throw new Error(`故障库条目 ${it.fault_id || "?"} 缺少字段 ${req}`);
-      }
+    for (const rawLine of lines) {
+        const line = rawLine.replace(/\t/g, "  ");
+        if (!line.trim() || line.trim().startsWith("#")) continue;
+        if (/^fault_knowledge_base:\s*$/.test(line)) continue;
+
+        const itemHead = line.match(/^\s*-\s+fault_id:\s*(.+)$/);
+        if (itemHead) {
+            item = {
+                fault_id: "",
+                fault_tag: "",
+                trigger_tags: [],
+                flight_phase: [],
+                exclude_tags: [],
+                possible_root_cause: [],
+                troubleshooting_steps: [],
+                risk_level: "",
+            };
+            kb.push(item);
+            item.fault_id = scalar(itemHead[1]);
+            listKey = null;
+            continue;
+        }
+
+        if (!item) continue;
+        const indent = line.length - line.trimStart().length;
+
+        const listItem = line.match(/^\s+-\s+(.+)$/);
+        if (listItem && listKey && indent >= 6) {
+            item[listKey].push(scalar(listItem[1]));
+            continue;
+        }
+
+        const kv = line.match(/^\s{2,4}([a-z_]+):\s*(.*)$/);
+        if (kv) {
+            const [, key, valRaw] = kv;
+            if (key === "possible_root_cause" || key === "troubleshooting_steps") {
+                item[key] = [];
+                listKey = key;
+                if (valRaw.trim()) item[key].push(scalar(valRaw.replace(/^-\s*/, "")));
+            } else if (key === "trigger_tags" || key === "flight_phase" || key === "exclude_tags") {
+                listKey = null;
+                const inline = valRaw.trim();
+                if (inline.startsWith("[")) {
+                    item[key] = inline
+                        .slice(1, -1)
+                        .split(",")
+                        .map((s) => scalar(s))
+                        .filter(Boolean);
+                } else {
+                    item[key] = [];
+                }
+            } else {
+                listKey = null;
+                item[key] = scalar(valRaw);
+            }
+        }
     }
-  }
-  return kb;
+
+    for (const it of kb) {
+        for (const req of ["fault_id", "fault_tag", "trigger_tags", "flight_phase", "risk_level"]) {
+            if (it[req] === "" || (Array.isArray(it[req]) && it[req].length === 0 && req !== "fault_tag")) {
+                throw new Error(`故障库条目 ${it.fault_id || "?"} 缺少字段 ${req}`);
+            }
+        }
+    }
+    return kb;
 }
 
 /**
@@ -180,7 +180,7 @@ function parseFaultKb(text) {
  * 所以只须转义反引号与 ${ 起始，绝不能转义反斜杠（否则 \\n 会变成 \\\\n）。
  */
 function toRawTemplate(text) {
-  return text.replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
+    return text.replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
 }
 
 // 框架自己往求值环境里补的名字（不属于 provider，见 providers/api.py 末尾的说明）。
@@ -195,74 +195,78 @@ const FRAMEWORK_VARS = ["has_topic"];
  * 与引擎漂移时表现为"构建期放行、运行期 NameError"——引擎按"数据不足"静默处理，
  * 那条规则从此不出结论，没有任何提示（`no_data` 当初就是这么漏的）。
  */
-const BUILTIN_VARS = new Set([...parseProviderApi(read(PY_PROVIDER_API)).builtinVariables,
-                              ...FRAMEWORK_VARS]);
+const BUILTIN_VARS = new Set([...parseProviderApi(read(PY_PROVIDER_API)).builtinVariables, ...FRAMEWORK_VARS]);
 
 /** 表达式里允许出现、但不是变量名的关键字/字面量（校验标识符时跳过） */
-const EXPR_KEYWORDS = new Set([
-  "and", "or", "not", "in", "is", "True", "False", "None",
-]);
+const EXPR_KEYWORDS = new Set(["and", "or", "not", "in", "is", "True", "False", "None"]);
 
 /** 扫标识符前先去掉字符串字面量（如 'vehicle_status' not in topics 里的 topic 名） */
 const stripStrings = (s) =>
-  String(s).replace(/'[^']*'/g, " ").replace(/"[^"]*"/g, " ");
+    String(s)
+        .replace(/'[^']*'/g, " ")
+        .replace(/"[^"]*"/g, " ");
 
 /** 这条表达式只能引用内置变量（用于 compute 之前求值的场合：适用范围轴、skip 条件） */
 function checkBuiltinOnly(expr, where, what) {
-  for (const name of stripStrings(expr).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
-    if (EXPR_KEYWORDS.has(name)) continue;
-    if (!BUILTIN_VARS.has(name)) {
-      throw new Error(
-        `${where}: ${what} 引用了非内置变量 ${name}——它在 compute 之前求值，拿不到 compute 的输出`,
-      );
+    for (const name of stripStrings(expr).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
+        if (EXPR_KEYWORDS.has(name)) continue;
+        if (!BUILTIN_VARS.has(name)) {
+            throw new Error(`${where}: ${what} 引用了非内置变量 ${name}——它在 compute 之前求值，拿不到 compute 的输出`);
+        }
     }
-  }
 }
 
 /** 从 operators.py 解析算子签名（本文件由我们维护，格式固定；解析不到即构建失败） */
 function parseOperatorSignatures(py) {
-  const sigs = {};
-  const re = /@operator\(\s*"([a-z_]+)"([^)]*)\)/g;
-  let m;
-  while ((m = re.exec(py))) {
-    const name = m[1];
-    const rest = m[2] || "";
-    const num = (key) => {
-      const mm = rest.match(new RegExp(key + "\\s*=\\s*(\\d+)"));
-      return mm ? Number(mm[1]) : 1;
-    };
-    // 入参个数可以写成**列表**（如 `in_arity=[1, 4]`）：同一种运算接受两种写法时用
-    // （`quat_to_euler` 收一组四列、或收 w/x/y/z 四列）。列表里每个数都是"可以接受的个数"，
-    // 构建期逐个放行、别的一律拒绝。
-    const arity = (key) => {
-      const mm = rest.match(new RegExp(key + "\\s*=\\s*(\\[[^\\]]*\\]|\\d+)"));
-      if (!mm) return 1;
-      if (!mm[1].startsWith("[")) return Number(mm[1]);
-      const list = mm[1]
-        .slice(1, -1)
-        .split(",")
-        .map((x) => Number(x.trim()))
-        .filter((x) => Number.isFinite(x));
-      if (list.length === 0) throw new Error(`算子 ${name} 的 ${key} 列表是空的`);
-      return list;
-    };
-    const names = rest.match(/out_names\s*=\s*\[([^\]]*)\]/);
-    // 紧跟装饰器的 def 的形参名：用来校验**关键字实参名**。
-    // node 上的额外键是 `**kw` 直通给算子的，名字写错不会报错、算子会用默认值算出错的结果，
-    // 所以必须在这里拦住。形参里的 **kw / * 会被下面的正则过滤掉。
-    const dm = /def\s+[A-Za-z_][A-Za-z0-9_]*\s*\(([\s\S]*?)\)\s*:/.exec(py.slice(re.lastIndex));
-    const params = dm
-      ? dm[1].split(",").map((s) => s.trim().split("=")[0].trim())
-          .filter((s) => /^[a-z_][a-z0-9_]*$/.test(s))
-      : [];
-    sigs[name] = {
-      in_arity: arity("in_arity"),
-      out_arity: num("out_arity"),
-      out_names: names ? names[1].split(",").map((x) => x.trim().replace(/["']/g, "")).filter(Boolean) : [],
-      params,
-    };
-  }
-  return sigs;
+    const sigs = {};
+    const re = /@operator\(\s*"([a-z_]+)"([^)]*)\)/g;
+    let m;
+    while ((m = re.exec(py))) {
+        const name = m[1];
+        const rest = m[2] || "";
+        const num = (key) => {
+            const mm = rest.match(new RegExp(key + "\\s*=\\s*(\\d+)"));
+            return mm ? Number(mm[1]) : 1;
+        };
+        // 入参个数可以写成**列表**（如 `in_arity=[1, 4]`）：同一种运算接受两种写法时用
+        // （`quat_to_euler` 收一组四列、或收 w/x/y/z 四列）。列表里每个数都是"可以接受的个数"，
+        // 构建期逐个放行、别的一律拒绝。
+        const arity = (key) => {
+            const mm = rest.match(new RegExp(key + "\\s*=\\s*(\\[[^\\]]*\\]|\\d+)"));
+            if (!mm) return 1;
+            if (!mm[1].startsWith("[")) return Number(mm[1]);
+            const list = mm[1]
+                .slice(1, -1)
+                .split(",")
+                .map((x) => Number(x.trim()))
+                .filter((x) => Number.isFinite(x));
+            if (list.length === 0) throw new Error(`算子 ${name} 的 ${key} 列表是空的`);
+            return list;
+        };
+        const names = rest.match(/out_names\s*=\s*\[([^\]]*)\]/);
+        // 紧跟装饰器的 def 的形参名：用来校验**关键字实参名**。
+        // node 上的额外键是 `**kw` 直通给算子的，名字写错不会报错、算子会用默认值算出错的结果，
+        // 所以必须在这里拦住。形参里的 **kw / * 会被下面的正则过滤掉。
+        const dm = /def\s+[A-Za-z_][A-Za-z0-9_]*\s*\(([\s\S]*?)\)\s*:/.exec(py.slice(re.lastIndex));
+        const params = dm
+            ? dm[1]
+                  .split(",")
+                  .map((s) => s.trim().split("=")[0].trim())
+                  .filter((s) => /^[a-z_][a-z0-9_]*$/.test(s))
+            : [];
+        sigs[name] = {
+            in_arity: arity("in_arity"),
+            out_arity: num("out_arity"),
+            out_names: names
+                ? names[1]
+                      .split(",")
+                      .map((x) => x.trim().replace(/["']/g, ""))
+                      .filter(Boolean)
+                : [],
+            params,
+        };
+    }
+    return sigs;
 }
 
 /**
@@ -273,216 +277,226 @@ function parseOperatorSignatures(py) {
  * 解析不到就构建失败（同 parseOperatorSignatures 的做法）。
  */
 function parseProviderApi(py) {
-  const block = (name) => {
-    const m = new RegExp(`^${name} = \\{([\\s\\S]*?)^\\}`, "m").exec(py);
-    if (!m) throw new Error(`engine/providers/api.py 里解析不到 ${name} 常量表`);
-    const keys = [...m[1].matchAll(/^\s{4}"([A-Za-z_0-9]+)":/gm)].map((x) => x[1]);
-    if (keys.length === 0) throw new Error(`engine/providers/api.py 的 ${name} 是空的`);
-    return keys;
-  };
-  return {
-    required: block("REQUIRED"),
-    optional: block("OPTIONAL"),
-    builtinVariables: block("BUILTIN_VARIABLES"),
-  };
+    const block = (name) => {
+        const m = new RegExp(`^${name} = \\{([\\s\\S]*?)^\\}`, "m").exec(py);
+        if (!m) throw new Error(`engine/providers/api.py 里解析不到 ${name} 常量表`);
+        const keys = [...m[1].matchAll(/^\s{4}"([A-Za-z_0-9]+)":/gm)].map((x) => x[1]);
+        if (keys.length === 0) throw new Error(`engine/providers/api.py 的 ${name} 是空的`);
+        return keys;
+    };
+    return {
+        required: block("REQUIRED"),
+        optional: block("OPTIONAL"),
+        builtinVariables: block("BUILTIN_VARIABLES"),
+    };
 }
 
 /** 校验并加载 rules/*.yaml；任何不完整都构建失败（杜绝"空洞经验"） */
 function loadRules(dir, signatures, ruleMeta, airframes) {
-  const files = readdirSync(dir).filter((f) => f.endsWith(".yaml")).sort();
-  if (files.length === 0) throw new Error("rules/ 下没有规则文件");
-  const rules = [];
-  const sources = [];   // 与 rules 一一对应的来源文件名（规则清单页要显示）
-  const seen = new Set();
-  const byGroup = ruleMeta.by_group ?? {};
-  const metaDefaults = ruleMeta.defaults ?? {};
-  // 同一个 group 的多条规则，派生的 category/doc 必须一致——不一致就逼作者显式写，
-  // 而不是静默取第一个（否则"改了派生表、却只有一条规则跟着变"没人会发现）。
-  const seenMeta = new Map();
+    const files = readdirSync(dir)
+        .filter((f) => f.endsWith(".yaml"))
+        .sort();
+    if (files.length === 0) throw new Error("rules/ 下没有规则文件");
+    const rules = [];
+    const sources = []; // 与 rules 一一对应的来源文件名（规则清单页要显示）
+    const seen = new Set();
+    const byGroup = ruleMeta.by_group ?? {};
+    const metaDefaults = ruleMeta.defaults ?? {};
+    // 同一个 group 的多条规则，派生的 category/doc 必须一致——不一致就逼作者显式写，
+    // 而不是静默取第一个（否则"改了派生表、却只有一条规则跟着变"没人会发现）。
+    const seenMeta = new Map();
 
-  // 先整读一遍：一个 YAML 可以装多条经验（顶层写成数组），一般情况下仍是一条经验一个文件
-  const loaded = files.map((file) => {
-    const p = parseYaml(readFileSync(resolve(dir, file), "utf8"));
-    return { file, items: Array.isArray(p) ? p : [p] };
-  });
+    // 先整读一遍：一个 YAML 可以装多条经验（顶层写成数组），一般情况下仍是一条经验一个文件
+    const loaded = files.map((file) => {
+        const p = parseYaml(readFileSync(resolve(dir, file), "utf8"));
+        return { file, items: Array.isArray(p) ? p : [p] };
+    });
 
-  for (const { file, items } of loaded) {
-    for (const raw of items) {
-    const where = `rules/${file}` + (items.length > 1 ? `#${(raw && raw.id) || "?"}` : "");
-    // guards 类经验（只产 guard 标签、不发 finding）没有 compute/triggers/check，
-    // 它的“实质”在 outputs.guard_tags 的条件里；其余经验仍要求完整六件套。
-    // 注意：普通经验也可以用 outputs.guard_tags（如陀螺零偏的温度跨度标签），
-    // 所以“是不是 guard 类经验”要看有没有 compute/triggers，而不是有没有 guard_tags。
-    const guardTags = raw.outputs?.guard_tags;
-    const hasCompute = Array.isArray(raw.compute) && raw.compute.length > 0;
-    const hasTriggers = Array.isArray(raw.triggers) && raw.triggers.length > 0;
-    const isGuardRule = Array.isArray(guardTags) && guardTags.length > 0 && !hasCompute && !hasTriggers;
-    // 必填项：身份 + 规则的“实质”。适用范围（conditions）整块可省——不限就什么都不用写。
-    // 不含 outputs——check / doc 现在都是派生的，没有 tag/stats 的规则确实没什么可声明。
-    const requiredKeys = isGuardRule
-      ? ["id", "group", "name"]
-      : ["id", "group", "name", "compute", "triggers"];
-    for (const key of requiredKeys) {
-      if (raw[key] === undefined || raw[key] === null || raw[key] === "") {
-        throw new Error(`${where}: 缺少必填字段 ${key}`);
-      }
-    }
-    if (raw.outputs !== undefined && (typeof raw.outputs !== "object" || raw.outputs === null || Array.isArray(raw.outputs))) {
-      throw new Error(`${where}: outputs 必须是对象`);
-    }
-    // ── 适用范围：一个 conditions 块，四个键都能省（规则与绘图预设共用 normalizeConditions）──
-    // 下面归一化成运行期的形态：两个平铺的轴 + 嵌套的 topics。**没有 skip 这个键**
-    // （原来那坨 no_data / not has_armed 的判定已退役，理由见 knowledge/px4/CLAUDE.md）。
-    // 退役的顶层键：不静默忽略，写错了要当场知道
-    for (const [key, hint] of [
-      ["skip", "缺 topic 改写进 conditions.topics；no_data / not has_armed 这类按需改成 precheck，或直接删"],
-      ["ran_on_success", "ran() 现在统一在 compute 成功之后记（算不出来会记一条「数据不足」），这个字段已删"],
-      ["known_legacy", '字段的跨版本差异改用候选组表达：ref("新名", "旧名") 取第一个存在的'],
-    ]) {
-      if (raw[key] !== undefined) throw new Error(`${where}: ${key} 已移除——${hint}`);
-    }
-    const cond = normalizeConditions(raw.conditions, where, airframes);
-    delete raw.conditions;
-    Object.assign(raw, cond);
-    if (seen.has(raw.id)) throw new Error(`${where}: 规则 id 重复 ${raw.id}`);
-    seen.add(raw.id);
+    for (const { file, items } of loaded) {
+        for (const raw of items) {
+            const where = `rules/${file}` + (items.length > 1 ? `#${(raw && raw.id) || "?"}` : "");
+            // guards 类经验（只产 guard 标签、不发 finding）没有 compute/triggers/check，
+            // 它的“实质”在 outputs.guard_tags 的条件里；其余经验仍要求完整六件套。
+            // 注意：普通经验也可以用 outputs.guard_tags（如陀螺零偏的温度跨度标签），
+            // 所以“是不是 guard 类经验”要看有没有 compute/triggers，而不是有没有 guard_tags。
+            const guardTags = raw.outputs?.guard_tags;
+            const hasCompute = Array.isArray(raw.compute) && raw.compute.length > 0;
+            const hasTriggers = Array.isArray(raw.triggers) && raw.triggers.length > 0;
+            const isGuardRule = Array.isArray(guardTags) && guardTags.length > 0 && !hasCompute && !hasTriggers;
+            // 必填项：身份 + 规则的“实质”。适用范围（conditions）整块可省——不限就什么都不用写。
+            // 不含 outputs——check / doc 现在都是派生的，没有 tag/stats 的规则确实没什么可声明。
+            const requiredKeys = isGuardRule ? ["id", "group", "name"] : ["id", "group", "name", "compute", "triggers"];
+            for (const key of requiredKeys) {
+                if (raw[key] === undefined || raw[key] === null || raw[key] === "") {
+                    throw new Error(`${where}: 缺少必填字段 ${key}`);
+                }
+            }
+            if (
+                raw.outputs !== undefined &&
+                (typeof raw.outputs !== "object" || raw.outputs === null || Array.isArray(raw.outputs))
+            ) {
+                throw new Error(`${where}: outputs 必须是对象`);
+            }
+            // ── 适用范围：一个 conditions 块，四个键都能省（规则与绘图预设共用 normalizeConditions）──
+            // 下面归一化成运行期的形态：两个平铺的轴 + 嵌套的 topics。**没有 skip 这个键**
+            // （原来那坨 no_data / not has_armed 的判定已退役，理由见 knowledge/px4/CLAUDE.md）。
+            // 退役的顶层键：不静默忽略，写错了要当场知道
+            for (const [key, hint] of [
+                ["skip", "缺 topic 改写进 conditions.topics；no_data / not has_armed 这类按需改成 precheck，或直接删"],
+                ["ran_on_success", "ran() 现在统一在 compute 成功之后记（算不出来会记一条「数据不足」），这个字段已删"],
+                ["known_legacy", '字段的跨版本差异改用候选组表达：ref("新名", "旧名") 取第一个存在的'],
+            ]) {
+                if (raw[key] !== undefined) throw new Error(`${where}: ${key} 已移除——${hint}`);
+            }
+            const cond = normalizeConditions(raw.conditions, where, airframes);
+            delete raw.conditions;
+            Object.assign(raw, cond);
+            if (seen.has(raw.id)) throw new Error(`${where}: 规则 id 重复 ${raw.id}`);
+            seen.add(raw.id);
 
-    // ── 从 facts.yaml 的 rule_meta 派生那些"每条规则各写一遍纯属重复"的字段 ──
-    // 身份块：规则里写了就以规则里的为准（个别规则确实会偏离默认）
-    for (const [k, v] of Object.entries(metaDefaults)) {
-      if (raw[k] === undefined) raw[k] = v;
-    }
-    if (byGroup[raw.group] === undefined) {
-      throw new Error(
-        `${where}: group「${raw.group}」未登记在 knowledge/px4/facts.yaml 的 rule_meta.by_group`,
-      );
-    }
-    const gm = byGroup[raw.group];
-    if (raw.category === undefined) raw.category = gm.category;
-    // outputs.check 缺省 = group；guard 类经验不填（它本来就不记 ran/skipped）
-    raw.outputs = raw.outputs ?? {};
-    if (raw.outputs.check === undefined && !isGuardRule) raw.outputs.check = raw.group;
-    if (raw.outputs.check !== undefined && raw.outputs.check !== raw.group) {
-      // 允许例外，但要说一声——免得例外悄悄变多
-      console.log(`  · ${raw.id}: outputs.check「${raw.outputs.check}」与 group「${raw.group}」不同（显式例外）`);
-    }
-    // doc 是**整条规则**的官方文档链接（不是 outputs 的一部分）：按 group 派生的规则级字段
-    if (raw.doc === undefined && gm.doc !== undefined) raw.doc = gm.doc;
-    // 同 group 的多条规则必须派生出同样的 category/doc
-    for (const [field, val] of [["category", raw.category], ["doc", raw.doc]]) {
-      const prev = seenMeta.get(`${raw.group} ${field}`);
-      if (prev !== undefined && prev !== val) {
-        throw new Error(
-          `${where}: group「${raw.group}」里 ${field} 与同组其它规则不一致` +
-            `（${JSON.stringify(prev)} vs ${JSON.stringify(val)}）——要么统一 facts.yaml 的 rule_meta，` +
-            `要么在本规则里显式写死`,
-        );
-      }
-      seenMeta.set(`${raw.group} ${field}`, val);
-    }
+            // ── 从 facts.yaml 的 rule_meta 派生那些"每条规则各写一遍纯属重复"的字段 ──
+            // 身份块：规则里写了就以规则里的为准（个别规则确实会偏离默认）
+            for (const [k, v] of Object.entries(metaDefaults)) {
+                if (raw[k] === undefined) raw[k] = v;
+            }
+            if (byGroup[raw.group] === undefined) {
+                throw new Error(
+                    `${where}: group「${raw.group}」未登记在 knowledge/px4/facts.yaml 的 rule_meta.by_group`,
+                );
+            }
+            const gm = byGroup[raw.group];
+            if (raw.category === undefined) raw.category = gm.category;
+            // outputs.check 缺省 = group；guard 类经验不填（它本来就不记 ran/skipped）
+            raw.outputs = raw.outputs ?? {};
+            if (raw.outputs.check === undefined && !isGuardRule) raw.outputs.check = raw.group;
+            if (raw.outputs.check !== undefined && raw.outputs.check !== raw.group) {
+                // 允许例外，但要说一声——免得例外悄悄变多
+                console.log(
+                    `  · ${raw.id}: outputs.check「${raw.outputs.check}」与 group「${raw.group}」不同（显式例外）`,
+                );
+            }
+            // doc 是**整条规则**的官方文档链接（不是 outputs 的一部分）：按 group 派生的规则级字段
+            if (raw.doc === undefined && gm.doc !== undefined) raw.doc = gm.doc;
+            // 同 group 的多条规则必须派生出同样的 category/doc
+            for (const [field, val] of [
+                ["category", raw.category],
+                ["doc", raw.doc],
+            ]) {
+                const prev = seenMeta.get(`${raw.group} ${field}`);
+                if (prev !== undefined && prev !== val) {
+                    throw new Error(
+                        `${where}: group「${raw.group}」里 ${field} 与同组其它规则不一致` +
+                            `（${JSON.stringify(prev)} vs ${JSON.stringify(val)}）——要么统一 facts.yaml 的 rule_meta，` +
+                            `要么在本规则里显式写死`,
+                    );
+                }
+                seenMeta.set(`${raw.group} ${field}`, val);
+            }
 
-    const declared = new Set();
-    if (!isGuardRule && (!Array.isArray(raw.compute) || raw.compute.length === 0)) {
-      throw new Error(`${where}: compute 必须是非空数组`);
-    }
-    // compute 是一串**字符串表达式**（与 triggers.when / skip.when 同一套 Python 子集）；
-    // **算子节点**（旧）。旧写法在这里编译成等价表达式，于是产物里只有一种形态、
-    // 也只有一套校验（不写第二套）。运行期由 engine/rule_engine.py 的 _eval_compute 求值。
-    const compute = (raw.compute ?? []).map((item) => normalizeCompute(item, where));
-    if (compute.length > 0) {
-      let types;
-      try {
-        types = validateComputeList(compute, { signatures, builtinVars: BUILTIN_VARS });
-      } catch (err) {
-        throw new Error(`${where}: ${err.message}`);
-      }
-      for (const name of types.keys()) declared.add(name);
-    }
-    raw.compute = compute;
-    // outputs.guard_tags：数据质量标签的产生条件（普通经验也会用，如陀螺零偏的温度跨度）。
-    // 条件里的名字必须是内置变量或 compute 输出，避免写错变量名却默默不打标签。
-    if (Array.isArray(guardTags)) {
-      for (const g of guardTags) {
-        if (typeof g.when !== "string" || !g.tag) {
-          throw new Error(`${where}: outputs.guard_tags 每项都要有 when 与 tag`);
+            const declared = new Set();
+            if (!isGuardRule && (!Array.isArray(raw.compute) || raw.compute.length === 0)) {
+                throw new Error(`${where}: compute 必须是非空数组`);
+            }
+            // compute 是一串**字符串表达式**（与 triggers.when / skip.when 同一套 Python 子集）；
+            // **算子节点**（旧）。旧写法在这里编译成等价表达式，于是产物里只有一种形态、
+            // 也只有一套校验（不写第二套）。运行期由 engine/rule_engine.py 的 _eval_compute 求值。
+            const compute = (raw.compute ?? []).map((item) => normalizeCompute(item, where));
+            if (compute.length > 0) {
+                let types;
+                try {
+                    types = validateComputeList(compute, { signatures, builtinVars: BUILTIN_VARS });
+                } catch (err) {
+                    throw new Error(`${where}: ${err.message}`);
+                }
+                for (const name of types.keys()) declared.add(name);
+            }
+            raw.compute = compute;
+            // outputs.guard_tags：数据质量标签的产生条件（普通经验也会用，如陀螺零偏的温度跨度）。
+            // 条件里的名字必须是内置变量或 compute 输出，避免写错变量名却默默不打标签。
+            if (Array.isArray(guardTags)) {
+                for (const g of guardTags) {
+                    if (typeof g.when !== "string" || !g.tag) {
+                        throw new Error(`${where}: outputs.guard_tags 每项都要有 when 与 tag`);
+                    }
+                    for (const name of stripStrings(g.when).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
+                        if (EXPR_KEYWORDS.has(name)) continue;
+                        if (!declared.has(name) && !BUILTIN_VARS.has(name)) {
+                            throw new Error(`${where}: guard_tags 条件引用了未声明的名字 ${name}`);
+                        }
+                    }
+                    if (!/^[a-z0-9_:]+$/i.test(String(g.tag))) {
+                        throw new Error(`${where}: guard 标签名不合法 ${g.tag}`);
+                    }
+                }
+            }
+            if (!isGuardRule && (!Array.isArray(raw.triggers) || raw.triggers.length === 0)) {
+                throw new Error(`${where}: triggers 必须是非空数组`);
+            }
+            // foreach：把「事件列表」展开成多条 finding。事件 dict 的键（如 t_s / name）
+            // 会叠加进模板环境，因此必须显式声明 keys，才能继续做占位符校验。
+            const eventKeys = new Set();
+            if (raw.foreach) {
+                const fe = typeof raw.foreach === "string" ? { var: raw.foreach } : raw.foreach;
+                if (!fe.var) throw new Error(`${where}: foreach 需要 var（事件列表的变量名）`);
+                if (!declared.has(fe.var)) {
+                    throw new Error(`${where}: foreach 引用的 ${fe.var} 不是 compute 的输出`);
+                }
+                for (const k of fe.keys || []) eventKeys.add(k);
+            }
+            for (const t of raw.triggers || []) {
+                if (typeof t.when !== "string") throw new Error(`${where}: trigger 缺 when（须为字符串，注意加引号）`);
+                // 词表取 rule-expr.mjs 的 SEVERITIES（编辑器 schema 也用这一份，别再抄一份）
+                if (!SEVERITIES.has(t.severity)) {
+                    throw new Error(
+                        `${where}: trigger severity 非法：${t.severity}（可用：${[...SEVERITIES].join(" / ")}）`,
+                    );
+                }
+                if (typeof t.title !== "string") throw new Error(`${where}: trigger 缺 title`);
+                if (typeof t.field !== "string") throw new Error(`${where}: trigger 缺 field（evidence.field）`);
+                // 表达式里的标识符必须已声明（内置变量 / compute 输出 / foreach 事件键）
+                for (const name of stripStrings(t.when).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
+                    if (EXPR_KEYWORDS.has(name)) continue;
+                    if (!declared.has(name) && !BUILTIN_VARS.has(name) && !eventKeys.has(name)) {
+                        throw new Error(`${where}: 表达式引用了未声明的名字 ${name}（when: ${t.when}）`);
+                    }
+                }
+                // 证据值是一个**表达式**（与 when 同一套语法）：写变量得原值、写 f"{x:.3f}" 得
+                // 格式化后的串、写常量就得到常量。名字必须是已声明的。
+                if (t.value !== undefined && typeof t.value !== "string") {
+                    throw new Error(`${where}: trigger 的 value 必须是字符串表达式（如 value: p99_stat）`);
+                }
+                if (typeof t.value === "string") {
+                    for (const name of stripStrings(t.value).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
+                        if (EXPR_KEYWORDS.has(name) || name === "f") continue; // f"..." 的 f 前缀
+                        if (!declared.has(name) && !BUILTIN_VARS.has(name) && !eventKeys.has(name)) {
+                            throw new Error(`${where}: value 引用了未声明的名字 ${name}（value: ${t.value}）`);
+                        }
+                    }
+                }
+                // 标题里的占位符同理
+                for (const m of t.title.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)(:[^}]*)?\}/g)) {
+                    if (!declared.has(m[1]) && !BUILTIN_VARS.has(m[1]) && !eventKeys.has(m[1])) {
+                        throw new Error(`${where}: 标题引用了未声明的名字 ${m[1]}`);
+                    }
+                }
+                // 证据文案/建议里的占位符同样校验（value 的 f-string 与 suggestion 都允许模板）
+                for (const txt of [t.value, t.suggestion, t.field]) {
+                    if (typeof txt !== "string") continue;
+                    for (const m of txt.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)(:[^}]*)?\}/g)) {
+                        if (!declared.has(m[1]) && !BUILTIN_VARS.has(m[1]) && !eventKeys.has(m[1])) {
+                            throw new Error(`${where}: 文案引用了未声明的名字 ${m[1]}`);
+                        }
+                    }
+                }
+            }
+            if (!isGuardRule && !raw.outputs.check) {
+                throw new Error(`${where}: outputs.check 必填（ran/skipped 用）`);
+            }
+            rules.push(raw);
+            sources.push(file);
         }
-        for (const name of stripStrings(g.when).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
-          if (EXPR_KEYWORDS.has(name)) continue;
-          if (!declared.has(name) && !BUILTIN_VARS.has(name)) {
-            throw new Error(`${where}: guard_tags 条件引用了未声明的名字 ${name}`);
-          }
-        }
-        if (!/^[a-z0-9_:]+$/i.test(String(g.tag))) {
-          throw new Error(`${where}: guard 标签名不合法 ${g.tag}`);
-        }
-      }
     }
-    if (!isGuardRule && (!Array.isArray(raw.triggers) || raw.triggers.length === 0)) {
-      throw new Error(`${where}: triggers 必须是非空数组`);
-    }
-    // foreach：把「事件列表」展开成多条 finding。事件 dict 的键（如 t_s / name）
-    // 会叠加进模板环境，因此必须显式声明 keys，才能继续做占位符校验。
-    const eventKeys = new Set();
-    if (raw.foreach) {
-      const fe = typeof raw.foreach === "string" ? { var: raw.foreach } : raw.foreach;
-      if (!fe.var) throw new Error(`${where}: foreach 需要 var（事件列表的变量名）`);
-      if (!declared.has(fe.var)) {
-        throw new Error(`${where}: foreach 引用的 ${fe.var} 不是 compute 的输出`);
-      }
-      for (const k of fe.keys || []) eventKeys.add(k);
-    }
-    for (const t of raw.triggers || []) {
-      if (typeof t.when !== "string") throw new Error(`${where}: trigger 缺 when（须为字符串，注意加引号）`);
-      // 词表取 rule-expr.mjs 的 SEVERITIES（编辑器 schema 也用这一份，别再抄一份）
-      if (!SEVERITIES.has(t.severity)) {
-        throw new Error(`${where}: trigger severity 非法：${t.severity}（可用：${[...SEVERITIES].join(" / ")}）`);
-      }
-      if (typeof t.title !== "string") throw new Error(`${where}: trigger 缺 title`);
-      if (typeof t.field !== "string") throw new Error(`${where}: trigger 缺 field（evidence.field）`);
-      // 表达式里的标识符必须已声明（内置变量 / compute 输出 / foreach 事件键）
-      for (const name of stripStrings(t.when).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
-        if (EXPR_KEYWORDS.has(name)) continue;
-        if (!declared.has(name) && !BUILTIN_VARS.has(name) && !eventKeys.has(name)) {
-          throw new Error(`${where}: 表达式引用了未声明的名字 ${name}（when: ${t.when}）`);
-        }
-      }
-      // 证据值是一个**表达式**（与 when 同一套语法）：写变量得原值、写 f"{x:.3f}" 得
-      // 格式化后的串、写常量就得到常量。名字必须是已声明的。
-      if (t.value !== undefined && typeof t.value !== "string") {
-        throw new Error(`${where}: trigger 的 value 必须是字符串表达式（如 value: p99_stat）`);
-      }
-      if (typeof t.value === "string") {
-        for (const name of stripStrings(t.value).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
-          if (EXPR_KEYWORDS.has(name) || name === "f") continue;   // f"..." 的 f 前缀
-          if (!declared.has(name) && !BUILTIN_VARS.has(name) && !eventKeys.has(name)) {
-            throw new Error(`${where}: value 引用了未声明的名字 ${name}（value: ${t.value}）`);
-          }
-        }
-      }
-      // 标题里的占位符同理
-      for (const m of t.title.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)(:[^}]*)?\}/g)) {
-        if (!declared.has(m[1]) && !BUILTIN_VARS.has(m[1]) && !eventKeys.has(m[1])) {
-          throw new Error(`${where}: 标题引用了未声明的名字 ${m[1]}`);
-        }
-      }
-      // 证据文案/建议里的占位符同样校验（value 的 f-string 与 suggestion 都允许模板）
-      for (const txt of [t.value, t.suggestion, t.field]) {
-        if (typeof txt !== "string") continue;
-        for (const m of txt.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)(:[^}]*)?\}/g)) {
-          if (!declared.has(m[1]) && !BUILTIN_VARS.has(m[1]) && !eventKeys.has(m[1])) {
-            throw new Error(`${where}: 文案引用了未声明的名字 ${m[1]}`);
-          }
-        }
-      }
-    }
-    if (!isGuardRule && !raw.outputs.check) {
-      throw new Error(`${where}: outputs.check 必填（ran/skipped 用）`);
-    }
-    rules.push(raw);
-    sources.push(file);
-    }
-  }
-  return { rules, sources };
+    return { rules, sources };
 }
 
 // ─────────────────── 指南「知识库」分组的规则清单 + 规则编写参考 ───────────────────
@@ -504,17 +518,22 @@ const CATALOGUE_INTRO = `引擎当前内置的 **{n} 条检查经验**，按执�
 
 /** 尽量贴近 Python 的 `%s`，免得清单文本因为换成 Node 生成而整篇 diff */
 function pyRepr(v) {
-  if (Array.isArray(v)) return "[" + v.map(pyRepr).join(", ") + "]";
-  if (v === null || v === undefined) return "None";
-  if (typeof v === "boolean") return v ? "True" : "False";
-  if (typeof v === "object") {
-    return "{" + Object.entries(v).map(([k, val]) => `'${k}': ${pyRepr(val)}`).join(", ") + "}";
-  }
-  return String(v);
+    if (Array.isArray(v)) return "[" + v.map(pyRepr).join(", ") + "]";
+    if (v === null || v === undefined) return "None";
+    if (typeof v === "boolean") return v ? "True" : "False";
+    if (typeof v === "object") {
+        return (
+            "{" +
+            Object.entries(v)
+                .map(([k, val]) => `'${k}': ${pyRepr(val)}`)
+                .join(", ") +
+            "}"
+        );
+    }
+    return String(v);
 }
 
-const listOr = (v, fallback) =>
-  Array.isArray(v) ? v.join(",") : v === undefined || v === null ? fallback : String(v);
+const listOr = (v, fallback) => (Array.isArray(v) ? v.join(",") : v === undefined || v === null ? fallback : String(v));
 
 /**
  * `ref(..., unit="deg")` 的**源单位**从哪来：`meta/<tag>.json`（经 `meta/topic-map.yaml`
@@ -526,74 +545,76 @@ const listOr = (v, fallback) =>
  * 目标单位（作者写的那个）认不出、或与源单位不同量纲 → 构建失败。
  */
 function resolveFieldUnits(refs, metaDir) {
-  const topicMap = parseYaml(read(resolve(metaDir, "topic-map.yaml"))).topics ?? {};
-  const overridePath = resolve(metaDir, "topic-overrides.yaml");
-  const overrides = existsSync(overridePath) ? parseYaml(read(overridePath)).units ?? {} : {};
+    const topicMap = parseYaml(read(resolve(metaDir, "topic-map.yaml"))).topics ?? {};
+    const overridePath = resolve(metaDir, "topic-overrides.yaml");
+    const overrides = existsSync(overridePath) ? (parseYaml(read(overridePath)).units ?? {}) : {};
 
-  // 逐 tag 读成 {字典键.字段: [原始单位…]}，main 在前（它的口径最新，优先采信）
-  const metaUnits = new Map();
-  const tags = readdirSync(metaDir).filter((f) => f.endsWith(".json")).sort();
-  for (const f of tags) {
-    const doc = JSON.parse(read(resolve(metaDir, f)));
-    for (const [key, spec] of Object.entries(doc.topics ?? {})) {
-      for (const [name, def] of Object.entries(spec.fields ?? {})) {
-        if (!def || !def.unit) continue;
-        const k = `${key}.${name}`;
-        if (!metaUnits.has(k)) metaUnits.set(k, []);
-        metaUnits.get(k).push(String(def.unit));
-      }
+    // 逐 tag 读成 {字典键.字段: [原始单位…]}，main 在前（它的口径最新，优先采信）
+    const metaUnits = new Map();
+    const tags = readdirSync(metaDir)
+        .filter((f) => f.endsWith(".json"))
+        .sort();
+    for (const f of tags) {
+        const doc = JSON.parse(read(resolve(metaDir, f)));
+        for (const [key, spec] of Object.entries(doc.topics ?? {})) {
+            for (const [name, def] of Object.entries(spec.fields ?? {})) {
+                if (!def || !def.unit) continue;
+                const k = `${key}.${name}`;
+                if (!metaUnits.has(k)) metaUnits.set(k, []);
+                metaUnits.get(k).push(String(def.unit));
+            }
+        }
     }
-  }
 
-  // "谁要单位、要哪个单位"由调用方收齐（规则从 compute 抽、预设从字段声明与 compute 抽），
-  // 这里只认 `{where, fields, unit}` 三样
-  const wanted = new Map();   // "topic.field" -> Set(规范目标单位)
-  for (const r of refs) {
-    if (r.unit === undefined || r.unit === null) continue;
-    const dst = normalizeUnit(r.unit);
-    if (!dst) {
-      throw new Error(
-        `${r.where}: unit="${r.unit}" 里那个单位认不出（可用：` +
-          `${[...new Set(Object.values(UNIT_ALIASES))].sort().join(" / ")}）`,
-      );
+    // "谁要单位、要哪个单位"由调用方收齐（规则从 compute 抽、预设从字段声明与 compute 抽），
+    // 这里只认 `{where, fields, unit}` 三样
+    const wanted = new Map(); // "topic.field" -> Set(规范目标单位)
+    for (const r of refs) {
+        if (r.unit === undefined || r.unit === null) continue;
+        const dst = normalizeUnit(r.unit);
+        if (!dst) {
+            throw new Error(
+                `${r.where}: unit="${r.unit}" 里那个单位认不出（可用：` +
+                    `${[...new Set(Object.values(UNIT_ALIASES))].sort().join(" / ")}）`,
+            );
+        }
+        for (const fld of r.fields) {
+            if (!wanted.has(fld)) wanted.set(fld, new Set());
+            wanted.get(fld).add(dst);
+        }
     }
-    for (const fld of r.fields) {
-      if (!wanted.has(fld)) wanted.set(fld, new Set());
-      wanted.get(fld).add(dst);
-    }
-  }
 
-  const out = {};
-  const unknown = [];
-  for (const fldRaw of [...wanted.keys()].sort()) {
-    // 实例号写在 topic 后（`vehicle_gps_position[-1].lat`）——单位表的键去掉它
-    const fld = fldRaw.replace(/\[[^\]]*\]\./, ".");
-    const [topic, field] = fld.split(".");
-    const dictKey = topicMap[topic] ?? topic;
-    const raw_ = overrides[fld] ?? (metaUnits.get(`${dictKey}.${field}`) ?? [])[0];
-    const src = normalizeUnit(raw_);
-    if (!src) {
-      unknown.push(fld);
-      continue;
+    const out = {};
+    const unknown = [];
+    for (const fldRaw of [...wanted.keys()].sort()) {
+        // 实例号写在 topic 后（`vehicle_gps_position[-1].lat`）——单位表的键去掉它
+        const fld = fldRaw.replace(/\[[^\]]*\]\./, ".");
+        const [topic, field] = fld.split(".");
+        const dictKey = topicMap[topic] ?? topic;
+        const raw_ = overrides[fld] ?? (metaUnits.get(`${dictKey}.${field}`) ?? [])[0];
+        const src = normalizeUnit(raw_);
+        if (!src) {
+            unknown.push(fld);
+            continue;
+        }
+        for (const dst of wanted.get(fldRaw)) {
+            if (UNIT_KIND[src] !== UNIT_KIND[dst]) {
+                throw new Error(
+                    `${fld} 的单位是 ${src}（${UNIT_KIND[src]}），而规则要它输出 ${dst}（${UNIT_KIND[dst]}）` +
+                        `——量纲不同不能换算。要改单位请改 meta/topic-overrides.yaml 的 units，` +
+                        `或者改 ref(..., unit=) 的期望单位`,
+                );
+            }
+        }
+        out[fld] = src;
     }
-    for (const dst of wanted.get(fldRaw)) {
-      if (UNIT_KIND[src] !== UNIT_KIND[dst]) {
-        throw new Error(
-          `${fld} 的单位是 ${src}（${UNIT_KIND[src]}），而规则要它输出 ${dst}（${UNIT_KIND[dst]}）` +
-            `——量纲不同不能换算。要改单位请改 meta/topic-overrides.yaml 的 units，` +
-            `或者改 ref(..., unit=) 的期望单位`,
+    if (unknown.length) {
+        console.warn(
+            `  ! 这些字段在 meta 里查不到单位，unit= 不做换算：${unknown.join("、")}\n` +
+                `    补法：在 knowledge/px4/meta/topic-overrides.yaml 的 units 里加一行（字段名 → 真实单位）`,
         );
-      }
     }
-    out[fld] = src;
-  }
-  if (unknown.length) {
-    console.warn(
-      `  ! 这些字段在 meta 里查不到单位，unit= 不做换算：${unknown.join("、")}\n` +
-        `    补法：在 knowledge/px4/meta/topic-overrides.yaml 的 units 里加一行（字段名 → 真实单位）`,
-    );
-  }
-  return out;
+    return out;
 }
 
 /**
@@ -607,17 +628,17 @@ function resolveFieldUnits(refs, metaDir) {
  * 不静默放过（写错的机架名会让那条经验**永远不跑**，最难发现的一种坏）。
  */
 function normalizeAirframe(spec, airframes, where) {
-  const canon = (name) => {
-    const n = String(name).trim();
-    if (airframes.aliases[n]) return airframes.aliases[n];
-    if (airframes.valid.has(n)) return n;
-    throw new Error(
-      `${where}: conditions.airframe 里的「${n}」不认识（可用：${[...airframes.valid].sort().join(" / ")}；` +
-        `简写见 facts.yaml 的 airframe_aliases）`,
-    );
-  };
-  if (typeof spec === "string") return spec.trim() === "any" ? "any" : canon(spec);
-  return spec.map(canon);
+    const canon = (name) => {
+        const n = String(name).trim();
+        if (airframes.aliases[n]) return airframes.aliases[n];
+        if (airframes.valid.has(n)) return n;
+        throw new Error(
+            `${where}: conditions.airframe 里的「${n}」不认识（可用：${[...airframes.valid].sort().join(" / ")}；` +
+                `简写见 facts.yaml 的 airframe_aliases）`,
+        );
+    };
+    if (typeof spec === "string") return spec.trim() === "any" ? "any" : canon(spec);
+    return spec.map(canon);
 }
 
 // ─────────────────────────── 绘图预设（plot/*.yml）───────────────────────────
@@ -641,24 +662,24 @@ const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
  * `parseExprList` 认引号与括号。
  */
 function parallelList(raw, n, where, what, check) {
-  if (raw === undefined || raw === null) return null;
-  if (!Array.isArray(raw)) {
-    throw new Error(
-      `${where}: ${what} 要写成 YAML 列表，如 ${what}: [甲, 乙]（只有一项也要写 ${what}: [甲]）` +
-        `——与 ydata 逐项对应；逗号串那种写法不再认`,
-    );
-  }
-  if (raw.length !== n) {
-    throw new Error(`${where}: ${what} 有 ${raw.length} 项、ydata 有 ${n} 项——两者必须一一对应`);
-  }
-  return raw.map((v, i) => {
-    if (typeof v !== "string" || !v.trim()) {
-      throw new Error(`${where}: ${what} 第 ${i + 1} 项必须是非空字符串（实际 ${JSON.stringify(v)}）`);
+    if (raw === undefined || raw === null) return null;
+    if (!Array.isArray(raw)) {
+        throw new Error(
+            `${where}: ${what} 要写成 YAML 列表，如 ${what}: [甲, 乙]（只有一项也要写 ${what}: [甲]）` +
+                `——与 ydata 逐项对应；逗号串那种写法不再认`,
+        );
     }
-    const s = v.trim();
-    if (check) check(s, i);
-    return s;
-  });
+    if (raw.length !== n) {
+        throw new Error(`${where}: ${what} 有 ${raw.length} 项、ydata 有 ${n} 项——两者必须一一对应`);
+    }
+    return raw.map((v, i) => {
+        if (typeof v !== "string" || !v.trim()) {
+            throw new Error(`${where}: ${what} 第 ${i + 1} 项必须是非空字符串（实际 ${JSON.stringify(v)}）`);
+        }
+        const s = v.trim();
+        if (check) check(s, i);
+        return s;
+    });
 }
 
 /**
@@ -668,79 +689,83 @@ function parallelList(raw, n, where, what, check) {
  * **在编译处登记**，不靠事后遍历产物猜形状：地图坐标编译后不是同一个形状，遍历会漏。
  */
 function compileFieldOne(raw, where, what, declaredVars, refs) {
-  if (typeof raw !== "string" || !raw.trim()) {
-    throw new Error(`${where}: ${what} 必须是非空的字段声明（如 ref("vehicle_gps_position.eph", unit="m")）`);
-  }
-  let desc;
-  try {
-    desc = checkFieldItem(raw, { signatures, builtinVars: BUILTIN_VARS, declaredVars });
-  } catch (err) {
-    throw new Error(`${where}: ${what}——${err.message}`);
-  }
-  if (refs && desc.kind === "field" && desc.unit) {
-    refs.push({ where, fields: desc.fields, unit: desc.unit });
-  }
-  return desc;
+    if (typeof raw !== "string" || !raw.trim()) {
+        throw new Error(`${where}: ${what} 必须是非空的字段声明（如 ref("vehicle_gps_position.eph", unit="m")）`);
+    }
+    let desc;
+    try {
+        desc = checkFieldItem(raw, { signatures, builtinVars: BUILTIN_VARS, declaredVars });
+    } catch (err) {
+        throw new Error(`${where}: ${what}——${err.message}`);
+    }
+    if (refs && desc.kind === "field" && desc.unit) {
+        refs.push({ where, fields: desc.fields, unit: desc.unit });
+    }
+    return desc;
 }
 
 /** 一条线一个取数声明（`ydata`）→ 运行期描述数组。**必须是 YAML 列表**，与 label/style/color 同形。 */
 function compileFieldList(raw, where, what, declaredVars, refs) {
-  if (!Array.isArray(raw)) {
-    throw new Error(
-      `${where}: ${what} 要写成 YAML 列表，一行一条线：\n` +
-        `    ${what}:\n      - ref("vehicle_gps_position.eph", unit="m")\n      - remaining_pct`,
-    );
-  }
-  if (raw.length === 0) throw new Error(`${where}: ${what} 是空列表（这张图画什么？）`);
-  return raw.map((item, i) => {
-    if (typeof item !== "string" || !item.trim()) {
-      throw new Error(`${where}: ${what} 第 ${i + 1} 项必须是非空字符串（实际 ${JSON.stringify(item)}）`);
+    if (!Array.isArray(raw)) {
+        throw new Error(
+            `${where}: ${what} 要写成 YAML 列表，一行一条线：\n` +
+                `    ${what}:\n      - ref("vehicle_gps_position.eph", unit="m")\n      - remaining_pct`,
+        );
     }
-    return compileFieldOne(item, `${where} 的 ${what} 第 ${i + 1} 项`, "", declaredVars, refs);
-  });
+    if (raw.length === 0) throw new Error(`${where}: ${what} 是空列表（这张图画什么？）`);
+    return raw.map((item, i) => {
+        if (typeof item !== "string" || !item.trim()) {
+            throw new Error(`${where}: ${what} 第 ${i + 1} 项必须是非空字符串（实际 ${JSON.stringify(item)}）`);
+        }
+        return compileFieldOne(item, `${where} 的 ${what} 第 ${i + 1} 项`, "", declaredVars, refs);
+    });
 }
 
 /** 一条线没写 label 时的图例名：字段引用用第一个候选的字段名，换算节点的输出用变量名。 */
 function defaultLabel(desc) {
-  if (desc.kind === "var") return desc.name;
-  const parsed = splitFieldRef(desc.fields[0]);
-  return parsed ? parsed.field : desc.fields[0];
+    if (desc.kind === "var") return desc.name;
+    const parsed = splitFieldRef(desc.fields[0]);
+    return parsed ? parsed.field : desc.fields[0];
 }
 
 /** 容器级那些可有可无的开关（legend / grid / flipx / flipy / range）。 */
 function containerSwitches(out, where) {
-  for (const k of ["legend", "grid", "flipx", "flipy"]) {
-    if (out[k] !== undefined && typeof out[k] !== "boolean") {
-      throw new Error(`${where}: ${k} 只能是 true / false（实际 ${JSON.stringify(out[k])}）`);
+    for (const k of ["legend", "grid", "flipx", "flipy"]) {
+        if (out[k] !== undefined && typeof out[k] !== "boolean") {
+            throw new Error(`${where}: ${k} 只能是 true / false（实际 ${JSON.stringify(out[k])}）`);
+        }
     }
-  }
-  let range = null;
-  if (out.range !== undefined) {
-    if (!Array.isArray(out.range) || ![2, 4].includes(out.range.length) || out.range.some((x) => typeof x !== "number")) {
-      throw new Error(`${where}: range 要是两个或四个数字（[x0,x1] 或 [x0,x1,y0,y1]），不写就是自动适配`);
+    let range = null;
+    if (out.range !== undefined) {
+        if (
+            !Array.isArray(out.range) ||
+            ![2, 4].includes(out.range.length) ||
+            out.range.some((x) => typeof x !== "number")
+        ) {
+            throw new Error(`${where}: range 要是两个或四个数字（[x0,x1] 或 [x0,x1,y0,y1]），不写就是自动适配`);
+        }
+        range = out.range;
     }
-    range = out.range;
-  }
-  let hlines = null;
-  if (out.hlines !== undefined) {
-    if (!Array.isArray(out.hlines) || !out.hlines.length) throw new Error(`${where}: hlines 必须是非空数组`);
-    hlines = out.hlines.map((h) => {
-      if (typeof h.value !== "number" || !h.label) throw new Error(`${where}: hlines 每项要有 value 与 label`);
-      if (!["ok", "warning", "critical"].includes(h.level)) {
-        throw new Error(`${where}: hlines.level 只能是 ok / warning / critical`);
-      }
-      return { value: h.value, level: h.level, label: h.label };
-    });
-  }
-  return {
-    title: out.title ?? null,
-    legend: out.legend !== false,
-    grid: out.grid !== false,
-    flipx: out.flipx === true,
-    flipy: out.flipy === true,
-    range,
-    hlines,
-  };
+    let hlines = null;
+    if (out.hlines !== undefined) {
+        if (!Array.isArray(out.hlines) || !out.hlines.length) throw new Error(`${where}: hlines 必须是非空数组`);
+        hlines = out.hlines.map((h) => {
+            if (typeof h.value !== "number" || !h.label) throw new Error(`${where}: hlines 每项要有 value 与 label`);
+            if (!["ok", "warning", "critical"].includes(h.level)) {
+                throw new Error(`${where}: hlines.level 只能是 ok / warning / critical`);
+            }
+            return { value: h.value, level: h.level, label: h.label };
+        });
+    }
+    return {
+        title: out.title ?? null,
+        legend: out.legend !== false,
+        grid: out.grid !== false,
+        flipx: out.flipx === true,
+        flipy: out.flipy === true,
+        range,
+        hlines,
+    };
 }
 
 /**
@@ -750,63 +775,73 @@ function containerSwitches(out, where) {
  * 的图不许出现 `[:]`（那会取到一组实例，引擎会报错——不如在这里说清楚）。
  */
 function compileAxes(out, where, declaredVars, refs) {
-  const switches = containerSwitches(out, where);
-  if (typeof out.ylabel !== "string" || !out.ylabel.trim()) {
-    throw new Error(`${where}: container: axes 必须有 ylabel（这张图的 y 轴标签，如 m / deg / %）`);
-  }
-  if (!Array.isArray(out.children) || out.children.length === 0) {
-    throw new Error(`${where}: children 必须是非空数组（这张图画哪几条线）`);
-  }
-  const perInstance = out.per_instance === true;
-  const children = out.children.map((child, ci) => {
-    const cwhere = `${where} 第 ${ci + 1} 条 child`;
-    if (!CHART_MODES.has(child.mode)) {
-      throw new Error(`${cwhere}: mode 只能是 TimeSeries / xyplot（实际 ${JSON.stringify(child.mode)}）`);
+    const switches = containerSwitches(out, where);
+    if (typeof out.ylabel !== "string" || !out.ylabel.trim()) {
+        throw new Error(`${where}: container: axes 必须有 ylabel（这张图的 y 轴标签，如 m / deg / %）`);
     }
-    const ydata = compileFieldList(child.ydata, cwhere, "ydata", declaredVars, refs);
-    const labels = parallelList(child.label, ydata.length, cwhere, "label") ?? ydata.map(defaultLabel);
-    const styles = parallelList(child.style, ydata.length, cwhere, "style", (v, i) => {
-      if (!LINE_STYLES.has(v)) {
-        throw new Error(
-          `${cwhere}: style 第 ${i + 1} 项 ${JSON.stringify(v)} 不是合法线型` +
-            `（可用：${[...LINE_STYLES].join(" / ")}）`,
-        );
-      }
-    }) ?? [];
-    const colors = parallelList(child.color, ydata.length, cwhere, "color", (v, i) => {
-      if (!COLOR_RE.test(v)) throw new Error(`${cwhere}: color 第 ${i + 1} 项 ${JSON.stringify(v)} 要是 #rrggbb`);
-    }) ?? [];
-    const xdata = child.xdata === undefined
-      ? null
-      : compileFieldOne(child.xdata, cwhere, "xdata", declaredVars, refs);
-    if (child.mode === "xyplot" && !xdata) throw new Error(`${cwhere}: mode: xyplot 必须写 xdata`);
-    return { mode: child.mode, xdata, ydata, labels, styles, colors };
-  });
+    if (!Array.isArray(out.children) || out.children.length === 0) {
+        throw new Error(`${where}: children 必须是非空数组（这张图画哪几条线）`);
+    }
+    const perInstance = out.per_instance === true;
+    const children = out.children.map((child, ci) => {
+        const cwhere = `${where} 第 ${ci + 1} 条 child`;
+        if (!CHART_MODES.has(child.mode)) {
+            throw new Error(`${cwhere}: mode 只能是 TimeSeries / xyplot（实际 ${JSON.stringify(child.mode)}）`);
+        }
+        const ydata = compileFieldList(child.ydata, cwhere, "ydata", declaredVars, refs);
+        const labels = parallelList(child.label, ydata.length, cwhere, "label") ?? ydata.map(defaultLabel);
+        const styles =
+            parallelList(child.style, ydata.length, cwhere, "style", (v, i) => {
+                if (!LINE_STYLES.has(v)) {
+                    throw new Error(
+                        `${cwhere}: style 第 ${i + 1} 项 ${JSON.stringify(v)} 不是合法线型` +
+                            `（可用：${[...LINE_STYLES].join(" / ")}）`,
+                    );
+                }
+            }) ?? [];
+        const colors =
+            parallelList(child.color, ydata.length, cwhere, "color", (v, i) => {
+                if (!COLOR_RE.test(v))
+                    throw new Error(`${cwhere}: color 第 ${i + 1} 项 ${JSON.stringify(v)} 要是 #rrggbb`);
+            }) ?? [];
+        const xdata =
+            child.xdata === undefined ? null : compileFieldOne(child.xdata, cwhere, "xdata", declaredVars, refs);
+        if (child.mode === "xyplot" && !xdata) throw new Error(`${cwhere}: mode: xyplot 必须写 xdata`);
+        return { mode: child.mode, xdata, ydata, labels, styles, colors };
+    });
 
-  const units = new Set();
-  let grouped = 0;
-  for (const c of children) {
-    for (const d of c.ydata) {
-      if (d.unit) units.add(d.unit);
-      if (d.kind === "field" && d.fields.some((f) => typeof (splitFieldRef(f) ?? {}).inst !== "number")) grouped++;
+    const units = new Set();
+    let grouped = 0;
+    for (const c of children) {
+        for (const d of c.ydata) {
+            if (d.unit) units.add(d.unit);
+            if (d.kind === "field" && d.fields.some((f) => typeof (splitFieldRef(f) ?? {}).inst !== "number"))
+                grouped++;
+        }
     }
-  }
-  if (units.size > 1) {
-    throw new Error(
-      `${where}: 同一张图里出现了不同单位的曲线（${[...units].join(" / ")}）——一张图只画一个量纲，` +
-        `拆成两张图，或者去掉不需要换算的那条线的 unit=`,
-    );
-  }
-  if (perInstance && grouped === 0) {
-    throw new Error(`${where}: 写了 per_instance 但没有任何引用取"所有实例"——那条线要写成 ref("topic[:].field")`);
-  }
-  if (!perInstance && grouped > 0) {
-    throw new Error(
-      `${where}: 有引用取到了"所有实例"（[:] 或不写实例），这样画不出图——` +
-        `要么给容器加 per_instance: true（每实例一张图），要么在引用里写死第几个实例`,
-    );
-  }
-  return { container: "axes", ...switches, per_instance: perInstance, ylabel: out.ylabel.trim(), xlabel: out.xlabel ?? "秒（相对日志开始）", children };
+    if (units.size > 1) {
+        throw new Error(
+            `${where}: 同一张图里出现了不同单位的曲线（${[...units].join(" / ")}）——一张图只画一个量纲，` +
+                `拆成两张图，或者去掉不需要换算的那条线的 unit=`,
+        );
+    }
+    if (perInstance && grouped === 0) {
+        throw new Error(`${where}: 写了 per_instance 但没有任何引用取"所有实例"——那条线要写成 ref("topic[:].field")`);
+    }
+    if (!perInstance && grouped > 0) {
+        throw new Error(
+            `${where}: 有引用取到了"所有实例"（[:] 或不写实例），这样画不出图——` +
+                `要么给容器加 per_instance: true（每实例一张图），要么在引用里写死第几个实例`,
+        );
+    }
+    return {
+        container: "axes",
+        ...switches,
+        per_instance: perInstance,
+        ylabel: out.ylabel.trim(),
+        xlabel: out.xlabel ?? "秒（相对日志开始）",
+        children,
+    };
 }
 
 /**
@@ -815,51 +850,52 @@ function compileAxes(out, where, declaredVars, refs) {
  * 同一个实例，否则三路采样率不同、画出来是错的。
  */
 function compileMap(out, where, declaredVars, refs) {
-  const switches = containerSwitches(out, where);
-  if (!Array.isArray(out.children) || out.children.length === 0) {
-    throw new Error(`${where}: children 必须是非空数组（地图上画哪几条轨道）`);
-  }
-  const children = out.children.map((child, ci) => {
-    const cwhere = `${where} 第 ${ci + 1} 条轨道`;
-    if (child.mode !== "track") throw new Error(`${cwhere}: 地图上的 mode 只能是 track`);
-    const maxPoints = child.max_points === undefined ? 1500 : Number(child.max_points);
-    if (!Number.isFinite(maxPoints) || maxPoints < 2) {
-      throw new Error(`${cwhere}: max_points 要是 ≥ 2 的数字（抽稀到多少点）`);
+    const switches = containerSwitches(out, where);
+    if (!Array.isArray(out.children) || out.children.length === 0) {
+        throw new Error(`${where}: children 必须是非空数组（地图上画哪几条轨道）`);
     }
-    const coords = {};
-    for (const axis of ["lat", "lon", "alt"]) {
-      const desc = compileFieldOne(child[axis], cwhere, axis, declaredVars, refs);
-      if (desc.kind !== "field") {
-        throw new Error(`${cwhere}: ${axis} 必须是字段引用（地图坐标不支持换算节点的输出）`);
-      }
-      for (const f of desc.fields) {
-        const parsed = splitFieldRef(f);
-        if (!parsed) throw new Error(`${cwhere}: ${axis} 的 ${JSON.stringify(f)} 不是 topic.field 形式`);
-        if (typeof parsed.inst !== "number") {
-          throw new Error(
-            `${cwhere}: ${axis} 的候选 ${f} 没写明实例——地图坐标要指定第几个实例` +
-              `（如 sensor_gps[0].latitude_deg；两条轨道各画一个实例时才有理由写别的 N）`,
-          );
+    const children = out.children.map((child, ci) => {
+        const cwhere = `${where} 第 ${ci + 1} 条轨道`;
+        if (child.mode !== "track") throw new Error(`${cwhere}: 地图上的 mode 只能是 track`);
+        const maxPoints = child.max_points === undefined ? 1500 : Number(child.max_points);
+        if (!Number.isFinite(maxPoints) || maxPoints < 2) {
+            throw new Error(`${cwhere}: max_points 要是 ≥ 2 的数字（抽稀到多少点）`);
         }
-      }
-      coords[axis] = { cands: desc.fields, unit: desc.unit ?? null };
-    }
-    // 候选顺序即优先级；provider 拿它去同一 topic 上取起始 UTC（与坐标同一口径）
-    const topics = [];
-    for (const f of coords.lat.cands) {
-      const parsed = splitFieldRef(f);
-      if (!topics.some(([t, i]) => t === parsed.topic && i === parsed.inst)) topics.push([parsed.topic, parsed.inst]);
-    }
-    return {
-      label: child.label ?? splitFieldRef(coords.lat.cands[0]).topic,
-      max_points: maxPoints,
-      lat: coords.lat,
-      lon: coords.lon,
-      alt: coords.alt,
-      topics,
-    };
-  });
-  return { container: "map", title: switches.title ?? "轨迹", legend: switches.legend, children };
+        const coords = {};
+        for (const axis of ["lat", "lon", "alt"]) {
+            const desc = compileFieldOne(child[axis], cwhere, axis, declaredVars, refs);
+            if (desc.kind !== "field") {
+                throw new Error(`${cwhere}: ${axis} 必须是字段引用（地图坐标不支持换算节点的输出）`);
+            }
+            for (const f of desc.fields) {
+                const parsed = splitFieldRef(f);
+                if (!parsed) throw new Error(`${cwhere}: ${axis} 的 ${JSON.stringify(f)} 不是 topic.field 形式`);
+                if (typeof parsed.inst !== "number") {
+                    throw new Error(
+                        `${cwhere}: ${axis} 的候选 ${f} 没写明实例——地图坐标要指定第几个实例` +
+                            `（如 sensor_gps[0].latitude_deg；两条轨道各画一个实例时才有理由写别的 N）`,
+                    );
+                }
+            }
+            coords[axis] = { cands: desc.fields, unit: desc.unit ?? null };
+        }
+        // 候选顺序即优先级；provider 拿它去同一 topic 上取起始 UTC（与坐标同一口径）
+        const topics = [];
+        for (const f of coords.lat.cands) {
+            const parsed = splitFieldRef(f);
+            if (!topics.some(([t, i]) => t === parsed.topic && i === parsed.inst))
+                topics.push([parsed.topic, parsed.inst]);
+        }
+        return {
+            label: child.label ?? splitFieldRef(coords.lat.cands[0]).topic,
+            max_points: maxPoints,
+            lat: coords.lat,
+            lon: coords.lon,
+            alt: coords.alt,
+            topics,
+        };
+    });
+    return { container: "map", title: switches.title ?? "轨迹", legend: switches.legend, children };
 }
 
 /**
@@ -876,92 +912,94 @@ function compileMap(out, where, declaredVars, refs) {
  * 内联在 `_run_rules` 里的）。写了非默认值就在**构建期**报错，别让它在运行期悄悄不生效。
  */
 function withMapConditions(map, conditions, where) {
-  const unsupported = ["firmware", "airframe"].filter((k) => conditions[k] && conditions[k] !== "any");
-  if (conditions.precheck) unsupported.push("precheck");
-  if (unsupported.length) {
-    throw new Error(
-      `${where}: 地图预设的 conditions 只支持 topics（引擎侧的地图路径没接 ${unsupported.join(" / ")}）——` +
-        `要按固件 / 机架 / 先决条件收紧，得先在 get_flight_track 里接上同一个闸门`,
-    );
-  }
-  return { ...map, conditions: { topics: conditions.topics ?? [] } };
+    const unsupported = ["firmware", "airframe"].filter((k) => conditions[k] && conditions[k] !== "any");
+    if (conditions.precheck) unsupported.push("precheck");
+    if (unsupported.length) {
+        throw new Error(
+            `${where}: 地图预设的 conditions 只支持 topics（引擎侧的地图路径没接 ${unsupported.join(" / ")}）——` +
+                `要按固件 / 机架 / 先决条件收紧，得先在 get_flight_track 里接上同一个闸门`,
+        );
+    }
+    return { ...map, conditions: { topics: conditions.topics ?? [] } };
 }
 
 /** 一份预设 → `{plot, map, refs}`（plot 进前端产物，map 进 facts.track）。 */
 function compilePreset(spec, where, airframes) {
-  for (const key of ["id", "title", "description", "outputs"]) {
-    if (spec[key] === undefined || spec[key] === null || spec[key] === "") {
-      throw new Error(`${where}: 缺少必填字段 ${key}`);
+    for (const key of ["id", "title", "description", "outputs"]) {
+        if (spec[key] === undefined || spec[key] === null || spec[key] === "") {
+            throw new Error(`${where}: 缺少必填字段 ${key}`);
+        }
     }
-  }
-  if (spec.order !== undefined && !Number.isFinite(Number(spec.order))) {
-    throw new Error(`${where}: order 必须是数字`);
-  }
-  const conditions = normalizeConditions(spec.conditions, where, airframes);
-  const compute = (spec.compute ?? []).map((s) => String(s).trim());
-  let declaredVars = new Set();
-  if (compute.length) {
-    try {
-      // 与规则的 compute **同一个校验器**：左值个数对得上算子、引用的名字已声明、算子已注册
-      declaredVars = new Set(validateComputeList(compute, { signatures, builtinVars: BUILTIN_VARS }).keys());
-    } catch (err) {
-      throw new Error(`${where}: compute ${err.message}`);
+    if (spec.order !== undefined && !Number.isFinite(Number(spec.order))) {
+        throw new Error(`${where}: order 必须是数字`);
     }
-  }
-  if (!Array.isArray(spec.outputs) || spec.outputs.length === 0) {
-    throw new Error(`${where}: outputs 必须是非空数组`);
-  }
-  let map = null;
-  const refs = [];
-  const outputs = spec.outputs.map((out, oi) => {
-    const owhere = `${where} 第 ${oi + 1} 个 container`;
-    if (out.container === "axes") return compileAxes(out, owhere, declaredVars, refs);
-    if (out.container === "map") {
-      if (map) throw new Error(`${where}: 一份预设里最多一个 container: map`);
-      map = compileMap(out, owhere, declaredVars, refs);
-      return map;
+    const conditions = normalizeConditions(spec.conditions, where, airframes);
+    const compute = (spec.compute ?? []).map((s) => String(s).trim());
+    let declaredVars = new Set();
+    if (compute.length) {
+        try {
+            // 与规则的 compute **同一个校验器**：左值个数对得上算子、引用的名字已声明、算子已注册
+            declaredVars = new Set(validateComputeList(compute, { signatures, builtinVars: BUILTIN_VARS }).keys());
+        } catch (err) {
+            throw new Error(`${where}: compute ${err.message}`);
+        }
     }
-    throw new Error(`${owhere}: container 只能是 axes / map（实际 ${JSON.stringify(out.container)}）`);
-  });
-  const plot = {
-    id: spec.id,
-    title: spec.title,
-    description: spec.description,
-    order: Number(spec.order ?? 999),
-    conditions,
-    compute,
-    outputs,
-  };
-  // 换算节点里的 ref(..., unit=) 也要进单位表（与规则同一套）
-  for (const stmt of compute) {
-    for (const r of collectRefs(stmt)) refs.push({ where: `${where} 的 compute`, ...r });
-  }
-  return { plot, map, refs };
+    if (!Array.isArray(spec.outputs) || spec.outputs.length === 0) {
+        throw new Error(`${where}: outputs 必须是非空数组`);
+    }
+    let map = null;
+    const refs = [];
+    const outputs = spec.outputs.map((out, oi) => {
+        const owhere = `${where} 第 ${oi + 1} 个 container`;
+        if (out.container === "axes") return compileAxes(out, owhere, declaredVars, refs);
+        if (out.container === "map") {
+            if (map) throw new Error(`${where}: 一份预设里最多一个 container: map`);
+            map = compileMap(out, owhere, declaredVars, refs);
+            return map;
+        }
+        throw new Error(`${owhere}: container 只能是 axes / map（实际 ${JSON.stringify(out.container)}）`);
+    });
+    const plot = {
+        id: spec.id,
+        title: spec.title,
+        description: spec.description,
+        order: Number(spec.order ?? 999),
+        conditions,
+        compute,
+        outputs,
+    };
+    // 换算节点里的 ref(..., unit=) 也要进单位表（与规则同一套）
+    for (const stmt of compute) {
+        for (const r of collectRefs(stmt)) refs.push({ where: `${where} 的 compute`, ...r });
+    }
+    return { plot, map, refs };
 }
 
 /** plot/ 下所有预设 → `{plots, mapSpec, refs}`。`*-template.yml` 是给人抄的骨架，不加载。 */
 function loadPresets(dir, airframes) {
-  const files = readdirSync(dir).filter((f) => f.endsWith(".yml") && !f.endsWith("-template.yml")).sort();
-  if (files.length === 0) throw new Error("knowledge/px4/plot/ 下没有预设文件");
-  const plots = [];
-  const refs = [];
-  const seen = new Set();
-  let mapSpec = null;
-  for (const file of files) {
-    const where = `plot/${file}`;
-    const { plot, map, refs: r } = compilePreset(parseYaml(read(resolve(dir, file))), where, airframes);
-    if (seen.has(plot.id)) throw new Error(`${where}: 预设 id 重复 ${plot.id}`);
-    seen.add(plot.id);
-    if (map) {
-      // 地图是报告页的常驻区，只有一块地方：多个预设各声明一份 map，谁都画不了
-      if (mapSpec) throw new Error(`${where}: 已经有一份预设声明了 container: map（全局只能一个）`);
-      mapSpec = withMapConditions(map, plot.conditions, where);
+    const files = readdirSync(dir)
+        .filter((f) => f.endsWith(".yml") && !f.endsWith("-template.yml"))
+        .sort();
+    if (files.length === 0) throw new Error("knowledge/px4/plot/ 下没有预设文件");
+    const plots = [];
+    const refs = [];
+    const seen = new Set();
+    let mapSpec = null;
+    for (const file of files) {
+        const where = `plot/${file}`;
+        const { plot, map, refs: r } = compilePreset(parseYaml(read(resolve(dir, file))), where, airframes);
+        if (seen.has(plot.id)) throw new Error(`${where}: 预设 id 重复 ${plot.id}`);
+        seen.add(plot.id);
+        if (map) {
+            // 地图是报告页的常驻区，只有一块地方：多个预设各声明一份 map，谁都画不了
+            if (mapSpec) throw new Error(`${where}: 已经有一份预设声明了 container: map（全局只能一个）`);
+            mapSpec = withMapConditions(map, plot.conditions, where);
+        }
+        plots.push(plot);
+        refs.push(...r);
     }
-    plots.push(plot);
-    refs.push(...r);
-  }
-  plots.sort((a, b) => a.order - b.order);
-  return { plots, mapSpec, refs };
+    plots.sort((a, b) => a.order - b.order);
+    return { plots, mapSpec, refs };
 }
 
 /**
@@ -976,259 +1014,263 @@ function loadPresets(dir, airframes) {
  * 由调用方各自拦（规则那边有历史包袱，预设那边写了直接报错）。
  */
 function normalizeConditions(raw, where, airframes) {
-  const cond = raw ?? {};
-  if (typeof cond !== "object" || cond === null || Array.isArray(cond)) {
-    throw new Error(`${where}: conditions 必须是对象（可用键：firmware / airframe / topics / precheck）`);
-  }
-  for (const k of Object.keys(cond)) {
-    if (!["firmware", "airframe", "topics", "precheck"].includes(k)) {
-      throw new Error(`${where}: conditions 里有未知键 ${k}（可用：firmware / airframe / topics / precheck）`);
+    const cond = raw ?? {};
+    if (typeof cond !== "object" || cond === null || Array.isArray(cond)) {
+        throw new Error(`${where}: conditions 必须是对象（可用键：firmware / airframe / topics / precheck）`);
     }
-  }
-  if (cond.firmware !== undefined && !isFirmwareSpec(cond.firmware)) {
-    throw new Error(
-      `${where}: conditions.firmware 必须是固件约束串（any / ">=1.15" / "<1.15" / ">=1.14,<1.15"），` +
-        `实际是 ${JSON.stringify(cond.firmware)}`,
-    );
-  }
-  if (cond.airframe !== undefined && !isAirframeSpec(cond.airframe)) {
-    throw new Error(
-      `${where}: conditions.airframe 必须是 any / 机架名 / 机架名列表（如 [fixed_wing, unknown]），` +
-        `实际是 ${JSON.stringify(cond.airframe)}`,
-    );
-  }
-  if (cond.topics !== undefined && !Array.isArray(cond.topics)) {
-    throw new Error(`${where}: conditions.topics 必须是数组（每项一个 topic，多个候选用 || 分隔）`);
-  }
-  if (Array.isArray(cond.topics) && cond.topics.length === 0) {
-    throw new Error(`${where}: conditions.topics 是空数组（没有依赖就整个删掉）`);
-  }
-  const topics = (cond.topics ?? []).map((t) => {
-    try {
-      return parseTopicReq(t);
-    } catch (err) {
-      throw new Error(`${where}: ${err.message}`);
+    for (const k of Object.keys(cond)) {
+        if (!["firmware", "airframe", "topics", "precheck"].includes(k)) {
+            throw new Error(`${where}: conditions 里有未知键 ${k}（可用：firmware / airframe / topics / precheck）`);
+        }
     }
-  });
-  if (cond.precheck !== undefined) {
-    if (!Array.isArray(cond.precheck) || cond.precheck.length === 0) {
-      throw new Error(`${where}: conditions.precheck 必须是非空数组（每项一条表达式，没有就整个删掉）`);
+    if (cond.firmware !== undefined && !isFirmwareSpec(cond.firmware)) {
+        throw new Error(
+            `${where}: conditions.firmware 必须是固件约束串（any / ">=1.15" / "<1.15" / ">=1.14,<1.15"），` +
+                `实际是 ${JSON.stringify(cond.firmware)}`,
+        );
     }
-    for (const w of cond.precheck) {
-      if (typeof w !== "string" || !w.trim()) {
-        throw new Error(`${where}: conditions.precheck 的每一项都要是非空表达式字符串`);
-      }
-      checkBuiltinOnly(w, where, `precheck 条件「${w}」`);
+    if (cond.airframe !== undefined && !isAirframeSpec(cond.airframe)) {
+        throw new Error(
+            `${where}: conditions.airframe 必须是 any / 机架名 / 机架名列表（如 [fixed_wing, unknown]），` +
+                `实际是 ${JSON.stringify(cond.airframe)}`,
+        );
     }
-  }
-  const out = {
-    firmware: cond.firmware ?? "any",
-    airframe: normalizeAirframe(cond.airframe ?? "any", airframes, where),
-  };
-  if (topics.length) out.topics = topics;
-  if (cond.precheck !== undefined) out.precheck = cond.precheck.map((s) => s.trim());
-  return out;
+    if (cond.topics !== undefined && !Array.isArray(cond.topics)) {
+        throw new Error(`${where}: conditions.topics 必须是数组（每项一个 topic，多个候选用 || 分隔）`);
+    }
+    if (Array.isArray(cond.topics) && cond.topics.length === 0) {
+        throw new Error(`${where}: conditions.topics 是空数组（没有依赖就整个删掉）`);
+    }
+    const topics = (cond.topics ?? []).map((t) => {
+        try {
+            return parseTopicReq(t);
+        } catch (err) {
+            throw new Error(`${where}: ${err.message}`);
+        }
+    });
+    if (cond.precheck !== undefined) {
+        if (!Array.isArray(cond.precheck) || cond.precheck.length === 0) {
+            throw new Error(`${where}: conditions.precheck 必须是非空数组（每项一条表达式，没有就整个删掉）`);
+        }
+        for (const w of cond.precheck) {
+            if (typeof w !== "string" || !w.trim()) {
+                throw new Error(`${where}: conditions.precheck 的每一项都要是非空表达式字符串`);
+            }
+            checkBuiltinOnly(w, where, `precheck 条件「${w}」`);
+        }
+    }
+    const out = {
+        firmware: cond.firmware ?? "any",
+        airframe: normalizeAirframe(cond.airframe ?? "any", airframes, where),
+    };
+    if (topics.length) out.topics = topics;
+    if (cond.precheck !== undefined) out.precheck = cond.precheck.map((s) => s.trim());
+    return out;
 }
 
-const escapeMdx = (s) => String(s ?? "").replace(/\{/g, "\\{").replace(/\}/g, "\\}");
+const escapeMdx = (s) =>
+    String(s ?? "")
+        .replace(/\{/g, "\\{")
+        .replace(/\}/g, "\\}");
 
 function fmtApplicability(raw) {
-  const parts = [];
-  // conditions 的三个键（不限就整个省掉）：固件 / 机架 / 依赖的 topic
-  if (raw.firmware !== "any") parts.push("固件 " + raw.firmware);
-  if (raw.airframe !== "any") parts.push("机架 " + listOr(raw.airframe, ""));
-  for (const cand of raw.topics ?? []) parts.push("需要 " + cand.join(" 或 "));
-  for (const w of raw.precheck ?? []) parts.push("不跑当 " + w);
-  return parts.join(" ｜ ") || "总是适用";
+    const parts = [];
+    // conditions 的三个键（不限就整个省掉）：固件 / 机架 / 依赖的 topic
+    if (raw.firmware !== "any") parts.push("固件 " + raw.firmware);
+    if (raw.airframe !== "any") parts.push("机架 " + listOr(raw.airframe, ""));
+    for (const cand of raw.topics ?? []) parts.push("需要 " + cand.join(" 或 "));
+    for (const w of raw.precheck ?? []) parts.push("不跑当 " + w);
+    return parts.join(" ｜ ") || "总是适用";
 }
 
 function fmtCompute(raw) {
-  const lines = [];
-  for (const expr of raw.compute || []) {
-    lines.push(`- \`${expr}\``);
-  }
-  return lines.join("\n") || "- （无 compute）";
+    const lines = [];
+    for (const expr of raw.compute || []) {
+        lines.push(`- \`${expr}\``);
+    }
+    return lines.join("\n") || "- （无 compute）";
 }
 
 function fmtTriggers(raw) {
-  const lines = [];
-  for (const t of raw.triggers || []) {
-    const bits = [`**${t.severity}**`, `\`${t.when}\``];
-    if (t.threshold !== undefined && t.threshold !== null) bits.push(`阈值 ${t.threshold}`);
-    if (t.unit) bits.push(`单位 ${t.unit}`);
-    bits.push(`标题「${escapeMdx(t.title)}」`);
-    lines.push("- " + bits.join(" ｜ "));
-  }
-  for (const g of raw.outputs?.guard_tags || []) {
-    lines.push(`- guard：当 \`${g.when}\` 时打标签 \`${g.tag}\``);
-  }
-  return lines.join("\n") || "- （只产 guard 标签，不发 finding）";
+    const lines = [];
+    for (const t of raw.triggers || []) {
+        const bits = [`**${t.severity}**`, `\`${t.when}\``];
+        if (t.threshold !== undefined && t.threshold !== null) bits.push(`阈值 ${t.threshold}`);
+        if (t.unit) bits.push(`单位 ${t.unit}`);
+        bits.push(`标题「${escapeMdx(t.title)}」`);
+        lines.push("- " + bits.join(" ｜ "));
+    }
+    for (const g of raw.outputs?.guard_tags || []) {
+        lines.push(`- guard：当 \`${g.when}\` 时打标签 \`${g.tag}\``);
+    }
+    return lines.join("\n") || "- （只产 guard 标签，不发 finding）";
 }
 
 function fmtOutputs(raw) {
-  const outputs = raw.outputs || {};
-  const bits = [];
-  if (outputs.check) bits.push(`check=${outputs.check}`);
-  if (outputs.tag) bits.push(`tag=${outputs.tag}`);
-  if (outputs.stats) {
-    bits.push("stats=" + Object.entries(outputs.stats).map(([k, v]) => `${k}(round ${v?.round ?? "-"})`).join(", "));
-  }
-  return bits.join("，") || "—";
+    const outputs = raw.outputs || {};
+    const bits = [];
+    if (outputs.check) bits.push(`check=${outputs.check}`);
+    if (outputs.tag) bits.push(`tag=${outputs.tag}`);
+    if (outputs.stats) {
+        bits.push(
+            "stats=" +
+                Object.entries(outputs.stats)
+                    .map(([k, v]) => `${k}(round ${v?.round ?? "-"})`)
+                    .join(", "),
+        );
+    }
+    return bits.join("，") || "—";
 }
 
 const SLOT_LABEL = {
-  guards_early: "数据质量 guard（最早执行）",
-  guards: "数据质量 guard",
+    guards_early: "数据质量 guard（最早执行）",
+    guards: "数据质量 guard",
 };
 
 function renderCatalogue(rules, sources) {
-  // 按码点比较而非 localeCompare：后者的结果随机器 ICU 语言环境变化，
-  // 生成产物必须逐字节可复现（group 名都是 ASCII，码点序就是稳定序）
-  const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
-  const bySlot = rules
-    .map((raw, i) => ({ file: sources[i], raw }))
-    .sort(
-      (a, b) =>
-        cmp(String(a.raw.group ?? ""), String(b.raw.group ?? "")) ||
-        Number(a.raw.order ?? 100000) - Number(b.raw.order ?? 100000),
-    );
+    // 按码点比较而非 localeCompare：后者的结果随机器 ICU 语言环境变化，
+    // 生成产物必须逐字节可复现（group 名都是 ASCII，码点序就是稳定序）
+    const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+    const bySlot = rules
+        .map((raw, i) => ({ file: sources[i], raw }))
+        .sort(
+            (a, b) =>
+                cmp(String(a.raw.group ?? ""), String(b.raw.group ?? "")) ||
+                Number(a.raw.order ?? 100000) - Number(b.raw.order ?? 100000),
+        );
 
-  const body = [];
-  let current = null;
-  for (const { file, raw } of bySlot) {
-    const slot = raw.group ?? "";
-    if (slot !== current) {
-      current = slot;
-      body.push(`\n## ${SLOT_LABEL[slot] ?? slot}（group: \`${slot}\`）\n`);
+    const body = [];
+    let current = null;
+    for (const { file, raw } of bySlot) {
+        const slot = raw.group ?? "";
+        if (slot !== current) {
+            current = slot;
+            body.push(`\n## ${SLOT_LABEL[slot] ?? slot}（group: \`${slot}\`）\n`);
+        }
+        body.push(`### ${raw.id} — ${raw.name ?? ""}\n`);
+        body.push(`- 文件：\`rules/${file}\` ｜ 位置：group \`${slot}\` #${raw.order ?? "—"}`);
+        body.push(`- 适用：${fmtApplicability(raw)}`);
+        body.push(`- 取值：\n${fmtCompute(raw)}`);
+        body.push(`- 判定：\n${fmtTriggers(raw)}`);
+        body.push(`- 产出：${fmtOutputs(raw)}\n`);
     }
-    body.push(`### ${raw.id} — ${raw.name ?? ""}\n`);
-    body.push(`- 文件：\`rules/${file}\` ｜ 位置：group \`${slot}\` #${raw.order ?? "—"}`);
-    body.push(`- 适用：${fmtApplicability(raw)}`);
-    body.push(`- 取值：\n${fmtCompute(raw)}`);
-    body.push(`- 判定：\n${fmtTriggers(raw)}`);
-    body.push(`- 产出：${fmtOutputs(raw)}\n`);
-  }
-  return body.join("\n");
+    return body.join("\n");
 }
 
 function catalogueFrontmatter({ title, titleEn, description, descriptionEn, order }) {
-  return [
-    "---",
-    `title: ${title}`,
-    `titleEn: ${titleEn}`,
-    `description: ${description}`,
-    `descriptionEn: ${descriptionEn}`,
-    `group: ${GROUP.zh}`,
-    `groupEn: ${GROUP.en}`,
-    `order: ${order}`,
-    "---",
-    "",
-  ].join("\n");
+    return [
+        "---",
+        `title: ${title}`,
+        `titleEn: ${titleEn}`,
+        `description: ${description}`,
+        `descriptionEn: ${descriptionEn}`,
+        `group: ${GROUP.zh}`,
+        `groupEn: ${GROUP.en}`,
+        `order: ${order}`,
+        "---",
+        "",
+    ].join("\n");
 }
 
 /** 规则清单页的完整内容（清单只出网站这一份，仓库里不留第二份拷贝） */
 function renderCataloguePage(rules, sources) {
-  return (
-    catalogueFrontmatter({
-      title: "现在规则清单",
-      titleEn: "Rule catalogue",
-      description: "全部检查经验的清单：各自读什么字段、什么条件触发、产出什么标签。",
-      descriptionEn: "Every built-in check — the fields it reads, the condition that fires it, and the tags it emits.",
-      order: 12,
-    }) +
-    `${CATALOGUE_INTRO.replace("{n}", String(rules.length))}\n\n---\n${renderCatalogue(rules, sources)}`
-  );
+    return (
+        catalogueFrontmatter({
+            title: "现在规则清单",
+            titleEn: "Rule catalogue",
+            description: "全部检查经验的清单：各自读什么字段、什么条件触发、产出什么标签。",
+            descriptionEn:
+                "Every built-in check — the fields it reads, the condition that fires it, and the tags it emits.",
+            order: 12,
+        }) + `${CATALOGUE_INTRO.replace("{n}", String(rules.length))}\n\n---\n${renderCatalogue(rules, sources)}`
+    );
 }
 
 // ---------- 算子目录：从 engine/operators.py 的 @operator 装饰器与注释中提取 ----------
 function parseOperatorSections(py) {
-  const sections = [];
-  const re = /^# [-]{3,}\s*(.+?)\s*[-]{3,}\s*$/gm;
-  let m;
-  while ((m = re.exec(py))) sections.push({ title: m[1].trim(), pos: m.index });
-  const order = [];
-  for (let i = 0; i < sections.length; i++) {
-    const start = sections[i].pos;
-    const end = i + 1 < sections.length ? sections[i + 1].pos : py.length;
-    const block = py.slice(start, end);
-    const names = [...block.matchAll(/@operator\(\s*"([a-z_0-9]+)"/g)].map((m2) => m2[1]);
-    if (names.length > 0) order.push(...names);
-  }
-  const sectionOf = {};
-  for (const s of sections) {
-    const start = s.pos;
-    const end = sections.indexOf(s) + 1 < sections.length
-      ? sections[sections.indexOf(s) + 1].pos
-      : py.length;
-    const block = py.slice(start, end);
-    const names = [...block.matchAll(/@operator\(\s*"([a-z_0-9]+)"/g)].map((m2) => m2[1]);
-    for (const n of names) sectionOf[n] = s.title;
-  }
-  return { sections, order, sectionOf };
+    const sections = [];
+    const re = /^# [-]{3,}\s*(.+?)\s*[-]{3,}\s*$/gm;
+    let m;
+    while ((m = re.exec(py))) sections.push({ title: m[1].trim(), pos: m.index });
+    const order = [];
+    for (let i = 0; i < sections.length; i++) {
+        const start = sections[i].pos;
+        const end = i + 1 < sections.length ? sections[i + 1].pos : py.length;
+        const block = py.slice(start, end);
+        const names = [...block.matchAll(/@operator\(\s*"([a-z_0-9]+)"/g)].map((m2) => m2[1]);
+        if (names.length > 0) order.push(...names);
+    }
+    const sectionOf = {};
+    for (const s of sections) {
+        const start = s.pos;
+        const end = sections.indexOf(s) + 1 < sections.length ? sections[sections.indexOf(s) + 1].pos : py.length;
+        const block = py.slice(start, end);
+        const names = [...block.matchAll(/@operator\(\s*"([a-z_0-9]+)"/g)].map((m2) => m2[1]);
+        for (const n of names) sectionOf[n] = s.title;
+    }
+    return { sections, order, sectionOf };
 }
 
 function operatorCatalog(py, sigs) {
-  const { sectionOf, order } = parseOperatorSections(py);
-  const grouped = {};
-  const re = /@operator\(\s*"([a-z_0-9]+)"(\s*,\s*(default|inplace)\s*=\s*(True|False))?\)/g;
-  let m;
-  while ((m = re.exec(py))) {
-    const name = m[1];
-    if (!sigs[name]) continue;
-    const sig = sigs[name];
-    const sec = sectionOf[name] || "其他";
-    if (!grouped[sec]) grouped[sec] = [];
-    grouped[sec].push({ name, sig, default: m[3] === "default", inplace: m[4] === "True" });
-  }
-  const lines = [];
-  for (const sec of Object.keys(grouped).sort((a, b) => {
-    const ia = order.indexOf(grouped[a][0]?.name ?? "");
-    const ib = order.indexOf(grouped[b][0]?.name ?? "");
-    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
-  })) {
-    lines.push(`#### ${sec}`, "");
-    lines.push("| 算子 | 输入 | 输出 | 说明 |");
-    lines.push("|------|------|------|------|");
-    for (const { name, sig } of grouped[sec]) {
-      const ins = (sig.in_names ?? sig.in_display ?? []).map((n) => `\`${n}\``).join(" / ");
-      const outs = (sig.out_names ?? sig.out_display ?? []).map((n) => `\`${n}\``).join(" / ");
-      const desc = sig.desc ?? "";
-      lines.push(`| \`${name}\` | ${ins || "—"} | ${outs || "—"} | ${desc} |`);
+    const { sectionOf, order } = parseOperatorSections(py);
+    const grouped = {};
+    const re = /@operator\(\s*"([a-z_0-9]+)"(\s*,\s*(default|inplace)\s*=\s*(True|False))?\)/g;
+    let m;
+    while ((m = re.exec(py))) {
+        const name = m[1];
+        if (!sigs[name]) continue;
+        const sig = sigs[name];
+        const sec = sectionOf[name] || "其他";
+        if (!grouped[sec]) grouped[sec] = [];
+        grouped[sec].push({ name, sig, default: m[3] === "default", inplace: m[4] === "True" });
     }
-    lines.push("");
-  }
-  return lines.join("\n");
+    const lines = [];
+    for (const sec of Object.keys(grouped).sort((a, b) => {
+        const ia = order.indexOf(grouped[a][0]?.name ?? "");
+        const ib = order.indexOf(grouped[b][0]?.name ?? "");
+        return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    })) {
+        lines.push(`#### ${sec}`, "");
+        lines.push("| 算子 | 输入 | 输出 | 说明 |");
+        lines.push("|------|------|------|------|");
+        for (const { name, sig } of grouped[sec]) {
+            const ins = (sig.in_names ?? sig.in_display ?? []).map((n) => `\`${n}\``).join(" / ");
+            const outs = (sig.out_names ?? sig.out_display ?? []).map((n) => `\`${n}\``).join(" / ");
+            const desc = sig.desc ?? "";
+            lines.push(`| \`${name}\` | ${ins || "—"} | ${outs || "—"} | ${desc} |`);
+        }
+        lines.push("");
+    }
+    return lines.join("\n");
 }
 
 function builtinTable(api) {
-  const vars = (api?.builtin_variables ?? {});
-  const keys = Object.keys(vars);
-  if (keys.length === 0) return "";
-  const lines = [
-    "| 变量 | 类型 | 说明 |",
-    "|------|------|------|",
-  ];
-  for (const k of keys) {
-    const v = vars[k];
-    const type = v?.type ?? "—";
-    const desc = v?.desc ?? "";
-    lines.push(`| \`${k}\` | ${type} | ${desc} |`);
-  }
-  return lines.join("\n") + "\n";
+    const vars = api?.builtin_variables ?? {};
+    const keys = Object.keys(vars);
+    if (keys.length === 0) return "";
+    const lines = ["| 变量 | 类型 | 说明 |", "|------|------|------|"];
+    for (const k of keys) {
+        const v = vars[k];
+        const type = v?.type ?? "—";
+        const desc = v?.desc ?? "";
+        lines.push(`| \`${k}\` | ${type} | ${desc} |`);
+    }
+    return lines.join("\n") + "\n";
 }
 
 /** 规则 schema 参考页：字段/算子/内置变量完整参考，算子目录与内置变量表从 engine/ 源码动态派生 */
 function renderSchemaPage(catalogueCount) {
-  const CAT = `\`engine/operators.py\` 与 \`engine/providers/api.py\``;
-  return (
-    catalogueFrontmatter({
-      title: "规则编写参考",
-      titleEn: "Rule schema reference",
-      description: "从必填字段到数据流表达式、触发条件与输出，附算子目录与常见坑。",
-      descriptionEn: "Required fields, data-flow expressions, triggers and outputs — plus the operator catalogue and pitfalls.",
-      order: 11,
-    }) +
-`写一条经验的权威参考：字段级定义、数据流（\`compute\`）语义、触发与输出、内置变量、
+    const CAT = `\`engine/operators.py\` 与 \`engine/providers/api.py\``;
+    return (
+        catalogueFrontmatter({
+            title: "规则编写参考",
+            titleEn: "Rule schema reference",
+            description: "从必填字段到数据流表达式、触发条件与输出，附算子目录与常见坑。",
+            descriptionEn:
+                "Required fields, data-flow expressions, triggers and outputs — plus the operator catalogue and pitfalls.",
+            order: 11,
+        }) +
+        `写一条经验的权威参考：字段级定义、数据流（\`compute\`）语义、触发与输出、内置变量、
 算子目录，以及构建期会直接拒绝的写法。内部设计（动机、实施状态与已知缺口）见仓库里的
 \`knowledge/px4/CLAUDE.md\`；现有规则清单：[规则目录](/guide/rule-catalogue)。
 
@@ -1329,8 +1371,8 @@ compute:
 ### 4.1 算子目录
 
 ` +
-    operatorCatalog(operatorsPy, signatures) +
-    `
+        operatorCatalog(operatorsPy, signatures) +
+        `
 
 ## 5. triggers 与 outputs
 
@@ -1352,8 +1394,8 @@ compute:
 ### 6.1 内置变量（直接引用，无需在 compute 声明）
 
 ` +
-    builtinTable(providerApi) +
-    `
+        builtinTable(providerApi) +
+        `
 
 ### 6.2 模板占位符
 
@@ -1431,7 +1473,8 @@ Python \`str.format_map\` 支持的格式：
 - 图上的换算（\`compute\` 节点、\`unit=\`）一律在引擎侧做，前端只画——"前端不写数学"。
 
 细节见 \`knowledge/px4/plot/README.md\`（骨架可抄 \`plot-template.yml\`）。
-`);
+`
+    );
 }
 
 const banner = `// ⚠️ 自动生成，请勿手改。源文件在 engine/ 与 knowledge/px4/，改完跑 \`pnpm build:kb\`（dev/build 自动执行）。\n`;
@@ -1443,10 +1486,10 @@ if (kb.length === 0) throw new Error("故障知识库解析为 0 条，终止");
 const outWorkers = resolve(webRoot, "workers");
 mkdirSync(outWorkers, { recursive: true });
 writeArtifact(
-  resolve(outWorkers, "fault-kb.generated.json"),
-  // 不写 generatedAt：时间戳会让产物每次构建都产生 diff（而它没有任何消费者），
-  // 产物应当可复现 —— 同样的 knowledge/ 输入必须得到逐字节相同的输出。
-  JSON.stringify({ entries: kb }, null, 2) + "\n",
+    resolve(outWorkers, "fault-kb.generated.json"),
+    // 不写 generatedAt：时间戳会让产物每次构建都产生 diff（而它没有任何消费者），
+    // 产物应当可复现 —— 同样的 knowledge/ 输入必须得到逐字节相同的输出。
+    JSON.stringify({ entries: kb }, null, 2) + "\n",
 );
 
 // 2) 检查脚本 .ts：内联 KB 与阈值，替换两个占位符
@@ -1456,9 +1499,9 @@ if (Object.keys(signatures).length === 0) throw new Error("operators.py 里没�
 // facts.yaml 要在规则校验**之前**读：规则的 category / doc / 身份块默认值都在 rule_meta 里
 const facts = parseYaml(read(FACTS_PATH));
 const airframes = {
-  // 简写 → 规范名（facts.yaml 里的人工数据）；合法名 = vehicle_types 的值 + unknown
-  aliases: facts.airframe_aliases ?? {},
-  valid: new Set([...Object.values(facts.vehicle_types ?? {}).map(String), "unknown"]),
+    // 简写 → 规范名（facts.yaml 里的人工数据）；合法名 = vehicle_types 的值 + unknown
+    aliases: facts.airframe_aliases ?? {},
+    valid: new Set([...Object.values(facts.vehicle_types ?? {}).map(String), "unknown"]),
 };
 const { rules, sources } = loadRules(RULES_DIR, signatures, facts.rule_meta ?? {}, airframes);
 // guards 类经验没有 compute（其判定在 outputs.guard_tags），逐条校验已在 loadRules 里做
@@ -1470,7 +1513,7 @@ const { plots, mapSpec, refs: plotRefs } = loadPresets(PLOT_DIR, airframes);
 facts.track = mapSpec ?? {};
 // 单位表：规则与预设里所有写了 `unit=` 的引用一起查（源单位在 meta/<tag>.json，见 resolveFieldUnits）
 const ruleRefs = rules.flatMap((r) =>
-  (r.compute ?? []).flatMap((expr) => collectRefs(expr).map((x) => ({ where: r.id, ...x }))),
+    (r.compute ?? []).flatMap((expr) => collectRefs(expr).map((x) => ({ where: r.id, ...x }))),
 );
 const fieldUnits = resolveFieldUnits([...ruleRefs, ...plotRefs], resolve(KN, "meta"));
 
@@ -1478,65 +1521,73 @@ const ruleEnginePy = read(PY_RULE_ENGINE);
 // 单位词表在两边各有一份（构建期管"别名 → 规范名"，运行期管"规范名 → 换算因子"），
 // 规范名必须一模一样。各改各的会静默换算出错数，所以在这里比一次。
 {
-  const pyUnits = ruleEnginePy.slice(ruleEnginePy.indexOf("_UNIT_FACTORS"));
-  const names = [...pyUnits.matchAll(/^\s{4}"([a-z0-9]+)":\s*\(/gm)].map((m) => m[1]);
-  const js = Object.keys(UNIT_KIND).map((x) => x.toLowerCase());
-  const missing = js.filter((u) => !names.includes(u));
-  const extra = names.filter((u) => !js.includes(u));
-  if (missing.length || extra.length) {
-    throw new Error(
-      `engine/rule_engine.py 的 _UNIT_FACTORS 与 web/scripts/lib/rule-expr.mjs 的 UNIT_KIND 对不上` +
-        `（规则侧多：${missing.join(",") || "无"}；引擎侧多：${extra.join(",") || "无"}）`,
-    );
-  }
+    const pyUnits = ruleEnginePy.slice(ruleEnginePy.indexOf("_UNIT_FACTORS"));
+    const names = [...pyUnits.matchAll(/^\s{4}"([a-z0-9]+)":\s*\(/gm)].map((m) => m[1]);
+    const js = Object.keys(UNIT_KIND).map((x) => x.toLowerCase());
+    const missing = js.filter((u) => !names.includes(u));
+    const extra = names.filter((u) => !js.includes(u));
+    if (missing.length || extra.length) {
+        throw new Error(
+            `engine/rule_engine.py 的 _UNIT_FACTORS 与 web/scripts/lib/rule-expr.mjs 的 UNIT_KIND 对不上` +
+                `（规则侧多：${missing.join(",") || "无"}；引擎侧多：${extra.join(",") || "无"}）`,
+        );
+    }
 }
 // facts.yaml：那一种格式的数据（码表 / 文案 / 展示口径 / 规则元数据）。
 // 键名是引擎与 provider 约定的，缺一个就构建失败（宁可构建失败，也不要在浏览器里
 // 跑到某个码表是空的才发现）。取数逻辑不在这里——它在 engine/providers/<格式>.py。
-for (const key of ["group_order", "log_levels", "vehicle_types",
-                   "nav_state_names", "nav_state_groups", "sys_info_keys", "ulog_msg_types",
-                   "info_key_docs", "rule_meta"]) {
-  if (facts[key] === undefined) throw new Error(`facts.yaml 缺少 ${key}`);
+for (const key of [
+    "group_order",
+    "log_levels",
+    "vehicle_types",
+    "nav_state_names",
+    "nav_state_groups",
+    "sys_info_keys",
+    "ulog_msg_types",
+    "info_key_docs",
+    "rule_meta",
+]) {
+    if (facts[key] === undefined) throw new Error(`facts.yaml 缺少 ${key}`);
 }
 for (const [k, v] of Object.entries(facts.info_key_docs)) {
-  if (typeof v?.name !== "string" || typeof v?.desc !== "string") {
-    throw new Error(`facts.yaml 的 info_key_docs.${k} 必须是 {name, desc} 两个字符串`);
-  }
+    if (typeof v?.name !== "string" || typeof v?.desc !== "string") {
+        throw new Error(`facts.yaml 的 info_key_docs.${k} 必须是 {name, desc} 两个字符串`);
+    }
 }
 for (const t of facts.ulog_msg_types) {
-  // 一条消息类型的单字母码是引擎按字节流统计出来的键，缺了就会静默少一行
-  if (typeof t?.code !== "string" || t.code.length !== 1) {
-    throw new Error(`facts.yaml 的 ulog_msg_types 每项都要有单字母 code：${JSON.stringify(t)}`);
-  }
+    // 一条消息类型的单字母码是引擎按字节流统计出来的键，缺了就会静默少一行
+    if (typeof t?.code !== "string" || t.code.length !== 1) {
+        throw new Error(`facts.yaml 的 ulog_msg_types 每项都要有单字母 code：${JSON.stringify(t)}`);
+    }
 }
 // metrics：概览指标的展示清单（key/label/unit + 可选的兜底取数）
 const metricKeys = new Set();
 for (const m of facts.metrics ?? []) {
-  if (!m?.key) throw new Error("facts.yaml 的 metrics 每项都要有 key");
-  if (metricKeys.has(m.key)) throw new Error(`facts.yaml 的 metrics 键重复：${m.key}`);
-  metricKeys.add(m.key);
-  if (m.op !== undefined) {
-    if (!signatures[m.op]) throw new Error(`facts.yaml 的 metric ${m.key} 引用了未注册的算子 ${m.op}`);
-    if (!m.topic) throw new Error(`facts.yaml 的 metric ${m.key} 有 op 就必须给 topic`);
-    if (m.field === undefined && m.fields === undefined) {
-      throw new Error(`facts.yaml 的 metric ${m.key} 有 op 就必须给 field/fields`);
+    if (!m?.key) throw new Error("facts.yaml 的 metrics 每项都要有 key");
+    if (metricKeys.has(m.key)) throw new Error(`facts.yaml 的 metrics 键重复：${m.key}`);
+    metricKeys.add(m.key);
+    if (m.op !== undefined) {
+        if (!signatures[m.op]) throw new Error(`facts.yaml 的 metric ${m.key} 引用了未注册的算子 ${m.op}`);
+        if (!m.topic) throw new Error(`facts.yaml 的 metric ${m.key} 有 op 就必须给 topic`);
+        if (m.field === undefined && m.fields === undefined) {
+            throw new Error(`facts.yaml 的 metric ${m.key} 有 op 就必须给 field/fields`);
+        }
+        if (m.pick !== undefined && !(signatures[m.op].out_names ?? []).includes(m.pick)) {
+            throw new Error(`facts.yaml 的 metric ${m.key} 的 pick=${m.pick} 不在 ${m.op} 的输出里`);
+        }
     }
-    if (m.pick !== undefined && !(signatures[m.op].out_names ?? []).includes(m.pick)) {
-      throw new Error(`facts.yaml 的 metric ${m.key} 的 pick=${m.pick} 不在 ${m.op} 的输出里`);
-    }
-  }
 }
 if (!Array.isArray(facts.group_order) || facts.group_order.length === 0) {
-  throw new Error("facts.yaml 的 group_order 不能为空");
+    throw new Error("facts.yaml 的 group_order 不能为空");
 }
 
 // 经验声明的 group 必须已登记在 facts.yaml 的 group_order 里——否则那条经验**永远不会被执行**
 // （引擎按 group_order 逐个 group 跑），且失败是静默的。宁可构建失败。
 const knownGroups = new Set(facts.group_order);
 for (const r of rules) {
-  if (!knownGroups.has(r.group)) {
-    throw new Error(`规则 ${r.id} 的 group「${r.group}」未登记在 knowledge/px4/facts.yaml 的 group_order`);
-  }
+    if (!knownGroups.has(r.group)) {
+        throw new Error(`规则 ${r.id} 的 group「${r.group}」未登记在 knowledge/px4/facts.yaml 的 group_order`);
+    }
 }
 // ---------------- provider 契约：构建期查"漏写" ----------------
 // 契约的事实源是 engine/providers/api.py 的两张常量表。这里查每个适配器是否**定义了**
@@ -1545,33 +1596,32 @@ for (const r of rules) {
 // tools/calibrate/check_provider.py 里，三道合起来才是完整的一道关。
 const providerApi = parseProviderApi(read(PY_PROVIDER_API));
 for (const f of providerFiles) {
-  const src = read(resolve(PROVIDER_DIR, f));
-  const where = `engine/providers/${f}`;
-  if (!/^class\s+\w+/m.test(src)) throw new Error(`${where}: 里没有定义适配器类`);
-  for (const name of providerApi.required) {
-    const ok = name === "log_type"
-      ? /^\s+log_type\s*=/m.test(src)
-      : new RegExp(`^\\s+def ${name}\\(`, "m").test(src);
-    if (!ok) {
-      throw new Error(`${where}: 缺少契约要求的能力 ${name}（见 engine/providers/api.py 的 REQUIRED）`);
+    const src = read(resolve(PROVIDER_DIR, f));
+    const where = `engine/providers/${f}`;
+    if (!/^class\s+\w+/m.test(src)) throw new Error(`${where}: 里没有定义适配器类`);
+    for (const name of providerApi.required) {
+        const ok =
+            name === "log_type" ? /^\s+log_type\s*=/m.test(src) : new RegExp(`^\\s+def ${name}\\(`, "m").test(src);
+        if (!ok) {
+            throw new Error(`${where}: 缺少契约要求的能力 ${name}（见 engine/providers/api.py 的 REQUIRED）`);
+        }
     }
-  }
-  // builtin_variables() 必须给出契约里列的每一个内置变量——少一个，引用它的规则会**静默**算不出数据
-  const body = src.slice(src.indexOf("def builtin_variables("));
-  const cut = body.indexOf("\n    def ", 10);
-  const sem = cut === -1 ? body : body.slice(0, cut);
-  for (const key of providerApi.builtinVariables) {
-    if (!sem.includes(`"${key}"`)) {
-      throw new Error(`${where}: builtin_variables() 缺少内置变量 ${key}（见 api.py 的 BUILTIN_VARIABLES）`);
+    // builtin_variables() 必须给出契约里列的每一个内置变量——少一个，引用它的规则会**静默**算不出数据
+    const body = src.slice(src.indexOf("def builtin_variables("));
+    const cut = body.indexOf("\n    def ", 10);
+    const sem = cut === -1 ? body : body.slice(0, cut);
+    for (const key of providerApi.builtinVariables) {
+        if (!sem.includes(`"${key}"`)) {
+            throw new Error(`${where}: builtin_variables() 缺少内置变量 ${key}（见 api.py 的 BUILTIN_VARIABLES）`);
+        }
     }
-  }
 }
 // 拼接顺序即执行顺序：算子注册表 → provider 契约 → 各格式适配器 → 框架 → 数据层
 const pyWithOperators = [
-  operatorsPy,
-  read(PY_PROVIDER_API),
-  ...providerFiles.map((f) => read(resolve(PROVIDER_DIR, f))),
-  ruleEnginePy,
+    operatorsPy,
+    read(PY_PROVIDER_API),
+    ...providerFiles.map((f) => read(resolve(PROVIDER_DIR, f))),
+    ruleEnginePy,
 ].join("\n");
 
 // 四个占位符在拼接后的 Python 里**必须恰好出现一次**。
@@ -1580,48 +1630,45 @@ const pyWithOperators = [
 // defined`、整份日志都解析不了；而本地回归与 Python 的 `str.replace` 都是全换 → 本地全绿、线上打不开。
 // 2026-09-17 就是这么挂的（provider 注释里提到占位符），所以这里按"恰好一次"卡住，不按"存在"。
 for (const ph of ["__FAULT_KB__", "__RULES__", "__FACTS__", "__FIELD_UNITS__"]) {
-  const n = pyWithOperators.split(ph).length - 1;
-  if (n === 0) throw new Error(`engine/ 里必须保留 ${ph} 占位符（见 rule_engine.py）`);
-  if (n > 1) {
-    throw new Error(
-      `${ph} 在拼接后的 Python 里出现了 ${n} 次，必须恰好 1 次：` +
-        "产物的 .replace() 只换第一处，多出来的那处会让真正的赋值留在原地、浏览器直接报 NameError。" +
-        "把注释里提到它的地方改个说法即可。",
-    );
-  }
+    const n = pyWithOperators.split(ph).length - 1;
+    if (n === 0) throw new Error(`engine/ 里必须保留 ${ph} 占位符（见 rule_engine.py）`);
+    if (n > 1) {
+        throw new Error(
+            `${ph} 在拼接后的 Python 里出现了 ${n} 次，必须恰好 1 次：` +
+                "产物的 .replace() 只换第一处，多出来的那处会让真正的赋值留在原地、浏览器直接报 NameError。" +
+                "把注释里提到它的地方改个说法即可。",
+        );
+    }
 }
 writeArtifact(
-  resolve(outWorkers, "ulog-check-script.ts"),
-  banner +
-    "import faultKbJson from \"./fault-kb.generated.json\";\n\n" +
-    "const rules = " +
-    JSON.stringify(rules) +
-    ";\n" +
-    // facts 也必须在此声明：下面的 .replace 链在模块加载时求值，缺声明就是 ReferenceError
-    "const facts = " +
-    JSON.stringify(facts) +
-    ";\n\n" +
-    // 字段单位表：只含写了 unit= 的引用涉及的字段；本地回归脚本也从这一行取（与 rules 同款）
-    "const fieldUnits = " +
-    JSON.stringify(fieldUnits) +
-    ";\n\n" +
-    "export const PY_ULG_CHECKS = String.raw`" +
-    toRawTemplate(pyWithOperators) +
-    "`\n" +
-    '  .replace("__FAULT_KB__", JSON.stringify(faultKbJson.entries))\n' +
-    '  .replace("__RULES__", JSON.stringify(rules))\n' +
-    '  .replace("__FACTS__", JSON.stringify(facts))\n' +
-    '  .replace("__FIELD_UNITS__", JSON.stringify(fieldUnits));\n',
+    resolve(outWorkers, "ulog-check-script.ts"),
+    banner +
+        'import faultKbJson from "./fault-kb.generated.json";\n\n' +
+        "const rules = " +
+        JSON.stringify(rules) +
+        ";\n" +
+        // facts 也必须在此声明：下面的 .replace 链在模块加载时求值，缺声明就是 ReferenceError
+        "const facts = " +
+        JSON.stringify(facts) +
+        ";\n\n" +
+        // 字段单位表：只含写了 unit= 的引用涉及的字段；本地回归脚本也从这一行取（与 rules 同款）
+        "const fieldUnits = " +
+        JSON.stringify(fieldUnits) +
+        ";\n\n" +
+        "export const PY_ULG_CHECKS = String.raw`" +
+        toRawTemplate(pyWithOperators) +
+        "`\n" +
+        '  .replace("__FAULT_KB__", JSON.stringify(faultKbJson.entries))\n' +
+        '  .replace("__RULES__", JSON.stringify(rules))\n' +
+        '  .replace("__FACTS__", JSON.stringify(facts))\n' +
+        '  .replace("__FIELD_UNITS__", JSON.stringify(fieldUnits));\n',
 );
 
 // 3) 数据层 .ts
 const reportDataPy = read(PY_REPORT_DATA);
 writeArtifact(
-  resolve(outWorkers, "ulog-data-script.ts"),
-  banner +
-    "export const PY_ULG_DATA_HELPERS = String.raw`" +
-    toRawTemplate(reportDataPy) +
-    "`;\n",
+    resolve(outWorkers, "ulog-data-script.ts"),
+    banner + "export const PY_ULG_DATA_HELPERS = String.raw`" + toRawTemplate(reportDataPy) + "`;\n",
 );
 
 // 4) LLM 提示词与空结论文案（边缘函数是 .js，直接生成 ESM）
@@ -1630,27 +1677,33 @@ const emptyMd = read(EMPTY_PATH).trim();
 const outLib = resolve(webRoot, "lib/knowledge");
 mkdirSync(outLib, { recursive: true });
 writeArtifact(
-  resolve(outLib, "prompts.generated.js"),
-  "// ⚠️ 自动生成，源：knowledge/px4/llm/。请勿手改。\n" +
-    "export const GJB841_SYSTEM_PROMPT = " +
-    JSON.stringify(prompt) +
-    ";\n" +
-    "export const EMPTY_FINDINGS_MARKDOWN = " +
-    JSON.stringify(emptyMd) +
-    ";\n",
+    resolve(outLib, "prompts.generated.js"),
+    "// ⚠️ 自动生成，源：knowledge/px4/llm/。请勿手改。\n" +
+        "export const GJB841_SYSTEM_PROMPT = " +
+        JSON.stringify(prompt) +
+        ";\n" +
+        "export const EMPTY_FINDINGS_MARKDOWN = " +
+        JSON.stringify(emptyMd) +
+        ";\n",
 );
 
 // 4.5) 绘图预设 → web/lib/knowledge/plots.generated.ts
 // 与引擎产物不同，这一份是**纯前端**渲染用（不进 Pyodide），所以单独生成一个 ESM 文件。
 // 内容已在上面编译并校验过（loadPresets）：这里只负责写出来。
-const plotFiles = readdirSync(PLOT_DIR).filter((f) => f.endsWith(".yml")).sort();
+const plotFiles = readdirSync(PLOT_DIR)
+    .filter((f) => f.endsWith(".yml"))
+    .sort();
 writeArtifact(
-  resolve(webRoot, "lib/knowledge/plots.generated.ts"),
-  banner +
-    "// 源：knowledge/px4/plot/*.yml（改图请改那边）\n" +
-    "export const PLOT_PRESETS = " +
-    JSON.stringify(plots.map(({ order, ...rest }) => rest), null, 2) +
-    " as const;\n",
+    resolve(webRoot, "lib/knowledge/plots.generated.ts"),
+    banner +
+        "// 源：knowledge/px4/plot/*.yml（改图请改那边）\n" +
+        "export const PLOT_PRESETS = " +
+        JSON.stringify(
+            plots.map(({ order, ...rest }) => rest),
+            null,
+            2,
+        ) +
+        " as const;\n",
 );
 
 // 4.6) 派生数据版本：**内容哈希**，不是手写常量——改了数据层就会出现新值，
@@ -1660,27 +1713,27 @@ writeArtifact(
 //      rule_engine.py 在列：它产出的 facts / findings **同样随报告一起归档**，口径一变
 //      （如 2026-09-16 那次软件版本串）老存档也得跟着刷一次，否则只能靠用户重新上传。
 const versionSources = [
-  ["engine/report_data.py", PY_REPORT_DATA],
-  ["engine/rule_engine.py", PY_RULE_ENGINE],
-  ["engine/providers/api.py", PY_PROVIDER_API],
-  ...providerFiles.map((f) => [`engine/providers/${f}`, resolve(PROVIDER_DIR, f)]),
-  ["knowledge/px4/facts.yaml", FACTS_PATH],
-  ...plotFiles.map((f) => [`knowledge/px4/plot/${f}`, resolve(PLOT_DIR, f)]),
+    ["engine/report_data.py", PY_REPORT_DATA],
+    ["engine/rule_engine.py", PY_RULE_ENGINE],
+    ["engine/providers/api.py", PY_PROVIDER_API],
+    ...providerFiles.map((f) => [`engine/providers/${f}`, resolve(PROVIDER_DIR, f)]),
+    ["knowledge/px4/facts.yaml", FACTS_PATH],
+    ...plotFiles.map((f) => [`knowledge/px4/plot/${f}`, resolve(PLOT_DIR, f)]),
 ];
 const derivedVersion = createHash("sha256");
 for (const [label, file] of versionSources) {
-  derivedVersion.update(label).update("\0").update(read(file)).update("\0");
+    derivedVersion.update(label).update("\0").update(read(file)).update("\0");
 }
 const derivedVersionHex = derivedVersion.digest("hex").slice(0, 12);
 writeArtifact(
-  resolve(webRoot, "lib/knowledge/derived-version.generated.ts"),
-  banner +
-    "// 源：engine/{report_data,rule_engine}.py + engine/providers/*.py + " +
-    "knowledge/px4/{facts.yaml,plot/*.yml} 的内容哈希\n" +
-    "// 用途：存档里的派生数据（info / 曲线 / 轨迹）带的版本，与这里不一致就重新解析一次。\n" +
-    "export const DERIVED_DATA_VERSION = " +
-    JSON.stringify(derivedVersionHex) +
-    ";\n",
+    resolve(webRoot, "lib/knowledge/derived-version.generated.ts"),
+    banner +
+        "// 源：engine/{report_data,rule_engine}.py + engine/providers/*.py + " +
+        "knowledge/px4/{facts.yaml,plot/*.yml} 的内容哈希\n" +
+        "// 用途：存档里的派生数据（info / 曲线 / 轨迹）带的版本，与这里不一致就重新解析一次。\n" +
+        "export const DERIVED_DATA_VERSION = " +
+        JSON.stringify(derivedVersionHex) +
+        ";\n",
 );
 
 // 4.7) 飞控参数的范围与说明：knowledge/px4/meta/<tag>.json 的 parameters → 前端**按需拉取**的静态 JSON
@@ -1693,20 +1746,20 @@ const PARAM_META = resolve(KN, "meta/main.json");
 const paramMeta = JSON.parse(read(PARAM_META)).parameters ?? {};
 const paramCompact = {};
 for (const [name, v] of Object.entries(paramMeta)) {
-  const min = typeof v?.min === "number" ? v.min : null;
-  const max = typeof v?.max === "number" ? v.max : null;
-  const desc = typeof v?.desc === "string" ? v.desc : "";
-  if (min === null && max === null && !desc) continue;
-  paramCompact[name] = [min, max, desc];
+    const min = typeof v?.min === "number" ? v.min : null;
+    const max = typeof v?.max === "number" ? v.max : null;
+    const desc = typeof v?.desc === "string" ? v.desc : "";
+    if (min === null && max === null && !desc) continue;
+    paramCompact[name] = [min, max, desc];
 }
 if (!CHECK) mkdirSync(resolve(webRoot, "public/params"), { recursive: true });
 writeArtifact(
-  resolve(webRoot, "public/params/px4-main.json"),
-  JSON.stringify({
-    source: "PX4 参数元数据（main 分支快照；release tag 不产出 parameters.json）",
-    count: Object.keys(paramCompact).length,
-    params: paramCompact,
-  }) + "\n",
+    resolve(webRoot, "public/params/px4-main.json"),
+    JSON.stringify({
+        source: "PX4 参数元数据（main 分支快照；release tag 不产出 parameters.json）",
+        count: Object.keys(paramCompact).length,
+        params: paramCompact,
+    }) + "\n",
 );
 
 // 4.8) rules/*.yaml 的**编辑器 schema**（yaml-language-server 消费，配 .vscode/settings.json）
@@ -1714,32 +1767,32 @@ writeArtifact(
 //      真源：改了 facts.yaml 而这里没跟上时，IDE 会拿旧词表去纠正新写法，比没提示更糟。
 //      与别的产物一样走 writeArtifact：`--check` 会比对它与源是否一致。
 writeArtifact(
-  resolve(KN, "rules-editor-schema.generated.json"),
-  JSON.stringify(buildRuleSchema({ signatures, facts, airframes, builtinVars: BUILTIN_VARS }), null, 2) + "\n",
+    resolve(KN, "rules-editor-schema.generated.json"),
+    JSON.stringify(buildRuleSchema({ signatures, facts, airframes, builtinVars: BUILTIN_VARS }), null, 2) + "\n",
 );
 
 // 5) 指南的「知识库」分组：规则清单 + 规则编写参考（改规则/算子/内置变量后自动跟上，不用谁记得手动同步）
 //    这两页**不是**提交进仓库的产物（落在不入库的 .generated/ 里），所以用 writeFileSync
 //    而不是 writeArtifact：--check 比对的是"入库产物有没有跟上 knowledge/"，这里没有可比的对象。
 if (!CHECK) {
-  mkdirSync(GUIDES_DIR, { recursive: true });
-  writeFileSync(resolve(GUIDES_DIR, "rule-catalogue.mdx"), renderCataloguePage(rules, sources), "utf8");
-  writeFileSync(resolve(GUIDES_DIR, "rule-schema.mdx"), renderSchemaPage(rules.length), "utf8");
+    mkdirSync(GUIDES_DIR, { recursive: true });
+    writeFileSync(resolve(GUIDES_DIR, "rule-catalogue.mdx"), renderCataloguePage(rules, sources), "utf8");
+    writeFileSync(resolve(GUIDES_DIR, "rule-schema.mdx"), renderSchemaPage(rules.length), "utf8");
 }
 
 if (CHECK) {
-  if (drifted.length > 0) {
-    console.error("FAIL 以下产物与 knowledge/ 不一致，重跑 pnpm build:kb");
-    for (const d of drifted) console.error(`  · ${d}`);
-    process.exitCode = 1;
-  } else {
-    console.log("OK 全部产物与 knowledge/ 一致");
-  }
+    if (drifted.length > 0) {
+        console.error("FAIL 以下产物与 knowledge/ 不一致，重跑 pnpm build:kb");
+        for (const d of drifted) console.error(`  · ${d}`);
+        process.exitCode = 1;
+    } else {
+        console.log("OK 全部产物与 knowledge/ 一致");
+    }
 } else {
-  console.log(
-    `knowledge built: ${kb.length} fault entries, ${rules.length} rules, ` +
-      `${Object.keys(signatures).length} operators; ` +
-      "ulog-check-script.ts, ulog-data-script.ts, prompts.generated.js",
-  );
-  console.log("guide built: rule-catalogue.mdx, rule-schema.mdx");
+    console.log(
+        `knowledge built: ${kb.length} fault entries, ${rules.length} rules, ` +
+            `${Object.keys(signatures).length} operators; ` +
+            "ulog-check-script.ts, ulog-data-script.ts, prompts.generated.js",
+    );
+    console.log("guide built: rule-catalogue.mdx, rule-schema.mdx");
 }

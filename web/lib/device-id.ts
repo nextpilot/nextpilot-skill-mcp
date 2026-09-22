@@ -7,17 +7,17 @@
 const KEY = "nextpilot:device-id";
 
 export function getDeviceId(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    let id = window.localStorage.getItem(KEY);
-    if (!id) {
-      const bytes = new Uint8Array(16);
-      window.crypto.getRandomValues(bytes);
-      id = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-      window.localStorage.setItem(KEY, id);
+    if (typeof window === "undefined") return "";
+    try {
+        let id = window.localStorage.getItem(KEY);
+        if (!id) {
+            const bytes = new Uint8Array(16);
+            window.crypto.getRandomValues(bytes);
+            id = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+            window.localStorage.setItem(KEY, id);
+        }
+        return id;
+    } catch {
+        return "";
     }
-    return id;
-  } catch {
-    return "";
-  }
 }

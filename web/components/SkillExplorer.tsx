@@ -15,148 +15,138 @@ type SortKey = "hot" | "rating" | "newest";
 const VALID_CATEGORIES = new Set<string>(["perception", "decision", "control", "toolchain"]);
 
 const SORT_LABELS: Record<SortKey, string> = {
-  hot: "最热",
-  rating: "评分",
-  newest: "最新",
+    hot: "最热",
+    rating: "评分",
+    newest: "最新",
 };
 
-export function SkillExplorer({
-  skills,
-  initialCategory,
-}: {
-  skills: SkillMeta[];
-  initialCategory?: CategoryKey;
-}) {
-  const { language, t } = useLanguage();
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<CategoryKey | "all">(initialCategory ?? "all");
+export function SkillExplorer({ skills, initialCategory }: { skills: SkillMeta[]; initialCategory?: CategoryKey }) {
+    const { language, t } = useLanguage();
+    const [query, setQuery] = useState("");
+    const [category, setCategory] = useState<CategoryKey | "all">(initialCategory ?? "all");
 
-  // `?category=xxx`（首页的分类入口指向这里）在浏览器端读一次：
-  // 页面本身要保持静态、不能接 searchParams——那会变成按需渲染，而 Skill 清单是构建期读盘的。
-  useEffect(() => {
-    if (initialCategory) return;   // 服务端已给初值（旧的调用方式）就不覆盖
-    const c = new URLSearchParams(window.location.search).get("category");
-    if (c && VALID_CATEGORIES.has(c as CategoryKey)) setCategory(c as CategoryKey);
-  }, [initialCategory]);
-  const [sort, setSort] = useState<SortKey>("hot");
-  const board = useLeaderboard("skill");
+    // `?category=xxx`（首页的分类入口指向这里）在浏览器端读一次：
+    // 页面本身要保持静态、不能接 searchParams——那会变成按需渲染，而 Skill 清单是构建期读盘的。
+    useEffect(() => {
+        if (initialCategory) return; // 服务端已给初值（旧的调用方式）就不覆盖
+        const c = new URLSearchParams(window.location.search).get("category");
+        if (c && VALID_CATEGORIES.has(c as CategoryKey)) setCategory(c as CategoryKey);
+    }, [initialCategory]);
+    const [sort, setSort] = useState<SortKey>("hot");
+    const board = useLeaderboard("skill");
 
-  const fuse = useMemo(
-    () =>
-      new Fuse(skills, {
-        keys: ["name", "description", "tags", "models", "platforms"],
-        threshold: 0.35,
-      }),
-    [skills],
-  );
+    const fuse = useMemo(
+        () =>
+            new Fuse(skills, {
+                keys: ["name", "description", "tags", "models", "platforms"],
+                threshold: 0.35,
+            }),
+        [skills],
+    );
 
-  const enriched = useMemo(() => applyDeltas(skills, board), [skills, board]);
+    const enriched = useMemo(() => applyDeltas(skills, board), [skills, board]);
 
-  const result = useMemo(() => {
-    const byCategory =
-      category === "all"
-        ? enriched
-        : enriched.filter((s) => s.category === category);
-    const matched = query.trim()
-      ? fuse.search(query).map((r) => {
-          // Fuse 用的是传入时的对象，用 slug 找到带增量的版本
-          const live = byCategory.find((b) => b.slug === r.item.slug);
-          return live ?? r.item;
-        })
-      : byCategory;
-    const sorted = [...matched];
-    if (sort === "hot") sorted.sort((a, b) => b.downloads - a.downloads || b.rating - a.rating);
-    if (sort === "rating") sorted.sort((a, b) => b.rating - a.rating || b.downloads - a.downloads);
-    if (sort === "newest")
-      sorted.sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
-    return sorted;
-  }, [query, category, sort, fuse, enriched]);
+    const result = useMemo(() => {
+        const byCategory = category === "all" ? enriched : enriched.filter((s) => s.category === category);
+        const matched = query.trim()
+            ? fuse.search(query).map((r) => {
+                  // Fuse 用的是传入时的对象，用 slug 找到带增量的版本
+                  const live = byCategory.find((b) => b.slug === r.item.slug);
+                  return live ?? r.item;
+              })
+            : byCategory;
+        const sorted = [...matched];
+        if (sort === "hot") sorted.sort((a, b) => b.downloads - a.downloads || b.rating - a.rating);
+        if (sort === "rating") sorted.sort((a, b) => b.rating - a.rating || b.downloads - a.downloads);
+        if (sort === "newest") sorted.sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+        return sorted;
+    }, [query, category, sort, fuse, enriched]);
 
-  return (
-    <div>
-      <div className="relative mb-4">
-        <Search className="absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-muted" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t(
-            "搜索 Skill，或描述你想做的事",
-            "Search skills, or describe your task",
-          )}
-          className="input pl-10"
-        />
-      </div>
+    return (
+        <div>
+            <div className="relative mb-4">
+                <Search className="absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-muted" />
+                <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={t("搜索 Skill，或描述你想做的事", "Search skills, or describe your task")}
+                    className="input pl-10"
+                />
+            </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-        <FilterChip active={category === "all"} onClick={() => setCategory("all")}>
-          {t("全部", "All")}
-        </FilterChip>
-        {CATEGORIES.map((c) => (
-          <FilterChip key={c.key} active={category === c.key} onClick={() => setCategory(c.key)}>
-            {language === "zh"
-              ? c.label
-              : { perception: "Perception", decision: "Decision", control: "Control", toolchain: "Toolchain" }[c.key]}
-          </FilterChip>
-        ))}
-        {/* 窄屏分类会折行，排序另起一行右对齐，避免看起来像是分类的一部分 */}
-        <span className="flex w-full items-center justify-end gap-1 text-xs text-muted sm:ml-auto sm:w-auto">
-          {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setSort(k)}
-              className={`rounded-md px-2.5 py-1 transition-colors ${
-                sort === k ? "bg-surface-2 font-medium text-text" : "hover:text-text"
-              }`}
-            >
-              {SORT_LABELS[k]}
-            </button>
-          ))}
-        </span>
-      </div>
+            <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+                <FilterChip active={category === "all"} onClick={() => setCategory("all")}>
+                    {t("全部", "All")}
+                </FilterChip>
+                {CATEGORIES.map((c) => (
+                    <FilterChip key={c.key} active={category === c.key} onClick={() => setCategory(c.key)}>
+                        {language === "zh"
+                            ? c.label
+                            : {
+                                  perception: "Perception",
+                                  decision: "Decision",
+                                  control: "Control",
+                                  toolchain: "Toolchain",
+                              }[c.key]}
+                    </FilterChip>
+                ))}
+                {/* 窄屏分类会折行，排序另起一行右对齐，避免看起来像是分类的一部分 */}
+                <span className="flex w-full items-center justify-end gap-1 text-xs text-muted sm:ml-auto sm:w-auto">
+                    {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+                        <button
+                            key={k}
+                            type="button"
+                            onClick={() => setSort(k)}
+                            className={`rounded-md px-2.5 py-1 transition-colors ${
+                                sort === k ? "bg-surface-2 font-medium text-text" : "hover:text-text"
+                            }`}
+                        >
+                            {SORT_LABELS[k]}
+                        </button>
+                    ))}
+                </span>
+            </div>
 
-      {result.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted">
-          {t("没有匹配的 Skill，换个关键词试试", "No matching skills. Try another search.")}
-        </p>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {result.map((skill) => (
-            <SkillCard key={skill.slug} skill={skill} />
-          ))}
+            {result.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted">
+                    {t("没有匹配的 Skill，换个关键词试试", "No matching skills. Try another search.")}
+                </p>
+            ) : (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {result.map((skill) => (
+                        <SkillCard key={skill.slug} skill={skill} />
+                    ))}
+                </div>
+            )}
+
+            <p className="mt-6 text-xs text-muted">
+                {t(
+                    "当前为关键词搜索（Fuse.js）。语义搜索（本地 BGE 向量匹配，无需上传查询内容）在计划中。",
+                    "Keyword search (Fuse.js) for now. Local BGE semantic search — no query ever leaves the browser — is planned.",
+                )}
+            </p>
         </div>
-      )}
-
-      <p className="mt-6 text-xs text-muted">
-        {t(
-          "当前为关键词搜索（Fuse.js）。语义搜索（本地 BGE 向量匹配，无需上传查询内容）在计划中。",
-          "Keyword search (Fuse.js) for now. Local BGE semantic search — no query ever leaves the browser — is planned.",
-        )}
-      </p>
-    </div>
-  );
+    );
 }
 
 function FilterChip({
-  active,
-  onClick,
-  children,
+    active,
+    onClick,
+    children,
 }: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
+    active: boolean;
+    onClick: () => void;
+    children: React.ReactNode;
 }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`chip px-3 py-1.5 transition-colors ${
-        active
-          ? "chip-brand border-transparent"
-          : "hover:border-border-strong hover:text-text"
-      }`}
-    >
-      {children}
-    </button>
-  );
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={`chip px-3 py-1.5 transition-colors ${
+                active ? "chip-brand border-transparent" : "hover:border-border-strong hover:text-text"
+            }`}
+        >
+            {children}
+        </button>
+    );
 }

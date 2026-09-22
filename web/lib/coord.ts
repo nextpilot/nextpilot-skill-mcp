@@ -18,37 +18,36 @@ const EE = 0.00669342162296594323;
 
 /** 中国大致范围（含港澳台不适用：港澳台用的是本地坐标系，这里按公式的适用范围处理） */
 function outOfChina(lat: number, lon: number): boolean {
-  return !(lon > 73.66 && lon < 135.05 && lat > 3.86 && lat < 53.55);
+    return !(lon > 73.66 && lon < 135.05 && lat > 3.86 && lat < 53.55);
 }
 
 function transformLat(lon: number, lat: number): number {
-  let ret =
-    -100.0 + 2.0 * lon + 3.0 * lat + 0.2 * lat * lat + 0.1 * lon * lat + 0.2 * Math.sqrt(Math.abs(lon));
-  ret += ((20.0 * Math.sin(6.0 * lon * PI) + 20.0 * Math.sin(2.0 * lon * PI)) * 2.0) / 3.0;
-  ret += ((20.0 * Math.sin(lat * PI) + 40.0 * Math.sin((lat / 3.0) * PI)) * 2.0) / 3.0;
-  ret += ((160.0 * Math.sin((lat / 12.0) * PI) + 320 * Math.sin((lat * PI) / 30.0)) * 2.0) / 3.0;
-  return ret;
+    let ret = -100.0 + 2.0 * lon + 3.0 * lat + 0.2 * lat * lat + 0.1 * lon * lat + 0.2 * Math.sqrt(Math.abs(lon));
+    ret += ((20.0 * Math.sin(6.0 * lon * PI) + 20.0 * Math.sin(2.0 * lon * PI)) * 2.0) / 3.0;
+    ret += ((20.0 * Math.sin(lat * PI) + 40.0 * Math.sin((lat / 3.0) * PI)) * 2.0) / 3.0;
+    ret += ((160.0 * Math.sin((lat / 12.0) * PI) + 320 * Math.sin((lat * PI) / 30.0)) * 2.0) / 3.0;
+    return ret;
 }
 
 function transformLon(lon: number, lat: number): number {
-  let ret = 300.0 + lon + 2.0 * lat + 0.1 * lon * lon + 0.1 * lon * lat + 0.1 * Math.sqrt(Math.abs(lon));
-  ret += ((20.0 * Math.sin(6.0 * lon * PI) + 20.0 * Math.sin(2.0 * lon * PI)) * 2.0) / 3.0;
-  ret += ((20.0 * Math.sin(lon * PI) + 40.0 * Math.sin((lon / 3.0) * PI)) * 2.0) / 3.0;
-  ret += ((150.0 * Math.sin((lon / 12.0) * PI) + 300.0 * Math.sin((lon / 30.0) * PI)) * 2.0) / 3.0;
-  return ret;
+    let ret = 300.0 + lon + 2.0 * lat + 0.1 * lon * lon + 0.1 * lon * lat + 0.1 * Math.sqrt(Math.abs(lon));
+    ret += ((20.0 * Math.sin(6.0 * lon * PI) + 20.0 * Math.sin(2.0 * lon * PI)) * 2.0) / 3.0;
+    ret += ((20.0 * Math.sin(lon * PI) + 40.0 * Math.sin((lon / 3.0) * PI)) * 2.0) / 3.0;
+    ret += ((150.0 * Math.sin((lon / 12.0) * PI) + 300.0 * Math.sin((lon / 30.0) * PI)) * 2.0) / 3.0;
+    return ret;
 }
 
 /** WGS-84（日志里的经纬度）→ GCJ-02（国内底图要的经纬度）。返回 [lat, lon]。 */
 export function wgs84ToGcj02(lat: number, lon: number): [number, number] {
-  if (outOfChina(lat, lon)) return [lat, lon];
+    if (outOfChina(lat, lon)) return [lat, lon];
 
-  let dLat = transformLat(lon - 105.0, lat - 35.0);
-  let dLon = transformLon(lon - 105.0, lat - 35.0);
-  const radLat = (lat / 180.0) * PI;
-  let magic = Math.sin(radLat);
-  magic = 1 - EE * magic * magic;
-  const sqrtMagic = Math.sqrt(magic);
-  dLat = (dLat * 180.0) / (((A * (1 - EE)) / (magic * sqrtMagic)) * PI);
-  dLon = (dLon * 180.0) / ((A / sqrtMagic) * Math.cos(radLat) * PI);
-  return [lat + dLat, lon + dLon];
+    let dLat = transformLat(lon - 105.0, lat - 35.0);
+    let dLon = transformLon(lon - 105.0, lat - 35.0);
+    const radLat = (lat / 180.0) * PI;
+    let magic = Math.sin(radLat);
+    magic = 1 - EE * magic * magic;
+    const sqrtMagic = Math.sqrt(magic);
+    dLat = (dLat * 180.0) / (((A * (1 - EE)) / (magic * sqrtMagic)) * PI);
+    dLon = (dLon * 180.0) / ((A / sqrtMagic) * Math.cos(radLat) * PI);
+    return [lat + dLat, lon + dLon];
 }

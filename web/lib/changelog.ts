@@ -21,18 +21,18 @@ const BULLET = /^\s*[-*]\s+(.*\S)\s*$/;
  * `check-skill-spec.mjs` / `check-mcp-spec.mjs` 在构建期拦，不在这里混淆。
  */
 export function parseChangelogFromMarkdown(md: string): ChangelogEntry[] {
-  const entries: ChangelogEntry[] = [];
-  let cur: ChangelogEntry | null = null;
+    const entries: ChangelogEntry[] = [];
+    let cur: ChangelogEntry | null = null;
 
-  for (const line of md.split("\n")) {
-    const head = VERSION_HEADING.exec(line);
-    if (head) {
-      cur = { version: head[1], date: head[2] ?? "", notes: [] };
-      entries.push(cur);
-      continue;
+    for (const line of md.split("\n")) {
+        const head = VERSION_HEADING.exec(line);
+        if (head) {
+            cur = { version: head[1], date: head[2] ?? "", notes: [] };
+            entries.push(cur);
+            continue;
+        }
+        const bullet = BULLET.exec(line);
+        if (bullet && cur) cur.notes.push(bullet[1]);
     }
-    const bullet = BULLET.exec(line);
-    if (bullet && cur) cur.notes.push(bullet[1]);
-  }
-  return entries;
+    return entries;
 }

@@ -16,13 +16,13 @@ import { installIssueBridge, setBridgeSession } from "@/lib/issue-bridge";
  * 两个都叫 IssueBridge 的话，grep 命中两个，还得分清哪个是模块、哪个是组件（§6.4 第①条）。
  */
 export function IssueBridgeMount() {
-  const { status } = useSession();
+    const { status } = useSession();
 
-  useEffect(() => {
-    setBridgeSession(status === "authenticated");
-  }, [status]);
+    useEffect(() => {
+        setBridgeSession(status === "authenticated");
+    }, [status]);
 
-  useEffect(() => installIssueBridge(), []);
+    useEffect(() => installIssueBridge(), []);
 
-  return null;
+    return null;
 }

@@ -5,21 +5,21 @@
  */
 
 export function splitHeading(text: string): { zh: string; en: string } {
-  const [zh, ...rest] = text.split("|");
-  const head = zh.trim();
-  // 只有中文时英文回退到同一串，避免英文界面下出现空标题
-  return { zh: head, en: rest.join("|").trim() || head };
+    const [zh, ...rest] = text.split("|");
+    const head = zh.trim();
+    // 只有中文时英文回退到同一串，避免英文界面下出现空标题
+    return { zh: head, en: rest.join("|").trim() || head };
 }
 
 /** 生成锚点 id。中文原样保留（href 侧再 encodeURIComponent），标点折叠成连字符。 */
 export function headingId(zh: string): string {
-  const slug = zh
-    .toLowerCase()
-    .replace(/[^\p{Letter}\p{Number}]+/gu, "-")
-    .replace(/^-+|-+$/g, "");
-  return slug || "section";
+    const slug = zh
+        .toLowerCase()
+        .replace(/[^\p{Letter}\p{Number}]+/gu, "-")
+        .replace(/^-+|-+$/g, "");
+    return slug || "section";
 }
 
 export function headingHref(zh: string): string {
-  return `#${encodeURIComponent(headingId(zh))}`;
+    return `#${encodeURIComponent(headingId(zh))}`;
 }

@@ -3,7 +3,16 @@ import nextPlugin from "@next/eslint-plugin-next";
 import globals from "globals";
 
 export default [
-    { ignores: [".next/**", "**/.next/**", ".generated/**", "**/.generated/**", "**/node_modules/**", "**/*.{ts,tsx}"] },
+    {
+        ignores: [
+            ".next/**",
+            "**/.next/**",
+            ".generated/**",
+            "**/.generated/**",
+            "**/node_modules/**",
+            "**/*.{ts,tsx}",
+        ],
+    },
     js.configs.recommended,
     {
         plugins: { "@next/next": nextPlugin },

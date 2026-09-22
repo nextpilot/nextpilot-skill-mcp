@@ -11,12 +11,10 @@
 
 /** 是"一个对象"才算可检查的记录：`null`、数组、字符串、数字一律不算 */
 export function asRecord(raw: unknown): Record<string, unknown> | null {
-  return raw && typeof raw === "object" && !Array.isArray(raw)
-    ? (raw as Record<string, unknown>)
-    : null;
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
 }
 
 /** 计数类字段：不是有限非负数一律当 0（后端给的多是 KV 列举条数，理论上不会为负） */
 export function toCount(v: unknown): number {
-  return typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0;
+    return typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0;
 }

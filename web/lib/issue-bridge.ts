@@ -26,27 +26,27 @@ import { SITE_VERSION } from "./site-version";
 export type ReportLevel = "fatal" | "recoverable";
 
 export interface ManualReportInput {
-  /** 本次命中的规则 id 列表。**只传 id**，不要传标题里的数值或 evidence。 */
-  ruleIds: string[];
-  findingCount: number;
-  severityCounts: { critical: number; warning: number; info: number };
-  /** 用户填的一句话描述 */
-  note?: string;
-  platform?: string;
-  /** 飞控软件版本（如 e82c4e1a1f8e）：定位"规则判定不对"的关键上下文，属公开版本号，非隐私 */
-  firmware?: string;
-  /** 端侧确定性引擎版本 */
-  parserVersion?: string;
-  /** 报告引用（云端 reportId 或本机存档 id，均为无用户标识的随机串） */
-  reportRef?: string;
+    /** 本次命中的规则 id 列表。**只传 id**，不要传标题里的数值或 evidence。 */
+    ruleIds: string[];
+    findingCount: number;
+    severityCounts: { critical: number; warning: number; info: number };
+    /** 用户填的一句话描述 */
+    note?: string;
+    platform?: string;
+    /** 飞控软件版本（如 e82c4e1a1f8e）：定位"规则判定不对"的关键上下文，属公开版本号，非隐私 */
+    firmware?: string;
+    /** 端侧确定性引擎版本 */
+    parserVersion?: string;
+    /** 报告引用（云端 reportId 或本机存档 id，均为无用户标识的随机串） */
+    reportRef?: string;
 }
 
 interface ReportInput extends Partial<ManualReportInput> {
-  kind?: "client-error" | "manual-report";
-  level?: ReportLevel;
-  type?: string;
-  message?: string;
-  stack?: string;
+    kind?: "client-error" | "manual-report";
+    level?: ReportLevel;
+    type?: string;
+    message?: string;
+    stack?: string;
 }
 
 const ENDPOINT = "/api/issues";
@@ -61,7 +61,7 @@ let lastManualAt = 0;
 let loggedIn = false;
 
 export function setBridgeSession(isLoggedIn: boolean) {
-  loggedIn = isLoggedIn === true;
+    loggedIn = isLoggedIn === true;
 }
 
 // 脱敏与截断已挪到 lib/error-policy.js：这两件事边缘侧也在做，必须逐字一致。
@@ -69,95 +69,93 @@ export function setBridgeSession(isLoggedIn: boolean) {
 //   兜底再截也救不回来——所以两边必须是同一个函数，而不是两份相同的代码。）
 
 function softFingerprint(input: ReportInput): string {
-  const frame = String(input.stack ?? "").split("\n")[1] ?? "";
-  // 与边缘侧同一套归一化：不抹平数字的话，`file 17.ulg` 与 `file 18.ulg` 在本地
-  // 就被当成两个错误各发一次——边缘最终会去重，但那一趟网络是白花的。
-  return [input.level, input.type, normalize(input.message ?? ""), normalize(frame)]
-    .join("|")
-    .slice(0, 400);
+    const frame = String(input.stack ?? "").split("\n")[1] ?? "";
+    // 与边缘侧同一套归一化：不抹平数字的话，`file 17.ulg` 与 `file 18.ulg` 在本地
+    // 就被当成两个错误各发一次——边缘最终会去重，但那一趟网络是白花的。
+    return [input.level, input.type, normalize(input.message ?? ""), normalize(frame)].join("|").slice(0, 400);
 }
 
 function pruneDedupe(now: number) {
-  if (seen.size <= 64) return;
-  for (const [key, at] of seen) if (now - at > DEDUPE_WINDOW_MS) seen.delete(key);
+    if (seen.size <= 64) return;
+    for (const [key, at] of seen) if (now - at > DEDUPE_WINDOW_MS) seen.delete(key);
 }
 
 function post(payload: Record<string, unknown>) {
-  const body = JSON.stringify(payload);
-  if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
-    // sendBeacon 不阻塞、页面卸载时也能发出去，优先用它
-    try {
-      if (navigator.sendBeacon(ENDPOINT, new Blob([body], { type: "application/json" }))) return;
-    } catch {
-      // 落下去走 fetch
+    const body = JSON.stringify(payload);
+    if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+        // sendBeacon 不阻塞、页面卸载时也能发出去，优先用它
+        try {
+            if (navigator.sendBeacon(ENDPOINT, new Blob([body], { type: "application/json" }))) return;
+        } catch {
+            // 落下去走 fetch
+        }
     }
-  }
-  void fetch(ENDPOINT, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body,
-    keepalive: true,
-  }).catch(() => {
-    // 上报失败就失败，绝不打扰用户
-  });
+    void fetch(ENDPOINT, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+        keepalive: true,
+    }).catch(() => {
+        // 上报失败就失败，绝不打扰用户
+    });
 }
 
 function basePayload() {
-  return {
-    route: typeof location !== "undefined" ? location.pathname : "",
-    ua: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 120) : "",
-    loggedIn,
-    // 站点版本的唯一读取口（构建期由 next.config.ts 注入）。以前这里直接读环境变量，
-    // 而全仓库没人给它赋值 → version 恒为空串、上报里那栏直接不打印。
-    version: SITE_VERSION.version,
-  };
+    return {
+        route: typeof location !== "undefined" ? location.pathname : "",
+        ua: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 120) : "",
+        loggedIn,
+        // 站点版本的唯一读取口（构建期由 next.config.ts 注入）。以前这里直接读环境变量，
+        // 而全仓库没人给它赋值 → version 恒为空串、上报里那栏直接不打印。
+        version: SITE_VERSION.version,
+    };
 }
 
 /** 上报一个错误。不会抛异常，也不会等待网络。 */
 export function reportError(input: ReportInput): void {
-  try {
-    if (typeof window === "undefined") return;
-    const payload: ReportInput = {
-      kind: input.kind ?? "client-error",
-      level: input.level ?? "recoverable",
-      type: String(input.type ?? "Error").slice(0, MAX_TYPE),
-      message: clip(scrub(String(input.message ?? "")), MAX_MESSAGE),
-      stack: clip(scrub(String(input.stack ?? "")), MAX_STACK),
-    };
+    try {
+        if (typeof window === "undefined") return;
+        const payload: ReportInput = {
+            kind: input.kind ?? "client-error",
+            level: input.level ?? "recoverable",
+            type: String(input.type ?? "Error").slice(0, MAX_TYPE),
+            message: clip(scrub(String(input.message ?? "")), MAX_MESSAGE),
+            stack: clip(scrub(String(input.stack ?? "")), MAX_STACK),
+        };
 
-    const manual = payload.kind === "manual-report";
-    const fp = softFingerprint(payload);
-    const now = Date.now();
-    if (manual) {
-      if (now - lastManualAt < MANUAL_COOLDOWN_MS) return;
-      lastManualAt = now;
-    } else if (!shouldSend(fp, now)) {
-      return;
+        const manual = payload.kind === "manual-report";
+        const fp = softFingerprint(payload);
+        const now = Date.now();
+        if (manual) {
+            if (now - lastManualAt < MANUAL_COOLDOWN_MS) return;
+            lastManualAt = now;
+        } else if (!shouldSend(fp, now)) {
+            return;
+        }
+
+        post({ ...basePayload(), ...payload });
+    } catch {
+        // 连组装 payload 都出错，那就什么都不做
     }
-
-    post({ ...basePayload(), ...payload });
-  } catch {
-    // 连组装 payload 都出错，那就什么都不做
-  }
 }
 
 function shouldSend(fp: string, now: number): boolean {
-  const last = seen.get(fp);
-  if (last !== undefined && now - last < DEDUPE_WINDOW_MS) return false;
-  seen.set(fp, now);
-  pruneDedupe(now);
-  return true;
+    const last = seen.get(fp);
+    if (last !== undefined && now - last < DEDUPE_WINDOW_MS) return false;
+    seen.set(fp, now);
+    pruneDedupe(now);
+    return true;
 }
 
 /** 用户主动反馈某份报告有问题。走同一出口，但不过滤（用户点一次就该发一次，只做连点保护）。 */
 export function reportManual(input: ManualReportInput): void {
-  reportError({
-    ...input,
-    kind: "manual-report",
-    level: "recoverable",
-    type: "ManualReport",
-    message: input.note?.slice(0, 500) ?? "",
-  });
+    reportError({
+        ...input,
+        kind: "manual-report",
+        level: "recoverable",
+        type: "ManualReport",
+        message: input.note?.slice(0, 500) ?? "",
+    });
 }
 
 /**
@@ -165,33 +163,33 @@ export function reportManual(input: ManualReportInput): void {
  * 在 RootLayout 里通过 <IssueBridgeMount /> 调用一次即可，重复调用无害。
  */
 export function installIssueBridge(): () => void {
-  if (typeof window === "undefined") return () => {};
+    if (typeof window === "undefined") return () => {};
 
-  const onError = (event: ErrorEvent) => {
-    // 资源加载失败（img/script）没有 error 对象，价值低，跳过
-    if (!event.error && !event.message) return;
-    reportError({
-      level: "fatal",
-      type: event.error?.name ?? "ErrorEvent",
-      message: event.message || String(event.error?.message ?? ""),
-      stack: event.error?.stack ?? "",
-    });
-  };
+    const onError = (event: ErrorEvent) => {
+        // 资源加载失败（img/script）没有 error 对象，价值低，跳过
+        if (!event.error && !event.message) return;
+        reportError({
+            level: "fatal",
+            type: event.error?.name ?? "ErrorEvent",
+            message: event.message || String(event.error?.message ?? ""),
+            stack: event.error?.stack ?? "",
+        });
+    };
 
-  const onRejection = (event: PromiseRejectionEvent) => {
-    const reason = event.reason;
-    reportError({
-      level: "fatal",
-      type: reason?.name ?? "UnhandledRejection",
-      message: typeof reason === "string" ? reason : String(reason?.message ?? reason ?? ""),
-      stack: reason?.stack ?? "",
-    });
-  };
+    const onRejection = (event: PromiseRejectionEvent) => {
+        const reason = event.reason;
+        reportError({
+            level: "fatal",
+            type: reason?.name ?? "UnhandledRejection",
+            message: typeof reason === "string" ? reason : String(reason?.message ?? reason ?? ""),
+            stack: reason?.stack ?? "",
+        });
+    };
 
-  window.addEventListener("error", onError);
-  window.addEventListener("unhandledrejection", onRejection);
-  return () => {
-    window.removeEventListener("error", onError);
-    window.removeEventListener("unhandledrejection", onRejection);
-  };
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+        window.removeEventListener("error", onError);
+        window.removeEventListener("unhandledrejection", onRejection);
+    };
 }

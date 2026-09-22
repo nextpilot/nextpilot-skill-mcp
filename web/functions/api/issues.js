@@ -20,13 +20,7 @@
 //   - 按 IP 日限流，超了直接 429，不给 KV 被刷的机会；
 //   - 限制请求体大小，超大直接拒绝；
 //   - 立刻返回 202，真正的去重与提交放进 waitUntil，不让用户等。
-import {
-  getKv,
-  listAll,
-  sha256Hex,
-  dateStamp,
-  clientIp,
-} from "../_lib/kv.js";
+import { getKv, listAll, sha256Hex, dateStamp, clientIp } from "../_lib/kv.js";
 import { jsonResponse, readJson } from "../_lib/http.js";
 import { reportIssue } from "../_lib/issue-filer.js";
 
@@ -36,41 +30,41 @@ const DAILY_CAP_PER_IP = 20;
 const MAX_BODY_BYTES = 64 * 1024;
 
 export async function onRequestPost({ request, env, waitUntil }) {
-  const declared = Number(request.headers.get("content-length") ?? 0);
-  if (declared > MAX_BODY_BYTES) {
-    return jsonResponse({ ok: false, error: "payload too large" }, 413);
-  }
-
-  const body = await readJson(request);
-  if (!body || typeof body !== "object") {
-    return jsonResponse({ ok: false, error: "请求体不是合法 JSON" }, 400);
-  }
-
-  const kv = getKv(env);
-  if (kv) {
-    const ipHash = await sha256Hex(clientIp(request));
-    const day = dateStamp();
-    const prefix = `errrl_${ipHash}_${day}_`;
-    // 平台坑：kv.list 无匹配时返回体里没有 keys 字段，统一走 listAll（见 docs/operations/README.md §1）
-    const used = (await listAll(kv, prefix)).length;
-    if (used >= DAILY_CAP_PER_IP) {
-      return jsonResponse({ ok: false, error: "今日上报次数已达上限" }, 429);
+    const declared = Number(request.headers.get("content-length") ?? 0);
+    if (declared > MAX_BODY_BYTES) {
+        return jsonResponse({ ok: false, error: "payload too large" }, 413);
     }
-    waitUntil?.(kv.put(`${prefix}${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, "1"));
-  }
 
-  // 去重与提交都在边缘侧完成。默认走 waitUntil 不阻塞响应；
-  // 配了 ISSUE_DEBUG=1 时同步等待并把结果回显，方便本地确认真通了。
-  const pending = reportIssue(env, { ...body, kind: body.kind ?? "client-error" }).catch(() => ({
-    skipped: "exception",
-  }));
-  if (String(env?.ISSUE_DEBUG ?? "") === "1") {
-    return jsonResponse({ ok: true, result: await pending }, 202);
-  }
-  waitUntil?.(pending);
-  return jsonResponse({ ok: true }, 202);
+    const body = await readJson(request);
+    if (!body || typeof body !== "object") {
+        return jsonResponse({ ok: false, error: "请求体不是合法 JSON" }, 400);
+    }
+
+    const kv = getKv(env);
+    if (kv) {
+        const ipHash = await sha256Hex(clientIp(request));
+        const day = dateStamp();
+        const prefix = `errrl_${ipHash}_${day}_`;
+        // 平台坑：kv.list 无匹配时返回体里没有 keys 字段，统一走 listAll（见 docs/operations/README.md §1）
+        const used = (await listAll(kv, prefix)).length;
+        if (used >= DAILY_CAP_PER_IP) {
+            return jsonResponse({ ok: false, error: "今日上报次数已达上限" }, 429);
+        }
+        waitUntil?.(kv.put(`${prefix}${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, "1"));
+    }
+
+    // 去重与提交都在边缘侧完成。默认走 waitUntil 不阻塞响应；
+    // 配了 ISSUE_DEBUG=1 时同步等待并把结果回显，方便本地确认真通了。
+    const pending = reportIssue(env, { ...body, kind: body.kind ?? "client-error" }).catch(() => ({
+        skipped: "exception",
+    }));
+    if (String(env?.ISSUE_DEBUG ?? "") === "1") {
+        return jsonResponse({ ok: true, result: await pending }, 202);
+    }
+    waitUntil?.(pending);
+    return jsonResponse({ ok: true }, 202);
 }
 
 export function onRequestGet() {
-  return jsonResponse({ ok: false, error: "请用 POST 上报，或访问 /issue-probe 自检配置" }, 405);
+    return jsonResponse({ ok: false, error: "请用 POST 上报，或访问 /issue-probe 自检配置" }, 405);
 }

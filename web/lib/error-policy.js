@@ -41,13 +41,13 @@ export const ALLOWED_KINDS = new Set(["client-error", "server-error", "manual-re
  * @type {Array<[RegExp, string]>}
  */
 export const SCRUB_RULES = [
-  [/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "<email>"],
-  [/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, "<jwt>"],
-  [/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, "Bearer <token>"],
-  [/\b[A-Fa-f0-9]{24,}\b/g, "<hex>"],
-  [/[A-Za-z]:\\Users\\[^\\\s"'`]+/gi, "<home>"],
-  [/\/(?:home|Users)\/[^/\s"'`]+/g, "<home>"],
-  [/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, "<ip>"],
+    [/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "<email>"],
+    [/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, "<jwt>"],
+    [/\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi, "Bearer <token>"],
+    [/\b[A-Fa-f0-9]{24,}\b/g, "<hex>"],
+    [/[A-Za-z]:\\Users\\[^\\\s"'`]+/gi, "<home>"],
+    [/\/(?:home|Users)\/[^/\s"'`]+/g, "<home>"],
+    [/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, "<ip>"],
 ];
 
 /**
@@ -57,9 +57,9 @@ export const SCRUB_RULES = [
  * @returns {string}
  */
 export function scrub(text) {
-  let out = String(text ?? "");
-  for (const [re, rep] of SCRUB_RULES) out = out.replace(re, rep);
-  return out;
+    let out = String(text ?? "");
+    for (const [re, rep] of SCRUB_RULES) out = out.replace(re, rep);
+    return out;
 }
 
 /**
@@ -72,11 +72,11 @@ export function scrub(text) {
  * @returns {string}
  */
 export function clip(text, max) {
-  const s = String(text ?? "");
-  if (s.length <= max) return s;
-  const head = Math.floor(max * 0.6);
-  const tail = Math.max(0, max - head - 24);
-  return `${s.slice(0, head)}\n…（已截断 ${s.length - max} 字符）…\n${s.slice(-tail)}`;
+    const s = String(text ?? "");
+    if (s.length <= max) return s;
+    const head = Math.floor(max * 0.6);
+    const tail = Math.max(0, max - head - 24);
+    return `${s.slice(0, head)}\n…（已截断 ${s.length - max} 字符）…\n${s.slice(-tail)}`;
 }
 
 /**
@@ -86,10 +86,10 @@ export function clip(text, max) {
  * @returns {string}
  */
 export function normalize(text) {
-  return String(text ?? "")
-    .replace(/0x[0-9a-f]+/gi, "0xH")
-    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "U")
-    .replace(/\b[A-Za-z0-9_-]{24,}\b/g, "L")
-    .replace(/\d+(?:\.\d+)?/g, "N")
-    .slice(0, MAX_MESSAGE);
+    return String(text ?? "")
+        .replace(/0x[0-9a-f]+/gi, "0xH")
+        .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "U")
+        .replace(/\b[A-Za-z0-9_-]{24,}\b/g, "L")
+        .replace(/\d+(?:\.\d+)?/g, "N")
+        .slice(0, MAX_MESSAGE);
 }

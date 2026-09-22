@@ -39,30 +39,21 @@ import type { GuideDoc } from "@/lib/guide";
  */
 const sharedRemarkPlugins = [remarkGfm];
 
-export function GuideBody({
-  renderer,
-  source,
-}: {
-  renderer: GuideDoc["renderer"];
-  source: string;
-}) {
-  if (renderer === "md") {
+export function GuideBody({ renderer, source }: { renderer: GuideDoc["renderer"]; source: string }) {
+    if (renderer === "md") {
+        return (
+            <ReactMarkdown remarkPlugins={[...sharedRemarkPlugins, remarkDropComments]} components={markdownComponents}>
+                {source}
+            </ReactMarkdown>
+        );
+    }
     return (
-      <ReactMarkdown
-        remarkPlugins={[...sharedRemarkPlugins, remarkDropComments]}
-        components={markdownComponents}
-      >
-        {source}
-      </ReactMarkdown>
+        <MDXRemote
+            source={source}
+            components={mdxComponents}
+            options={{ mdxOptions: { remarkPlugins: sharedRemarkPlugins } }}
+        />
     );
-  }
-  return (
-    <MDXRemote
-      source={source}
-      components={mdxComponents}
-      options={{ mdxOptions: { remarkPlugins: sharedRemarkPlugins } }}
-    />
-  );
 }
 
 /**
@@ -80,20 +71,20 @@ export function GuideBody({
  * 字符串（实测 `_components = { code: "code" }`），react-markdown 也输出内建标签名。
  */
 function textOf(node: React.ReactNode): string {
-  if (typeof node === "string") return node;
-  if (typeof node === "number") return String(node);
-  if (Array.isArray(node)) return node.map(textOf).join("");
-  if (React.isValidElement(node)) {
-    const inner = textOf((node.props as { children?: React.ReactNode }).children);
-    return node.type === "code" ? `\`${inner}\`` : inner;
-  }
-  return "";
+    if (typeof node === "string") return node;
+    if (typeof node === "number") return String(node);
+    if (Array.isArray(node)) return node.map(textOf).join("");
+    if (React.isValidElement(node)) {
+        const inner = textOf((node.props as { children?: React.ReactNode }).children);
+        return node.type === "code" ? `\`${inner}\`` : inner;
+    }
+    return "";
 }
 
 interface MdNode {
-  type?: string;
-  value?: string;
-  children?: MdNode[];
+    type?: string;
+    value?: string;
+    children?: MdNode[];
 }
 
 /**
@@ -105,70 +96,70 @@ interface MdNode {
  * 只有普通 markdown 这条路需要它——`knowledge-*.md` 带 HTML 注释，`.mdx` 不带。
  */
 function remarkDropComments() {
-  return function drop(tree: MdNode) {
-    if (!Array.isArray(tree.children)) return;
-    tree.children = tree.children.filter(
-      (child) => !(child?.type === "html" && /^\s*<!--[\s\S]*?-->\s*$/.test(child.value ?? "")),
-    );
-    for (const child of tree.children) drop(child);
-  };
+    return function drop(tree: MdNode) {
+        if (!Array.isArray(tree.children)) return;
+        tree.children = tree.children.filter(
+            (child) => !(child?.type === "html" && /^\s*<!--[\s\S]*?-->\s*$/.test(child.value ?? "")),
+        );
+        for (const child of tree.children) drop(child);
+    };
 }
 
 /** h2/h3 覆写：把 `## 中文 | English` 拆成两种语言并补上 id。两个解析器共用。 */
 function H2({ children }: { children?: React.ReactNode }) {
-  const { zh, en } = splitHeading(textOf(children));
-  return (
-    <h2 id={headingId(zh)}>
-      <LocalizedText zh={zh} en={en} />
-    </h2>
-  );
+    const { zh, en } = splitHeading(textOf(children));
+    return (
+        <h2 id={headingId(zh)}>
+            <LocalizedText zh={zh} en={en} />
+        </h2>
+    );
 }
 
 function H3({ children }: { children?: React.ReactNode }) {
-  const { zh, en } = splitHeading(textOf(children));
-  return (
-    <h3 id={headingId(zh)}>
-      <LocalizedText zh={zh} en={en} />
-    </h3>
-  );
+    const { zh, en } = splitHeading(textOf(children));
+    return (
+        <h3 id={headingId(zh)}>
+            <LocalizedText zh={zh} en={en} />
+        </h3>
+    );
 }
 
 function Table({ children }: { children?: React.ReactNode }) {
-  // 字段表动不动十几列，窄屏必须能横滚，否则整页被撑破
-  return (
-    <div className="overflow-x-auto">
-      <table>{children}</table>
-    </div>
-  );
+    // 字段表动不动十几列，窄屏必须能横滚，否则整页被撑破
+    return (
+        <div className="overflow-x-auto">
+            <table>{children}</table>
+        </div>
+    );
 }
 
 function Callout({
-  tone = "neutral",
-  title,
-  titleEn,
-  children,
+    tone = "neutral",
+    title,
+    titleEn,
+    children,
 }: {
-  tone?: "neutral" | "primary" | "warning";
-  title: string;
-  titleEn?: string;
-  children?: React.ReactNode;
+    tone?: "neutral" | "primary" | "warning";
+    title: string;
+    titleEn?: string;
+    children?: React.ReactNode;
 }) {
-  // 正文卡片是 surface，插入块用 surface-2 才是「凹陷块」，层级才分得开
-  const tones = {
-    neutral: "border-border bg-surface-2",
-    primary: "border-primary/25 bg-primary/5",
-    warning: "border-warning/30 bg-warning/5",
-  }[tone];
+    // 正文卡片是 surface，插入块用 surface-2 才是「凹陷块」，层级才分得开
+    const tones = {
+        neutral: "border-border bg-surface-2",
+        primary: "border-primary/25 bg-primary/5",
+        warning: "border-warning/30 bg-warning/5",
+    }[tone];
 
-  return (
-    <div className={`my-6 rounded-xl border p-4 sm:p-5 ${tones}`}>
-      {/* 用 div 而非 p：.prose-guide p 会给段落加 my-4，标题行不需要 */}
-      <div className="mb-2 text-sm font-semibold text-text">
-        <LocalizedText zh={title} en={titleEn ?? title} />
-      </div>
-      <div className="[&>*:first-child]:mt-0 [&>*:last-child]:mb-0">{children}</div>
-    </div>
-  );
+    return (
+        <div className={`my-6 rounded-xl border p-4 sm:p-5 ${tones}`}>
+            {/* 用 div 而非 p：.prose-guide p 会给段落加 my-4，标题行不需要 */}
+            <div className="mb-2 text-sm font-semibold text-text">
+                <LocalizedText zh={title} en={titleEn ?? title} />
+            </div>
+            <div className="[&>*:first-child]:mt-0 [&>*:last-child]:mb-0">{children}</div>
+        </div>
+    );
 }
 
 const markdownComponents = { h2: H2, h3: H3, table: Table };
