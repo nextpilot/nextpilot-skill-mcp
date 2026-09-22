@@ -14,13 +14,26 @@
 
 | 文件 | 是什么 | 干什么 |
 | --- | --- | --- |
-| `web/scripts/sync-content.mjs` | 内容同步脚本 | 把内容真源（`docs/guide`、`knowledge/skills`、`knowledge/mcp`）拷进 `web/.generated/`。因为 `web/` 是独立项目、部署时只上传它自己，运行期读不到仓库别处 |
+| `web/scripts/sync-content.mjs` | 内容同步脚本 | 把内容真源（`docs/guide`、`knowledge/skills`、`knowledge/mcp`）拷进 `web/.generated/`。因为 `web/` 是独立项目、部署时只上传它自己，运行期读不到仓库别处。**只在 `pnpm dev` 启动时拷一次**，之后不跟着变（见下面那个坑） |
 | `web/scripts/build-knowledge.mjs` | 知识构建脚本 | 把引擎源码与人工经验拼成运行时的产物（见阶段 2）。**1744 行全是 `throw`**：规则缺字段、算子没注册、表达式编译不过，这里就报错 |
-| `next dev` | Next.js 开发服务器 | 起热更新的网站 |
+| `next dev` | Next.js 开发服务器 | 起热更新的网站。它热更新的是 `web/` 自己的代码，**盯不到你改的内容真源** |
 
-**同时另开一个终端**：`tsc --noEmit --watch` —— 存盘就报类型错。
+**同时另开两个终端**（都要开）：
 
-> **起不来往往不是 Next.js 的问题，是知识库写错了。** 报错会直指哪个文件哪个字段。
+```bash
+tsc --noEmit --watch   # 存盘就报类型错
+pnpm sync:watch        # 改内容真源时用：存盘即重拷，不用重启 dev
+```
+
+> **两个坑**
+>
+> **1. 改内容真源，页面不会自己变。** `docs/guide/*.mdx`、`knowledge/skills/`、
+> `knowledge/mcp/` 只在 `pnpm dev` 启动时被拷进 `.generated/` 一次；之后 Next 盯的是
+> `.generated/`，不是你改的真源。所以**写内容时必须另开 `pnpm sync:watch`**
+> （= `node scripts/sync-content.mjs --watch`），它会打 `[sync] docs/guide/basics.mdx 变了，重拷`。
+> 不跑它，改了没反应不是 bug。
+>
+> **2. 起不来往往不是 Next.js 的问题，是知识库写错了。** 报错会直指哪个文件哪个字段。
 
 ---
 
@@ -188,6 +201,9 @@ pnpm test:e2e            # 全量 42 条
 
 ## 附 · 几个坑
 
+- **改内容真源不会自动生效**：`docs/guide`、`knowledge/skills`、`knowledge/mcp` 只在
+  `pnpm dev` 启动时被拷进 `web/.generated/`。写内容时要另开 `pnpm sync:watch`。
+  （`web/` 自己的代码则由 Next 正常热更新。）
 - **两份同名的 `sample.ulg`**：`tools/calibrate/logs/sample.ulg`（4.0MB，**不入库**，
   日志回归用）vs `web/e2e/fixtures/sample.ulg`（921KB，**已入库**，CI 的 E2E 用）。
 - **`check_secrets` 扫全仓**（含 `.md`）—— 文档里留一句假密钥同样会被抓。
