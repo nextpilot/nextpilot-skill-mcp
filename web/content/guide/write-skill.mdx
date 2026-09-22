@@ -10,35 +10,27 @@ order: 3
 
 ## 先写清楚任务 | Define the task first
 
-<Zh>
-写下使用场景、输入、输出和限制条件。一个好的 Skill 应该能被另一个人复现，
-而不是只依赖作者的上下文。
-</Zh>
+<Zh>写下使用场景、输入、输出和限制条件。一个好的 Skill 应该能被另一个人复现， 而不是只依赖作者的上下文。</Zh>
 
 <En>
-Write down the use case, inputs, outputs, and constraints. A good Skill should be reproducible
-without the author's private context.
+    Write down the use case, inputs, outputs, and constraints. A good Skill should be reproducible without the author's
+    private context.
 </En>
 
-<Zh>
-场景要具体到触发条件：什么情况下该用这个 Skill，什么情况下不该用。边界比能力更能说明问题。
-</Zh>
+<Zh>场景要具体到触发条件：什么情况下该用这个 Skill，什么情况下不该用。边界比能力更能说明问题。</Zh>
 
 <En>
-Make the trigger specific: when this Skill applies, and — more telling — when it does not.
-Boundaries explain a capability better than its features do.
+    Make the trigger specific: when this Skill applies, and — more telling — when it does not. Boundaries explain a
+    capability better than its features do.
 </En>
 
 ## 给出可验证的示例 | Provide verifiable examples
 
-<Zh>
-至少提供一组真实输入和期望输出，说明异常输入应该如何处理。涉及飞控时，
-必须写明适用平台和安全边界。
-</Zh>
+<Zh>至少提供一组真实输入和期望输出，说明异常输入应该如何处理。涉及飞控时， 必须写明适用平台和安全边界。</Zh>
 
 <En>
-Provide at least one real input and its expected output, and state how bad input is handled.
-For flight control, document the target platform and safety boundaries.
+    Provide at least one real input and its expected output, and state how bad input is handled. For flight control,
+    document the target platform and safety boundaries.
 </En>
 
 ```text
@@ -49,9 +41,12 @@ For flight control, document the target platform and safety boundaries.
 
 ## 常见问题 | Common pitfalls
 
-- <Zh>**只写 prompt，不写输入输出**——模型每次都要重新猜格式。</Zh><En>**Prompt only, no I/O** — the model re-guesses the format every run.</En>
-- <Zh>**示例过于理想**——真实日志里的缺失字段才是主要工作量。</Zh><En>**Idealized examples** — missing fields in real logs are where the work actually is.</En>
-- <Zh>**省略安全边界**——涉及真实载具时，默认只读必须是显式写明的约束。</Zh><En>**Omitted safety boundaries** — when real aircraft are involved, read-only by default must be written down.</En>
+- <Zh>**只写 prompt，不写输入输出**——模型每次都要重新猜格式。</Zh>
+  <En>**Prompt only, no I/O** — the model re-guesses the format every run.</En>
+- <Zh>**示例过于理想**——真实日志里的缺失字段才是主要工作量。</Zh>
+  <En>**Idealized examples** — missing fields in real logs are where the work actually is.</En>
+- <Zh>**省略安全边界**——涉及真实载具时，默认只读必须是显式写明的约束。</Zh>
+  <En>**Omitted safety boundaries** — when real aircraft are involved, read-only by default must be written down.</En>
 
 <Callout tone="warning" title="不要写进 Skill 的东西" titleEn="What must not go into a Skill">
 

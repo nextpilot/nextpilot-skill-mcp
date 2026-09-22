@@ -11,60 +11,72 @@ order: 2
 ## Skill 是什么 | What a Skill is
 
 <Zh>
-Skill 是一组可复用的任务说明、提示词、输入输出约定和领域经验。它告诉模型应该如何完成一类工作，
-但**不会自动获得执行外部操作的权限**。
+    Skill 是一组可复用的任务说明、提示词、输入输出约定和领域经验。它告诉模型应该如何完成一类工作，
+    但**不会自动获得执行外部操作的权限**。
 </Zh>
 
 <En>
-A Skill is a reusable set of task instructions, prompts, I/O conventions, and domain expertise.
-It guides the model without granting external access by itself.
+    A Skill is a reusable set of task instructions, prompts, I/O conventions, and domain expertise. It guides the model
+    without granting external access by itself.
 </En>
 
 <Zh>
-判断一个 Skill 是否合格，看它能否被另一个人复现：输入是什么、输出长什么样、异常输入怎么处理，
-三者都写清楚了才算数。
+    判断一个 Skill 是否合格，看它能否被另一个人复现：输入是什么、输出长什么样、异常输入怎么处理， 三者都写清楚了才算数。
 </Zh>
 
 <En>
-A Skill is good when someone else can reproduce it: what goes in, what comes out, and what happens
-on bad input. All three must be explicit.
+    A Skill is good when someone else can reproduce it: what goes in, what comes out, and what happens on bad input. All
+    three must be explicit.
 </En>
 
 ## MCP 是什么 | What MCP is
 
 <Zh>
-MCP（Model Context Protocol）是一种连接 AI 与外部工具、数据源的协议。MCP 服务暴露工具，
-客户端按协议发现并调用它们。
+    MCP（Model Context Protocol）是一种连接 AI 与外部工具、数据源的协议。MCP 服务暴露工具， 客户端按协议发现并调用它们。
 </Zh>
 
 <En>
-MCP (Model Context Protocol) connects AI to external tools and data. An MCP 服务 exposes tools
-that clients discover and call over the protocol.
+    MCP (Model Context Protocol) connects AI to external tools and data. An MCP 服务 exposes tools that clients discover
+    and call over the protocol.
 </En>
 
 <Zh>
-关键差别在于**谁发起**：Skill 是模型读到的上下文，MCP 是模型可以真正按下的按钮。
-只要工具能写数据或影响真实设备，就必须先回答权限和边界的问题。
+    关键差别在于**谁发起**：Skill 是模型读到的上下文，MCP 是模型可以真正按下的按钮。
+    只要工具能写数据或影响真实设备，就必须先回答权限和边界的问题。
 </Zh>
 
 <En>
-The difference is **who acts**: a Skill is context the model reads, an MCP tool is a button the
-model can actually press. The moment a tool writes data or affects hardware, permissions and
-boundaries come first.
+    The difference is **who acts**: a Skill is context the model reads, an MCP tool is a button the model can actually
+    press. The moment a tool writes data or affects hardware, permissions and boundaries come first.
 </En>
 
 ## 它们如何协作 | How they work together
 
-- <Zh><strong>Skill</strong>——描述能力与工作方式</Zh><En><strong>Skill</strong> — describes the capability</En>
-- <Zh><strong>MCP 服务</strong>——提供可调用的工具</Zh><En><strong>MCP server</strong> — provides callable tools</En>
-- <Zh><strong>AI 客户端</strong>——理解任务并选择调用</Zh><En><strong>AI client</strong> — chooses tools for a task</En>
+- <Zh>
+      <strong>Skill</strong>——描述能力与工作方式
+  </Zh>
+  <En>
+      <strong>Skill</strong> — describes the capability
+  </En>
+- <Zh>
+      <strong>MCP 服务</strong>——提供可调用的工具
+  </Zh>
+  <En>
+      <strong>MCP server</strong> — provides callable tools
+  </En>
+- <Zh>
+      <strong>AI 客户端</strong>——理解任务并选择调用
+  </Zh>
+  <En>
+      <strong>AI client</strong> — chooses tools for a task
+  </En>
 
 <Zh>
-三者叠起来才构成一次完整的能力调用：客户端理解意图，Skill 提供方法与约束，
-MCP 服务执行真正的读写。缺任何一层，能力都只停留在纸面上。
+    三者叠起来才构成一次完整的能力调用：客户端理解意图，Skill 提供方法与约束， MCP
+    服务执行真正的读写。缺任何一层，能力都只停留在纸面上。
 </Zh>
 
 <En>
-All three together make one capability call: the client understands intent, the Skill supplies
-method and constraints, and the MCP 服务 performs the actual read or write.
+    All three together make one capability call: the client understands intent, the Skill supplies method and
+    constraints, and the MCP 服务 performs the actual read or write.
 </En>

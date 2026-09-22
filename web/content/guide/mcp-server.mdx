@@ -10,42 +10,38 @@ order: 4
 
 ## 定义工具 | Define the tools
 
-<Zh>
-每个工具都应有清晰的名称、参数 Schema、返回值和错误行为。优先设计只读工具，
-再考虑写入或控制能力。
-</Zh>
+<Zh>每个工具都应有清晰的名称、参数 Schema、返回值和错误行为。优先设计只读工具， 再考虑写入或控制能力。</Zh>
 
 <En>
-Give every tool a clear name, parameter schema, return value, and error behavior. Design read-only
-tools before write or control actions.
+    Give every tool a clear name, parameter schema, return value, and error behavior. Design read-only tools before
+    write or control actions.
 </En>
 
-<Zh>
-返回值要能直接喂给模型：结构化、字段名自解释、错误以正常返回表达，而不是抛栈。
-</Zh>
+<Zh>返回值要能直接喂给模型：结构化、字段名自解释、错误以正常返回表达，而不是抛栈。</Zh>
 
 <En>
-Return values should be directly usable by a model: structured, self-describing field names, and
-errors expressed as normal returns rather than stack traces.
+    Return values should be directly usable by a model: structured, self-describing field names, and errors expressed as
+    normal returns rather than stack traces.
 </En>
 
 ## 接入客户端 | Connect a client
 
-<Zh>
-使用 TypeScript MCP SDK 或其他官方 SDK 实现协议层，先在本地客户端中测试工具发现、
-参数校验和超时行为。
-</Zh>
+<Zh>使用 TypeScript MCP SDK 或其他官方 SDK 实现协议层，先在本地客户端中测试工具发现、 参数校验和超时行为。</Zh>
 
 <En>
-Use the TypeScript MCP SDK or another official SDK. Test discovery, validation, and timeout
-behavior in a local client first.
+    Use the TypeScript MCP SDK or another official SDK. Test discovery, validation, and timeout behavior in a local
+    client first.
 </En>
 
 ```ts
-server.registerTool("analyze_findings", {
-  description: "提交端侧解析得到的结构化 findings，返回解释后的报告",
-  inputSchema: { findings: z.array(FindingSchema) },
-}, async ({ findings }) => ({ content: [{ type: "text", text: await explain(findings) }] }));
+server.registerTool(
+    "analyze_findings",
+    {
+        description: "提交端侧解析得到的结构化 findings，返回解释后的报告",
+        inputSchema: { findings: z.array(FindingSchema) },
+    },
+    async ({ findings }) => ({ content: [{ type: "text", text: await explain(findings) }] }),
+);
 ```
 
 ## 飞控安全原则 | Flight safety principle
@@ -53,17 +49,20 @@ server.registerTool("analyze_findings", {
 <Callout tone="warning" title="平台永不直接致动真实载具" titleEn="The platform never actuates real aircraft">
 
 <Zh>
-涉及 arm、模式切换或任务执行的能力，只以开源 Skill 形式提供，并强制三重门禁：
-**默认只读**、**显式开启致动参数**、**仿真环境优先**，对真实载具再设额外安全门禁。
+    涉及 arm、模式切换或任务执行的能力，只以开源 Skill 形式提供，并强制三重门禁：
+    **默认只读**、**显式开启致动参数**、**仿真环境优先**，对真实载具再设额外安全门禁。
 </Zh>
 
 <En>
-Capabilities that arm, switch modes, or run missions ship only as open-source Skills under three
-gates: **read-only by default**, **actuation behind an explicit flag**, and **simulation first** —
-with further gates for real aircraft.
+    Capabilities that arm, switch modes, or run missions ship only as open-source Skills under three gates: **read-only
+    by default**, **actuation behind an explicit flag**, and **simulation first** — with further gates for real
+    aircraft.
 </En>
 
 </Callout>
 
 <Zh>这条约束不是免责声明，而是接口设计的前提：只读路径应当是默认路径，而不是需要额外开启的选项。</Zh>
-<En>This is a design premise, not a disclaimer: the read-only path must be the default path, not an option you remember to enable.</En>
+<En>
+    This is a design premise, not a disclaimer: the read-only path must be the default path, not an option you remember
+    to enable.
+</En>

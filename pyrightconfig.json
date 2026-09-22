@@ -1,0 +1,23 @@
+{
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    ".venv",
+    "tools"
+  ],
+  "typeCheckingMode": "standard",
+  "reportMissingTypeStubs": false,
+  "reportUnknownMemberType": false,
+  "reportUnknownArgumentType": false,
+  "reportUnknownVariableType": false,
+  "reportUnknownParameterType": false,
+  "reportUnknownLambdaType": false,
+  "reportMissingParameterType": false,
+  "reportPrivateImportUsage": false,
+  "reportUnusedCallResult": false,
+  "reportUndefinedVariable": false,
+  "reportOptionalMemberAccess": false,
+  "reportOptionalOperand": false,
+  "reportOptionalSubscript": false,
+  "reportArgumentType": false
+}

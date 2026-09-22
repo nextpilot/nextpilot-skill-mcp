@@ -96,8 +96,8 @@ jobs:
       - id: "pyright"
         name: "Python type checking (pyright)"
         workdir: "{ROOT}"
-        command: ["{NODE}", "web/node_modules/pyright/index.js", "."]
-        hint: "Fix the Python type errors listed above. Run `npx pyright .` locally for detailed output."
+        command: ["{NODE}", "web/node_modules/pyright/index.js", "engine"]
+        hint: "Fix the Python type errors listed above. Run `npx pyright engine` locally for detailed output."
 
       - id: "eslint"
         name: "TypeScript lint (eslint)"

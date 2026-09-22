@@ -7,6 +7,7 @@ group: 知识库
 groupEn: Knowledge base
 order: 12
 ---
+
 引擎当前内置的 **31 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
 每条给出：**适用**（固件 / 机架 / 依赖）、**取值**（读哪些字段、过哪个算子）、**判定**（自上而下
 命中第一条即发射）、**产出**（写进报告的 check 名、喂故障库匹配的标签、UI 用的统计）。
@@ -32,7 +33,6 @@ order: 12
 - **critical** ｜ `has_invalid and invalid_frac >= 0.50` ｜ 阈值 0.5 ｜ 标题「空速传感器在固定翼段大部分时间无效（\{invalid_frac:.0%\} 样本）」
 - **warning** ｜ `has_invalid and invalid_frac >= 0.10` ｜ 阈值 0.1 ｜ 标题「空速传感器间歇无效（\{invalid_frac:.0%\} 样本）」
 - 产出：check=airspeed，tag=low_airspeed，stats=airspeedInvalidRatio(round 3), airspeedMinM(round 1)
-
 
 ## attitude_tracking（group: `attitude_tracking`）
 
@@ -86,7 +86,6 @@ order: 12
 - **warning** ｜ `osc_stat >= 4.0 and p99_stat >= 15.0 and not IS_FIXED_WING` ｜ 阈值 4 ｜ 单位 Hz ｜ 标题「姿态误差高频振荡（约 \{osc_stat:.1f\} Hz）」
 - 产出：check=attitude_tracking，tag=attitude_overshoot，stats=attitudeErrDegP99(round 1), attitudeOscHz(round 2)
 
-
 ## battery（group: `battery`）
 
 ### px4-power-cell-voltage — 单电芯电压
@@ -126,7 +125,6 @@ order: 12
 - **warning** ｜ `rem <= 0.20` ｜ 阈值 0.2 ｜ 标题「电池剩余电量偏低（\{rem_pct:.0f\}%）」
 - 产出：check=battery，tag=battery_voltage_drop，stats=batteryRemainingMin(round 3)
 
-
 ## cpu（group: `cpu`）
 
 ### px4-cpu-load — CPU 负载
@@ -139,7 +137,6 @@ order: 12
 - **critical** ｜ `cpu_max >= 0.95` ｜ 阈值 0.95 ｜ 标题「CPU 负载峰值 \{cpu_max:.0%\} 超阈值」
 - **warning** ｜ `cpu_max >= 0.90` ｜ 阈值 0.9 ｜ 标题「CPU 负载峰值 \{cpu_max:.0%\} 偏高」
 - 产出：check=cpu_load，stats=cpuLoadMax(round 3)
-
 
 ## ekf_faults（group: `ekf_faults`）
 
@@ -156,7 +153,6 @@ order: 12
 - **info** ｜ `fault_union > 0 and not crit_bits` ｜ 阈值 0 ｜ 标题「EKF 报告非核心辅助传感器融合拒绝（filter_fault_flags=\{fault_union\}，常见为未使用视觉/光流）」
 - 产出：check=ekf_faults，tag=ekf_innovation_failure
 
-
 ## ekf_innovations（group: `ekf_innovations`）
 
 ### px4-ekf-innovation — EKF 创新检验
@@ -165,28 +161,27 @@ order: 12
 - 适用：需要 estimator_status
 - 取值：
 - `frac, names, inst = worst_reject_ratio(
-  ref("estimator_status[:].innovation_check_flags"),
-  ref("estimator_status[:].vel_test_ratio"),
-  ref("estimator_status[:].pos_test_ratio"),
-  ref("estimator_status[:].hgt_test_ratio"),
-  ref("estimator_status[:].hdg_test_ratio"),
-  ref("estimator_status[:].mag_test_ratio"),
-  ref("estimator_status[:].tas_test_ratio"),
-  ref("estimator_status[:].hagl_test_ratio"),
-  ref("estimator_status[:].beta_test_ratio"),
-  primary_min=3,
-  primary_names=["速度", "水平位置", "垂直位置", "磁罗盘 X", "磁罗盘 Y", "磁罗盘 Z",
-                 "航向", "空速", "侧滑", "离地高度", "光流 X", "光流 Y"],
-  ge=1.0,                    # 通道判拒阈值：ratio >= 1 即该路观测被 EKF 拒绝
-  channel_min=3,             # 通道最少被拒样本数，去偶发尖峰毛刺
-  channel_labels=["速度", "水平位置", "垂直高度", "航向", "磁罗盘", "空速", "离地高度", "侧滑"],
-  fallback_label="未知通道")`
+ref("estimator_status[:].innovation_check_flags"),
+ref("estimator_status[:].vel_test_ratio"),
+ref("estimator_status[:].pos_test_ratio"),
+ref("estimator_status[:].hgt_test_ratio"),
+ref("estimator_status[:].hdg_test_ratio"),
+ref("estimator_status[:].mag_test_ratio"),
+ref("estimator_status[:].tas_test_ratio"),
+ref("estimator_status[:].hagl_test_ratio"),
+ref("estimator_status[:].beta_test_ratio"),
+primary_min=3,
+primary_names=["速度", "水平位置", "垂直位置", "磁罗盘 X", "磁罗盘 Y", "磁罗盘 Z",
+               "航向", "空速", "侧滑", "离地高度", "光流 X", "光流 Y"],
+ge=1.0,                    # 通道判拒阈值：ratio >= 1 即该路观测被 EKF 拒绝
+channel_min=3,             # 通道最少被拒样本数，去偶发尖峰毛刺
+channel_labels=["速度", "水平位置", "垂直高度", "航向", "磁罗盘", "空速", "离地高度", "侧滑"],
+fallback_label="未知通道")`
 - `pct = frac * 100`
 - 判定：
 - **critical** ｜ `pct >= 5.0` ｜ 阈值 5 ｜ 单位 % ｜ 标题「EKF 创新检验持续失败（estimator #\{inst\}：\{names\}）」
 - **warning** ｜ `pct >= 1.0` ｜ 阈值 1 ｜ 单位 % ｜ 标题「EKF 创新检验偶发失败（estimator #\{inst\}：\{names\}）」
 - 产出：check=ekf_innovations，tag=ekf_innovation_failure，stats=ekfRejectRatioPct(round 2)
-
 
 ## failsafe（group: `failsafe`）
 
@@ -250,7 +245,6 @@ order: 12
 - **critical** ｜ `True` ｜ 标题「飞行中导航状态切换为 \{name\}（t=\{t_s:.1f\}s）」
 - 产出：check=failsafe
 
-
 ## gps_health（group: `gps_health`）
 
 ### px4-gps-eph — GPS 水平位置误差
@@ -289,7 +283,6 @@ order: 12
 - **warning** ｜ `njump >= 3` ｜ 阈值 3 ｜ 单位 次 ｜ 标题「GPS 位置出现 \{njump\} 次异常跳变（>50 m/s）」
 - 产出：check=gps_health，tag=gps_jump，stats=gpsJumpCount(round -)
 
-
 ## 数据质量 guard（group: `guards`）
 
 ### px4-guard-restart — 数据质量-中途重启
@@ -324,7 +317,6 @@ order: 12
 - guard：当 `DROPOUT_MS > 1000` 时打标签 `log_dropouts_high`
 - 产出：—
 
-
 ## 数据质量 guard（最早执行）（group: `guards_early`）
 
 ### px4-guard-short-log — 数据质量-短日志
@@ -338,7 +330,6 @@ order: 12
 - guard：当 `ARMED_S == 0 and DURATION_S < 60` 时打标签 `insufficient_data`
 - 产出：—
 
-
 ## imu_bias（group: `imu_bias`）
 
 ### px4-imu-bias-drift — 陀螺零偏漂移
@@ -347,8 +338,8 @@ order: 12
 - 适用：不跑当 not HAS_ARMED
 - 取值：
 - `bx, by, bz, bts, src_text = _try(gyro_bias_series( ref("estimator_sensor_bias[0].gyro_bias"), ref("estimator_sensor_bias[0].timestamp"), ref("estimator_states[0].states"), ref("estimator_states[0].timestamp"), ref("estimator_status[0].states"), ref("estimator_status[0].timestamp"), slot=10, sources=["estimator_sensor_bias.gyro_bias[]",
-         "estimator_states.states[10..12]",
-         "estimator_status.states[10..12]"]))`
+       "estimator_states.states[10..12]",
+       "estimator_status.states[10..12]"]))`
 - `worst_abs, worst_axis, worst_drift, drift_axis = gyro_bias_worst( bx, by, bz, bts, ARMED_INTERVALS, labels=["X", "Y", "Z"], min_count=10)`
 - `temp_range = _try(max_temp_range(ref("vehicle_imu_status[0].temperature_gyro"), ref("vehicle_air_data[0].ambient_temperature")))`
 - `bias_stat = _try(larger(worst_abs, worst_drift))`
@@ -357,7 +348,6 @@ order: 12
 - **warning** ｜ `worst_abs >= 0.02 or worst_drift >= 0.02` ｜ 阈值 0.02 ｜ 单位 rad/s ｜ 标题「陀螺零偏异常（轴 \{worst_axis\}：绝对值 \{worst_abs:.4f\} rad/s，漂移 \{worst_drift:.4f\} rad/s）」
 - guard：当 `temp_range >= 15` 时打标签 `temperature_change_large`
 - 产出：check=imu_bias，tag=imu_bias_drift，stats=gyroBiasMaxRadS(round 4), gyroBiasDriftRadS(round 4), gyroBiasSource(round -), imuTempRangeC(round 1)
-
 
 ## logged_messages（group: `logged_messages`）
 
@@ -383,7 +373,6 @@ order: 12
 - **warning** ｜ `n > 0` ｜ 阈值 0 ｜ 单位 条 ｜ 标题「日志中出现 \{n\} 条 WARNING 消息」
 - 产出：check=logged_messages
 
-
 ## mode_thrash（group: `mode_thrash`）
 
 ### px4-mode-thrash — 飞行模式抖动
@@ -396,7 +385,6 @@ order: 12
 - 判定：
 - **warning** ｜ `n_changes > 12` ｜ 阈值 12 ｜ 单位 次 ｜ 标题「飞行模式切换 \{n_changes\} 次（>12），可能存在模式抖动」
 - 产出：check=mode_thrash，stats=navStateChanges(round -)
-
 
 ## motor_balance（group: `motor_balance`）
 
@@ -414,7 +402,6 @@ order: 12
 - **warning** ｜ `spread >= 0.08` ｜ 阈值 0.08 ｜ 标题「电机输出差异偏大（通道 \{busiest\} 与 \{idlest\} 差 \{spread:.3f\}）」
 - 产出：check=motor_balance，tag=motor_output_unbalance，stats=motorControlSpread(round 3), motorCountActive(round -)
 
-
 ## vibration（group: `vibration`）
 
 ### px4-vibration — 高频振动
@@ -423,7 +410,7 @@ order: 12
 - 适用：需要 vehicle_imu_status
 - 取值：
 - `vibe_mean, vibe_p95, vibe_max, imu_idx = worst_mean_stats(
-  ref("vehicle_imu_status[:].accel_vibration_metric"), min_mean=0)`
+ref("vehicle_imu_status[:].accel_vibration_metric"), min_mean=0)`
 - 判定：
 - **critical** ｜ `vibe_mean >= 9.81` ｜ 阈值 9.81 ｜ 单位 m/s^2 ｜ 标题「高频振动严重超标（IMU #\{imu_idx\}）」
 - **warning** ｜ `vibe_mean >= 4.905` ｜ 阈值 4.905 ｜ 单位 m/s^2 ｜ 标题「高频振动偏大（IMU #\{imu_idx\}）」
@@ -435,14 +422,13 @@ order: 12
 - 适用：需要 vehicle_imu_status
 - 取值：
 - `clip, clip_idx, clip_axis = worst_column_delta(
-  ref("vehicle_imu_status[:].accel_clipping", alias="clipping"))`
+ref("vehicle_imu_status[:].accel_clipping", alias="clipping"))`
 - `clip_stat = clip if clip > 0 else None`
 - 判定：
 - **critical** ｜ `clip >= 1000` ｜ 阈值 1000 ｜ 单位 count ｜ 标题「加速度计削波严重：IMU #\{clip_idx\} 轴 \{clip_axis\} 全日志累计削波 \{clip\} 次（理想值为 0）」
 - **warning** ｜ `clip >= 100` ｜ 阈值 100 ｜ 单位 count ｜ 标题「检测到明显加速度计削波：IMU #\{clip_idx\} 轴 \{clip_axis\} 全日志累计削波 \{clip\} 次（理想值为 0）」
 - **info** ｜ `clip > 0` ｜ 阈值 0 ｜ 单位 count ｜ 标题「偶发加速度计削波：IMU #\{clip_idx\} 轴 \{clip_axis\} 全日志累计削波 \{clip\} 次（理想值为 0）」
 - 产出：check=vibration，tag=high_vibration，stats=imuAccelClippingCountMax(round -)
-
 
 ## vtol_transition（group: `vtol_transition`）
 
@@ -464,7 +450,6 @@ order: 12
 - **warning** ｜ `has_tilt and enough and tilt_max > 8.0` ｜ 阈值 8 ｜ 单位 ° ｜ 标题「VTOL 转换阶段姿态越限（最大 \{tilt_max:.1f\}°，限值 8°）」
 - 产出：check=vtol_transition，tag=vtol_convert_attitude_over，stats=vtolTransitionSamples(round -), vtolTransitionMaxTiltDeg(round 1)
 
-
 ## wind_estimate（group: `wind_estimate`）
 
 ### px4-wind-estimate — 风扰估计
@@ -473,11 +458,11 @@ order: 12
 - 适用：需要 estimator_wind 或 wind_estimate
 - 取值：
 - `w_p95 = percentile(
-  hypot(coalesce(ref("estimator_wind[0].windspeed_north"),
-                 ref("wind_estimate[0].windspeed_north")),
-        coalesce(ref("estimator_wind[0].windspeed_east"),
-                 ref("wind_estimate[0].windspeed_east"))),
-  p=95)`
+hypot(coalesce(ref("estimator_wind[0].windspeed_north"),
+               ref("wind_estimate[0].windspeed_north")),
+      coalesce(ref("estimator_wind[0].windspeed_east"),
+               ref("wind_estimate[0].windspeed_east"))),
+p=95)`
 - 判定：
 - **warning** ｜ `w_p95 >= 12.0` ｜ 阈值 8 ｜ 单位 m/s ｜ 标题「估计风速较大（p95 \{w_p95:.1f\} m/s）」
 - **info** ｜ `w_p95 >= 8.0` ｜ 阈值 8 ｜ 单位 m/s ｜ 标题「估计风速偏大（p95 \{w_p95:.1f\} m/s）」
