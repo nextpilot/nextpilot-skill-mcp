@@ -147,21 +147,43 @@ curl -s -X POST -H "Accept: application/vnd.git-lfs+json" \
 
 
 
-## 开发服务器：`pnpm dev` 起两段热更新
+## 开发服务器：`pnpm dev` 起三段热更新
 
-内容更新是**两段**，缺一段就「改了没反应」：
+内容更新是**三段**，缺一段就「改了没反应」：
 
 | 改什么 | 谁负责 |
 | --- | --- |
 | `web/` 里的代码 | Next 自己热更新 |
 | `docs/guide`、`knowledge/skills`、`knowledge/mcp` | `sync-content --watch` 重拷进 `web/.generated/` |
+| `knowledge/px4/`（rules/facts/plot/llm/meta）、`engine/` | `build-knowledge --watch` 重建产物 |
 
-`pnpm dev` = `node scripts/dev.mjs`，**两段一起起**（2026-09-22 起）。
-`pnpm dev:no-watch` 是旧行为（不挂 watch）；`pnpm sync:watch` 单独开内容热拷贝。
+`pnpm dev` = `node scripts/dev.mjs`，**三段一起起**（2026-09-22 起）。
+`pnpm dev:no-watch` 是旧行为（不挂 watch）；`pnpm sync:watch` / `pnpm kb:watch` 单独用。
 
 **Next 16 按目录判重 dev server**（不是按端口）：同目录已有 dev server 时直接报错退出，
 换 `PORT` 没用。测启动器前先确认没有旧 dev server 在跑。
 
+### 给"产物落在源码目录内"的构建脚本加 watch：必须排除产物
+
+`build-knowledge` 的产物 `rules-editor-schema.generated.json` **就落在 `knowledge/px4/` 里**。
+监听 `knowledge/px4/` 顶层 = 写产物触发再构建 = **无限重建**（实测两次编辑跑了 7 次）。
+两个 watch 脚本的共同纪律：
+
+- 只监听**真源子目录**（`rules/` `plot/` `llm/` `meta/` `providers/` `scripts/lib`）
+- 顶层目录（为拿到 `facts.yaml` / `operators.py` 这类"文件型"真源的事件）在回调里按
+  `*.generated.*` 过滤掉产物
+
+同类纪律：**产物写入源码目录时，任何基于文件监听的自动化都要显式排除产物路径。**
+
+### 把顶层顺序代码包进函数时：检查跨层读取的变量
+
+`build-knowledge.mjs` 的构建逻辑包进 `build()`（供 `--watch` 复用）后，两个变量成了
+**函数的自由变量**、运行时报 `xxx is not defined`：`signatures`（被 `compileFieldOne` /
+`compilePreset` 读）、`operatorsPy`（被 `renderSchemaPage` 读）。
+**`--check` 路径发现不了这类错误**（走的是不渲染页面那条分支）——
+加 watch 后必须真跑一遍完整路径，不能只跑 `--check`。
+
 **本机工具注意事项**：`wmic` 被安全策略拉黑（用 `tasklist /FO CSV /NH` 代替）；
 Windows 上 Python 发 Ctrl+C 要 `CREATE_NEW_PROCESS_GROUP` + `CTRL_BREAK_EVENT`；
-`netstat` / `tasklist` 中文输出是 GBK，要 `decode('gbk')`。
+`netstat` / `tasklist` 中文输出是 GBK，要 `decode('gbk')`；
+**PowerShell 工具本机无 stdout**（exit 0 但零输出）——要输出改用 Python `subprocess`。
