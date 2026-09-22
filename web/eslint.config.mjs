@@ -7,8 +7,10 @@ export default [
         ignores: [
             ".next/**",
             "**/.next/**",
-            ".generated/**",
-            "**/.generated/**",
+            "content/skills/**",
+            "content/mcp/**",
+            "**/content/skills/**",
+            "**/content/mcp/**",
             "**/node_modules/**",
             "**/*.{ts,tsx}",
         ],

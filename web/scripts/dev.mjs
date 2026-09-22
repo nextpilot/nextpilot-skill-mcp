@@ -3,13 +3,13 @@
  *
  * 为什么需要它：内容是两段更新的，缺一段就会出现「改了没反应」——
  *   1. Next 自己热更新 `web/` 里的代码；
- *   2. `sync-content.mjs --watch` 把 `docs/guide` / `knowledge/skills` / `knowledge/mcp`
- *      这些**真源**重拷进 `.generated/`，Next 才会看到。
+ *   2. `sync-content.mjs --watch` 把 `knowledge/skills` / `knowledge/mcp`
+ *      这些**真源**重拷进 `content/`，Next 才会看到。
  * 以前第 2 步要另开一个终端手动跑 `pnpm sync:watch`，忘了就以为热更新坏了。
  * 现在两条一起起，Ctrl+C 一起停。
  *
  * 顺序：先跑一次 `sync-content` 与 `build-knowledge`（要等它们成功），再起
- * `sync-content --watch` 与 `next dev`。**Next 必须看到已同步的 `.generated/`**，
+ * `sync-content --watch` 与 `next dev`。**Next 必须看到已同步的 `content/`**，
  * 所以在空内容上启动会白屏一次再自愈，不如等两秒。
  *
  * 为什么不装 concurrently / npm-run-all：两个子进程 + 一次信号转发不值得多一个依赖，

@@ -1,0 +1,65 @@
+---
+name: ibvs-visual-servoing
+description: "不依赖 GPS 和全局定位，直接以图像特征误差驱动速度指令，实现室内 / 近距离对目标的对准、跟踪与降落。当用户在 GPS 拒止环境做对准、跟踪或精准降落，需要用图像特征误差直接生成速度指令时使用。触发词：视觉伺服、IBVS、室内飞行、无 GPS、AprilTag、精准降落。"
+metadata:
+  display_name: "IBVS 基于图像的视觉伺服"
+  icon: "🎥"
+  category: "control"
+  platforms: "PX4, ArduPilot, 通用"
+  models: "经典视觉（特征点/AprilTag）, 深度网络特征"
+  tags: "视觉伺服, IBVS, 室内飞行, 无GPS"
+  clients: "Claude, Cursor"
+  seed_rating: "4.5"
+  seed_downloads: "1050"
+  featured: "true"
+---
+
+# IBVS 基于图像的视觉伺服
+
+## 何时使用
+
+当用户在 GPS 拒止环境做对准、跟踪或精准降落，需要用图像特征误差直接生成速度指令时使用。
+
+- 视觉伺服
+- IBVS
+- 室内飞行
+- 无 GPS
+- AprilTag
+- 精准降落
+
+## 背景
+
+GPS 拒止环境（室内、桥下、仓库）中无法用位置控制。IBVS（Image-Based Visual Servoing）直接在图像空间定义期望特征（如标记点居中、目标轮廓占比），用特征误差实时计算机体速度。
+
+## 工作流
+
+```text
+图像特征 s（点坐标 / 标记位姿 / 目标框）
+   → 误差 e = s* - s
+   → 交互矩阵伪逆 + 增益 λ：v = λ · L⁺ · e
+   → 速度指令送飞控（OFFBOARD / guided 模式）
+```
+
+## 输入示例
+
+```text
+相机画面中一个 AprilTag，期望状态：标签居中且面积占画面 12%（接近降落点）
+```
+
+## 输出示例
+
+```json
+{
+  "vx": 0.2,
+  "vy": -0.1,
+  "vz": 0.15,
+  "yawrate": 0.0,
+  "feature_error_norm": 0.08
+}
+```
+
+## 注意事项
+
+- 务必做**深度 / 高度通道的限幅**，纯 IBVS 在深度未知时可能产生激进的 z 轴指令。
+- 视觉延迟大时要降低增益或加观测器，否则容易振荡。
+- 相关的"神经-解析控制蒸馏"工作用小模型学生逼近 IBVS 解析解，推理速度可提升一个数量级，适合机载实时部署。

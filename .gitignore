@@ -10,8 +10,7 @@ dist/
 *.tsbuildinfo
 
 # ========== Next.js / 站点 ==========
-# 站点构建期拷贝（真源在 docs/guide、knowledge/skills、knowledge/mcp）
-web/.generated/
+# 站点内容全部在 web/content/ 下，全部入库
 
 # ========== Python ==========
 # 字节码

@@ -69,9 +69,9 @@ const RULES_DIR = resolve(KN, "rules");
 const OPERATORS_PY = resolve(ENGINE, "operators.py");
 const PROMPT_PATH = resolve(KN, "llm/gjb841-system-prompt.md");
 const EMPTY_PATH = resolve(KN, "llm/report-empty.md");
-// 指南页的运行期目录：sync-content.mjs 把 docs/guide 拷进来，本脚本再往里补两页生成物。
-// 写在这里而不是仓库根，是因为部署包只有 web/ 一个目录（详见 sync-content.mjs 顶部）。
-const GUIDES_DIR = resolve(webRoot, ".generated/guide");
+// 指南页目录：人工编写的 guide 页直接放在 web/content/guide/，本脚本再往里生成规则清单页与参考页。
+// 写在这里而不是仓库根，是因为部署包只有 web/ 一个目录。
+const GUIDES_DIR = resolve(webRoot, "content/guide");
 const PLOT_DIR = resolve(KN, "plot"); // 结果页曲线预设（纯前端，不经 Pyodide）
 
 const read = (p) => readFileSync(p, "utf8");
@@ -1785,12 +1785,10 @@ function build() {
     );
 
     // 5) 指南的「知识库」分组：规则清单 + 规则编写参考（改规则/算子/内置变量后自动跟上，不用谁记得手动同步）
-    //    这两页**不是**提交进仓库的产物（落在不入库的 .generated/ 里），所以用 writeFileSync
-    //    而不是 writeArtifact：--check 比对的是"入库产物有没有跟上 knowledge/"，这里没有可比的对象。
     if (!CHECK) {
         mkdirSync(GUIDES_DIR, { recursive: true });
-        writeFileSync(resolve(GUIDES_DIR, "rule-catalogue.mdx"), renderCataloguePage(rules, sources), "utf8");
-        writeFileSync(resolve(GUIDES_DIR, "rule-schema.mdx"), renderSchemaPage(rules.length, providerApi), "utf8");
+        writeFileSync(resolve(GUIDES_DIR, "rule-catalogue.md"), renderCataloguePage(rules, sources), "utf8");
+        writeFileSync(resolve(GUIDES_DIR, "rule-schema.md"), renderSchemaPage(rules.length, providerApi), "utf8");
     }
 
     if (CHECK) {
@@ -1807,7 +1805,7 @@ function build() {
                 `${Object.keys(signatures).length} operators; ` +
                 "ulog-check-script.ts, ulog-data-script.ts, prompts.generated.js",
         );
-        console.log("guide built: rule-catalogue.mdx, rule-schema.mdx");
+        console.log("guide built: rule-catalogue.md, rule-schema.md");
     }
 }
 

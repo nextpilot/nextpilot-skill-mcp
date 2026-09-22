@@ -70,7 +70,8 @@ const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\
  */
 const walkSourceFiles = (root, sub = "", out = []) => {
     for (const e of readdirSync(join(root, sub), { withFileTypes: true })) {
-        if (["node_modules", ".next", ".generated", "e2e", "playwright-report"].includes(e.name)) continue;
+        if (["node_modules", ".next", "content/skills", "content/mcp", "e2e", "playwright-report"].includes(e.name))
+            continue;
         const rel = sub ? join(sub, e.name) : e.name;
         if (e.isDirectory()) walkSourceFiles(root, rel, out);
         else if (/\.tsx?$/.test(e.name)) out.push(rel);
@@ -796,7 +797,8 @@ console.log("\n[18] 站点版本只有一个读取口（footer 的「版本 + �
     const offenders = [];
     const walk = (dir) => {
         for (const e of readdirSync(dir, { withFileTypes: true })) {
-            if (["node_modules", ".next", ".generated", "e2e", "playwright-report"].includes(e.name)) continue;
+            if (["node_modules", ".next", "content/skills", "content/mcp", "e2e", "playwright-report"].includes(e.name))
+                continue;
             const p = join(dir, e.name);
             if (e.isDirectory()) {
                 walk(p);

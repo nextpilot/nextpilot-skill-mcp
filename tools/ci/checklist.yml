@@ -74,12 +74,7 @@ jobs:
     stage: "Push"
     description: "Local pre-push: fast static checks plus the log regression (seconds each)"
     steps:
-      - id: "check-secrets"
-        name: "No committed credentials (check_secrets)"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/ci/check_secrets.py"]
-        hint: "A credential-shaped value was found in a tracked file. Move it to an environment variable; if it is a legitimate placeholder, add it to the allowlist in tools/ci/check_secrets.py."
-
+      # ── 基本检查：格式 → lint → 类型 ──
       - id: "ruff-format"
         name: "Python style (ruff format --check)"
         workdir: "{ROOT}"
@@ -92,12 +87,45 @@ jobs:
         command: ["{PYTHON}", "-m", "ruff", "check", "."]
         hint: "Run `python -m ruff check --fix .` to auto-fix fixable issues, then review remaining items manually."
 
+      - id: "prettier-check"
+        name: "Frontend style (prettier --check)"
+        workdir: "{WEB}"
+        command: ["{NODE}", "node_modules/prettier/bin/prettier.cjs", "--check", "."]
+        hint: "Run `pnpm format` to format the frontend. Generated files are excluded via .prettierignore."
+
+      - id: "pyright"
+        name: "Python type checking (pyright)"
+        workdir: "{ROOT}"
+        command: ["{NODE}", "web/node_modules/pyright/index.js", "."]
+        hint: "Fix the Python type errors listed above. Run `npx pyright .` locally for detailed output."
+
+      - id: "eslint"
+        name: "TypeScript lint (eslint)"
+        workdir: "{WEB}"
+        command: ["{NODE}", "node_modules/eslint/bin/eslint.js", "."]
+        hint: "Fix the ESLint errors listed above. Run `npx eslint . --fix` to auto-fix where possible."
+
+      - id: "tsc"
+        name: "TypeScript type checking (tsc --noEmit)"
+        workdir: "{WEB}"
+        command: ["{NODE}", "node_modules/typescript/bin/tsc", "--noEmit"]
+        hint: "Fix the TypeScript errors listed above. Run `npx tsc --noEmit --pretty` locally for detailed output."
+
+      # ── 密钥检查 ──
+      - id: "check-secrets"
+        name: "No committed credentials (check_secrets)"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "tools/ci/check_secrets.py"]
+        hint: "A credential-shaped value was found in a tracked file. Move it to an environment variable; if it is a legitimate placeholder, add it to the allowlist in tools/ci/check_secrets.py."
+
+      # ── 单元测试 ──
       - id: "pytest-engine"
         name: "Operator / CEL sandbox unit tests (pytest)"
         workdir: "{ROOT}"
         command: ["{PYTHON}", "-m", "pytest", "engine/tests"]
         hint: "Review the pytest output above. Run `python -m pytest engine/tests -v` locally for detailed failure info."
 
+      # ── 其它测试 ──
       - id: "check-artifact"
         name: "Artifact is valid Python (check-pyodide-px4log-engine)"
         workdir: "{ROOT}"
@@ -110,29 +138,35 @@ jobs:
         command: ["{PYTHON}", "tools/ci/check_engine_purity.py"]
         hint: "The engine/ directory contains non-Pyodide-safe code. Review the violations above; engine/ must work in both browser (Pyodide) and native CPython."
 
-      - id: "tsc"
-        name: "Type checking (tsc --noEmit)"
-        workdir: "{WEB}"
-        command: ["{NODE}", "node_modules/typescript/bin/tsc", "--noEmit"]
-        hint: "Fix the TypeScript errors listed above. Run `npx tsc --noEmit --pretty` locally for detailed output."
-
-      - id: "prettier-check"
-        name: "Frontend style (prettier --check)"
-        workdir: "{WEB}"
-        command: ["{NODE}", "node_modules/prettier/bin/prettier.cjs", "--check", "."]
-        hint: "Run `pnpm format` to format the frontend. Generated files are excluded via .prettierignore."
-
-      - id: "eslint"
-        name: "TypeScript lint (eslint)"
-        workdir: "{WEB}"
-        command: ["{NODE}", "node_modules/eslint/bin/eslint.js", "."]
-        hint: "Fix the ESLint errors listed above. Run `npx eslint . --fix` to auto-fix where possible."
-
       - id: "check-hygiene"
         name: "Validator hygiene (check_hygiene)"
         workdir: "{ROOT}"
         command: ["{PYTHON}", "tools/ci/check_hygiene.py"]
         hint: "Review the hygiene violations listed above and fix them. Common issues: dangling section references, silent failures, stale freshness gates."
+
+      # 以下三项原本住在 ci 阶段跑。它们都只读源码、不碰日志、各不到 1s
+      # （实测 build:kb --check 0.63s / check-skill-spec 0.32s / check-mcp-spec 0.34s），
+      # 与 push 阶段里已有的秒级项同一量级，所以放在本地 pre-push 拦更早 ——
+      # 等云端 CI 才发现"产物忘了重新生成"要多等一个来回。
+      - id: "build-kb-parity"
+        name: "Build contract vs artifact parity (build:kb --check)"
+        workdir: "{WEB}"
+        # check_hygiene 的「产物新鲜度门还在」判据在扫这一行的字样，改名会让那道门恒红。
+        command: ["{NODE}", "scripts/build-knowledge.mjs", "--check"]
+        hint: "The built knowledge base differs from the committed artifact. Run `node scripts/build-knowledge.mjs` locally and commit the updated artifact."
+
+      # 内容规范。两个脚本各自带反例自检。
+      - id: "check-skill-spec"
+        name: "Skill directory spec (check-skill-spec)"
+        workdir: "{WEB}"
+        command: ["{NODE}", "scripts/check-skill-spec.mjs"]
+        hint: "knowledge/skills/ 下有目录不合规范（缺 SKILL.md / README.md / CHANGELOG.md，或字段不合规）。按上面的输出补齐对应目录。"
+
+      - id: "check-mcp-spec"
+        name: "MCP directory spec (check-mcp-spec)"
+        workdir: "{WEB}"
+        command: ["{NODE}", "scripts/check-mcp-spec.mjs"]
+        hint: "knowledge/mcp/ 下有目录不合 server.json（MCP Registry）规范。按上面的输出补齐；upstream_status: pending 的条目是 SKIP 不是放行，核实后要补 server.json 并删掉该字段。"
 
       # 需要真实日志的回归。日志不入仓库（CLAUDE.md 第 9 节：原始日志不上传服务器），
       # 所以 CI 上这四项必然 SKIP —— 这就是它们归 push 而不是 ci 的原因。
@@ -163,30 +197,6 @@ jobs:
         workdir: "{ROOT}"
         command: ["{PYTHON}", "tools/calibrate/lint_rules.py", "--strict"]
         hint: "Field reference linting found violations. Review the output above and fix the referenced fields."
-
-      # 以下三项原本住在 ci 阶段跑。它们都只读源码、不碰日志、各不到 1s
-      # （实测 build:kb --check 0.63s / check-skill-spec 0.32s / check-mcp-spec 0.34s），
-      # 与 push 阶段里已有的秒级项同一量级，所以放在本地 pre-push 拦更早 ——
-      # 等云端 CI 才发现"产物忘了重新生成"要多等一个来回。
-      - id: "build-kb-parity"
-        name: "Build contract vs artifact parity (build:kb --check)"
-        workdir: "{WEB}"
-        # check_hygiene 的「产物新鲜度门还在」判据在扫这一行的字样，改名会让那道门恒红。
-        command: ["{NODE}", "scripts/build-knowledge.mjs", "--check"]
-        hint: "The built knowledge base differs from the committed artifact. Run `node scripts/build-knowledge.mjs` locally and commit the updated artifact."
-
-      # 内容规范。两个脚本各自带反例自检。
-      - id: "check-skill-spec"
-        name: "Skill directory spec (check-skill-spec)"
-        workdir: "{WEB}"
-        command: ["{NODE}", "scripts/check-skill-spec.mjs"]
-        hint: "knowledge/skills/ 下有目录不合规范（缺 SKILL.md / README.md / CHANGELOG.md，或字段不合规）。按上面的输出补齐对应目录。"
-
-      - id: "check-mcp-spec"
-        name: "MCP directory spec (check-mcp-spec)"
-        workdir: "{WEB}"
-        command: ["{NODE}", "scripts/check-mcp-spec.mjs"]
-        hint: "knowledge/mcp/ 下有目录不合 server.json（MCP Registry）规范。按上面的输出补齐；upstream_status: pending 的条目是 SKIP 不是放行，核实后要补 server.json 并删掉该字段。"
 
   - id: ci
     stage: "CI"

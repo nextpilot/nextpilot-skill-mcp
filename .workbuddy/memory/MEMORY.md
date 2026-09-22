@@ -139,8 +139,26 @@ curl -s -X POST -H "Accept: application/vnd.git-lfs+json" \
 `check_all.py` 内部就是用 `sys.executable -m ruff` —— 所以**启动它的解释器必须是带 ruff 的那个**。
 这是 `.githooks/pre-commit` 在本机历史上坏掉的根因。
 
+## 并发会话会静默回滚你的工作区（2026-09-22 事故）
+
+本机可能有第二个会话同时操作这个仓库。它的一次操作把 `docs/dev/check-taxonomy-rework.md`
+回滚到 HEAD，我 20 分钟的编辑**全丢**，且 git 里没有任何痕迹（未提交的改动不生成 blob，`git fsck` 找不回）。
+症状很隐蔽：行数从 582 掉到 539，`git diff` 变空。
+
+1. 长文档改动**周期性备份**到 `.workbuddy/tmp/`（不入 git），别攒到最后统一存。
+2. 多点改动用**带断言的脚本**重放（每条 `count == 1`，否则 `exit 1`）——
+   手改时"某条没匹配上"会被静默忽略，结果就是文档里留下一处过时引用。
+3. `git status` **不是**"我的改动还在吗"的可靠依据：同一轮内观察到 `.husky/` 先 `A` 后消失、
+   `package.json` 先 `M` 后被还原。
+
 ## Git 在 Windows 上的 hook 调用规则（Git 源码行为）
 
+- 本机 `core.hooksPath = .githooks`（实测）。**放进 `.husky/` 的钩子永远不会被 Git 调用**——
+  2026-09-22 就有一个会话加过 `.husky/pre-commit`，它是死代码，但看着像在生效。
+- 连带那条：`.lintstagedrc.json` 里写 `python -m ruff` 在本机**必然失败**，
+  必须走 `.githooks/_python_with_ruff.py` 的 `ensure_python_with_ruff` 探测。
+- `.githooks/pre-commit` 有两条有据可查的取舍别丢：`ruff check` **不加 `--fix`**（`engine/` 由片段拼出，
+  自动修复会删东西）；找不到解释器时退 **127** 让 Git 放行。
 - 只认**无扩展名**的 hook，或 `.exe` / `.bat` / `.cmd`——**`.ps1` 永远不会被 Git 调用**（纯手动辅助脚本）。
 - Git 用 `/bin/sh` 启动 hook，**脚本里路径一律用 `/` 分隔符**：
   连 `python.exe` 前那一节也要写 `C:/Users/.../python.exe`，反斜杠会被 sh 当转义符吃掉。
