@@ -140,7 +140,7 @@ cd web && pnpm check:mcp
 | 加一条故障模式（根因 / 排查步骤） | `px4/fault-kb.yaml`（trigger_tags 必须是引擎会产出的标签） |
 | 加一个可复用计算步骤 | `engine/operators.py`（`@operator` 声明 in/out arity），再在经验的 `compute` 里引用 |
 | 改 AI 报告口径 | `px4/llm/*.md` |
-| 同步固件元数据 | `python tools/px4/sync_px4_msg.py --tags ...` → 生成物在 `px4/meta/<tag>.json` |
+| 同步固件元数据 | `python tools/px4/fetch_px4_uorb_msg.py --tags ...` → 生成物在 `px4/meta/<tag>.json` |
 
 ## 改完怎么验证
 

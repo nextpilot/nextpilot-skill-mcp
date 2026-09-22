@@ -1,5 +1,5 @@
 {
- "_note": "生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 PX4 上游同步。",
+ "_note": "生成物，勿手改。由 tools/topics/fetch_px4_uorb_msg.py 从 PX4 上游同步。",
  "tag": "v1.15.0",
  "topicCount": 213,
  "topics": {

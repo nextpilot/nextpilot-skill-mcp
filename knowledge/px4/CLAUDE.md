@@ -1110,10 +1110,10 @@ fields:
 
 ```bash
 # 拉取指定 release tag 的 msg 与 parameters.json，生成/更新 meta/<tag>.json
-python tools/px4/sync_px4_msg.py --tags v1.13.3,v1.14.4,v1.15.0,v1.16.0,main
+python tools/px4/fetch_px4_uorb_msg.py --tags v1.13.3,v1.14.4,v1.15.0,v1.16.0,main
 
 # CI / 本地校验：只比对不写入，若上游已变则非零退出
-python tools/px4/sync_px4_msg.py --check
+python tools/px4/fetch_px4_uorb_msg.py --check
 ```
 
 **落盘结构：缓存与产物都按 tag 组织**——一个 tag 一个文件夹，里面的东西都属于该版本。
@@ -1275,7 +1275,7 @@ knowledge/px4/
 
 - **阶段 0 冻结基线**：`tools/calibrate/dump_baseline.py` 把 5 个日志的完整输出冻结成
   `tools/calibrate/baseline/*.json` 提交（findings 全字段 + tags/guards/phases/checks*）
-- **阶段 0.5 同步字段与参数字典**：`tools/px4/sync_px4_msg.py` 按 tag（v1.13.3 / v1.14.4 /
+- **阶段 0.5 同步字段与参数字典**：`tools/px4/fetch_px4_uorb_msg.py` 按 tag（v1.13.3 / v1.14.4 /
   v1.15.0 / v1.16.0 / main）各建一个文件夹，下载 `msg/` 与 `parameters.json`，生成
   `meta/<tag>.json`（该版本字段字典 + 参数字典）；
   人工补 `topic-overrides.yaml` 的 `aliases` / `groups` / `invalid`

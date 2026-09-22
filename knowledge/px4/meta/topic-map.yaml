@@ -30,7 +30,7 @@ topics:
 
 # 字典里查不到的（本项目收录的 tag 里没有对应 msg，无法校验——不是"字段不存在"）：
 #   wind_estimate          旧固件的估计器风 topic，上游是 WindEstimate.msg；本项目没收旧 tag。
-#                          要校验得先 `python tools/px4/sync_px4_msg.py --tags v1.13.3,v1.14.4`
+#                          要校验得先 `python tools/px4/fetch_px4_uorb_msg.py --tags v1.13.3,v1.14.4`
 #   旧字段 lat / lon / alt  同上，旧 tag 才有
 unknown:
   - wind_estimate

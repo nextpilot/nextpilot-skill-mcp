@@ -1,41 +1,63 @@
-# 依赖与构建产物（各子项目）
+# ========== 依赖 ==========
 node_modules/
+# 仓库根的 pnpm-lock.yaml 是零依赖空壳，不入库（web/pnpm-lock.yaml 照常跟踪）
+/pnpm-lock.yaml
+
+# ========== 构建产物 ==========
 .next/
 out/
 dist/
-# 仓库根是零依赖的纯转发壳；根目录的 pnpm-lock.yaml 是空壳，不应入库
-# （web/ 下的 pnpm-lock.yaml 是真实依赖锁，照常跟踪——前导 / 只匹配仓库根）
-/pnpm-lock.yaml
+*.tsbuildinfo
 
-# 环境变量
+# ========== Next.js / 站点 ==========
+# 站点构建期拷贝（真源在 docs/guide、knowledge/skills、knowledge/mcp）
+web/.generated/
+
+# ========== Python ==========
+# 字节码
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+# 打包
+*.egg-info/
+# 工具缓存
+.ruff_cache/
+# PX4 消息定义缓存（由 tools/px4/fetch_px4_uorb_msg.py 拉取，不入库）
+.cache/
+.pytest_cache/
+
+# ========== 测试与覆盖率 ==========
+.coverage
+.coverage.*
+htmlcov/
+# Playwright
+playwright-report/
+test-results/
+
+# ========== 环境变量 ==========
 .env
 .env.local
 .env*.local
 
-# 日志与系统文件
-*.log
-.DS_Store
+# ========== 平台部署 ==========
+.vercel/
+.edgeone/
 
-# 平台目录
-.vercel
-.edgeone
-
-# 校准用真实飞行日志（含 GPS 轨迹，勿入库；用小样本/合成日志做 CI）
+# ========== 校准用真实飞行日志 ==========
+# 含 GPS 轨迹，勿入库；用小样本/合成日志做 CI
 tools/calibrate/logs/*.ulg
 tools/calibrate/logs/*.bin
 
-# TS 增量构建
-*.tsbuildinfo
+# ========== IDE / 编辑器 ==========
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
 
-# Python 字节码
-__pycache__/
-*.pyc
-
-# ruff 的缓存（配置见仓库根 pyproject.toml）
-.ruff_cache/
-
-.cache
-
-# 站点内容的构建期拷贝（真源在 docs/guide、knowledge/skills、knowledge/mcp）
-# 由 web/scripts/sync-content.mjs 在 dev / build 前现拷，不入库
-web/.generated/
+# ========== 日志 ==========
+*.log

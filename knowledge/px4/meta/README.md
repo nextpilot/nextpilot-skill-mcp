@@ -23,8 +23,8 @@
 生成（不要手写）：
 
 ```bash
-python tools/px4/sync_px4_msg.py --tags v1.15.0,v1.16.0,main
-python tools/px4/sync_px4_msg.py --check     # 只比对不写入（CI）
+python tools/px4/fetch_px4_uorb_msg.py --tags v1.15.0,v1.16.0,main
+python tools/px4/fetch_px4_uorb_msg.py --check     # 只比对不写入（CI）
 ```
 
 上游：

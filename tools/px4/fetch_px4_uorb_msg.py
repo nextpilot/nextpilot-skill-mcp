@@ -10,8 +10,8 @@
 - 原始下载缓存到 .cache/px4/<tag>/，不入库
 
 用法：
-  python tools/px4/sync-px4-msg.py --tags v1.15.0,v1.16.0,main
-  python tools/px4/sync-px4-msg.py --check          # 只比对不写入（CI 用），不一致则退出码 1
+  python tools/px4/fetch_px4_uorb_msg.py --tags v1.15.0,v1.16.0,main
+  python tools/px4/fetch_px4_uorb_msg.py --check          # 只比对不写入（CI 用），不一致则退出码 1
 
 依赖：仅标准库（urllib + tarfile + json）；无需 pip install。
 """
@@ -258,7 +258,7 @@ def render_meta_json(tag: str, topics: dict[str, dict], params: dict | None) -> 
         return out
 
     doc: dict = {
-        "_note": "生成物，勿手改。由 tools/topics/sync-px4-msg.py 从 PX4 上游同步。",
+        "_note": "生成物，勿手改。由 tools/topics/fetch_px4_uorb_msg.py 从 PX4 上游同步。",
         "tag": tag,
         "topicCount": len(topics),
         "topics": {name: fix_fields(topics[name]) for name in sorted(topics)},
