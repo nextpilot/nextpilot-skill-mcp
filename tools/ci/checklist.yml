@@ -99,7 +99,7 @@ jobs:
         hint: "Review the pytest output above. Run `python -m pytest engine/tests -v` locally for detailed failure info."
 
       - id: "check-artifact"
-        name: "Artifact is valid Python (check_artifact)"
+        name: "Artifact is valid Python (check-pyodide-px4log-engine)"
         workdir: "{ROOT}"
         command: ["{PYTHON}", "tools/calibrate/check-pyodide-px4log-engine.py"]
         hint: "The artifact file contains invalid Python syntax. Check the error output above for the exact location."
