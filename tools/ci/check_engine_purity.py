@@ -133,7 +133,7 @@ def check_engine_is_pure_python() -> list[str]:
 # ---------------------------------------------------------------------------
 
 BROWSER_MARKER = ("web/scripts/build-knowledge.mjs", 'resolve(webRoot, "../engine")')
-LOCAL_MARKER = ("tools/calibrate/run_checks_locally.py", 'REPO_ROOT / "engine"')
+LOCAL_MARKER = ("tools/calibrate/px4log_engine_runner.py", 'REPO_ROOT / "engine"')
 
 
 def check_sharing_premise_alive() -> list[str]:

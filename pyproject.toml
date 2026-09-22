@@ -8,7 +8,7 @@
 #   1. **格式化器是唯一权威**：`ruff format` 说了算，人不与之争论；
 #   2. **lint 只开能抓真 bug 的一组**，风格的事全部交给格式化器。
 #
-# 校验（与 compare_baseline / check_artifact 同一层，改完 .py 就跑）：
+# 校验（与 compare_baseline / check-pyodide-px4log-engine 同一层，改完 .py 就跑）：
 #   python -m ruff format --check . && python -m ruff check .
 
 [tool.ruff]

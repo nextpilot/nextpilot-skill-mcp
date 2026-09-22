@@ -290,7 +290,7 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         name="坏输入不再让校验脚本非零退出",
-        path="tools/calibrate/run_checks_locally.py",
+        path="tools/calibrate/px4log_engine_runner.py",
         old="return 1 if failed else 0",
         new="return 0",
         guard="hygiene",
@@ -335,7 +335,7 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         name="本机校准工具不再直接指到 engine/",
-        path="tools/calibrate/run_checks_locally.py",
+        path="tools/calibrate/px4log_engine_runner.py",
         old='ENGINE = REPO_ROOT / "engine"',
         new='ENGINE = REPO_ROOT / "engine_moved"',
         guard="engine",
@@ -597,7 +597,7 @@ def _install_signal_guard() -> None:
     """被中断时也要还原 —— `finally` 挡不住 SIGTERM / Ctrl-C。
 
     `finally` 只在异常/正常返回时执行；SIGTERM 的默认处理是**立刻终止进程**，不走 finally。
-    2026-09-19 真踩到了：全量自证跑到第 17 条被超时杀掉，`run_checks_locally.py` 的
+    2026-09-19 真踩到了：全量自证跑到第 17 条被超时杀掉，`px4log_engine_runner.py` 的
     `return 1 if failed else 0` 就留在了 `return 0` 的状态——下一次跑**任何**守卫，
     看到的都是一条假的基线失败（而且提示指向的方向完全不对）。
     """

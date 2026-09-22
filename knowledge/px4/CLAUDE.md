@@ -34,7 +34,7 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 
 - 契约本体是 `engine/providers/api.py` 的三张常量表（REQUIRED / OPTIONAL / SEMANTICS）。
   它同时是**构建期**（`build-knowledge.mjs` 派生 `BUILTIN_VARS`、查每个适配器有没有漏实现）、
-  **运行期**（`check_provider()` 自检类型与缺席）、**测试**（`tools/calibrate/check_provider.py`）
+  **运行期**（`check_provider()` 自检类型与缺席）、**测试**（`tools/calibrate/guard-px4log-provider.py`）
   三处的输入 —— 一处定义、三处使用。**不写 `typing.Protocol`**：两端都没有类型检查器
   （构建期不执行 Python、Pyodide 里没有 mypy），写了只是"看着有约束、实际没人管"。
 - 内置变量从 23 个收敛到 **11 个 + `has_topic()`**（实测 10 个零引用：
@@ -54,7 +54,7 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
   （**2026-09-18 起 plot 的单位已改由 meta 派生**，见下面第五段——这条从"不做"里划掉。）
 
 验证口径同前：`compare_baseline.py` 6 条日志**逐字段零差异**（这次是纯搬家，
-出现任何差异都说明搬错了），外加新增的 `check_provider.py`（契约测试）。
+出现任何差异都说明搬错了），外加新增的 `guard-px4log-provider.py`（契约测试）。
 
 **2026-09-17 追加（第三段）：provider 初始化按「数据来源」分组 + 解析器版本改由 provider 给**
 
@@ -93,7 +93,7 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
   `"parserVersion": "pyulog/pyodide-0.3.0"` 写死——一个与实际装的解析器无关的假版本串，
   而且把 `pyulog` 这个名字钉进了**格式无关层**（正是上面「机制 / 数据 / 格式」三分要避免的）。
   现在由 provider 给真值（`pyulog.__version__`）。构建期查漏实现、运行期 `check_provider()`
-  查类型、`check_provider.py` 契约测试查非空，三道都跟着 REQUIRED 表自动生效
+  查类型、`guard-px4log-provider.py` 契约测试查非空，三道都跟着 REQUIRED 表自动生效
   （`build-knowledge.mjs` 的 `parseProviderApi` 从表里派生，**不用改构建脚本**）。
 - 浏览器里解析器版本**不受本站控制**：worker 用 `micropip.install("pyulog")` 装的是
   PyPI 当时的最新版（除非配了 `NEXT_PUBLIC_PYULOG_WHEEL` 自托管）。所以报告里记的这个值
@@ -159,7 +159,7 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 - **验证**：`compare_baseline.py` 6 条日志零差异（它逐字段比 finding 的
   `id/ruleId/severity/tag/title/evidence/docUrl/suggestion`，**覆盖 `docUrl`**）；
   构建产物解析成对象后逐条与改名前**相等**（只有 key 顺序变了）；
-  `check-pyodide-px4log-engine.py` / `check_provider.py` / `build:kb --check` 全过。
+  `check-pyodide-px4log-engine.py` / `guard-px4log-provider.py` / `build:kb --check` 全过。
   **`derived-version`会变**（`rule_engine.py` 在哈希里），用户存档打开时自动重解析一次；
   `rules/*.yaml` 仍**不进**哈希，所以改名 / 改阈值不会让历史结论重算。
 - **顺带统一了分段格式**（同一批的第二笔提交，**只动空行、无语义变化**）：原先「每个顶层键前都空一行」
@@ -1291,7 +1291,7 @@ knowledge/px4/
    算子名拼错、表达式引用未声明变量同样失败
 2. **等价回归（核心）**：`compare_baseline.py` 要求 5 个日志输出与冻结基线逐条逐字段完全相同。
    基线：ce302d3b=9/F004、39f26cce=4/F001·F006·F009、95b077d9=0、两个 sample=0
-3. `run_checks_locally.py --probe-data` 结构不变
+3. `px4log_engine_runner.py --probe-data` 结构不变
 4. `tsc --noEmit` + `pnpm build`；`node tools/browser/check-upload.mjs <ulog> <png>` 浏览器端跑通
 5. 抽查：改 `rules/vibration.yaml` 的阈值 → 报告页 finding 文案随之变化
 

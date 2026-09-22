@@ -510,7 +510,7 @@ class Probe:
 PROBES: list[Probe] = [
     Probe(
         name="数据层自检拿到不存在的日志",
-        argv=[PY, "tools/calibrate/run_checks_locally.py", "--probe-data", "tools/calibrate/logs/__no_such_log__.ulg"],
+        argv=[PY, "tools/calibrate/px4log_engine_runner.py", "--probe-data", "tools/calibrate/logs/__no_such_log__.ulg"],
         marker="ERROR",
         needs=("numpy", "pyulog"),
     ),

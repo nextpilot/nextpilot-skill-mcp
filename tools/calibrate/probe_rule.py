@@ -16,7 +16,7 @@ from _logging import get_logger  # noqa: E402
 log = get_logger()
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from run_checks_locally import build_namespace  # noqa: E402
+from px4log_engine_runner import build_namespace  # noqa: E402
 
 
 def describe(a):

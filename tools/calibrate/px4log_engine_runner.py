@@ -1,8 +1,8 @@
 """本地校准/验证用：直接跑 engine/ 下的 Python 源，在真实 .ulg 上验证。
 
 用法：
-  python tools/calibrate/run_checks_locally.py <file.ulg> [more.ulg ...]
-  python tools/calibrate/run_checks_locally.py --probe-data <file.ulg> ...
+  python tools/calibrate/px4log_engine_runner.py <file.ulg> [more.ulg ...]
+  python tools/calibrate/px4log_engine_runner.py --probe-data <file.ulg> ...
 
 引擎实现在 engine/（本脚本直接读源码，改完即可跑）；**规则读构建产物**
 （web/workers/pyodide-px4log-engine.ts 的 `const rules = [...]`）。
@@ -128,12 +128,19 @@ def call(ns: dict, code: str):
 
 
 def probe_one(path: Path) -> dict:
-    """对数据层三个 API 做结构 / JSON 合法性 / 降采样点数的自检。"""
+    """对数据层三个 API 做结构 / JSON 合法性 / 降采样点数的自检。
+
+    注意：本函数只负责**数据层探查**（纯 driver 角色），断言检查由 main() 的
+    `--probe-data` 分支通过 `print_check` 完成。返回 dict 里附带 `_probe_errors`
+    收集探查过程中的非致命问题（如 series 返回 error 字段），供上层决定是否 fail。
+    """
     ns = build_namespace(path)
     manifest = call(ns, "np_manifest()")
     info = call(ns, "np_log_info()")
     topics = manifest["topics"]
-    # 抽一个有数据的 topic 验证 series
+
+    errors: list[str] = []
+
     sample = None
     for t in topics:
         if t["n"] > 2:
@@ -142,19 +149,15 @@ def probe_one(path: Path) -> dict:
     series = None
     if sample:
         fld = sample["fields"][0]["name"]
-        # `np_series` 收的是一份**请求 JSON**（契约见 pyodide-px4log-data.ts 的 `np_series`）：
-        # 面板要第几个实例、每条线怎么取，全在声明里。**别改回位置参数**——以前这里写的是
-        # `np_series(topic, instance, fields, max_points)`，签名改成请求体之后没人跟着改，
-        # 于是这一段**每次都以 TypeError 结束**；而 `main()` 又不看失败（见下），结果是
-        # "对 6 份日志全打 ERROR 却报 OK"（§6.6：恒绿的守卫和没写守卫，肉眼完全一样）。
-        # 后果不是崩溃，是 `series` 这一路**很久没被真的检过**——数据层坏掉也没人知道。
         req = {
             "instance": sample["instance"],
-            # 字段引用要带 topic（`_pick_ref` 收的是 `"topic.field"`，不是裸字段名）
             "ydata": [{"kind": "field", "fields": [f"{sample['topic']}.{fld}"]}],
         }
-        series = call(ns, f"np_series({json.dumps(json.dumps(req, ensure_ascii=False))}, 3000)")
-    # 自检
+        try:
+            series = call(ns, f"np_series({json.dumps(json.dumps(req, ensure_ascii=False))}, 3000)")
+        except Exception as exc:
+            errors.append(f"np_series 调用抛异常：{type(exc).__name__}: {exc}")
+
     checks = {
         "topics": len(topics),
         "messages": len(info["messages"]),
@@ -170,20 +173,45 @@ def probe_one(path: Path) -> dict:
     }
     if series is not None:
         if series.get("error"):
-            raise RuntimeError(f"np_series 报了错：{series['error']}")
-        # 确保无 NaN 泄漏（json 已把 NaN 转 null，这里只查点数）
+            errors.append(f"np_series 返回 error 字段：{series['error']}")
         checks["seriesField"] = sample["topic"] + "#" + str(sample["instance"]) + "." + fld
         checks["seriesPoints"] = len(series.get("t", []))
         checks["fullCount"] = series.get("fullCount")
-        # JSON 里不得出现 NaN/Infinity 字样（应已转 null）
         raw = json.dumps(series)
-        assert "NaN" not in raw and "Infinity" not in raw, "series 泄漏 NaN/Infinity"
-        assert checks["seriesPoints"] <= 3000, "降采样点数超标"
-        # "取到了但一个点都没有"和"没取到"是两回事，不许都给 0（§6.6 规则 5）
-        assert checks["seriesPoints"] > 0, f"series 一个点都没取到（field={checks['seriesField']}）"
+        if "NaN" in raw or "Infinity" in raw:
+            errors.append("series JSON 泄漏 NaN/Infinity（应已转 null）")
+        if checks["seriesPoints"] > 3000:
+            errors.append(f"降采样点数超标：{checks['seriesPoints']} > 3000")
+        if checks["seriesPoints"] == 0:
+            errors.append(f"series 一个点都没取到（field={checks['seriesField']}）")
     else:
-        raise RuntimeError(f"没能抽到任何有采样的 topic（topics={len(topics)}），series 这条路没被检")
+        errors.append(f"没能抽到任何有采样的 topic（topics={len(topics)}），series 这条路没被检")
+
+    checks["_probe_errors"] = errors
     return checks
+
+
+def _probe_checks(path: Path) -> tuple[list[tuple[str, str]], dict]:
+    """对一份日志跑 probe_one 并把结果拆成结构化 check 列表。"""
+    result = probe_one(path)
+    errors = result.pop("_probe_errors")
+    checks: list[tuple[str, str]] = []
+
+    checks.append(("topics > 0", "ok" if result["topics"] > 0 else "fail"))
+    checks.append(("messages > 0", "ok" if result["messages"] > 0 else "fail"))
+    checks.append(("params > 0", "ok" if result["params"] > 0 else "fail"))
+    checks.append(("phases >= 1", "ok" if result["phases"] >= 1 else "fail"))
+    checks.append(("sysInfoKeys 非空", "ok" if result["sysInfoKeys"] else "fail"))
+
+    has_series = "seriesField" in result
+    if has_series:
+        checks.append(("seriesPoints > 0", "ok" if result["seriesPoints"] > 0 else "fail"))
+        checks.append(("seriesPoints <= 3000", "ok" if result["seriesPoints"] <= 3000 else "fail"))
+        checks.append(("series JSON 无 NaN/Infinity", "ok" if not any("NaN/Infinity" in e for e in errors) else "fail"))
+
+    checks.append((f"np_series 无错误 ({'有抽中 topic' if has_series else '无可用 topic'})", "ok" if not errors else "fail"))
+
+    return checks, result
 
 
 def main(argv: list[str]) -> int:
@@ -194,17 +222,23 @@ def main(argv: list[str]) -> int:
     if not args:
         log.info(__doc__)
         return 2
-    mode = "探针数据（probe-data）" if probe else "本地回归"
-    log.info(f"=== {mode}：{len(args)} 份日志 ===")
+
+    if probe:
+        return _main_probe(args)
+    return _main_run(args)
+
+
+def _main_run(args: list[str]) -> int:
+    log.print_header(
+        "本地回归 (run_one)",
+        f"python {Path(__file__).name} {' '.join(args)}",
+    )
     failed = 0
     for name in args:
         path = Path(name)
         log.info(f"\n· {path.name}")
         try:
-            if probe:
-                log.info(json.dumps(probe_one(path), ensure_ascii=False, indent=2))
-            else:
-                log.info(json.dumps(run_one(path), ensure_ascii=False, indent=2))
+            log.info(json.dumps(run_one(path), ensure_ascii=False, indent=2))
         except Exception as exc:
             failed += 1
             log.error(f"ERROR: {type(exc).__name__}: {exc}")
@@ -213,6 +247,36 @@ def main(argv: list[str]) -> int:
     else:
         log.info(f"\n=== {len(args)} 份日志全部完成 ===")
     return 1 if failed else 0
+
+
+def _main_probe(args: list[str]) -> int:
+    log.print_header(
+        "数据层结构自检 (probe-data)",
+        f"python {Path(__file__).name} --probe-data {' '.join(args)}",
+    )
+
+    all_results: list[tuple[str, str]] = []
+    for name in args:
+        path = Path(name)
+        try:
+            checks, summary = _probe_checks(path)
+        except Exception as exc:
+            log.error(f"ERROR: {path.name} — {type(exc).__name__}: {exc}")
+            all_results.append((f"{path.name} 探查阶段抛异常", "fail"))
+            continue
+
+        log.info(f"\n· {path.name}")
+        total = len(checks)
+        for i, (name, status) in enumerate(checks, 1):
+            ok = status == "ok"
+            detail = ""
+            if not ok and name.startswith("np_series 无错误"):
+                detail = "探查阶段收集到的错误已在前面的 fail 中体现"
+            log.print_check(i, total, name, ok, detail=detail)
+        log.info(f"\n  摘要：{json.dumps(summary, ensure_ascii=False)}")
+        all_results.extend((f"{path.name} — {c}", s) for c, s in checks)
+
+    return log.print_summary(all_results, [])
 
 
 if __name__ == "__main__":

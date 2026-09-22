@@ -103,7 +103,7 @@
 | 10 | `tools/ci/check_hygiene.py` | 元检查 | **校验机制自己**还健康吗（悬空引用、静默失败、守卫恒真） | 4.2s |
 | 11 | `tools/calibrate/compare_baseline.py` | 基线比对 | 改规则后结论还准吗（6 份日志逐字段比对） | 3s |
 | 12 | `tools/calibrate/guard-px4log-provider.py` | 适配器契约 | 数据适配层契约还成立吗（逐份日志跑同一套断言） | 3s |
-| 13 | `tools/calibrate/run_checks_locally.py --probe-data` | 数据层自检 | 数据层结构自洽吗 | 3s |
+| 13 | `tools/calibrate/px4log_engine_runner.py --probe-data` | 数据层自检 | 数据层结构自洽吗 | 3s |
 | 14 | `tools/calibrate/lint_rules.py --strict` | 字段引用 lint | 规则里引用的**字段名真实存在**吗 | 2s |
 
 **⚠ 第 11~14 项只在你的开发机跑。** 它们要真实 `.ulg` 日志，而原始日志含 GPS 轨迹、

@@ -24,7 +24,7 @@ log = get_logger()
 
 # 复用同一套加载/执行逻辑，保证"基线跑的是什么，比对跑的就是什么"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import run_checks_locally as runner  # noqa: E402
+import px4log_engine_runner as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LOG_DIR = Path(__file__).resolve().parent / "logs"  # 校准用真实日志（不入库，需自备）

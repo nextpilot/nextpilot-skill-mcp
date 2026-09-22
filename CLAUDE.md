@@ -509,7 +509,7 @@
 > 第五、第六次（2026-09-18 晚，同一天内）：`track` 的"取不到要说清缺什么"那条契约，
 > **回归日志恰好有 GPS**，失败分支一次都不会被执行 → 守卫恒绿（做法：**构造反向用例**，
 > 改运行期配置把分支逼出来，见 `check-pyodide-px4log-engine.py` 的两道 probe）；以及
-> `run_checks_locally.py --probe-data` **对每一份日志都打 ERROR 却 `return 0`**——
+> `px4log_engine_runner.py --probe-data` **对每一份日志都打 ERROR 却 `return 0`**——
 > 它的 `np_series` 调用还停在旧的 4 参签名上，签名改成请求体之后没人跟着改，
 > 于是 `series` 那一路**很久没被真的检过**，而 `check_all.py` 只看退出码、一直报 OK。
 > **一次失败要不要算失败，是守卫的一部分**；只打印不计数等于没写。
@@ -648,7 +648,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 │   · compare_baseline.py                     │
 │     （6 条冻结日志基线逐字段比对）              │
 │   · guard-px4log-provider.py（适配器契约测试）        │
-│   · run_checks_locally.py --probe-data      │
+│   · px4log_engine_runner.py --probe-data      │
 │     （数据层结构自检 + 真抽一次 series）        │
 │   · lint_rules.py --strict                  │
 │     （字段引用 / 版本错配校验）                 │

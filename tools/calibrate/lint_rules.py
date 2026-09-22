@@ -38,7 +38,7 @@ from _logging import get_logger  # noqa: E402
 log = get_logger()
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import run_checks_locally as runner  # noqa: E402
+import px4log_engine_runner as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RULES_DIR = REPO_ROOT / "knowledge" / "px4" / "rules"

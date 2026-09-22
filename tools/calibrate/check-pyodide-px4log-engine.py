@@ -30,7 +30,7 @@ log = get_logger()
 # 数据配置的装配规则与本地回归共用一处（facts.yaml + plot/track.yml）——
 # 别在这里再手写一遍，两边不一致时本地跑得出、浏览器跑不出。
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import run_checks_locally as runner  # noqa: E402
+import px4log_engine_runner as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TS = REPO_ROOT / "web" / "workers" / "pyodide-px4log-engine.ts"

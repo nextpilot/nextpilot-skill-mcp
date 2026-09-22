@@ -69,7 +69,7 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 | lint | 有没有可疑写法 | `ruff check`（Py）、`eslint`（JS，**TS 暂不覆盖**，第 5 节） |
 | 类型 | 类型对得上吗 | `tsc --noEmit` |
 | 单测 | 算子与表达式求值对不对 | `pytest engine/tests` |
-| 契约 | 产物与源一致吗、产物合法吗 | `build:kb --check`、`check_artifact`、`check_engine_purity`、`check-skill-spec`、`check-mcp-spec` |
+| 契约 | 产物与源一致吗、产物合法吗 | `build:kb --check`、`check-pyodide-px4log-engine`、`check_engine_purity`、`check-skill-spec`、`check-mcp-spec` |
 | 守卫集 | 前端不许退化的那批断言还成立吗 | `test-issue-filer`（21 节） |
 | 元检查 | **校验机制自己**还健康吗 | `check_hygiene` |
 | 自证 | 守卫真的会红吗（不是恒绿） | `mutate_guards`（43 条变异） |
@@ -100,7 +100,7 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 | 类型 | `tsc --noEmit` | 2s | 每次 | push（另加 dev 的 `--watch`） |
 | 单测 | `pytest engine/tests`（算子 / CEL 沙箱） | 3s | 每次 | push |
 | 契约 | `build:kb --check`（产物 vs `knowledge/` 源） | 1s | 静态（pre-push 跳过） | CI |
-| 契约 | `check_artifact`（产物是合法 Python 且真执行） | 1s | 每次 | push |
+| 契约 | `check-pyodide-px4log-engine`（产物是合法 Python 且真执行） | 1s | 每次 | push |
 | 契约 | `check_engine_purity`（`engine/` 纯净性） | 1s | 每次 | push |
 | 契约 | `check-skill-spec` | 1s | 每次 | CI |
 | 契约 | `check-mcp-spec` | 1s | 每次 | CI |
@@ -108,7 +108,7 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 | 元检查 | `check_hygiene`（校验机制自身卫生） | 4s | 每次 | push |
 | 日志回归 | `compare_baseline` | 3s | 本地 push | **本地**（`.ulg` 不入库，第 9 节） |
 | 日志回归 | `guard-px4log-provider` | 3s | 本地 push | **本地**（同上） |
-| 日志回归 | `run_checks_locally --probe-data` | 3s | 本地 push | **本地**（同上） |
+| 日志回归 | `px4log_engine_runner --probe-data` | 3s | 本地 push | **本地**（同上） |
 | 日志回归 | `lint_rules --strict` | 2s | 本地 push | **本地**（同上） |
 | 构建 | `sync-content` + `build-knowledge` | — | dev / build | dev / build |
 | 构建 | `next build` | **144s** | CI（`--stage build`） | CI |
@@ -671,7 +671,7 @@ git checkout -- tools/ci/check_hygiene.py tools/ci/mutate_guards.py \
 ## 8. 复测方式
 
 项目 Python 是 `C:\Users\zhanfuyu\anaconda3\python.exe`（有 ruff / pytest / numpy / pyulog）。
-托管 Python 3.13 缺科学栈，`check_artifact` 与 `check_hygiene` 会假失败。
+托管 Python 3.13 缺科学栈，`check-pyodide-px4log-engine` 与 `check_hygiene` 会假失败。
 
 ```bash
 python tools/ci/check_all.py --stage push               # 本地快检（约 31s）
@@ -740,7 +740,7 @@ CI 里这 4 项**继续 SKIP**。补充日志集**暂不做**。
 | --- | --- | --- | --- |
 | 冻结基线逐字段比对 | `compare_baseline` | 3s | 6 份日志在 `tools/calibrate/logs/` |
 | 适配器契约 | `guard-px4log-provider` | 3s | 同上 |
-| probe-data | `run_checks_locally --probe-data` | 3s | 同上 |
+| probe-data | `px4log_engine_runner --probe-data` | 3s | 同上 |
 | 字段引用 lint | `lint_rules --strict` | 2s | 同上 |
 
 4 项共 11s，全部秒级，**留在本地 push 完全不影响"检查不卡进度"**。

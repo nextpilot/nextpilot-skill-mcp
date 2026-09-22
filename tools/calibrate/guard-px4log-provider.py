@@ -24,7 +24,7 @@ from _logging import get_logger  # noqa: E402
 log = get_logger()
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import run_checks_locally as runner  # noqa: E402
+import px4log_engine_runner as runner  # noqa: E402
 
 TOTAL_STEPS = 8
 

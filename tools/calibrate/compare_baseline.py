@@ -23,7 +23,7 @@ from _logging import get_logger  # noqa: E402
 log = get_logger()
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import run_checks_locally as runner  # noqa: E402
+import px4log_engine_runner as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LOG_DIR = Path(__file__).resolve().parent / "logs"  # 校准用真实日志（不入库，需自备）

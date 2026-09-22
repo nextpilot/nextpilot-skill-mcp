@@ -9,7 +9,7 @@
 # 仓库校验：ruff 管风格与真 bug（配置见 pyproject.toml）
 ruff==0.16.7
 
-# 仓库校验：check-pyodide-px4log-engine.py 经 tools/calibrate/run_checks_locally.load_facts_payload()
+# 仓库校验：check-pyodide-px4log-engine.py 经 tools/calibrate/px4log_engine_runner.load_facts_payload()
 # 读 facts.yaml 与 plot/track.yml。**CI 也要这一条**，所以不能只写在 calibrate 那边。
 PyYAML==6.0
 
