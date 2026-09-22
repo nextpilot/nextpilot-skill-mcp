@@ -76,11 +76,13 @@ pnpm dev
 ## 校验与 CI
 
 所有校验收在**一个入口**（CI、pre-push hook 与本地跑的是同一份清单；要加一项校验只改
-`tools/ci/check_all.py` 一处，CI 自动跟着变）：
+`tools/ci/checklist.yml` 一处，CI 自动跟着变）：
 
 ```bash
-python tools/ci/check_all.py                 # 常规（本机有日志时连带跑日志类回归）
-python tools/ci/check_all.py --with-build    # 再加 next build（CI 用，本地太慢）
+python tools/ci/check_all.py --stage push        # 本地快检（秒级，pre-push hook 跑的就是它）
+python tools/ci/check_all.py --stage ci          # 云端那批（产物比对、守卫自测、依赖审计）
+python tools/ci/check_all.py --stage build,ci    # 再加 next build（CI 用，本地太慢）
+python tools/ci/check_all.py --list-stages       # 只看阶段地图，不执行
 ```
 
 分两组，**区别在于是否需要真实 `.ulg` 日志**：

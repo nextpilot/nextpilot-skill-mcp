@@ -164,7 +164,7 @@ GET  /issue-probe?write=1    确认写入真的通（需要 ISSUE_DEBUG=1）—�
 
 | 文件 | 触发 | 做什么 |
 | --- | --- | --- |
-| `.github/workflows/ci.yml` | push 到 master / PR / 手动 | 跑 `tools/ci/check_all.py --with-build`（含 ruff、产物比对、`tsc --noEmit`、`next build`） |
+| `.github/workflows/ci.yml` | push 到 master / PR / 手动 | 跑 `tools/ci/check_all.py --stage build,ci --with-e2e`（含 ruff、产物比对、`tsc --noEmit`、`next build`、E2E 冒烟、依赖审计） |
 | `.github/workflows/deploy.yml` | CI 跑完且成功（`workflow_run`）/ 手动 / 同仓 PR | `edgeone pages deploy` 到 EdgeOne Pages，生产环境加 `/ping` 冒烟 |
 
 - **部署等 CI 绿了才发**：`workflow_run` 无法在 `on` 里过滤结果，判据写在 job 的 `if` 里（只认 `conclusion == 'success'`）。
@@ -185,4 +185,4 @@ GET  /issue-probe?write=1    确认写入真的通（需要 ISSUE_DEBUG=1）—�
 > 或在 Gitee 侧另写一份等价配置（但那样就破了「校验命令只写一处」的约定，CI 与本地会分成两处维护）。
 > 未迁移前，云端门禁实际处于**未生效**状态，质量仍只靠本机 `.githooks/pre-push` 拦。
 
-改动校验清单时只改 `tools/ci/check_all.py` 一处，两个 workflow 都跟着变——命令不要在 workflow 里另抄一份。
+改动校验清单时只改 `tools/ci/checklist.yml` 一处，两个 workflow 与本地 hook 都跟着变——命令不要在 workflow 里另抄一份。
