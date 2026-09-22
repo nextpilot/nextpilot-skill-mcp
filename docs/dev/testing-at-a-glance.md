@@ -10,30 +10,28 @@
 
 **你敲**：`pnpm dev`
 
-**跑这三个**（`package.json` 里的 `dev` 脚本依次调）：
+它**一次起两段**（`web/scripts/dev.mjs`）：先同步 + 构建，再同时起内容热拷贝与 Next。
 
 | 文件 | 是什么 | 干什么 |
 | --- | --- | --- |
-| `web/scripts/sync-content.mjs` | 内容同步脚本 | 把内容真源（`docs/guide`、`knowledge/skills`、`knowledge/mcp`）拷进 `web/.generated/`。因为 `web/` 是独立项目、部署时只上传它自己，运行期读不到仓库别处。**只在 `pnpm dev` 启动时拷一次**，之后不跟着变（见下面那个坑） |
+| `web/scripts/dev.mjs` | **dev 启动器** | 顺序：① `sync-content` ② `build-knowledge` ③ 并起 `sync-content --watch` 与 `next dev`。Ctrl+C 一起停 |
+| `web/scripts/sync-content.mjs` | 内容同步脚本 | 把内容真源（`docs/guide`、`knowledge/skills`、`knowledge/mcp`）拷进 `web/.generated/`。因为 `web/` 是独立项目、部署时只上传它自己，运行期读不到仓库别处 |
 | `web/scripts/build-knowledge.mjs` | 知识构建脚本 | 把引擎源码与人工经验拼成运行时的产物（见阶段 2）。**1744 行全是 `throw`**：规则缺字段、算子没注册、表达式编译不过，这里就报错 |
-| `next dev` | Next.js 开发服务器 | 起热更新的网站。它热更新的是 `web/` 自己的代码，**盯不到你改的内容真源** |
+| `next dev` | Next.js 开发服务器 | 起热更新的网站 |
 
-**同时另开两个终端**（都要开）：
+**另开一个终端**（可选，看类型错用）：`tsc --noEmit --watch`。
 
-```bash
-tsc --noEmit --watch   # 存盘就报类型错
-pnpm sync:watch        # 改内容真源时用：存盘即重拷，不用重启 dev
-```
+**热更新分两段**，`pnpm dev` 现在两段都拉起来了：
 
-> **两个坑**
+| 你改了 | 谁负责 |
+| --- | --- |
+| `web/` 里的代码（`.tsx` / `.css`） | Next 自己热更新 |
+| 内容真源（`docs/guide/*.mdx`、`knowledge/skills/`、`knowledge/mcp/`） | `sync-content --watch` 重拷进 `.generated/`，Next 才看得到 |
+
+> **只想开一半**：`pnpm dev:no-watch` —— 同步 + 构建 + `next dev`，不挂 watch。
+> **单独开着内容热拷贝**：`pnpm sync:watch`（另开终端时用）。
 >
-> **1. 改内容真源，页面不会自己变。** `docs/guide/*.mdx`、`knowledge/skills/`、
-> `knowledge/mcp/` 只在 `pnpm dev` 启动时被拷进 `.generated/` 一次；之后 Next 盯的是
-> `.generated/`，不是你改的真源。所以**写内容时必须另开 `pnpm sync:watch`**
-> （= `node scripts/sync-content.mjs --watch`），它会打 `[sync] docs/guide/basics.mdx 变了，重拷`。
-> 不跑它，改了没反应不是 bug。
->
-> **2. 起不来往往不是 Next.js 的问题，是知识库写错了。** 报错会直指哪个文件哪个字段。
+> **起不来往往不是 Next.js 的问题，是知识库写错了。** 报错会直指哪个文件哪个字段。
 
 ---
 
@@ -201,9 +199,10 @@ pnpm test:e2e            # 全量 42 条
 
 ## 附 · 几个坑
 
-- **改内容真源不会自动生效**：`docs/guide`、`knowledge/skills`、`knowledge/mcp` 只在
-  `pnpm dev` 启动时被拷进 `web/.generated/`。写内容时要另开 `pnpm sync:watch`。
-  （`web/` 自己的代码则由 Next 正常热更新。）
+- **内容真源由 `sync-content --watch` 负责同步**（`pnpm dev` 已带上）。若用 `pnpm dev:no-watch`，
+  改 `docs/guide`、`knowledge/skills`、`knowledge/mcp` 后页面不会变，要另开 `pnpm sync:watch`。
+- **`pnpm dev` 会阻止第二个 dev server**：Next 16 按**目录**判重（不是按端口），
+  同一目录已有 dev server 时会直接报错退出，换 `PORT` 没用。
 - **两份同名的 `sample.ulg`**：`tools/calibrate/logs/sample.ulg`（4.0MB，**不入库**，
   日志回归用）vs `web/e2e/fixtures/sample.ulg`（921KB，**已入库**，CI 的 E2E 用）。
 - **`check_secrets` 扫全仓**（含 `.md`）—— 文档里留一句假密钥同样会被抓。
