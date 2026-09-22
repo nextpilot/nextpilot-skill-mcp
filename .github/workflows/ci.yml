@@ -60,13 +60,60 @@ jobs:
         working-directory: web
         run: pnpm install --frozen-lockfile
 
-      # --with-build：CI 才跑 next build（真编译），本地默认跳过（太慢，已挂在 pre-push 的
-      # 那套里没有它）。其余校验项见 tools/ci/check_all.py
-      - name: 仓库校验
-        run: python tools/ci/check_all.py --with-build
+      # E2E 只在云端跑：「上传 .ulg 完成分析」自带 420s 超时，挂本地 pre-push 会让每次 push
+      # 堵几分钟。
+      - name: 装 Playwright 浏览器
+        working-directory: web
+        run: pnpm exec playwright install --with-deps chromium
+
+      # --stage build 必须显式列出：`--stage ci` 不含 build，否则每次 CI 会少跑真编译。
+      # --with-e2e 是步骤级开关而非阶段开关——它同时控制两条 E2E：
+      #   playwright-smoke（@smoke，约 1~2 分钟）与 playwright-analyze（日志分析全流程，约 5~7 分钟）。
+      # 后者上传的是入库的 web/e2e/fixtures/sample.ulg，不依赖本机日志，云端能真跑。
+      # 不传这个 flag 两步都会静默跳过（--list-stages 里标 [off] 就是这个意思）。
+      - name: 仓库校验（含 E2E 冒烟 + 日志分析全流程）
+        run: python tools/ci/check_all.py --stage build,ci --with-e2e
 
       # 日志类那组在 CI 里必然 SKIP，把这句话顶到汇总最上面，免得"全绿"被误读成回归通过
       - name: 提醒：日志类回归未跑
         if: always()
         run: |
           echo "::notice::CI 全绿不等于回归过了 —— 需要真实 .ulg 的 4 项（冻结基线比对 / 适配器契约 / probe-data / lint_rules --strict）在本机 pre-push 才跑：python tools/ci/check_all.py"
+
+  # 守卫自证：每条守卫都要能先红一次（CLAUDE.md §6.6）。
+  # 单独成 job 是时长决定的：42 条变异各要完整跑一遍对应守卫，全套约 20 分钟，
+  # 与主 job 并行才各有独立超时预算。
+  guard-self-proof:
+    name: 守卫自证（mutate_guards）
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: 装 Python 校验工具
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: 装 web 依赖
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      # 产物侧那几条变异要真执行编译产物（缺 numpy / pyulog 会 ModuleNotFoundError），
+      # 且 CI 里没有真实 .ulg —— 那几条会自己 SKIP，不会伪装成通过。
+      - name: 每条守卫都要先红一次
+        run: python tools/ci/check_all.py --with-mutate

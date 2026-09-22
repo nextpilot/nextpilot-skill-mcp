@@ -1,29 +1,51 @@
-#!/bin/bash
-# Pre-push hook — fast mode (skip heavy static checks)
-#   SKIP_E2E=1 git push          # also skip E2E
-#   SKIP_LOG_ANALYSIS=1 git push  # skip log-analysis smoke E2E
-#   FULL_PUSH=1 git push          # run everything (like CI)
+#!/usr/bin/env python
+"""Pre-push hook: run the local fast checks.
 
-set -e
+  git push                    -> check_all.py --stage push          (seconds)
+  WITH_E2E=1 git push         -> --stage push,ci --with-e2e
+  FULL_PUSH=1 git push        -> --stage push,ci,build --with-e2e (everything CI does)
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+To bypass this hook: git push --no-verify
 
-cd "$REPO_ROOT"
+Why the checks are addressed by stage rather than by flags: checklist.yml owns
+what each stage contains, so this hook only decides *when* to run one.
+"""
 
-if [ "$FULL_PUSH" = "1" ]; then
-  echo "===== FULL_PUSH=1: full check_all.py (like CI) ====="
-  python tools/ci/check_all.py --with-e2e
-  echo "===== OK ====="
-  exit 0
-fi
+from __future__ import annotations
 
-if [ "$SKIP_E2E" = "1" ]; then
-  echo "===== SKIP_E2E=1: check_all.py --pre-push only ====="
-  python tools/ci/check_all.py --pre-push
-  echo "===== OK ====="
-  exit 0
-fi
+import os
+import subprocess
+import sys
+from pathlib import Path
 
-echo "===== pre-push check (check_all.py --pre-push --with-e2e) ====="
-python tools/ci/check_all.py --pre-push --with-e2e
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _python_with_ruff import ensure_python_with_ruff  # noqa: E402
+
+
+def main() -> int:
+    root = Path(__file__).resolve().parents[1]
+    script = str(root / "tools" / "ci" / "check_all.py")
+
+    with_e2e = os.environ.get("WITH_E2E") == "1"
+    if os.environ.get("FULL_PUSH") == "1":
+        stages = ["push", "ci", "build"]
+        with_e2e = True
+    elif with_e2e:
+        stages = ["push", "ci"]
+    else:
+        stages = ["push"]
+
+    cmd = [sys.executable, script, "--stage", ",".join(stages)]
+    # --with-e2e is orthogonal to the stage list: it toggles steps *inside* the ci
+    # stage. Deriving it from `"ci" not in stages` would silently drop it in every
+    # case that matters -- the E2E steps live in ci, so any run that wants them
+    # already has ci in the list.
+    if with_e2e:
+        cmd.append("--with-e2e")
+
+    print(f"[pre-push] {Path(script).name} {' '.join(cmd[2:])}")
+    return subprocess.run(cmd, cwd=str(root), check=False).returncode
+
+
+if __name__ == "__main__":
+    raise SystemExit(ensure_python_with_ruff(main))

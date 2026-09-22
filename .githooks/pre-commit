@@ -1,51 +1,120 @@
 #!/usr/bin/env python
-"""Pre-commit hook: auto-format staged Python files with ruff.
+"""Pre-commit hook: format staged files.
 
-If formatting changes any file, the changes are re-staged automatically.
+  .py                        -> ruff format, then ruff check (no --fix; see below)
+  .ts/.tsx/.js/.mjs/.css     -> prettier --write
+  .ts/.tsx                   -> eslint --fix
+
+Files changed by formatting are re-staged, so what you commit is what you just saw.
 To bypass this hook: git commit --no-verify
+
+Why --fix is not passed to ruff: engine/ is assembled from fragments, and ruff's
+autofixes delete things there. eslint --fix is safe (its autofixable rules are
+formatting-class), ruff check --fix is not.
+
+Usage: called by git; not meant to be run by hand.
 """
 
+from __future__ import annotations
+
+import shutil
 import subprocess
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _python_with_ruff import ensure_python_with_ruff  # noqa: E402
+
+PY_FILES = (".py",)
+FRONTEND_FILES = (".ts", ".tsx", ".js", ".mjs", ".css")
 
 
-def run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, check=False, capture_output=True, text=True, **kwargs)
+def run(cmd: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess:
+    return subprocess.run(cmd, check=False, capture_output=True, text=True, cwd=cwd, encoding="utf-8", errors="replace")
 
 
 def main() -> int:
-    # Get list of staged Python files
+    root = Path(__file__).resolve().parents[1]
     result = run(["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"])
-    staged_files = [f for f in result.stdout.splitlines() if f.endswith(".py")]
+    staged = [f for f in result.stdout.splitlines() if f.strip()]
 
-    if not staged_files:
+    py_files = [f for f in staged if f.endswith(PY_FILES)]
+    fe_files = [f for f in staged if f.endswith(FRONTEND_FILES)]
+    ts_files = [f for f in staged if f.endswith((".ts", ".tsx"))]
+
+    if not py_files and not fe_files:
         return 0
 
-    print("[pre-commit] Formatting staged Python files with ruff...")
+    if py_files:
+        print("[pre-commit] ruff format + check on staged Python files...")
+        fmt = run([sys.executable, "-m", "ruff", "format"] + py_files)
+        if fmt.returncode != 0:
+            print(fmt.stdout)
+            print(fmt.stderr, file=sys.stderr)
+            return 1
+        chk = run([sys.executable, "-m", "ruff", "check"] + py_files)
+        if chk.returncode != 0:
+            print(chk.stdout)
+            print(chk.stderr, file=sys.stderr)
+            return 1
 
-    # Format only staged files
-    fmt = run([sys.executable, "-m", "ruff", "format"] + staged_files)
-    if fmt.returncode != 0:
-        print(fmt.stdout)
-        print(fmt.stderr, file=sys.stderr)
-        return 1
+    if fe_files:
+        # Run from web/: prettier resolves .prettierrc there, and eslint needs the
+        # flat config next to it. Paths are relative to the repo root, so convert.
+        web = root / "web"
+        prettier = web / "node_modules" / "prettier" / "bin" / "prettier.cjs"
+        if prettier.exists():
+            rel = [str((root / f).resolve().relative_to(web)).replace("\\", "/") for f in fe_files]
+            print("[pre-commit] prettier --write on staged frontend files...")
+            pw = run([_node(), str(prettier), "--write", *rel], cwd=web)
+            if pw.returncode != 0:
+                print(pw.stdout)
+                print(pw.stderr, file=sys.stderr)
+                return 1
+        else:
+            print("[pre-commit] prettier not installed in web/ -- skipping frontend format.")
 
-    # Re-stage any files that were modified by formatting
-    add = run(["git", "add"] + staged_files)
+    if ts_files:
+        web = root / "web"
+        eslint = web / "node_modules" / "eslint" / "bin" / "eslint.js"
+        if eslint.exists():
+            rel = [str((root / f).resolve().relative_to(web)).replace("\\", "/") for f in ts_files]
+            print("[pre-commit] eslint --fix on staged TS files...")
+            ef = run([_node(), str(eslint), "--fix", *rel], cwd=web)
+            if ef.returncode != 0:
+                print(ef.stdout)
+                print(ef.stderr, file=sys.stderr)
+                return 1
+        else:
+            print("[pre-commit] eslint not installed in web/ -- skipping TS lint.")
+
+    # Re-stage anything the formatters rewrote, so the commit matches the working tree.
+    touched = py_files + fe_files
+    add = run(["git", "add", "--"] + touched)
     if add.returncode != 0:
         print(add.stderr, file=sys.stderr)
-        return 1
-
-    print("[pre-commit] Running ruff check...")
-    chk = run([sys.executable, "-m", "ruff", "check"] + staged_files)
-    if chk.returncode != 0:
-        print(chk.stdout)
-        print(chk.stderr, file=sys.stderr)
         return 1
 
     print("[pre-commit] Done.")
     return 0
 
 
+def _node() -> str:
+    node = shutil.which("node")
+    if node:
+        return node
+    # Git starts hooks with a bare PATH; fall back to the managed runtime.
+    for candidate in (
+        Path.home() / ".workbuddy" / "binaries" / "node" / "versions",
+        Path("C:/Program Files/nodejs"),
+    ):
+        if candidate.is_dir():
+            for exe in sorted(candidate.glob("*/node.exe"), reverse=True):
+                return str(exe)
+            if (candidate / "node.exe").exists():
+                return str(candidate / "node.exe")
+    return "node"
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(ensure_python_with_ruff(main))

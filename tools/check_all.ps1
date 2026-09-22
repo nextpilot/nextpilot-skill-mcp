@@ -1,101 +1,45 @@
-# NextPilot Skill local full check script
-# This wraps the canonical python tools/ci/check_all.py and adds web-specific checks:
-#   - ESLint static analysis
-#   - E2E smoke tests (optional, requires dev server)
+# 开发机上的 Windows 包装脚本 —— 只做一件事：把开关翻译成 --stage，转调 check_all.py。
 #
-# Usage:
-#   .\tools\check_all.ps1                  # base checks + ESLint
-#   .\tools\check_all.ps1 -WithE2E         # base checks + ESLint + E2E
-#   .\tools\check_all.ps1 -WithBuild       # base checks + ESLint + next build
-#   .\tools\check_all.ps1 -SkipLogs        # skip .ulg-dependent checks
+# 为什么不在这里再写一遍 eslint / E2E 的命令：那样等于给同一批检查建第二个事实源，
+# 两处必然漂移，最后变成"哪个绿算绿"说不清。检查内容全部由 tools/ci/checklist.yml 决定，
+# 这个脚本只决定跑哪个阶段。
+#
+# 用法：
+#   .\tools\check_all.ps1                  # push 阶段（本地快检，秒级）
+#   .\tools\check_all.ps1 -Stage ci        # ci 阶段（云端那批）
+#   .\tools\check_all.ps1 -Stage push,ci   # 两者都跑
+#   .\tools\check_all.ps1 -WithBuild       # 额外加 build 阶段（next build，约 144s）
+#   .\tools\check_all.ps1 -WithE2E         # 额外跑 E2E 冒烟（--with-e2e 是步骤级开关）
+#   .\tools\check_all.ps1 -SkipLogs        # 跳过依赖 .ulg 的那几项
 param(
-    [switch]$WithE2E,
+    [string[]]$Stage = @("push"),
     [switch]$WithBuild,
+    [switch]$WithE2E,
     [switch]$SkipLogs
 )
 
 $ErrorActionPreference = "Continue"
 $ROOT = Split-Path -Parent $PSScriptRoot
-$Failed = @()
-$Passed = @()
 
-function Run-Step($Label, $ScriptBlock) {
-    Write-Host "  [$Label]" -ForegroundColor Cyan
-    try {
-        & $ScriptBlock
-        if ($LASTEXITCODE -eq 0) {
-            $script:Passed += $Label
-            Write-Host "    OK" -ForegroundColor Green
-        } else {
-            $script:Failed += $Label
-            Write-Host "    FAIL (exit=$LASTEXITCODE)" -ForegroundColor Red
-        }
-    } catch {
-        $script:Failed += $Label
-        Write-Host "    FAIL $_" -ForegroundColor Red
-    }
+$stages = @($Stage)
+if ($WithBuild -and ($stages -notcontains "build")) {
+    $stages += "build"
 }
 
-# ============================================================
-# Group 1: Canonical Python checks (via check_all.py)
-# ============================================================
-Write-Host "`n=== Group 1: Python canonical checks (check_all.py) ===" -ForegroundColor Yellow
-
-$checkAllArgs = @("tools/ci/check_all.py")
+$checkAllArgs = @("tools/ci/check_all.py", "--stage", ($stages -join ","))
+if ($WithE2E) { $checkAllArgs += "--with-e2e" }
 if ($SkipLogs) { $checkAllArgs += "--skip-logs" }
-if ($WithBuild) { $checkAllArgs += "--with-build" }
 
-Run-Step "Python CI check_all.py" {
-    Push-Location $ROOT
-    python @checkAllArgs
-    Pop-Location
-}
+Write-Host "`n=== check_all.py --stage $($stages -join ',') ===" -ForegroundColor Yellow
 
-# ============================================================
-# Group 2: Web-specific checks (ESLint)
-# ============================================================
-Write-Host "`n=== Group 2: Web-specific checks ===" -ForegroundColor Yellow
+Push-Location $ROOT
+python @checkAllArgs
+$code = $LASTEXITCODE
+Pop-Location
 
-Run-Step "ESLint (eslint .)" {
-    Push-Location (Join-Path $ROOT "web")
-    pnpm exec eslint . --max-warnings 50
-    Pop-Location
-}
-
-# ============================================================
-# Group 3: E2E smoke tests (optional, needs dev server)
-# ============================================================
-if ($WithE2E) {
-    Write-Host "`n=== Group 3: E2E Smoke Tests ===" -ForegroundColor Yellow
-
-    Run-Step "E2E pages (key page render)" {
-        Push-Location (Join-Path $ROOT "web")
-        pnpm exec playwright test pages.spec.ts
-        Pop-Location
-    }
-
-    Run-Step "E2E analyze flow" {
-        Push-Location (Join-Path $ROOT "web")
-        pnpm exec playwright test analyze.spec.ts
-        Pop-Location
-    }
-}
-
-# ============================================================
-# Summary
-# ============================================================
-Write-Host "`n=== Check Summary ===" -ForegroundColor Yellow
-Write-Host "  Passed: $($Passed.Count) items" -ForegroundColor Green
-if ($Passed.Count) { $Passed | ForEach-Object { Write-Host "    + $_" -ForegroundColor Green } }
-
-if ($Failed.Count) {
-    Write-Host "  Failed: $($Failed.Count) items" -ForegroundColor Red
-    $Failed | ForEach-Object { Write-Host "    - $_" -ForegroundColor Red }
-}
-
-if ($Failed.Count -gt 0) {
-    Write-Host "`n$($Failed.Count) check(s) failed. Please fix and retry." -ForegroundColor Red
-    exit 1
+if ($code -ne 0) {
+    Write-Host "`nCheck(s) failed (exit=$code). Fix and retry." -ForegroundColor Red
+    exit $code
 }
 
 Write-Host "`nAll checks passed!" -ForegroundColor Green

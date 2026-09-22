@@ -1,0 +1,83 @@
+#!/usr/bin/env python
+"""Commit-msg hook: enforce the Conventional Commits header this repo already uses.
+
+Accepts:   feat|fix|chore|docs|refactor|perf|style|test|build|ci|revert
+           with an optional lowercase scope:  feat(web): ..., chore: ...
+Rejects:   anything else, plus headers longer than 72 characters.
+
+To bypass this hook: git commit --no-verify
+
+Why round brackets only: the Conventional Commits spec is often quoted with
+square brackets (`feat[web]: ...`), but square brackets are an escaping hazard
+in both `sh` and Git config, and all 15 real commits in this repo use round
+ones. Encode the style actually in use, not the style in the documentation.
+
+Why the body is not checked: how much detail a commit body carries is the
+author's call. Policing it only teaches people to write filler.
+"""
+
+from __future__ import annotations
+
+import re
+import sys
+
+HEADER = re.compile(
+    r"^(?:feat|fix|chore|docs|refactor|perf|style|test|build|ci|revert)"
+    r"(?:\([a-z0-9-]+\))?: .+"
+)
+
+# Git's own automatic messages; they have no author to reformat.
+EXEMPT_PREFIXES = ("Merge ", "Revert ", "revert ", "fixup!", "squash!")
+
+MAX_HEADER = 72
+
+
+def check(message: str) -> str | None:
+    """Return a failure reason, or None when the message is acceptable."""
+    header = message.splitlines()[0].strip() if message.strip() else ""
+
+    if not header:
+        return "commit message is empty"
+
+    if header.startswith(EXEMPT_PREFIXES):
+        return None
+
+    if not HEADER.match(header):
+        return (
+            "header must look like `type(scope): subject` or `type: subject`\n"
+            "  types: feat fix chore docs refactor perf style test build ci revert\n"
+            "  example: feat(web): add smoke tags to critical pages"
+        )
+
+    if len(header) > MAX_HEADER:
+        return f"header is {len(header)} characters; keep it within {MAX_HEADER}"
+
+    return None
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) < 2:
+        return 0
+
+    path = argv[1]
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            message = f.read()
+    except OSError as exc:
+        print(f"[commit-msg] cannot read {path}: {exc}", file=sys.stderr)
+        return 0
+
+    # `git commit -m` leaves comments and the diff block for `git commit -v`.
+    lines = [ln for ln in message.splitlines() if not ln.startswith("#")]
+    reason = check("\n".join(lines))
+
+    if reason is None:
+        return 0
+
+    print(f"[commit-msg] rejected: {reason}", file=sys.stderr)
+    print("[commit-msg] bypass with: git commit --no-verify", file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))

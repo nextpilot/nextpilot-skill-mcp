@@ -1,7 +1,15 @@
 # tools/ci/checklist.yml
-# Repository validation checklist
+# Repository validation checklist -- organised by stage.
+#
+# 清单即阶段地图：读这个文件就能看出"哪个阶段跑哪些检查"。
+# 三个阶段（dev / commit / deploy）以空阶段占位，因为它们各自的检查不住在这里：
+#   dev    -- `pnpm dev` 与 `tsc --noEmit --watch`（常驻进程，无退出码）
+#   commit -- .githooks/pre-commit（对 staged 文件跑 ruff / prettier，独立脚本）
+#   deploy -- .github/workflows/deploy.yml 的 live E2E（在 workflow 里）
+# 这里只放"一次执行、退出码表示成败"的项，也就是 check_all.py 能驱动的那部分。
 #
 # Each stage has:
+#   id          - stage id, matched by `check_all.py --stage <id>` (never change)
 #   stage       - stage display name
 #   description - optional stage description
 #   critical    - if true, stage failure stops execution immediately
@@ -20,6 +28,8 @@
 # Placeholders (resolved at runtime):
 #   {PYTHON}   - Python interpreter path (sys.executable)
 #   {NODE}     - Node.js executable (shutil.which("node"))
+#   {PNPM}     - pnpm executable (shutil.which("pnpm")); pnpm is a global tool with no
+#                path under web/node_modules, so it must go through PATH
 #   {ROOT}     - repository root directory
 #   {WEB}      - ROOT / "web"
 #   {LOGS}     - log file paths (space-separated, for log-dependent steps)
@@ -29,27 +39,47 @@
 # `when` values: Python expressions evaluated with `args` (argparse.Namespace) and `has_logs` (bool)
 #   Examples:
 #     "True"                              - always run (same as omitting when)
-#     "not args.pre_push"                 - skip in pre-push mode
 #     "args.with_build"                   - only with --with-build
-#     "args.with_e2e and has_logs"        - compound condition (AND)
+#     "args.with_mutate"                  - only with --with-mutate
 #     "args.with_build or args.with_e2e"  - compound condition (OR)
+#
+# 阶段归属由 stage 决定，不再靠 `when` 表达"哪个阶段跑"（那是 --stage 的职责）。
+# `when` 只表达"这一步在什么条件下跑"，如 `has_logs`（日志在不在本机）。
 #
 # To add a new check: add a step entry here, that's it.
 
 jobs:
-  - stage: "Toolchain prerequisites"
-    description: "Verify that all required tools and SDKs are installed with correct versions"
-    critical: true
-    steps:
-      - id: "check_prereq"
-        name: "Toolchain prerequisites"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/ci/check_prereq.py", "{ENV.WITH_LOGS}"]
-        hint: "One or more required tools are missing or have incorrect versions. Install the missing prerequisites as listed above, then re-run."
+  - id: dev
+    stage: "Development"
+    description: "常驻进程，不在本清单里 —— `pnpm dev` 与 `tsc --noEmit --watch`（另开终端）"
+    steps: []
 
-  - stage: "Static checks"
-    description: "Code style, linting, type checking, and project-structure validations"
+  - id: commit
+    stage: "Commit"
+    description: "对 staged 文件格式化 —— 在 .githooks/pre-commit 里，不调 check_all.py"
+    steps: []
+
+  - id: build
+    stage: "Site build"
+    description: "Full Next.js production build (slow; CI always, locally on demand)"
     steps:
+      - id: "next-build"
+        name: "Site build (next build)"
+        timeout: 300
+        workdir: "{WEB}"
+        command: ["{NODE}", "node_modules/next/dist/bin/next", "build"]
+        hint: "Review the Next.js build errors above. Run `npx next build` locally for detailed output."
+
+  - id: push
+    stage: "Push"
+    description: "Local pre-push: fast static checks plus the log regression (seconds each)"
+    steps:
+      - id: "check-secrets"
+        name: "No committed credentials (check_secrets)"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "tools/ci/check_secrets.py"]
+        hint: "A credential-shaped value was found in a tracked file. Move it to an environment variable; if it is a legitimate placeholder, add it to the allowlist in tools/ci/check_secrets.py."
+
       - id: "ruff-format"
         name: "Python style (ruff format --check)"
         workdir: "{ROOT}"
@@ -86,6 +116,12 @@ jobs:
         command: ["{NODE}", "node_modules/typescript/bin/tsc", "--noEmit"]
         hint: "Fix the TypeScript errors listed above. Run `npx tsc --noEmit --pretty` locally for detailed output."
 
+      - id: "prettier-check"
+        name: "Frontend style (prettier --check)"
+        workdir: "{WEB}"
+        command: ["{NODE}", "node_modules/prettier/bin/prettier.cjs", "--check", "."]
+        hint: "Run `pnpm format` to format the frontend. Generated files are excluded via .prettierignore."
+
       - id: "eslint"
         name: "TypeScript lint (eslint)"
         workdir: "{WEB}"
@@ -98,52 +134,8 @@ jobs:
         command: ["{PYTHON}", "tools/ci/check_hygiene.py"]
         hint: "Review the hygiene violations listed above and fix them. Common issues: dangling section references, silent failures, stale freshness gates."
 
-      - id: "build-kb-parity"
-        name: "Build contract vs artifact parity (build:kb --check)"
-        when: "not args.pre_push"
-        workdir: "{WEB}"
-        command: ["{NODE}", "scripts/build-knowledge.mjs", "--check"]
-        hint: "The built knowledge base differs from the committed artifact. Run `node scripts/build-knowledge.mjs` locally and commit the updated artifact."
-
-      - id: "test-issue-filer"
-        name: "Issue-filer self-test (fingerprint / scrub / allowlist / guards)"
-        when: "not args.pre_push"
-        workdir: "{WEB}"
-        command: ["{NODE}", "scripts/test-issue-filer.mjs"]
-        hint: "Review the test output above for specific failures in fingerprint / scrub / allowlist / guard logic."
-
-      - id: "mutate-guards"
-        name: "Guard self-proof -- each guard must fail once"
-        when: "args.with_mutate"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/ci/mutate_guards.py"]
-        hint: "Not all guards triggered as expected. Each registered mutation must cause exactly one guard to fail. Review the mutation test output above."
-
-  - stage: "Site build"
-    description: "Full Next.js production build (CI only, slow)"
-    steps:
-      - id: "next-build"
-        name: "Site build (next build)"
-        when: "args.with_build"
-        timeout: 300
-        workdir: "{WEB}"
-        command: ["{NODE}", "node_modules/next/dist/bin/next", "build"]
-        hint: "Review the Next.js build errors above. Run `npx next build` locally for detailed output."
-
-  - stage: "E2E smoke"
-    description: "Playwright smoke tests on critical user paths"
-    steps:
-      - id: "playwright-smoke"
-        name: "E2E smoke (Playwright @smoke)"
-        when: "args.with_e2e"
-        timeout: 180
-        workdir: "{WEB}"
-        command: ["{NODE}", "node_modules/@playwright/test/cli.js", "test", "--grep", "@smoke", "{ENV.SKIP_LOG_ANALYSIS}"]
-        hint: "Review the Playwright test output above. Run `npx playwright test --grep @smoke` locally to reproduce."
-
-  - stage: "Log-dependent checks"
-    description: "Regression tests that require real PX4 flight logs (.ulg/.bin)"
-    steps:
+      # 需要真实日志的回归。日志不入仓库（CLAUDE.md 第 9 节：原始日志不上传服务器），
+      # 所以 CI 上这四项必然 SKIP —— 这就是它们归 push 而不是 ci 的原因。
       - id: "compare-baseline"
         name: "Frozen baseline field-by-field diff (compare_baseline)"
         when: "has_logs"
@@ -171,3 +163,87 @@ jobs:
         workdir: "{ROOT}"
         command: ["{PYTHON}", "tools/calibrate/lint_rules.py", "--strict"]
         hint: "Field reference linting found violations. Review the output above and fix the referenced fields."
+
+  - id: ci
+    stage: "CI"
+    description: "Cloud-only checks: artifact parity, guard self-test, guard self-proof, dependency audit"
+    steps:
+      - id: "build-kb-parity"
+        name: "Build contract vs artifact parity (build:kb --check)"
+        workdir: "{WEB}"
+        # check_hygiene 的「产物新鲜度门还在」判据在扫这一行的字样，改名会让那道门恒红。
+        command: ["{NODE}", "scripts/build-knowledge.mjs", "--check"]
+        hint: "The built knowledge base differs from the committed artifact. Run `node scripts/build-knowledge.mjs` locally and commit the updated artifact."
+
+      # 内容规范。两个脚本各自带反例自检，且跑完只要 ~1s。
+      - id: "check-skill-spec"
+        name: "Skill directory spec (check-skill-spec)"
+        workdir: "{WEB}"
+        command: ["{NODE}", "scripts/check-skill-spec.mjs"]
+        hint: "knowledge/skills/ 下有目录不合规范（缺 SKILL.md / README.md / CHANGELOG.md，或字段不合规）。按上面的输出补齐对应目录。"
+
+      - id: "check-mcp-spec"
+        name: "MCP directory spec (check-mcp-spec)"
+        workdir: "{WEB}"
+        command: ["{NODE}", "scripts/check-mcp-spec.mjs"]
+        hint: "knowledge/mcp/ 下有目录不合 server.json（MCP Registry）规范。按上面的输出补齐；upstream_status: pending 的条目是 SKIP 不是放行，核实后要补 server.json 并删掉该字段。"
+
+      - id: "test-issue-filer"
+        name: "Issue-filer self-test (fingerprint / scrub / allowlist / guards)"
+        workdir: "{WEB}"
+        command: ["{NODE}", "scripts/test-issue-filer.mjs"]
+        hint: "Review the test output above for specific failures in fingerprint / scrub / allowlist / guard logic."
+
+      - id: "pip-audit"
+        name: "Python dependency audit (pip-audit)"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "-m", "pip_audit", "-r", "requirements-dev.txt", "--strict"]
+        hint: "A pinned Python dependency has a known vulnerability. Upgrade it and pin the new version, or document why it must stay."
+
+      # 必须带 --registry：本机 ~/.npmrc 指向 npmmirror，该镜像没实现 audit 端点。
+      # 不带的话本机必红而 CI 绿 —— 最坏的一种不一致。
+      # 用 {PNPM} 而非 {NODE} + node_modules/pnpm/...：pnpm 是全局工具，不是 web/ 的依赖，
+      # 那条路径根本不存在（曾经的写法让这一步在任何机器上都恒红）。
+      - id: "pnpm-audit"
+        name: "Frontend dependency audit (pnpm audit)"
+        workdir: "{WEB}"
+        command: ["{PNPM}", "--registry=https://registry.npmjs.org/", "audit", "--audit-level=high"]
+        hint: "A frontend dependency has a known vulnerability. Run `pnpm --registry=https://registry.npmjs.org/ audit` for details, then upgrade."
+
+      # 变异自证约 20 分钟，单独一个 job 跑（--with-mutate），不并进 --stage ci 的默认集合。
+      # 条数以 `mutate_guards.py --list` 为准（别把这个数字当事实源，加了变异就过期）。
+      - id: "mutate-guards"
+        name: "Guard self-proof -- each guard must fail once"
+        when: "args.with_mutate"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "tools/ci/mutate_guards.py"]
+        hint: "Not all guards triggered as expected. Each registered mutation must cause exactly one guard to fail. Review the mutation test output above."
+
+      - id: "playwright-smoke"
+        name: "E2E smoke (Playwright @smoke)"
+        when: "args.with_e2e"
+        timeout: 300
+        workdir: "{WEB}"
+        command: ["{NODE}", "node_modules/@playwright/test/cli.js", "test", "--grep", "@smoke"]
+        hint: "Review the Playwright test output above. Run `npx playwright test --grep @smoke` locally to reproduce."
+
+      # 「上传 .ulg → Pyodide 解析 → 显示」这条全流程。它曾经是 @smoke 的一员，
+      # 后因单次要 7 分钟而被移出冒烟，于是**没有任何自动环节再跑它**——从"CI 时守"
+      # 退成"上线时守"。这一步把它接回 CI：上传/解析/渲染整条链路一旦断，CI 就红，
+      # 而不是等部署后才发现。代价约 5~7 分钟，故与冒烟分开、各自独立超时。
+      #
+      # 与冒烟的关键差别：这条**不依赖 has_logs**。它上传的是仓库里的
+      # `web/e2e/fixtures/sample.ulg`（已入库），不是 `tools/calibrate/logs/` 下的
+      # 真实日志——所以云端 checkout 里也有，能真跑而不是 SKIP。
+      - id: "playwright-analyze"
+        name: "E2E analyze flow (Playwright 日志分析流程)"
+        when: "args.with_e2e"
+        timeout: 900
+        workdir: "{WEB}"
+        command: ["{NODE}", "node_modules/@playwright/test/cli.js", "test", "--grep", "日志分析流程"]
+        hint: "The upload -> Pyodide parse -> render chain is broken. Run `pnpm test:e2e:analyze` locally to reproduce; the full flow needs ~7 minutes (Pyodide downloads WASM + numpy + pyulog on first run)."
+
+  - id: deploy
+    stage: "Deploy"
+    description: "部署后打线上的全量 E2E —— 在 .github/workflows/deploy.yml 里"
+    steps: []
