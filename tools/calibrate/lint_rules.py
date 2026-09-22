@@ -34,6 +34,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from _logging import get_logger  # noqa: E402
+from _logging import _c, YELLOW, RED  # noqa: E402
 
 log = get_logger()
 
@@ -202,12 +203,15 @@ def main(argv: list[str]) -> int:
     logs = fields_by_version_from_logs()
     meta = fields_by_version_from_meta()
     versions = sorted(set(logs) | set(meta))
-    log.info(
-        f"=== 经验规则字段引用检查 ===\n来源版本：{'，'.join(fmt(v) for v in versions)}（日志实测 {len(logs)} 个版本，字典 {len(meta)} 个版本）"
+
+    log.print_header(
+        "经验规则字段引用检查" + (" --strict" if strict else ""),
+        "来源版本：%s（日志实测 %d 个版本，字典 %d 个版本）" % ("、".join(fmt(v) for v in versions), len(logs), len(meta)),
     )
+
     if not logs:
         log.warning(
-            "警告：日志侧字段源为空 —— 上面那些'可疑引用'会大量假阳性，先确认\n"
+            "警告：日志侧字段源为空 —— 下面那些'可疑引用'会大量假阳性，先确认\n"
             "      %s 下有 .ulg、且 baseline/*.json 的 result.facts.firmware 有值。" % LOG_DIR
         )
 
@@ -241,20 +245,43 @@ def main(argv: list[str]) -> int:
             suspicious += 1
             bad_rows.append((rid, label(names)))
 
-    log.info("\n字段引用 %d 处：适用版本内命中 %d ｜ 版本错配 %d ｜ 可疑 %d" % (ok + gaps + suspicious, ok, gaps, suspicious))
+    total = ok + gaps + suspicious
+    all_ok = gaps == 0 and suspicious == 0
+
+    # ── 拼接 detail / err ──
+    detail_lines: list[str] = []
+    err_lines: list[str] = []
+
+    detail_lines.append("字段引用 %d 处：适用版本内命中 %d ｜ 版本错配 %d ｜ 可疑 %d" % (total, ok, gaps, suspicious))
 
     if gap_rows:
-        log.warning("\n版本错配：声明的 firmware 范围内找不到这些字段（该经验在这些固件上不会生效）")
-        log.warning('    修法：改 firmware 范围 / 补 when_fw 分支 / 改用候选组 ref("新名", "旧名")')
+        detail_lines.append("")
+        detail_lines.append(_c(YELLOW, "版本错配：声明的 firmware 范围内找不到这些字段（该经验在这些固件上不会生效）"))
+        detail_lines.append(_c(YELLOW, '修法：改 firmware 范围 / 补 when_fw 分支 / 改用候选组 ref("新名", "旧名")'))
         for rid, names, fw, elsewhere in gap_rows:
-            log.warning("   %-28s %-42s firmware=%s ｜ 仅存在于 %s" % (rid, names, fw, ", ".join(elsewhere)))
+            err_lines.append("%-28s %-42s firmware=%s ｜ 仅存在于 %s" % (rid, names, fw, "、".join(elsewhere)))
+
     if bad_rows:
-        log.error("\n可疑引用（哪里都没找到，多半是拼错）：")
+        detail_lines.append("")
+        detail_lines.append(_c(RED, "可疑引用（哪里都没找到，多半是拼错）："))
         for rid, names in bad_rows:
-            log.error("   %-28s %s" % (rid, names))
-    failed = gaps + suspicious
-    if failed == 0:
+            err_lines.append("%-28s %s" % (rid, names))
+
+    log.print_check(
+        1,
+        1,
+        "字段引用检查",
+        all_ok,
+        detail="\n".join(detail_lines),
+        err="\n".join(err_lines) if err_lines else "",
+    )
+
+    results = [("字段引用检查", "ok" if all_ok else "fail")]
+    log.print_summary(results, [])
+
+    if all_ok:
         log.info("\n=== 经验规则字段引用检查通过：所有引用都在其版本范围内找得到 ===")
+    failed = gaps + suspicious
     return 1 if (strict and failed) else 0
 
 

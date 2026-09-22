@@ -273,7 +273,7 @@ def _main_probe(args: list[str]) -> int:
             if not ok and name.startswith("np_series 无错误"):
                 detail = "探查阶段收集到的错误已在前面的 fail 中体现"
             log.print_check(i, total, name, ok, detail=detail)
-        log.info(f"\n  摘要：{json.dumps(summary, ensure_ascii=False)}")
+        log.info(f"摘要：{json.dumps(summary, ensure_ascii=False)}")
         all_results.extend((f"{path.name} — {c}", s) for c, s in checks)
 
     return log.print_summary(all_results, [])
