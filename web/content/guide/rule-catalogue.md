@@ -172,7 +172,7 @@ ref("estimator_status[:].hagl_test_ratio"),
 ref("estimator_status[:].beta_test_ratio"),
 primary_min=3,
 primary_names=["速度", "水平位置", "垂直位置", "磁罗盘 X", "磁罗盘 Y", "磁罗盘 Z",
-               "航向", "空速", "侧滑", "离地高度", "光流 X", "光流 Y"],
+             "航向", "空速", "侧滑", "离地高度", "光流 X", "光流 Y"],
 ge=1.0,                    # 通道判拒阈值：ratio >= 1 即该路观测被 EKF 拒绝
 channel_min=3,             # 通道最少被拒样本数，去偶发尖峰毛刺
 channel_labels=["速度", "水平位置", "垂直高度", "航向", "磁罗盘", "空速", "离地高度", "侧滑"],
@@ -338,8 +338,8 @@ fallback_label="未知通道")`
 - 适用：不跑当 not HAS_ARMED
 - 取值：
 - `bx, by, bz, bts, src_text = _try(gyro_bias_series( ref("estimator_sensor_bias[0].gyro_bias"), ref("estimator_sensor_bias[0].timestamp"), ref("estimator_states[0].states"), ref("estimator_states[0].timestamp"), ref("estimator_status[0].states"), ref("estimator_status[0].timestamp"), slot=10, sources=["estimator_sensor_bias.gyro_bias[]",
-       "estimator_states.states[10..12]",
-       "estimator_status.states[10..12]"]))`
+     "estimator_states.states[10..12]",
+     "estimator_status.states[10..12]"]))`
 - `worst_abs, worst_axis, worst_drift, drift_axis = gyro_bias_worst( bx, by, bz, bts, ARMED_INTERVALS, labels=["X", "Y", "Z"], min_count=10)`
 - `temp_range = _try(max_temp_range(ref("vehicle_imu_status[0].temperature_gyro"), ref("vehicle_air_data[0].ambient_temperature")))`
 - `bias_stat = _try(larger(worst_abs, worst_drift))`
@@ -459,9 +459,9 @@ ref("vehicle_imu_status[:].accel_clipping", alias="clipping"))`
 - 取值：
 - `w_p95 = percentile(
 hypot(coalesce(ref("estimator_wind[0].windspeed_north"),
-               ref("wind_estimate[0].windspeed_north")),
-      coalesce(ref("estimator_wind[0].windspeed_east"),
-               ref("wind_estimate[0].windspeed_east"))),
+             ref("wind_estimate[0].windspeed_north")),
+    coalesce(ref("estimator_wind[0].windspeed_east"),
+             ref("wind_estimate[0].windspeed_east"))),
 p=95)`
 - 判定：
 - **warning** ｜ `w_p95 >= 12.0` ｜ 阈值 8 ｜ 单位 m/s ｜ 标题「估计风速较大（p95 \{w_p95:.1f\} m/s）」
