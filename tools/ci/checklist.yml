@@ -144,10 +144,10 @@ jobs:
         hint: "The baseline has changed unexpectedly. Review the diff output above. If the change is intentional, re-baseline by running the comparison tool."
 
       - id: "check-provider"
-        name: "Adapter contract test (check_provider)"
+        name: "Adapter contract test (guard-px4log-provider)"
         when: "has_logs"
         workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/calibrate/check_provider.py", "{LOGS}"]
+        command: ["{PYTHON}", "tools/calibrate/guard-px4log-provider.py", "{LOGS}"]
         hint: "One or more log files failed the adapter contract test. Check the output above for which adapter and what contract was violated."
 
       - id: "probe-data"
