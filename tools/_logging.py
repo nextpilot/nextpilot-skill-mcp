@@ -11,6 +11,7 @@ Usage:
     # Logger helpers:
     log.print_header("check Python/Node prerequisites")
     log.print_step(1, 10, "ruff available", "$ ruff --version", 0, "")
+    log.print_check(2, 10, "inline validation", True, detail="3 items, all green")
     log.print_summary(results, skipped)
 
 Colors: ERROR → red, WARNING → yellow, INFO/DEBUG → default.
@@ -106,6 +107,48 @@ def _print_hint(logger: logging.Logger, hint: str) -> None:
     logger.info(_c(CYAN, f"| {'─' * 100}"))
 
 
+def _print_check(
+    logger: logging.Logger,
+    step: int,
+    total: int,
+    name: str,
+    ok: bool,
+    detail: str = "",
+    err: str = "",
+) -> None:
+    """Print a single inline check result (no subprocess).
+
+    Format:
+    ----------------------------------------------------------------------------------------------------
+    [k/N]  xxxxxxxx
+    ----------------------------------------------------------------------------------------------------
+    | Result:  OK / FAIL
+    | Detail:  xxxxxx          (only if detail provided)
+    |          多行 detail      (detail 里的 \n 会被展开缩进)
+    ----------------------------------------------------------------------------------------------------
+    | ERR block               (only on failure)
+    ----------------------------------------------------------------------------------------------------
+    """
+    tag = f"[{step:>2}/{total:<2}]"
+    status = "OK" if ok else "FAIL"
+    color = GREEN if ok else RED
+
+    logger.info("")
+    logger.info(_SEP2)
+    logger.info(_c(CYAN, f"{tag}  {name}"))
+    logger.info(_SEP2)
+    logger.info(_c(color, f"| Result:  {status}"))
+    if detail:
+        for i, line in enumerate(detail.splitlines()):
+            prefix = "| Detail:" if i == 0 else "|        "
+            logger.info(f"{prefix} {line}")
+    if err and not ok:
+        logger.info(_SEP2)
+        for line in err.splitlines():
+            logger.info("| " + line)
+    logger.info(_SEP2)
+
+
 def _print_summary(logger: logging.Logger, results: list[tuple[str, str]], skipped: list[str]) -> int:
     """Print a structured summary block.
 
@@ -168,6 +211,17 @@ class _CheckLogger(logging.Logger):
         stdout: str = "",
     ) -> None:
         _print_step(self, step, total, name, command, returncode, stdout)
+
+    def print_check(
+        self,
+        step: int,
+        total: int,
+        name: str,
+        ok: bool,
+        detail: str = "",
+        err: str = "",
+    ) -> None:
+        _print_check(self, step, total, name, ok, detail, err)
 
     def print_hint(self, hint: str) -> None:
         _print_hint(self, hint)
