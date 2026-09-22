@@ -629,39 +629,32 @@ def main(argv: list[str]) -> int:
         _print_index()
         return 0
 
-    log.info("=== 校验机制自身的卫生 ===")
+    log.print_header("校验机制自身的卫生")
+
     failed: list[str] = []
-    skipped: list[str] = []
-    for name, fn in CHECKS:
-        log.info(f"\n· {name}")
+    skip_reasons: list[str] = []
+    results: list[tuple[str, str]] = []
+    for i, (name, fn) in enumerate(CHECKS, 1):
         try:
             problems = fn()  # type: ignore[operator]
         except Skip as exc:
             log.warning(f"SKIP {name}  -> {exc}")
-            skipped.append(name)
+            skip_reasons.append(f"{name}：{exc}")
+            results.append((name, "skip"))
             continue
-        if problems:
+        ok = len(problems) == 0
+        if ok:
+            log.print_check(i, len(CHECKS), name, True)
+            results.append((name, "ok"))
+        else:
             # 这一行的格式有意义：`FAIL <名字>  -> <一句话>` 是 tools/ci/mutate_guards.py
             # 从输出里数"红了几条"的依据，名字要与注册表里的 expect 逐字一致。
-            log.error(f"FAIL {name}  -> {problems[0]}" + (f"（共 {len(problems)} 处）" if len(problems) > 1 else ""))
-            for one in problems:
-                log.error(f"      {one}")
+            one_line = f"FAIL {name}  -> {problems[0]}" + (f"（共 {len(problems)} 处）" if len(problems) > 1 else "")
+            log.print_check(i, len(CHECKS), name, False, detail=one_line, err="\n".join(problems))
             failed.append(name)
-        else:
-            log.info(f"OK {name}")
+            results.append((name, "fail"))
 
-    log.info("\n=== 汇总 ===")
-    for name, _ in CHECKS:
-        mark = "FAIL" if name in failed else ("SKIP" if name in skipped else "OK  ")
-        log.info(f"  {mark} {name}")
-    if failed:
-        # 这句**不能**写成 `FAIL <名字>` 的形状：tools/ci/mutate_guards.py 逐行取 "FAIL 后面的东西"
-        # 当检查名，那句总结会被它当成一条检查名，于是每条变异都多报一次"牵连"。
-        # （被那套跑手解析的守卫都有这条格式契约，见它的 _failed_names。）
-        log.error(f"\n{len(failed)} 项卫生检查未过 —— 逐项看上面的输出。")
-        return 1
-    log.info(f"\nOK 全部通过（{len(CHECKS) - len(skipped)} 项，跳过的已说明原因）。")
-    return 0
+    return log.print_summary(results, skip_reasons)
 
 
 if __name__ == "__main__":

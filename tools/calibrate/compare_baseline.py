@@ -75,24 +75,32 @@ def main(argv: list[str]) -> int:
     if not paths:
         log.warning("没有基线文件，先跑 dump-baseline.py")
         return 2
-    log.info("=== 基线比对 ===")
-    failures = 0
-    for p in paths:
+
+    log.print_header("基线比对")
+
+    results: list[tuple[str, str]] = []
+    for i, p in enumerate(paths, 1):
+        slug = p.stem
         if not p.exists():
-            log.warning(f"SKIP（基线不存在）: {p.name}")
-            failures += 1
+            log.print_check(i, len(paths), slug, False, detail=f"SKIP（基线不存在）: {p.name}")
+            results.append((slug, "fail"))
             continue
         diffs = compare_one(p)
-        slug = p.stem
         if diffs:
-            failures += 1
-            log.error(f"FAIL {slug}: {len(diffs)} 处差异")
-            for d in diffs:
-                log.error(d)
+            log.print_check(
+                i,
+                len(paths),
+                slug,
+                False,
+                detail=f"FAIL {slug}: {len(diffs)} 处差异",
+                err="\n".join(diffs),
+            )
+            results.append((slug, "fail"))
         else:
-            log.info(f"OK   {slug}")
-    log.info(f"\n=== 基线比对{'全部通过' if failures == 0 else f'{failures} 项不一致'} ===")
-    return 1 if failures else 0
+            log.print_check(i, len(paths), slug, True)
+            results.append((slug, "ok"))
+
+    return log.print_summary(results, [])
 
 
 if __name__ == "__main__":
