@@ -107,7 +107,7 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 | 守卫集 | `test-issue-filer`（前端守卫） | **42s** | 静态（pre-push 跳过） | CI |
 | 元检查 | `check_hygiene`（校验机制自身卫生） | 4s | 每次 | push |
 | 日志回归 | `compare_baseline` | 3s | 本地 push | **本地**（`.ulg` 不入库，第 9 节） |
-| 日志回归 | `check_provider` | 3s | 本地 push | **本地**（同上） |
+| 日志回归 | `guard-px4log-provider` | 3s | 本地 push | **本地**（同上） |
 | 日志回归 | `run_checks_locally --probe-data` | 3s | 本地 push | **本地**（同上） |
 | 日志回归 | `lint_rules --strict` | 2s | 本地 push | **本地**（同上） |
 | 构建 | `sync-content` + `build-knowledge` | — | dev / build | dev / build |
@@ -739,7 +739,7 @@ CI 里这 4 项**继续 SKIP**。补充日志集**暂不做**。
 | 项 | 命令 | 实测 | 前提 |
 | --- | --- | --- | --- |
 | 冻结基线逐字段比对 | `compare_baseline` | 3s | 6 份日志在 `tools/calibrate/logs/` |
-| 适配器契约 | `check_provider` | 3s | 同上 |
+| 适配器契约 | `guard-px4log-provider` | 3s | 同上 |
 | probe-data | `run_checks_locally --probe-data` | 3s | 同上 |
 | 字段引用 lint | `lint_rules --strict` | 2s | 同上 |
 

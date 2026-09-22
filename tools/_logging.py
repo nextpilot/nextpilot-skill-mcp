@@ -170,19 +170,19 @@ def _print_summary(logger: logging.Logger, results: list[tuple[str, str]], skipp
     logger.info(f"| Total : {len(results)} checks ran, {len(skipped)} skipped")
 
     if passed:
-        logger.info(_c(GREEN, f"\n|  PASSED ({len(passed)})"))
+        logger.info(_c(GREEN, f"|\n|  PASSED ({len(passed)})"))
         for name, _ in passed:
             logger.info(_c(GREEN, f"|  [OK   ] {name}"))
     if failed:
-        logger.info(_c(RED, f"\n| FAILED ({len(failed)})"))
+        logger.info(_c(RED, f"|\n| FAILED ({len(failed)})"))
         for name, _ in failed:
             logger.info(_c(RED, f"|   [FAIL ] {name}"))
     if skipped:
-        logger.info(_c(YELLOW, f"\nSKIPPED ({len(skipped)})"))
+        logger.info(_c(YELLOW, f"|\n| SKIPPED ({len(skipped)})"))
         for s in skipped:
             logger.info(_c(YELLOW, f"|   [SKIP ] {s}"))
 
-    logger.info("")
+    logger.info("|")
     if failed:
         logger.info(_c(RED, f"| RESULT: {len(failed)} check(s) FAILED -- see output above for details."))
         logger.info(_SEP2)

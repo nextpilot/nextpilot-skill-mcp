@@ -647,7 +647,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 │ 第二关：单元测试（算子 / CEL 表达式）           │
 │   · compare_baseline.py                     │
 │     （6 条冻结日志基线逐字段比对）              │
-│   · check_provider.py（适配器契约测试）        │
+│   · guard-px4log-provider.py（适配器契约测试）        │
 │   · run_checks_locally.py --probe-data      │
 │     （数据层结构自检 + 真抽一次 series）        │
 │   · lint_rules.py --strict                  │
@@ -721,7 +721,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 1. **冒烟不通过 = 阻断合并**：第三关任何失败都阻止 PR 合并。
 2. **全套 E2E 失败**：合并后自动跑第四关，失败通知提交者修复。
 3. **既有代码警告**：ESLint 当前 0 错误 / 5 警告（均为既存未使用变量），不阻断合并，但新增代码引入的警告需关注。
-4. **日志类校验不在云端 CI**：`compare_baseline`、`check_provider` 等需要真实 `.ulg` 日志的检查仅在本地有日志时运行；云端 CI 全绿**不等于**规则/引擎回归过了，改规则/引擎后必须在本地跑一次完整检查。
+4. **日志类校验不在云端 CI**：`compare_baseline`、`guard-px4log-provider` 等需要真实 `.ulg` 日志的检查仅在本地有日志时运行；云端 CI 全绿**不等于**规则/引擎回归过了，改规则/引擎后必须在本地跑一次完整检查。
 
 ### 6.9.1 `mutate_guards.py` Windows 兼容说明
 
