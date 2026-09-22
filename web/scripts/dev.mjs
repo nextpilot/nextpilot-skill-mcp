@@ -78,5 +78,6 @@ for (const [args, label] of [
 }
 
 run(["scripts/sync-content.mjs", "--watch"], "sync-content --watch");
+run(["scripts/build-knowledge.mjs", "--watch"], "build-knowledge --watch");
 run(["node_modules/next/dist/bin/next", "dev"], "next dev");
-console.log("[dev] 已启动：内容热拷贝 + Next 开发服务器（Ctrl+C 一起停）");
+console.log("[dev] 已启动：内容热拷贝 + 知识热重建 + Next 开发服务器（Ctrl+C 一起停）");

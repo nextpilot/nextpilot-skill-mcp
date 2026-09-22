@@ -10,28 +10,30 @@
 
 **你敲**：`pnpm dev`
 
-它**一次起两段**（`web/scripts/dev.mjs`）：先同步 + 构建，再同时起内容热拷贝与 Next。
+它**一次起三段**（`web/scripts/dev.mjs`）：先同步 + 构建，再同时起内容热拷贝、知识热重建与 Next。
 
 | 文件 | 是什么 | 干什么 |
 | --- | --- | --- |
-| `web/scripts/dev.mjs` | **dev 启动器** | 顺序：① `sync-content` ② `build-knowledge` ③ 并起 `sync-content --watch` 与 `next dev`。Ctrl+C 一起停 |
+| `web/scripts/dev.mjs` | **dev 启动器** | 顺序：① `sync-content` ② `build-knowledge` ③ 并起 `sync-content --watch`、`build-knowledge --watch` 与 `next dev`。Ctrl+C 一起停 |
 | `web/scripts/sync-content.mjs` | 内容同步脚本 | 把内容真源（`docs/guide`、`knowledge/skills`、`knowledge/mcp`）拷进 `web/.generated/`。因为 `web/` 是独立项目、部署时只上传它自己，运行期读不到仓库别处 |
-| `web/scripts/build-knowledge.mjs` | 知识构建脚本 | 把引擎源码与人工经验拼成运行时的产物（见阶段 2）。**1744 行全是 `throw`**：规则缺字段、算子没注册、表达式编译不过，这里就报错 |
+| `web/scripts/build-knowledge.mjs` | 知识构建脚本 | 把引擎源码与人工经验拼成运行时的产物（见阶段 2）。**全是 `throw`**：规则缺字段、算子没注册、表达式编译不过，这里就报错 |
 | `next dev` | Next.js 开发服务器 | 起热更新的网站 |
 
 **另开一个终端**（可选，看类型错用）：`tsc --noEmit --watch`。
 
-**热更新分两段**，`pnpm dev` 现在两段都拉起来了：
+**热更新分三段**，`pnpm dev` 三段都拉起来了：
 
 | 你改了 | 谁负责 |
 | --- | --- |
 | `web/` 里的代码（`.tsx` / `.css`） | Next 自己热更新 |
 | 内容真源（`docs/guide/*.mdx`、`knowledge/skills/`、`knowledge/mcp/`） | `sync-content --watch` 重拷进 `.generated/`，Next 才看得到 |
+| 知识真源（`knowledge/px4/rules/*.yaml`、`facts.yaml`、`engine/operators.py` 等） | `build-knowledge --watch` 重建产物，Next 才看得到 |
 
 > **只想开一半**：`pnpm dev:no-watch` —— 同步 + 构建 + `next dev`，不挂 watch。
-> **单独开着内容热拷贝**：`pnpm sync:watch`（另开终端时用）。
+> **单独开着两段热拷贝**：`pnpm sync:watch`、`pnpm kb:watch`（另开终端时用）。
 >
 > **起不来往往不是 Next.js 的问题，是知识库写错了。** 报错会直指哪个文件哪个字段。
+> watch 模式下写坏了不会退出，改对了下次存盘自动重建。
 
 ---
 
@@ -201,6 +203,11 @@ pnpm test:e2e            # 全量 42 条
 
 - **内容真源由 `sync-content --watch` 负责同步**（`pnpm dev` 已带上）。若用 `pnpm dev:no-watch`，
   改 `docs/guide`、`knowledge/skills`、`knowledge/mcp` 后页面不会变，要另开 `pnpm sync:watch`。
+- **知识真源由 `build-knowledge --watch` 负责重建**（`pnpm dev` 已带上）。同样地，用
+  `pnpm dev:no-watch` 时改 `knowledge/px4/` 或 `engine/` 后页面不会变，要另开 `pnpm kb:watch`。
+- **`build-knowledge` 的产物里有一个落在 `knowledge/px4/` 内部**（`rules-editor-schema.generated.json`）。
+  所以 `--watch` 只监听 `rules/`、`plot/`、`llm/`、`meta/` 这些真源子目录，
+  并在监听顶层目录时按文件名滤掉 `*.generated.*` —— 否则写产物会触发自己、无限重建。
 - **`pnpm dev` 会阻止第二个 dev server**：Next 16 按**目录**判重（不是按端口），
   同一目录已有 dev server 时会直接报错退出，换 `PORT` 没用。
 - **两份同名的 `sample.ulg`**：`tools/calibrate/logs/sample.ulg`（4.0MB，**不入库**，

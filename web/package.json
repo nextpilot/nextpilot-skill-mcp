@@ -6,6 +6,7 @@
   "scripts": {
     "sync:content": "node scripts/sync-content.mjs",
     "sync:watch": "node scripts/sync-content.mjs --watch",
+    "kb:watch": "node scripts/build-knowledge.mjs --watch",
     "check:skills": "node scripts/check-skill-spec.mjs",
     "check:mcp": "node scripts/check-mcp-spec.mjs",
     "dev": "node scripts/dev.mjs",
