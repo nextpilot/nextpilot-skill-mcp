@@ -66,7 +66,7 @@ def main(argv: list[str]) -> int:
     ap.add_argument(
         "--pyodide",
         default="v0.27.7",
-        help="Pyodide 版本（要与 web/workers/ulog-worker.ts 的默认值一致）",
+        help="Pyodide 版本（要与 web/workers/pyodide-px4log-worker.ts 的默认值一致）",
     )
     args = ap.parse_args(argv[1:])
 

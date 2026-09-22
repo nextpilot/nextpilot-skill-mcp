@@ -101,7 +101,7 @@ jobs:
       - id: "check-artifact"
         name: "Artifact is valid Python (check_artifact)"
         workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/calibrate/check_artifact.py"]
+        command: ["{PYTHON}", "tools/calibrate/check-pyodide-px4log-engine.py"]
         hint: "The artifact file contains invalid Python syntax. Check the error output above for the exact location."
 
       - id: "check-engine-purity"

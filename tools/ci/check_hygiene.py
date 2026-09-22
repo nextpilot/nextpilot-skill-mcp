@@ -82,8 +82,8 @@ SCAN_SUFFIXES = {".py", ".ts", ".tsx", ".mjs", ".js", ".md", ".mdx", ".yml", ".y
 # 扫它们只会让同一条问题报两遍，而产物不手改——报在源码上才有可操作性。
 SKIP_FILES = frozenset(
     {
-        "web/workers/ulog-check-script.ts",
-        "web/workers/ulog-data-script.ts",
+        "web/workers/pyodide-px4log-engine.ts",
+        "web/workers/pyodide-px4log-data.ts",
         "web/workers/prompts.generated.js",
         "tools/_logging.py",
     }

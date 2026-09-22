@@ -1,4 +1,4 @@
-"""校验**生成产物**（web/workers/ulog-check-script.ts）能被当作合法 Python 执行。
+"""校验**生成产物**（web/workers/pyodide-px4log-engine.ts）能被当作合法 Python 执行。
 
 为什么需要它：本地回归跑的是 engine/ 下的源文件，而浏览器里跑的是构建产物
 （operators.py + ulog_checks.py 经 String.raw 内联 + __FAULT_KB__/__RULES__
@@ -11,7 +11,7 @@
 原因"（并**构造两道反向用例**逼出失败分支）、"像经纬度"的判据不会把 `relative` 里的 `lat`
 当成纬度、worker 查的全局名真的存在。
 
-用法：python tools/calibrate/check-artifact.py
+用法：python tools/calibrate/check-pyodide-px4log-engine.py
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import run_checks_locally as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-TS = REPO_ROOT / "web" / "workers" / "ulog-check-script.ts"
+TS = REPO_ROOT / "web" / "workers" / "pyodide-px4log-engine.ts"
 FAULT_KB = REPO_ROOT / "web" / "workers" / "fault-kb.generated.json"
 TRACK_YML = REPO_ROOT / "knowledge" / "px4" / "plot" / "track.yml"
 
@@ -185,7 +185,7 @@ def main() -> int:
 
     # 仅语法检查不够：NameError / KeyError 这类只有**真执行**才暴露
     # （曾漏掉"operators.py 没被内联"导致 Pyodide 里 OPERATORS 未定义）。
-    data_ts = (REPO_ROOT / "web" / "workers" / "ulog-data-script.ts").read_text(encoding="utf-8")
+    data_ts = (REPO_ROOT / "web" / "workers" / "pyodide-px4log-data.ts").read_text(encoding="utf-8")
     m2 = re.search(r"String\.raw`(.*)`;", data_ts, re.S)
     if not m2:
         raise SystemExit("数据层产物里找不到 String.raw 模板")
@@ -221,12 +221,12 @@ def main() -> int:
 
     # 「产物跑得通」不等于「worker 问得到东西」：worker 是拿**名字**去这个命名空间里取的
     # （pyodide.globals.get("...")），名字写错了守卫就恒真/恒假，语法与执行检查都看不见。
-    # 2026-09-18 线上就栽在这：ulog-worker.ts 的守卫写的是 globals.get("ulog")，
+    # 2026-09-18 线上就栽在这：pyodide-px4log-worker.ts 的守卫写的是 globals.get("ulog")，
     # 而产物里从来没有名为 `ulog` 的全局（bootstrap 那行是 `provider = open_log(...)`，
     # `from pyulog import ULog` 只带来 `ULog`）——于是守卫恒真，track/series 请求**永远**
     # 被判成"这份日志没解析过"：轨迹画不出来、也从没进过存档，界面还一直叫用户重选文件。
     # 名字对不对，只有拿真执行出来的命名空间核一遍才算数。
-    worker_src = (REPO_ROOT / "web" / "workers" / "ulog-worker.ts").read_text(encoding="utf-8")
+    worker_src = (REPO_ROOT / "web" / "workers" / "pyodide-px4log-worker.ts").read_text(encoding="utf-8")
     asked = sorted(set(re.findall(r'globals\.get\("([A-Za-z_$][\w$]*)"\)', worker_src)))
     set_by_worker = set(re.findall(r'globals\.set\("([A-Za-z_$][\w$]*)"', worker_src))
     # 按 worker 的顺序把入口都调一遍：`__result` 是入口函数内部 `global __result` 摆出来的，

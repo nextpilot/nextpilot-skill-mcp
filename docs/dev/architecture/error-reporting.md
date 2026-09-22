@@ -10,7 +10,7 @@
 调研结论（`web/` 下 112 个源文件）：
 
 | 事实 | 说明 |
-|---|---|
+| --- | --- |
 | 87 处 `catch` | 全部只 `return` 一个错误消息给调用方，**没有一处落记录** |
 | 边缘函数 | `api/explain.js` 的 LLM 失败只 `jsonResponse({error}, 502)`，服务端不留痕 |
 | 前端 | **没有** `error.tsx` / `global-error.tsx` / `window.onerror` / `unhandledrejection` |
@@ -49,7 +49,7 @@
 **关键判断**：错误的频率分布完全两极，统一处理必崩。
 
 | 级别 | 例子 | 频率 | 策略 |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **致命** | Pyodide 解析崩溃、Worker 未捕获异常、页面渲染崩溃 | 低（一次发版级） | **必报**，去重后基本一次一个 |
 | **可恢复** | LLM 502/超时、KV 写入失败、网络抖动、配额拒绝 | 高（每用户每天） | **按指纹每日一次**，绝不逐次报 |
 
@@ -88,19 +88,19 @@
 ## 3. 落点
 
 | 文件 | 作用 |
-|---|---|
+| --- | --- |
 | `web/functions/_lib/issue-filer.js` | **新建**。指纹计算、脱敏、KV 去重、限流、调 issue API。平台无关（GitHub / Gitee 由 `ISSUE_PROVIDER` 选） |
 | `web/functions/api/issues.js` | **新建**。浏览器报错的唯一入口（POST），校验 + 限流 + 转交 |
 | `web/functions/api/explain.js` 等 | 在 catch 分支调 `reportIssue(env, waitUntil, {...})`——服务端本地就有完整栈，最划算 |
 | `web/lib/issue-bridge.ts` | **新建**。`window.onerror` + `unhandledrejection` + 导出手动 `reportError()`；采样与去抖在前端也做一层 |
 | `web/app/global-error.tsx` | **新建**。App Router 渲染错误兜底（现在完全没有） |
-| `web/workers/ulog-worker.ts` | Worker 内 `catch` 调 `reportError()`——**解析类错误是最该上报的一类** |
+| `web/workers/pyodide-px4log-worker.ts` | Worker 内 `catch` 调 `reportError()`——**解析类错误是最该上报的一类** |
 | `docs/operations/README.md` | 补环境变量表与排查条目 |
 
 环境变量（EdgeOne 控制台）：
 
 | 变量 | 说明 |
-|---|---|
+| --- | --- |
 | `ISSUE_ENABLED` | `1` 才开，不配则整个上报层 no-op |
 | `ISSUE_PROVIDER` | `github`（默认）/ `gitee` |
 | `ISSUE_REPO` | `owner/repo` |
@@ -123,7 +123,7 @@
 ## 5. 已定的决策
 
 | 决策 | 选定 | 理由与要付的代价 |
-|---|---|---|
+| --- | --- | --- |
 | 目标仓库 | **现有 Gitee 仓库** | issue 与提交在同一处看，省一个仓库。**代价：仓库是公开的**，用户报错对所有人可见——所以脱敏必须走白名单（§2.3），不能打折 |
 | 上报范围 | **自动 + 人工上报入口** | 自动上报只看得见崩溃；"结论算错了"只有用户发现得了，而后者恰恰是日志分析最容易出的问题 |
 | 浏览器端 | **报** | Pyodide 崩溃只在用户机器上发生，不报就抓不到（上一轮 `__FACTS__` 就是这么漏到线上的）。接受脱敏后的少量客户端数据上行 |
@@ -133,7 +133,7 @@
 ## 6. 实现落点（已完成）
 
 | 文件 | 说明 |
-|---|---|
+| --- | --- |
 | `web/lib/error-policy.js` | 新增。**两侧共用的政策**：脱敏规则与顺序、`clip()` 头尾保留截断、`normalize()` 指纹归一化、长度上限、级别白名单。浏览器与边缘都引它——见 §6.2 |
 | `web/functions/_lib/issue-filer.js` | 新增。指纹（归一化后 sha256 前 16 位）、KV 去重、内存限流、Gitee/GitHub 适配、失败留痕、`probeConfig()` |
 | `web/functions/api/issues.js` | 新增。浏览器入口，公开端点：按 IP 日限流 20 条、body ≤ 64KB、立即 202 由 `waitUntil` 处理；`ISSUE_DEBUG=1` 时同步回显结果 |
@@ -165,7 +165,7 @@
 `web/lib/error-policy.js` 一份：
 
 | 共用（`lib/error-policy.js`） | 各自独立 |
-|---|---|
+| --- | --- |
 | 脱敏规则与顺序、`clip()`、`normalize()`、长度上限、级别白名单 | 浏览器侧：`sendBeacon`/`fetch` 传输、内存去抖窗口、payload 组装、全局钩子 |
 | 同上 | 边缘侧：token 与配置、sha256 指纹、KV 去重、评论节流、平台适配、issue 正文渲染 |
 

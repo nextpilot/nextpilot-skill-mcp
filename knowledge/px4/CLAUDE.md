@@ -159,8 +159,8 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 - **验证**：`compare_baseline.py` 6 条日志零差异（它逐字段比 finding 的
   `id/ruleId/severity/tag/title/evidence/docUrl/suggestion`，**覆盖 `docUrl`**）；
   构建产物解析成对象后逐条与改名前**相等**（只有 key 顺序变了）；
-  `check_artifact.py` / `check_provider.py` / `build:kb --check` 全过。
-  **`derived-version` 会变**（`rule_engine.py` 在哈希里），用户存档打开时自动重解析一次；
+  `check-pyodide-px4log-engine.py` / `check_provider.py` / `build:kb --check` 全过。
+  **`derived-version`会变**（`rule_engine.py` 在哈希里），用户存档打开时自动重解析一次；
   `rules/*.yaml` 仍**不进**哈希，所以改名 / 改阈值不会让历史结论重算。
 - **顺带统一了分段格式**（同一批的第二笔提交，**只动空行、无语义变化**）：原先「每个顶层键前都空一行」
   的写法把只有 10 个键的文件撑到 50 多行，而且 5 个文件还漏了几处。改为按文件头注释自己的分组
@@ -545,7 +545,7 @@ load_crit = 0.95
   engine/rule_engine.py           ─┤
   engine/report_data.py           ─┘
         ↓ 生成的产物（提交进仓库）
-  web/workers/ulog-check-script.ts   ← Python 源码，内联 __RULES__/__FACTS__/__TOPICS__ 的 JSON 字面量
+  web/workers/pyodide-px4log-engine.ts   ← Python 源码，内联 __RULES__/__FACTS__/__TOPICS__ 的 JSON 字面量
   web/workers/fault-kb.generated.json
         ↓ 浏览器运行时
   Web Worker + Pyodide  →  执行 Python：基础事实层 → 匹配 firmware/airframe → 取字段
@@ -570,7 +570,7 @@ load_crit = 0.95
 生成的 Python 大致长这样（`__RULES__` 等占位符在构建期被替换成 JSON 字面量）：
 
 ```python
-# web/workers/ulog-check-script.ts 里的 Python（自动生成，勿手改）
+# web/workers/pyodide-px4log-engine.ts 里的 Python（自动生成，勿手改）
 import json, ast
 import numpy as np
 from pyulog import ULog

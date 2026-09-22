@@ -7,7 +7,7 @@
 #
 # 现状：**没有运行时消费者**——它只服务构建期校验（见下方"用在哪"）。
 # 本文件**不进浏览器产物**（与 meta/ 一样是构建期的东西），所以不必内联进
-# web/workers/ulog-check-script.ts。
+# web/workers/pyodide-px4log-engine.ts。
 #
 # 用在哪：`tools/calibrate/lint_rules.py` 与将来的构建期字段校验。判据是先按它把
 # 日志 topic 名换成字典键，再在那个键的 `fields` 里找字段（并按 tag 判版本错配）。

@@ -261,7 +261,7 @@ python tools/ci/check_all.py --stage push    # 无工具链检查，26s
    好在 4 项共 11s，秒级，留在 push 不影响"检查不卡进度"。
 
 **改完后 push 阶段剩什么**：静态检查那批（格式化 / lint / 类型 / 单测 / 契约 / 元检查）
-+ 日志回归 4 项（11s），全部秒级。**再加上第 11.2 节的 `check_secrets`**。
+- 日志回归 4 项（11s），全部秒级。**再加上第 11.2 节的 `check_secrets`**。
 这才是"检查不卡进度"的形态。
 
 **日志回归为什么去不了 CI**（第 9 节）：
@@ -425,7 +425,7 @@ npmmirror 而失败（该镜像无 audit 端点），但 **CI 未配 registry，
 | --- | --- | --- |
 | 装 prettier | `web/package.json` devDependencies | 装子项目，依赖不进仓库根 |
 | 配置 | `web/.prettierrc` | `tabWidth: 4`、`printWidth: 120`、`semi`、`singleQuote: false`、**`endOfLine: "auto"`** |
-| 排除生成物 | `web/.prettierignore` | `.generated/`、`workers/ulog-check-script.ts`、`workers/ulog-data-script.ts`、`lib/knowledge/*.generated.*`、锁文件 |
+| 排除生成物 | `web/.prettierignore` | `.generated/`、`workers/pyodide-px4log-engine.ts`、`workers/pyodide-px4log-data.ts`、`lib/knowledge/*.generated.*`、锁文件 |
 | ESLint 扩到 TS | `web/eslint.config.mjs` | **放弃** —— `typescript-eslint` 不支持 TS 7，详见下方「TS lint 为什么没接」 |
 | pre-commit | `.githooks/pre-commit` | 对 staged 的 `.ts/.tsx/.js/.mjs/.css` 跑 `prettier --write`，对 `.ts/.tsx` 跑 `eslint --fix`，并重新暂存 |
 | 接入清单 | `tools/ci/checklist.yml` | 静态阶段加 `prettier --check`，接在 `eslint` 之后 |
@@ -1173,7 +1173,7 @@ feat(web): … / fix(ci): … / chore: … / refactor(ci): … / perf(ci): … /
 | 格式 | `^(feat\|fix\|chore\|docs\|refactor\|perf\|style\|test\|build\|ci\|revert)(\([a-z0-9-]+\))?: .+` |
 | 首行长度 | ≤ 72 字符（**不设下限**：`chore: x` 这类短标题是合理的） |
 | 空 message | 拒绝（`git commit --amend` 留下的空模板也算） |
-| 例外 | `Merge ` / `Revert ` 开头的自动提交放行 |
+| 例外 | `Merge` / `Revert` 开头的自动提交放行 |
 
 **为什么不卡正文**：`CLAUDE.md` 级的约定是"结论先行、风险不粉饰"，
 但提交正文写多细是人的自由；**卡正文格式只会逼人写废话**。
@@ -1377,7 +1377,7 @@ if with_e2e:
 ```
 
 **已配守卫**（`check_hygiene.py` 第 6 项「hook 不从阶段列表反推开关」）
-+ 变异自证（`mutate_guards.py`「pre-push 从阶段列表反推 --with-e2e」）。
+- 变异自证（`mutate_guards.py`「pre-push 从阶段列表反推 --with-e2e」）。
 凡是".githooks/ 里把 `--with-*` 与阶段表达式绑在一起"的写法，静态扫出来即失败。
 
 **自证时暴露的第二个坑（值得记下）**：这条守卫的**第一版正则是恒绿的**——

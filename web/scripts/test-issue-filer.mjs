@@ -459,7 +459,7 @@ console.log('\n[12] 取数据前先让 Worker 装上这份日志（共享 Worker
     // 文件"——而字节往往就在手里（刚选过的那份、或本机缓存里的）。2026-09-18 用户连着报了三轮
     // "还是这个问题"，就是这么来的：每一步看起来都对，但没有人负责"把这份日志装进 Worker"。
     // 现在这个责任归前端：取数前先 ensureLogLoaded。下面几条把结构钉住。
-    const worker = read("../workers/ulog-worker.ts");
+    const worker = read("../workers/pyodide-px4log-worker.ts");
     const hook = read("../hooks/useLogAnalyzer.ts");
 
     // Worker 必须回传"这次装的是哪一份"——前端不许靠"我发过 analyze"推断（analyze 会失败）
@@ -714,7 +714,7 @@ console.log("\n[16] 轨迹取不到要说清缺什么（不许再退回一句空
     // 用户的原话："这段日志里没有可用的定位轨迹 直接告诉用户缺少什么字段，不要这么空洞的提示"。
     // 空洞只是表象：那句概括只对应六种原因里的一种（缺 topic / 缺字段 / 字段改名 / 有采样但
     // 全程没定位 / 采样数对不上 / 没 timestamp），另外五种下它是**错的**。
-    // 引擎侧那半（返回体必须带 errorReasons）由 tools/calibrate/check_artifact.py 动态核；
+    // 引擎侧那半（返回体必须带 errorReasons）由 tools/calibrate/check-pyodide-px4log-engine.py 动态核；
     // 这里管界面这半——失败分支真的填、列表真的渲染、切了日志清空。
     // 只留 `tsc` **看不见**的那几条：`TrackData` 的字段声明、state 声明、setter 调用，少一环
     // tsc 都会当场报错，再给它们配守卫就是"恒绿的守卫"（§6.6 那条"守卫自己也要被校验"——

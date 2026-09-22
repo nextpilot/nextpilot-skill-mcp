@@ -2,8 +2,8 @@
 # 格式化了会被下次构建覆盖，还会让 build:kb --check 的产物比对产生假失败。
 
 # 生成的 TS/JS 数据脚本
-workers/ulog-check-script.ts
-workers/ulog-data-script.ts
+workers/pyodide-px4log-engine.ts
+workers/pyodide-px4log-data.ts
 lib/knowledge/*.generated.ts
 lib/knowledge/*.generated.js
 

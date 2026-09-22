@@ -47,7 +47,7 @@ Python（只当文本搬运，见 `../README.md`），Pyodide 里也没有 mypy�
   函数调用）——规则里判"某个 topic 在不在日志里"用它。
 - **别把取数逻辑搬回 YAML**：候选字段、异常回退、位解码、按版本挑分支——这些是逻辑，
   用 YAML 表达只能再造一门小语言（本项目已经删掉两门了）。
-- **这里会整份进浏览器**：`api.py` 与各适配器都被内联进 `web/workers/ulog-check-script.ts`，
+- **这里会整份进浏览器**：`api.py` 与各适配器都被内联进 `web/workers/pyodide-px4log-engine.ts`，
   在 Pyodide 里执行。只能用 Pyodide 自带的（`numpy` / `ast` / `json` / `lzma`）。
   （`knowledge/*/meta/*.json` 是例外：太大且与具体日志无关，**不进产物**，按需从
   `web/public/params/` 拉。）

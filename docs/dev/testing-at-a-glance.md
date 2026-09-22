@@ -73,8 +73,8 @@
 
 | 产物 | 是什么 |
 | --- | --- |
-| `web/workers/ulog-check-script.ts` | 引擎的浏览器版（Pyodide 里跑的那份） |
-| `web/workers/ulog-data-script.ts` | 数据层的浏览器版 |
+| `web/workers/pyodide-px4log-engine.ts` | 引擎的浏览器版（Pyodide 里跑的那份） |
+| `web/workers/pyodide-px4log-data.ts` | 数据层的浏览器版 |
 | `web/workers/fault-kb.generated.json` | 故障知识库的内联版 |
 | `knowledge/px4/rules-editor-schema.generated.json` | 规则编辑器的 JSON Schema |
 
@@ -95,7 +95,7 @@
 | 2 | `ruff format --check` | Python 格式化 | 风格统一吗（**只认 `.py`**） | 2s |
 | 3 | `ruff check` | Python lint | 有没有可疑写法 | 1s |
 | 4 | `engine/tests/` | 单元测试 | 算子与 CEL 表达式**求值对不对** | 1.2s |
-| 5 | `tools/calibrate/check_artifact.py` | 产物校验 | 生成的产物是合法可执行的 Python 吗；轨迹取不到时给没给逐条原因 | 1s |
+| 5 | `tools/calibrate/check-pyodide-px4log-engine.py` | 产物校验 | 生成的产物是合法可执行的 Python 吗；轨迹取不到时给没给逐条原因 | 1s |
 | 6 | `tools/ci/check_engine_purity.py` | 纯净性守卫 | `engine/` 还是纯 Python 吗（浏览器与本机共用同一份的前提） | 0.6s |
 | 7 | `tsc --noEmit` | 类型检查 | TypeScript 类型对得上吗 | 2s |
 | 8 | `prettier --check` | 前端格式化 | 前端风格统一吗 | 3.7s |

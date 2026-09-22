@@ -166,8 +166,8 @@ cd web && pnpm build:kb --check    # 只比对不写入：任一产物与 knowle
 ```
 
 生成产物（提交进仓库，EdgeOne 直接 `next build` 也有得用）：
-`web/workers/ulog-check-script.ts`（内联 engine/operators.py + engine/rule_engine.py + rules/*.yaml）、
-`web/workers/ulog-data-script.ts`、`web/workers/fault-kb.generated.json`、
+`web/workers/pyodide-px4log-engine.ts`（内联 engine/operators.py + engine/rule_engine.py + rules/*.yaml）、
+`web/workers/pyodide-px4log-data.ts`、`web/workers/fault-kb.generated.json`、
 `web/lib/knowledge/prompts.generated.js`、
 `px4/rules-editor-schema.generated.json`（编辑器用，见下节）。
 

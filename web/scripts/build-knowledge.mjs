@@ -11,8 +11,8 @@
  *   knowledge/px4/meta/*.json     固件字段与参数字典
  *
  * 本脚本生成（产物提交进仓库，EdgeOne 直接 next build 也能跑）：
- *   web/workers/ulog-check-script.ts   （导出 PY_ULG_CHECKS，内联 KB）
- *   web/workers/ulog-data-script.ts    （导出 PY_ULG_DATA_HELPERS）
+ *   web/workers/pyodide-px4log-engine.ts   （导出 PY_ULG_CHECKS，内联 KB）
+ *   web/workers/pyodide-px4log-data.ts    （导出 PY_ULG_DATA_HELPERS）
  *   web/workers/fault-kb.generated.json
  *   web/lib/knowledge/prompts.generated.js（ESM，供边缘函数 import）
  *   web/.generated/guide/rule-catalogue.mdx（指南「知识库」分组的规则清单页）
@@ -1654,7 +1654,7 @@ function build() {
         }
     }
     writeArtifact(
-        resolve(outWorkers, "ulog-check-script.ts"),
+        resolve(outWorkers, "pyodide-px4log-engine.ts"),
         banner +
             'import faultKbJson from "./fault-kb.generated.json";\n\n' +
             "const rules = " +
@@ -1680,7 +1680,7 @@ function build() {
     // 3) 数据层 .ts
     const reportDataPy = read(PY_REPORT_DATA);
     writeArtifact(
-        resolve(outWorkers, "ulog-data-script.ts"),
+        resolve(outWorkers, "pyodide-px4log-data.ts"),
         banner + "export const PY_ULG_DATA_HELPERS = String.raw`" + toRawTemplate(reportDataPy) + "`;\n",
     );
 

@@ -5,7 +5,7 @@
   python tools/calibrate/run_checks_locally.py --probe-data <file.ulg> ...
 
 引擎实现在 engine/（本脚本直接读源码，改完即可跑）；**规则读构建产物**
-（web/workers/ulog-check-script.ts 的 `const rules = [...]`）。
+（web/workers/pyodide-px4log-engine.ts 的 `const rules = [...]`）。
 为什么不直接读 rules/*.yaml：compute 的老节点写法要编译成表达式，而那份编译器只有构建期
 一份（web/scripts/lib/rule-expr.mjs）——Python 侧不再重复实现（两份一定漂移）。
 所以**改了 rules/ 要先 `cd web && pnpm build:kb` 再回归**，脚本会检查产物是否陈旧。
@@ -38,7 +38,7 @@ REPORT_DATA_PY = ENGINE / "report_data.py"
 RULES_DIR = KN_PX4 / "rules"
 FACTS_YAML = KN_PX4 / "facts.yaml"  # PX4 的数据（码表/文案/展示口径/规则元数据）
 FAULT_KB_JSON = REPO_ROOT / "web" / "workers" / "fault-kb.generated.json"
-CHECK_SCRIPT = REPO_ROOT / "web" / "workers" / "ulog-check-script.ts"
+CHECK_SCRIPT = REPO_ROOT / "web" / "workers" / "pyodide-px4log-engine.ts"
 
 
 def _load_rules() -> list:
@@ -142,7 +142,7 @@ def probe_one(path: Path) -> dict:
     series = None
     if sample:
         fld = sample["fields"][0]["name"]
-        # `np_series` 收的是一份**请求 JSON**（契约见 ulog-data-script.ts 的 `np_series`）：
+        # `np_series` 收的是一份**请求 JSON**（契约见 pyodide-px4log-data.ts 的 `np_series`）：
         # 面板要第几个实例、每条线怎么取，全在声明里。**别改回位置参数**——以前这里写的是
         # `np_series(topic, instance, fields, max_points)`，签名改成请求体之后没人跟着改，
         # 于是这一段**每次都以 TypeError 结束**；而 `main()` 又不看失败（见下），结果是

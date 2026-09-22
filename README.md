@@ -61,8 +61,8 @@ pnpm dev
   → 中文 Markdown 报告（GJB-841 格式）
 ```
 
-- **第一层 解析引擎**：Pyodide（WASM Python）+ pyulog，见 `web/workers/ulog-worker.ts`
-- **第二层 规则检查**：YAML 声明式规则 → 构建期编译为 Python → 内联进 `web/workers/ulog-check-script.ts`，覆盖振动、EKF、电源、GPS、姿态、失效保护等 16 个检查维度
+- **第一层 解析引擎**：Pyodide（WASM Python）+ pyulog，见 `web/workers/pyodide-px4log-worker.ts`
+- **第二层 规则检查**：YAML 声明式规则 → 构建期编译为 Python → 内联进 `web/workers/pyodide-px4log-engine.ts`，覆盖振动、EKF、电源、GPS、姿态、失效保护等 16 个检查维度
 - **第三层 LLM 解释**：`web/functions/api/explain.js`，只接收 findings，system prompt 禁止编造数值
 
 新增 Skill：在 `knowledge/skills/` 下建一个以 slug 命名的目录，里面放三份文件

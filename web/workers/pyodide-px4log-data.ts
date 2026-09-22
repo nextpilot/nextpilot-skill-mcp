@@ -6,8 +6,8 @@ export const PY_ULG_DATA_HELPERS = String.raw`# ================================
 # 取数一律走 provider（契约见 providers/api.py）——本文件不碰 pyulog，
 # 也不出现任何 topic 名 / 字段名（那些在 providers/<格式>.py 与 facts.yaml 里）。
 #
-# 与 providers 的关系：本文件与 ulog-check-script.ts 跑在**同一个 __main__ globals** 里
-# （ulog-worker.ts 把两段拼起来执行），所以直接用那边建好的 \`provider\`。
+# 与 providers 的关系：本文件与 pyodide-px4log-engine.ts 跑在**同一个 __main__ globals** 里
+# （pyodide-px4log-worker.ts 把两段拼起来执行），所以直接用那边建好的 \`provider\`。
 # ============================================================================
 
 import json

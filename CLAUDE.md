@@ -322,8 +322,8 @@
 | 分析页 tab 组件 | 一个 tab 一个文件：`Log<用途>Msg.tsx` | `LogEventsMsg.tsx`、`LogParamsMsg.tsx`、`LogSystemMsg.tsx`、`LogFlightMap.tsx` |
 | 库 / 类型 / 常量 | kebab-case + `.ts` | `chart-presets.ts`、`types.ts`、`constants.ts` |
 | **两侧共用**的库（浏览器 + 边缘函数都引） | kebab-case + **`.js`**（例外：边缘那 22 个文件全是 `.js`，`.ts` 能否被 EdgeOne 打包器吃下本地验证不了） | `lib/error-policy.js` |
-| Web Worker 入口 | kebab-case + `-worker.ts` | `ulog-worker.ts` |
-| Worker 内嵌脚本 / helper | kebab-case + `-script.ts` | 现由 `build-knowledge.mjs` **生成**，不手改 |
+| Web Worker 入口 | kebab-case + `-worker.ts` | `pyodide-px4log-worker.ts` |
+| Worker 内嵌脚本 / helper | kebab-case + `-script.ts` / `-engine.ts` / `-data.ts` | 现由 `build-knowledge.mjs` **生成**，不手改 |
 | Next.js 路由 | `page.tsx` / `route.ts` / `layout.tsx`（目录即路由） | `app/analyze/page.tsx`、`app/api/explain/route.ts` |
 | Python 模块 | snake_case + `.py` | `engine/rule_engine.py`、`engine/operators.py`、`engine/report_data.py` |
 | 知识 / 经验文件 | 见 `knowledge/README.md`；规则 `rules/*.yaml`、故障库 `fault-kb.yaml` | `rules/vibration.yaml`、`fault-kb.yaml` |
@@ -381,7 +381,7 @@
    同理反向也成立：只服务一类的（列表页 `SkillExplorer` / `McpGrid`）**不要**为了"统一"
    改成中立名——那会让"这是哪一类的列表"从名字里消失。
 
-> 注意：Worker 相关文件统一用连字符（`ulog-worker.ts`），不要用点号（❌ `ulog.worker.ts`）。
+> 注意：Worker 相关文件统一用连字符（`pyodide-px4log-worker.ts`），不要用点号（❌ `pyodide-px4log.worker.ts`）。
 >
 > **日志分析的人工经验（阈值 / 故障树 / 检查逻辑 / LLM 范式 / 事实层绑定与码表）单一事实源在仓库根
 > `knowledge/px4/`**（= `rules/*.yaml` + `fault-kb.yaml` + `facts.yaml` + `llm/*.md`；
@@ -485,7 +485,7 @@
    JS 侧查不出来（Pyodide 的 `globals.get("不存在的名字")` 返回 `undefined`，不报错）。
 4. **守卫要答两件不同的事时，两件必须一起成立。** 例：`track`/`series` 请求既要"命名空间装载了"
    又要"装的就是这一份日志"——少后半句，工作区里装着日志 A 时打开没有轨迹存档的报告 B，
-   会把 A 的航线画成 B 的飞行记录（`web/workers/ulog-worker.ts` 的 `logNotLoadedReason`）。
+   会把 A 的航线画成 B 的飞行记录（`web/workers/pyodide-px4log-worker.ts` 的 `logNotLoadedReason`）。
 5. **"缺字段"和"空"是两个答案，判空不许给同一个。** `result.get("findings", [])` 对"字段没交付"
    和"本来就没有告警"返回同一个 0——守卫看着是绿的，其实什么也没查。查"在不在"就直说：
    `if "findings" not in result` / `if not isinstance(..., list)`。同型的还有不区分来源的
@@ -499,7 +499,7 @@
 > 因为复解析是成功的，被挡掉的是紧跟其后的 track 请求。
 > **三次都不是"少写一个判断"，都是"判断本身没有被任何东西检查过"。**
 >
-> 守住这条的是 `tools/calibrate/check_artifact.py`：它真执行编译产物，把 `ulog-worker.ts` 里
+> 守住这条的是 `tools/calibrate/check-pyodide-px4log-engine.py`：它真执行编译产物，把 `pyodide-px4log-worker.ts` 里
 > 所有 `pyodide.globals.get("…")` 的名字**逐个拿到那个命名空间里核**（核对前先按 worker 的顺序
 > 调一遍 `np_report` / `np_manifest` / `np_log_info` / `np_track`，`__result` 这类由函数内部
 > `global` 摆出来的名字才真的存在），不存在即红并打印命名空间里真实存在的名字。
@@ -508,7 +508,7 @@
 >
 > 第五、第六次（2026-09-18 晚，同一天内）：`track` 的"取不到要说清缺什么"那条契约，
 > **回归日志恰好有 GPS**，失败分支一次都不会被执行 → 守卫恒绿（做法：**构造反向用例**，
-> 改运行期配置把分支逼出来，见 `check_artifact.py` 的两道 probe）；以及
+> 改运行期配置把分支逼出来，见 `check-pyodide-px4log-engine.py` 的两道 probe）；以及
 > `run_checks_locally.py --probe-data` **对每一份日志都打 ERROR 却 `return 0`**——
 > 它的 `np_series` 调用还停在旧的 4 参签名上，签名改成请求体之后没人跟着改，
 > 于是 `series` 那一路**很久没被真的检过**，而 `check_all.py` 只看退出码、一直报 OK。
@@ -585,7 +585,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 4. **声明期的判据必须真的送到判定的那一侧，并且每次搬家都要有守卫。** `conditions.topics`
    写在 `plot/track.yml`，判定在引擎侧——构建期把这份声明搬进 `facts.track` 时漏过一次，
    于是引擎"看不到"闸门，只能退回那句概括。搬家的丢失只有产物看得见，所以
-   `check_artifact.py` 拿 `track.yml` 的声明与产物里的 `facts.track.conditions.topics` 对账。
+   `check-pyodide-px4log-engine.py` 拿 `track.yml` 的声明与产物里的 `facts.track.conditions.topics` 对账。
 5. **"缺什么"要和"实际有什么"成对出现。** 只说缺，用户分不清是固件版本不同、还是字段改了名；
    附一句"这份日志里带经纬度字段的 topic 有：…"才有对照物。挑对照物要按**字段**而不是 topic 名——
    `vehicle_local_position` 这个名字看不出它只有参考原点 `ref_lat/ref_lon`、没有逐点经纬度，
@@ -610,7 +610,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 > 断的是构建期那一段：`compileMap` 只把 `children` 搬进了 `facts.track`，`conditions` 留在原地。
 > **机制存在 ≠ 机制可达**；`conditions` 这类"声明"在链路上每经过一次搬运，都值得配一道对账的守卫。
 >
-> 守住这条的是 `tools/calibrate/check_artifact.py`（对账 `conditions` 搬运 + 真执行 `np_track()`
+> 守住这条的是 `tools/calibrate/check-pyodide-px4log-engine.py`（对账 `conditions` 搬运 + 真执行 `np_track()`
 > 核返回体契约，并且**构造两道反向用例**——一道逼出"声明的 topic 不在日志里"，一道逼出"字段取不到"，
 > 因为回归日志有 GPS，不构造的话失败分支一次都不会被执行，守卫恒绿）与 `test-issue-filer.mjs`
 > §[16]（界面那半：失败分支真的填、列表真的渲染、切了日志清空）。§[16] 只留 `tsc` **看不见**
@@ -633,7 +633,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 │   · ruff format --check（Python 风格）       │
 │   · ruff check（Python lint）                │
 │   · build:kb --check（知识库契约与产物一致）    │
-│   · check_artifact（产物是合法 Python）       │
+│   · check-pyodide-px4log-engine（产物是合法 Python）  │
 │   · check_engine_purity（三处共用源码纯净性）   │
 │   · tsc --noEmit（TypeScript 类型检查）       │
 │   · test-issue-filer.mjs（报错上报自测）      │

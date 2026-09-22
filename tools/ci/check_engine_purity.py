@@ -5,7 +5,7 @@ r"""`engine/` 必须是**纯 Python** —— 不许碰 Pyodide / JS 桥接 / 浏
 `engine/` 是「一份源码、三个运行时」共用：
 
 - **浏览器**：`web/scripts/build-knowledge.mjs` 把 `operators.py` / `providers/*.py` /
-  `rule_engine.py` 拼成一段 Python 字符串，内联进 `web/workers/ulog-check-script.ts`，
+  `rule_engine.py` 拼成一段 Python 字符串，内联进 `web/workers/pyodide-px4log-engine.ts`，
   在 Pyodide 里跑（日志不出设备，所以只能这样）；
 - **本机**：`tools/calibrate/` 直接把 `engine/` 指进 `sys.path`，用 CPython 跑同一份；
 - **将来**：独立后端进程也打算复用这一份。

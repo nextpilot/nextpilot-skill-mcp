@@ -12,8 +12,8 @@
  * 请求都带 `logId`（日志内容指纹）：这个 Worker 是**共享**的、跨报告存活，
  * 一旦里面装的是另一份日志，取数据会静默拿错——见 logNotLoadedReason 的说明。
  */
-import { PY_ULG_CHECKS } from "./ulog-check-script";
-import { PY_ULG_DATA_HELPERS } from "./ulog-data-script";
+import { PY_ULG_CHECKS } from "./pyodide-px4log-engine";
+import { PY_ULG_DATA_HELPERS } from "./pyodide-px4log-data";
 import type { LogInfo, TopicManifest } from "@/lib/types";
 import type { SeriesRequest } from "@/lib/chart-presets";
 
@@ -168,7 +168,7 @@ let loadedLogId: string | null = null;
  *    import ULog` 只带来 `ULog`）。守卫于是恒真：轨迹请求**永远**被判成"没解析过"，
  *    轨迹画不出来、也从没进过存档，界面还一直说"重选文件即可恢复"——
  *    用户照做一遍，回到报告页看到同一句（复解析是成功的，只是 track 请求又被这道守卫挡了）。
- *    `tools/calibrate/check_artifact.py` 现在会真执行产物、拿命名空间核对这里查的名字。
+ *    `tools/calibrate/check-pyodide-px4log-engine.py` 现在会真执行产物、拿命名空间核对这里查的名字。
  *
  * 2. **装的就是这一份。** 探到 provider 就直接发数据的话，工作区里装着日志 A、
  *    用户打开没有轨迹存档的报告 B 时，会把 A 的轨迹画成 B 的飞行记录——
