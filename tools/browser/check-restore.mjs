@@ -46,7 +46,10 @@ await send("Emulation.setDeviceMetricsOverride", {
 });
 
 const ev = async (expr) => {
-    const r = await send("Runtime.evaluate", { expression: expr, returnByValue: true });
+    const r = await send("Runtime.evaluate", {
+        expression: expr,
+        returnByValue: true,
+    });
     return r?.result?.value;
 };
 
@@ -106,7 +109,10 @@ await sleep(1000);
 const final = JSON.parse(await ev(state));
 console.log("最终:", final);
 console.log("缓存足迹:", await ev(`document.body.innerText.match(/本机缓存了[^。]*。/)?.[0] ?? "(无)"`));
-const shot = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+const shot = await send("Page.captureScreenshot", {
+    format: "png",
+    captureBeyondViewport: false,
+});
 writeFileSync(process.env.OUT ?? "/tmp/restore.png", Buffer.from(shot.data, "base64"));
 console.log("saved", process.env.OUT ?? "/tmp/restore.png");
 ws.close();

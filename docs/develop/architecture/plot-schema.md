@@ -79,8 +79,16 @@ series:
     deg: { label: 度, range: [-180, 180] }
     m: { label: 高度 }
   children:
-    - { mode: series, y: deg, series: [{ field: [latitude_deg, lat], label: 纬度 }] }
-    - { mode: series, y: m, series: [{ field: [altitude_msl_m, alt], label: 海拔 }] }
+    - {
+        mode: series,
+        y: deg,
+        series: [{ field: [latitude_deg, lat], label: 纬度 }],
+      }
+    - {
+        mode: series,
+        y: m,
+        series: [{ field: [altitude_msl_m, alt], label: 海拔 }],
+      }
 ```
 
 只有一个轴时省略 `y`（图元落到默认轴），写最短形式。

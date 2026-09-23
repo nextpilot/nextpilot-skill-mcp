@@ -171,6 +171,13 @@ export function LogFlightMap({
         load();
         return () => {
             cancelled = true;
+            // providerId 或 loadTrack 变化时立即销毁旧地图，否则新 buildMap 会报
+            // "Map container is being reused by another instance"
+            if (mapRef.current) {
+                mapRef.current.remove();
+                mapRef.current = null;
+                boundsRef.current = null;
+            }
         };
     }, [loadTrack, providerId]);
 
@@ -219,6 +226,11 @@ export function LogFlightMap({
         if (mapRef.current) {
             mapRef.current.remove();
             mapRef.current = null;
+        }
+        // 安全网：强制清除容器上可能残留的 Leaflet 内部标记
+        // （provider 切换时 cleanup 已经 remove 过，这里防御极端时序）
+        if (containerRef.current) {
+            delete (containerRef.current as unknown as Record<string, unknown>)._leaflet_id;
         }
 
         const map = L.map(containerRef.current, {
@@ -318,7 +330,13 @@ export function LogFlightMap({
             .bindTooltip(`终点 · ${last.alt.toFixed(1)} m`)
             .addTo(map);
 
+        if (all.length === 0) return;
+
         const bounds = L.latLngBounds(all);
+        // 防御：如果所有点被 Leaflet 判为无效（例如 NaN），bounds 会是空的，
+        // fitBounds 会内部崩掉 "Cannot read properties of undefined (reading 'length')"
+        if (!bounds.isValid()) return;
+
         boundsRef.current = bounds;
         map.fitBounds(bounds, { padding: [20, 20], maxZoom: provider.fitMaxZoom });
     }

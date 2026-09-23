@@ -1033,7 +1033,15 @@ node node_modules/@playwright/test/cli.js test --grep '日志分析流程' --lis
 **但 `checklist.yml:154` 的 `{ENV.SKIP_LOG_ANALYSIS}` 占位符还在**：
 
 ```yaml
-command: ["{NODE}", "node_modules/@playwright/test/cli.js", "test", "--grep", "@smoke", "{ENV.SKIP_LOG_ANALYSIS}"]
+command:
+  [
+    "{NODE}",
+    "node_modules/@playwright/test/cli.js",
+    "test",
+    "--grep",
+    "@smoke",
+    "{ENV.SKIP_LOG_ANALYSIS}",
+  ]
 ```
 
 `check_all.py` 的 `_build_placeholders` 把 `{ENV.XXX}` 解析成"环境变量有值就代入，

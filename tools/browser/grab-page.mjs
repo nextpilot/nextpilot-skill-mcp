@@ -67,7 +67,10 @@ const { result: textRes } = await send("Runtime.evaluate", {
 });
 writeFileSync(`${prefix}.txt`, textRes.value ?? "", "utf8");
 
-const shot = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });
+const shot = await send("Page.captureScreenshot", {
+    format: "png",
+    captureBeyondViewport: true,
+});
 writeFileSync(`${prefix}.png`, Buffer.from(shot.data, "base64"));
 
 console.log("saved", prefix + ".png/.html/.txt");

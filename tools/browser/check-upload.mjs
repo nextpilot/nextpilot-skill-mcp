@@ -90,7 +90,10 @@ await send("Emulation.setDeviceMetricsOverride", {
 await send("Page.navigate", { url: `${base}/analyze` });
 
 const evalIn = async (expr) => {
-    const r = await send("Runtime.evaluate", { expression: expr, returnByValue: true });
+    const r = await send("Runtime.evaluate", {
+        expression: expr,
+        returnByValue: true,
+    });
     return r?.result?.value;
 };
 
@@ -145,7 +148,10 @@ async function tryUpload() {
         selector: 'input[type="file"]',
     });
     if (!found.nodeId) throw new Error("页面上没找到 file input");
-    await send("DOM.setFileInputFiles", { nodeId: found.nodeId, files: [logPath] });
+    await send("DOM.setFileInputFiles", {
+        nodeId: found.nodeId,
+        files: [logPath],
+    });
     const n = await evalIn("document.querySelector('input[type=file]').files.length");
     // setFileInputFiles 只把文件塞进 input，不保证触发事件（Chrome 版本间行为不一致），
     // 必须显式派发；若 React 仍未接住则重试（见下方的响应判定）

@@ -4,11 +4,11 @@
 
 本项目采用 [BSD-3-Clause](LICENSE) 许可证。
 
-> PX4 
+> PX4
 >
 > `.ulg`
 >
->  端侧解析内置 
+> 端侧解析内置
 >
 > **32 条自包含检查经验（16 个执行位置 / 74 个算子）+ 10 条故障知识库**
 >
@@ -16,8 +16,6 @@
 > 输出 GJB-841 中文报告。Skill Hub + GitHub / 邮箱登录 + EdgeOne KV 已上线。
 
 ## 目录结构
-
-
 
 ```
 .
@@ -65,8 +63,6 @@
 
 ## 快速开始
 
-
-
 ```
 cd web
 
@@ -79,21 +75,17 @@ pnpm dev
 
 打开 [http://localhost:3000](http://localhost:3000) ：
 
+- `/` 首页与精选 Skill
 
+- `/guide` Skill / MCP 帮助文档与提交使用指南
 
-* `/` 首页与精选 Skill
+- `/skills` Skill 技能库（内容源 `knowledge/skills/<slug>/`，Fuse.js 客户端搜索）
 
-* `/guide` Skill / MCP 帮助文档与提交使用指南
+- `/mcp` 收录的 MCP 服务（内容源 `knowledge/mcp/<slug>/`，**另一份规范**：`server.json`）
 
-* `/skills` Skill 技能库（内容源 `knowledge/skills/<slug>/`，Fuse.js 客户端搜索）
-
-* `/mcp` 收录的 MCP 服务（内容源 `knowledge/mcp/<slug>/`，**另一份规范**：`server.json`）
-
-* `/analyze` PX4 日志分析（Pyodide + pyulog 在 Web Worker 中本地解析）
+- `/analyze` PX4 日志分析（Pyodide + pyulog 在 Web Worker 中本地解析）
 
 ## 架构
-
-
 
 ```
 选择 .ulg（全程留在浏览器，不上传原始文件）
@@ -107,13 +99,11 @@ pnpm dev
 &#x20; → 中文 Markdown 报告（GJB-841 格式）
 ```
 
+- **第一层 解析引擎**：Pyodide（WASM Python）+ pyulog，见 `web/workers/pyodide-px4log-worker.ts`
 
+- **第二层 规则检查**：YAML 声明式规则 → 构建期编译为 Python → 内联进 `web/workers/pyodide-px4log-engine.ts`，覆盖振动、EKF、电源、GPS、姿态、失效保护等 16 个检查维度
 
-* **第一层 解析引擎**：Pyodide（WASM Python）+ pyulog，见 `web/workers/pyodide-px4log-worker.ts`
-
-* **第二层 规则检查**：YAML 声明式规则 → 构建期编译为 Python → 内联进 `web/workers/pyodide-px4log-engine.ts`，覆盖振动、EKF、电源、GPS、姿态、失效保护等 16 个检查维度
-
-* **第三层 LLM 解释**：`web/functions/api/explain.js`，只接收 findings，system prompt 禁止编造数值
+- **第三层 LLM 解释**：`web/functions/api/explain.js`，只接收 findings，system prompt 禁止编造数值
 
 新增 Skill：在 `knowledge/skills/` 下建一个以 slug 命名的目录，里面放三份文件
 
@@ -135,8 +125,6 @@ pnpm dev
 
 `tools/ci/checklist.yml` 一处，CI 自动跟着变）：
 
-
-
 ```
 python tools/ci/check\_all.py --stage push        # 本地快检（秒级，pre-push hook 跑的就是它）
 
@@ -149,16 +137,12 @@ python tools/ci/check\_all.py --list-stages       # 只看阶段地图，不执�
 
 分两组，**区别在于是否需要真实&#x20;**`.ulg`**&#x20;日志**：
 
-
-
-| 组     | 拦什么                                                                                                                            | 在哪跑                                                                     |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| 不需要日志 | ruff 风格与 lint；`build:kb --check`（产物与 `knowledge/` 一致、契约不漏写）；指南页算子表是否跟上 `engine/` 源码；产物是否为合法 Python；`tsc --noEmit`；`next build` | 云端 CI（[.github/workflows/ci.yml](.github/workflows/ci.yml)）+ 本地         |
-| 需要日志  | 6 条冻结基线逐字段比对、适配器契约测试、数据层 probe、字段引用 lint                                                                                       | **只在本地** —— 原始日志含 GPS 轨迹、按隐私规则不入库（见 `.gitignore`），CI 的 checkout 里没有这些文件 |
+| 组         | 拦什么                                                                                                                                                                 | 在哪跑                                                                                                  |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 不需要日志 | ruff 风格与 lint；`build:kb --check`（产物与 `knowledge/` 一致、契约不漏写）；指南页算子表是否跟上 `engine/` 源码；产物是否为合法 Python；`tsc --noEmit`；`next build` | 云端 CI（[.github/workflows/ci.yml](.github/workflows/ci.yml)）+ 本地                                   |
+| 需要日志   | 6 条冻结基线逐字段比对、适配器契约测试、数据层 probe、字段引用 lint                                                                                                    | **只在本地** —— 原始日志含 GPS 轨迹、按隐私规则不入库（见 `.gitignore`），CI 的 checkout 里没有这些文件 |
 
 启用本地那道拦截（每台机器做一次；`core.hooksPath` 是本地设置，git 不跟着仓库走）：
-
-
 
 ```
 git config core.hooksPath .githooks
@@ -168,8 +152,8 @@ git config core.hooksPath .githooks
 >
 > ：改规则、算子或引擎后，必须在本机跑一次上面的命令 ——
 > 需要日志的那组是这道回归的真正门槛，云 CI 覆盖不到。
-> 校验项与设计理由见 
+> 校验项与设计理由见
 >
 > [tools/ci/check_all.py](tools/ci/check_all.py)
 >
->  的模块文档。
+> 的模块文档。
