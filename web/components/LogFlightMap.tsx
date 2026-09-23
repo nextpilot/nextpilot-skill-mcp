@@ -6,7 +6,7 @@ import type { TrackData, TrackSeries } from "@/lib/types";
 import { FileUp, Loader2, MapPin } from "lucide-react";
 import { wgs84ToGcj02 } from "@/lib/coord";
 import { SERIES_COLORS_DARK, SERIES_COLORS_LIGHT } from "@/lib/chart-presets";
-import { DEFAULT_PROVIDER, getProvider, MAP_PROVIDERS, type MapProvider, type MapProviderId } from "@/lib/amap-tiles";
+import { DEFAULT_PROVIDER, getProvider, MAP_PROVIDERS, type MapProvider, type MapProviderId } from "@/lib/map-tiles";
 import "leaflet/dist/leaflet.css";
 
 interface GpsPoint {
@@ -159,7 +159,8 @@ export function LogFlightMap({
                 setLegend(drawn.map((t) => ({ label: t.label, color: t.color })));
                 setHidden([]);
                 const start = drawn[0].points[0];
-                setMapsUrl(provider.externalUrl(start.lat, start.lon));
+                // 没给 external 的底图（天地图没有带坐标的稳定深链）就不显示"外部打开"入口
+                setMapsUrl(provider.external ? provider.external.url(start.lat, start.lon) : null);
                 buildMap(LModule, drawn, provider);
                 setState("ready");
             } catch (err) {
@@ -240,13 +241,23 @@ export function LogFlightMap({
         });
         mapRef.current = map;
 
-        const tileOpts = (overrides?: Record<string, unknown>) => ({
-            subdomains: provider.subdomains,
-            attribution: provider.attribution,
-            maxNativeZoom: provider.maxNativeZoom,
-            maxZoom: 19,
-            ...overrides,
-        });
+        const tileOpts = (overrides?: Record<string, unknown>) => {
+            const opts: Record<string, unknown> = {
+                subdomains: provider.subdomains,
+                attribution: provider.attribution,
+                maxNativeZoom: provider.maxNativeZoom,
+                maxZoom: 19,
+                ...overrides,
+            };
+            // 显式写 undefined 会盖掉 Leaflet 自己的默认值（L.setOptions 是 `for (var i in options)`
+            // 逐键拷贝，不跳过 undefined）。subdomains 被盖成 undefined 后，_getSubdomain 会对它读
+            // .length 抛错；而 _getTileUrl 不管 URL 模板里有没有 {s} 都会调 _getSubdomain，
+            // 所以不用 {s} 的底图照样会中招。
+            for (const k of Object.keys(opts)) {
+                if (opts[k] === undefined) delete opts[k];
+            }
+            return opts;
+        };
 
         const satellite = L.tileLayer(provider.satellite, tileOpts());
         const street = L.tileLayer(provider.street, tileOpts());
@@ -353,20 +364,23 @@ export function LogFlightMap({
                 </span>
                 {state === "ready" && mapsUrl && (
                     <a href={mapsUrl} target="_blank" rel="noreferrer" className="ml-auto text-primary hover:underline">
-                        {getProvider(providerId).id === "amap" ? "在高德地图打开起点" : "在 Google Maps 打开起点"}
+                        {getProvider(providerId).external?.label}
                     </a>
                 )}
-                {/* 底图切换下拉：国内飞看高德更细，国外飞切 Esri 才看得到卫星 */}
+                {/* 底图切换下拉：国内飞看高德/天地图更细，国外飞切 Esri 才看得到卫星。
+                    需要 Key 的底图（天地图）没配 Key 时不在下拉里出现 */}
                 <select
                     value={providerId}
                     onChange={(e) => setProviderId(e.target.value as MapProviderId)}
                     className="ml-2 rounded border border-border bg-surface-2 px-1.5 py-0.5 text-[11px] text-muted focus:outline-none"
                 >
-                    {Object.values(MAP_PROVIDERS).map((p) => (
-                        <option key={p.id} value={p.id}>
-                            {p.name}
-                        </option>
-                    ))}
+                    {Object.values(MAP_PROVIDERS)
+                        .filter((p) => p.enabled)
+                        .map((p) => (
+                            <option key={p.id} value={p.id}>
+                                {p.name}
+                            </option>
+                        ))}
                 </select>
             </h4>
 

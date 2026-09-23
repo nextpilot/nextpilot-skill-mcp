@@ -20,7 +20,7 @@ import type { SavedReport } from "@/lib/report-history";
 import { formatDateTime, formatFirmware, formatLogTime } from "@/lib/format";
 import { vehicleTypeLabel } from "@/lib/vehicle-type";
 import { modeStyle } from "@/lib/phase-colors";
-import { THUMB_SATELLITE, TILE_SIZE, latToWorldY, lonToWorldX, tileUrl } from "@/lib/amap-tiles";
+import { THUMB_SATELLITE, TILE_SIZE, latToWorldY, lonToWorldX, tileUrl } from "@/lib/map-tiles";
 
 const DURATION_OPTIONS = [
     { key: "", label: "全部时长" },
