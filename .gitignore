@@ -42,7 +42,7 @@ test-results/
 # ========== 平台部署 ==========
 .vercel/
 .edgeone/
-.workbuddy
+.workbuddy/
 
 # ========== 校准用真实飞行日志 ==========
 # 含 GPS 轨迹，勿入库；用小样本/合成日志做 CI
