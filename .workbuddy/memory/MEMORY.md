@@ -271,6 +271,113 @@ web 一旦用 `workspace:*` 依赖兄弟包，云端不是 symlink 断，是**�
 `server/` 目录真创建 → 上 uv workspace（engine + server 两成员）；
 出现第二个 Node 包（如 `packages/shared`）→ 上 pnpm workspace。
 
+### monorepo 结论更新（2026-09-23 下午，知识库多形态模型敲定后重算）
+
+**结论变了，但只变一半：Python 侧现在就该做，Node 侧仍然别做。**
+
+- **Python 侧 ✅ 现在就给 `engine/` 加 `pyproject.toml`**：
+  后端 wheel 是既定目标 ⇒ engine 必须成为真正的 Python 包 ⇒ 需要包配置，
+  而它**现在没有**（根 `pyproject.toml` 只有 `[tool.ruff]` + `[tool.pytest]`，是仓库级
+  lint/test 配置，不是包配置）。成员的 requires-python 交集约束现在只有一个成员，不会撞。
+- **Node 侧 ❌ 仍然别做 pnpm workspace**：部署上传范围只有 `web/` 的约束没变，
+  且按新模型 web 产物是内联字符串，不依赖兄弟包 ⇒ 零收益。
+- **uv workspace 现在也不建**：只有一个 Python 成员时无意义；等 `server/` 出现再加。
+
+✅ **已核实（关键，决定了上面那条能不能安全做）**：
+Ruff 官方文档（astral-sh/ruff `docs/configuration.md`）原话 ——
+> "In locating the 'closest' pyproject.toml file for a given path, Ruff **ignores any
+> pyproject.toml files that lack a `[tool.ruff]` section**."
+
+→ 所以 `engine/pyproject.toml` **只放 `[project]` + `[build-system]`、不放 `[tool.ruff]`**
+时，Ruff 会忽略它并继续向上用根那份。根配置**不会**对 `engine/` 失效。
+
+⚠️ **但这是个一踩就静默的坑**（Ruff 与 ESLint 不同，**子配置完全替换父配置，不合并**）：
+一旦有人在 `engine/pyproject.toml` 里加了 `[tool.ruff]`，根的 lint 配置对 `engine/`
+**整体失效**（不是部分覆盖）—— 表现为"规则突然不报错了"。
+真要加必须显式 `extend = "../pyproject.toml"`（路径相对配置文件自身解析）。
+**建议加一条守卫**：断言 `engine/pyproject.toml` 不含 `[tool.ruff]`。
+
+**另外**：`knowledge/` 仍然不是 package（它是源，构建期被读）—— 这条不受新模型影响。
+
+## 价值排序：知识库是本体，engine 只是工具（2026-09-23 用户两次强调）
+
+用户原话："知识库是一级目录，最重要的是知识，engine 只是工具。"
+后续补充："知识库是项目最大价值，engine 只是把知识库编译成各种产物的工具。"
+
+→ **推演的起点永远是"知识库需要什么"，不是"工具/产物该长什么样"。**
+我犯过两次同方向的错：
+  1. 把合并后的项目根定成 `engine/knowledge/`（把关系写反了，正确是 `knowledge/engine/`）
+  2. 反复论证 wheel vs 内联字符串（形态是结果不是输入，被明确纠正过一次）
+
+⚠️ **目录关系**：`knowledge/` **必须是一级目录**，`engine/` 移入其内成 `knowledge/engine/`。
+反过来写（`engine/knowledge/`）与 CLAUDE.md §6.4「名字读出来的关系必须和真实关系一致」冲突。
+
+⚠️ **engine 的定位**：编译器 / 工具。它不拥有知识，只处理知识。
+所以"engine 项目"这种叫法本身就是错的 —— 它是 `knowledge` 项目里的工具目录。
+
+**编译器归属已定（2026-09-23 用户明确）**：
+> "`build:kb` 功能不是 web 提供的，而是 knowledge 提供的，web 只是使用它的产物。"
+
+→ `web/scripts/build-knowledge.mjs` 是 knowledge 的能力，现暂住 `web/`（历史原因），
+将来应迁入 `knowledge/scripts/`。**web 只是产物的消费方。**
+
+**产物流向已定论（2026-09-23，用户明确，我先前错当成"待拍板的选择题"）**：
+> "knowledge 的编译和构建就是 knowledge 自己负责。web 只要在 dev 的时候
+> 调用 knowledge 的 build，并把结果拉过来就好了。"
+
+→ **编译器只往 knowledge 自己的产物目录写（`knowledge/dist/`），永不跨项目写 `web/`。**
+拉取是消费方的动作：
+`knowledge` 有 `build` 命令 → `knowledge/dist/**` → web 的 `pull-knowledge.mjs`
+按映射表搬到 web 内对应位置（workers/ · lib/knowledge/ · content/guide/ · public/params/）。
+web 的 dev 脚本形如 `pnpm --filter knowledge build && node scripts/pull-knowledge.mjs && next dev`。
+
+⚠️ 别再把"编译器归 knowledge 但产物要落到 web/"当成矛盾 —— **这个矛盾是我自己造出来的**。
+产物落到 knowledge 自己的 dist/，消费方拉取，方向从头就是顺的。
+
+⚠️ 拉进 `web/` 的产物**仍需入库**（EdgeOne 云端只 `next build`、不重建 knowledge）。
+→ 由此产生的漂移风险必须有守卫：**`web/` 内的产物必须与 `knowledge/dist/` 逐字节一致**，
+自证方式为改 web 侧一个字节断言变红。这条是本方案新增的，必须做。
+
+**⚠️ 由此推出：knowledge 是「双语言包」，这是 monorepo 设计的硬约束**
+编译器 `build-knowledge.mjs` 是 **Node 脚本**（.mjs，依赖 `yaml`），而 wheel 是 Python。
+→ knowledge 同时需要：
+- `knowledge/package.json`（pnpm 侧，供 web `pnpm --filter knowledge build` 调用编译器）
+- `knowledge/pyproject.toml`（uv 侧，产出 wheel 给后端）
+
+`pnpm-workspace.yaml: ["web","knowledge"]` 与 `[tool.uv.workspace] members=["knowledge"]`
+**可共存**。⚠️ 但 knowledge 进 pnpm workspace 是**为了被调用，不是为了被 import** ——
+旧结论不变：web 不得依赖 workspace 兄弟包（部署只上传 `web/`，依赖了云端装不上）。
+
+**⚠️ 部署约束不受 monorepo 影响**：EdgeOne 只上传 `web/` → knowledge 的 Node 编译器
+**在云端不可用** → 产物必须**入库**（现状如此，脚本 L20 写明），
+web 的构建不能依赖 knowledge 在云端被构建。
+
+**打包边界（setuptools 官方核实，v61+）**：
+`tool.setuptools.include-package-data` 在 pyproject.toml 里**默认 true**
+（与 setup.py/setup.cfg 的 false 相反，官方明确说"differs"）。
+生效条件 = "MANIFEST.in 收录" 或 "git 跟踪 + setuptools-scm"。
+→ **一旦用了 setuptools-scm，knowledge/ 下所有 git 跟踪的非 .py 文件都进 wheel**
+（px4 48 + skills 24 + mcp 5 + engine 全进）。
+用户提过这个担心，成立。控制手段首选：
+`include-package-data = false` + `[tool.setuptools.package-data]` 白名单
+（代价：新增文件类型要记得补白名单）。
+
+**当前缺口（实测）**：`knowledge/` 下**一个校验入口都没有**（`git ls-files knowledge`
+里没有 check/validate/lint/schema/test 任何一项）。三个相关校验脚本散在别处：
+`web/scripts/check-skill-spec.mjs`、`web/scripts/check-mcp-spec.mjs`、
+`tools/calibrate/lint_rules.py` —— 本体的工具住在消费方家里，方向是反的。
+
+**⚠️ 本体在 CI 里没有自证能力（2026-09-23 实测，重要）**：
+`lint_rules.py` 是知识库**最强的一致性守卫** —— 版本感知地检查规则里引用的
+`topic.field` 在该固件版本是否真存在（写错不报错，只是取到 None、经验静默不生效）。
+但它 **依赖 `tools/calibrate/logs/` 下的真实 `.ulg`**（含 GPS、不入库）→
+虽然注册在 `tools/ci/checklist.yml:211`（带 `--strict`），**CI 里跑不了**，
+只有开发机 `pre-push` 能跑（`ci.yml:81` 自己写明了这一点）。
+→ 结论：**知识库在 CI 里是"裸"的** —— 改一条规则、字段名写错，CI 全绿。
+若要让本体真正自证，得给 lint_rules 补一条**不依赖真实日志**的通道
+（只用 `knowledge/px4/meta/<tag>.json` 上游字典做存在性判定，`fields_by_version_from_meta()`
+这个函数已经存在，缺的是"只走 meta"的开关）。
+
 ## knowledge 的定位：源，不是包（2026-09-23 用户确认形态）
 
 用户原话（**我第一遍理解错了，被纠正**）："knowledge 有自己的工具，将知识库编译成
