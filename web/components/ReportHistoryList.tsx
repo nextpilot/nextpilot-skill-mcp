@@ -20,8 +20,7 @@ import type { SavedReport } from "@/lib/report-history";
 import { formatDateTime, formatFirmware, formatLogTime } from "@/lib/format";
 import { vehicleTypeLabel } from "@/lib/vehicle-type";
 import { modeStyle } from "@/lib/phase-colors";
-import { wgs84ToGcj02 } from "@/lib/coord";
-import { AMAP_SATELLITE, TILE_SIZE, latToWorldY, lonToWorldX, tileUrl } from "@/lib/amap-tiles";
+import { THUMB_SATELLITE, TILE_SIZE, latToWorldY, lonToWorldX, tileUrl } from "@/lib/amap-tiles";
 
 const DURATION_OPTIONS = [
     { key: "", label: "全部时长" },
@@ -69,12 +68,12 @@ function fmtSize(bytes?: number): string {
 }
 
 /**
- * 轨迹缩略图：**高德瓦片当底 + 轨迹折线**（对齐 Flight Review browse 页的 Overview 那张地图）。
+ * 轨迹缩略图：**瓦片当底 + 轨迹折线**（对齐 Flight Review browse 页的 Overview 那张地图）。
  *
  * 与报告页那张大地图的区别：这里不起 Leaflet 实例（列表里几十行，每行一个地图实例又慢又费内存），
  * 而是自己算墨卡托像素：挑一个能把轨迹装进一张瓦片的层级 → 铺 1~4 张 <img> 瓦片 → 上面叠 SVG 折线。
  * 瓦片与折线用同一套像素换算，所以对齐；SVG 是矢量的，悬停放大不糊。
- * 坐标同样要先 WGS-84 → GCJ-02（高德是偏移坐标系），否则轨迹整体偏几百米。
+ * 缩略图用 Esri 卫星（WGS-84），与日志坐标系一致，无需 GCJ-02 换算。
  */
 function TrackThumb({ points }: { points?: [number, number][] }) {
     // 宽度跟着列走（w-full + 4:3 比例）：写成固定 64×48 的话，列比它宽一截时两侧就留白，
@@ -192,10 +191,9 @@ type ThumbView = {
 function buildThumbView(points?: [number, number][]): ThumbView | null {
     if (!points || points.length < 2) return null;
 
-    // 先转到 GCJ-02（底图坐标系），否则轨迹与地图整体错位
-    const gcj = points.map(([lat, lon]) => wgs84ToGcj02(lat, lon));
-    const lats = gcj.map((p) => p[0]);
-    const lons = gcj.map((p) => p[1]);
+    // Esri 底图用 WGS-84，日志也是 WGS-84，坐标系一致无需转换
+    const lats = points.map((p) => p[0]);
+    const lons = points.map((p) => p[1]);
     const minLat = Math.min(...lats);
     const maxLat = Math.max(...lats);
     const minLon = Math.min(...lons);
@@ -212,8 +210,8 @@ function buildThumbView(points?: [number, number][]): ThumbView | null {
     );
     const z = Math.max(3, Math.min(17, Math.floor(Math.min(zLon, zLat))));
 
-    const xs = gcj.map((p) => lonToWorldX(p[1], z));
-    const ys = gcj.map((p) => latToWorldY(p[0], z));
+    const xs = points.map((p) => lonToWorldX(p[1], z));
+    const ys = points.map((p) => latToWorldY(p[0], z));
     const px0 = Math.min(...xs);
     const px1 = Math.max(...xs);
     const py0 = Math.min(...ys);
@@ -249,7 +247,7 @@ function buildThumbView(points?: [number, number][]): ThumbView | null {
             // left/width 的百分比相对盒宽（100 个 viewBox 单位），top/height 相对盒高（75 个）
             const side = TILE_SIZE * scale;
             tiles.push({
-                url: tileUrl(AMAP_SATELLITE, tx, ty, z, i++),
+                url: tileUrl(THUMB_SATELLITE, tx, ty, z, i++),
                 x: tx,
                 y: ty,
                 z,
@@ -261,7 +259,7 @@ function buildThumbView(points?: [number, number][]): ThumbView | null {
         }
     }
 
-    const line = gcj
+    const line = points
         .map((_, idx) => toVB(xs[idx], ys[idx]))
         .map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`)
         .join(" ");

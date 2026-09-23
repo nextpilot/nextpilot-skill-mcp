@@ -6,15 +6,7 @@ import type { TrackData, TrackSeries } from "@/lib/types";
 import { FileUp, Loader2, MapPin } from "lucide-react";
 import { wgs84ToGcj02 } from "@/lib/coord";
 import { SERIES_COLORS_DARK, SERIES_COLORS_LIGHT } from "@/lib/chart-presets";
-import {
-    AMAP_ATTRIBUTION,
-    AMAP_SATELLITE,
-    AMAP_SATELLITE_LABELS,
-    AMAP_STREET,
-    FIT_MAX_ZOOM,
-    TILE_MAX_NATIVE_ZOOM,
-    TILE_SUBDOMAINS,
-} from "@/lib/amap-tiles";
+import { DEFAULT_PROVIDER, getProvider, MAP_PROVIDERS, type MapProvider, type MapProviderId } from "@/lib/amap-tiles";
 import "leaflet/dist/leaflet.css";
 
 interface GpsPoint {
@@ -23,7 +15,7 @@ interface GpsPoint {
     alt: number;
 }
 
-/** 画在地图上的一条轨道（坐标已换算成 GCJ-02） */
+/** 画在地图上的一条轨道（坐标已按底图坐标系换算） */
 interface DrawnTrack {
     label: string;
     color: string;
@@ -31,9 +23,8 @@ interface DrawnTrack {
 }
 
 /**
- * 底图：**国内可达**的高德瓦片（OpenStreetMap / Esri 在国内实测连不上，地图会是一片灰）。
- * 代价是坐标系——高德是 GCJ-02，日志是 WGS-84，所以画之前统一换算（见 lib/coord.ts）。
- * 上线正式域名时建议换成带 key 的正式瓦片服务（高德 JS API 或天地图）。
+ * 底图：支持 Esri（WGS-84，全球）与高德（GCJ-02，中国）切换。
+ * 日志 GPS 是 WGS-84，用 Esri 时无需坐标转换，高德则通过 lib/coord.ts 换算。
  */
 function altitudeColor(alt: number, minAlt: number, maxAlt: number): string {
     if (maxAlt <= minAlt) return "#4a8cf7";
@@ -86,8 +77,10 @@ export function LogFlightMap({
     /** 错误种类（见 TrackData.code）：`log-not-loaded` 才给「重新选择文件」按钮
      *  （= Worker 里没装着这份日志；重选文件解析一次就能恢复。别的错误重选也没用） */
     const [errorCode, setErrorCode] = useState<TrackData["code"]>(undefined);
-    /** "在高德地图打开起点"的链接（用换算后的 GCJ-02 坐标，点开就落在正确位置） */
-    const [amapUrl, setAmapUrl] = useState<string | null>(null);
+    /** 当前底图提供商 */
+    const [providerId, setProviderId] = useState<MapProviderId>(DEFAULT_PROVIDER);
+    /** 在外部地图打开起点的链接（坐标系与当前底图一致） */
+    const [mapsUrl, setMapsUrl] = useState<string | null>(null);
     /** 底图瓦片加载失败（域名不通 / 被拦）：要说出来，不然只剩一片灰说不清 */
     const [tileError, setTileError] = useState(false);
 
@@ -120,8 +113,9 @@ export function LogFlightMap({
                     return;
                 }
 
-                // 底图是高德的 GCJ-02，日志是 WGS-84：画之前统一换算，否则轨迹整体偏几百米。
-                // 只换算画图用的那份，"这份轨迹是 WGS-84" 的事实不被改写。
+                // 坐标系转换取决于当前底图提供商：高德用 GCJ-02，Esri 用 WGS-84。
+                const provider = getProvider(providerId);
+                const needsGcj = provider.crs === "gcj02";
                 const colors = isDark() ? SERIES_COLORS_DARK : SERIES_COLORS_LIGHT;
                 const drawn: DrawnTrack[] = [];
                 /** 点数不足 2 个、画不出来的轨道：连着它的采样数一起说清（不然界面没话可说） */
@@ -136,7 +130,7 @@ export function LogFlightMap({
                         const lat = tk.lat[i];
                         const lon = tk.lon[i];
                         if (typeof lat !== "number" || typeof lon !== "number") continue;
-                        const [gLat, gLon] = wgs84ToGcj02(lat, lon);
+                        const [gLat, gLon] = needsGcj ? wgs84ToGcj02(lat, lon) : [lat, lon];
                         const alt = typeof tk.alt?.[i] === "number" ? (tk.alt[i] as number) : 0;
                         points.push({ lat: gLat, lon: gLon, alt });
                         alts.push(alt);
@@ -165,10 +159,8 @@ export function LogFlightMap({
                 setLegend(drawn.map((t) => ({ label: t.label, color: t.color })));
                 setHidden([]);
                 const start = drawn[0].points[0];
-                setAmapUrl(
-                    `https://uri.amap.com/marker?position=${start.lon.toFixed(6)},${start.lat.toFixed(6)}&name=${encodeURIComponent("飞行起点")}`,
-                );
-                buildMap(LModule, drawn);
+                setMapsUrl(provider.externalUrl(start.lat, start.lon));
+                buildMap(LModule, drawn, provider);
                 setState("ready");
             } catch (err) {
                 console.error("LogFlightMap 加载失败:", err);
@@ -180,7 +172,7 @@ export function LogFlightMap({
         return () => {
             cancelled = true;
         };
-    }, [loadTrack]);
+    }, [loadTrack, providerId]);
 
     useEffect(() => {
         return () => {
@@ -200,7 +192,8 @@ export function LogFlightMap({
             const map = mapRef.current;
             if (!map) return;
             map.invalidateSize();
-            if (boundsRef.current) map.fitBounds(boundsRef.current, { padding: [20, 20], maxZoom: FIT_MAX_ZOOM });
+            if (boundsRef.current)
+                map.fitBounds(boundsRef.current, { padding: [20, 20], maxZoom: getProvider(providerId).fitMaxZoom });
         }, 100);
         return () => clearTimeout(timer);
     }, [state]);
@@ -220,7 +213,7 @@ export function LogFlightMap({
         });
     }, []);
 
-    function buildMap(L: LeafletModule, tracks: DrawnTrack[]) {
+    function buildMap(L: LeafletModule, tracks: DrawnTrack[], provider: MapProvider) {
         if (!containerRef.current) return;
 
         if (mapRef.current) {
@@ -235,39 +228,33 @@ export function LogFlightMap({
         });
         mapRef.current = map;
 
-        const street = L.tileLayer(AMAP_STREET, {
-            subdomains: TILE_SUBDOMAINS,
-            attribution: AMAP_ATTRIBUTION,
-            maxNativeZoom: TILE_MAX_NATIVE_ZOOM,
+        const tileOpts = (overrides?: Record<string, unknown>) => ({
+            subdomains: provider.subdomains,
+            attribution: provider.attribution,
+            maxNativeZoom: provider.maxNativeZoom,
             maxZoom: 19,
-        });
-        const satellite = L.tileLayer(AMAP_SATELLITE, {
-            subdomains: TILE_SUBDOMAINS,
-            attribution: AMAP_ATTRIBUTION,
-            maxNativeZoom: TILE_MAX_NATIVE_ZOOM,
-            maxZoom: 19,
-        });
-        // 卫星图上的路名/地名/边界，另有一层（style=8 与街道图同源，但只作叠加用）
-        const satelliteLabels = L.tileLayer(AMAP_SATELLITE_LABELS, {
-            subdomains: TILE_SUBDOMAINS,
-            maxNativeZoom: TILE_MAX_NATIVE_ZOOM,
-            maxZoom: 19,
+            ...overrides,
         });
 
-        // 默认卫星影像 + 标注：一眼能看出飞在哪片地/哪个园区；街道图在同一控件里切换
+        const satellite = L.tileLayer(provider.satellite, tileOpts());
+        const street = L.tileLayer(provider.street, tileOpts());
+
+        // 默认卫星影像；街道图在同一控件里切换
         satellite.addTo(map);
-        satelliteLabels.addTo(map);
-        // 瓦片挂了（域名不通 / 被拦）要说话：否则用户只看到一片灰，分不清"没轨迹"还是"没底图"
         satellite.on("tileerror", () => setTileError(true));
         map.on("tileload", () => setTileError(false));
+
+        // 路名标注覆盖层（仅高德有独立图层）
+        const overlays: Record<string, L.TileLayer> = {};
+        if (provider.satelliteLabels) {
+            const labels = L.tileLayer(provider.satelliteLabels, tileOpts({ attribution: "" }));
+            labels.addTo(map);
+            overlays["路名标注"] = labels;
+        }
+
         L.control
-            .layers(
-                { 卫星影像: satellite, 街道图: street },
-                { 路名标注: satelliteLabels },
-                { position: "topright", collapsed: true },
-            )
+            .layers({ 卫星影像: satellite, 街道图: street }, overlays, { position: "topright", collapsed: true })
             .addTo(map);
-        // 比例尺：判断"飞了多远"比看经纬度直观
         L.control.scale({ imperial: false, position: "bottomright" }).addTo(map);
 
         layersRef.current = new Map();
@@ -333,7 +320,7 @@ export function LogFlightMap({
 
         const bounds = L.latLngBounds(all);
         boundsRef.current = bounds;
-        map.fitBounds(bounds, { padding: [20, 20], maxZoom: FIT_MAX_ZOOM });
+        map.fitBounds(bounds, { padding: [20, 20], maxZoom: provider.fitMaxZoom });
     }
 
     return (
@@ -343,12 +330,26 @@ export function LogFlightMap({
                 GPS 轨迹 · {pointCount > 0 ? `${pointCount} 点` : ""}
                 {legend.length > 1 ? ` · ${legend.length} 条轨道` : ""}
                 {droppedCount > 0 ? `（已剔除 ${droppedCount} 个未定位采样）` : ""}
-                <span className="text-faint">（底图高德，坐标已从 WGS-84 换算到 GCJ-02；右上角可切街道图）</span>
-                {state === "ready" && amapUrl && (
-                    <a href={amapUrl} target="_blank" rel="noreferrer" className="ml-auto text-primary hover:underline">
-                        在高德地图打开起点
+                <span className="text-faint">
+                    （{getProvider(providerId).name} · {getProvider(providerId).crs.toUpperCase()} · 右上角可切街道图）
+                </span>
+                {state === "ready" && mapsUrl && (
+                    <a href={mapsUrl} target="_blank" rel="noreferrer" className="ml-auto text-primary hover:underline">
+                        {getProvider(providerId).id === "amap" ? "在高德地图打开起点" : "在 Google Maps 打开起点"}
                     </a>
                 )}
+                {/* 底图切换下拉：国内飞看高德更细，国外飞切 Esri 才看得到卫星 */}
+                <select
+                    value={providerId}
+                    onChange={(e) => setProviderId(e.target.value as MapProviderId)}
+                    className="ml-2 rounded border border-border bg-surface-2 px-1.5 py-0.5 text-[11px] text-muted focus:outline-none"
+                >
+                    {Object.values(MAP_PROVIDERS).map((p) => (
+                        <option key={p.id} value={p.id}>
+                            {p.name}
+                        </option>
+                    ))}
+                </select>
             </h4>
 
             {/* 容器**始终可见**：Leaflet 建图时要拿到真实尺寸，曾经是 display:none 时建图 →
