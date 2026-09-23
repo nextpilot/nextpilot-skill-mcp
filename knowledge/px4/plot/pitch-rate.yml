@@ -1,0 +1,23 @@
+id: pitch-rate
+title: Pitch Angular Rate
+description: Pitch 角速度估计值与 setpoint、积分。
+order: 6
+conditions:
+  topics: [vehicle_attitude]
+outputs:
+  - container: axes
+    title: Pitch Angular Rate
+    ylabel: deg/s
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("vehicle_angular_velocity[0].xyz[1]", "vehicle_attitude[0].pitchspeed")
+        label: ["Pitch Rate Estimated"]
+      - mode: TimeSeries
+        ydata:
+          - ref("vehicle_rates_setpoint[0].pitch")
+        label: ["Pitch Rate Setpoint"]
+      - mode: TimeSeries
+        ydata:
+          - ref("rate_ctrl_status[0].pitchspeed_integ")
+        label: ["Pitch Rate Integral"]

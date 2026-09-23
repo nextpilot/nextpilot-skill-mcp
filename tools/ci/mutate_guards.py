@@ -113,6 +113,13 @@ GUARDS = {
     "engine": ([PY, "tools/ci/check_engine_purity.py"], ROOT, "引擎纯度（check_engine_purity）", "fail-lines"),
     # pnpm 转发脚本：只扫 package.json 的 scripts 文本 —— 快、无依赖、不需要日志
     "pnpm-filter": ([PY, "tools/ci/check_pnpm_filter.py"], ROOT, "pnpm 转发脚本（check_pnpm_filter）", "fail-lines"),
+    # 面板解析器：只跑纯函数（内置假 manifest），无浏览器无日志 —— 快
+    "panel-resolver": (
+        [NODE, "--experimental-strip-types", "scripts/check-panel-resolver.mjs"],
+        WEB,
+        "面板解析器（check-panel-resolver）",
+        "fail-lines",
+    ),
 }
 
 
@@ -603,6 +610,151 @@ MUTATIONS: list[Mutation] = [
         guard="pnpm-filter",
         expect="workspace-members-nonempty",
         note="防「判空分支是死代码」：解析不出成员目录时守卫会悄悄按残缺的包名集合下结论",
+    ),
+    # ---- 界面侧：地图左上角「一条按钮 + 一条色带」的形态（2026-09-23） ----
+    #
+    # 这一节守的是**布局形态**而不是像素值：像素值得起浏览器量（分钟级），进不了秒级检查。
+    # 能静态锁的是"会不会回潮"——复位按钮另起 .leaflet-bar 就与缩放条之间 10px 空档 +
+    # 2px 双边框；按钮竖排会把色带顶端往下压 ~60px；色带容器少了边界就会被内容挤成 2px。
+    Mutation(
+        name="复位按钮又裂成第二个 .leaflet-bar（与缩放条之间留 10px 空档）",
+        path=FLIGHT_MAP,
+        old='const btn = L.DomUtil.create("a", "");',
+        new='L.DomUtil.create("div", "leaflet-bar leaflet-control");\n            const btn = L.DomUtil.create("a", "");',
+        guard="ui",
+        expect="复位按钮不另起 .leaflet-bar（另起就与缩放条留 10px 空档 + 2px 双边框）",
+        note="原形：Leaflet 给每个 .leaflet-control 都加 margin-top 10px，两个 bar 还各有 1px 边框",
+    ),
+    Mutation(
+        name="复位按钮不再挂进缩放条（取容器 → append 这条链断了）",
+        path=FLIGHT_MAP,
+        old="zoomBar.appendChild(btn);",
+        new="",
+        guard="ui",
+        expect="复位按钮挂在缩放条里（zoomControl 取容器后 appendChild）",
+        note=(
+            "判据守的是这条链本身：appendChild 一消失，按钮就再也不会出现在缩放条里，"
+            "三个图标立刻裂成两组（只改 append 的目标不行——判据不看目标）"
+        ),
+    ),
+    Mutation(
+        name="按钮行退回竖排（色带顶端跟着下移 60px）",
+        path=FLIGHT_MAP,
+        old='zoomBar.style.display = "flex";',
+        new='zoomBar.style.display = "block";',
+        guard="ui",
+        expect="按钮行是横排的（给缩放条设了 display:flex，分隔线改成 border-right）",
+        note="竖排吃掉 ~94px 高，色带只能从 104 往下铺；横排省下的 60 多 px 全在色带上",
+    ),
+    Mutation(
+        name="色带容器丢了 bottom-0（没上边界，会被内容挤成 2px）",
+        path=FLIGHT_MAP,
+        old='className="pointer-events-none absolute bottom-0 left-2.5 top-[48px] z-[700] flex w-3 flex-col"',
+        new='className="pointer-events-none absolute left-2.5 top-[48px] z-[700] flex w-3 flex-col"',
+        guard="ui",
+        expect="高度色带同时写了 top-[…px] 与 bottom-0（缺 top 就没有上边界，会被挤成 2px）",
+        note="只写 bottom-0 时 flex 容器按内容高度收缩，实测色带只剩 2px——整条看不见",
+    ),
+    Mutation(
+        name="色带不再与按钮行左对齐（退回 left-14）",
+        path=FLIGHT_MAP,
+        old='className="pointer-events-none absolute bottom-0 left-2.5 top-[48px] z-[700] flex w-3 flex-col"',
+        new='className="pointer-events-none absolute bottom-0 left-14 top-[48px] z-[700] flex w-3 flex-col"',
+        guard="ui",
+        expect="高度色带与按钮行左对齐、不挡地图操作（left-2.5 + pointer-events-none）",
+        note="left-14 是改版前的写法：色带悬在按钮行右侧，看着像两个不相干的东西",
+    ),
+    Mutation(
+        name="高度标签又压回色带上（left-full 改回 left-0）",
+        path=FLIGHT_MAP,
+        old='className="absolute left-full top-0 ml-1 whitespace-nowrap rounded bg-surface-2/85 px-1 text-[10px] text-muted"',
+        new='className="absolute left-0 top-0 ml-1 whitespace-nowrap rounded bg-surface-2/85 px-1 text-[10px] text-muted"',
+        guard="ui",
+        expect="两个高度标签挂在色带右侧（left-full，不遮渐变）",
+        note="只改两个里的一个就足够红——判据数的是 left-full 的个数；条只有 12px 宽，数字压上去就盖住渐变",
+    ),
+    # ---- 界面侧：静态守卫引用的路径必须真的存在（2026-09-23） ----
+    #
+    # 失效形态不是"报错"，而是**守卫集体失效还伪装成通过**：i18n 给所有页面套了一层
+    # [locale]，写死的路径一次性全废，readFileSync 抛 ENOENT 让脚本死在 §[17]，
+    # 后面几节一条没跑，CI 只看得见"进程非零退出"。
+    #
+    # 变异特意用"新增一个指向不存在文件的 read"，而不是"把已有路径改回旧写法"：后者会
+    # 让 §[17] 同时红（它有一条"共用集合非空"的判空），「恰好一条红」的判据就废了，
+    # 反而看不出根因只有一个。
+    Mutation(
+        name="新增一节时把路径写错（兜底汇总要抓到）",
+        path="web/scripts/test-issue-filer.mjs",
+        # 插在节标题那行之后（顶层语句），不能插进 check( 的实参列表——那会先撞上 SyntaxError，
+        # 脚本连一条检查都跑不到（第一版就是这么写的，表现为"红了但理由不对"）。
+        old=r'console.log("\n[23] 静态守卫引用的源码路径都存在（路径失效不许把后面整段带走）");',
+        new=(
+            r'console.log("\n[23] 静态守卫引用的源码路径都存在（路径失效不许把后面整段带走）");'
+            '\nread("../components/MovedByI18n.tsx"); // 变异：再写一次 i18n 迁移前的路径'
+        ),
+        guard="ui",
+        expect="静态守卫引用的路径都指向真实文件",
+        note="read / readWeb 把坏路径登记进 MISSING_PATHS 而不是抛异常；末节负责把「哪几个不存在」说清楚",
+    ),
+    # ---- 面板解析器：实例数与区间展开（2026-09-24） ----
+    # 这几条改坏时**前端不会崩**——只是少画几张图、或者图例分不清是哪一路传感器。
+    # 没有任何运行时信号，所以每条都要有一个"先红"的证明。
+    Mutation(
+        name="数实例时又拿采样点数筛一遍",
+        path="web/lib/panel-resolver.ts",
+        old="        .filter((t) => t.topic === topic)",
+        new="        .filter((t) => t.topic === topic && t.n > 1)",
+        guard="panel-resolver",
+        expect="数实例不看采样点数",
+        note="n 是采样点数：只采到一个点的实例会被丢掉，全是单点时整组图直接消失",
+    ),
+    Mutation(
+        name="展开的线不写实例号（图例分不清哪一路）",
+        path="web/lib/panel-resolver.ts",
+        old="                    series.push({ label: ref, style: p.style, color: p.color });",
+        new="                    series.push({ label: p.label, style: p.style, color: p.color });",
+        guard="panel-resolver",
+        expect="区间引用同图展开成多条线",
+        note="多实例同图时三条线都叫 accel[:].x，看图的人分不出是哪路 IMU",
+    ),
+    Mutation(
+        name="拆图时也展开区间（每张图把全部实例都画了）",
+        path="web/lib/panel-resolver.ts",
+        old="            const pendings = planChild(child, m, inst, !out.split_by_instance);",
+        new="            const pendings = planChild(child, m, inst, true);",
+        guard="panel-resolver",
+        expect="拆图时区间引用不再展开",
+        note="拆图要的是「每张图一个实例」，再展开一次就每张图都是三条线",
+    ),
+    Mutation(
+        name="实例数不齐时按最短的那条砍齐（不是取并集）",
+        path="web/lib/panel-resolver.ts",
+        old="    return all.size === 0 ? null : [...all].sort((a, b) => a - b);",
+        new=(
+            "    return pendings.filter((p) => p.spread).map((p) => p.spread.instances)"
+            ".sort((a, b) => a.length - b.length)[0] ?? null;"
+        ),
+        guard="panel-resolver",
+        expect="实例数不齐取并集并给告警",
+        note="gyro 只有实例 0 就把 accel 的三个实例砍成 1 个——少的那边不该拖累多的那边",
+    ),
+    Mutation(
+        name="缺的实例不再给提示（那一路静默消失）",
+        path="web/lib/panel-resolver.ts",
+        old="                        panelWarnings.push(",
+        new="                        void 0 && panelWarnings.push(",
+        guard="panel-resolver",
+        expect="实例数不齐取并集并给告警",
+        note="continue 还在（那一条线照样不画），但没人告诉用户为什么图上少了线",
+    ),
+    Mutation(
+        name="构建期正则退回只认一维下标",
+        path="web/scripts/lib/rule-expr.mjs",
+        old=r"        /^([a-z][a-z0-9_]*)(?:\[([-]?\d*(?::-?\d*)?)\])?\.((?:[a-z][a-z0-9_]*\.)*[a-z][a-z0-9_]*)(?:\[(\d+(?:,\d+)?)\])?$/.exec(",
+        new=r"        /^([a-z][a-z0-9_]*)(?:\[([-]?\d*(?::-?\d*)?)\])?\.((?:[a-z][a-z0-9_]*\.)*[a-z][a-z0-9_]*)(?:\[(\d+)\])?$/.exec(",
+        guard="panel-resolver",
+        expect="构建期放行二维下标",
+        note="field[i,j]（i 行 j 列）过不了校验，作者只能退回写死",
     ),
 ]
 

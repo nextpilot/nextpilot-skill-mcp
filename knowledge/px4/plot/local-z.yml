@@ -1,0 +1,19 @@
+id: local-z
+title: Local Position Z
+description: 局部位置 Z 轴估计值与 setpoint（向上为正）。
+order: 11
+conditions:
+  topics: [vehicle_local_position]
+outputs:
+  - container: axes
+    title: Local Position Z
+    ylabel: "[m]"
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("vehicle_local_position[0].z")
+        label: ["Z Estimated"]
+      - mode: TimeSeries
+        ydata:
+          - ref("vehicle_local_position_setpoint[0].z")
+        label: ["Z Setpoint"]

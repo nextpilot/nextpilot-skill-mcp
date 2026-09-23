@@ -255,8 +255,8 @@ def _pick_ref(name, *more, alias=None, unit=None, instance=None):
 
     与 `_ref` 是同一件事，区别只在**回传命中的是哪个字段**——地图轨迹要用它去同一 topic 上
     取时间戳与定位类型（`fix_type`），图上的时间轴也要。`instance` 非 None 时**覆盖**引用里
-    写的实例切片（图上"每实例一个面板"用：声明里写 `[:]`，具体画第几个由这一层定）；
-    写死的 `[N]` 不受它影响。
+    写的实例**切片**（图上"每实例一个面板"用：声明里写 `[:]`，具体画第几个由这一层定）；
+    写死的 `[N]`、以及**不写下标**（= 实例 0）都不受它影响。
     """
     for cand in (name, *more):
         bare, inst = _split_ref(cand)
@@ -277,11 +277,13 @@ def _ref(name, *more, alias=None, unit=None):
     """字段取数：表达式里的 `ref("topic.field", ...)` 与裸写的 `topic.field` 都走这里。
 
     字段名有两种下标，别混：
-      `topic.field` / `topic[:].field` —— **所有实例**（两种写法等效）。多实例时给
-                          「每实例一组」的列表，交给需要分组的算子；**只有一个实例时
-                          就是那一条序列**（与写 `[0]` 同形），所以单实例字段照旧直接算
-      `topic[N].field` —— 只取第 N 个实例（N 可为负）
-      `topic.field[N]` —— 数组字段的元素下标（如 `vehicle_attitude.q[0]`）
+      `topic.field`     —— **只取第 0 个实例**（与 `topic[0].field` 同义）。要别的实例
+                          就写明；要"所有实例"必须写 `[:]`
+      `topic[:].field`  —— **所有实例**。多实例时给「每实例一组」的列表，交给需要分组
+                          的算子；**只有一个实例时就是那一条序列**（与写 `[0]` 同形）
+      `topic[a:b].field`—— 闭区间，实例 a~b（**含 b**），如 `[1:3]` = 1、2、3
+      `topic[N].field`  —— 只取第 N 个实例（N 可为负，按 Python 语义从末尾数）
+      `topic.field[N]`  —— 数组字段的元素下标（如 `vehicle_attitude.q[0]`）
 
     **位置参数可以给多个**：`ref("新名", "旧名")` 是候选组——按顺序取第一个在日志里
     存在的；都没有返回 None，由数据流自己中止。改名的场合一律用它，**没有"这个引用只
@@ -301,7 +303,7 @@ def _ref(name, *more, alias=None, unit=None):
 
 
 def _split_ref(ref):
-    """`"topic[:].field"` → ("topic.field", slice(None, None))；`[N]` → int；**不写也是 slice**。
+    """`"topic[:].field"` → ("topic.field", 所有实例)；`[N]` → int；**不写下标 → 0**。
 
     实例说明交给 provider 直接用下标取（Python 的 int/切片语义），这里只负责拆开。
     """
@@ -312,12 +314,22 @@ def _split_ref(ref):
 
 
 def _parse_inst(txt):
-    """`[2]` → int；`[:]` / `[1:3]` / **不写** → slice（不写就是"所有实例"）。形状由构建期保证。"""
+    """`[2]` → int；`[1:3]` → slice（**闭区间**，含 3）；**不写** → 0（只取第 0 个实例）。
+
+    区间按**闭区间**算（`[1:3]` = 实例 1、2、3）——这是知识库的写法约定，与 Python 切片
+    "含头不含尾"相反，所以转 Python slice 时**上界要 +1**：这里返回的 slice 打印出来
+    比写的多 1，**别照着它的数字读实例号**（报错文案里也不打 slice，只打闭区间）。
+    """
     if txt is None or txt == "":
-        return slice(None, None)
+        return 0
     if ":" in txt:
         a, _, b = txt.partition(":")
-        return slice(int(a) if a else None, int(b) if b else None)
+        start = int(a) if a else None
+        stop = int(b) if b else None
+        if stop is not None:
+            # 闭区间 → 半开：上界 +1。`[:-1]` 那一端 +1 得 0（取空），改用 None（到末尾）
+            stop = None if stop + 1 == 0 else stop + 1
+        return slice(start, stop)
     return int(txt)
 
 

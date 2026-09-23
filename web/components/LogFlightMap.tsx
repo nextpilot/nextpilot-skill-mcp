@@ -60,8 +60,6 @@ export function LogFlightMap({
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<import("leaflet").Map | null>(null);
     const boundsRef = useRef<import("leaflet").LatLngBounds | null>(null);
-    /** 色带的竖向起止（相对地图容器顶部，单位 px），由轨迹包围盒投影而来 */
-    const [elevSpan, setElevSpan] = useState<{ top: number; height: number } | null>(null);
     /** 每条约定的图层（图例点选隐藏时按 label 增删） */
     const layersRef = useRef<Map<string, Layer[]>>(new Map());
     const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -208,38 +206,6 @@ export function LogFlightMap({
         return () => clearTimeout(timer);
     }, [state]);
 
-    /** 色带的竖向位置 = 轨迹在地图上的包围盒，让色带与轨迹**等高对齐**。
-     *
-     *  为什么不用 CSS 定高：色带原本是 top-20/bottom-6 的固定值，只有当轨迹恰好铺满地图时才对齐；
-     *  轨迹短时（比如 sample.ulg 的 309 个点）色带会一路戳到地图底部，看着像"压住了按钮"。
-     *
-     *  坐标系：latLngToContainerPoint 给的是相对**地图容器**的像素；地图容器是定位父元素里的
-     *  第一个子元素（见 JSX），它的顶边就是父元素的顶边，所以像素 y 可以直接当 CSS top 用，
-     *  不用减任何偏移。bounding box 是地理四边形，取对角两点的 y 极值即可，不必逐点算。
-     *
-     *  地图一拖一缩放就得重算 → 订阅 move / zoom（wheel 缩放会连带触发 zoom，已实测）。
-     *  坐标换算是 gcj02 转换后的点：amap / tianditu 下整体平移一个常量偏移，取极值后差值不变，
-     *  所以不必区分 provider 用哪套坐标。 */
-    useEffect(() => {
-        const map = mapRef.current;
-        if (state !== "ready" || !map || !altRange) return;
-
-        const measure = () => {
-            const b = boundsRef.current;
-            if (!b || !b.isValid()) return;
-            const nw = map.latLngToContainerPoint(b.getNorthWest());
-            const se = map.latLngToContainerPoint(b.getSouthEast());
-            const y0 = Math.min(nw.y, se.y);
-            const y1 = Math.max(nw.y, se.y);
-            setElevSpan({ top: y0, height: Math.max(y1 - y0, 1) });
-        };
-        measure();
-        map.on("move zoom", measure);
-        return () => {
-            map.off("move zoom", measure);
-        };
-    }, [state, altRange]);
-
     /** 图例点选：把那条轨道的图层从地图上摘掉/加回来（**不重 fit**，免得视野乱跳） */
     const toggleTrack = useCallback((label: string) => {
         const map = mapRef.current;
@@ -309,48 +275,78 @@ export function LogFlightMap({
             overlays["路名标注"] = labels;
         }
 
-        L.control
+        const layersControl = L.control
             .layers({ 卫星影像: satellite, 街道图: street }, overlays, { position: "topright", collapsed: true })
             .addTo(map);
+        // 图层图标与左上角缩放按钮**同尺寸**：Leaflet 给 .leaflet-control-layers-toggle
+        // 的是 44×44（触屏下），而左侧 .leaflet-bar a 只有 30px —— 两个角一大一小，
+        // 看着不像同一套控件。缩到 30 之后两边顶边都是 10px，同一条水平线。
+        //
+        // background-size 必须跟着缩：那个图标是 80×80 的 sprite（layers.png 里两张图平铺），
+        // 只改容器不改它，图会被裁掉一角。
+        // 同样用 inline style：.leaflet-touch 下的选择器权重比自定义类高，谁后加载谁赢不可控。
+        const layersToggle = layersControl.getContainer()?.querySelector("a");
+        if (layersToggle) {
+            layersToggle.style.width = "30px";
+            layersToggle.style.height = "30px";
+            layersToggle.style.backgroundSize = "20px 20px";
+        }
         L.control.scale({ imperial: false, position: "bottomright" }).addTo(map);
 
-        // 一键回到轨迹视野：挂在缩放按钮所在的左上角控件列里
-        // controlOrder 是 Leaflet 给控件排序用的整数属性（默认控件是 200 以下），
-        // 给它一个更大的值就排到缩放按钮**下面**，形成一条连续的按钮列。
-        // 早先它按默认顺序插在里面，和缩放组之间留了缝，色带正好卡进那道缝里。
+        // 一键回到轨迹视野：直接**插进 Leaflet 自带的缩放条**，排成 + / − / ◎ 一条。
         //
-        // 这列按钮占的横向区间由 Leaflet 的 CSS 定死（.leaflet-left .leaflet-control margin-left 10px，
-        // 按钮本体 26~30px + 1px 边框），也就是 x≈10..42 —— 高度色带必须**整个让到它右边**
-        // （见下方 JSX 的 left-12），不能靠调 z-index 硬压：压过去只是让按钮盖住色带，
-        // 色带会被按钮切成上下两截，颜色仍然是断的。
-        const ResetViewControl = L.Control.extend({
-            options: { position: "topleft", controlOrder: 1000 },
-            onAdd() {
-                const container = L.DomUtil.create("div", "leaflet-bar leaflet-control");
-                const btn = L.DomUtil.create("a", "");
-                btn.href = "#";
-                btn.title = "回到轨迹视野";
-                btn.setAttribute("role", "button");
-                btn.setAttribute("aria-label", "回到轨迹视野");
-                btn.innerHTML =
-                    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>';
-                btn.style.cssText =
-                    "display:flex;align-items:center;justify-content:center;width:30px;height:30px;cursor:pointer;color:#333;";
-                L.DomEvent.on(btn, "click", (e) => {
-                    L.DomEvent.preventDefault(e);
-                    L.DomEvent.stopPropagation(e);
-                    if (boundsRef.current && boundsRef.current.isValid()) {
-                        map.fitBounds(boundsRef.current, {
-                            padding: [20, 20],
-                            maxZoom: provider.fitMaxZoom,
-                        });
-                    }
-                });
-                container.appendChild(btn);
-                return container;
-            },
-        });
-        new ResetViewControl().addTo(map);
+        // 为什么不另起一个 L.Control（position topleft + controlOrder 1000 排到缩放下面）：
+        // Leaflet 的 CSS 给**每个** .leaflet-control 都加了 margin-top 10px，两组之间必定
+        // 留一道 10px 的空档；而且两个 .leaflet-bar 各有 1px 边框，就算把 margin 抹掉，
+        // 贴在一起也是 2px 的双线。只有塞进**同一个** .leaflet-bar 才会共享一条边框、
+        // 由 .leaflet-bar a 的 border-bottom 自动分隔，看着才像"一条按钮"。
+        //
+        // 代价：按钮列底边上移了 10px 多，高度色带的 top 要跟着改（见 JSX 里的注释）。
+        //
+        // zoomControl 是 L.map({ zoomControl: true }) 建的（见上方建图参数），
+        // 但它不在 Map 的公开类型上 → 只能自己声明形状再取。
+        const zoomBar = (
+            map as unknown as { zoomControl?: { getContainer(): HTMLElement } }
+        ).zoomControl?.getContainer();
+        if (zoomBar) {
+            const btn = L.DomUtil.create("a", "");
+            btn.href = "#";
+            btn.title = "回到轨迹视野";
+            btn.setAttribute("role", "button");
+            btn.setAttribute("aria-label", "回到轨迹视野");
+            btn.innerHTML =
+                '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>';
+            // 尺寸交给 Leaflet 的 .leaflet-bar a（26px，触屏下 30px），这里只管让 svg 居中：
+            // svg 是 inline 元素，按基线对齐全往上偏，必须 flex 才正。
+            btn.style.cssText = "display:flex;align-items:center;justify-content:center;cursor:pointer;";
+            // 手动塞进 .leaflet-bar 的元素不会被 Leaflet 的控件容器接管，click 会冒泡到地图
+            // （变成"点一下地图"），必须自己掐掉。
+            L.DomEvent.disableClickPropagation(btn);
+            L.DomEvent.on(btn, "click", (e) => {
+                L.DomEvent.preventDefault(e);
+                if (boundsRef.current && boundsRef.current.isValid()) {
+                    map.fitBounds(boundsRef.current, {
+                        padding: [20, 20],
+                        maxZoom: provider.fitMaxZoom,
+                    });
+                }
+            });
+            zoomBar.appendChild(btn);
+
+            // 三个按钮**横排**：竖着堆要占掉 ~94px 高，横过来只剩 ~32px，省下的 60 多 px
+            // 全给高度色带（色带的 top 就是从这条的底边往下数的，见下方 JSX）。
+            //
+            // 用 inline style 而不是 CSS 类：分隔线得从 border-bottom 改成 border-right，
+            // 而 Leaflet 的 `.leaflet-touch .leaflet-bar a` 是 (0,2,1) 权重，自定义类写出来
+            // 跟它同权重、谁赢取决于两份 CSS 谁后加载 —— 不可控。inline 恒定最高。
+            zoomBar.style.display = "flex";
+            for (const a of Array.from(zoomBar.querySelectorAll<HTMLAnchorElement>("a"))) {
+                a.style.borderBottom = "none";
+                a.style.borderRight = "1px solid rgba(0, 0, 0, 0.2)";
+            }
+            const last = zoomBar.querySelector<HTMLAnchorElement>("a:last-child");
+            if (last) last.style.borderRight = "none";
+        }
 
         layersRef.current = new Map();
         const all: [number, number][] = [];
@@ -464,64 +460,46 @@ export function LogFlightMap({
           滚动时地图糊在导航栏上面。隔离后这些 z-index 只在这个容器内比较。 */}
             <div className="relative isolate">
                 <div ref={containerRef} className="h-[380px] w-full overflow-hidden rounded-lg sm:h-[520px]" />
-                {/* 高度色带：竖着贴在地图左侧（颜色 = 轨迹那段的平均高度）。只在**单条轨道**时给——
-            多条时每条是纯色（图例里分色），色带就没有对应关系了。
+                {/* 高度色带：竖着贴在地图左侧，从按钮行**底下**一路铺到地图底边
+            （颜色 = 轨迹那段的平均高度）。只在**单条轨道**时给 —— 多条时每条是纯色
+            （图例里分色），色带就没有对应关系了。
 
-            横向必须**整块**让开 Leaflet 的左上角控件列，包括那两个海拔数字标签：
-            按钮列的 x 区间由 Leaflet 自己的 CSS 定死（.leaflet-left .leaflet-control 的
-            margin-left 10px + 按钮 26~30 + 1px 边框 ≈ 10..42），既改不了也不该改。
-            所以色带容器从 **left-14(56px)** 起。容器左边缘到按钮列右边（42）留 14px，
-            而容器内部是 items-start（左对齐）—— 标签和色带的**左边缘**都钉在这个容器边上，
-            不会再往左溢出。这里踩过两次：左对齐方向搞反时，「489 m」这种比容器还宽的标签
-            会以容器中线对称地往两边胀，左边缘直接压到按钮列上（实测压了 4px）。
+            **横向**：左边缘与按钮行左边缘对齐（都是 Leaflet 定死的 10px）。
+            两个数字标签挂在**色带右侧**（left-full + ml-1）：压在条上的话数字会盖住渐变本身，
+            而条只有 12px 宽，任何标签都宽过它。
 
-            纵向不写死：上撑块的高度 = 轨迹包围盒顶边到容器顶边的距离（见上方 measure），
-            中间那根线因此总是与轨迹**等高对齐**。写死 top/bottom 的话，轨迹一短色带就会
-            拖到地图底部，看着像压住了什么。
+            **纵向**：上接按钮行（横排后底边实测 44px，留 4px 取 48），下接地图底边（bottom-0）。
+            按钮之所以要横排，就是为了把这一段尽量留长：竖排时三个按钮吃掉 ~94px，横排只剩 ~32px。
+            这个数是量出来的、不是算出来的：按钮尺寸由 Leaflet 的 .leaflet-bar a 决定
+            （26px，触屏下 30px），改按钮个数或排布就得重新量。
+            此前是"与轨迹包围盒等高对齐"，那个做法在轨迹短时会把色带缩成一小截、悬在半空，
+            看着像"压住了什么"；现在整列铺满，色带首先是「颜色 ↔ 高度」的图例，位置稳定。
+
+            **只写 bottom-0 不写 top 就没有上边界** —— 容器会被内容高度挤成 2px，整条色带
+            看不见（2026-09-23 实测过一次）。
+
+            标签用 absolute 叠在条的两端，不跟着流排：跟着排的话 min 标签会把条的底端从
+            地图底边顶上去约 19px，"底端与下边缘对齐"就不成立了。
 
             pointer-events-none 不挡地图操作。z-[700] 落在 Leaflet 面板层（400）与控件层
             （.leaflet-top 是 1000）之间：色带不需要盖住任何控件，留个"即使算错了也是控件在上"
             的兜底，免得将来再出现"色带糊住按钮"这种看不出所以然的故障。 */}
                 {state === "ready" && altRange && (
                     <div
-                        className="pointer-events-none absolute top-0 bottom-0 left-14 z-[700] flex w-24 flex-col items-start"
+                        className="pointer-events-none absolute bottom-0 left-2.5 top-[48px] z-[700] flex w-3 flex-col"
                         title="轨迹颜色对应的高度（米，海拔）—— 蓝低红高"
                     >
-                        {/* 竖向布局靠"上撑块 + 色带 + 下撑块"三段：上撑块的 flex-basis 就是轨迹
-                    包围盒顶边到容器顶边的距离（elevSpan.top），中间那根线因此被挤到轨迹所在的
-                    高度上并与它等高。
-
-                    两个撑块都朝**色带那一侧**对齐（上撑块 justify-end、下撑块 justify-start），
-                    数字标签才会贴在色带两端。反过来写（撑块默认 justify-start / justify-end）
-                    标签会跑到容器的上下边缘去 —— 撑块有好几百 px 高时，标签离色带能差 250px。
-                    量到之前（elevSpan 为 null）撑块给 0、线透明，免得闪一条位置错的。
-
-                    色带线要和标签**左边缘对齐**（所以这里不是 items-center 居中）：色带线只占
-                    左边 12px，标签横向可以更长，往右伸不会碰到任何东西。 */}
                         <span
-                            className="flex w-full flex-col items-start justify-end"
-                            style={{ flex: `0 0 ${elevSpan ? Math.max(elevSpan.top, 0) : 0}px` }}
-                        >
-                            <span className="mb-1 rounded bg-surface-2/85 px-1 text-[10px] text-muted">
-                                {altRange[1].toFixed(0)} m
-                            </span>
-                        </span>
-                        <span
-                            className="w-3 rounded-sm border border-border/60"
+                            className="relative w-3 flex-1 rounded-sm border border-border/60"
                             style={{
-                                flex: `0 0 ${elevSpan ? Math.max(elevSpan.height, 0) : 0}px`,
-                                // 退化样本兜底：轨迹只在地图上占十几个 px 时（比如 sample.ulg 的
-                                // 4×13），严格等高会把色带压成一条几乎看不见的缝。色带首先是
-                                // 「颜色 ↔ 高度」的图例，24px 是还能读出渐变的下限；超出部分
-                                // 由下撑块（flex:1）吸收，不会把标签顶出容器。
-                                minHeight: 24,
-                                opacity: elevSpan ? 1 : 0,
                                 background:
                                     "linear-gradient(to top, hsl(220,70%,48%), hsl(180,70%,48%), hsl(120,70%,48%), hsl(60,70%,48%), hsl(0,70%,48%))",
                             }}
-                        />
-                        <span className="flex w-full flex-col items-start justify-start" style={{ flex: 1 }}>
-                            <span className="mt-1 rounded bg-surface-2/85 px-1 text-[10px] text-muted">
+                        >
+                            <span className="absolute left-full top-0 ml-1 whitespace-nowrap rounded bg-surface-2/85 px-1 text-[10px] text-muted">
+                                {altRange[1].toFixed(0)} m
+                            </span>
+                            <span className="absolute bottom-0 left-full ml-1 whitespace-nowrap rounded bg-surface-2/85 px-1 text-[10px] text-muted">
                                 {altRange[0].toFixed(0)} m
                             </span>
                         </span>

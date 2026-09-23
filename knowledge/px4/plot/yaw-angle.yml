@@ -1,0 +1,25 @@
+id: yaw-angle
+title: Yaw Angle
+description: Yaw 欧拉角估计值与 setpoint、FF。
+order: 7
+conditions:
+  topics: [vehicle_attitude]
+compute:
+  - roll, pitch, yaw = quat_to_euler(vehicle_attitude.q)
+outputs:
+  - container: axes
+    title: Yaw Angle
+    ylabel: deg
+    children:
+      - mode: TimeSeries
+        ydata:
+          - yaw
+        label: ["Yaw Estimated"]
+      - mode: TimeSeries
+        ydata:
+          - ref("vehicle_attitude_setpoint[0].yaw_d")
+        label: ["Yaw Setpoint"]
+      - mode: TimeSeries
+        ydata:
+          - ref("vehicle_attitude_setpoint[0].yaw_sp_move_rate")
+        label: ["Yaw FF Setpoint [deg/s]"]

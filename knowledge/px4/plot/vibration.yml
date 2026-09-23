@@ -1,20 +1,21 @@
 id: vibration
-title: 振动
-description: 每个 IMU 的高频振动指标（accel_vibration_metric，m/s²），参考线 4.905 / 9.81。
-order: 15
+title: Vibration Metrics
+description: 每个 IMU 的高频振动指标 IMU0-3 合在一张图上，参考线 4.905 / 9.81。
+order: 26
 conditions:
   topics: [vehicle_imu_status]
 outputs:
   - container: axes
-    title: "IMU #{instance}"
+    title: Vibration Metrics
     ylabel: m/s²
-    # [:] = 所有实例；配上 per_instance 就是"每个 IMU 一张图"（与改造前一致）
-    per_instance: true
     hlines:
       - { value: 4.905, level: warning, label: "4.905（警告）" }
       - { value: 9.81, level: critical, label: "9.81（严重）" }
     children:
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_imu_status[:].accel_vibration_metric")
-        label: [振动]
+          - ref("vehicle_imu_status[0].accel_vibration_metric")
+          - ref("vehicle_imu_status[1].accel_vibration_metric")
+          - ref("vehicle_imu_status[2].accel_vibration_metric")
+          - ref("vehicle_imu_status[3].accel_vibration_metric")
+        label: ["Accel 0 Vibration Level [m/s^2]", "Accel 1 Vibration Level [m/s^2]", "Accel 2 Vibration Level [m/s^2]", "Accel 3 Vibration Level [m/s^2]"]

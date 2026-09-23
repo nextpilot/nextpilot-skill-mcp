@@ -1,0 +1,47 @@
+id: failsafe-flags
+title: Failsafe Flags
+description: 失效保护标志：failsafe / user_took_over / failsafe_flags。
+order: 38
+conditions:
+  topics: [vehicle_status]
+outputs:
+  - container: axes
+    title: Failsafe Flags
+    ylabel: "flag"
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("vehicle_status[0].failsafe")
+          - ref("vehicle_status[0].failsafe_and_user_took_over")
+        label: ["In Failsafe", "User Took Over"]
+      - mode: TimeSeries
+        ydata:
+          - ref("failsafe_flags[0].auto_mission_missing")
+          - ref("failsafe_flags[0].geofence_breached")
+          - ref("failsafe_flags[0].local_position_accuracy_low")
+          - ref("failsafe_flags[0].local_position_required")
+          - ref("failsafe_flags[0].local_position_invalid")
+          - ref("failsafe_flags[0].local_velocity_invalid")
+          - ref("failsafe_flags[0].local_altitude_invalid")
+          - ref("failsafe_flags[0].global_position_accuracy_low")
+          - ref("failsafe_flags[0].global_position_required")
+          - ref("failsafe_flags[0].global_position_invalid")
+          - ref("failsafe_flags[0].global_velocity_invalid")
+          - ref("failsafe_flags[0].home_position_invalid")
+          - ref("failsafe_flags[0].manual_control_available")
+          - ref("failsafe_flags[0].gcs_connection_available")
+          - ref("failsafe_flags[0].offboard_control_signal_lost")
+          - ref("failsafe_flags[0].rc_signal_found")
+          - ref("failsafe_flags[0].battery_warning")
+          - ref("failsafe_flags[0].vtol_fixed_wing_system_failure")
+          - ref("failsafe_flags[0].engine_failure")
+          - ref("failsafe_flags[0].mission_failure")
+          - ref("failsafe_flags[0].avoidance_failure")
+        label:
+          ["auto_mission_missing", "geofence_breached", "local_position_accuracy_low",
+           "local_position_required", "local_position_invalid", "local_velocity_invalid",
+           "local_altitude_invalid", "global_position_accuracy_low", "global_position_required",
+           "global_position_invalid", "global_velocity_invalid", "home_position_invalid",
+           "manual_control_available", "gcs_connection_available", "offboard_control_signal_lost",
+           "rc_signal_found", "battery_warning", "vtol_fixed_wing_system_failure",
+           "engine_failure", "mission_failure", "avoidance_failure"]

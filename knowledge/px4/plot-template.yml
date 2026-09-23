@@ -27,7 +27,7 @@ compute:
 # ── 输出：至少一个。容器两种 —— axes（一张曲线图）｜map（地图轨迹）──
 outputs:
   - container: axes # 一张图 = 一个面板
-    title: 电压 # 可选 → 预设 title；可用 {instance} 占位（per_instance 时）
+    title: 电压 # 可选 → 预设 title；可用 {instance} 占位（split_by_instance 时）
     ylabel: V # **必填**：这张图的 y 轴标签（一张图只画一个量纲）
     xlabel: 秒（相对日志开始） # 可选 → 就是这句；xyplot 时写你的横轴名
     legend: true # 可选，默认 true
@@ -36,7 +36,7 @@ outputs:
     range: [0, 100, 4, 5.2] # 可选，默认自动适配。[x0,x1] 或 [x0,x1,y0,y1]
     hlines: # 可选：水平参考线（颜色由 level 定）
       - { value: 4.905, level: warning, label: "4.905（警告）" }
-    per_instance: false # 可选，默认 false；置 true 时下面写 [:] 的线按实例拆成多张图
+    split_by_instance: false # 可选，默认 false；置 true 时下面写 [:] 的线按实例拆成多张图
     children: # 至少一条 child：每条 child 一组取数
       - mode: TimeSeries # TimeSeries（横轴=时间）｜xyplot（横轴=你给的 xdata）
         # 横轴：不写 xdata 时取**命中字段那个话题的 timestamp**（同一份采样，天然对齐）。

@@ -35,7 +35,7 @@
 //
 // 跑法：node web/scripts/test-issue-filer.mjs
 import { sanitizePayload, fingerprintOf, reportIssue } from "../functions/_lib/issue-filer.js";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 // 脱敏/截断是两侧**共用**的那一份（浏览器侧 lib/issue-bridge.ts 也引它），
@@ -52,10 +52,38 @@ function check(name, cond, extra = "") {
     }
 }
 
-/** 读 web/ 下的源码（末尾几节的静态守卫用；路径相对本文件，即 web/scripts/） */
-const read = (rel) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
 /** web/ 根目录（静态守卫要 readdir / join 时用） */
 const WEB = fileURLToPath(new URL("..", import.meta.url));
+/**
+ * 静态守卫引用的源码路径**必须登记**，不许直接 readFileSync。
+ *
+ * 由来（2026-09-23 实测）：i18n 给所有页面套了一层 `[locale]`，脚本里写死的
+ * `app/skills/[slug]/page.tsx` 之类集体失效；readFileSync 直接抛 ENOENT，脚本在
+ * §[17] 就死掉 —— §[18]~§[22] **一条都没跑**，而 CI 只看得见"进程非零退出"，
+ * 分不清是"路径坏了"还是"守卫真红了"。这是最坏的一种失败：**守卫失效的同时还伪装成通过**。
+ *
+ * 所以这两个函数在路径不存在时**登记下来并返回空串**，让那一节的断言自己红（缺什么说清楚），
+ * 而不是把后面的节全部带走。末尾 §[23] 汇总"有没有引用到不存在的路径"。
+ */
+const MISSING_PATHS = [];
+/** 读 web/ 下的源码（末尾几节的静态守卫用；路径相对本文件，即 web/scripts/） */
+const read = (rel) => {
+    const p = fileURLToPath(new URL(rel, import.meta.url));
+    if (!existsSync(p)) {
+        MISSING_PATHS.push(rel);
+        return "";
+    }
+    return readFileSync(p, "utf8");
+};
+/** 同上，路径相对 web/ 根（多段用逗号分隔，跟 join 一致） */
+const readWeb = (...parts) => {
+    const rel = join(...parts);
+    if (!existsSync(join(WEB, rel))) {
+        MISSING_PATHS.push(rel);
+        return "";
+    }
+    return readFileSync(join(WEB, rel), "utf8");
+};
 /**
  * 剥掉注释再扫。**静态守卫必须先过这一步**：本仓库的习惯是把"为什么"写进注释，注释里
  * 会原样出现标识符（`node.type === "code"`、`react-markdown`…），裸子串检查于是被注释
@@ -553,8 +581,8 @@ console.log("\n[13] functions/ 下的端点在本地 dev 垫片里必须可达�
     // 全部静默丢掉**（桥接层按设计吞掉失败），排查缺字段那类问题时等于没有证据。
     // 三个根级探针（ping / kv-probe / issue-probe）同样没接上：它们是"发布前手工验一遍"
     // 的工具，本地访问不了就只能等上线后再发现。
-    const route = readFileSync(join(WEB, "app/edge-dev/[[...path]]/route.ts"), "utf8");
-    const config = readFileSync(join(WEB, "next.config.ts"), "utf8");
+    const route = readWeb("app/edge-dev/[[...path]]/route.ts");
+    const config = readWeb("next.config.ts");
 
     const mapAt = route.indexOf("const handlers:");
     const mapEnd = route.indexOf("\n};", mapAt);
@@ -721,7 +749,7 @@ console.log("\n[16] 轨迹取不到要说清缺什么（不许再退回一句空
     // tsc 都会当场报错，再给它们配守卫就是"恒绿的守卫"（§6.6 那条"守卫自己也要被校验"——
     // 第一次写就有一条被另外两条**蕴含**，变异怎么打都不红）。真正会静默退化的是**行为**：
     // 填了不渲染、渲染了不在失败分支填、切了日志不清空、引擎违约时拿一句谎话顶上。
-    const map = stripComments(readFileSync(join(WEB, "components", "LogFlightMap.tsx"), "utf8"));
+    const map = stripComments(readWeb("components", "LogFlightMap.tsx"));
     check("失败分支收下引擎给的全部原因", /setErrorReasons\(\s*track\.errorReasons/.test(map));
     check("界面把逐条原因渲染成列表", /errorReasons\.map\(/.test(map));
     check("重新取数时清空上一轮的原因", /setErrorReasons\(\[\]\)/.test(map));
@@ -742,12 +770,10 @@ console.log("\n[17] 两类条目共用的详情页组件不许带某一类的前
     //
     // 判据只看 import，且必须 `stripComments`：注释里会原样出现这些标识符，裸扫会被注释喂饱。
     const imports = (rel) =>
-        [...stripComments(readFileSync(join(WEB, rel), "utf8")).matchAll(/from "@\/components\/([A-Za-z0-9_]+)"/g)].map(
-            (m) => m[1],
-        );
+        [...stripComments(readWeb(rel)).matchAll(/from "@\/components\/([A-Za-z0-9_]+)"/g)].map((m) => m[1]);
 
-    const skillDeps = imports("app/skills/[slug]/page.tsx");
-    const mcpDeps = imports("app/mcp/[slug]/page.tsx");
+    const skillDeps = imports("app/[locale]/skills/[slug]/page.tsx");
+    const mcpDeps = imports("app/[locale]/mcp/[slug]/page.tsx");
     const shared = skillDeps.filter((n) => mcpDeps.includes(n));
 
     // 先判"共用集合非空"：若哪天两个页面被彻底拆开，下面两条会变成空集上的恒真判定，
@@ -778,8 +804,8 @@ console.log("\n[18] 站点版本只有一个读取口（footer 的「版本 + �
     //
     // 这里守的是三件事：注入方真的注入了三个值、只有一个文件读它们、footer 取到并且渲染出来。
     // 少任何一条，footer 上的版本号都会变成"看起来一直正常、其实早就过期"的那类错。
-    const config = stripComments(readFileSync(join(WEB, "next.config.ts"), "utf8"));
-    const footer = stripComments(readFileSync(join(WEB, "components", "SiteFooter.tsx"), "utf8"));
+    const config = stripComments(readWeb("next.config.ts"));
+    const footer = stripComments(readWeb("components", "SiteFooter.tsx"));
     const versionMod = stripComments(read("../lib/site-version.ts"));
 
     // 注入方：三个键一个都不能少（少了就在静默退化成"版本未知"，而没人会去查为什么）
@@ -830,10 +856,10 @@ console.log("\n[19] 指南页栏宽跟随内容、栏间距不许回到 40px");
     //
     // 这类错不报错、不白屏，只会"看起来有点空"，属于没人会主动去查的静默退化，
     // 所以做成机器能拦的守卫：宽度必须跟内容走，且上下限都要有兜底。
-    const sidebar = stripComments(readFileSync(join(WEB, "components", "GuideSidebar.tsx"), "utf8"));
-    const layout = stripComments(read("../app/guide/layout.tsx"));
-    const article = stripComments(readFileSync(join(WEB, "components", "GuideArticle.tsx"), "utf8"));
-    const outlineSrc = stripComments(readFileSync(join(WEB, "components", "GuideOutline.tsx"), "utf8"));
+    const sidebar = stripComments(readWeb("components", "GuideSidebar.tsx"));
+    const layout = stripComments(read("../app/[locale]/guide/layout.tsx"));
+    const article = stripComments(readWeb("components", "GuideArticle.tsx"));
+    const outlineSrc = stripComments(readWeb("components", "GuideOutline.tsx"));
 
     // 只取那个 `<aside>` 自己的类名，别把注释/其他元素的类名混进来
     const asideCls = (/<aside className="([^"]*)"/.exec(sidebar)?.[1] ?? "").split(/\s+/);
@@ -882,7 +908,7 @@ console.log("\n[20] 两句固定文案只有一个出处（措辞不许各写各
     // 这里守三件事：出处里两句都在、上传卡真的从出处取并渲染、全站任何别的文件不许手写
     // 这两句的字面量（否则下次有人往别的页面贴，措辞又会各长各的）。
     const notes = stripComments(read("../lib/log-analysis-notes.ts"));
-    const upload = stripComments(readFileSync(join(WEB, "app", "analyze", "AnalyzeEntryClient.tsx"), "utf8"));
+    const upload = stripComments(readWeb("app", "[locale]", "analyze", "AnalyzeEntryClient.tsx"));
 
     const zhPrivacy = "日志在浏览器本地解析，原始文件不上传";
     const zhDisclaimer = "分析结果为辅助判读，不能完全替代人工排查";
@@ -974,6 +1000,81 @@ console.log("\n[21] 次数上限不在前端显示（上限由后台配置，前
         "取数层仍然保留 quota（后台配好上限后 UI 直接取用）",
         quotaConsumers.includes(join("hooks", "useLogAnalyzer.ts")),
         "hooks/useLogAnalyzer.ts 已不再碰 quota",
+    );
+}
+
+console.log("\n[22] 地图左上角三个图标是一条按钮，高度色带贴着它往下铺（不留空档）");
+{
+    // 由来：复位按钮最早是**另一个** L.Control（position topleft + controlOrder 1000），
+    // 排到缩放条下面。但 Leaflet 的 CSS 给**每个** .leaflet-control 都加了 margin-top 10px，
+    // 两组之间必然留一道空档；而且两个 .leaflet-bar 各有 1px 边框，就算把 margin 抹掉，
+    // 贴在一起也是 2px 双线。用户看到的就是"缩小按钮和复位图标之间一大块空白"。
+    // 只有 append 进**同一个** .leaflet-bar 才会共享一条边框、由 .leaflet-bar a 的
+    // border-bottom 自动分隔。
+    //
+    // 连带：按钮列底边因此上移（118 → 104），色带的 top-[110px] 是量出来的、跟着这个
+    // 形态走。**只写 bottom-0 不写 top 就没有上边界** —— 2026-09-23 实测过：top-[124px]
+    // 没进 CSS 时容器被内容高度挤成 2px，整条色带看不见。
+    //
+    // 为什么只能静态锁写法、锁不住 104 这个数：那是浏览器布局的结果，要验就得起服务跑
+    // Playwright（分钟级），进不了秒级检查。这里锁住的是"会不会回潮成两个 bar"，
+    // 以及"色带有没有上下边界"——这两条一旦回潮，现象和这次完全一样。
+    const src = stripComments(read("../components/LogFlightMap.tsx"));
+    // 色带容器的 className：靠 top-[…px] 这个特征值从全组件的 className 里认出来
+    const barCls = [...src.matchAll(/className="([^"]+)"/g)].map((m) => m[1]).find((c) => /top-\[\d+px\]/.test(c));
+
+    check(
+        "复位按钮不另起 .leaflet-bar（另起就与缩放条留 10px 空档 + 2px 双边框）",
+        !src.includes('L.DomUtil.create("div", "leaflet-bar leaflet-control")'),
+        "又出现了手工建的 leaflet-bar 容器：三个图标会裂成两组",
+    );
+    check(
+        "复位按钮挂在缩放条里（zoomControl 取容器后 appendChild）",
+        // 窗口给到 1200：getContainer() 与 appendChild 之间夹着按钮的 svg 字符串与事件绑定，
+        // 400 装不下（第一版就是卡在这儿，判据写窄了会假红）。
+        src.includes("zoomControl") && /getContainer\(\)[\s\S]{0,1200}appendChild\(/.test(src),
+        "没找到「取缩放条容器 → appendChild」这条链，复位按钮大概率又变成独立控件了",
+    );
+    // 三个按钮必须横排：竖排时它们吃掉 ~94px 高，色带只能从 104 往下铺。
+    // 这条锁的是"横排"这个事实，不是某个像素值（像素值得起浏览器量，进不了秒级检查）。
+    check(
+        "按钮行是横排的（给缩放条设了 display:flex，分隔线改成 border-right）",
+        /display\s*=\s*"flex"/.test(src) && src.includes("borderRight"),
+        "没找到「横排 + border-right」：按钮会回到竖排，色带顶端跟着下移 60px 左右",
+    );
+    check(
+        "高度色带同时写了 top-[…px] 与 bottom-0（缺 top 就没有上边界，会被挤成 2px）",
+        !!barCls && barCls.includes("bottom-0"),
+        barCls ? `色带 className 缺 bottom-0：${barCls}` : "找不到带 top-[…px] 的色带容器",
+    );
+    check(
+        "高度色带与按钮行左对齐、不挡地图操作（left-2.5 + pointer-events-none）",
+        !!barCls && barCls.includes("left-2.5") && barCls.includes("pointer-events-none"),
+        barCls ? `色带 className 不满足：${barCls}` : "找不到带 top-[…px] 的色带容器",
+    );
+    // 标签必须挂在色带**右侧**（left-full）：压在条上会盖住渐变，而条只有 12px 宽。
+    const labelCls = [...src.matchAll(/className="([^"]+)"/g)].map((m) => m[1]).filter((c) => c.includes("left-full"));
+    check(
+        "两个高度标签挂在色带右侧（left-full，不遮渐变）",
+        labelCls.length === 2 && labelCls.every((c) => c.includes("whitespace-nowrap")),
+        `命中的标签 className ${labelCls.length} 个：${labelCls.join(" | ")}`,
+    );
+}
+
+console.log("\n[23] 静态守卫引用的源码路径都存在（路径失效不许把后面整段带走）");
+{
+    // 见文件头 read / readWeb 的说明：这些路径是写死在脚本里的，路由一改就集体失效，
+    // 而失效的表现曾经是"抛 ENOENT 把后面所有节带走"——既没红在该红的地方，也让人
+    // 分不清是"路径坏了"还是"守卫真红了"。
+    //
+    // 这一节是**兜底汇总**：read / readWeb 已经保证坏路径只让那一节自己红，这里再把
+    // "到底哪几个路径不存在"单独说清楚，免得表现为若干节同时红、根因却只有一个。
+    //
+    // 想证明它会红：把 read / readWeb 里任一路径改成一个不存在的文件名再跑本脚本。
+    check(
+        "静态守卫引用的路径都指向真实文件",
+        MISSING_PATHS.length === 0,
+        MISSING_PATHS.length ? `不存在的路径：${[...new Set(MISSING_PATHS)].join("、")}` : "",
     );
 }
 

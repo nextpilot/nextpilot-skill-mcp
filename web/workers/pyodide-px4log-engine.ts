@@ -1666,6 +1666,9 @@ class Px4Provider:
         # 本日志实际录到的 topic 名集合
         self._topics = set(d.name for d in self.ulog.data_list)
 
+        # 取数时"要的实例超出日志里有的"这类说明，由 \`take_inst_notes()\` 取走（见 get_series）
+        self.inst_notes = []
+
         # 按 pyulog 的**数据来源**分组读：各段只读自己那一种来源，都只往 self 上放结果、
         # 不碰 facts。顺序有一处硬约束——\`_read_logged_messages()\` 要用 \`_read_data_list()\` 算出的
         # \`t0_us\` 把消息时间换成**相对日志起点**的秒数，所以它必须排最后；其余互不依赖。
@@ -1715,12 +1718,12 @@ class Px4Provider:
         """按 \`"topic.field"\` 取一条序列（与规则里写的引用形一致）。
 
         **取不到或字段不存在一律返回 None，不抛异常。** 形态：
-          · instance=slice（规则里写 \`topic[:].field\`，**不写下标也一样**）—— 所有实例。
-            多实例时返回「每实例一组」的列表；**只有一个实例时返回那一条序列本身**
-            （否则单实例字段就得处处写 \`[0]\`，而且 \`q\` 这种"每元素一列"的数组字段会被
-            多包一层而读不出来）
-          · instance=N（规则里写 \`topic[N].field\`，N 可为负，按 Python 语义从末尾数）
-            —— 只取第 N 个实例
+          · instance=slice（规则里写 \`topic[:].field\` / \`topic[a:b].field\`，区间**含两端**）
+            —— 区间内的实例。多实例时返回「每实例一组」的列表；**只有一个实例时返回那
+            一条序列本身**（否则单实例字段就得处处写 \`[0]\`，而且 \`q\` 这种"每元素一列"
+            的数组字段会被多包一层而读不出来）
+          · instance=N（规则里写 \`topic[N].field\`，**不写下标就是 0**，N 可为负，
+            按 Python 语义从末尾数）—— 只取第 N 个实例
           · alias —— 该字段的备用命名（旧固件改过名），可给字符串或字符串列表
         定长数组字段（如 float32[3] accel_clipping）：pyulog 按 'field[i]' 暴露，
         这里返回**每元素一列的列表**，缺的元素位置为 None。
@@ -1737,6 +1740,8 @@ class Px4Provider:
         groups = self._read_grouped(ref, aliases)
         if not groups:
             return None
+        if isinstance(instance, slice):
+            self._note_inst_range(ref, instance, len(groups))
         try:
             picked = groups[instance]
         except (IndexError, TypeError):
@@ -1745,6 +1750,32 @@ class Px4Provider:
             # 单实例：直接给那一条（与 \`[0]\` 同形），别让调用方无谓地拆一层
             return picked[0] if len(picked) == 1 else picked
         return picked
+
+    def _note_inst_range(self, ref, instance, n):
+        """区间要的实例超出了日志里实际有的 → 记一条说明（取数照截断走，不报错）。
+
+        只提示不报错：区间写宽了通常是作者对**这份日志**有几路传感器估错了，按能取到的
+        画出来仍然是对的结论，但得让人看见"少了几路"，否则会当成全部实例都查过了。
+        """
+        last = n - 1
+        # 文案里报**作者写的那个数**（可能是负的，表示从末尾数），判越界才换算成非负下标
+        lo_w = 0 if instance.start is None else instance.start
+        # slice 的上界是闭区间 +1（见 _parse_inst），减回来才是作者写的那个数；None = 到末尾
+        hi_w = last if instance.stop is None else instance.stop - 1
+        lo = n + lo_w if lo_w < 0 else lo_w
+        hi = n + hi_w if hi_w < 0 else hi_w
+        if lo >= 0 and hi <= last and lo <= hi:
+            return
+        self.inst_notes.append(
+            "%s 要实例 %d~%d，这份日志只有 0~%d —— 按 %d~%d 取"
+            % (ref.partition(".")[0], lo_w, hi_w, last, max(lo, 0), min(hi, last))
+        )
+
+    def take_inst_notes(self):
+        """取走并清空上面那些越界说明（图取完数统一带出，别串到下一次请求）。"""
+        notes = list(self.inst_notes)
+        self.inst_notes.clear()
+        return notes
 
     def get_first_existing_column(self, topic, names):
         """只取第一个实例、按候选名取第一个存在的**原样列**（概览指标兜底取数用）。"""
@@ -2341,6 +2372,12 @@ class Px4Provider:
             if direct is not None and len(direct):
                 groups.append(np.asarray(direct, dtype=float))
                 continue
+            # \`field[K]\` 且日志里没有 \`field[K]\` 这一列 → 这是**标量序列取第 K 个采样**
+            # （数组字段走上面的 direct：\`q[0]\` 是 pyulog 的 'q[0]' 列，一整条序列）
+            elem = self._element_at(d, field, *aliases)
+            if elem is not None:
+                groups.append(elem)
+                continue
             cols = []
             for idx in range(32):
                 col = None
@@ -2354,6 +2391,46 @@ class Px4Provider:
                 cols.pop()
             groups.append(cols if cols else None)
         return groups
+
+    @staticmethod
+    def _element_at(ds, field, *aliases):
+        """\`name[K]\` / \`name[i,j]\` 取不出来 → None（K 越界、列不存在、name 根本不存在都算）。
+
+        \`topic.field[K]\` 是"取第 K 个元素"，**元素是什么取决于字段本身**：
+          · 数组字段（\`q\`、\`accel_clipping\`）—— pyulog 直接给了 \`q[K]\` 这一列，是一整条
+            序列，**走不到这里**（\`_read_grouped\` 前面的 direct 就命中了）
+          · 标量序列（\`ref_alt\`、\`z\`）—— 日志里没有 \`ref_alt[K]\` 列，这里按**第 K 个采样**
+            取一个标量。相对高度那类"拿首值当基准"的算式靠它：\`ref_alt[0] - ref_alt\`
+
+        \`field[i,j]\` 是**二维下标**：i 是行、j 是列。数组字段在 pyulog 里存成"每列一条序列"
+        （\`q[0]\`、\`q[1]\`…），所以**行 = 第几个采样（随时间递进）、列 = 第几路信号**——
+        \`q[10,2]\` 就是"第 10 个采样时刻、第 2 列"那个值。
+        """
+        m2 = _re.match(r"^(.+)\[(\d+),(\d+)\]$", field)
+        if m2:
+            stem, i, j = m2.group(1), int(m2.group(2)), int(m2.group(3))
+            for name in ["%s[%d]" % (stem, j)] + ["%s[%d]" % (a, j) for a in aliases]:
+                try:
+                    v = ds.data[name]
+                except KeyError:
+                    continue
+                if v is None:
+                    continue
+                return float(v[i]) if i < len(v) else None
+            return None
+        m = _re.match(r"^(.+)\[(\d+)\]$", field)
+        if not m:
+            return None
+        stem, k = m.group(1), int(m.group(2))
+        for name in [stem] + list(aliases):
+            try:
+                v = ds.data[name]
+            except KeyError:
+                continue
+            if v is None:
+                continue
+            return float(v[k]) if k < len(v) else None
+        return None
 
     def _level_str(self, m, lvl):
         try:
@@ -2938,8 +3015,8 @@ def _pick_ref(name, *more, alias=None, unit=None, instance=None):
 
     与 \`_ref\` 是同一件事，区别只在**回传命中的是哪个字段**——地图轨迹要用它去同一 topic 上
     取时间戳与定位类型（\`fix_type\`），图上的时间轴也要。\`instance\` 非 None 时**覆盖**引用里
-    写的实例切片（图上"每实例一个面板"用：声明里写 \`[:]\`，具体画第几个由这一层定）；
-    写死的 \`[N]\` 不受它影响。
+    写的实例**切片**（图上"每实例一个面板"用：声明里写 \`[:]\`，具体画第几个由这一层定）；
+    写死的 \`[N]\`、以及**不写下标**（= 实例 0）都不受它影响。
     """
     for cand in (name, *more):
         bare, inst = _split_ref(cand)
@@ -2960,11 +3037,13 @@ def _ref(name, *more, alias=None, unit=None):
     """字段取数：表达式里的 \`ref("topic.field", ...)\` 与裸写的 \`topic.field\` 都走这里。
 
     字段名有两种下标，别混：
-      \`topic.field\` / \`topic[:].field\` —— **所有实例**（两种写法等效）。多实例时给
-                          「每实例一组」的列表，交给需要分组的算子；**只有一个实例时
-                          就是那一条序列**（与写 \`[0]\` 同形），所以单实例字段照旧直接算
-      \`topic[N].field\` —— 只取第 N 个实例（N 可为负）
-      \`topic.field[N]\` —— 数组字段的元素下标（如 \`vehicle_attitude.q[0]\`）
+      \`topic.field\`     —— **只取第 0 个实例**（与 \`topic[0].field\` 同义）。要别的实例
+                          就写明；要"所有实例"必须写 \`[:]\`
+      \`topic[:].field\`  —— **所有实例**。多实例时给「每实例一组」的列表，交给需要分组
+                          的算子；**只有一个实例时就是那一条序列**（与写 \`[0]\` 同形）
+      \`topic[a:b].field\`—— 闭区间，实例 a~b（**含 b**），如 \`[1:3]\` = 1、2、3
+      \`topic[N].field\`  —— 只取第 N 个实例（N 可为负，按 Python 语义从末尾数）
+      \`topic.field[N]\`  —— 数组字段的元素下标（如 \`vehicle_attitude.q[0]\`）
 
     **位置参数可以给多个**：\`ref("新名", "旧名")\` 是候选组——按顺序取第一个在日志里
     存在的；都没有返回 None，由数据流自己中止。改名的场合一律用它，**没有"这个引用只
@@ -2984,7 +3063,7 @@ def _ref(name, *more, alias=None, unit=None):
 
 
 def _split_ref(ref):
-    """\`"topic[:].field"\` → ("topic.field", slice(None, None))；\`[N]\` → int；**不写也是 slice**。
+    """\`"topic[:].field"\` → ("topic.field", 所有实例)；\`[N]\` → int；**不写下标 → 0**。
 
     实例说明交给 provider 直接用下标取（Python 的 int/切片语义），这里只负责拆开。
     """
@@ -2995,12 +3074,22 @@ def _split_ref(ref):
 
 
 def _parse_inst(txt):
-    """\`[2]\` → int；\`[:]\` / \`[1:3]\` / **不写** → slice（不写就是"所有实例"）。形状由构建期保证。"""
+    """\`[2]\` → int；\`[1:3]\` → slice（**闭区间**，含 3）；**不写** → 0（只取第 0 个实例）。
+
+    区间按**闭区间**算（\`[1:3]\` = 实例 1、2、3）——这是知识库的写法约定，与 Python 切片
+    "含头不含尾"相反，所以转 Python slice 时**上界要 +1**：这里返回的 slice 打印出来
+    比写的多 1，**别照着它的数字读实例号**（报错文案里也不打 slice，只打闭区间）。
+    """
     if txt is None or txt == "":
-        return slice(None, None)
+        return 0
     if ":" in txt:
         a, _, b = txt.partition(":")
-        return slice(int(a) if a else None, int(b) if b else None)
+        start = int(a) if a else None
+        stop = int(b) if b else None
+        if stop is not None:
+            # 闭区间 → 半开：上界 +1。\`[:-1]\` 那一端 +1 得 0（取空），改用 None（到末尾）
+            stop = None if stop + 1 == 0 else stop + 1
+        return slice(start, stop)
     return int(txt)
 
 

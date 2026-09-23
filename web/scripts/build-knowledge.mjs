@@ -772,7 +772,7 @@ function containerSwitches(out, where) {
 /**
  * `container: axes` → 一张图。**单位一致性在这里卡住**：同一张图里写了 `unit=` 的引用必须
  * 目标单位相同（一图一量纲 —— `eph`(m) 与 `hdop`(无量纲) 画在一个 y 轴上没法读）。
- * `per_instance` 要求图上有 `[:]` 的引用（否则拆不出多张图）；反过来，没有 `per_instance`
+ * `split_by_instance` 要求图上有 `[:]` 的引用（否则拆不出多张图）；反过来，没有 `split_by_instance`
  * 的图不许出现 `[:]`（那会取到一组实例，引擎会报错——不如在这里说清楚）。
  */
 function compileAxes(out, where, declaredVars, refs) {
@@ -783,7 +783,7 @@ function compileAxes(out, where, declaredVars, refs) {
     if (!Array.isArray(out.children) || out.children.length === 0) {
         throw new Error(`${where}: children 必须是非空数组（这张图画哪几条线）`);
     }
-    const perInstance = out.per_instance === true;
+    const perInstance = out.split_by_instance === true;
     const children = out.children.map((child, ci) => {
         const cwhere = `${where} 第 ${ci + 1} 条 child`;
         if (!CHART_MODES.has(child.mode)) {
@@ -827,18 +827,20 @@ function compileAxes(out, where, declaredVars, refs) {
         );
     }
     if (perInstance && grouped === 0) {
-        throw new Error(`${where}: 写了 per_instance 但没有任何引用取"所有实例"——那条线要写成 ref("topic[:].field")`);
+        throw new Error(
+            `${where}: 写了 split_by_instance 但没有任何引用取"所有实例"——那条线要写成 ref("topic[:].field")`,
+        );
     }
     if (!perInstance && grouped > 0) {
         throw new Error(
             `${where}: 有引用取到了"所有实例"（[:] 或不写实例），这样画不出图——` +
-                `要么给容器加 per_instance: true（每实例一张图），要么在引用里写死第几个实例`,
+                `要么给容器加 split_by_instance: true（每实例一张图），要么在引用里写死第几个实例`,
         );
     }
     return {
         container: "axes",
         ...switches,
-        per_instance: perInstance,
+        split_by_instance: perInstance,
         ylabel: out.ylabel.trim(),
         xlabel: out.xlabel ?? "秒（相对日志开始）",
         children,

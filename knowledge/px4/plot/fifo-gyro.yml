@@ -1,0 +1,18 @@
+id: fifo-gyro
+title: Raw Gyro (FIFO)
+description: FIFO 陀螺仪原始数据（每 IMU 一张），仅当 sensor_gyro_fifo 存在时显示。
+order: 29
+conditions:
+  topics: [sensor_gyro_fifo]
+outputs:
+  - container: axes
+    title: "Raw Gyro (FIFO, IMU{instance})"
+    ylabel: "[deg/s]"
+    split_by_instance: true
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("sensor_gyro_fifo[:].x")
+          - ref("sensor_gyro_fifo[:].y")
+          - ref("sensor_gyro_fifo[:].z")
+        label: ["X", "Y", "Z"]

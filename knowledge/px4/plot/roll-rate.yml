@@ -1,0 +1,23 @@
+id: roll-rate
+title: Roll Angular Rate
+description: Roll 角速度估计值与 setpoint、积分。
+order: 4
+conditions:
+  topics: [vehicle_attitude]
+outputs:
+  - container: axes
+    title: Roll Angular Rate
+    ylabel: deg/s
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("vehicle_angular_velocity[0].xyz[0]", "vehicle_attitude[0].rollspeed")
+        label: ["Roll Rate Estimated"]
+      - mode: TimeSeries
+        ydata:
+          - ref("vehicle_rates_setpoint[0].roll")
+        label: ["Roll Rate Setpoint"]
+      - mode: TimeSeries
+        ydata:
+          - ref("rate_ctrl_status[0].rollspeed_integ")
+        label: ["Roll Rate Integral"]

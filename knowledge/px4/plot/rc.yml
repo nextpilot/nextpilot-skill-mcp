@@ -1,13 +1,13 @@
 id: rc
-title: 遥控输入
-description: 手动遥控器摇杆输入（归一化 -1..1）。
-order: 9
+title: Manual Control Inputs
+description: 手动控制输入（遥控器/手柄）：Roll/Pitch/Yaw/Throttle + Aux + Flight Mode + Kill Switch。
+order: 20
 conditions:
   topics: [manual_control_setpoint]
 outputs:
   - container: axes
-    title: 摇杆输入
-    ylabel: "归一化 [-1,1]"
+    title: Manual Control Inputs (Radio or Joystick)
+    ylabel: "[-1, 1]"
     children:
       - mode: TimeSeries
         ydata:
@@ -15,4 +15,11 @@ outputs:
           - ref("manual_control_setpoint[0].pitch")
           - ref("manual_control_setpoint[0].yaw")
           - ref("manual_control_setpoint[0].throttle")
-        label: [Roll, Pitch, Yaw, Throttle]
+          - ref("manual_control_setpoint[0].aux1")
+          - ref("manual_control_setpoint[0].aux2")
+        label: ["Y / Roll", "X / Pitch", "Yaw", "Throttle [-1, 1]", "Aux1", "Aux2"]
+      - mode: TimeSeries
+        ydata:
+          - ref("manual_control_switches[0].mode_slot", "manual_control_setpoint[0].mode_slot")
+          - ref("manual_control_switches[0].kill_switch", "manual_control_setpoint[0].kill_switch")
+        label: ["Flight Mode", "Kill Switch"]

@@ -1,0 +1,23 @@
+id: actuator-controls-1
+title: Actuator Controls 1 (VTOL in Fixed-Wing mode)
+description: 第二组 Actuator Controls（仅 VTOL/固定翼配置时存在）。
+order: 22
+conditions:
+  topics: ["vehicle_torque_setpoint || actuator_controls_1"]
+outputs:
+  - container: axes
+    title: Actuator Controls 1 (VTOL in Fixed-Wing mode)
+    ylabel: "normalized"
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("vehicle_torque_setpoint[1].xyz[0]")
+        label: ["Roll"]
+      - mode: TimeSeries
+        ydata:
+          - ref("vehicle_torque_setpoint[1].xyz[1]")
+        label: ["Pitch"]
+      - mode: TimeSeries
+        ydata:
+          - ref("vehicle_torque_setpoint[1].xyz[2]")
+        label: ["Yaw"]

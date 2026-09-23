@@ -1,0 +1,67 @@
+id: actuator-outputs
+title: Actuator Outputs
+description: 执行机构输出（Motor/Servo 或 Main/AUX/EXTRA），取决于 dynamic_control_alloc。
+order: 23
+conditions:
+  topics: ["actuator_motors || actuator_servos || actuator_outputs"]
+outputs:
+  - container: axes
+    title: Motor Outputs
+    ylabel: "[-1, 1]"
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("actuator_motors[0].control[0]")
+          - ref("actuator_motors[0].control[1]")
+          - ref("actuator_motors[0].control[2]")
+          - ref("actuator_motors[0].control[3]")
+          - ref("actuator_motors[0].control[4]")
+          - ref("actuator_motors[0].control[5]")
+          - ref("actuator_motors[0].control[6]")
+          - ref("actuator_motors[0].control[7]")
+        label: ["Motor 1", "Motor 2", "Motor 3", "Motor 4", "Motor 5", "Motor 6", "Motor 7", "Motor 8"]
+  - container: axes
+    title: Servo Outputs
+    ylabel: "[-1, 1]"
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("actuator_servos[0].control[0]")
+          - ref("actuator_servos[0].control[1]")
+          - ref("actuator_servos[0].control[2]")
+          - ref("actuator_servos[0].control[3]")
+          - ref("actuator_servos[0].control[4]")
+          - ref("actuator_servos[0].control[5]")
+          - ref("actuator_servos[0].control[6]")
+          - ref("actuator_servos[0].control[7]")
+        label: ["Servo 1", "Servo 2", "Servo 3", "Servo 4", "Servo 5", "Servo 6", "Servo 7", "Servo 8"]
+  - container: axes
+    title: Actuator Outputs (Main)
+    ylabel: us
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("actuator_outputs[0].output[0]")
+          - ref("actuator_outputs[0].output[1]")
+          - ref("actuator_outputs[0].output[2]")
+          - ref("actuator_outputs[0].output[3]")
+          - ref("actuator_outputs[0].output[4]")
+          - ref("actuator_outputs[0].output[5]")
+          - ref("actuator_outputs[0].output[6]")
+          - ref("actuator_outputs[0].output[7]")
+        label: ["Output 0", "Output 1", "Output 2", "Output 3", "Output 4", "Output 5", "Output 6", "Output 7"]
+  - container: axes
+    title: Actuator Outputs (AUX)
+    ylabel: us
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("actuator_outputs[1].output[0]")
+          - ref("actuator_outputs[1].output[1]")
+          - ref("actuator_outputs[1].output[2]")
+          - ref("actuator_outputs[1].output[3]")
+          - ref("actuator_outputs[1].output[4]")
+          - ref("actuator_outputs[1].output[5]")
+          - ref("actuator_outputs[1].output[6]")
+          - ref("actuator_outputs[1].output[7]")
+        label: ["Output 0", "Output 1", "Output 2", "Output 3", "Output 4", "Output 5", "Output 6", "Output 7"]

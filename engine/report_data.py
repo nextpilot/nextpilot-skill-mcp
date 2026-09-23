@@ -75,9 +75,20 @@ def np_report():
     "交给前端"）。跑规则仍是 rule_engine 的活（`run_all()`），这里只负责把结果交出去，
     与 np_manifest / np_series / np_track / np_log_info 同一形状——
     前端面对的 Python 面因此是 5 个对称的具名入口，没有"谁先读 __result"的隐含顺序。
+
+    取数过程中"要的实例超出日志里有的"这类说明在这里一并带出（规则侧没人取走会攒着，
+    跑完统一收）；图侧由 `np_series` 自己带。
     """
     global __result
-    __result = json.dumps(run_all(), ensure_ascii=False)
+    take_notes = getattr(provider, "take_inst_notes", None)
+    if take_notes:
+        take_notes()  # 别把上一次的带进来
+    report = run_all()
+    if take_notes:
+        notes = take_notes()
+        if notes:
+            report["instanceNotes"] = notes
+    __result = json.dumps(report, ensure_ascii=False)
 
 
 # ============ np_manifest：话题清单（驱动前端预设可用性）============
@@ -99,14 +110,19 @@ def np_series(request_json, max_points=3000):
       xdata     可选：`mode: xyplot` 的横轴。不给就用**命中字段那个 topic 的 timestamp**
       compute   可选：预设的换算节点（与规则 compute 同一套表达式与算子），在取 ydata **之前**求值
 
-    返回 `{t, x, series:[…], fullCount}`：`series` 与 ydata **同序等长**（取不到的那条是
-    `null`），前端按预设里的 label/color 逐项对齐即可；`x` 为 null 表示横轴就是 `t`。
-    一条都取不到、或拿到的是一组实例（`[:]` 没配 `per_instance`），给 `{"error": …}`。
+    返回 `{t, x, series:[…], fullCount, warnings:[…]}`：`series` 与 ydata **同序等长**
+    （取不到的那条是 `null`），前端按预设里的 label/color 逐项对齐即可；`x` 为 null 表示
+    横轴就是 `t`；`warnings` 是取数过程中的提示（如"要实例 1~5，日志里只有 0~2"）。
+    一条都取不到、或区间引用没在前端展开成单条，给 `{"error": …}`。
 
     换算（四元数→欧拉角、单位、多字段合成）都在这里做，前端只画——"前端不写数学"。
     """
     global __result
     req = json.loads(request_json)
+    # 上一条请求留下的越界说明不能串到这条（规则侧没人取走，会一直攒着）
+    take_notes = getattr(provider, "take_inst_notes", None)
+    if take_notes:
+        take_notes()
     inst = int(req.get("instance") or 0)
     yspec = req.get("ydata") or []
     if not yspec:
@@ -201,6 +217,7 @@ def np_series(request_json, max_points=3000):
             "x": None if x_vals is None else [_clean(np.asarray(x_vals, dtype=float)[i]) for i in idx],
             "series": [None if a is None else [_clean(a[i]) for i in idx] for a in arrs],
             "fullCount": n,
+            "warnings": take_notes() if take_notes else [],
         },
         ensure_ascii=False,
     )
@@ -212,7 +229,11 @@ def _panel_series(spec, env, inst):
     · `{"kind":"var"}` 取换算节点的输出（标量由调用方铺成常量线）
     · `{"kind":"field"}` 走 `_pick_ref`（候选组 + 单位换算 + 实例覆盖）
 
-    分组结果（`[:]` 且容器没写 `per_instance`）是**用错了**：报错，别把一组数据画成一条线。
+    区间引用（`[:]` / `[a:b]`）有两种去向，都由**前端**决定，这里只见到结果：
+      · 容器 `split_by_instance: true` → 按实例拆成多张图，每张图把实例号放在 `instance=` 里
+        发过来，`_pick_ref` 用它盖掉引用里的区间 → 拿到单条序列
+      · 容器不拆 → 前端自己把 `a[:].b` 展开成 `a[0].b`、`a[1].b`… 再发过来 → 也是单条
+    所以这里**只会**见到单条序列。万一见到一组，那不是预设写错了，是解析器漏了展开。
     """
     if spec.get("kind") == "var":
         return env.get(spec.get("name")), None
@@ -223,7 +244,8 @@ def _panel_series(spec, env, inst):
         return None, None
     if isinstance(series, list) and series and isinstance(series[0], (list, tuple)):
         raise ValueError(
-            "%s 取到的是所有实例（[:]），图上画不了——要么给容器加 per_instance: true、要么在引用里指定第几个实例" % bare
+            "%s 取到的是一组实例（%d 条）——区间引用应该在前端就展开成每条一个实例，"
+            "这里是解析器的问题，不是预设写错了" % (bare, len(series))
         )
     return series, bare
 

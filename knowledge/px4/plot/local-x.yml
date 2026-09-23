@@ -1,0 +1,19 @@
+id: local-x
+title: Local Position X
+description: 局部位置 X 轴估计值与 setpoint。
+order: 9
+conditions:
+  topics: [vehicle_local_position]
+outputs:
+  - container: axes
+    title: Local Position X
+    ylabel: "[m]"
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("vehicle_local_position[0].x")
+        label: ["X Estimated"]
+      - mode: TimeSeries
+        ydata:
+          - ref("vehicle_local_position_setpoint[0].x")
+        label: ["X Setpoint"]

@@ -1,0 +1,16 @@
+id: cpu-ram
+title: CPU & RAM
+description: CPU 负载与 RAM 使用率。
+order: 39
+conditions:
+  topics: [cpuload]
+outputs:
+  - container: axes
+    title: CPU & RAM
+    ylabel: "[0, 1]"
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("cpuload[0].ram_usage")
+          - ref("cpuload[0].load")
+        label: ["RAM Usage", "CPU Load"]

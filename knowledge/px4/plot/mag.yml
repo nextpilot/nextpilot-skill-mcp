@@ -1,17 +1,17 @@
 id: mag
-title: 磁罗盘
-description: 磁场强度三轴分量（Gauss），用于航向估计。
-order: 8
+title: Raw Magnetic Field Strength
+description: 传感器原始磁场强度（magnetometer_ga），兼容 vehicle_magnetometer / sensor_combined。
+order: 30
 conditions:
-  topics: [sensor_mag]
+  topics: ["vehicle_magnetometer || sensor_combined"]
 outputs:
   - container: axes
-    title: 磁场强度
-    ylabel: Gauss
+    title: Raw Magnetic Field Strength
+    ylabel: "[gauss]"
     children:
       - mode: TimeSeries
         ydata:
-          - ref("sensor_mag[0].x")
-          - ref("sensor_mag[0].y")
-          - ref("sensor_mag[0].z")
-        label: [X, Y, Z]
+          - ref("vehicle_magnetometer[0].magnetometer_ga[0]", "sensor_combined[0].magnetometer_ga[0]")
+          - ref("vehicle_magnetometer[0].magnetometer_ga[1]", "sensor_combined[0].magnetometer_ga[1]")
+          - ref("vehicle_magnetometer[0].magnetometer_ga[2]", "sensor_combined[0].magnetometer_ga[2]")
+        label: ["X", "Y", "Z"]

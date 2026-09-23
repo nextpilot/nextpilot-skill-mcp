@@ -129,6 +129,17 @@ jobs:
         command: ["{PYTHON}", "tools/ci/check_secrets.py"]
         hint: "A credential-shaped value was found in a tracked file. Move it to an environment variable; if it is a legitimate placeholder, add it to the allowlist in tools/ci/check_secrets.py."
 
+      # 面板解析器：实例怎么数、区间引用怎么展开。只跑纯函数（内置假 manifest），
+      # 无浏览器无日志，实测不到 1s。这些规矩改坏时前端不会崩、只会**少画几张图**——
+      # 没有任何运行时信号，只能靠这一道门。
+      - id: "check-panel-resolver"
+        name: "Panel resolver rules (check-panel-resolver)"
+        workdir: "{WEB}"
+        # --experimental-strip-types：断言直接 import 真的 lib/panel-resolver.ts。
+        # 断言写在副本上就守不住真身了（Node 22 起自带类型擦除，不需要构建步骤）
+        command: ["{NODE}", "--experimental-strip-types", "scripts/check-panel-resolver.mjs"]
+        hint: "面板解析器的规矩被改坏了（数实例 / 区间展开 / 并集告警）。看上面 FAIL 那一行，改回 lib/panel-resolver.ts。"
+
       # ── 单元测试 ──
       - id: "pytest-engine"
         name: "Operator / CEL sandbox unit tests (pytest)"

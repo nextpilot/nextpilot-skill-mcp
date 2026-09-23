@@ -1,0 +1,17 @@
+id: raw-gyro
+title: Raw Angular Speed (Gyroscope)
+description: 传感器原始角速度（sensor_combined.gyro_rad）。
+order: 27
+conditions:
+  topics: [sensor_combined]
+outputs:
+  - container: axes
+    title: Raw Angular Speed (Gyroscope)
+    ylabel: "[rad/s]"
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("sensor_combined[0].gyro_rad[0]")
+          - ref("sensor_combined[0].gyro_rad[1]")
+          - ref("sensor_combined[0].gyro_rad[2]")
+        label: ["X", "Y", "Z"]

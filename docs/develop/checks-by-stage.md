@@ -70,9 +70,9 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 | 类型     | 类型对得上吗                       | `tsc --noEmit`                                                                                                                      |
 | 单测     | 算子与表达式求值对不对             | `pytest engine/tests`                                                                                                               |
 | 契约     | 产物与源一致吗、产物合法吗         | `build:kb --check`、`check-pyodide-px4log-engine`、`check_engine_purity`、`check_pnpm_filter`、`check-skill-spec`、`check-mcp-spec` |
-| 守卫集   | 前端不许退化的那批断言还成立吗     | `test-issue-filer`（21 节）                                                                                                         |
+| 守卫集   | 前端不许退化的那批断言还成立吗     | `test-issue-filer`（23 节）                                                                                                         |
 | 元检查   | **校验机制自己**还健康吗           | `check_hygiene`                                                                                                                     |
-| 自证     | 守卫真的会红吗（不是恒绿）         | `mutate_guards`（46 条变异）                                                                                                        |
+| 自证     | 守卫真的会红吗（不是恒绿）         | `mutate_guards`（53 条变异）                                                                                                        |
 | 回归     | 改规则后结论还准吗                 | 日志回归 4 项                                                                                                                       |
 | 冒烟     | 关键路径还能跑通吗                 | Playwright `@smoke`                                                                                                                 |
 | E2E      | 全量链路还能跑通吗                 | Playwright 全量、`playwright.live`（线上）                                                                                          |
@@ -105,7 +105,7 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 | 契约     | `check_pnpm_filter`（`pnpm --filter` 值命中真实项目）       | **0.5s**                               | 每次                  | push                                   |
 | 契约     | `check-skill-spec`                                          | 1s                                     | 每次                  | CI                                     |
 | 契约     | `check-mcp-spec`                                            | 1s                                     | 每次                  | CI                                     |
-| 守卫集   | `test-issue-filer`（前端守卫）                              | **42s**                                | 静态（pre-push 跳过） | CI                                     |
+| 守卫集   | `test-issue-filer`（前端守卫）                              | **约 45s**                             | 静态（pre-push 跳过） | CI                                     |
 | 元检查   | `check_hygiene`（校验机制自身卫生）                         | 4s                                     | 每次                  | push                                   |
 | 日志回归 | `compare_baseline`                                          | 3s                                     | 本地 push             | **本地**（`.ulg` 不入库，第 9 节）     |
 | 日志回归 | `guard-px4log-provider`                                     | 3s                                     | 本地 push             | **本地**（同上）                       |
@@ -113,7 +113,7 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 | 日志回归 | `lint_rules --strict`                                       | 2s                                     | 本地 push             | **本地**（同上）                       |
 | 构建     | `sync-content` + `build-knowledge`                          | —                                      | dev / build           | dev / build                            |
 | 构建     | `next build`                                                | **144s**                               | CI（`--stage build`） | CI                                     |
-| 自证     | `mutate_guards`（46 条变异）                                | **约 20min**                           | 无人跑                | CI 独立 job                            |
+| 自证     | `mutate_guards`（53 条变异）                                | **约 26min**                           | 无人跑                | CI 独立 job                            |
 | 冒烟     | `playwright --grep @smoke`                                  | 分钟级                                 | 原在 pre-push         | CI（**标记重整见第 10 节**）           |
 | E2E      | `playwright --grep 日志分析流程`（11 条）                   | 约 5~7min                              | 无人跑                | CI（`playwright-analyze`，第 10.6 节） |
 | E2E      | `playwright.live.config.ts`（打线上）                       | —                                      | deploy 后             | deploy 后                              |
@@ -132,8 +132,8 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 现选择**跑 `pnpm format` 全量格式化一次**（134 个文件、8.6s、纯缩进变更）。
 **代价是一个巨型 diff**，换来门禁可满足。格式化后 `--stage push` **14/14 全绿**。
 
-**四类检查的耗时是分档的关键**：`test-issue-filer` 42s、`next build` 144s、
-`mutate_guards` 约 20 分钟（46 条变异里 27 条打在 `test-issue-filer` 上，42s × 27）、
+**四类检查的耗时是分档的关键**：`test-issue-filer` 约 45s、`next build` 144s、
+`mutate_guards` 约 26 分钟（53 条变异里 34 条打在 `test-issue-filer` 上，45s × 34）、
 E2E 里那条"上传 .ulg 完成分析"约 420s（`playwright-analyze` 因此单独一步、超时 900s）。
 
 **表末四行（机密 / 审计 ×2 / 提交规范）是第 11 节新增项**，决定依据与实测数据见第 11 节。

@@ -1,0 +1,17 @@
+id: actuator-controls-0
+title: Actuator Controls
+description: Actuator Controls 0：扭矩轴（Roll/Pitch/Yaw）+ 推力。
+order: 21
+conditions:
+  topics: ["vehicle_torque_setpoint || actuator_controls_0"]
+outputs:
+  - container: axes
+    title: Actuator Controls
+    ylabel: "normalized"
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("vehicle_torque_setpoint[0].xyz[0]", "actuator_controls_0[0].control[0]")
+          - ref("vehicle_torque_setpoint[0].xyz[1]", "actuator_controls_0[0].control[1]")
+          - ref("vehicle_torque_setpoint[0].xyz[2]", "actuator_controls_0[0].control[2]")
+        label: ["Roll", "Pitch", "Yaw"]

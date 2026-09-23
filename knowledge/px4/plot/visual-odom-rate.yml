@@ -1,0 +1,17 @@
+id: visual-odom-rate
+title: Visual Odometry Attitude Rate
+description: 视觉里程计角速率（仅当 topic 存在时显示）。
+order: 16
+conditions:
+  topics: [vehicle_visual_odometry]
+outputs:
+  - container: axes
+    title: Visual Odometry Attitude Rate
+    ylabel: "[deg]"
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("vehicle_visual_odometry[0].rollspeed")
+          - ref("vehicle_visual_odometry[0].pitchspeed")
+          - ref("vehicle_visual_odometry[0].yawspeed")
+        label: ["Roll Rate", "Pitch Rate", "Yaw Rate"]

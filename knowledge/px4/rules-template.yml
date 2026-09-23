@@ -58,9 +58,16 @@ conditions:
 # 两个下标各自可省，省掉的含义不同，别混）：
 #   topic[N].field[M]             —— 完整形态（两个下标一起用也合法）
 #   topic[N].field                —— 只取第 N 个实例（N 可为负，按 Python 语义从末尾数）
-#   topic.field[M]                —— 数组字段的第 M 个元素（如 vehicle_attitude.q[0]）
-#   topic.field 或 topic[:].field —— **所有实例**（两种写法等效）：多实例给「每实例一组」
-#                                   交给会分组的算子；单实例就是那一条序列
+#   topic.field[M]                —— 字段的第 M 个元素：数组字段给**整条序列**（q[0] 是第 0
+#                                   个分量随时间变化）；标量序列给**第 M 个采样的标量**
+#                                   （ref_alt[0] 是首值，ref_alt[0] - ref_alt 就是"相对基准"）
+#   topic.field[i,j]              —— 二维下标：i 是行（第几个采样，随时间递进）、j 是列
+#                                   （第几路信号）。数组字段在日志里存成"每列一条序列"
+#                                   （q[0]、q[1]…），所以 q[10,2] = 第 10 个采样、第 2 列
+#   topic.field                    —— **只取第 0 个实例**（与 topic[0].field 同义）
+#   topic[:].field                 —— **所有实例**：多实例给「每实例一组」交给会分组的算子；
+#                                   单实例就是那一条序列
+#   topic[a:b].field               —— 闭区间，实例 a~b（**含 b**），如 [1:3] = 1、2、3
 #
 # 裸写还是包 ref(...)：**不需要修饰就用裸写**——`vehicle_status.nav_state` 与
 # `ref("vehicle_status.nav_state")` 完全等价，包了是白写；要指定实例、或挂 alias /

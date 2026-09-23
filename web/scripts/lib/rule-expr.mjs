@@ -184,32 +184,37 @@ const REF_KEYS = new Set(["alias", "unit"]);
 
 /**
  * 字段引用：`topic.field`，两段各自可以带一个下标。
- *   · `topic[:]` / `topic[N]` / `topic[A:B]`，**以及什么都不写** —— **实例**：切片按 Python
- *      语义（`[:]` = 所有实例，与不写等效；多实例时给"每实例一组"，单实例时就是那一条，
- *      交给会归约的算子；`[0]` / `[-1]` = 第一个 / 最后一个）
+ *   · `topic[:]` / `topic[N]` / `topic[A:B]`，**以及什么都不写** —— **实例**：
+ *      `[A:B]` 是**闭区间**（含两端，与 Python 切片相反）；`[:]` = 所有实例；
+ *      **不写 = 第 0 个实例**（与 `[0]` 同义——要"所有实例"必须写 `[:]`）
  *   · `topic.field[N]` —— 数组字段的元素下标（如 `vehicle_attitude.q[0]`）
+ *   · `topic.field[i,j]` —— 二维下标：i 是行（第几个采样，随时间递进）、j 是列（第几路
+ *      信号）。数组字段在日志里存成"每列一条序列"（`q[0]`、`q[1]`…），所以 `q[10,2]` 是
+ *      "第 10 个采样时刻、第 2 列"
  * 两个下标位置不同、含义不同，别混。
  */
-const FIELD_REF = /^[a-z][a-z0-9_]*(\[[-]?\d*(?::-?\d*)?\])?\.[a-z][a-z0-9_]*(\[\d+\])?$/;
+const FIELD_REF =
+    /^[a-z][a-z0-9_]*(\[[-]?\d*(?::-?\d*)?\])?\.(?:[a-z][a-z0-9_]*\.)*[a-z][a-z0-9_]*(\[\d+(?:,\d+)?\])?$/;
 
-/** 拆开字段引用 → {topic, inst, field}（inst 是 int 或 slice；**不写 = 所有实例**） */
+/** 拆开字段引用 → {topic, inst, field}（inst 是 int 或 slice；**不写 = 第 0 个实例**） */
 export function splitFieldRef(s) {
-    const m = /^([a-z][a-z0-9_]*)(?:\[([-]?\d*(?::-?\d*)?)\])?\.([a-z][a-z0-9_]*)(?:\[(\d+)\])?$/.exec(
-        String(s).trim(),
-    );
+    const m =
+        /^([a-z][a-z0-9_]*)(?:\[([-]?\d*(?::-?\d*)?)\])?\.((?:[a-z][a-z0-9_]*\.)*[a-z][a-z0-9_]*)(?:\[(\d+(?:,\d+)?)\])?$/.exec(
+            String(s).trim(),
+        );
     if (!m) return null;
     return {
         topic: m[1],
         inst: parseInstance(m[2]),
         field: m[3],
-        // 数组元素下标原样保留（它是字段名的一部分，取数时按 'field[i]' 找列）
-        fieldIndex: m[4] === undefined ? null : Number(m[4]),
+        // 数组元素下标原样保留（它是字段名的一部分，取数时按 'field[i]' / 'field[i,j]' 找列）
+        fieldIndex: m[4] === undefined ? null : m[4],
     };
 }
 
-/** `[2]` → int；`[:]` / `[1:3]` / **不写** → slice（不写就是"所有实例"，与 `[:]` 等效） */
+/** `[2]` → int；`[:]` / `[1:3]` → slice（**闭区间**，含两端）；**不写 → 0**（只取第 0 个实例） */
 function parseInstance(txt) {
-    if (txt === undefined || txt === "") return { slice: [null, null] };
+    if (txt === undefined || txt === "") return 0;
     if (txt.includes(":")) {
         const [a, b] = txt.split(":");
         const num = (x) => (x === "" || x === undefined ? null : Number(x));

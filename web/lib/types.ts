@@ -167,6 +167,9 @@ export interface AnalysisReport {
     guardTags?: string[];
     checksRun?: string[];
     checksSkipped?: { check: string; reason: string }[];
+    /** 规则取数时的实例提示（区间越界被截断等）——不是判定结论，是"这份日志没有你写的那么
+     *  多路数据"。与图上的 `SeriesResponse.warnings` 同源，界面上一起进告警栏 */
+    instanceNotes?: string[];
     /** 第三层故障知识库命中条目 */
     matchedFaults?: MatchedFault[];
     analyzedAt: string;
@@ -203,6 +206,9 @@ export interface SeriesResponse {
     x: (number | null)[] | null;
     series: ((number | null)[] | null)[];
     fullCount: number;
+    /** 取数过程中的提示（如"要实例 1~9，这份日志只有 0~2 —— 按 1~2 取"）。
+     *  不是错误：图还是画出来了，只是取到的和写的不完全一样，界面上要给出来 */
+    warnings?: string[];
     error?: string;
 }
 

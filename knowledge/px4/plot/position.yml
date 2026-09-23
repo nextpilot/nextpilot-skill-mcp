@@ -1,0 +1,27 @@
+id: position
+title: Position
+description: 2D 位置轨迹（vehicle_local_position y vs x），及 setpoint、GPS setpoint。
+order: 1
+conditions:
+  topics: 
+  - vehicle_local_position
+  - vehicle_local_position_setpoint
+  # - vehicle_local_position_groundtruth
+outputs:
+  - container: axes
+    title: 位置 2D 轨迹
+    ylabel: "[m]"
+    xlabel: "[m]"
+    children:
+      - mode: xyplot
+        ydata:
+          - ref("vehicle_local_position[0].y")
+        xdata: ref("vehicle_local_position[0].x")
+        label:
+          - Estimated
+      - mode: xyplot
+        ydata:
+          - ref("vehicle_local_position_setpoint[0].y")
+        xdata: ref("vehicle_local_position_setpoint[0].x")
+        label:
+          - Setpoint

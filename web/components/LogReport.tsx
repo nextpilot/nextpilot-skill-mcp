@@ -257,6 +257,7 @@ export function LogReport({
                         storedSeries={storedPlots?.series ?? null}
                         phases={info.phases}
                         requestSeries={requestSeries}
+                        notes={report.instanceNotes ?? null}
                     />
                 )}
                 {effectiveTab === "messages" && info && <LogEventsMsg info={info} />}

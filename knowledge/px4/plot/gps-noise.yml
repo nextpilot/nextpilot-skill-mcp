@@ -1,0 +1,16 @@
+id: gps-noise
+title: GPS Noise & Jamming
+description: GPS 噪声与干扰指示器。
+order: 33
+conditions:
+  topics: ["vehicle_gps_position || sensor_gps"]
+outputs:
+  - container: axes
+    title: GPS Noise & Jamming
+    ylabel: "value"
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("vehicle_gps_position[0].noise_per_ms", "sensor_gps[0].noise_per_ms")
+          - ref("vehicle_gps_position[0].jamming_indicator", "sensor_gps[0].jamming_indicator")
+        label: ["Noise per ms", "Jamming Indicator"]

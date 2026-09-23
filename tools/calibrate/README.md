@@ -12,6 +12,34 @@
 - `probe_stats.py <file.ulg> ...`：dump 三个关键消息的原始指标分布，用于定阈值。
 - `inspect_fields.py <file.ulg>`：打印 `vehicle_imu_status / estimator_status /
 battery_status / sensor_imu` 的真实字段名（不同 PX4 版本字段差异很大）。
+- `probe_rule.py <file.ulg> <rule_id>`：**表达式级**调试——把规则的 compute 拆成子表达式
+  逐个求值，回答"这一层为什么算不出来"，纯文本输出。
+- `probe_rule_plot.py <file.ulg> <rule_id|规则文件名>`：**单条规则体检**——在同一份日志上跑
+  compute 与 triggers，给出结论、一张自包含 HTML（曲线 + 阈值线 + 规则算出的值 + 缺什么），
+  退出码 0（跑通）/ 2（用错或产物旧）/ 3（跑不通）。图优先复用浏览器那张
+  （`web/lib/knowledge/plots.generated.ts` 的 `PLOT_PRESETS`），取数走引擎 `np_series()`，
+  与浏览器同一条路径。加 `--open` 直接打开。
+  **不给任何参数**则进网页模式：起一个只听 127.0.0.1 的临时服务并打开浏览器
+  （`--port` 指定端口，`--no-browser` 不自动弹窗，Ctrl+C 结束）。
+  网页模式是**三个工具**，首页各一个入口（`/ulog` / `/rule` / `/plot`）：
+  - **① 看日志（probe ulog）**：列出一份 `.ulg` 里有哪些 topic（含实例数与采样数），
+    点开一个 topic 看它有哪些字段，勾上字段就看取值摘要（最小/最大/均值/首尾）与曲线。
+    清单来自 `np_manifest()`，取值来自 `np_series()`。
+  - **② 日志 + 规则**（`knowledge/px4/rules/*.yaml`，26 个文件 / 31 条规则）：左栏改 YAML →
+    「保存并看效果」= 直接写回源文件 → 跑一次 `build-knowledge.mjs`（约 1 秒）→
+    右栏**把这个文件里装的规则全跑一遍**，逐条出结论 + 图 + 执行过程。
+  - **③ 日志 + 图**（`knowledge/px4/plot/*.yml`）：同上，但右栏出的是「这张图画出来什么样」。
+
+  ②③ 的共同约定：
+  - **按文件编、不按规则 id 拆开编** —— 按 id 编辑要「解析 → 改一条 → 反序化回 YAML」，
+    那会冲掉注释与 `>-` 折叠写法；而一个文件本来就能装多条规则（`failsafe.yaml` 有 6 条），
+    所以保存后是整文件一起跑，改一条顺手改崩隔壁能立刻看见。左栏顶部的下拉框直接切文件。
+  - 保存是**局部刷新**：只换右栏，编辑框的滚动位置与光标不动。服务端按请求头 `X-Partial`
+    决定回 JSON 还是整页，没有 JS 的浏览器也能用。
+  - 编译不过时右栏给出**精确到「第几项 / 第几列」**的报错，并**自动把源文件还原成
+    保存前的样子**（备份在 `.cache/px4/kb-backup/`）——`knowledge/` 里不会留下一个让
+    `pnpm build:kb` 红掉的文件，而编辑框里的内容仍然保留。
+  - 编译走的是构建期那一份编译器（Node 侧 `build-knowledge.mjs`），Python 侧不重复实现。
 
 ## 冻结基线与等价比对（规则重构时必用）
 

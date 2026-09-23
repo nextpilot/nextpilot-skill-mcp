@@ -1,0 +1,24 @@
+id: temperature
+title: Temperature
+description: 传感器温度：Baro / Accel / Airspeed / Battery / ESC。
+order: 36
+conditions:
+  topics: [sensor_baro]
+outputs:
+  - container: axes
+    title: Temperature
+    ylabel: "[C]"
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("sensor_baro[0].temperature")
+          - ref("sensor_accel[0].temperature")
+        label: ["Baro temperature", "Accel temperature"]
+      - mode: TimeSeries
+        ydata:
+          - ref("airspeed[0].air_temperature_celsius")
+        label: ["Airspeed temperature"]
+      - mode: TimeSeries
+        ydata:
+          - ref("battery_status[0].temperature")
+        label: ["Battery temperature"]

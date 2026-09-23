@@ -1,0 +1,30 @@
+id: altitude
+title: Altitude Estimate
+description: GPS / 气压计 / 融合高度估计值与 setpoint。
+order: 2
+conditions:
+  topics:
+   - vehicle_gps_position || sensor_gps
+# ⚠️ setpoint 那条线暂时缺着，卡在 DSL 上，不是忘了写：
+# 高度设定值只能取 vehicle_local_position_setpoint.z（NED **向下为正**），跟这张图另外
+# 三条「往上为正」的线反向，而当前 DSL 写不出序列取负 —— scale_series 的 factor 是命名
+# 选项、只接受字面量（-1.0 是一元负号表达式，不算），位置实参又被 in_arity=1 挡住。
+# 原来的 position_setpoint_triplet.current.alt 也不行：嵌套字段（current.alt）超出
+# 「topic.field」的表达范围，而且它在日志里只有 5 个采样（航点级），画不成时间序列。
+# 等有了 neg_series 算子（或字面量判定认一元负号）再补这条线。
+outputs:
+  - container: axes
+    title: 高度估计
+    ylabel: "[m]"
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("vehicle_gps_position[0].altitude_msl_m", "vehicle_gps_position[0].alt", unit="m")
+          - ref("vehicle_air_data[0].baro_alt_meter", "sensor_combined[0].baro_alt_meter")
+          - ref("vehicle_global_position[0].alt")
+          # - alt_sp
+        label:
+          - "GPS Altitude (MSL)"
+          - "Barometer Altitude"
+          - "Fused Altitude Estimation"
+          # - "Altitude Setpoint"

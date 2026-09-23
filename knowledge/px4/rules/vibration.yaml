@@ -1,4 +1,5 @@
-# 高频振动（robotto）：per_instance 取「振动指标均值最大的 IMU」，与迁移前一致。
+# 高频振动（robotto）：跨 IMU 实例取「振动指标均值最大的那个」，与迁移前一致
+# （当年写在算子链上的 `per_instance: worst` 修饰，现在是算子 worst_mean_stats 吃 `[:]` 的分组输入）。
 # 阈值 [来源] Flight Review 振动色带 0.5g / 1g（与 px4-thresholds.toml [vibration] 一致）。
 
 id: px4-vibration

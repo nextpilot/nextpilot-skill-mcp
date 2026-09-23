@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, Loader2, LineChart, Maximize2, RotateCcw, Share2, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, Loader2, LineChart, Maximize2, RotateCcw, Share2, X } from "lucide-react";
 import { modeStyle } from "@/lib/phase-colors";
 import type { FlightPhase, SeriesResponse, TopicManifest } from "@/lib/types";
 import {
@@ -51,6 +51,7 @@ export function LogCharts({
     storedSeries,
     phases,
     requestSeries,
+    notes,
 }: {
     /** 实时分析：用 manifest 解析面板；打开历史：manifest 为空、改用下面两项 */
     manifest?: TopicManifest | null;
@@ -58,6 +59,8 @@ export function LogCharts({
     storedSeries?: StoredPlotSeries | null;
     phases: FlightPhase[];
     requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
+    /** 报告级的取数提示（规则侧的实例越界等），与图上的提示一起进告警栏 */
+    notes?: string[] | null;
 }) {
     /** 面板来源：存档优先（打开历史不必解析），否则用 manifest 现解析 */
     const presets = useMemo(() => {
@@ -73,6 +76,26 @@ export function LogCharts({
         );
     }, [manifest, storedPanels]);
 
+    // 告警栏的两批来源：解析时就知道的（面板上带着），和取数后引擎回来才知道的（PanelChart 回调）。
+    // 后者要在多个面板并发取数时去重——同一条提示会被每张图重复报一次
+    const [runtimeWarnings, setRuntimeWarnings] = useState<string[]>([]);
+    const seenRef = useRef<Set<string>>(new Set());
+    const pushWarnings = useCallback((ws: string[]) => {
+        const fresh = ws.filter((w) => w && !seenRef.current.has(w));
+        if (fresh.length === 0) return;
+        for (const w of fresh) seenRef.current.add(w);
+        setRuntimeWarnings((prev) => [...prev, ...fresh]);
+    }, []);
+
+    const notices = useMemo(() => {
+        const all = [
+            ...(notes ?? []),
+            ...presets.flatMap((p) => p.panels?.flatMap((pp) => pp.warnings ?? []) ?? []),
+            ...runtimeWarnings,
+        ];
+        return [...new Set(all.filter(Boolean))];
+    }, [notes, presets, runtimeWarnings]);
+
     if (phases.length === 0) {
         return (
             <p className="text-sm text-muted">该日志未记录飞行模式（vehicle_status.nav_state），无法绘制阶段背景。</p>
@@ -81,6 +104,21 @@ export function LogCharts({
 
     return (
         <div className="space-y-6">
+            {notices.length > 0 && (
+                <div className="rounded-lg border border-warning/40 bg-warning/[0.08] px-4 py-3 text-sm">
+                    <div className="flex items-start gap-2">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+                        <div className="min-w-0">
+                            <p className="font-medium text-text">取数提示（{notices.length}）</p>
+                            <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-muted">
+                                {notices.map((w, i) => (
+                                    <li key={i}>{w}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            )}
             {presets.length === 0 ? (
                 <p className="text-sm text-muted">
                     该日志未记录可绘制的图表话题（振动 / IMU / 姿态 / EKF / 电源 / GPS）。
@@ -97,6 +135,7 @@ export function LogCharts({
                             phases={phases}
                             requestSeries={requestSeries}
                             storedSeries={storedSeries ?? null}
+                            onWarnings={pushWarnings}
                         />
                     ))}
                 </div>
@@ -113,6 +152,7 @@ function PresetCard({
     phases,
     requestSeries,
     storedSeries,
+    onWarnings,
 }: {
     id: string;
     title: string;
@@ -121,6 +161,7 @@ function PresetCard({
     phases: FlightPhase[];
     requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
     storedSeries: StoredPlotSeries | null;
+    onWarnings: (ws: string[]) => void;
 }) {
     const [open, setOpen] = useState(false);
     const [xRange, setXRange] = useState<[number, number] | null>(null);
@@ -176,6 +217,7 @@ function PresetCard({
                                 groupKey={id}
                                 xRange={xRange}
                                 onXRangeChange={handleXRangeChange}
+                                onWarnings={onWarnings}
                             />
                         ))}
                     </div>
@@ -194,6 +236,7 @@ function PanelChart({
     groupKey,
     xRange,
     onXRangeChange,
+    onWarnings,
 }: {
     panel: PanelSpec;
     phases: FlightPhase[];
@@ -205,6 +248,8 @@ function PanelChart({
     groupKey: string;
     xRange: [number, number] | null;
     onXRangeChange: (range: [number, number] | null) => void;
+    /** 引擎回来的取数提示，交给上层的告警栏 */
+    onWarnings: (ws: string[]) => void;
 }) {
     const elRef = useRef<HTMLDivElement>(null);
     const localRangeRef = useRef<[number, number] | null>(null);
@@ -342,6 +387,7 @@ function PanelChart({
                     panel.requests.map((r, i) => (stored && stored[i] ? Promise.resolve(stored[i]) : requestSeries(r))),
                 );
                 if (cancelled || !elRef.current) return;
+                onWarnings(responses.flatMap((r) => r?.warnings ?? []));
                 const Plotly = await getPlotly();
                 if (cancelled || !elRef.current) return;
 
@@ -457,7 +503,7 @@ function PanelChart({
         return () => {
             cancelled = true;
         };
-    }, [panel, phases, requestSeries, groupKey]);
+    }, [panel, phases, requestSeries, groupKey, onWarnings]);
 
     return (
         <div className="w-full min-w-0">

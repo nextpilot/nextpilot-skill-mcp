@@ -1,6 +1,7 @@
 id: track
 title: 轨迹
 description: 地图上的飞行轨迹（原始 GNSS），多条轨道叠画、可点选隐藏。
+order: 41
 conditions:
   topics: ["sensor_gps || vehicle_gps_position"]
 # 地图容器的声明方式与曲线**完全一样**，只是 container 不同、children 画的是轨道。
