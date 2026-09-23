@@ -44,15 +44,15 @@
 **为什么 C**（不是口味，是两条硬理由）：
 
 1. **主体关系必须体现在目录上。** 用户明确：知识是主体，engine 是处理它的工具。
-   `engine/knowledge/` 读作"引擎项目里带了点数据"，把关系写反了 —— 与 CLAUDE.md
-   §6.4「名字读出来的关系必须和真实关系一致」冲突。
+   `engine/knowledge/` 读作"引擎项目里带了点数据"，把关系写反了 —— 与
+   CLAUDE.md §6.4「名字读出来的关系必须和真实关系一致」冲突。
 2. **`knowledge/` 侧一处都不用改**，其中包含 `web/lib/constants.ts:59` 的 `contentRoot`
-   这种**运行期读取**的硬骨头（改错的表现是"Skill 0 个、指南 0 篇"，不报错、CI 全绿，见 §5.1）。
+   这种**运行期读取**的硬骨头（改错的表现是"Skill 0 个、指南 0 篇"，不报错、CI 全绿，见 CLAUDE.md）。
    方案 A 正好要把这块动一遍 —— 把最危险的一处留着不动，这本身就是选 C 的理由。
 
 结果结构：
 
-```
+```text
 knowledge/                  ← 独立项目根（一级目录）
 ├── px4/                    facts · rules · fault-kb · llm · meta · plot
 ├── skills/  mcp/           web 内容卡片的真源
@@ -60,7 +60,7 @@ knowledge/                  ← 独立项目根（一级目录）
 │   ├── operators.py  rule_engine.py  report_data.py
 │   ├── providers/{api,px4}.py
 │   └── tests/
-└── pyproject.toml          ← 给包身份（可选，见 §8.3）
+└── pyproject.toml          ← 给包身份（可选，见 CLAUDE.md）
 ```
 
 ---
@@ -242,7 +242,7 @@ python tools/ci/check_all.py --with-mutate
 → 编译器**只往 knowledge 自己的产物目录写**，**永不跨项目写 `web/`**。
 拉取是消费方的动作，方向自然：
 
-```
+```text
 knowledge/
 ├── px4/  engine/              源 + 工具
 ├── scripts/build.mjs          编译器（原 web/scripts/build-knowledge.mjs）
@@ -320,13 +320,16 @@ knowledge 的 Node 编译器**在云端不可用**。所以产物必须**入库*
 三条控制手段（**推荐第 1 条**）：
 
 1. **`include-package-data = false` + 显式 `package-data` 白名单**（最精确）
+
    ```toml
    [tool.setuptools]
    include-package-data = false        # 关掉"git 跟踪即打包"
    [tool.setuptools.package-data]
    nextpilot_knowledge = ["px4/**/*.yaml", "px4/**/*.yml", "px4/**/*.md", "px4/**/*.json"]
    ```
+
    代价：新增文件类型（如 `.csv`）要记得补白名单 —— 白名单的固有代价。
+
 2. **保留 `include-package-data = true`，用 MANIFEST.in 排除**：`prune knowledge/skills`、
    `prune knowledge/mcp`。注意 MANIFEST.in 主要影响 sdist，wheel 侧仍受上面那条默认值影响，
    **必须实测**。
