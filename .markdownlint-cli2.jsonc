@@ -42,9 +42,9 @@
     "web/content/skills/",
     "web/content/mcp/",
     // calibrate baseline
-    "tools/calibrate/baseline/",
+    // "tools/calibrate/baseline/",
     // 自动生成的 knowledge 元数据
-    "knowledge/px4/meta/",
+    // "knowledge/px4/meta/",
     // 带 generated 标记的生成文件
     "**/*.generated.*",
     // AI 工具自动生成
