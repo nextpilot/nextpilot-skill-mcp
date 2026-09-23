@@ -58,7 +58,7 @@
     "eslint": "^10.10.0",
     "eslint-config-next": "^16.3.5",
     "globals": "^17.12.0",
-    "markdownlint-cli": "^0.49.1",
+    "markdownlint-cli2": "^0.17.2",
     "prettier": "^3.9.8",
     "pyright": "^1.1.400",
     "typescript": "^7.0.2"

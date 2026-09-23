@@ -97,20 +97,12 @@ jobs:
         hint: "Run `npx prettier --write .` to auto-format all files. Auto-generated files are excluded via .prettierignore."
 
       - id: "markdownlint"
-        name: "Markdown lint (markdownlint)"
+        name: "Markdown lint (markdownlint-cli2)"
         workdir: "{ROOT}"
-        command:
-          [
-            "{NODE}",
-            "web/node_modules/markdownlint-cli/markdownlint.js",
-            "**/*.md",
-            "**/*.mdx",
-            "--config",
-            "web/.markdownlint.json",
-            "--ignore-path",
-            ".markdownlintignore",
-          ]
-        hint: "Fix the Markdown lint errors listed above. Auto-generated files are excluded via .markdownlintignore."
+        # markdownlint-cli2 自动寻找 .markdownlint-cli2.jsonc，ignores 直接写在配置里，
+        # VS Code 扩展同样优先读 .markdownlint-cli2.jsonc —— CI 与编辑器完全一致。
+        command: ["{NODE}", "web/node_modules/markdownlint-cli2/markdownlint-cli2-bin.mjs", "**/*.md", "**/*.mdx"]
+        hint: "Fix the Markdown lint errors listed above. Ignored paths are configured in .markdownlint-cli2.jsonc."
 
       - id: "pyright"
         name: "Python type checking (pyright)"

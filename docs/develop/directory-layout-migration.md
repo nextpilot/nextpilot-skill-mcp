@@ -50,6 +50,11 @@
 | `.markdownlintignore`                | 有                         | 无                      | —                 |
 | `.markdownlint.json` / `.prettierrc` | 无                         | 有                      | lint 配置在子目录 |
 
+> ⚠️ **上表已过时（2026-09-23）**：`.prettierrc` 与 `.markdownlint.json` 已各自合并到仓库根
+> （后者随之改名 `.markdownlint.jsonc`），`web/` 下的两份已删。这两步是**脱离本方案单独执行**的
+> —— 因为"配置只对 `web/` 生效、其余目录落回默认"会持续造成来回改的假报错，等不到大迁移。
+> 本文档其余部分**仍然搁置，不要照着执行**；变更依据见 `checks-by-stage.md` 的同名注记。
+
 ### 1.2 两套工具链分居两处
 
 - Python：`pyproject.toml` / `requirements-dev.txt` / `pyrightconfig.json` 在根

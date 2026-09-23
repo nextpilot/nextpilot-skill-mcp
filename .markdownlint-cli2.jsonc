@@ -1,0 +1,54 @@
+// Markdown 规则的唯一事实源。**必须放在仓库根**。
+//
+// markdownlint-cli2 的优势：
+//   1. CI 和 VS Code 扩展都能读到同一份配置（扩展优先读 .markdownlint-cli2.jsonc）
+//   2. ignores 直接写在配置里，不再需要单独的 .markdownlintignore 文件
+//      （markdownlint-cli 的 .markdownlintignore 扩展根本不读，是已知缺口）
+{
+  "config": {
+    "default": true,
+    // 行长：文档里表格和长 URL 折不断，按默认 80 会命中 1305 处。
+    // 排版宽度由 prettier 管（.prettierrc 对 *.md 是 printWidth 120 + proseWrap preserve）。
+    "MD013": false,
+    // 内联 HTML：文档里有 <br>、<img>、<details> 等，属有意使用。
+    "MD033": false,
+    // 代码块语言标注：部分片段无对应语言。
+    "MD040": false,
+    // 裸 URL：正文里直接写链接地址。
+    "MD034": false,
+    // 首行必须是 H1：部分文件以 front matter 或说明块开头。
+    "MD041": false,
+    // 重复标题：同名小节（如"背景""结论"）在长文档里多处出现。
+    "MD024": false,
+    // 强调当标题：有用加粗段落充当小节的写法。
+    "MD036": false,
+    // 代码块风格：fence 与混排并存。
+    "MD046": false,
+    // 强调风格：* 与 _ 混用。
+    "MD049": false,
+    // 链接片段：部分锚点指向动态生成的标题。
+    "MD051": false,
+    "MD025": {
+      "front_matter_title": "^\\s*title\\s*[:=]",
+    },
+  },
+  "ignores": [
+    // 依赖与构建产物
+    "**/node_modules/**",
+    "**/.next/**",
+    "web/test-results/**",
+    // 自动生成文件
+    "web/content/guide/rule-*.mdx",
+    "web/content/skills/",
+    "web/content/mcp/",
+    // calibrate baseline
+    "tools/calibrate/baseline/",
+    // 自动生成的 knowledge 元数据
+    "knowledge/px4/meta/",
+    // 带 generated 标记的生成文件
+    "**/*.generated.*",
+    // AI 工具自动生成
+    ".workbuddy/",
+    ".claude/",
+  ],
+}
