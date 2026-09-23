@@ -22,6 +22,9 @@ __pycache__/
 *.egg-info/
 # 工具缓存
 .ruff_cache/
+# 本地类型检查用的虚拟环境（pyright 靠它找到 numpy / pyulog；每台机器路径不同，不入库）
+# 建法见 docs/develop/ 里的 pyright 一节：项目解释器 -m venv .venv，再装 numpy 与 pyulog
+.venv/
 # PX4 消息定义缓存（由 tools/px4/fetch_px4_uorb_msg.py 拉取，不入库）
 .cache/
 .pytest_cache/

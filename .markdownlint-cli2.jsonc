@@ -41,6 +41,10 @@
     "**/node_modules/**",
     "**/.next/**",
     "web/test-results/**",
+    // 本地类型检查用的虚拟环境（pyright 靠它找 numpy / pyulog）。site-packages 里带
+    // 第三方 LICENSE.md，扫进来会报一堆与本项目无关的规则错。gitignore 管不到这里——
+    // cli2 只读自己的 ignores。
+    ".venv/",
     // 自动生成文件
     "web/content/guide/rule-*.mdx",
     "web/content/skills/",
