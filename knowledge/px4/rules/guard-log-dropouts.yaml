@@ -7,5 +7,5 @@ group: guards
 order: 3
 
 outputs:
-  guard_tags:
-    - {when: "DROPOUT_MS > 1000", tag: log_dropouts_high}
+    guard_tags:
+        - { when: "DROPOUT_MS > 1000", tag: log_dropouts_high }

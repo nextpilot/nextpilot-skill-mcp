@@ -9,41 +9,41 @@ order: 1
 
 # 原实现的外层条件是「有 vehicle_status 且有 armed 段」，不成立时静默（既不 ran 也不 skipped）
 conditions:
-  topics:
-    - vtol_vehicle_status
+    topics:
+        - vtol_vehicle_status
 
 compute:
-  # 转换段样本数（判"这段日志里到底有没有转换"）
-  - trans_n = _try(count_above(vtol_vehicle_status.vtol_in_trans_mode, gt=0))
-  - trans_n_i = _try(to_int(trans_n))
-  # 转换标志按"向前保持"采样到姿态时间轴，作为掩码
-  - >-
-      trans_mask = _try(fill_to(ref("vtol_vehicle_status.vtol_in_trans_mode"),
-      ref("vtol_vehicle_status.timestamp"), ref("vehicle_attitude.timestamp")))
-  # 姿态四元数 → 欧拉角；取横滚/俯仰里较大的倾角
-  # （q 是"每元素一列"的数组字段，裸写就取到四列，quat_to_euler 收这一组即可）
-  - >-
-      roll, pitch, yaw = _try(quat_to_euler(ref("vehicle_attitude.q")))
-  - tilt_max = _try(masked_absmax(larger(abs_values(roll), abs_values(pitch)), trans_mask))
-  - trans_cnt = _try(count_true(trans_mask))
-  # 样本 > 5 才算数；enough / has_tilt 被 trigger 引用，所以必须是具名变量
-  - enough = _try(trans_cnt > 5)
-  - has_tilt = tilt_max is not None
-  - tilt_stat = _try(tilt_max if enough else None)
+    # 转换段样本数（判"这段日志里到底有没有转换"）
+    - trans_n = _try(count_above(vtol_vehicle_status.vtol_in_trans_mode, gt=0))
+    - trans_n_i = _try(to_int(trans_n))
+    # 转换标志按"向前保持"采样到姿态时间轴，作为掩码
+    - >-
+        trans_mask = _try(fill_to(ref("vtol_vehicle_status.vtol_in_trans_mode"),
+        ref("vtol_vehicle_status.timestamp"), ref("vehicle_attitude.timestamp")))
+    # 姿态四元数 → 欧拉角；取横滚/俯仰里较大的倾角
+    # （q 是"每元素一列"的数组字段，裸写就取到四列，quat_to_euler 收这一组即可）
+    - >-
+        roll, pitch, yaw = _try(quat_to_euler(ref("vehicle_attitude.q")))
+    - tilt_max = _try(masked_absmax(larger(abs_values(roll), abs_values(pitch)), trans_mask))
+    - trans_cnt = _try(count_true(trans_mask))
+    # 样本 > 5 才算数；enough / has_tilt 被 trigger 引用，所以必须是具名变量
+    - enough = _try(trans_cnt > 5)
+    - has_tilt = tilt_max is not None
+    - tilt_stat = _try(tilt_max if enough else None)
 
 outputs:
-  tag: vtol_convert_attitude_over
-  stats:
-    vtolTransitionSamples: {var: trans_n_i}
-    vtolTransitionMaxTiltDeg: {var: tilt_stat, round: 1}
+    tag: vtol_convert_attitude_over
+    stats:
+        vtolTransitionSamples: { var: trans_n_i }
+        vtolTransitionMaxTiltDeg: { var: tilt_stat, round: 1 }
 
 triggers:
-  - when: "has_tilt and enough and tilt_max > 8.0"
-    severity: warning
-    tag: vtol_convert_attitude_over
-    threshold: 8.0
-    value: f"{tilt_max:.1f}"
-    unit: "°"
-    field: "vehicle_attitude（vtol_in_trans_mode 段）"
-    title: "VTOL 转换阶段姿态越限（最大 {tilt_max:.1f}°，限值 8°）"
-    suggestion: "结合故障库 F003：复盘转换时序与推力匹配，强风环境优先归因环境扰动。"
+    - when: "has_tilt and enough and tilt_max > 8.0"
+      severity: warning
+      tag: vtol_convert_attitude_over
+      threshold: 8.0
+      value: f"{tilt_max:.1f}"
+      unit: "°"
+      field: "vehicle_attitude（vtol_in_trans_mode 段）"
+      title: "VTOL 转换阶段姿态越限（最大 {tilt_max:.1f}°，限值 8°）"
+      suggestion: "结合故障库 F003：复盘转换时序与推力匹配，强风环境优先归因环境扰动。"

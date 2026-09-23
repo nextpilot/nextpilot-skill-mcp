@@ -7,25 +7,25 @@ group: gps_health
 order: 2
 
 conditions:
-  topics:
-    - vehicle_gps_position
+    topics:
+        - vehicle_gps_position
 
 compute:
-  - s_min_raw = min(vehicle_gps_position.satellites_used)
-  - s_min = to_int(s_min_raw)
+    - s_min_raw = min(vehicle_gps_position.satellites_used)
+    - s_min = to_int(s_min_raw)
 
 outputs:
-  tag: gps_eph_high
-  stats:
-    gpsSatellitesMin: {var: s_min}
+    tag: gps_eph_high
+    stats:
+        gpsSatellitesMin: { var: s_min }
 
 triggers:
-  - when: "s_min <= 6"
-    severity: warning
-    tag: gps_eph_high
-    threshold: 8
-    value: s_min
-    unit: 颗
-    field: "vehicle_gps_position.satellites_used(min)"
-    title: "GPS 卫星数最少仅 {s_min} 颗"
-    suggestion: "卫星数不足时定位易跳变；排查遮挡与天线。"
+    - when: "s_min <= 6"
+      severity: warning
+      tag: gps_eph_high
+      threshold: 8
+      value: s_min
+      unit: 颗
+      field: "vehicle_gps_position.satellites_used(min)"
+      title: "GPS 卫星数最少仅 {s_min} 颗"
+      suggestion: "卫星数不足时定位易跳变；排查遮挡与天线。"

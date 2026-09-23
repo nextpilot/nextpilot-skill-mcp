@@ -15,15 +15,11 @@
       "firmwareDisplay": "v1.11.2 (8583f1)",
       "fwReleaseType": 0,
       "armedDurationSec": 5.6,
-      "phases": [
-        "maneuver"
-      ],
+      "phases": ["maneuver"],
       "dropoutTotalMs": 30,
       "hardware": "CUBEPILOT_CUBEORANGE",
       "verSw": "8583f1da30b63154d6ba0bc187d86135dfe33cf9",
-      "modes": [
-        "Manual"
-      ],
+      "modes": ["Manual"],
       "mainMode": "Manual",
       "uuid": "000600000000383638393239510d0035002d",
       "verSwBranch": "v1.11.2_w_rc_sysid",
@@ -150,9 +146,7 @@
       }
     ],
     "tags": [],
-    "guardTags": [
-      "insufficient_data"
-    ],
+    "guardTags": ["insufficient_data"],
     "checksRun": [
       "vibration",
       "ekf_faults",

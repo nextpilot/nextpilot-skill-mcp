@@ -21,11 +21,25 @@
 #     不用改任何 Python；构建期会校验"经验的 group 是否都已登记"。
 #   · guards_early 必须排第一（insufficient_data 要是第一个 guard 标签），guards 排最后。
 group_order:
-  [guards_early,
-   vibration, ekf_innovations, ekf_faults, battery, cpu, gps_health, failsafe,
-   mode_thrash, motor_balance, imu_bias, attitude_tracking, airspeed,
-   vtol_transition, wind_estimate, logged_messages,
-   guards]
+    [
+        guards_early,
+        vibration,
+        ekf_innovations,
+        ekf_faults,
+        battery,
+        cpu,
+        gps_health,
+        failsafe,
+        mode_thrash,
+        motor_balance,
+        imu_bias,
+        attitude_tracking,
+        airspeed,
+        vtol_transition,
+        wind_estimate,
+        logged_messages,
+        guards,
+    ]
 
 # 规则元数据：**能从已有信息推出来的，就不让每条规则各写一遍**。
 #   defaults —— 身份块默认值；规则里写了就以规则里的为准（个别规则确实会偏离）
@@ -37,83 +51,120 @@ group_order:
 #   为什么不让规则各写一遍：32 条规则里 category 与 group 一一对应、doc 只有 6 种取值，
 #   写 32 遍纯属重复，而且改一处漏一处。
 rule_meta:
-  defaults:
-    version: "1.0.0"
-    status: stable
-    license: CC-BY-4.0
-    author: {name: NextPilot 内置}
-  by_group:
-    airspeed:          {category: airspeed, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html"}
-    attitude_tracking: {category: attitude, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html"}
-    battery:           {category: power,    doc: "https://docs.px4.io/main/en/config/battery.html"}
-    cpu:               {category: system,   doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html"}
-    ekf_faults:        {category: ekf,      doc: "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"}
-    ekf_innovations:   {category: ekf,      doc: "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"}
-    failsafe:          {category: failsafe, doc: "https://docs.px4.io/main/en/config/safety.html"}
-    gps_health:        {category: gps,      doc: "https://docs.px4.io/main/en/gps_compass/"}
-    guards:            {category: guard}          # guard 类不发 finding，没有 doc
-    guards_early:      {category: guard}
-    imu_bias:          {category: imu,      doc: "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html"}
-    logged_messages:   {category: messages, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html"}
-    mode_thrash:       {category: mode,     doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html"}
-    motor_balance:     {category: motor,    doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html"}
-    vibration:         {category: vibration, doc: "https://docs.px4.io/main/en/assembly/vibration_isolation.html"}
-    vtol_transition:   {category: vtol,     doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html"}
-    wind_estimate:     {category: wind,     doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html"}
+    defaults:
+        version: "1.0.0"
+        status: stable
+        license: CC-BY-4.0
+        author: { name: NextPilot 内置 }
+    by_group:
+        airspeed: { category: airspeed, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
+        attitude_tracking: { category: attitude, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
+        battery: { category: power, doc: "https://docs.px4.io/main/en/config/battery.html" }
+        cpu: { category: system, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
+        ekf_faults: { category: ekf, doc: "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html" }
+        ekf_innovations: { category: ekf, doc: "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html" }
+        failsafe: { category: failsafe, doc: "https://docs.px4.io/main/en/config/safety.html" }
+        gps_health: { category: gps, doc: "https://docs.px4.io/main/en/gps_compass/" }
+        guards: { category: guard } # guard 类不发 finding，没有 doc
+        guards_early: { category: guard }
+        imu_bias: { category: imu, doc: "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html" }
+        logged_messages: { category: messages, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
+        mode_thrash: { category: mode, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
+        motor_balance: { category: motor, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
+        vibration: { category: vibration, doc: "https://docs.px4.io/main/en/assembly/vibration_isolation.html" }
+        vtol_transition: { category: vtol, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
+        wind_estimate: { category: wind, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
 
 # ULog 日志级别：PX4 把 **ASCII 码**写进 log_level（'0'=48 … '7'=55），与 pyulog
 # Message.log_level_str() 一致。经验里按 level_name 判定，别拿 3/4 去比 51/52。
-log_levels: {48: EMERGENCY, 49: ALERT, 50: CRITICAL, 51: ERROR,
-             52: WARNING, 53: NOTICE, 54: INFO, 55: DEBUG}
+log_levels: { 48: EMERGENCY, 49: ALERT, 50: CRITICAL, 51: ERROR, 52: WARNING, 53: NOTICE, 54: INFO, 55: DEBUG }
 
 # 机型（vehicle_status.vehicle_type 的码值）
-vehicle_types: {1: rotary_wing, 2: fixed_wing, 3: rover, 4: airship}
+vehicle_types: { 1: rotary_wing, 2: fixed_wing, 3: rover, 4: airship }
 
 # 机架名的简写（写规则时用，构建期换成规范名——产物里只留规范名，引擎不认识别名）
 # 注意 `vtol` 在 PX4 里既是机型也可能出现在别的上下文，这里就按字面对待，不做语义推断。
-airframe_aliases: {mc: rotary_wing, fw: fixed_wing}
+airframe_aliases: { mc: rotary_wing, fw: fixed_wing }
 
 # 飞行模式的显示名（报告页用；码值同 PX4 commander，与 meta/<tag>.json 的 nav_state 枚举同源）
 nav_state_names:
-  {0: Manual, 1: Altitude, 2: Position, 3: Mission, 4: Hold, 5: Return, 6: Position Slow,
-   7: Free5, 8: Free4, 10: Acro, 11: Free3, 12: Descend, 13: Termination, 14: Offboard,
-   15: Stabilized, 16: Free2, 17: Takeoff, 18: Land, 19: Free1, 20: Follow, 21: Orbit,
-   22: VTOL Takeoff}
+    {
+        0: Manual,
+        1: Altitude,
+        2: Position,
+        3: Mission,
+        4: Hold,
+        5: Return,
+        6: Position Slow,
+        7: Free5,
+        8: Free4,
+        10: Acro,
+        11: Free3,
+        12: Descend,
+        13: Termination,
+        14: Offboard,
+        15: Stabilized,
+        16: Free2,
+        17: Takeoff,
+        18: Land,
+        19: Free1,
+        20: Follow,
+        21: Orbit,
+        22: VTOL Takeoff,
+    }
 
 # 飞行模式码 → 飞行阶段（故障库按 flight_phase 匹配时用；codes 是 nav_state 的取值）
 # 注意别和上面的 group 混：这里是 nav_state **码值**的分组，group 是**规则**的执行分组。
 nav_state_groups:
-  - {phase: takeoff,   codes: [17, 22]}
-  - {phase: hover,     codes: [2, 4, 6, 14, 21]}
-  - {phase: maneuver,  codes: [0, 1, 10, 15]}
-  - {phase: fw_cruise, codes: [3, 8]}
-  - {phase: landing,   codes: [18, 20, 5, 12, 13]}
+    - { phase: takeoff, codes: [17, 22] }
+    - { phase: hover, codes: [2, 4, 6, 14, 21] }
+    - { phase: maneuver, codes: [0, 1, 10, 15] }
+    - { phase: fw_cruise, codes: [3, 8] }
+    - { phase: landing, codes: [18, 20, 5, 12, 13] }
 
 # 报告页「系统消息」tab 的 sysInfo 子集：完整字典见 report_data.py 的 infoDict，这里只挑常用的
 # （sysInfo 供报告头 / 未来 MCP 取用；UI 展示的是整份 infoDict）
 sys_info_keys:
-  [sys_name, ver_sw, ver_sw_release, ver_vendor_sw_release, ver_hw, ver_hw_subtype,
-   sys_os_name, sys_os_ver, sys_toolchain, sys_toolchain_ver, sys_mcu, time_start_utc,
-   duration, git_branch]
+    [
+        sys_name,
+        ver_sw,
+        ver_sw_release,
+        ver_vendor_sw_release,
+        ver_hw,
+        ver_hw_subtype,
+        sys_os_name,
+        sys_os_ver,
+        sys_toolchain,
+        sys_toolchain_ver,
+        sys_mcu,
+        time_start_utc,
+        duration,
+        git_branch,
+    ]
 
 # ── ULog 的消息类型码表（报告页「系统消息」tab 的记录统计按这个顺序与名字展示）──# 字母来自 ULog 文件格式规范，与 pyulog 的 ULog.MSG_TYPE_* 一致；统计由引擎**逐条走字节流**
 # 得到（[uint16 长度][uint8 类型] 序列），不走 pyulog 的解析结果——所以它同时是"文件里到底
 # 有多少条、有没有被截断"的旁证。数量对得上 pyulog 的两项可交叉验证：L = logged_messages、
 # D = 各话题采样点数之和。
 ulog_msg_types:
-  - {code: B, name: 标志位,         en: Flag Bits,         desc: 兼容性标志，只在文件开头出现}
-  - {code: I, name: 信息,           en: Information,       desc: 键 → 值，系统信息字典}
-  - {code: M, name: 多值信息,       en: Multi Information, desc: 键 → 多组值，无时间戳（一条长消息会拆成多行续写，故条数多于键数）}
-  - {code: F, name: 消息格式,       en: Format,            desc: 每个订阅话题的字段定义}
-  - {code: P, name: 参数,           en: Parameter,         desc: 日志开头的参数值；飞行中改参数也用它}
-  - {code: Q, name: 参数默认值,     en: Default Parameter, desc: 只记与当前值不同的默认值（一个参数可能写两条）}
-  - {code: A, name: 订阅话题,       en: Add Logged,        desc: 每个话题实例一条}
-  - {code: R, name: 取消订阅,       en: Remove Logged,     desc: 运行中停止记录某话题}
-  - {code: D, name: 数据,           en: Data,              desc: 日志主体：订阅话题的每一次采样}
-  - {code: L, name: 日志消息,       en: Logging,           desc: 带时间戳的日志行}
-  - {code: C, name: 带标签日志消息, en: Tagged Logging,    desc: 同上，另有来源 tag}
-  - {code: O, name: 丢包,           en: Dropout,           desc: 记录线程来不及时丢掉的时长}
-  - {code: S, name: 同步标记,       en: Sync,              desc: 每约 4 KB 一个，损坏后靠它重新对齐}
+    - { code: B, name: 标志位, en: Flag Bits, desc: 兼容性标志，只在文件开头出现 }
+    - { code: I, name: 信息, en: Information, desc: 键 → 值，系统信息字典 }
+    - {
+          code: M,
+          name: 多值信息,
+          en: Multi Information,
+          desc: 键 → 多组值，无时间戳（一条长消息会拆成多行续写，故条数多于键数）,
+      }
+    - { code: F, name: 消息格式, en: Format, desc: 每个订阅话题的字段定义 }
+    - { code: P, name: 参数, en: Parameter, desc: 日志开头的参数值；飞行中改参数也用它 }
+    - { code: Q, name: 参数默认值, en: Default Parameter, desc: 只记与当前值不同的默认值（一个参数可能写两条） }
+    - { code: A, name: 订阅话题, en: Add Logged, desc: 每个话题实例一条 }
+    - { code: R, name: 取消订阅, en: Remove Logged, desc: 运行中停止记录某话题 }
+    - { code: D, name: 数据, en: Data, desc: 日志主体：订阅话题的每一次采样 }
+    - { code: L, name: 日志消息, en: Logging, desc: 带时间戳的日志行 }
+    - { code: C, name: 带标签日志消息, en: Tagged Logging, desc: 同上，另有来源 tag }
+    - { code: O, name: 丢包, en: Dropout, desc: 记录线程来不及时丢掉的时长 }
+    - { code: S, name: 同步标记, en: Sync, desc: 每约 4 KB 一个，损坏后靠它重新对齐 }
 
 # ── Information Message（'I'）各键的中文名与说明（报告页「系统信息」表格的两列）──
 # 上游没有这份对照表（PX4 只在源码里写死这些 key），所以是**人工维护**的一份；
@@ -121,27 +172,27 @@ ulog_msg_types:
 #   name  变量名旁边的中文名（短）
 #   desc  说明列（一句话，讲清这个值能拿来干什么）
 info_key_docs:
-  ver_sw: {name: 固件提交号, desc: 固件构建时的 git 提交，用来对上游源码}
-  ver_sw_branch: {name: 固件分支, desc: 构建所在的分支 / 标签}
-  ver_sw_release: {name: 固件版本号, desc: "打包成 major<<24 | minor<<16 | patch<<8 | 类型（1=release 等）"}
-  ver_vendor_sw_release: {name: 厂商版本号, desc: 厂商自定义版本；255 表示厂商未使用}
-  ver_hw: {name: 硬件型号, desc: 飞控板型号，判断引脚 / 传感器配置的入口}
-  ver_hw_subtype: {name: 硬件子型号, desc: 同型号的不同批次 / 变体}
-  ver_data_format: {name: 数据格式版本, desc: ULog 数据格式版本，与本站解析器看到的格式对应}
-  sys_name: {name: 系统名, desc: 固定为 PX4}
-  sys_os_name: {name: 操作系统, desc: NuttX（飞控本机）或 Linux（机载计算机）}
-  sys_os_ver: {name: OS 提交号, desc: 操作系统的 git 提交}
-  sys_os_ver_release: {name: OS 版本号, desc: 打包方式同固件版本号}
-  sys_toolchain: {name: 工具链, desc: 编译固件用的工具链}
-  sys_toolchain_ver: {name: 工具链版本, desc: 工具链的具体版本，排查"换个编译器行为就不一样"时用}
-  sys_mcu: {name: MCU, desc: 主控芯片型号与硅版本}
-  sys_uuid: {name: 飞控唯一 ID, desc: PX4GUID，出厂烧录；同型号不同板子也不同，可用来区分设备}
-  time_ref_utc: {name: UTC 时间参考, desc: 相对启动的偏移（秒）；0 表示这次飞行没对时}
-  time_start_utc: {name: 起始 UTC 时间, desc: 日志起始时刻（旧固件记录）}
-  boot_time_utc_us: {name: 启动时刻, desc: UTC 微秒；只有对过时才有意义}
-  duration: {name: 日志时长, desc: 秒（旧固件记录）}
-  git_branch: {name: 固件分支, desc: 旧固件的分支名字段}
-  metadata_events_sha256: {name: 事件元数据哈希, desc: 事件定义文件的 SHA-256，用来校验事件定义是否被改动}
+    ver_sw: { name: 固件提交号, desc: 固件构建时的 git 提交，用来对上游源码 }
+    ver_sw_branch: { name: 固件分支, desc: 构建所在的分支 / 标签 }
+    ver_sw_release: { name: 固件版本号, desc: "打包成 major<<24 | minor<<16 | patch<<8 | 类型（1=release 等）" }
+    ver_vendor_sw_release: { name: 厂商版本号, desc: 厂商自定义版本；255 表示厂商未使用 }
+    ver_hw: { name: 硬件型号, desc: 飞控板型号，判断引脚 / 传感器配置的入口 }
+    ver_hw_subtype: { name: 硬件子型号, desc: 同型号的不同批次 / 变体 }
+    ver_data_format: { name: 数据格式版本, desc: ULog 数据格式版本，与本站解析器看到的格式对应 }
+    sys_name: { name: 系统名, desc: 固定为 PX4 }
+    sys_os_name: { name: 操作系统, desc: NuttX（飞控本机）或 Linux（机载计算机） }
+    sys_os_ver: { name: OS 提交号, desc: 操作系统的 git 提交 }
+    sys_os_ver_release: { name: OS 版本号, desc: 打包方式同固件版本号 }
+    sys_toolchain: { name: 工具链, desc: 编译固件用的工具链 }
+    sys_toolchain_ver: { name: 工具链版本, desc: 工具链的具体版本，排查"换个编译器行为就不一样"时用 }
+    sys_mcu: { name: MCU, desc: 主控芯片型号与硅版本 }
+    sys_uuid: { name: 飞控唯一 ID, desc: PX4GUID，出厂烧录；同型号不同板子也不同，可用来区分设备 }
+    time_ref_utc: { name: UTC 时间参考, desc: 相对启动的偏移（秒）；0 表示这次飞行没对时 }
+    time_start_utc: { name: 起始 UTC 时间, desc: 日志起始时刻（旧固件记录） }
+    boot_time_utc_us: { name: 启动时刻, desc: UTC 微秒；只有对过时才有意义 }
+    duration: { name: 日志时长, desc: 秒（旧固件记录） }
+    git_branch: { name: 固件分支, desc: 旧固件的分支名字段 }
+    metadata_events_sha256: { name: 事件元数据哈希, desc: 事件定义文件的 SHA-256，用来校验事件定义是否被改动 }
 
 # ── 概览指标（结果页「关键数据」）──
 # 说明：这些数字大多由规则顺带产出（rules/*.yaml 的 outputs.stats），但**规则 skip 时数字就没了**
@@ -151,30 +202,72 @@ info_key_docs:
 #   op    兜底算子（必须已在 engine/operators.py 注册）；多输出的复合算子用 pick: <输出名>
 #   scale 兜底值再乘的系数（单位换算，如 eph 是 mm → m 用 0.001）
 metrics:
-  - {key: imuAccelVibrationMax, label: 最大振动,        unit: m/s², topic: vehicle_imu_status, field: accel_vibration_metric, op: max, round: 2}
-  - {key: batteryVoltageMin,   label: 最低电压,        unit: V,    topic: battery_status, field: voltage_v, op: min, round: 2}
-  - {key: batteryCellVoltageMin, label: 最低电芯电压,  unit: V,    topic: battery_status,
-     fields: [voltage_cell_v, voltage_v, voltage_filtered_v, cell_count], op: cell_voltage_min, pick: vmin, round: 3}
-  - {key: currentMax,          label: 最大电流,        unit: A,    topic: battery_status, field: current_a, op: max, round: 2}
-  - {key: batteryRemainingMin, label: 最低剩余电量,    unit: "0..1", topic: battery_status, field: remaining, op: min_ge, ge: 0, round: 3}
-  - {key: gpsSatellitesMin,    label: 最少搜星,        unit: 颗,   topic: vehicle_gps_position, field: [satellites_used, satellites_visible], op: min, round: 0}
-  - {key: gpsEphMaxM,          label: 最大定位误差,    unit: m,    topic: vehicle_gps_position, field: eph, op: max, scale: 0.001, round: 2}
-  - {key: cpuLoadMax,          label: CPU 峰值,        unit: "0..1", topic: cpuload, field: load, op: max, round: 3}
+    - {
+          key: imuAccelVibrationMax,
+          label: 最大振动,
+          unit: m/s²,
+          topic: vehicle_imu_status,
+          field: accel_vibration_metric,
+          op: max,
+          round: 2,
+      }
+    - { key: batteryVoltageMin, label: 最低电压, unit: V, topic: battery_status, field: voltage_v, op: min, round: 2 }
+    - {
+          key: batteryCellVoltageMin,
+          label: 最低电芯电压,
+          unit: V,
+          topic: battery_status,
+          fields: [voltage_cell_v, voltage_v, voltage_filtered_v, cell_count],
+          op: cell_voltage_min,
+          pick: vmin,
+          round: 3,
+      }
+    - { key: currentMax, label: 最大电流, unit: A, topic: battery_status, field: current_a, op: max, round: 2 }
+    - {
+          key: batteryRemainingMin,
+          label: 最低剩余电量,
+          unit: "0..1",
+          topic: battery_status,
+          field: remaining,
+          op: min_ge,
+          ge: 0,
+          round: 3,
+      }
+    - {
+          key: gpsSatellitesMin,
+          label: 最少搜星,
+          unit: 颗,
+          topic: vehicle_gps_position,
+          field: [satellites_used, satellites_visible],
+          op: min,
+          round: 0,
+      }
+    - {
+          key: gpsEphMaxM,
+          label: 最大定位误差,
+          unit: m,
+          topic: vehicle_gps_position,
+          field: eph,
+          op: max,
+          scale: 0.001,
+          round: 2,
+      }
+    - { key: cpuLoadMax, label: CPU 峰值, unit: "0..1", topic: cpuload, field: load, op: max, round: 3 }
 
-  # 以下只声明展示名与顺序（取数依赖跨 topic 对齐或时序，交由规则产出；规则没跑则不显示）
-  - {key: imuAccelClippingCountMax, label: 加速度计削波计数, unit: 次}
-  - {key: imuTempRangeC,       label: IMU 温度跨度,    unit: °C}
-  - {key: ekfRejectRatioPct,   label: EKF 拒绝占比,    unit: 比例}
-  - {key: attitudeErrDegP99,   label: 姿态误差 p99,    unit: °}
-  - {key: attitudeOscHz,       label: 姿态振荡频率,    unit: Hz}
-  - {key: motorControlSpread,  label: 电机输出离散度}
-  - {key: motorCountActive,    label: 活跃电机数,      unit: 个}
-  - {key: gyroBiasMaxRadS,     label: 陀螺零偏最大,    unit: rad/s}
-  - {key: gyroBiasDriftRadS,   label: 陀螺零偏漂移,    unit: rad/s}
-  - {key: windSpeedP95M,       label: 风速 p95,        unit: m/s}
-  - {key: airspeedMinM,        label: 最低空速,        unit: m/s}
-  - {key: airspeedInvalidRatio, label: 空速无效占比,   unit: 比例}
-  - {key: gpsJumpCount,        label: GPS 跳变次数,    unit: 次}
-  - {key: navStateChanges,     label: 模式切换次数,    unit: 次}
-  - {key: vtolTransitionSamples, label: VTOL 转换样本数, unit: 个}
-  - {key: batteryCellCount,    label: 电芯数,          unit: 个}
+    # 以下只声明展示名与顺序（取数依赖跨 topic 对齐或时序，交由规则产出；规则没跑则不显示）
+    - { key: imuAccelClippingCountMax, label: 加速度计削波计数, unit: 次 }
+    - { key: imuTempRangeC, label: IMU 温度跨度, unit: °C }
+    - { key: ekfRejectRatioPct, label: EKF 拒绝占比, unit: 比例 }
+    - { key: attitudeErrDegP99, label: 姿态误差 p99, unit: ° }
+    - { key: attitudeOscHz, label: 姿态振荡频率, unit: Hz }
+    - { key: motorControlSpread, label: 电机输出离散度 }
+    - { key: motorCountActive, label: 活跃电机数, unit: 个 }
+    - { key: gyroBiasMaxRadS, label: 陀螺零偏最大, unit: rad/s }
+    - { key: gyroBiasDriftRadS, label: 陀螺零偏漂移, unit: rad/s }
+    - { key: windSpeedP95M, label: 风速 p95, unit: m/s }
+    - { key: airspeedMinM, label: 最低空速, unit: m/s }
+    - { key: airspeedInvalidRatio, label: 空速无效占比, unit: 比例 }
+    - { key: gpsJumpCount, label: GPS 跳变次数, unit: 次 }
+    - { key: navStateChanges, label: 模式切换次数, unit: 次 }
+    - { key: vtolTransitionSamples, label: VTOL 转换样本数, unit: 个 }
+    - { key: batteryCellCount, label: 电芯数, unit: 个 }

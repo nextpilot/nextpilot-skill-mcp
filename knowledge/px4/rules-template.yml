@@ -10,11 +10,12 @@
 # 见文件末尾）。其余每一项都能省，省掉的含义写在各自注释里。
 
 # ── 身份 ──
-id: px4-xxx                    # finding.ruleId，全局唯一；故障库与报告都引用它
-name: 中文名                    # 报告里显示的名字
-group: xxx                     # 执行分组：决定执行顺序与 finding 编号（F01、F02…）。
-                               # 必须已登记在 facts.yaml 的 group_order 与 rule_meta.by_group
-order: 1                       # 同 group 内的次序（缺省 100000，再按 id 兜底）
+id: px4-xxx # finding.ruleId，全局唯一；故障库与报告都引用它
+name: 中文名 # 报告里显示的名字
+group:
+  xxx # 执行分组：决定执行顺序与 finding 编号（F01、F02…）。
+  # 必须已登记在 facts.yaml 的 group_order 与 rule_meta.by_group
+order: 1 # 同 group 内的次序（缺省 100000，再按 id 兜底）
 # 下面这些可省，缺省按 group 从 facts.yaml 的 rule_meta 派生，只在确实偏离时才写：
 #   category / version / status / license / author / outputs.check / doc
 # doc: https://docs.px4.io/main/en/...   # 整条规则的官方文档链接 → finding.docUrl
@@ -81,38 +82,39 @@ conditions:
 #     knowledge/px4/meta/topic-overrides.yaml 的 units 里即可。
 compute:
   - >-
-      vibe_mean, vibe_p95, vibe_max, imu_idx = worst_mean_stats(
-      ref("vehicle_imu_status[:].accel_vibration_metric"))
+    vibe_mean, vibe_p95, vibe_max, imu_idx = worst_mean_stats(
+    ref("vehicle_imu_status[:].accel_vibration_metric"))
   - >-
-      step = _try(adjacent_speed_mps(
-      ref("vehicle_gps_position.latitude_deg", "vehicle_gps_position.lat", unit="deg"),
-      ref("vehicle_gps_position.longitude_deg", "vehicle_gps_position.lon", unit="deg"),
-      ref("vehicle_gps_position.timestamp")))
+    step = _try(adjacent_speed_mps(
+    ref("vehicle_gps_position.latitude_deg", "vehicle_gps_position.lat", unit="deg"),
+    ref("vehicle_gps_position.longitude_deg", "vehicle_gps_position.lon", unit="deg"),
+    ref("vehicle_gps_position.timestamp")))
   - n = count_above(step, gt=50.0)
 
 # ── 副产品（整块可省）：喂故障库的标签、写进「关键数据」的统计、按条件打的数据质量标签 ──
 outputs:
-  check: xxx                   # ran/skipped 用的 check 名；缺省 = group
-  tag: xxx                     # 喂故障库匹配的异常标签（trigger 没写 tag 时回退到它）
-  stats:                       # → 报告「关键数据」；var 是 compute 里的变量名
-    xxxCount: {var: n, round: 3}
-  guard_tags:                  # 条件性数据质量标签：不依赖是否发出 finding，算出来就带上
-    - {when: "n > 0", tag: temperature_change_large}
+  check: xxx # ran/skipped 用的 check 名；缺省 = group
+  tag: xxx # 喂故障库匹配的异常标签（trigger 没写 tag 时回退到它）
+  stats: # → 报告「关键数据」；var 是 compute 里的变量名
+    xxxCount: { var: n, round: 3 }
+  guard_tags: # 条件性数据质量标签：不依赖是否发出 finding，算出来就带上
+    - { when: "n > 0", tag: temperature_change_large }
 
 # ── 判定：自上而下，命中第一条即发一条 finding（guard 类经验可整块省）──
 # 数据缺失要让条件自己为假——表达式里的异常按"未命中"处理
 # （如 airspeed 的 `has_invalid and invalid_frac >= 0.50`）
 triggers:
-  - when: "n >= 3"                 # 必填
-    severity: warning              # 必填：critical | warning | info
-    title: "……{n}……"               # 必填；可用 {变量} 占位
+  - when: "n >= 3" # 必填
+    severity: warning # 必填：critical | warning | info
+    title: "……{n}……" # 必填；可用 {变量} 占位
     field: "some_topic.some_field" # 必填：证据字段（evidence.field）
-    value: f"{n:.3f}"              # 证据值，表达式（f-string 管格式化）
-    threshold: 3                   # 阈值（evidence.threshold）
-    unit: 次                       # 单位（evidence.unit）
-    tag: xxx                       # 本条 finding 的标签（缺省 = outputs.tag；写 null = 不产标签）
-    suggestion: "结合故障库 F0xx：……"     # 结论建议（也可用 {变量} 占位）
-    evidence_extra: {samples: samples}   # 额外证据：{evidence 键: 变量名}
+    value: f"{n:.3f}" # 证据值，表达式（f-string 管格式化）
+    threshold: 3 # 阈值（evidence.threshold）
+    unit: 次 # 单位（evidence.unit）
+    tag: xxx # 本条 finding 的标签（缺省 = outputs.tag；写 null = 不产标签）
+    suggestion: "结合故障库 F0xx：……" # 结论建议（也可用 {变量} 占位）
+    evidence_extra: { samples: samples } # 额外证据：{evidence 键: 变量名}
+
 
 # ── 可选：事件类经验（一次事件一条 finding，如每次失效保护边沿）──
 #   compute 里用事件算子产出列表（rising_edge_events / step_into_events），再按它展开：

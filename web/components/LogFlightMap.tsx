@@ -280,9 +280,11 @@ export function LogFlightMap({
             .addTo(map);
         L.control.scale({ imperial: false, position: "bottomright" }).addTo(map);
 
-        // 一键回到轨迹视野：放在缩放按钮下方。用户拖拽后找不着飞机时点一下即可复位
+        // 一键回到轨迹视野：放在缩放按钮下方
+        // 高度色带的 z-index(1100) 高于 Leaflet 控件(1000)，视觉上会盖住按钮，
+        // 但色带设置了 pointer-events-none，点击会穿透到下面的按钮，两者都能正常工作
         const ResetViewControl = L.Control.extend({
-            options: { position: "topleft" },
+            options: { position: "topleft", controlOrder: 1000 },
             onAdd() {
                 const container = L.DomUtil.create("div", "leaflet-bar leaflet-control");
                 const btn = L.DomUtil.create("a", "");
@@ -424,9 +426,9 @@ export function LogFlightMap({
                 <div ref={containerRef} className="h-[380px] w-full overflow-hidden rounded-lg sm:h-[520px]" />
                 {/* 高度色带：竖着贴在地图左侧（颜色 = 轨迹那段的平均高度）。只在**单条轨道**时给——
             多条时每条是纯色（图例里分色），色带就没有对应关系了。
-            从 top-20 起是为了让开 Leaflet 左上角的缩放按钮；pointer-events-none 不挡地图操作；
-            z-[700] 必须给——Leaflet 自己的 pane 是 z-index 200~800 的绝对定位层，
-            不给 z 就会被瓦片层（200）盖住 */}
+
+            pointer-events-none 不挡地图操作；z-[1100] 必须给——Leaflet 自己的 pane 是 z-index 200~800
+            的绝对定位层，不给 z 就会被瓦片层（200）盖住 */}
                 {state === "ready" && altRange && (
                     <div
                         className="pointer-events-none absolute top-20 bottom-6 left-3 z-[700] flex flex-col items-center"
@@ -451,7 +453,7 @@ export function LogFlightMap({
                 {/* 图例：多条轨道时给出"哪条是什么颜色"，点一下可以隐藏/显示那条。
             放在右上角图层控件**下面**（top-20），避免两个控件叠在一起 */}
                 {state === "ready" && legend.length > 1 && (
-                    <div className="absolute top-20 right-3 z-[700] flex flex-col gap-1 rounded-md bg-surface-2/90 px-2 py-1.5 text-[11px] backdrop-blur-sm">
+                    <div className="absolute top-20 right-3 z-[1100] flex flex-col gap-1 rounded-md bg-surface-2/90 px-2 py-1.5 text-[11px] backdrop-blur-sm">
                         {legend.map((r) => (
                             <button
                                 key={r.label}

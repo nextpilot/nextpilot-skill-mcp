@@ -63,7 +63,9 @@ def main() -> int:
         prettier = web / "node_modules" / "prettier" / "bin" / "prettier.cjs"
         if prettier.exists():
             print("[pre-commit] prettier --write on staged frontend files...")
-            pw = run([_node(), str(prettier), "--write", *fe_files, "--config", str(web / ".prettierrc")], cwd=root)
+            # 不传 --config：配置在仓库根，prettier 从每个文件向上找就能命中。
+            # 目的是让 hook 与编辑器保存走同一条查找路径，否则 web/ 之外的文件会被两套规则来回改。
+            pw = run([_node(), str(prettier), "--write", *fe_files], cwd=root)
             if pw.returncode != 0:
                 print(pw.stdout)
                 print(pw.stderr, file=sys.stderr)

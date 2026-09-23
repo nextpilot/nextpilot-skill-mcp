@@ -9,41 +9,41 @@ order: 1
 version: 1.1.0
 
 conditions:
-  topics:
-    - actuator_motors
+    topics:
+        - actuator_motors
 # 活跃通道 >= 4 才算跑过：通道不足由算子的 min_channels=4 兜住，算不出来就记一条
 # 「数据不足」，不会算作跑过（ran() 现在统一在 compute 成功之后记）
 
 compute:
-  - mts = actuator_motors.timestamp
-  - cols = actuator_motors.control
-  - >-
-      seg = active_window_mask(mts, ARMED_INTERVALS, vehicle_status.nav_state,
-      vehicle_status.timestamp, codes=[2, 4, 6, 14, 21], min_active=20)
-  - >-
-      spread, busiest, idlest, n_active = column_spread_stats(
-      cols, seg, min_mean=0.01, min_channels=4)
+    - mts = actuator_motors.timestamp
+    - cols = actuator_motors.control
+    - >-
+        seg = active_window_mask(mts, ARMED_INTERVALS, vehicle_status.nav_state,
+        vehicle_status.timestamp, codes=[2, 4, 6, 14, 21], min_active=20)
+    - >-
+        spread, busiest, idlest, n_active = column_spread_stats(
+        cols, seg, min_mean=0.01, min_channels=4)
 
 outputs:
-  tag: motor_output_unbalance
-  stats:
-    motorControlSpread: {var: spread, round: 3}
-    motorCountActive: {var: n_active}
+    tag: motor_output_unbalance
+    stats:
+        motorControlSpread: { var: spread, round: 3 }
+        motorCountActive: { var: n_active }
 
 triggers:
-  - when: "spread >= 0.15"
-    severity: critical
-    tag: motor_output_unbalance
-    threshold: 0.15
-    value: f"{spread:.3f}"
-    field: "actuator_motors.control[](悬停段均值极差)"
-    title: "电机输出不平衡（悬停段通道 {busiest} 与 {idlest} 差 {spread:.3f}）"
-    suggestion: "结合故障库 F008：检查桨叶型号/正反桨是否一致、单电机效率、机架形变。"
-  - when: "spread >= 0.08"
-    severity: warning
-    tag: motor_output_unbalance
-    threshold: 0.08
-    value: f"{spread:.3f}"
-    field: "actuator_motors.control[](悬停段均值极差)"
-    title: "电机输出差异偏大（通道 {busiest} 与 {idlest} 差 {spread:.3f}）"
-    suggestion: "结合故障库 F008 排查动力一致性；偶发差异可先观察。"
+    - when: "spread >= 0.15"
+      severity: critical
+      tag: motor_output_unbalance
+      threshold: 0.15
+      value: f"{spread:.3f}"
+      field: "actuator_motors.control[](悬停段均值极差)"
+      title: "电机输出不平衡（悬停段通道 {busiest} 与 {idlest} 差 {spread:.3f}）"
+      suggestion: "结合故障库 F008：检查桨叶型号/正反桨是否一致、单电机效率、机架形变。"
+    - when: "spread >= 0.08"
+      severity: warning
+      tag: motor_output_unbalance
+      threshold: 0.08
+      value: f"{spread:.3f}"
+      field: "actuator_motors.control[](悬停段均值极差)"
+      title: "电机输出差异偏大（通道 {busiest} 与 {idlest} 差 {spread:.3f}）"
+      suggestion: "结合故障库 F008 排查动力一致性；偶发差异可先观察。"

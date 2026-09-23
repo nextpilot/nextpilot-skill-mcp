@@ -7,14 +7,14 @@
 # 这个文件本身**不会被加载**（`*-template.yml` 是给人抄的骨架）。
 
 # ── 身份 ──
-id: xxx                        # 锚点与去重；页面里这组图的标识
-title: 中文名                  # 卡片标题
-description: 一句话说明这张图看什么   # 卡片副标题
-order: 5                       # 可选，页面里这组图的先后（缺省 999）
+id: xxx # 锚点与去重；页面里这组图的标识
+title: 中文名 # 卡片标题
+description: 一句话说明这张图看什么 # 卡片副标题
+order: 5 # 可选，页面里这组图的先后（缺省 999）
 
 # ── 适用范围：整块可省（省 = 总是适用）。**与规则同形**（同一份校验代码）
 conditions:
-  topics: [battery_status]             # 项内 `||` = 任意一个存在即可；项间 = 都要有
+  topics: [battery_status] # 项内 `||` = 任意一个存在即可；项间 = 都要有
   # firmware / airframe / precheck 同样可用（图上一般只用 topics）
 
 # ── 换算节点：可选，整块可省。与规则的 compute **同一套表达式与算子**（engine/operators.py）
@@ -26,19 +26,19 @@ compute:
 
 # ── 输出：至少一个。容器两种 —— axes（一张曲线图）｜map（地图轨迹）──
 outputs:
-  - container: axes            # 一张图 = 一个面板
-    title: 电压                # 可选 → 预设 title；可用 {instance} 占位（per_instance 时）
-    ylabel: V                  # **必填**：这张图的 y 轴标签（一张图只画一个量纲）
-    xlabel: 秒（相对日志开始）    # 可选 → 就是这句；xyplot 时写你的横轴名
-    legend: true               # 可选，默认 true
-    grid: true                 # 可选，默认 true
-    flipx: false               # 可选，默认 false（flipy 同）
-    range: [0, 100, 4, 5.2]    # 可选，默认自动适配。[x0,x1] 或 [x0,x1,y0,y1]
-    hlines:                    # 可选：水平参考线（颜色由 level 定）
-      - {value: 4.905, level: warning, label: "4.905（警告）"}
-    per_instance: false        # 可选，默认 false；置 true 时下面写 [:] 的线按实例拆成多张图
-    children:                  # 至少一条 child：每条 child 一组取数
-      - mode: TimeSeries       # TimeSeries（横轴=时间）｜xyplot（横轴=你给的 xdata）
+  - container: axes # 一张图 = 一个面板
+    title: 电压 # 可选 → 预设 title；可用 {instance} 占位（per_instance 时）
+    ylabel: V # **必填**：这张图的 y 轴标签（一张图只画一个量纲）
+    xlabel: 秒（相对日志开始） # 可选 → 就是这句；xyplot 时写你的横轴名
+    legend: true # 可选，默认 true
+    grid: true # 可选，默认 true
+    flipx: false # 可选，默认 false（flipy 同）
+    range: [0, 100, 4, 5.2] # 可选，默认自动适配。[x0,x1] 或 [x0,x1,y0,y1]
+    hlines: # 可选：水平参考线（颜色由 level 定）
+      - { value: 4.905, level: warning, label: "4.905（警告）" }
+    per_instance: false # 可选，默认 false；置 true 时下面写 [:] 的线按实例拆成多张图
+    children: # 至少一条 child：每条 child 一组取数
+      - mode: TimeSeries # TimeSeries（横轴=时间）｜xyplot（横轴=你给的 xdata）
         # 横轴：不写 xdata 时取**命中字段那个话题的 timestamp**（同一份采样，天然对齐）。
         # 命中字段 = ydata 里第一个取到数据的字段；整张图都由 compute 算出来时，从 compute
         # 语句里反推第一个"topic 存在于日志"的引用（ref(...) 与裸写 topic.field 都认）。
@@ -57,14 +57,14 @@ outputs:
         # meta/topic-overrides.yaml 即可）。只在**需要换算**时写 unit=；字段本来就是目标
         # 单位就别写（不写 = 不换算、也不查表）。
         ydata:
-          - ref("battery_status[0].voltage_v")          # 行尾可以挂注释
+          - ref("battery_status[0].voltage_v") # 行尾可以挂注释
           - ref("battery_status[0].voltage_filtered_v")
           - remaining_pct
         # label / style / color 都是 **YAML 列表**，与 ydata **逐项对齐**
         # （个数不等就构建失败，报错指出第几项；只有一项也要写 [甲]）
         label: [电压, 滤波后电压, 剩余电量]
-        style: [solid, dashed, solid]    # solid｜dashed｜dotted（缺省 solid）
-        color: ["#409eff", "#ff4d4f"]    # #rrggbb；不写就按站点调色板顺序取
+        style: [solid, dashed, solid] # solid｜dashed｜dotted（缺省 solid）
+        color: ["#409eff", "#ff4d4f"] # #rrggbb；不写就按站点调色板顺序取
         # 老固件少个字段怎么办：**什么都不用写** —— 那条线取到 null，前端自动不画；
         # 要"换个名字继续画"就把它放进候选组：ref("新名", "旧名")。
 
@@ -73,9 +73,9 @@ outputs:
     title: 轨迹
     legend: true
     children:
-      - mode: track            # 地图上的 child 固定是 track
-        label: gps             # 图例名；可省 → 第一个话题名
-        max_points: 1500       # 可省 → 1500（抽稀到多少点；抽稀是**图元级**的）
+      - mode: track # 地图上的 child 固定是 track
+        label: gps # 图例名；可省 → 第一个话题名
+        max_points: 1500 # 可省 → 1500（抽稀到多少点；抽稀是**图元级**的）
         # 三个坐标各是一个字段引用（**不支持 compute 的输出**），且**必须写明实例**：
         # 同一条轨道的时间戳与 fix_type 要跟坐标来自同一个 topic 的同一个实例，
         # 否则三路采样率不同、数组长度不一致，画出来是错的。

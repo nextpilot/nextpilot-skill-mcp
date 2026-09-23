@@ -15,18 +15,12 @@
       "firmwareDisplay": "v1.16.0",
       "fwReleaseType": 255,
       "armedDurationSec": 181.7,
-      "phases": [
-        "fw_cruise",
-        "maneuver"
-      ],
+      "phases": ["fw_cruise", "maneuver"],
       "dropoutTotalMs": 0,
       "hardware": "PX4_FMU_V6C",
       "hardwareSubtype": "V6C002002",
       "verSw": "6ea3539157ca358c70a515878b77077af7d4611d",
-      "modes": [
-        "Mission",
-        "Manual"
-      ],
+      "modes": ["Mission", "Manual"],
       "mainMode": "Mission",
       "uuid": "0006000000003132343830345115001e0023",
       "vehicleLifeS": 695.3,
@@ -145,14 +139,8 @@
         "value": "estimator_sensor_bias.gyro_bias[]"
       }
     ],
-    "tags": [
-      "high_vibration",
-      "attitude_overshoot",
-      "low_airspeed"
-    ],
-    "guardTags": [
-      "topic_missing:battery_status"
-    ],
+    "tags": ["high_vibration", "attitude_overshoot", "low_airspeed"],
+    "guardTags": ["topic_missing:battery_status"],
     "checksRun": [
       "vibration",
       "ekf_innovations",
@@ -199,46 +187,25 @@
           "检查IMU减震组件，确认减震球无开裂硬化"
         ],
         "note": "日志存在碰撞标记时，本条失效，优先排查撞击损伤",
-        "matchedPhases": [
-          "maneuver",
-          "fw_cruise"
-        ]
+        "matchedPhases": ["maneuver", "fw_cruise"]
       },
       {
         "faultId": "F006",
         "faultTag": "attitude_overshoot",
         "riskLevel": "中",
-        "possibleRootCause": [
-          "姿态环PID增益过高，系统阻尼不足",
-          "机架共振，激励控制环震荡"
-        ],
-        "troubleshootingSteps": [
-          "适当降低姿态环P增益，优先调阻尼D项",
-          "排查整机共振点，避开控制带宽"
-        ],
+        "possibleRootCause": ["姿态环PID增益过高，系统阻尼不足", "机架共振，激励控制环震荡"],
+        "troubleshootingSteps": ["适当降低姿态环P增益，优先调阻尼D项", "排查整机共振点，避开控制带宽"],
         "note": "大风环境下超调优先归为环境扰动，禁止直接大幅度下调PID",
-        "matchedPhases": [
-          "maneuver"
-        ]
+        "matchedPhases": ["maneuver"]
       },
       {
         "faultId": "F009",
         "faultTag": "low_airspeed",
         "riskLevel": "高",
-        "possibleRootCause": [
-          "空速管堵塞、积水",
-          "空速校准未完成",
-          "总压/静压管路漏气"
-        ],
-        "troubleshootingSteps": [
-          "检查空速管有无异物堵塞",
-          "检查管路接头，确认无漏气",
-          "重新执行空速校准"
-        ],
+        "possibleRootCause": ["空速管堵塞、积水", "空速校准未完成", "总压/静压管路漏气"],
+        "troubleshootingSteps": ["检查空速管有无异物堵塞", "检查管路接头，确认无漏气", "重新执行空速校准"],
         "note": "VTOL固定翼阶段空速失效极易引发失速",
-        "matchedPhases": [
-          "fw_cruise"
-        ]
+        "matchedPhases": ["fw_cruise"]
       }
     ],
     "findings": [

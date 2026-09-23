@@ -3,11 +3,7 @@
   "title": "PX4 检查经验（knowledge/px4/rules/*.yaml）",
   "description": "⚠ 自动生成，请勿手改 —— 源：facts.yaml / engine/operators.py / engine/providers/api.py。改完跑 `cd web && pnpm build:kb`。\n字段级权威参考见站内 /guide/rule-schema；可抄的骨架见 knowledge/px4/rules-template.yml。",
   "type": "object",
-  "required": [
-    "id",
-    "group",
-    "name"
-  ],
+  "required": ["id", "group", "name"],
   "additionalProperties": false,
   "properties": {
     "id": {
@@ -92,12 +88,7 @@
         "firmware": {
           "type": "string",
           "pattern": "^(any|\\s*(>=|<=|==|>|<)?\\s*\\d+(\\.\\d+)?(\\s*,\\s*(>=|<=|==|>|<)?\\s*\\d+(\\.\\d+)?\\s*)*)$",
-          "examples": [
-            "any",
-            ">=1.15",
-            "<1.15",
-            ">=1.14,<1.15"
-          ],
+          "examples": ["any", ">=1.15", "<1.15", ">=1.14,<1.15"],
           "description": "固件：any（缺省）/ \">=1.15\" / \"<1.15\" / \">=1.14,<1.15\"（逗号 = 与）"
         },
         "airframe": {
@@ -105,31 +96,13 @@
           "oneOf": [
             {
               "type": "string",
-              "enum": [
-                "airship",
-                "any",
-                "fixed_wing",
-                "fw",
-                "mc",
-                "rotary_wing",
-                "rover",
-                "unknown"
-              ]
+              "enum": ["airship", "any", "fixed_wing", "fw", "mc", "rotary_wing", "rover", "unknown"]
             },
             {
               "type": "array",
               "items": {
                 "type": "string",
-                "enum": [
-                  "airship",
-                  "any",
-                  "fixed_wing",
-                  "fw",
-                  "mc",
-                  "rotary_wing",
-                  "rover",
-                  "unknown"
-                ]
+                "enum": ["airship", "any", "fixed_wing", "fw", "mc", "rotary_wing", "rover", "unknown"]
               }
             }
           ]
@@ -191,10 +164,7 @@
           "description": "ran / skipped 用的 check 名；缺省 = group，写别的就是显式例外"
         },
         "tag": {
-          "type": [
-            "string",
-            "null"
-          ],
+          "type": ["string", "null"],
           "description": "喂故障库匹配的异常标签（trigger 没写 tag 时回退到它）"
         },
         "stats": {
@@ -202,9 +172,7 @@
           "description": "写进报告「关键数据」的统计。键是展示名，var 是 compute 里的变量名",
           "additionalProperties": {
             "type": "object",
-            "required": [
-              "var"
-            ],
+            "required": ["var"],
             "additionalProperties": false,
             "properties": {
               "var": {
@@ -221,10 +189,7 @@
           "description": "条件性数据质量标签：不依赖是否发出 finding，算出来就带上",
           "items": {
             "type": "object",
-            "required": [
-              "when",
-              "tag"
-            ],
+            "required": ["when", "tag"],
             "additionalProperties": false,
             "properties": {
               "when": {
@@ -244,12 +209,7 @@
       "description": "判定：自上而下，命中第一条即发一条 finding",
       "items": {
         "type": "object",
-        "required": [
-          "when",
-          "severity",
-          "title",
-          "field"
-        ],
+        "required": ["when", "severity", "title", "field"],
         "additionalProperties": false,
         "properties": {
           "when": {
@@ -258,11 +218,7 @@
           },
           "severity": {
             "type": "string",
-            "enum": [
-              "critical",
-              "info",
-              "warning"
-            ]
+            "enum": ["critical", "info", "warning"]
           },
           "title": {
             "type": "string",
@@ -277,10 +233,7 @@
             "description": "证据值，表达式（f-string 管格式化），如 f\"{n:.3f}\""
           },
           "threshold": {
-            "type": [
-              "number",
-              "string"
-            ],
+            "type": ["number", "string"],
             "description": "阈值（evidence.threshold）"
           },
           "unit": {
@@ -288,10 +241,7 @@
             "description": "单位（evidence.unit）"
           },
           "tag": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "本条 finding 的标签（缺省 = outputs.tag；写 null = 不产标签）"
           },
           "suggestion": {
@@ -315,9 +265,7 @@
         },
         {
           "type": "object",
-          "required": [
-            "var"
-          ],
+          "required": ["var"],
           "additionalProperties": false,
           "properties": {
             "var": {
@@ -338,22 +286,15 @@
   },
   "anyOf": [
     {
-      "required": [
-        "compute",
-        "triggers"
-      ],
+      "required": ["compute", "triggers"],
       "title": "普通经验：要取值也要判定"
     },
     {
-      "required": [
-        "outputs"
-      ],
+      "required": ["outputs"],
       "title": "guard 类经验：只打数据质量标签，不发 finding",
       "properties": {
         "outputs": {
-          "required": [
-            "guard_tags"
-          ]
+          "required": ["guard_tags"]
         }
       }
     }

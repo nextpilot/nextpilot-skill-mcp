@@ -7,5 +7,5 @@ group: guards
 order: 1
 
 outputs:
-  guard_tags:
-    - {when: "RESTART_DETECTED", tag: restart_detected}
+    guard_tags:
+        - { when: "RESTART_DETECTED", tag: restart_detected }

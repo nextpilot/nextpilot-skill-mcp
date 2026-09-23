@@ -15,17 +15,11 @@
       "firmwareDisplay": "v1.15.0 (479ee0)",
       "fwReleaseType": 0,
       "armedDurationSec": 74.5,
-      "phases": [
-        "hover"
-      ],
+      "phases": ["hover"],
       "dropoutTotalMs": 0,
       "hardware": "DAMIAO_DM_FC01",
       "verSw": "479ee0e4de8e79f6a5babee12013caf5c830031a",
-      "modes": [
-        "Position",
-        "Stabilized",
-        "Altitude"
-      ],
+      "modes": ["Position", "Stabilized", "Altitude"],
       "mainMode": "Position",
       "uuid": "0006000000003638373135335105003e0027",
       "verSwBranch": "damiao_dm-fc01_v1.15.0",
@@ -132,9 +126,7 @@
         "value": "estimator_sensor_bias.gyro_bias[]"
       }
     ],
-    "tags": [
-      "battery_voltage_drop"
-    ],
+    "tags": ["battery_voltage_drop"],
     "guardTags": [],
     "checksRun": [
       "vibration",
@@ -191,9 +183,7 @@
           "复核整机起飞重量，确认不超过最大起飞重量"
         ],
         "note": "大机动动作瞬时压降属于正常，持续压降才判定故障",
-        "matchedPhases": [
-          "hover"
-        ]
+        "matchedPhases": ["hover"]
       }
     ],
     "findings": [

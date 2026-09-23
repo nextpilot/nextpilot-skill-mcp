@@ -4,10 +4,10 @@
 
 id: px4-guard-short-log
 name: 数据质量-短日志
-group: guards_early           # 在原过程式位置执行：尽早打标签，且要排在其它 guard 之前
+group: guards_early # 在原过程式位置执行：尽早打标签，且要排在其它 guard 之前
 order: 1
 
 outputs:
-  guard_tags:
-    - {when: "ARMED_S > 0 and ARMED_S < 60", tag: insufficient_data}
-    - {when: "ARMED_S == 0 and DURATION_S < 60", tag: insufficient_data}
+    guard_tags:
+        - { when: "ARMED_S > 0 and ARMED_S < 60", tag: insufficient_data }
+        - { when: "ARMED_S == 0 and DURATION_S < 60", tag: insufficient_data }

@@ -19,9 +19,7 @@
       "dropoutTotalMs": 119,
       "hardware": "AUAV_X21",
       "verSw": "fd483321a5cf50ead91164356d15aa474643aa73",
-      "modes": [
-        "Manual"
-      ],
+      "modes": ["Manual"],
       "mainMode": "Manual",
       "airframeId": 10020
     },
@@ -40,16 +38,8 @@
       }
     ],
     "tags": [],
-    "guardTags": [
-      "topic_missing:battery_status"
-    ],
-    "checksRun": [
-      "ekf_faults",
-      "cpu_load",
-      "failsafe",
-      "mode_thrash",
-      "logged_messages"
-    ],
+    "guardTags": ["topic_missing:battery_status"],
+    "checksRun": ["ekf_faults", "cpu_load", "failsafe", "mode_thrash", "logged_messages"],
     "checksSkipped": [
       {
         "check": "vibration",

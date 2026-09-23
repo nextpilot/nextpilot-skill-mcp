@@ -422,20 +422,32 @@ npmmirror 而失败（该镜像无 audit 端点），但 **CI 未配 registry，
 
 ### 已定方案
 
-| 步骤           | 落点                               | 决定                                                                                                                       |
-| -------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| 装 prettier    | `web/package.json` devDependencies | 装子项目，依赖不进仓库根                                                                                                   |
-| 配置           | `web/.prettierrc`                  | `tabWidth: 4`、`printWidth: 120`、`semi`、`singleQuote: false`、**`endOfLine: "auto"`**                                    |
-| 排除生成物     | `web/.prettierignore`              | `.generated/`、`workers/pyodide-px4log-engine.ts`、`workers/pyodide-px4log-data.ts`、`lib/knowledge/*.generated.*`、锁文件 |
-| ESLint 扩到 TS | `web/eslint.config.mjs`            | **放弃** —— `typescript-eslint` 不支持 TS 7，详见下方「TS lint 为什么没接」                                                |
-| pre-commit     | `.githooks/pre-commit`             | 对 staged 的 `.ts/.tsx/.js/.mjs/.css` 跑 `prettier --write`，对 `.ts/.tsx` 跑 `eslint --fix`，并重新暂存                   |
-| 接入清单       | `tools/ci/checklist.yml`           | 静态阶段加 `prettier --check`，接在 `eslint` 之后                                                                          |
+| 步骤           | 落点                                        | 决定                                                                                                                       |
+| -------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| 装 prettier    | `web/package.json` devDependencies          | 装子项目，依赖不进仓库根                                                                                                   |
+| 配置           | `.prettierrc`（**仓库根**，见下方变更）     | `tabWidth: 4`、`printWidth: 120`、`semi`、`singleQuote: false`、**`endOfLine: "auto"`**                                    |
+| 排除生成物     | `.prettierignore`（**仓库根**，见下方变更） | `.generated/`、`workers/pyodide-px4log-engine.ts`、`workers/pyodide-px4log-data.ts`、`lib/knowledge/*.generated.*`、锁文件 |
+| ESLint 扩到 TS | `web/eslint.config.mjs`                     | **放弃** —— `typescript-eslint` 不支持 TS 7，详见下方「TS lint 为什么没接」                                                |
+| pre-commit     | `.githooks/pre-commit`                      | 对 staged 的 `.ts/.tsx/.js/.mjs/.css` 跑 `prettier --write`，对 `.ts/.tsx` 跑 `eslint --fix`，并重新暂存                   |
+| 接入清单       | `tools/ci/checklist.yml`                    | 静态阶段加 `prettier --check`，接在 `eslint` 之后                                                                          |
 
 **`endOfLine: "auto"` 是"默认零 diff"成立的前提**：工作区是 CRLF，而 prettier 默认 `"lf"`，
 用默认值会让首次 `--check` 把 100 个文件全报成"要改"，全量 `--write` 把行尾整个重写。
 
 **生成物必须排除**：`build-knowledge.mjs` 每次构建重写它们，格式化了会被下次构建覆盖，
 还会和 `build:kb --check` 的产物比对打架。
+
+**2026-09-23 变更：两份配置合并到仓库根**。原先配置只住在 `web/`，靠 CI 与 `pre-commit`
+**显式 `--config web/.prettierrc`** 把 4 空格/120 强行套到全仓。问题是 prettier 对
+`web/` 之外的文件（`tools/browser/*.mjs`、`docs/**/*.md`）**按目录向上找不到配置**，落回内置默认
+（2 空格 / 80 宽）—— 于是任何不传 `--config` 的路径（编辑器保存、手工 `npx prettier --write`）
+都会把它们改坏，下次 CI 再按 4/120 判不合格，来回拉锯。
+
+改法：`.prettierrc` 与 `.prettierignore` 各只留**仓库根一份**，删掉 `web/` 下的，
+并去掉 `checklist.yml` 与 `pre-commit` 里的 `--config`（不再需要，prettier 就近查找自然会命中根）。
+`web/package.json` 的 `format` / `format:check` 因 cwd 在 `web/`，显式加 `--ignore-path ../.prettierignore`。
+⚠️ 排除规则一律写成 `**/` 开头的通用 glob：这份文件会在两种 cwd 下被用，
+写成 `web/workers/...` 这种带顶层目录的形式，在 cwd=`web` 时匹配不到。
 
 **三条限制**（用户已确认）：
 
@@ -1033,15 +1045,7 @@ node node_modules/@playwright/test/cli.js test --grep '日志分析流程' --lis
 **但 `checklist.yml:154` 的 `{ENV.SKIP_LOG_ANALYSIS}` 占位符还在**：
 
 ```yaml
-command:
-  [
-    "{NODE}",
-    "node_modules/@playwright/test/cli.js",
-    "test",
-    "--grep",
-    "@smoke",
-    "{ENV.SKIP_LOG_ANALYSIS}",
-  ]
+command: ["{NODE}", "node_modules/@playwright/test/cli.js", "test", "--grep", "@smoke", "{ENV.SKIP_LOG_ANALYSIS}"]
 ```
 
 `check_all.py` 的 `_build_placeholders` 把 `{ENV.XXX}` 解析成"环境变量有值就代入，

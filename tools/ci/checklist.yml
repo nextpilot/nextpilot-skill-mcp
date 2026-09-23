@@ -90,16 +90,11 @@ jobs:
       - id: "prettier-check"
         name: "Code style (prettier --check)"
         workdir: "{ROOT}"
-        command:
-          [
-            "{NODE}",
-            "web/node_modules/prettier/bin/prettier.cjs",
-            "--check",
-            ".",
-            "--config",
-            "web/.prettierrc",
-          ]
-        hint: "Run `npx prettier --write . --config web/.prettierrc` to auto-format all files. Auto-generated files are excluded via .prettierignore."
+        # 不传 --config：仓库根已经有 .prettierrc，prettier 从被扫描的文件向上找就能命中。
+        # 显式传 --config 只在这里生效，编辑器/手工命令仍会落回默认 2 空格/80 宽，
+        # 于是 web/ 之外的文件被改坏 —— 配置放在根才能两头一致。
+        command: ["{NODE}", "web/node_modules/prettier/bin/prettier.cjs", "--check", "."]
+        hint: "Run `npx prettier --write .` to auto-format all files. Auto-generated files are excluded via .prettierignore."
 
       - id: "markdownlint"
         name: "Markdown lint (markdownlint)"
@@ -205,21 +200,14 @@ jobs:
         name: "Adapter contract test (guard-px4log-provider)"
         when: "has_logs"
         workdir: "{ROOT}"
-        command:
-          ["{PYTHON}", "tools/calibrate/guard-px4log-provider.py", "{LOGS}"]
+        command: ["{PYTHON}", "tools/calibrate/guard-px4log-provider.py", "{LOGS}"]
         hint: "One or more log files failed the adapter contract test. Check the output above for which adapter and what contract was violated."
 
       - id: "probe-data"
         name: "Data-layer structure self-check (--probe-data)"
         when: "has_logs"
         workdir: "{ROOT}"
-        command:
-          [
-            "{PYTHON}",
-            "tools/calibrate/px4log_engine_runner.py",
-            "--probe-data",
-            "{LOGS}",
-          ]
+        command: ["{PYTHON}", "tools/calibrate/px4log_engine_runner.py", "--probe-data", "{LOGS}"]
         hint: "The data layer structure is inconsistent. Review the probe output above for details."
 
       - id: "lint-rules"
@@ -242,15 +230,7 @@ jobs:
       - id: "pip-audit"
         name: "Python dependency audit (pip-audit)"
         workdir: "{ROOT}"
-        command:
-          [
-            "{PYTHON}",
-            "-m",
-            "pip_audit",
-            "-r",
-            "requirements-dev.txt",
-            "--strict",
-          ]
+        command: ["{PYTHON}", "-m", "pip_audit", "-r", "requirements-dev.txt", "--strict"]
         hint: "A pinned Python dependency has a known vulnerability. Upgrade it and pin the new version, or document why it must stay."
 
       # 必须带 --registry：本机 ~/.npmrc 指向 npmmirror，该镜像没实现 audit 端点。
@@ -260,13 +240,7 @@ jobs:
       - id: "pnpm-audit"
         name: "Frontend dependency audit (pnpm audit)"
         workdir: "{WEB}"
-        command:
-          [
-            "{PNPM}",
-            "--registry=https://registry.npmjs.org/",
-            "audit",
-            "--audit-level=high",
-          ]
+        command: ["{PNPM}", "--registry=https://registry.npmjs.org/", "audit", "--audit-level=high"]
         hint: "A frontend dependency has a known vulnerability. Run `pnpm --registry=https://registry.npmjs.org/ audit` for details, then upgrade."
 
       # 变异自证约 20 分钟，单独一个 job 跑（--with-mutate），不并进 --stage ci 的默认集合。
@@ -283,14 +257,7 @@ jobs:
         when: "args.with_e2e"
         timeout: 300
         workdir: "{WEB}"
-        command:
-          [
-            "{NODE}",
-            "node_modules/@playwright/test/cli.js",
-            "test",
-            "--grep",
-            "@smoke",
-          ]
+        command: ["{NODE}", "node_modules/@playwright/test/cli.js", "test", "--grep", "@smoke"]
         hint: "Review the Playwright test output above. Run `npx playwright test --grep @smoke` locally to reproduce."
 
       # 「上传 .ulg → Pyodide 解析 → 显示」这条全流程。它曾经是 @smoke 的一员，
@@ -306,14 +273,7 @@ jobs:
         when: "args.with_e2e"
         timeout: 900
         workdir: "{WEB}"
-        command:
-          [
-            "{NODE}",
-            "node_modules/@playwright/test/cli.js",
-            "test",
-            "--grep",
-            "日志分析流程",
-          ]
+        command: ["{NODE}", "node_modules/@playwright/test/cli.js", "test", "--grep", "日志分析流程"]
         hint: "The upload -> Pyodide parse -> render chain is broken. Run `pnpm test:e2e:analyze` locally to reproduce; the full flow needs ~7 minutes (Pyodide downloads WASM + numpy + pyulog on first run)."
 
   - id: deploy

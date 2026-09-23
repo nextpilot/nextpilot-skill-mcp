@@ -16,16 +16,16 @@
 # 只登记 meta 里查不到的或查错的，别把能查到的也抄一遍（抄了就会漂移）。
 
 units:
-  # 新口径（1.15+）的字段在 meta 里只有 note（"Latitude in degrees…"）、没有 unit 字段
-  vehicle_gps_position.latitude_deg: deg
-  vehicle_gps_position.longitude_deg: deg
-  vehicle_gps_position.altitude_msl_m: m
-  # 老口径：meta 里只收了 v1.15.0 / v1.16.0 / main 三份 tag，这些字段已经不在其中
-  vehicle_gps_position.lat: degE7
-  vehicle_gps_position.lon: degE7
-  vehicle_gps_position.alt: mm
-  # 话题改名（1.16 起 vehicle_gps_position → sensor_gps）后是**另一套字典键与另一个 topic 名**，
-  # 同一个字段要各登记一行：ref 里写的是日志 topic 名，查表按它来。
-  sensor_gps.latitude_deg: deg
-  sensor_gps.longitude_deg: deg
-  sensor_gps.altitude_msl_m: m
+    # 新口径（1.15+）的字段在 meta 里只有 note（"Latitude in degrees…"）、没有 unit 字段
+    vehicle_gps_position.latitude_deg: deg
+    vehicle_gps_position.longitude_deg: deg
+    vehicle_gps_position.altitude_msl_m: m
+    # 老口径：meta 里只收了 v1.15.0 / v1.16.0 / main 三份 tag，这些字段已经不在其中
+    vehicle_gps_position.lat: degE7
+    vehicle_gps_position.lon: degE7
+    vehicle_gps_position.alt: mm
+    # 话题改名（1.16 起 vehicle_gps_position → sensor_gps）后是**另一套字典键与另一个 topic 名**，
+    # 同一个字段要各登记一行：ref 里写的是日志 topic 名，查表按它来。
+    sensor_gps.latitude_deg: deg
+    sensor_gps.longitude_deg: deg
+    sensor_gps.altitude_msl_m: m

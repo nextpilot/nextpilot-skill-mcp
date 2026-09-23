@@ -11,8 +11,8 @@ outputs:
     # [:] = 所有实例；配上 per_instance 就是"每个 IMU 一张图"（与改造前一致）
     per_instance: true
     hlines:
-      - {value: 4.905, level: warning, label: "4.905（警告）"}
-      - {value: 9.81, level: critical, label: "9.81（严重）"}
+      - { value: 4.905, level: warning, label: "4.905（警告）" }
+      - { value: 9.81, level: critical, label: "9.81（严重）" }
     children:
       - mode: TimeSeries
         ydata:

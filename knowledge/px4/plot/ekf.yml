@@ -9,7 +9,7 @@ outputs:
     title: "estimator_status #{instance}"
     ylabel: ratio
     hlines:
-      - {value: 1.0, level: critical, label: "1.0（拒绝）"}
+      - { value: 1.0, level: critical, label: "1.0（拒绝）" }
     children:
       - mode: TimeSeries
         # 这里用"每路一条线"的平铺写法：字段在日志里不存在的那条会取到 null，

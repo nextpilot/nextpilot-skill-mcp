@@ -17,20 +17,20 @@
 # 只登记**确实对不上**的，别把同名映射也抄一遍（抄了就会漂移）。
 
 topics:
-  # PX4 1.15 起把 uORB `vehicle_gps_position` 改名为 `sensor_gps`（msg 文件 SensorGps.msg）。
-  # 但实测 1.15 / 1.16 / 1.17 的日志里**两个 topic 都在**，规则沿用 `vehicle_gps_position`，
-  # 而字典里只有 `sensor_gps` —— 校验时要走这一条。
-  # 注意字段也换了：新字典是 latitude_deg/longitude_deg/altitude_msl_m，没有 lat/lon/alt
-  # （旧固件那套在旧 tag 里，本项目目前只收了 v1.15.0 / v1.16.0 / main）。
-  vehicle_gps_position: sensor_gps
+    # PX4 1.15 起把 uORB `vehicle_gps_position` 改名为 `sensor_gps`（msg 文件 SensorGps.msg）。
+    # 但实测 1.15 / 1.16 / 1.17 的日志里**两个 topic 都在**，规则沿用 `vehicle_gps_position`，
+    # 而字典里只有 `sensor_gps` —— 校验时要走这一条。
+    # 注意字段也换了：新字典是 latitude_deg/longitude_deg/altitude_msl_m，没有 lat/lon/alt
+    # （旧固件那套在旧 tag 里，本项目目前只收了 v1.15.0 / v1.16.0 / main）。
+    vehicle_gps_position: sensor_gps
 
-  # 1.15+ 的估计器风。日志 topic 叫 estimator_wind，上游 msg 是 Wind.msg → 字典键 `wind`。
-  # （日志里另有一个叫 `wind` 的 topic，与这条不是一回事，别按名字猜。）
-  estimator_wind: wind
+    # 1.15+ 的估计器风。日志 topic 叫 estimator_wind，上游 msg 是 Wind.msg → 字典键 `wind`。
+    # （日志里另有一个叫 `wind` 的 topic，与这条不是一回事，别按名字猜。）
+    estimator_wind: wind
 
 # 字典里查不到的（本项目收录的 tag 里没有对应 msg，无法校验——不是"字段不存在"）：
 #   wind_estimate          旧固件的估计器风 topic，上游是 WindEstimate.msg；本项目没收旧 tag。
 #                          要校验得先 `python tools/px4/fetch_px4_uorb_msg.py --tags v1.13.3,v1.14.4`
 #   旧字段 lat / lon / alt  同上，旧 tag 才有
 unknown:
-  - wind_estimate
+    - wind_estimate

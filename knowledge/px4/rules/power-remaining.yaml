@@ -3,34 +3,34 @@
 id: px4-power-remaining
 name: 电池剩余电量
 group: battery
-order: 3                 # battery group 内的次序：cell-voltage=1, sag=2, remaining=3
+order: 3 # battery group 内的次序：cell-voltage=1, sag=2, remaining=3
 
 conditions:
-  topics:
-    - battery_status
+    topics:
+        - battery_status
 
 compute:
-  # remaining ∈ [0,1]，-1 = 未知，滤掉。**只看第 0 块电池**（见 power-cell-voltage 的说明）
-  - rem = min_ge(ref("battery_status[0].remaining"), ge=0)
-  - rem_pct = rem * 100
+    # remaining ∈ [0,1]，-1 = 未知，滤掉。**只看第 0 块电池**（见 power-cell-voltage 的说明）
+    - rem = min_ge(ref("battery_status[0].remaining"), ge=0)
+    - rem_pct = rem * 100
 
 outputs:
-  tag: battery_voltage_drop
-  stats:
-    batteryRemainingMin: {var: rem, round: 3}
+    tag: battery_voltage_drop
+    stats:
+        batteryRemainingMin: { var: rem, round: 3 }
 
 triggers:
-  - when: "rem <= 0.10"
-    severity: critical
-    threshold: 0.10
-    value: f"{rem:.3f}"
-    field: "battery_status.remaining(min)"
-    title: "电池剩余电量极低（{rem_pct:.0f}%）"
-    suggestion: "剩余电量低于 10%，应立即返航；检查电量估算与电池健康。"
-  - when: "rem <= 0.20"
-    severity: warning
-    threshold: 0.20
-    value: f"{rem:.3f}"
-    field: "battery_status.remaining(min)"
-    title: "电池剩余电量偏低（{rem_pct:.0f}%）"
-    suggestion: "剩余电量低于 20%，注意返航裕度。"
+    - when: "rem <= 0.10"
+      severity: critical
+      threshold: 0.10
+      value: f"{rem:.3f}"
+      field: "battery_status.remaining(min)"
+      title: "电池剩余电量极低（{rem_pct:.0f}%）"
+      suggestion: "剩余电量低于 10%，应立即返航；检查电量估算与电池健康。"
+    - when: "rem <= 0.20"
+      severity: warning
+      threshold: 0.20
+      value: f"{rem:.3f}"
+      field: "battery_status.remaining(min)"
+      title: "电池剩余电量偏低（{rem_pct:.0f}%）"
+      suggestion: "剩余电量低于 20%，注意返航裕度。"

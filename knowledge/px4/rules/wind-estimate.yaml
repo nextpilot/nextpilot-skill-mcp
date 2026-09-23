@@ -9,48 +9,48 @@ group: wind_estimate
 order: 1
 
 conditions:
-  topics:
-    - estimator_wind || wind_estimate
+    topics:
+        - estimator_wind || wind_estimate
 
 compute:
-  # 1.15 起这个量在日志里的 topic 叫 estimator_wind，之前叫 wind_estimate——**候选组**
-  # 按存在性取（实测两者从不同时出现，所以"有谁用谁"就是原来的版本分流）。
-  # 上游另有一个叫 wind 的 topic：字典按 .msg 文件名收录，与日志 topic 名不是一一对应，
-  # 别按名字猜。缺任一路（两个 topic 都没有）时 hypot 得 None、w_p95 也是 None → 不出结论。
-  # **只看第 0 个估计器实例**：以前靠"不加修饰＝所有实例拼起来"隐式跨实例取最大，现在得写明。
-  - >-
-    w_p95 = percentile(
-      hypot(coalesce(ref("estimator_wind[0].windspeed_north"),
-                     ref("wind_estimate[0].windspeed_north")),
-            coalesce(ref("estimator_wind[0].windspeed_east"),
-                     ref("wind_estimate[0].windspeed_east"))),
-      p=95)
+    # 1.15 起这个量在日志里的 topic 叫 estimator_wind，之前叫 wind_estimate——**候选组**
+    # 按存在性取（实测两者从不同时出现，所以"有谁用谁"就是原来的版本分流）。
+    # 上游另有一个叫 wind 的 topic：字典按 .msg 文件名收录，与日志 topic 名不是一一对应，
+    # 别按名字猜。缺任一路（两个 topic 都没有）时 hypot 得 None、w_p95 也是 None → 不出结论。
+    # **只看第 0 个估计器实例**：以前靠"不加修饰＝所有实例拼起来"隐式跨实例取最大，现在得写明。
+    - >-
+        w_p95 = percentile(
+          hypot(coalesce(ref("estimator_wind[0].windspeed_north"),
+                         ref("wind_estimate[0].windspeed_north")),
+                coalesce(ref("estimator_wind[0].windspeed_east"),
+                         ref("wind_estimate[0].windspeed_east"))),
+          p=95)
 
 outputs:
-  tag: wind_disturb
-  # 风速偏大本身就是个事实（该进解读的背景），所以用 guard_tags 而不是 trigger 上的标记：
-  # 不依赖哪条 trigger 命中，算出来就带上
-  guard_tags:
-    - {when: "w_p95 >= 8.0", tag: wind_strong}
-  stats:
-    windSpeedP95M: {var: w_p95, round: 1}
+    tag: wind_disturb
+    # 风速偏大本身就是个事实（该进解读的背景），所以用 guard_tags 而不是 trigger 上的标记：
+    # 不依赖哪条 trigger 命中，算出来就带上
+    guard_tags:
+        - { when: "w_p95 >= 8.0", tag: wind_strong }
+    stats:
+        windSpeedP95M: { var: w_p95, round: 1 }
 
 triggers:
-  - when: "w_p95 >= 12.0"
-    severity: warning
-    tag: wind_disturb
-    threshold: 8.0
-    value: f"{w_p95:.1f}"
-    unit: m/s
-    field: "estimator_wind.windspeed_north/east"
-    title: "估计风速较大（p95 {w_p95:.1f} m/s）"
-    suggestion: "结合故障库 F010：强风属环境扰动，姿态超调/转换越限优先归因风，不要直接改 PID。"
-  - when: "w_p95 >= 8.0"
-    severity: info
-    tag: wind_disturb
-    threshold: 8.0
-    value: f"{w_p95:.1f}"
-    unit: m/s
-    field: "estimator_wind.windspeed_north/east"
-    title: "估计风速偏大（p95 {w_p95:.1f} m/s）"
-    suggestion: "解释姿态类异常时需考虑风扰因素。"
+    - when: "w_p95 >= 12.0"
+      severity: warning
+      tag: wind_disturb
+      threshold: 8.0
+      value: f"{w_p95:.1f}"
+      unit: m/s
+      field: "estimator_wind.windspeed_north/east"
+      title: "估计风速较大（p95 {w_p95:.1f} m/s）"
+      suggestion: "结合故障库 F010：强风属环境扰动，姿态超调/转换越限优先归因风，不要直接改 PID。"
+    - when: "w_p95 >= 8.0"
+      severity: info
+      tag: wind_disturb
+      threshold: 8.0
+      value: f"{w_p95:.1f}"
+      unit: m/s
+      field: "estimator_wind.windspeed_north/east"
+      title: "估计风速偏大（p95 {w_p95:.1f} m/s）"
+      suggestion: "解释姿态类异常时需考虑风扰因素。"

@@ -655,34 +655,18 @@ for rule in RULES + GUARDS:
 ```yaml
 compute:
   # ① 单字段 → 单变量（最常见，短写法）
-  - {
-      out: vibe,
-      from: vehicle_imu_status.accel_vibration_metric,
-      op: mean,
-      per_instance: worst,
-    }
+  - { out: vibe, from: vehicle_imu_status.accel_vibration_metric, op: mean, per_instance: worst }
 
   # ② 多字段 → 一个向量变量
   - {
       out: q_att,
-      from:
-        [
-          vehicle_attitude.q_0,
-          vehicle_attitude.q_1,
-          vehicle_attitude.q_2,
-          vehicle_attitude.q_3,
-        ],
+      from: [vehicle_attitude.q_0, vehicle_attitude.q_1, vehicle_attitude.q_2, vehicle_attitude.q_3],
 
       op: read,
     }
 
   # ③ 多输入 → 多输出：四元数 → 欧拉角（4 进 3 出）
-  - {
-      op: quat_to_euler,
-      in: [q_att],
-      out: [roll_deg, pitch_deg, yaw_deg],
-      unit: "°",
-    }
+  - { op: quat_to_euler, in: [q_att], out: [roll_deg, pitch_deg, yaw_deg], unit: "°" }
 
   # ④ 跨 topic 联合输入 → 单输出（姿态指令也是四元数，同一算子复用）
   - {
@@ -696,27 +680,12 @@ compute:
         ],
       op: read,
     }
-  - {
-      op: quat_to_euler,
-      in: [q_sp],
-      out: [roll_sp, pitch_sp, yaw_sp],
-      unit: "°",
-    }
+  - { op: quat_to_euler, in: [q_sp], out: [roll_sp, pitch_sp, yaw_sp], unit: "°" }
   - { op: angle_diff_deg, in: [pitch_deg, pitch_sp], out: pitch_err, unit: "°" }
 
   # ⑤ 串联：对上一步的输出做时序统计（带作用域）
-  - {
-      op: p99,
-      in: [pitch_err],
-      out: p99_err,
-      scope: { when: "armed and phase == 'maneuver'" },
-    }
-  - {
-      op: zero_cross_hz,
-      in: [pitch_err],
-      out: osc_hz,
-      scope: { when: "armed and phase == 'maneuver'" },
-    }
+  - { op: p99, in: [pitch_err], out: p99_err, scope: { when: "armed and phase == 'maneuver'" } }
+  - { op: zero_cross_hz, in: [pitch_err], out: osc_hz, scope: { when: "armed and phase == 'maneuver'" } }
 
 triggers:
   - expr: "p99_err >= 30 or (p99_err >= 15 and osc_hz >= 4)"
@@ -807,10 +776,7 @@ calibration:
 ```yaml
 fixtures:
   positive:
-    - {
-        log: tools/calibrate/logs/39f26cce-*.ulg,
-        expect: { severity: warning, fault_tags: [high_vibration] },
-      }
+    - { log: tools/calibrate/logs/39f26cce-*.ulg, expect: { severity: warning, fault_tags: [high_vibration] } }
   negative:
     - { log: tools/calibrate/logs/95b077d9-*.ulg }
 ```
@@ -868,11 +834,7 @@ compute:
   - {
       out: clip,
       from:
-        [
-          vehicle_imu_status.accel_clipping_0,
-          vehicle_imu_status.accel_clipping_1,
-          vehicle_imu_status.accel_clipping_2,
-        ],
+        [vehicle_imu_status.accel_clipping_0, vehicle_imu_status.accel_clipping_1, vehicle_imu_status.accel_clipping_2],
       op: delta_last_first,
       per_instance: worst,
       unit: count,
@@ -998,12 +960,7 @@ compute:
       op: head_tail_median_diff,
       scope: { when: "armed", skip_first_s: 5 },
     }
-  - {
-      out: rem,
-      from: battery_status.remaining,
-      op: min,
-      filter: { when: "remaining >= 0" },
-    } # -1 表示未知，过滤掉
+  - { out: rem, from: battery_status.remaining, op: min, filter: { when: "remaining >= 0" } } # -1 表示未知，过滤掉
 
 requires:
   any_of: [vehicle_imu_status]
@@ -1106,8 +1063,7 @@ topic: battery_status
 fields:
   voltage_cell_v: { type: array, unit: V, note: 索引即电芯序号，0 表示未接 }
   cell_count: { type: uint8 }
-  remaining:
-    { type: scalar, unit: "0..1", invalid: -1, note: -1 表示未知，判定前需过滤 }
+  remaining: { type: scalar, unit: "0..1", invalid: -1, note: -1 表示未知，判定前需过滤 }
 ```
 
 **字段级规则**（都在 topic 文件内声明，框架自动执行）：
@@ -1236,8 +1192,7 @@ aliases: # 字段改名 → 引擎自动回退（跨 tag diff 产出候选，人
   vehicle_imu_status.stddev_accel_x_m_s2: [stddev_accel_x]
 groups: # 命名集合 → 可在 scope.when / phase 里按名引用
   nav_state.hover_ish: [2, 4, 6, 14, 21]
-  nav_state.failsafe_nav:
-    { 5: AUTO_RTL, 12: DESCEND, 13: TERMINATION, 18: LAND }
+  nav_state.failsafe_nav: { 5: AUTO_RTL, 12: DESCEND, 13: TERMINATION, 18: LAND }
   filter_fault_flags.critical_union: [0, 1, 2, 3, 4, 5]
 invalid: # 无效值标记（判定前过滤）
   battery_status.remaining: -1

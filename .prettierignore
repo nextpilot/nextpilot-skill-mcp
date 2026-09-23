@@ -1,13 +1,25 @@
-# ========== 自动生成文件（每次构建重写，格式化毫无意义） ==========
-web/content/guide/rule-*.mdx
-web/content/skills/
-web/content/mcp/
-web/.generated/
+# 全仓库唯一一份 prettier 排除清单。
+#
+# 规则一律写成不带顶层目录名的 glob（**/ 开头），因为这份文件会在两种 cwd 下被用到：
+#   - cwd = 仓库根：CI 的 `prettier --check .` 与 .githooks/pre-commit
+#   - cwd = web  ：`pnpm -C web format`（显式 --ignore-path ../.prettierignore）
+# 写成 `web/workers/...` 这种带顶层目录的形式，在 cwd=web 时匹配不到，
+# 于是生成物被格式化 —— 下次构建覆盖掉不说，还会让 build:kb --check 的产物比对假失败。
+
+# ========== 自动生成的 web 产物（每次构建重写，格式化毫无意义） ==========
+**/content/guide/rule-*.mdx
+**/content/skills/
+**/content/mcp/
+**/.generated/
+**/params/px4-main.json
 
 # ========== build:kb 生成物 ==========
-web/workers/pyodide-px4log-engine.ts
-web/workers/pyodide-px4log-data.ts
-web/public/params/px4-main.json
+**/pyodide-px4log-engine.ts
+**/pyodide-px4log-data.ts
+
+# ========== 任意目录下的 *.generated.* ==========
+# 覆盖 lib/knowledge/*.generated.ts|.js、workers/*.generated.json、rules-editor-schema.generated.json 等
+**/*.generated.*
 
 # ========== calibrate baseline ==========
 tools/calibrate/baseline/
@@ -18,10 +30,6 @@ knowledge/px4/meta/
 # ========== knowledge rules YAML（块标量 + 行内流映射，缩进是语法，prettier 会破坏） ==========
 knowledge/**/*.yaml
 knowledge/**/*.yml
-knowledge/**/*.generated.json
-
-# ========== 带 generated 标记的生成文件 ==========
-**/*.generated.*
 
 # ========== AI 工具自动生成 ==========
 .workbuddy/
