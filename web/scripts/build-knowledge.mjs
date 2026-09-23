@@ -140,7 +140,7 @@ function parseFaultKb(text) {
             continue;
         }
 
-        const kv = line.match(/^\s{2,4}([a-z_]+):\s*(.*)$/);
+        const kv = line.match(/^\s{2,}([a-z_]+):\s*(.*)$/);
         if (kv) {
             const [, key, valRaw] = kv;
             if (key === "possible_root_cause" || key === "troubleshooting_steps") {
