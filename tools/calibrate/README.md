@@ -14,7 +14,7 @@
 battery_status / sensor_imu` 的真实字段名（不同 PX4 版本字段差异很大）。
 - `probe_rule.py <file.ulg> <rule_id>`：**表达式级**调试——把规则的 compute 拆成子表达式
   逐个求值，回答"这一层为什么算不出来"，纯文本输出。
-- `probe_rule_plot.py <file.ulg> <rule_id|规则文件名>`：**单条规则体检**——在同一份日志上跑
+- `workbench.py <file.ulg> <rule_id|规则文件名>`：**单条规则体检**——在同一份日志上跑
   compute 与 triggers，给出结论、一张自包含 HTML（曲线 + 阈值线 + 规则算出的值 + 缺什么），
   退出码 0（跑通）/ 2（用错或产物旧）/ 3（跑不通）。图优先复用浏览器那张
   （`web/lib/knowledge/plots.generated.ts` 的 `PLOT_PRESETS`），取数走引擎 `np_series()`，

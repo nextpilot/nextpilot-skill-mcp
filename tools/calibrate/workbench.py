@@ -1,9 +1,9 @@
 """单条规则体检：在一份真实日志上跑一条规则，给出结论 + 一张图 + 说清「缺什么」的报错。
 
 用法：
-  python tools/calibrate/probe_rule_plot.py                          # 不给参数 = 打开网页选日志和规则
-  python tools/calibrate/probe_rule_plot.py <log.ulg> <rule_id|规则文件名>
-  python tools/calibrate/probe_rule_plot.py .cache/px4/logs/sample.ulg px4-vibration --open
+  python tools/calibrate/workbench.py                          # 不给参数 = 打开网页选日志和规则
+  python tools/calibrate/workbench.py <log.ulg> <rule_id|规则文件名>
+  python tools/calibrate/workbench.py .cache/px4/logs/sample.ulg px4-vibration --open
 
 网页模式：**一个都不给**时起一个只听 127.0.0.1 的临时服务并打开浏览器（`--port` 指定端口，
 `--no-browser` 不自动弹窗，Ctrl+C 结束）。为什么用下拉框而不是 `<input type=file>`：
@@ -114,6 +114,9 @@ ANSI_RE = re.compile(r"\033\[[0-9;]*m")
 REF_RE = re.compile(r'ref\(\s*"([^"]+)"')
 # `vehicle_imu_status[:].accel_vibration_metric` / `...[0].field` → (topic, field)
 FIELD_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*\.\s*([A-Za-z0-9_]+)\s*$")
+# 区间引用：`topic[:].field` / `topic[a:b].field`（`[0]` 是单实例，不算）。
+# 线上会把它们按实例展开成多条，这个预览不展开（见 spread_notes）——识别出来才能提醒。
+RANGE_REF_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\[\s*(-?\d*)\s*:\s*(-?\d*)\s*\]\s*\.\s*(.+?)\s*$")
 
 
 # --------------------------------------------------------------------------- 取声明
@@ -416,8 +419,45 @@ def _esc(text) -> str:
 # --------------------------------------------------------------------------- 取数
 
 
+def instance_count(ns: dict, topic: str) -> int:
+    """这个 topic 在日志里有几个实例。
+
+    **只看 manifest 里有没有这一行**：`n` 是"这一路采了多少个点"，不是"有几个实例"——
+    按 `n > 1` 筛会把只采到一个点的实例静默丢掉（前端 `topicInstances` 就栽过这一条）。
+    """
+    man = call(ns, "np_manifest()") or {}
+    return sum(1 for t in man.get("topics") or [] if t.get("topic") == topic)
+
+
+def spread_notes(ns: dict, yspec) -> list[str]:
+    """区间引用在这个预览里**只画实例 0**，线上却会按实例展开成多条 —— 两边不是一回事。
+
+    引擎 `_pick_ref` 收到 `instance=` 会盖掉引用里的区间，所以这条路径既不报错也不展开：
+    `sensor_accel[:].x` 在这里画出的是实例 0 一条（实测 28174ed8 确认），而线上是 3 条。
+    静默少画又不说，等于让作者照着一张不准的图调预设，所以必须点破。
+    """
+    out = []
+    for spec in yspec or []:
+        for ref in spec.get("fields") or []:
+            m = RANGE_REF_RE.match(str(ref))
+            if not m:
+                continue
+            topic, field = m.group(1), m.group(4)
+            n = instance_count(ns, topic)
+            if n == 0:
+                out.append("`%s` 是区间引用，但这份日志里没有 %s —— 预览和线上都画不出来" % (ref, topic))
+            elif n == 1:
+                out.append("`%s` 是区间引用：这份日志里 %s 只有 1 个实例，预览与线上都是 1 条" % (ref, topic))
+            else:
+                out.append(
+                    "`%s` 是区间引用：预览只画实例 0，线上会展开成 %d 条（%s）"
+                    % (ref, n, "、".join("%s[%d].%s" % (topic, k, field) for k in range(n)))
+                )
+    return out
+
+
 def fetch_child(ns: dict, child: dict, compute=None) -> dict:
-    """按一个 child 的声明取数。返回 {xs, lines:[{label, ys}], error}。
+    """按一个 child 的声明取数。返回 {xs, lines:[{label, ys}], error, notes}。
 
     `compute` 必须跟着传：很多图的 ydata 是 `{"kind":"var"}`（四元数转欧拉角这类换算节点的
     输出），不把预设的换算节点一起交给 np_series，变量算不出来 → 整张图静默变空
@@ -425,6 +465,8 @@ def fetch_child(ns: dict, child: dict, compute=None) -> dict:
     """
     yspec = child.get("ydata") or []
     labels = child.get("labels") or []
+    # 区间引用在这条路径上会被 `instance: 0` 盖掉（见 spread_notes），先算出提示再取数
+    notes = spread_notes(ns, yspec)
     req = {"instance": 0, "ydata": yspec}
     if compute:
         req["compute"] = compute
@@ -433,9 +475,9 @@ def fetch_child(ns: dict, child: dict, compute=None) -> dict:
     try:
         got = call(ns, "np_series(%s, %d)" % (json.dumps(json.dumps(req, ensure_ascii=False)), MAX_POINTS))
     except Exception as exc:  # noqa: BLE001 —— 取数失败要变成图上的一句话，而不是让脚本崩掉
-        return {"xs": [], "lines": [], "error": "%s: %s" % (type(exc).__name__, exc)}
+        return {"xs": [], "lines": [], "error": "%s: %s" % (type(exc).__name__, exc), "notes": notes}
     if got.get("error"):
-        return {"xs": [], "lines": [], "error": got["error"]}
+        return {"xs": [], "lines": [], "error": got["error"], "notes": notes}
     xs = got.get("x") or got.get("t") or []
     series = got.get("series") or []
     lines = []
@@ -455,7 +497,7 @@ def fetch_child(ns: dict, child: dict, compute=None) -> dict:
                 "stats": series_stats(ys) if ys is not None else None,
             }
         )
-    return {"xs": xs, "lines": lines, "error": ""}
+    return {"xs": xs, "lines": lines, "error": "", "notes": notes}
 
 
 # --------------------------------------------------------------------------- HTML
@@ -824,6 +866,7 @@ def _probe_body(ns: dict, rule: dict) -> dict:
                 # 不点名是哪条线，就会让人以为整张图都废了
                 who = "、".join(child.get("labels") or []) or "未命名线"
                 notes.append("%s：%s" % (who, res["error"]))
+            notes.extend(res.get("notes") or [])
             panels.append({"xs": res["xs"], "lines": res["lines"]})
         body = svg_chart(axes, panels, stat_lines)
         for n in dict.fromkeys(notes):
@@ -863,7 +906,7 @@ def main(argv: list[str]) -> int:
     import argparse
 
     ap = argparse.ArgumentParser(
-        prog="probe_rule_plot.py",
+        prog="workbench.py",
         description="在一份真实日志上跑一条规则：给结论、给图、说清缺什么。不给参数则打开网页选。",
     )
     ap.add_argument("log", nargs="?", help=".ulg 日志路径")
@@ -890,7 +933,7 @@ def main(argv: list[str]) -> int:
         log.error("FAIL 找不到绘图产物 %s —— 先 cd web && pnpm build:kb" % PLOTS_TS.name)
         return 2
 
-    log.print_header("单条规则体检", "python tools/calibrate/probe_rule_plot.py %s %s" % (args.log, args.rule))
+    log.print_header("单条规则体检", "python tools/calibrate/workbench.py %s %s" % (args.log, args.rule))
     try:
         ns = build_namespace(log_path)
     except RuntimeError as exc:
@@ -1196,6 +1239,7 @@ def run_preset(ns: dict, preset: dict) -> dict:
             if res["error"]:
                 who = "、".join(child.get("labels") or []) or "未命名线"
                 panel_notes.append("%s：%s" % (who, res["error"]))
+            panel_notes.extend(res.get("notes") or [])
             panels.append({"xs": res["xs"], "lines": res["lines"]})
             line_rows.append(
                 {
@@ -2563,7 +2607,7 @@ def serve(port: int = 0, open_browser: bool = True) -> int:
     with http.server.ThreadingHTTPServer(("127.0.0.1", port), Handler) as httpd:
         host, real_port = httpd.server_address[0], httpd.server_address[1]
         url = "http://%s:%d/" % (host, real_port)
-        log.print_header("单条规则体检 · 网页模式", "python tools/calibrate/probe_rule_plot.py")
+        log.print_header("单条规则体检 · 网页模式", "python tools/calibrate/workbench.py")
         log.info("  地址：%s" % url)
         log.info("  （只听 127.0.0.1；Ctrl+C 结束）")
         if open_browser:
