@@ -1,5 +1,16 @@
 # knowledge 独立成项目（方案，未执行）
 
+## 0. 需求（这就是全部）
+
+1. **`knowledge/` 是一个独立项目。** 知识本身 + 处理它的工具，都在它里面。
+2. **knowledge 自己编译自己**，产出各种产物。
+3. **web 和 server 直接引用产物。** web 在 dev 时调 knowledge 的 build、把结果拉过来；
+   server 引用它产出的库。
+
+后面所有内容都是为了实现这三条。**不由这三条派生出来的，一律不做。**
+
+---
+
 > 状态：**方案，未执行**。本文件只做规划，不动代码。
 > 提出：2026-09-23，用户原话"我将 engine+knowledge 合并成一个文件夹，作为一个独立的项目"。
 > **主体已澄清（同日）**：**知识是本体、是项目最大价值；engine 只是工具**，
@@ -12,10 +23,10 @@
 
 ## 1. 现状实测
 
-| 目录 | 体积 | 内容 |
-|---|---|---|
-| `knowledge/` | 2.0 MB / 78 文件 | `px4/`（facts · rules · fault-kb · llm · meta · plot）、`skills/`、`mcp/` |
-| `engine/` | 484 KB | `operators.py` / `rule_engine.py` / `report_data.py` / `providers/{api,px4}.py` + `tests/`（共 6 个 .py） |
+| 目录         | 体积             | 内容                                                                                                      |
+| ------------ | ---------------- | --------------------------------------------------------------------------------------------------------- |
+| `knowledge/` | 2.0 MB / 78 文件 | `px4/`（facts · rules · fault-kb · llm · meta · plot）、`skills/`、`mcp/`                                 |
+| `engine/`    | 484 KB           | `operators.py` / `rule_engine.py` / `report_data.py` / `providers/{api,px4}.py` + `tests/`（共 6 个 .py） |
 
 引用规模（`git grep -l`）：`knowledge/` 被 **67** 个文件提到、`engine/` 被 **55** 个。
 其中**真正会因路径改动而失效**的功能点见 §4。
@@ -24,11 +35,11 @@
 
 ## 2. 目录形态：结论是方案 C
 
-| 方案 | 结果结构 | 谁是一级目录 | 引用改动量 |
-|---|---|---|---|
-| A `engine/` 保持，knowledge 移入 | `engine/knowledge/` | engine | knowledge 全改（含**运行期** `contentRoot`） |
-| B 新建目录，两者都移入 | `xxx/engine/` + `xxx/knowledge/` | 新名 | 两边全改 + 守卫改名 |
-| **C（采纳）`knowledge/` 保持，engine 移入** | `knowledge/engine/` | **knowledge** | 只改 engine 侧 |
+| 方案                                        | 结果结构                         | 谁是一级目录  | 引用改动量                                   |
+| ------------------------------------------- | -------------------------------- | ------------- | -------------------------------------------- |
+| A `engine/` 保持，knowledge 移入            | `engine/knowledge/`              | engine        | knowledge 全改（含**运行期** `contentRoot`） |
+| B 新建目录，两者都移入                      | `xxx/engine/` + `xxx/knowledge/` | 新名          | 两边全改 + 守卫改名                          |
+| **C（采纳）`knowledge/` 保持，engine 移入** | `knowledge/engine/`              | **knowledge** | 只改 engine 侧                               |
 
 **为什么 C**（不是口味，是两条硬理由）：
 
@@ -59,9 +70,9 @@ knowledge/                  ← 独立项目根（一级目录）
 它们本来就在 `knowledge/` 下，方案 C **不需要动它们** —— 这是 C 相对 A 的额外好处。
 但要认清它们的性质不同于 `px4/`：
 
-| 子目录 | 性质 | 谁消费 |
-|---|---|---|
-| `px4/` | **引擎知识** | 编译进 Pyodide 产物；将来进后端 wheel |
+| 子目录            | 性质                   | 谁消费                                              |
+| ----------------- | ---------------------- | --------------------------------------------------- |
+| `px4/`            | **引擎知识**           | 编译进 Pyodide 产物；将来进后端 wheel               |
 | `skills/`、`mcp/` | **web 内容卡片的真源** | `sync-content.mjs` 拷进 `web/content/`，只有 web 用 |
 
 → 建议：位置不动，但在 `knowledge/README.md` 里写明这一点。
@@ -73,18 +84,18 @@ knowledge/                  ← 独立项目根（一级目录）
 
 ### 4.1 必改（改错就坏）
 
-| # | 文件:行 | 现在 | 改为 |
-|---|---|---|---|
-| 1 | `web/scripts/build-knowledge.mjs` | `resolve(webRoot, "../engine")` | `resolve(webRoot, "../knowledge/engine")` |
-| 2 | `tools/calibrate/px4log_engine_runner.py:32` | `ENGINE = REPO_ROOT / "engine"` | `ENGINE = REPO_ROOT / "knowledge" / "engine"` |
-| 3 | `tools/ci/check_engine_purity.py:61` | `ENGINE = ROOT / "engine"` | `ENGINE = ROOT / "knowledge" / "engine"` |
-| 4 | `tools/ci/check_engine_purity.py:135` | `BROWSER_MARKER = (..., 'resolve(webRoot, "../engine")')` | `'resolve(webRoot, "../knowledge/engine")'` |
-| 5 | `tools/ci/check_engine_purity.py:136` | `LOCAL_MARKER = (..., 'REPO_ROOT / "engine"')` | `'REPO_ROOT / "knowledge" / "engine"'` ⚠️ 须与 #2 的**实际写法逐字一致** |
-| 6 | `tools/ci/mutate_guards.py:330` | `path="engine/report_data.py"` | `"knowledge/engine/report_data.py"` |
-| 7 | `tools/ci/mutate_guards.py:334` | `old='resolve(webRoot, "../engine")'` | 同步新路径 |
-| 8 | `tools/ci/mutate_guards.py:339` | `old='ENGINE = REPO_ROOT / "engine"'` | 同步新路径 |
-| 9 | `pyproject.toml:47-49` | `"engine/rule_engine.py" = ["F821"]` 等三条 | 前缀加 `knowledge/` |
-| 10 | `pyproject.toml:58` | `testpaths = ["engine/tests"]` | `["knowledge/engine/tests"]` |
+| #   | 文件:行                                      | 现在                                                      | 改为                                                                     |
+| --- | -------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 1   | `web/scripts/build-knowledge.mjs`            | `resolve(webRoot, "../engine")`                           | `resolve(webRoot, "../knowledge/engine")`                                |
+| 2   | `tools/calibrate/px4log_engine_runner.py:32` | `ENGINE = REPO_ROOT / "engine"`                           | `ENGINE = REPO_ROOT / "knowledge" / "engine"`                            |
+| 3   | `tools/ci/check_engine_purity.py:61`         | `ENGINE = ROOT / "engine"`                                | `ENGINE = ROOT / "knowledge" / "engine"`                                 |
+| 4   | `tools/ci/check_engine_purity.py:135`        | `BROWSER_MARKER = (..., 'resolve(webRoot, "../engine")')` | `'resolve(webRoot, "../knowledge/engine")'`                              |
+| 5   | `tools/ci/check_engine_purity.py:136`        | `LOCAL_MARKER = (..., 'REPO_ROOT / "engine"')`            | `'REPO_ROOT / "knowledge" / "engine"'` ⚠️ 须与 #2 的**实际写法逐字一致** |
+| 6   | `tools/ci/mutate_guards.py:330`              | `path="engine/report_data.py"`                            | `"knowledge/engine/report_data.py"`                                      |
+| 7   | `tools/ci/mutate_guards.py:334`              | `old='resolve(webRoot, "../engine")'`                     | 同步新路径                                                               |
+| 8   | `tools/ci/mutate_guards.py:339`              | `old='ENGINE = REPO_ROOT / "engine"'`                     | 同步新路径                                                               |
+| 9   | `pyproject.toml:47-49`                       | `"engine/rule_engine.py" = ["F821"]` 等三条               | 前缀加 `knowledge/`                                                      |
+| 10  | `pyproject.toml:58`                          | `testpaths = ["engine/tests"]`                            | `["knowledge/engine/tests"]`                                             |
 
 ### 4.2 不改不坏，但会误导（建议一并更新）
 
@@ -149,6 +160,7 @@ knowledge/                  ← 独立项目根（一级目录）
 3. 针对 marker（§5.2）：临时把 `build-knowledge.mjs` 里的路径改回 `../engine`，
    断言守卫报"前提不在了"。**断言完还原。**
 4. **必须新增的守卫（本方案引入的漂移风险）**：
+
    > `web/` 内被拉取的产物，必须与 `knowledge/dist/` 下的对应文件**逐字节一致**。
    > 自证：改 `web/` 里一个产物文件的一个字节，断言守卫变红。**断言完还原。**
 
@@ -212,13 +224,13 @@ python tools/ci/check_all.py --with-mutate
 
 `build-knowledge.mjs` 的产物落点（实测，脚本 L14-19 与 L1502-1783）：
 
-| 产物 | 现在写到哪 |
-|---|---|
-| `pyodide-px4log-engine.ts` / `-data.ts` / `fault-kb.generated.json` | `web/workers/` |
-| `prompts.generated.js` / `plots.generated.ts` / `derived-version.generated.ts` | `web/lib/knowledge/` |
-| `rule-catalogue.mdx` / `rule-schema.mdx` | `web/content/guide/` |
-| `px4-main.json`（参数字典） | `web/public/params/` |
-| `rules-editor-schema.generated.json` | **`knowledge/px4/`**（产物落在源目录里，脚本 L1821 自认） |
+| 产物                                                                           | 现在写到哪                                                |
+| ------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| `pyodide-px4log-engine.ts` / `-data.ts` / `fault-kb.generated.json`            | `web/workers/`                                            |
+| `prompts.generated.js` / `plots.generated.ts` / `derived-version.generated.ts` | `web/lib/knowledge/`                                      |
+| `rule-catalogue.mdx` / `rule-schema.mdx`                                       | `web/content/guide/`                                      |
+| `px4-main.json`（参数字典）                                                    | `web/public/params/`                                      |
+| `rules-editor-schema.generated.json`                                           | **`knowledge/px4/`**（产物落在源目录里，脚本 L1821 自认） |
 
 ### 7.5.2 定论：knowledge 自产出，web 在 dev 时调用并拉取
 
@@ -277,10 +289,10 @@ knowledge 侧的 `--check` 在 CI 里拦住。**所以 §6 的守卫自证里要
 → **knowledge 不是纯 Python 项目，是"Python 产物 + Node 编译器"的双语言包。**
 这与 Langfuse 那种纯 TS monorepo 不同，也意味着它**同时需要两个包管理器认它**：
 
-| 管理器 | knowledge 需要什么 | 用途 |
-|---|---|---|
-| pnpm | `knowledge/package.json`（name / scripts.build / deps: yaml） | web 用 `pnpm --filter knowledge build` 调它的编译器 |
-| uv | `knowledge/pyproject.toml`（`[project]` + `[build-system]`） | 产出 wheel 给后端 |
+| 管理器 | knowledge 需要什么                                            | 用途                                                |
+| ------ | ------------------------------------------------------------- | --------------------------------------------------- |
+| pnpm   | `knowledge/package.json`（name / scripts.build / deps: yaml） | web 用 `pnpm --filter knowledge build` 调它的编译器 |
+| uv     | `knowledge/pyproject.toml`（`[project]` + `[build-system]`）  | 产出 wheel 给后端                                   |
 
 `pnpm-workspace.yaml: packages: ["web", "knowledge"]` 与
 `pyproject.toml [tool.uv.workspace] members = ["knowledge"]` **可以共存**，不冲突。
@@ -322,6 +334,7 @@ knowledge 的 Node 编译器**在云端不可用**。所以产物必须**入库*
    但版本号要手写或走 `[tool.setuptools.dynamic]`。
 
 **更根本的问题：skills/mcp 到底该不该进 wheel？** 按"消费方需要什么就产什么"：
+
 - 只有 web 需要卡片 → 不该进（用白名单排除）
 - 将来 server 要供 Skill Hub 的 API → 该进，或拆成**第二个分发包** `nextpilot-content`
 

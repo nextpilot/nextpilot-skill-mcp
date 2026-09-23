@@ -1,7 +1,7 @@
 """从 Flight Review（https://logs.px4.io/browse）批量下载真实 PX4 .ulg 日志。
 
 用途：为规则校准 / 误报率统计 / 数据分析与训练积累真实日志集。文件落在
-`.cache/px4/ulog/`（已在 .gitignore），原始日志不进仓库、不上传。
+`.cache/px4/logs/`（已在 .gitignore），原始日志不进仓库、不上传。
 
 数据来源（均为公开页面/接口，无需鉴权）：
 - 列表：GET https://logs.px4.io/browse_data_retrieval
@@ -40,7 +40,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_DEST = REPO_ROOT / ".cache" / "px4" / "ulog"
+DEFAULT_DEST = REPO_ROOT / ".cache" / "px4" / "logs"
 
 BASE = "https://logs.px4.io"
 BROWSE_API = BASE + "/browse_data_retrieval"
@@ -165,9 +165,9 @@ def matches_filters(meta: dict, args: argparse.Namespace) -> bool:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="从 logs.px4.io 下载真实 PX4 .ulg 到 .cache/px4/ulog")
+    ap = argparse.ArgumentParser(description="从 logs.px4.io 下载真实 PX4 .ulg 到 .cache/px4/logs")
     ap.add_argument("--count", type=int, default=20, help="目标下载条数（已存在的跳过，默认 20）")
-    ap.add_argument("--dest", type=Path, default=DEFAULT_DEST, help="保存目录（默认 .cache/px4/ulog）")
+    ap.add_argument("--dest", type=Path, default=DEFAULT_DEST, help="保存目录（默认 .cache/px4/logs）")
     ap.add_argument("--page-size", type=int, default=100, help="列表翻页大小（站点上限 100）")
     ap.add_argument("--max-scan", type=int, default=0, help="最多扫描多少条候选后放弃（默认 count*10）")
     ap.add_argument("--search", default="", help="browse 页面自带搜索（服务端模糊匹配）")
