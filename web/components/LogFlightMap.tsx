@@ -280,6 +280,36 @@ export function LogFlightMap({
             .addTo(map);
         L.control.scale({ imperial: false, position: "bottomright" }).addTo(map);
 
+        // 一键回到轨迹视野：放在缩放按钮下方。用户拖拽后找不着飞机时点一下即可复位
+        const ResetViewControl = L.Control.extend({
+            options: { position: "topleft" },
+            onAdd() {
+                const container = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+                const btn = L.DomUtil.create("a", "");
+                btn.href = "#";
+                btn.title = "回到轨迹视野";
+                btn.setAttribute("role", "button");
+                btn.setAttribute("aria-label", "回到轨迹视野");
+                btn.innerHTML =
+                    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>';
+                btn.style.cssText =
+                    "display:flex;align-items:center;justify-content:center;width:30px;height:30px;cursor:pointer;color:#333;";
+                L.DomEvent.on(btn, "click", (e) => {
+                    L.DomEvent.preventDefault(e);
+                    L.DomEvent.stopPropagation(e);
+                    if (boundsRef.current && boundsRef.current.isValid()) {
+                        map.fitBounds(boundsRef.current, {
+                            padding: [20, 20],
+                            maxZoom: provider.fitMaxZoom,
+                        });
+                    }
+                });
+                container.appendChild(btn);
+                return container;
+            },
+        });
+        new ResetViewControl().addTo(map);
+
         layersRef.current = new Map();
         const all: [number, number][] = [];
         const single = tracks.length === 1;
