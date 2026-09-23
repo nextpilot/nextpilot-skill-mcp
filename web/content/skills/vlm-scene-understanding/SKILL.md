@@ -1,6 +1,6 @@
 ---
 name: vlm-scene-understanding
-description: "让无人机用语言描述相机看到的场景，支持\"东边田里有没有人\"这类自然语言提问，基于 Qwen-VL / LLaVA。当用户想让无人机用自然语言描述现场，或回答开放式视觉问题（如田里有没有人）时使用。触发词：视觉语言模型、VLM、场景描述、视觉问答、Qwen-VL、LLaVA。"
+description: '让无人机用语言描述相机看到的场景，支持"东边田里有没有人"这类自然语言提问，基于 Qwen-VL / LLaVA。当用户想让无人机用自然语言描述现场，或回答开放式视觉问题（如田里有没有人）时使用。触发词：视觉语言模型、VLM、场景描述、视觉问答、Qwen-VL、LLaVA。'
 metadata:
   display_name: "视觉语言场景理解（VLM）"
   icon: "👁️"

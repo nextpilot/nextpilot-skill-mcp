@@ -3,9 +3,9 @@ title: 编写一个 Skill
 titleEn: Write a Skill
 description: 从场景、输入输出到示例与安全边界，把一次成功的尝试固化成别人也能复现的能力。
 descriptionEn: From use case and I/O to examples and safety boundaries — turning one successful attempt into a capability others can reproduce.
-group: 构建
-groupEn: Build
-order: 3
+group: 开发指南
+groupEn: For Developers
+order: 5
 ---
 
 ## 先写清楚任务 | Define the task first
@@ -24,6 +24,78 @@ order: 3
     capability better than its features do.
 </En>
 
+## Skill 的文件结构 | File structure
+
+<Zh>每个 Skill 包含三个核心文件，放在 `web/content/skills/<skill-name>/` 目录下：</Zh>
+
+<En>Every Skill has three core files under `web/content/skills/<skill-name>/`:</En>
+
+| 文件           | <Zh>用途</Zh><En>Purpose</En>                                                                                                          | <Zh>面向谁</Zh><En>Audience</En>    |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `SKILL.md`     | <Zh>AI 可读的指令原文，模型直接读它来执行任务</Zh><En>AI-readable instructions; the model reads this directly to perform the task</En> | AI 模型                             |
+| `README.md`    | <Zh>人类可读的说明页，展示在网站上</Zh><En>Human-readable page shown on the website</En>                                               | <Zh>用户</Zh><En>Users</En>         |
+| `CHANGELOG.md` | <Zh>版本变更记录</Zh><En>Version changelog</En>                                                                                        | <Zh>维护者</Zh><En>Maintainers</En> |
+
+### SKILL.md 的格式 | SKILL.md format
+
+<Zh>`SKILL.md` 使用 YAML frontmatter 定义元数据，正文是 AI 实际读取的指令：</Zh>
+
+<En>`SKILL.md` uses YAML frontmatter for metadata; the body is what the AI actually reads:</En>
+
+````yaml
+---
+name: my-skill-name
+description: "一句话描述这个 Skill 解决什么问题。包含触发词帮助模型判断何时调用。"
+metadata:
+  display_name: "用户看到的名称"
+  icon: "📊"
+  category: "toolchain"
+  platforms: "PX4"
+  models: "DeepSeek, GPT-4o-mini"
+  tags: "PX4, 日志分析, 振动"
+  clients: "Claude, Cursor"
+  source_url: "https://github.com/example/my-skill"
+---
+
+# Skill 标题
+
+## 何时使用
+写清楚触发条件……
+
+## 背景
+为什么需要这个 Skill……
+
+## 输入示例
+```text
+具体的输入格式
+````
+
+## 输出示例
+
+```json
+{ "key": "value" }
+```
+
+## 注意事项
+
+安全边界、限制条件……
+
+<Callout tone="primary" title="metadata 字段说明" titleEn="Metadata fields">
+
+| 字段           | <Zh>说明</Zh><En>Description</En>                                                                                              | <Zh>必填</Zh><En>Required</En> |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------ |
+| `display_name` | <Zh>网站上显示的名称</Zh><En>Display name on the website</En>                                                                  | <Zh>是</Zh><En>Yes</En>        |
+| `icon`         | <Zh>emoji 图标</Zh><En>Emoji icon</En>                                                                                         | <Zh>是</Zh><En>Yes</En>        |
+| `category`     | <Zh>分类：toolchain / analysis / control / simulation 等</Zh><En>Category: toolchain, analysis, control, simulation, etc.</En> | <Zh>是</Zh><En>Yes</En>        |
+| `platforms`    | <Zh>适用飞控平台，逗号分隔</Zh><En>Supported flight controllers, comma-separated</En>                                          | <Zh>是</Zh><En>Yes</En>        |
+| `models`       | <Zh>推荐 AI 模型，逗号分隔</Zh><En>Recommended AI models, comma-separated</En>                                                 | <Zh>否</Zh><En>No</En>         |
+| `tags`         | <Zh>搜索标签，逗号分隔</Zh><En>Search tags, comma-separated</En>                                                               | <Zh>否</Zh><En>No</En>         |
+| `clients`      | <Zh>适用 AI 客户端</Zh><En>Compatible AI clients</En>                                                                          | <Zh>否</Zh><En>No</En>         |
+| `source_url`   | <Zh>开源仓库地址</Zh><En>Open-source repo URL</En>                                                                             | <Zh>否</Zh><En>No</En>         |
+| `seed_rating`  | <Zh>初始评分（4.0~5.0）</Zh><En>Initial rating (4.0-5.0)</En>                                                                  | <Zh>否</Zh><En>No</En>         |
+
+</Callout>
+
 ## 给出可验证的示例 | Provide verifiable examples
 
 <Zh>至少提供一组真实输入和期望输出，说明异常输入应该如何处理。涉及飞控时， 必须写明适用平台和安全边界。</Zh>
@@ -39,6 +111,34 @@ order: 3
 异常：日志缺少 IMU 数据时，明确返回"无法判定"，不猜测数值
 ```
 
+## Skill 分类指南 | Category guide
+
+<Zh>选择正确的分类，帮助用户更快找到你的 Skill：</Zh>
+
+<En>Pick the right category so users can find your Skill faster:</En>
+
+| 分类         | <Zh>适用范围</Zh><En>Scope</En>                                                     | <Zh>示例</Zh><En>Example</En> |
+| ------------ | ----------------------------------------------------------------------------------- | ----------------------------- |
+| `toolchain`  | <Zh>工具链、解析器、格式转换</Zh><En>Toolchains, parsers, format converters</En>    | PX4 ULog 解析器               |
+| `analysis`   | <Zh>数据分析、故障诊断</Zh><En>Data analysis, fault diagnosis</En>                  | 振动频谱分析                  |
+| `control`    | <Zh>飞行控制、导航、路径规划</Zh><En>Flight control, navigation, path planning</En> | PID 自整定                    |
+| `simulation` | <Zh>仿真场景、数字孪生</Zh><En>Simulation scenarios, digital twins</En>             | 视觉伺服仿真                  |
+| `vision`     | <Zh>视觉感知、目标检测</Zh><En>Visual perception, object detection</En>             | 航拍目标检测                  |
+| `mission`    | <Zh>任务规划、航线设计</Zh><En>Mission planning, route design</En>                  | 自然语言任务规划              |
+
+## 测试你的 Skill | Test your Skill
+
+<Zh>写好 `SKILL.md` 后，在本地 AI 客户端中加载并跑一轮示例输入。确认：</Zh>
+
+<En>After writing `SKILL.md`, load it in a local AI client and run the example input. Verify:</En>
+
+1. <Zh>示例输入产生了预期输出</Zh>
+   <En>The example input produces the expected output</En>
+2. <Zh>异常输入被妥当处理（不猜测、不编造）</Zh>
+   <En>Bad input is handled properly (no guessing, no fabrication)</En>
+3. <Zh>边界条件有明确返回值</Zh>
+   <En>Edge cases return a clear result</En>
+
 ## 常见问题 | Common pitfalls
 
 - <Zh>**只写 prompt，不写输入输出**——模型每次都要重新猜格式。</Zh>
@@ -47,6 +147,8 @@ order: 3
   <En>**Idealized examples** — missing fields in real logs are where the work actually is.</En>
 - <Zh>**省略安全边界**——涉及真实载具时，默认只读必须是显式写明的约束。</Zh>
   <En>**Omitted safety boundaries** — when real aircraft are involved, read-only by default must be written down.</En>
+- <Zh>**元数据不完整**——缺少 platforms 或 category，用户搜不到你的 Skill。</Zh>
+  <En>**Incomplete metadata** — missing platforms or category means users can't find your Skill.</En>
 
 <Callout tone="warning" title="不要写进 Skill 的东西" titleEn="What must not go into a Skill">
 
@@ -54,3 +156,8 @@ order: 3
 <En>Keys, accounts, real GPS tracks, or operational data. Replace any coordinate in an example with a placeholder.</En>
 
 </Callout>
+
+## 下一步 | Next step
+
+<Zh>写好后，[贡献我的技能](/guide/publish-skill) 让更多人使用你的 Skill。</Zh>
+<En>Once written, [publish to the hub](/guide/publish-skill) to share it with others.</En>

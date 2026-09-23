@@ -41,20 +41,20 @@ export function GuideSidebar({ groups }: { groups: GuideNavGroup[] }) {
                     {groups.map((group) => {
                         const isOpen = !collapsed[group.zh];
                         return (
-                            <div key={group.zh} className="mb-4 last:mb-0">
+                            <div key={group.zh} className="mb-2 last:mb-0">
                                 <button
-                                    className="flex w-full items-center gap-1.5 text-xs font-semibold tracking-wider text-muted transition-colors hover:text-text"
+                                    className="flex w-full items-center gap-1.5 py-1 text-sm font-semibold text-muted transition-colors hover:text-text"
                                     onClick={() => toggle(group.zh)}
                                 >
                                     <ChevronDown
-                                        className={`h-3.5 w-3.5 shrink-0 transition-transform ${
+                                        className={`h-4 w-4 shrink-0 transition-transform ${
                                             isOpen ? "" : "-rotate-90"
                                         }`}
                                     />
                                     {t(group.zh, group.en)}
                                 </button>
                                 <ul
-                                    className={`mt-1.5 overflow-hidden border-l border-border transition-all duration-200 ${
+                                    className={`mt-2 overflow-hidden border-l border-border transition-all duration-200 ${
                                         isOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
                                     }`}
                                 >
@@ -65,7 +65,7 @@ export function GuideSidebar({ groups }: { groups: GuideNavGroup[] }) {
                                                 <Link
                                                     href={item.href}
                                                     aria-current={active ? "page" : undefined}
-                                                    className={`-ml-px block border-l-2 py-1.5 pl-3 text-sm transition-colors ${
+                                                    className={`-ml-px block border-l-2 py-1.5 pl-3.5 text-base transition-colors ${
                                                         active
                                                             ? "border-primary font-medium text-primary"
                                                             : "border-transparent text-muted hover:border-border hover:text-text"

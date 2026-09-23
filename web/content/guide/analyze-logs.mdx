@@ -1,0 +1,154 @@
+---
+title: LOG 数据分析实战
+titleEn: Log analysis guide
+description: 上传 PX4 日志、看懂分析报告、定位飞行问题——从入门到能独立诊断。
+descriptionEn: Upload PX4 logs, read analysis reports, troubleshoot flight issues — from zero to independent diagnosis.
+group: 面向用户
+groupEn: For Users
+order: 3
+---
+
+<Zh>
+
+日志分析是 NextPilot 平台内置的核心能力：上传一份 PX4 `.ulg`，引擎在浏览器端完成确定性解析和规则检查，
+LLM 将结构化 findings 翻译成可读的中文报告。全程原始日志不离开你的浏览器。
+
+</Zh>
+
+<En>
+
+Log analysis is NextPilot's built-in core capability: upload a PX4 `.ulg`, the engine runs deterministic parsing
+and rule checks in your browser, and the LLM translates structured findings into a readable report. The raw
+log never leaves your browser.
+
+</En>
+
+## 分析流程 | How it works
+
+```text
+.ulg 上传 → Pyodide 解析（浏览器端） → 规则引擎逐条检查 → 结构化 findings
+                                                              ↓
+                                            服务器 LLM → 中文报告 → 页面展示
+```
+
+<Zh>
+
+关键点：**LLM 只做翻译**——不参与任何数值判断。每条 finding 的判定逻辑、阈值、标签都由确定性规则引擎在浏览器里完成。
+这保证了同一份日志每次分析的结果一致、可复现。
+
+</Zh>
+
+<En>
+
+Key point: **the LLM only translates** — it never touches a number. Every finding's logic, threshold, and tag
+are computed by the deterministic rule engine in the browser. This guarantees the same log always produces
+the same results.
+
+</En>
+
+## 第一步：上传日志 | Step 1 — Upload
+
+<Zh>
+
+打开 [日志分析页](/analyze)，将 `.ulg` 文件拖入或点击选择。目前支持的日志类型：
+
+</Zh>
+
+<En>
+
+Open the [analysis page](/analyze) and drag or select a `.ulg` file. Currently supported log types:
+
+</En>
+
+- **PX4 .ulg** — <Zh>完整支持，31 条内置规则覆盖振动、EKF、电源、GPS、姿态、空速等</Zh><En>Full support with 31 built-in rules covering vibration, EKF, power, GPS, attitude, airspeed, and more</En>
+- <Zh>ArduPilot .bin / .log（规划中）</Zh>
+  <En>ArduPilot .bin / .log (planned)</En>
+
+<Callout tone="primary" title="日志大小" titleEn="Log size">
+
+<Zh>大日志（>100 MB）解析可能较慢，但全程在浏览器本地运行，不消耗服务器带宽。建议先用小日志（10~30 MB）试手。</Zh>
+<En>Large logs (>100 MB) may parse slowly, but everything runs locally — no server bandwidth is consumed. Start with a small log (10-30 MB) to get familiar.</En>
+
+</Callout>
+
+## 第二步：看懂报告 | Step 2 — Read the report
+
+<Zh>报告由以下几部分组成：</Zh>
+<En>The report consists of:</En>
+
+### 检查结论 | Findings
+
+<Zh>每条 finding 包含：</Zh>
+<En>Each finding has:</En>
+
+| 字段       | <Zh>含义</Zh><En>Meaning</En>                                                                                                                         |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **严重度** | `critical`（严重）/ `warning`（警告）/ `info`（信息）                                                                                                 |
+| **检查项** | <Zh>对应哪条规则（如 `ekf_innovations`、`vibration`）</Zh><En>Which rule it maps to (e.g. `ekf_innovations`, `vibration`)</En>                        |
+| **标题**   | <Zh>一句话描述发现的问题</Zh><En>One-line summary of the issue</En>                                                                                   |
+| **建议**   | <Zh>具体可操作的排查方向</Zh><En>Actionable troubleshooting direction</En>                                                                            |
+| **数值**   | <Zh>触发判定的具体数据（如 CPU 峰值 97%、电芯最低 3.2V）</Zh><En>The specific data that triggered the finding (e.g. CPU peak 97%, cell min 3.2V)</En> |
+
+### 飞行轨迹地图 | Flight track map
+
+<Zh>基于 GPS 数据绘制的飞行轨迹，可以看到飞行路径、高度变化和可能的异常区域。</Zh>
+<En>A map of the flight track from GPS data — flight path, altitude changes, and potential anomaly zones.</En>
+
+### 参数曲线 | Parameter charts
+
+<Zh>关键参数的时间序列曲线：振动、姿态、电池电压、EKF 创新检验值等。鼠标悬停可查看具体数值。</Zh>
+<En>
+    Time-series charts for key parameters: vibration, attitude, battery voltage, EKF innovation test ratios, etc. Hover
+    for values.
+</En>
+
+## 第三步：定位问题 | Step 3 — Diagnose
+
+<Zh>拿到报告后，按以下顺序排查：</Zh>
+<En>After getting the report, troubleshoot in this order:</En>
+
+1. **<Zh>先看严重度</Zh><En>Start with severity</En>**
+
+    <Zh>`critical` 的 finding 优先处理——它们指向可能导致炸机的直接原因。</Zh>
+    <En>`critical` findings first — they point to direct causes of potential crashes.</En>
+
+2. **<Zh>交叉验证</Zh><En>Cross-validate</En>**
+
+    <Zh>
+        一条 finding 可能只是表象。比如"电芯电压低"可能因电池老化，也可能因低温环境或负载过大。结合飞行阶段（arm →
+        takeoff → cruise → land）判断。
+    </Zh>
+    <En>
+        A single finding may be a symptom. "Cell voltage low" could be aging battery, cold weather, or excessive load.
+        Cross-check against flight phase (arm → takeoff → cruise → land).
+    </En>
+
+3. **<Zh>对比正常日志</Zh><En>Compare with healthy logs</En>**
+    <Zh>同一台飞机、同一固件版本的正常飞行日志是最好的基线。把两份报告放一起看，差异往往就是问题所在。</Zh>
+    <En>
+        A healthy log from the same aircraft and firmware version is the best baseline. Put two reports side by side —
+        the differences usually point to the problem.
+    </En>
+
+### 常见发现与对策 | Common findings and remedies
+
+| <Zh>发现</Zh><En>Finding</En>                        | <Zh>可能原因</Zh><En>Possible cause</En>                                                                         | <Zh>排查方向</Zh><En>Check</En>                                                                            |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| <Zh>振动超标</Zh><En>Vibration high</En>             | <Zh>桨叶不平衡、电机轴承磨损、机架松动</Zh><En>Unbalanced props, worn motor bearings, loose frame</En>           | <Zh>检查桨叶动平衡、电机温度、飞控减震</Zh><En>Check prop balance, motor temp, FC damping</En>             |
+| <Zh>EKF 创新失败</Zh><En>EKF innovation failure</En> | <Zh>GPS 信号差、磁罗盘干扰、IMU 漂移</Zh><En>Poor GPS signal, mag interference, IMU drift</En>                   | <Zh>检查 GPS 卫星数、磁罗盘安装位置、IMU 预热</Zh><En>Check GPS satellites, mag placement, IMU warmup</En> |
+| <Zh>电芯电压低</Zh><En>Cell voltage low</En>         | <Zh>电池老化、低温、负载过大</Zh><En>Battery aging, cold weather, excessive load</En>                            | <Zh>对比飞行时间、回充电压、内阻</Zh><En>Compare flight time, resting voltage, internal resistance</En>    |
+| <Zh>CPU 负载高</Zh><En>CPU load high</En>            | <Zh>日志频率过高、传感器过多、固件配置不当</Zh><En>High logging rate, too many sensors, bad firmware config</En> | <Zh>降低日志频率、检查传感器冗余</Zh><En>Reduce logging rate, check sensor redundancy</En>                 |
+| <Zh>失效保护触发</Zh><En>Failsafe triggered</En>     | <Zh>遥控/数传断连、GPS 丢失、低电量</Zh><En>RC/telemetry loss, GPS loss, low battery</En>                        | <Zh>检查触发时间点前后的飞行状态</Zh><En>Check flight state before/after trigger time</En>                 |
+
+## 第四步：导出与分享 | Step 4 — Export and share
+
+<Zh>报告可以分享链接给其他人查看，无需登录。每条 finding 带官方文档链接，方便深入了解。</Zh>
+<En>Reports can be shared via link without login. Each finding links to official docs for deeper understanding.</En>
+
+<Zh>完整报告的数据可用于团队复盘、固件调参和飞控选型参考。</Zh>
+<En>Full report data supports team retrospectives, firmware tuning, and flight controller selection.</En>
+
+## 下一步 | Next step
+
+<Zh>想给引擎加自己的检查规则？去 [编写检查规则](/guide/write-rules)。</Zh>
+<En>Want to add your own check rules? Go to [Write rules](/guide/write-rules).</En>

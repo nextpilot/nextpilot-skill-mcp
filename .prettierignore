@@ -2,6 +2,7 @@
 web/content/guide/rule-*.mdx
 web/content/skills/
 web/content/mcp/
+web/.generated/
 
 # ========== build:kb 生成物 ==========
 web/workers/pyodide-px4log-engine.ts

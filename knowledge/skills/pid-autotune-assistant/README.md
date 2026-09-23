@@ -23,7 +23,11 @@ LLM **不凭空给数值**：先由确定性脚本从日志中算出特征量（
 {
   "axis": "pitch_rate",
   "current": { "P": 0.18, "I": 0.1, "D": 0.004 },
-  "step_response": { "overshoot_pct": 32, "oscillation_hz": 2.8, "settle_ms": 900 }
+  "step_response": {
+    "overshoot_pct": 32,
+    "oscillation_hz": 2.8,
+    "settle_ms": 900
+  }
 }
 ```
 

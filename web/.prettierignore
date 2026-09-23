@@ -11,8 +11,13 @@ lib/knowledge/*.generated.js
 workers/*.generated.json
 public/params/px4-main.json
 
+# build-knowledge.mjs 的产物（规则清单与 Schema 文档）
+content/guide/rule-*.mdx
+
 # sync-content.mjs 的产物
 .generated/
+content/skills/
+content/mcp/
 
 # 报告与缓存
 playwright-report/

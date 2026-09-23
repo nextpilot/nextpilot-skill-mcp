@@ -15,8 +15,8 @@
  *   web/workers/pyodide-px4log-data.ts    （导出 PY_ULG_DATA_HELPERS）
  *   web/workers/fault-kb.generated.json
  *   web/lib/knowledge/prompts.generated.js（ESM，供边缘函数 import）
- *   web/content/guide/rule-catalogue.mdx（指南「知识库」分组的规则清单页）
- *   web/content/guide/rule-schema.mdx   （指南「知识库」分组的规则编写参考页）
+ *   web/content/guide/rule-catalogue.mdx（指南「开发指南」分组的规则清单页）
+ *   web/content/guide/rule-schema.mdx   （指南「开发指南」分组的规则编写参考页）
  *
  * 最后两页落在 content/guide/ 里（与 sync-content.mjs 拷进来的人工页面同一处），
  * 全部入库，`--check` 只比对前 5 个产物。
@@ -500,14 +500,14 @@ function loadRules(dir, signatures, ruleMeta, airframes) {
     return { rules, sources };
 }
 
-// ─────────────────── 指南「知识库」分组的规则清单 + 规则编写参考 ───────────────────
+// ─────────────────── 指南「开发指南」分组的规则清单 + 规则编写参考 ───────────────────
 //
 // 把 rules/*.yaml 渲染成 /guide/rule-catalogue 那一页（产物提交进仓库）。
 // 把 engine/ 源码的算子签名与内置变量渲染成 /guide/rule-schema 那一页（算子目录与内置变量表动态派生）。
 // 与引擎产物同源、同一次构建生成：规则/算子改了页面就跟着变，不用谁记得手动同步。
 // 清单与参考页只出网站这一份，仓库里不留第二份拷贝（免得两处对不上）。
 
-const GROUP = { zh: "知识库", en: "Knowledge base" };
+const GROUP = { zh: "开发指南", en: "For Developers" };
 
 const CATALOGUE_INTRO = `引擎当前内置的 **{n} 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
 每条给出：**适用**（固件 / 机架 / 依赖）、**取值**（读哪些字段、过哪个算子）、**判定**（自上而下
@@ -1784,7 +1784,7 @@ function build() {
         JSON.stringify(buildRuleSchema({ signatures, facts, airframes, builtinVars: BUILTIN_VARS }), null, 2) + "\n",
     );
 
-    // 5) 指南的「知识库」分组：规则清单 + 规则编写参考（改规则/算子/内置变量后自动跟上，不用谁记得手动同步）
+    // 5) 指南的「开发指南」分组：规则清单 + 规则编写参考（改规则/算子/内置变量后自动跟上，不用谁记得手动同步）
     if (!CHECK) {
         mkdirSync(GUIDES_DIR, { recursive: true });
         writeFileSync(resolve(GUIDES_DIR, "rule-catalogue.mdx"), renderCataloguePage(rules, sources), "utf8");

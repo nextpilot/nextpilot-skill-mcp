@@ -205,3 +205,228 @@ curl -s -X POST -H "Accept: application/vnd.git-lfs+json" \
 Windows 上 Python 发 Ctrl+C 要 `CREATE_NEW_PROCESS_GROUP` + `CTRL_BREAK_EVENT`；
 `netstat` / `tasklist` 中文输出是 GBK，要 `decode('gbk')`；
 **PowerShell 工具本机无 stdout**（exit 0 但零输出）——要输出改用 Python `subprocess`。
+
+## 目录结构：维持 `web/` 现状（2026-09-23 决定，别再提议迁移）
+
+评估过一次「`web/` → 仓库根 + `src/`」，**决定不迁移**（改动面大于当期收益，
+且有两项前置条件只能在生产部署时才能看见结果）。方案留在
+`docs/develop/directory-layout-migration.md`，**已标记为搁置，正文不要照着执行**。
+
+维持现状下仍然成立的事实（与迁移无关，别弄错）：
+
+- 根 `package.json`（`pnpm -C web` 转发壳）与根 `pnpm-lock.yaml`（零依赖空壳）是
+  **影子，不是第二套配置**。改依赖只在 `web/` 改 —— 别往根 `package.json` 加依赖。
+- 根 `.gitignore` 里的 `/pnpm-lock.yaml` **是有意为之**（真 lockfile 在 `web/`），别顺手删。
+- `public/` 只能在项目根 —— Next 源码 `path.join(dir,'public')`，不存在 `src/public`。
+  现状 `web/public/` 就是对的。
+- `web/app/` 已存在，`findDir` 优先 `./app` 再 `./src/app` →
+  **不要新建 `web/src/app`**，它会被静默忽略，不报错。
+- `tools/calibrate/logs/*.ulg`（含 GPS）靠"在 `web/` 之外"**物理隔离**，
+  不要移进 `web/`，也别把 EdgeOne 上传范围放宽到仓库根。
+
+**部署上传范围 = `web/` 目录本身**（`deploy.yml` 两个 job 都是
+`working-directory: web` + `npx edgeone pages deploy`）。推论：
+任何 workspace 兄弟包（`packages/*`）都**不在上传范围内** ——
+web 一旦用 `workspace:*` 依赖它们，云端构建不是 symlink 断，是**压根没有**这个包。
+（项目无 `.npmrc` → `node-linker` 用默认 `isolated`。）
+
+**通用判据（不只本项目）**：配置放在「覆盖它所需作用域的最小共同祖先」上。
+同名配置出现两份时，判据是**内容是否重叠 + 是否工具链强制**，不是文件数量。
+（参照 Langfuse：根管跨包编排、`web/` 管包自身，子包 `package.json` 是 workspace 硬要求，
+不属于重复；我们项目根那两个是空壳，属于影子。）
+
+若将来重提迁移，先确认三项**本地与 CI 都验证不了**的事：EdgeOne 控制台的构建根目录、
+EdgeOne CLI 上传是否遵循 `.gitignore`（不遵循要补 `.edgeoneignore`）、
+`functions/` 能否进 `src/`。
+
+## monorepo 评估（2026-09-23，结论：暂不做，等 `server/`）
+
+用户设想三分：**web / server / knowledge 各一个项目**。
+
+**现状其实已经隐含这个设计** —— 根 `package.json` 的 description 原文写着
+"真正的依赖在各自的子项目里（web/ 是 Next.js 项目，**server/ 将来是 Python**，
+走 pyproject.toml）。不要往这里加 dependencies"。
+所以根那份**不是影子，是有文档的转发层**；"乱"的感觉有一部分来自它没被 workspace 显式化。
+
+**三分里有一个不成立**：`knowledge/` 是**资产不是包**（无构建、无依赖、无版本）。
+硬给它 `package.json` 只为让 pnpm 认它，结果是 Node 侧走 node_modules symlink、
+Python 侧仍走相对路径 —— **同一份资产两套解析方式**，比现在更乱。
+
+**两侧对应机制**（都核实过官方文档）：
+
+- Node 侧：pnpm workspace。现在只有 `web/` 一个成员。
+  注：`web/pnpm-workspace.yaml` 里**只有 `allowBuilds` 审批表，不是 packages 声明** ——
+  但 pnpm 靠该文件判定 workspace root，所以 `web/` 已经是单成员 workspace 根。
+- Python 侧：**uv workspace**（官方 `[tool.uv.workspace]`，成熟；跨包 `{ workspace = true }`）。
+  ⚠️ 硬约束：**`requires-python` 取所有成员的交集**（官方文档明说）。
+  `engine/` 跑在 Pyodide 里、`server/` 跑在普通 CPython，版本要求若不同会冲突。
+
+**部署红线（最关键）**：`deploy.yml` 里 `working-directory: web`，
+EdgeOne CLI 在 `web/` 目录**内**上传并构建 → **上传范围 = `web/` 这一个目录**。
+web 一旦用 `workspace:*` 依赖兄弟包，云端不是 symlink 断，是**压根没有这个包**。
+（早先记成"symlink 断链"**不够准** —— 根因是上传范围不含兄弟目录，与 node-linker 无关。
+之所以特意留这句修正：照旧说法去查会查错方向。）
+
+**触发条件（两个都没发生就别引入 workspace）**：
+`server/` 目录真创建 → 上 uv workspace（engine + server 两成员）；
+出现第二个 Node 包（如 `packages/shared`）→ 上 pnpm workspace。
+
+## knowledge 的定位：源，不是包（2026-09-23 用户确认形态）
+
+用户原话（**我第一遍理解错了，被纠正**）："knowledge 有自己的工具，将知识库编译成
+**一个 lib**，web 直接拿来用，server 也可以使用这个库。" —— 是**一个 lib**，不是多目标产物。
+
+→ 关键推论（别再想错）：web 端已经在用 **Pyodide** 跑 Python，server 是 Python。
+所以这个 lib 只能是 **Python 产物** —— 不可能是 JS/TS。
+**同一份产物，两种运行时**，与 `engine/` 现有模式完全一致。
+
+→ 类比 protobuf / openapi：源与产物分离，产物才分发，源永不进部署包。
+
+**产物形态 = 按消费方分发，不是一个产物两端共用**（2026-09-23 用户最终拍板）：
+> "server 和 web 都需要一个共同的知识库，这个知识库可以不同的形式，
+> 比如 web 是内联代码 + skill + mcp 卡片，后端可能就是一个 wheel 库"
+
+→ 类比 protobuf：`knowledge/` + `engine/` 是 `.proto`（源，唯一）；
+每种形态是各自的目标产物。**源只有一个，形态可以有 N 个。**
+
+⚠️ **修正我上午的判断（过度推广，以本条为准）**：上午写"产物不是 wheel"，
+那**只对 web 侧成立** —— web 走 Pyodide，用不上 wheel。**后端就该是 wheel**，
+我当时把 web 侧的约束错误地推广成了全局结论。
+
+**web 侧继续内联（不走 wheel）的理由**（都核实过）：
+  1. 现状就是内联字符串，产物形态改了这条链路不用改，**零新增网络请求**
+  2. micropip 只能装纯 Python wheel 或 Pyodide wasm32 wheel
+     （命名规范 PEP 427、METADATA、`deps=True` 会去查 PyPI）—— 走 wheel 是白添约束
+  3. 边缘函数要的 `prompts.generated.js` 是 ESM，也走不了 wheel
+
+- ⚠️ **不要拼成单个 `.py`**：会把 `providers/` 插件位拍平。
+  `knowledge/mcp/ardupilot-log` 已预告**第二种日志格式**，届时单文件挡路。
+  → 产物保持目录结构；**"拼成字符串"只是 web 侧的打包方式，不是产物本身的形态**。
+
+- knowledge 编译进产物时**编译成 `.py` 数据模块**（不是把 yaml/json 塞进包里当 data）：
+  纯 import、零 FS 依赖，两端行为一致，契合"确定性"。
+
+- 这套方案**不需要动目录** —— `engine/` 与 `knowledge/` 位置都不动，
+  只在构建期产出包目录。化解了与"维持现状、不动目录"的冲突。
+  ⚠️ 待定：产物目录放哪（`dist/`？`engine/dist/`？）。
+
+⚠️ 硬约束不变：**必须纯 Python，Pyodide 装不了 C 扩展**。
+一旦 lib 引入 numpy 这类带 C 扩展的依赖，web 侧直接废。
+（`engine/` 保持纯 Python 正是为此 —— 这条会一直卡着 lib 的依赖选择。）
+→ 后果：这会让**后端 wheel 与 web 内联的依赖集不一致**，是这套多形态模型的固有张力，
+不是 bug。别试图抹平它，要在文档里写明"哪些依赖只有后端能用"。
+
+**knowledge 内部其实是两类内容，别混为一谈**（这是多形态分发的真正切分线）：
+  - `knowledge/px4/`（facts / rules / fault-kb / llm / meta）→ **引擎知识**，
+    既进后端 wheel、也内联进 web
+  - `knowledge/skills/`、`knowledge/mcp/` → **内容卡片**，web 展示用；
+    **卡片进不了 wheel** —— 后端若要消费（Skill Hub 的 API）得另定形态，此项未定
+
+**跨形态一致性建议（未实施）**：形态越多，"改了源忘了重编某个形态"的风险越大。
+建议**两段式编译**：源 → 规范化中间产物（如 facts.json / rules.json）→ 各形态包装器消费，
+而不是每个形态各自从源读一遍。这样能保证"web 显示的规则 == 后端执行的规则"。
+
+⚠️ **一致性要分两层，别一刀切**（2026-09-23 用户拍板，**别再拿 LLM 一致性当风险提**）：
+- **确定性层必须一致**：规则判定、facts、阈值 —— web 与后端**必须**给出同样结论。
+  同一份日志两种判定 = bug，这条要守。
+- **LLM 解释层不必一致**：用户原话"llm 两边不一样就不一样，本来不同的 ai 给的结果不一样"。
+  **这是预期行为，不是缺陷 —— 别提、别加校验、别写进风险清单。**
+- **LLM 调用位置**：现在走 **EdgeOne 边缘函数**（`prompts.generated.js` 就是给它的）；
+  将来迁到 server。**这是计划内的演进，不是待解决的分裂。**
+
+**契约已经相当完备，别重复造**（读 `knowledge/README.md` + grep 实测）：
+
+- 唯一真源声明：README 已写明"未来的平台 MCP 服务也只消费这里派生的产物"
+- 版本：每个 `rules/*.yaml` 各带 `version`；`skills/<slug>/CHANGELOG.md`、
+  `mcp/<slug>/CHANGELOG.md` 是 version / updatedAt 的**唯一真源**；`facts.yaml` 也有 version
+- 校验：`pnpm check:skills` / `pnpm check:mcp` / `python tools/calibrate/lint-rules.py`
+  / `compare_baseline.py` / `check-artifact.py`
+- 铁律（README 末节）：生成物不要手改
+
+**真正的缺口只有一条：产物版本戳** —— lib 分发时必须能回答
+"这份 lib 是哪版源编出来的"。
+
+⚠️ **不要加 `knowledge/VERSION`**：rules 各有版本、skills/mcp 各有 CHANGELOG，
+再加会变成**第三份版本真源**，与 README 铁律冲突。
+正确做法是在生成物里带源版本摘要（改 `build-knowledge.mjs`）。
+
+⚠️ **编译器归属 knowledge（用户已确认）**：`build-knowledge.mjs` 现在住在 `web/scripts/`，
+但它是 knowledge 的工具，不属于 web。**knowledge 独立的实质动作 = 编译器迁到 knowledge 侧。**
+这与"维持现状、不动目录"的决定冲突，需用户拍板什么时候搬。
+
+**加载链路已核实（2026-09-23，不再是推论）**：
+
+- web 现状：`build-knowledge.mjs` 用 ast 解析 `providers/*.py`，把 `engine/*.py` + knowledge
+  编译结果**拼成一个 3493 行的 TS 字符串** `PY_ULG_CHECKS`（`web/workers/pyodide-px4log-engine.ts`
+  L9 起，`String.raw`）；`engine/rule_engine.py:33` 的 `FACTS = json.loads(r"""__FACTS__""")`
+  是构建期替换的占位符。`providers/api.py` 只作契约文档，不进产物。
+- Pyodide **0.27.7**（`web/workers/pyodide-px4log-worker.ts:22`，可由 `NEXT_PUBLIC_PYODIDE_URL` 改）。
+- `loadPackage(["micropip","numpy"])` + `micropip.install(PYULOG_WHEEL || "pyulog")`，重试 3 次；
+  `tools/px4/fetch_pyodide_assets.py` 已在抓 wheel 到 Blob 自托管，`NEXT_PUBLIC_PYULOG_WHEEL` 注入
+  → **wheel 这条路本来就通**，只是对本场景不必要。
+- micropip 默认 `deps=True` 会解析 METADATA 里的依赖并查 PyPI；
+  纯 Python **无依赖**的 wheel 才不联网（要断网就 `deps=False` 或不声明依赖）。
+- micropip 还支持 `emfs:` 前缀装 Pyodide 虚拟 FS 里的 wheel —— 备选项，未实测。
+
+**规模实测（2026-09-23）**：knowledge = **2.0 MB / 78 文件**（34 md、39 yaml·yml、5 json），
+engine 484K。离"需要拆出去"还差两个数量级。
+触发条件：文件 > 500 或体积 > 20 MB，或要对外发布规则包给第三方。
+
+**knowledge 是源、其余是拷贝 —— 用户 2026-09-23 确认，且已实现**：
+
+`web/scripts/sync-content.mjs` 已把 `knowledge/skills → web/content/skills`、
+`knowledge/mcp → web/content/mcp` **先清后拷**；`dev` / `build` / `build:kb` 都会自动跑它。
+（`web/content/guide/` 例外：真源就在那里，入库，不拷贝。）
+
+⚠️ **但拷贝产物全部入库了（实测，不是推测）**：
+`git ls-files web/content/skills` = **24 个**、`web/content/mcp` = **5 个**，
+且 `git check-ignore` 显示 **NOT ignored**。
+→ 后果（最难查的那类）：谁直接改 `web/content/skills/*/SKILL.md`，下次 sync **先清后拷**
+把它静默覆盖，**不报错、CI 全绿**。
+
+→ 已有实证：`git log -- web/content/skills` 里 `664fa17 chore: add Prettier +
+markdownlint for all repo .md/.mdx files` —— prettier 会格式化**副本**；
+若源与副本的 prettier 作用域不一致（看 `.prettierignore`），就会出现
+「prettier 改副本 → sync 从源覆盖回去 → 再格式化」的**反复 diff**。
+
+**建议守卫（未实施）**：CI 里跑一次 `pnpm build:kb` 后 `git diff --exit-code` ——
+产物入库就必须能证明"入库的那份 == 现生成的那份"。
+（前提：确认 EdgeOne 云端到底跑 `pnpm build` 还是直接 `next build`。
+README 说云端不跑 `build:kb`，若属实则产物入库是**有意为之**，守卫更必要。）
+
+### 产物全景（2026-09-23 实测 build-knowledge.mjs，不是推测）
+
+用户原则原话：**"web 端需要什么、server 端需要什么，产物就是什么。"**
+
+脚本头部自述（L13-20）+ 写入点实测，**产物共 10 份，全是 web 专用形态**：
+
+| 产物 | 形态 | 消费方 |
+|---|---|---|
+| `web/workers/pyodide-px4log-engine.ts` | TS 包着 Python 字符串 | web Pyodide |
+| `web/workers/pyodide-px4log-data.ts` | 同上 | web |
+| `web/workers/fault-kb.generated.json` | JSON | web |
+| `web/lib/knowledge/plots.generated.ts` | TS | web 图表 |
+| `web/lib/knowledge/prompts.generated.js` | ESM | **边缘函数（JS）** |
+| `web/lib/knowledge/derived-version.generated.ts` | TS | web |
+| `web/public/params/px4-main.json` | JSON | web |
+| `knowledge/px4/rules-editor-schema.generated.json` | JSON | IDE（yaml-language-server） |
+| `web/content/guide/rule-catalogue.mdx` | MDX | web 指南页 |
+| `web/content/guide/rule-schema.mdx` | MDX | web 指南页 |
+
+→ **现在没有"库"**：10 份产物散在 `web/` 的 4 个目录（workers/、lib/knowledge/、
+content/guide/、public/params/），**server 一份都用不了**。这是"乱"的又一实证。
+
+**产物入库是有意设计**（脚本 L20 原话）："产物提交进仓库，EdgeOne 直接 next build 也能跑"
+→ 所以**不能说"产物不该入库"**；代价是**每一份入库产物都必须被 `--check` 覆盖**。
+
+⚠️ **实测到的守卫缺口（具体、可修）**：
+`--check` 覆盖**所有走 `writeArtifact()` 的产物**（含 `public/params/px4-main.json`、
+`rules-editor-schema.generated.json` —— 脚本 L1781 注释自己写明"与别的产物一样走
+writeArtifact，`--check` 会比对"）。
+**只有两个 MDX 指南页不在覆盖内** —— 它们用裸 `writeFileSync` 且整个包在 `if (!CHECK)` 里。
+而这两个页面恰好落在 `web/content/guide/`，**与人工撰写的指南页同一目录**，最容易被手改。
+（注：脚本头部注释说"--check 只比对前 5 个产物"，实测比这更宽 —— 以 writeArtifact 为准。）
+
+**`rules-editor-schema.generated.json` 落在源目录里**（`knowledge/px4/`），
+脚本 L1821 自认这个问题：会导致 watch 时"写产物触发再构建、自己喂自己"，
+所以 watch 只能按 `/\.generated\.(json|ts|js)$/` 过滤。**这是技术债，不是设计。**

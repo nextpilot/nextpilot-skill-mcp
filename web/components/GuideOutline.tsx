@@ -47,8 +47,8 @@ export function GuideOutline({ headings }: { headings: GuideHeading[] }) {
                     <a
                         href={`#${encodeURIComponent(h.id)}`}
                         aria-current={active === h.id ? "true" : undefined}
-                        className={`-ml-px block border-l-2 py-1 text-sm leading-5 transition-colors ${
-                            h.level === 3 ? "pl-6" : "pl-3"
+                        className={`-ml-px block border-l-2 py-1.5 text-base transition-colors ${
+                            h.level === 3 ? "pl-6" : "pl-3.5"
                         } ${
                             active === h.id
                                 ? "border-primary font-medium text-primary"
@@ -72,7 +72,7 @@ export function GuideOutline({ headings }: { headings: GuideHeading[] }) {
           全是 176）。降到 lg 后最窄 1024 时正文仍有 ~672px，可读；1263 时正文能到 768 上限。 */}
             <aside className="hidden w-max min-w-28 max-w-56 shrink-0 lg:block">
                 <nav className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pb-10">
-                    <p className="mb-3 text-xs font-semibold tracking-wider text-muted">
+                    <p className="mb-3 text-sm font-semibold text-muted">
                         <span className="inline-flex min-w-0 items-center gap-2 truncate">
                             <ListIcon className="h-4 w-4 shrink-0 text-primary" />
                             <span className="truncate">{language === "zh" ? "本页目录" : "On this page"}</span>

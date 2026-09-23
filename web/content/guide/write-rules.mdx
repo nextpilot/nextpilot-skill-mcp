@@ -1,0 +1,213 @@
+---
+title: 贡献检查规则
+titleEn: Write check rules
+description: 从零开始写一条日志检查规则——选字段、写算式、设阈值、跑验证。
+descriptionEn: Write a log check rule from scratch — pick fields, write expressions, set thresholds, run validation.
+group: 开发指南
+groupEn: For Developers
+order: 7
+---
+
+<Zh>
+
+检查规则是平台日志分析的核心：每条规则定义一个"从原始数据到诊断结论"的判定逻辑。
+这篇教程带你从零写一条规则，读完就可以上手。
+
+</Zh>
+
+<En>
+
+Check rules are the core of the platform's log analysis: each rule defines a diagnostic pipeline from raw data
+to conclusion. This tutorial walks you through writing one from scratch.
+
+</En>
+
+<Zh>
+
+规则存放在 `knowledge/px4/rules/*.yaml`，构建期由 `build-knowledge.mjs` 编译进 Python 引擎。
+语法是 Python 表达式的一个安全子集，阈值、字段、算子都在 YAML 里声明，构建期做完整校验。
+
+</Zh>
+
+<En>
+
+Rules live in `knowledge/px4/rules/*.yaml` and are compiled into the Python engine by `build-knowledge.mjs`.
+The syntax is a safe subset of Python expressions; thresholds, fields, and operators are declared in YAML
+and fully validated at build time.
+
+</En>
+
+## 一条规则长什么样 | Anatomy of a rule
+
+<Zh>以最简单的 CPU 负载规则为例：</Zh>
+<En>Take the simplest CPU load rule as an example:</En>
+
+```yaml
+id: px4-cpu-load
+group: cpu
+slot: cpu
+triggers: [cpuload]
+compute:
+    cpu_max:
+        op: max
+        of: cpuload.load
+condition: cpu_max >= 0.90
+title: "CPU 负载关注"
+severity: warning
+tags: []
+suggestion: "CPU 负载关注，关注是否因为开启了过多的模块或日志"
+```
+
+<Zh>这条规则做的事：从 `cpuload.load` 取最大值 → 如果 >= 0.90 → 发射一条 warning。</Zh>
+<En>What this rule does: take the max of `cpuload.load` → if >= 0.90 → emit a warning.</En>
+
+### 字段速查 | Quick field reference
+
+| 字段         | <Zh>说明</Zh><En>Description</En>                                                                                                 | <Zh>必填</Zh><En>Required</En> |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `id`         | <Zh>唯一标识，如 `px4-cpu-load`</Zh><En>Unique identifier, e.g. `px4-cpu-load`</En>                                               | <Zh>是</Zh><En>Yes</En>        |
+| `group`      | <Zh>分组名，必须在 `facts.yaml` 的 `group_order` 里登记</Zh><En>Group name; must be registered in `facts.yaml` `group_order`</En> | <Zh>是</Zh><En>Yes</En>        |
+| `slot`       | <Zh>执行位置，决定能读到哪些原始 Topic</Zh><En>Execution slot; determines which raw topics are available</En>                     | <Zh>是</Zh><En>Yes</En>        |
+| `triggers`   | <Zh>需要的原始 Topic 列表</Zh><En>List of required raw topics</En>                                                                | <Zh>是</Zh><En>Yes</En>        |
+| `compute`    | <Zh>数据流表达式（核心）</Zh><En>Data-flow expression (the core)</En>                                                             | <Zh>是</Zh><En>Yes</En>        |
+| `condition`  | <Zh>Python 表达式，`True` 时触发</Zh><En>Python expression; fires when `True`</En>                                                | <Zh>否</Zh><En>No</En>         |
+| `title`      | <Zh>结论标题（支持 `{变量}` 占位）</Zh><En>Conclusion title (supports `{var}` placeholders)</En>                                  | <Zh>是</Zh><En>Yes</En>        |
+| `severity`   | <Zh>`critical` / `warning` / `info`</Zh><En>`critical` / `warning` / `info`</En>                                                  | <Zh>否</Zh><En>No</En>         |
+| `tags`       | <Zh>标签列表，用于故障库匹配</Zh><En>Tag list for fault KB matching</En>                                                          | <Zh>否</Zh><En>No</En>         |
+| `suggestion` | <Zh>诊断建议文案</Zh><En>Diagnostic suggestion text</En>                                                                          | <Zh>否</Zh><En>No</En>         |
+
+<Zh>完整字段级参考见 [规则编写参考](/guide/rule-schema)。</Zh>
+<En>Full field-level reference: [Rule schema reference](/guide/rule-schema).</En>
+
+## 动手写第一条规则 | Write your first rule
+
+<Zh>假设你要写一条规则，检查电池剩余电量是否过低。分四步走：</Zh>
+<En>Let's write a rule to check if battery remaining is too low. Four steps:</En>
+
+### 1. 确定数据来源 | Identify the data source
+
+<Zh>电池相关数据在 `battery_status` Topic 里。打开一份 ULog 看看有哪些字段可用：</Zh>
+<En>Battery data lives in the `battery_status` topic. Open a ULog to see available fields:</En>
+
+- `battery_status[0].remaining` — <Zh>剩余电量百分比（0.0~1.0）</Zh><En>Remaining percentage (0.0-1.0)</En>
+- `battery_status[0].voltage_v` — <Zh>总电压</Zh><En>Total voltage</En>
+- `battery_status[0].voltage_cell_v` — <Zh>单电芯电压数组</Zh><En>Per-cell voltage array</En>
+
+### 2. 选择算子和参数 | Choose operator and params
+
+<Zh>我们要取 `remaining` 的最小值，用 `min` 算子：</Zh>
+<En>We want the minimum of `remaining`, using the `min` operator:</En>
+
+```yaml
+compute:
+    rem:
+        op: min
+        of: battery_status[0].remaining
+```
+
+<Zh>`rem` 是你自己起的变量名，之后在 `title` 和 `suggestion` 里用 `{rem}` 引用它。</Zh>
+<En>`rem` is the variable name you choose; reference it as `{rem}` in `title` and `suggestion`.</En>
+
+### 3. 设定判定逻辑 | Set the judgment logic
+
+<Zh>用 `condition` 定义什么时候触发，用 `severity` 定义严重等级。多条判定从上到下匹配：</Zh>
+<En>Use `condition` to define when to fire, and `severity` for the level. Multiple branches match top-down:</En>
+
+```yaml
+condition:
+    - expr: rem <= 0.10
+      severity: critical
+      title: "电池剩余电量极低（{rem:.0%}）"
+      suggestion: "立即降落，检查电池健康度"
+    - expr: rem <= 0.20
+      severity: warning
+      title: "电池剩余电量偏低（{rem:.0%}）"
+      suggestion: "尽早返航，关注电压变化"
+```
+
+### 4. 补齐元数据 | Complete the metadata
+
+<Zh>把前面的拼起来，写进 `knowledge/px4/rules/my-battery.yaml`：</Zh>
+<En>Put it all together in `knowledge/px4/rules/my-battery.yaml`:</En>
+
+```yaml
+id: px4-battery-remaining
+group: battery
+slot: battery
+triggers: [battery_status]
+compute:
+    rem:
+        op: min
+        of: battery_status[0].remaining
+condition:
+    - expr: rem <= 0.10
+      severity: critical
+      title: "电池剩余电量极低（{rem:.0%}）"
+      suggestion: "立即降落，检查电池健康度。最低剩余 {rem:.0%}"
+    - expr: rem <= 0.20
+      severity: warning
+      title: "电池剩余电量偏低（{rem:.0%}）"
+      suggestion: "尽早返航，关注电压变化。最低剩余 {rem:.0%}"
+tags: [battery_voltage_drop]
+```
+
+## 常用算子速查 | Common operators
+
+| 算子                    | <Zh>作用</Zh><En>What it does</En>                            | <Zh>示例</Zh><En>Example</En>                                   |
+| ----------------------- | ------------------------------------------------------------- | --------------------------------------------------------------- |
+| `max`                   | <Zh>取最大值</Zh><En>Maximum</En>                             | `op: max, of: cpuload.load`                                     |
+| `min`                   | <Zh>取最小值</Zh><En>Minimum</En>                             | `op: min, of: battery_status[0].remaining`                      |
+| `mean`                  | <Zh>取均值</Zh><En>Mean</En>                                  | `op: mean, of: sensor_accel.x`                                  |
+| `ratio_equal`           | <Zh>等于某值的比例</Zh><En>Ratio equal to value</En>          | `op: ratio_equal, of: airspeed_validated.valid, value: 0`       |
+| `worst_reject_ratio`    | <Zh>EKF 拒绝比分析</Zh><En>EKF rejection ratio</En>           | <Zh>见 ekf-innovation 规则</Zh><En>See ekf-innovation rule</En> |
+| `head_tail_median_drop` | <Zh>头尾中位数压降</Zh><En>Head-tail median voltage drop</En> | <Zh>见 power-sag 规则</Zh><En>See power-sag rule</En>           |
+
+<Zh>完整算子目录见 [规则编写参考 §4](/guide/rule-schema#算子是-operator-catalogue)。</Zh>
+<En>Full operator catalogue: [Rule schema reference §4](/guide/rule-schema#算子是-operator-catalogue).</En>
+
+## 跑构建校验 | Run build validation
+
+<Zh>写完规则后，跑构建命令做校验：</Zh>
+<En>After writing, run the build command to validate:</En>
+
+```bash
+pnpm build:kb    # --check 模式只校验不写入
+```
+
+<Zh>构建期会检查：</Zh>
+<En>The build checks:</En>
+
+- <Zh>`group` 是否在 `facts.yaml` 里登记</Zh>
+  <En>`group` registered in `facts.yaml`</En>
+- <Zh>`tags` 值是否在 facts 里定义</Zh>
+  <En>`tags` values defined in facts</En>
+- <Zh>`triggers` 的 Topic 是否在白名单里</Zh>
+  <En>`triggers` topics in the whitelist</En>
+- <Zh>算子名是否存在、参数是否齐全</Zh>
+  <En>Operator name exists, params complete</En>
+- <Zh>模板占位符是否都能解析</Zh>
+  <En>Template placeholders are all resolvable</En>
+
+<Callout tone="warning" title="构建期拒绝的常见写法" titleEn="Build-time rejections">
+
+- <Zh>`group` 未登记 → `group『xxx』未登记`</Zh>
+  <En>`group` not registered → `group 'xxx' not registered`</En>
+- <Zh>算子拼写错误 → `未知的算子名『xxx』`</Zh>
+  <En>Operator typo → `unknown operator 'xxx'`</En>
+- <Zh>`compute` 写了多管道 → `每条经验只允许一个 compute 键值对`</Zh>
+  <En>Multiple pipes in `compute` → `only one compute key-value pair allowed`</En>
+
+</Callout>
+
+## 调试技巧 | Debugging tips
+
+<Zh>在规则里加 `display: {log: true}`，跑日志时浏览器控制台会打印计算中间值。</Zh>
+<En>Add `display: {log: true}` to your rule to print intermediate values in the browser console.</En>
+
+<Zh>加 `display: {plots: ["cpu_max"]}` 可以画出计算结果的曲线图，方便直观检查。</Zh>
+<En>Add `display: {plots: ["cpu_max"]}` to plot the computed result for visual inspection.</En>
+
+## 下一步 | Next step
+
+- [规则清单](/guide/rule-catalogue) — <Zh>查看引擎全部内置规则的详细说明</Zh><En>Browse all built-in rules with detailed descriptions</En>
+- [规则编写参考](/guide/rule-schema) — <Zh>字段级权威参考与完整算子目录</Zh><En>Field-level authoritative reference and full operator catalogue</En>

@@ -1,0 +1,150 @@
+---
+title: 常见问题
+titleEn: FAQ
+description: 使用平台时的常见问题与解答。
+descriptionEn: Frequently asked questions about using the platform.
+group: 更多帮助
+groupEn: Help
+order: 99
+---
+
+## Skill 相关 | About Skills
+
+### Skill 和 MCP 有什么区别？
+
+<Zh>
+    Skill 是模型读到的上下文（一组提示词和约束），MCP 是模型可以调用的工具接口。 简单说：Skill 告诉模型"怎么做"，MCP
+    让模型"真的去做"。 详见 [核心概念](/guide/concepts)。
+</Zh>
+
+<En>
+    A Skill is context the model reads (a set of prompts and constraints); MCP is a tool interface the model can call.
+    Simply: Skill tells the model "how to do it", MCP lets the model "actually do it". See [Core
+    concepts](/guide/concepts).
+</En>
+
+### 我写的 Skill 能调用外部 API 吗？
+
+<Zh>
+    可以。在 `SKILL.md` 的指令中说明 API 的调用方式和参数格式即可。但注意：Skill 本身不执行任何代码——
+    它只是告诉模型"可以调用哪个 API、传什么参数"。真正的调用由 AI 客户端完成。
+</Zh>
+
+<En>
+    Yes. Describe the API's call method and parameter format in the `SKILL.md` instructions. Note: a Skill itself
+    executes no code — it only tells the model "which API to call and with what parameters". The actual call is made by
+    the AI client.
+</En>
+
+### 如何让更多人发现我的 Skill？
+
+<Zh>
+    补全 metadata 中的 `platforms`、`category`、`tags`——这些是搜索和筛选的关键字段。 一个分类正确、标签准确的 Skill
+    比没有标签的更容易被找到。
+</Zh>
+
+<En>
+    Complete `platforms`, `category`, and `tags` in the metadata — these are the key fields for search and filtering. A
+    well-categorized Skill with accurate tags is much easier to discover.
+</En>
+
+## 日志分析相关 | About log analysis
+
+### 我的日志会被上传到服务器吗？
+
+<Zh>
+    不会。`.ulg` 文件在浏览器本地解析（通过 Pyodide / WebAssembly），原始日志不出浏览器。 只有解析后的结构化
+    findings（如"CPU 负载峰值 97%"）发送到服务器生成中文报告。
+</Zh>
+
+<En>
+    No. The `.ulg` file is parsed locally in your browser (via Pyodide / WebAssembly). Only the structured findings
+    (e.g. "CPU load peak 97%") are sent to the server to generate the Chinese report.
+</En>
+
+### 支持哪些日志格式？
+
+<Zh>目前支持 PX4 `.ulg` 格式。ArduPilot `.bin` / `.log` 在规划中。</Zh>
+
+<En>Currently supports PX4 `.ulg` format. ArduPilot `.bin` / `.log` is planned.</En>
+
+### 为什么大日志分析很慢？
+
+<Zh>
+大日志（>100 MB）包含更多飞行数据，解析和规则检查需要更多时间。由于在浏览器本地运行，
+速度取决于你的设备性能。建议先用小日志（10~30 MB）试手。
+</Zh>
+
+<En>
+Large logs (>100 MB) contain more flight data, taking more time to parse and check. Since everything runs locally
+in your browser, speed depends on your device. Start with small logs (10-30 MB).
+</En>
+
+### 如何对比两次飞行的数据？
+
+<Zh>分别上传两次飞行的 `.ulg` 文件，打开两份报告页面，并列对比 findings 和参数曲线。 目前平台不提供自动 diff 功能。</Zh>
+
+<En>
+    Upload both `.ulg` files separately, open both report pages, and compare findings and parameter charts side by side.
+    The platform does not currently offer automatic diff.
+</En>
+
+## 规则相关 | About rules
+
+### 我能添加自己的检查规则吗？
+
+<Zh>
+    可以。规则存放在 `knowledge/px4/rules/*.yaml`，写完跑 `pnpm build:kb` 校验通过后即可生效。 详见
+    [贡献检查规则](/guide/write-rules)。
+</Zh>
+
+<En>
+    Yes. Rules live in `knowledge/px4/rules/*.yaml`. Run `pnpm build:kb` after writing; once validated, the rule takes
+    effect. See [Write check rules](/guide/write-rules).
+</En>
+
+### 规则的判定逻辑可靠吗？
+
+<Zh>
+    所有判定都由确定性规则引擎完成（不依赖 LLM），同一份日志每次分析结果一致。 阈值和逻辑写在 YAML
+    里，构建期自动校验，不会出现"写法错误但静默跳过"的情况。
+</Zh>
+
+<En>
+    All judgments are made by the deterministic rule engine (no LLM involvement), so the same log always produces the
+    same result. Thresholds and logic are in YAML and validated at build time — no silent failures.
+</En>
+
+### 如何测试新写的规则？
+
+<Zh>
+在规则里加 `display: {log: true}` 和 `display: {plots: ["your_var"]}`，然后用已知的 `.ulg` 日志跑一次分析，在浏览器控制台看中间值、在图表区看曲线。详见 [规则编写参考 §7](/guide/rule-schema#compute-调试日志与图)。
+</Zh>
+
+<En>
+Add `display: {log: true}` and `display: {plots: ["your_var"]}` to your rule, then run an analysis with a known
+`.ulg` log. Check intermediate values in the browser console and curves in the charts area. See [Rule schema reference §7](/guide/rule-schema#compute-调试日志与图).
+</En>
+
+## 平台相关 | About the platform
+
+### 平台是免费的吗？
+
+<Zh>Skill 和 MCP 服务免费开放。日志分析的基础功能免费。</Zh>
+
+<En>Skills and MCP servers are free and open. Basic log analysis features are free.</En>
+
+### 如何反馈问题或建议？
+
+<Zh>通过 [反馈页面](/issue) 提交。报告页里也有反馈入口，会自动附带当前分析的规则和结论条数。</Zh>
+
+<En>
+    Submit via the [issue page](/issue). The report page also has a feedback entry that auto-includes the current
+    analysis's rules and finding count.
+</En>
+
+### 平台支持哪些语言？
+
+<Zh>界面支持中文和英文，在页面顶部切换。日志报告目前只输出中文。</Zh>
+
+<En>The UI supports Chinese and English — toggle at the top of the page. Log reports are currently Chinese only.</En>

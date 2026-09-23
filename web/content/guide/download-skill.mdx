@@ -1,0 +1,75 @@
+---
+title: 下载与使用 Skill
+titleEn: Download & use a Skill
+description: 浏览、下载社区 Skill，一步部署到 AI 客户端，让 AI 获得专业领域能力。
+descriptionEn: Browse and download community Skills, deploy them to your AI client in one step, and give your AI domain expertise.
+group: 面向用户
+groupEn: For Users
+order: 4
+---
+
+社区贡献了几十个不同领域的 Skill，从无人机 PID 调参到视觉伺伏，每条都是作者验证过的可复现经验。
+
+## 浏览 Skills
+
+访问网站的 **[Skills](/skills)** 页面，你会看到一个按分类整理的 Skill 列表。每条 Skill 卡片展示：
+
+- **名称与图标**：一眼识别用途
+- **分类标签**：control（控制）、perception（感知）、planning（规划）等
+- **兼容平台**：PX4、ArduPilot、Betaflight、通用
+- **推荐模型**：DeepSeek-V3、Qwen2.5 等——不同 Skill 对不同模型的适配程度不一样
+- **种子评分与下载量**：社区热度的参考
+
+点击任意卡片进入 Skill 详情页，你会看到完整的能力说明、触发词列表、适用场景和用户评价。
+
+## 下载 Skill
+
+每条 Skill 本质上是一个 `SKILL.md` 文件——里面是给 AI 看的系统指令。进入 Skill 详情页后有两种获取方式：
+
+### 方式一：一键安装到客户端（推荐）
+
+详情页顶部有**安装到客户端**入口。目前支持的客户端：
+
+| 客户端              | 说明                                               |
+| ------------------- | -------------------------------------------------- |
+| **Cursor**          | 自动写入 `.cursor/rules/` 目录，重启 Cursor 后生效 |
+| **Claude Code**     | 写入 `CLAUDE.md` 或项目级 instructions             |
+| **ChatGPT**         | 粘贴到自定义 GPT 的 Instructions 字段              |
+| **Qwen / 通义千问** | 导入到知识库或自定义智能体                         |
+
+### 方式二：手动下载
+
+如果一键安装不支持你的客户端，可以手动操作：
+
+1. 在详情页查看 `SKILL.md` 的完整内容
+2. 复制全文，或点击下载按钮保存为 `.md` 文件
+3. 放到客户端对应的 rules / instructions / knowledge 目录下
+
+常见客户端的手动路径：
+
+```text
+Cursor          →  .cursor/rules/skill-name.md
+Claude Code     →  CLAUDE.md（追加）或 .claude/rules/
+GitHub Copilot  →  .github/copilot-instructions.md
+自定义 GPT      →  GPT 配置页 → Instructions 文本框
+```
+
+## 验证是否生效
+
+部署后用一个简单的触发词测试。比如你下载了 **PID 参数智能调参**：
+
+> "我有一个 pitch_rate 的阶跃响应数据，超调 32%，振荡频率 2.8 Hz，帮我推荐 PID 参数。"
+
+如果 AI 开始分析阶跃响应特征、给出具体参数建议，说明 Skill 已生效。
+
+如果 AI 的回复和没装 Skill 时一样，检查：
+
+- 文件是否放对了目录（注意 `.cursor/rules/` 是隐藏目录）
+- 客户端是否已重启（部分客户端需要重启才能读到新文件）
+- Skill 的触发词是否匹配你的提问
+
+## 下一步
+
+- 装上 Skill 后试试 **[数据分析实战](/guide/analyze-logs)**，上传真实的 PX4 日志跑一次完整诊断
+- 如果你想用 MCP 协议接入更强大的后端服务，继续看 **[接入客户端](/guide/connect-client)**
+- 如果你有想固化成 Skill 的经验，跳转到 **[编写一个 Skill](/guide/write-skill)**

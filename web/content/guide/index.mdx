@@ -1,71 +1,121 @@
 ---
-title: 从一个 Skill 开始
-titleEn: Start with one Skill
-description: 用最短路径了解 Skill 与 MCP，学会把一个想法写成可复用能力，再把它接入自己的 AI 工作流。
-descriptionEn: Learn Skill and MCP fundamentals, turn an idea into a reusable capability, and connect it to your own AI workflow.
-group: 开始
-groupEn: Getting started
+title: 快速上手
+titleEn: Quick start
+description: "5 分钟走通平台三条路径：浏览 Skill、上传日志、接入 MCP。"
+descriptionEn: "Walk through the platform in 5 minutes: browse Skills, upload a log, connect MCP."
+group: 面向用户
+groupEn: For Users
 order: 1
 ---
 
 <Zh>
 
-NextPilot Skill收录飞控方向的 AI Skill 与 MCP 服务，并内置一套确定性的日志分析服务。
-这份指南按「认识 → 编写 → 交付 → 使用」的顺序组织，每一页都可以单独阅读。
+NextPilot 收录飞控方向的 AI Skill 与 MCP 服务，并内置一套浏览器端运行的日志分析引擎。Skill / MCP 面向社区**免费开放**，用于交流和引流；日志分析是**平台内置能力**，不作 Skill 分发——壁垒在检查规则、阈值逻辑与故障模式知识。
+
+下面用三步走通平台的三个入口。
 
 </Zh>
 
 <En>
 
-NextPilot Skill collects AI skills and MCP servers for flight control, with a deterministic
-log-analysis service built in. This guide runs from concepts to authoring, shipping, and use —
-each page stands on its own.
+NextPilot collects flight-control AI Skills and MCP servers, with a built-in log-analysis engine
+that runs in your browser. Skills and MCP servers are **free and open** — for exchange and reach.
+The log-analysis service is **built in**, not distributed as a Skill — its value is in the check
+rules, thresholds, and failure-mode knowledge.
+
+Three steps to walk through the platform's three entry points.
 
 </En>
 
-## 这份指南包含什么 | What this guide covers
-
-- <Zh>
-      <strong>核心概念</strong>——Skill 与 MCP 分别是什么，如何协作。
-  </Zh>
-  <En>
-      <strong>Core concepts</strong> — what a Skill and an MCP server each are, and how they fit together.
-  </En>
-- <Zh>
-      <strong>编写与开发</strong>——把一个想法写成可复现的能力，并暴露成可调用的工具。
-  </Zh>
-  <En>
-      <strong>Authoring</strong> — turn an idea into a reproducible capability and expose it as callable tools.
-  </En>
-- <Zh>
-      <strong>提交与审核</strong>——材料清单、许可证与安全边界。
-  </Zh>
-  <En>
-      <strong>Submission</strong> — required material, licensing, and safety boundaries.
-  </En>
-- <Zh>
-      <strong>下载与使用</strong>——把它接入你自己的客户端。
-  </Zh>
-  <En>
-      <strong>Use</strong> — wire it into your own client.
-  </En>
-
-## 两条主线 | Two tracks
+## 第一步：浏览 Skill 库 | Step 1 — Browse Skills
 
 <Zh>
 
-社区内容与平台服务是两条不同的主线：**Skill / MCP 免费开放**，用于交流和引流；
-**日志分析服务是平台内置能力**，不作 Skill 分发，壁垒在检查规则、阈值逻辑与故障模式知识。
+打开 [技能库](/skills)，你会看到一个卡片网格。每张卡片标着名称、适用平台（PX4 / ArduPilot）、依赖的 AI 模型和推荐客户端。
+
+**先看平台维度**：一份为 ArduPilot 写的 Skill 直接套到 PX4 上，结论不一定可靠。点进卡片看详细说明，确认适用场景后再用。
+
+找到感兴趣的 Skill 后，复制提示词或按页面说明导入到你的 AI 客户端即可使用。
 
 </Zh>
 
 <En>
 
-Community content and platform services are two separate tracks. **Skills and MCP servers are
-free and open** — they exist for exchange and reach. The **log-analysis service is built in**,
-not distributed as a Skill; its value is in the check rules, thresholds, and failure-mode knowledge.
+Open the [Skills library](/skills) — a grid of cards, each with a name, platform (PX4 / ArduPilot),
+required model, and recommended client.
+
+**Read the platform first**: a Skill written for ArduPilot applied to PX4 is only as reliable as
+the field semantics line up. Click into the card for details before using.
+
+Found a Skill you like? Copy the prompt or import it into your AI client per the page instructions.
+
+</En>
+
+## 第二步：上传日志做分析 | Step 2 — Analyze a log
+
+<Zh>
+
+日志分析是平台内置能力，无需下载任何 Skill。到 [日志分析页](/analyze) 上传一份 PX4 `.ulg` 文件：
+
+1. 拖入或选择 `.ulg` 文件
+2. 解析在浏览器本地完成，不会上传原始日志
+3. 结构化 findings 发送服务器生成中文报告
+
+报告包含检查结论（严重度分 critical / warning / info）、飞行轨迹地图和关键参数曲线图。各项含义见 [数据分析实战](/guide/analyze-logs)。
+
+</Zh>
+
+<En>
+
+Log analysis is built in — no Skill download needed. Go to the [analysis page](/analyze) and
+upload a PX4 `.ulg`:
+
+1. Drag or select a `.ulg` file
+2. Parsing runs locally in your browser; raw logs are never uploaded
+3. Only structured findings go to the server for the Chinese report
+
+The report shows findings by severity (critical → warning → info), a flight-track map, and
+key-parameter charts. What each means: [Data analysis guide](/guide/analyze-logs).
 
 </En>
 
 > <Zh>日志全程留在你的浏览器里解析，原始 `.ulg` 不会上传服务器。</Zh>
 > <En>Logs are parsed entirely in your browser — the raw `.ulg` is never uploaded.</En>
+
+## 第三步：接入 MCP 服务 | Step 3 — Connect an MCP
+
+<Zh>
+
+如果你想让 AI 客户端**直接调用工具**（而不仅仅是读提示词），用 MCP 服务。从 [MCP 服务页](/mcp) 找到合适的服务，查看 `server.json` 获取接入配置。
+
+接入方法因客户端而异——Claude、Cursor、Claude Code 的配置方式在各自 MCP 页面有说明。更多细节见 [开发一个 MCP 服务](/guide/write-mcp) 和 [接入客户端](/guide/connect-client)。
+
+</Zh>
+
+<En>
+
+If you want your AI client to **call tools directly** (not just read prompts), use an MCP server.
+Find one on the [MCP page](/mcp) and check its `server.json` for the connection config.
+
+Connection method depends on the client — Claude, Cursor, and Claude Code each have their own
+config; instructions are on each MCP page. More: [Build an MCP server](/guide/write-mcp) and
+[Connect to your client](/guide/connect-client).
+
+</En>
+
+## 下一步怎么走 | Next steps
+
+- <Zh>**我想下载社区 Skill 直接用** → [下载与使用 Skill](/guide/download-skill)</Zh>
+  <En>**I want to download a community Skill** → [Download & use a Skill](/guide/download-skill)</En>
+- <Zh>**我想上传日志做飞行诊断** → [数据分析实战](/guide/analyze-logs)</Zh>
+  <En>**I want to upload a log for diagnosis** → [Log analysis guide](/guide/analyze-logs)</En>
+- <Zh>**我想把 MCP 服务接入 AI 客户端** → [接入客户端](/guide/connect-client)</Zh>
+  <En>**I want to connect MCP to my AI client** → [Connect to client](/guide/connect-client)</En>
+- <Zh>**我想写一个 Skill 分享给社区** → [编写一个 Skill](/guide/write-skill)</Zh>
+  <En>**I want to write a Skill** → [Write a Skill](/guide/write-skill)</En>
+- <Zh>**我想把自己的服务暴露为 MCP 给 AI 调用** → [开发一个 MCP 服务](/guide/write-mcp)</Zh>
+  <En>**I want to expose my service as MCP** → [Build an MCP server](/guide/write-mcp)</En>
+- <Zh>**我想设计自己的日志检查规则** → [贡献检查规则](/guide/write-rules)</Zh>
+  <En>**I want to design my own log check rules** → [Write rules](/guide/write-rules)</En>
+- <Zh>**我想把做好的内容贡献给平台** → [发布到平台](/guide/publish-skill)</Zh>
+  <En>**I want to publish my content** → [Publish to the hub](/guide/publish-skill)</En>
