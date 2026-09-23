@@ -32,6 +32,10 @@
       "front_matter_title": "^\\s*title\\s*[:=]",
     },
   },
+  // 这里是 **glob 表达式**，不是 gitignore 文件语法。
+  // 实测（2026-09-23）：cli2 认 "web/content/skills/" 这种**带尾斜杠的目录**写法 ——
+  // 删掉那两行后扫描文件数从 64 涨到 92（正好 +24 个 skills + 4 个 mcp），证明确实生效。
+  // 别照 gitignore 习惯去"修正"它，也别假定同样的写法在别的工具里也成立。
   "ignores": [
     // 依赖与构建产物
     "**/node_modules/**",
@@ -41,14 +45,13 @@
     "web/content/guide/rule-*.mdx",
     "web/content/skills/",
     "web/content/mcp/",
-    // calibrate baseline
-    // "tools/calibrate/baseline/",
-    // 自动生成的 knowledge 元数据
-    // "knowledge/px4/meta/",
     // 带 generated 标记的生成文件
     "**/*.generated.*",
     // AI 工具自动生成
     ".workbuddy/",
     ".claude/",
   ],
+  // 刻意**不**整目录排除 knowledge/px4/meta/：里面那个 README 是手写的设计说明
+  // （它开头写"生成物，一 tag 一份"是在介绍目录用途，不是说它自己被生成），该被 lint。
+  // 真正生成的 <tag>.json 不在 **/*.md 的扫描范围里，本来就扫不到。
 }

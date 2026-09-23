@@ -449,37 +449,45 @@ npmmirror 而失败（该镜像无 audit 端点），但 **CI 未配 registry，
 ⚠️ 排除规则一律写成 `**/` 开头的通用 glob：这份文件会在两种 cwd 下被用，
 写成 `web/workers/...` 这种带顶层目录的形式，在 cwd=`web` 时匹配不到。
 
-**2026-09-23 变更：markdownlint 配置同样合并到仓库根**。原先 `.markdownlint.json` 住在 `web/`、
-`.markdownlintignore` 住在根 —— 两个文件分处两层，CI 靠显式 `--config web/.markdownlint.json`
-才对得上。症状与 prettier 那次一样是"配置只对 `web/` 生效"，但**机理不同**，改法也不同：
+**2026-09-23 变更：markdownlint 配置合并到仓库根，并最终换成 `markdownlint-cli2`**。
 
-- `markdownlint-cli` 找配置是 `fs.accessSync('.markdownlint.jsonc')` —— **只看 cwd 这一层，不向上遍历**
-  （`web/node_modules/markdownlint-cli/markdownlint.js:57` 的 `projectConfigFiles` 与 :68 的调用）。
-  cwd=`{ROOT}` 时 `web/` 里的配置压根不在查找范围内，只能靠 `--config` 硬指。
-- VS Code 的 markdownlint 扩展相反，是**从 md 文件所在目录向上逐级找**（官方原文：
+起因（第一步）：原先 `.markdownlint.json` 住在 `web/`、`.markdownlintignore` 住在根 —— 两个文件分处
+两层，CI 靠显式 `--config web/.markdownlint.json` 才对得上。症状与 prettier 那次一样是"配置只对
+`web/` 生效"，但**机理不同**：
+
+- `markdownlint-cli` 找配置是 `fs.accessSync(...)` —— **只看 cwd 这一层，不向上遍历**。
+- VS Code 的 markdownlint 扩展相反，是**从 md 文件所在目录向上逐级找**（官方原文
   ".markdownlint.{jsonc,json,...} file in the same or parent directory"）。`docs/`、`README.md`、
-  `knowledge/` 向上走到仓库根就停 —— `web/` 是**子目录**，不在这些文件的任何一条向上路径上。
+  `knowledge/` 向上走到仓库根就停 —— `web/` 是**子目录**，不在任何一条向上路径上。
 
-实测代价：cwd=ROOT 不传 `--config` 跑一次 = **40 个文件、1770 条违规**，其中 MD013（行长 80）1305 条、
-MD033（内联 HTML）446 条，全是配置没被读到造成的假报错，不是文档真有问题。
+实测代价：cwd=ROOT 不传 `--config` 跑一次 = **40 个文件、1770 条违规**（MD013 行长 1305 条、
+MD033 内联 HTML 446 条），全是配置没被读到的假报错。
 
-改法：只留**仓库根一份** `.markdownlint.jsonc`（改用 jsonc 是为了能写注释；CLI 的查找顺序里
-`.markdownlint.jsonc` 排在 `.markdownlint.json` 前面，扩展同样认），删掉 `web/.markdownlint.json`，
-去掉 `checklist.yml` 里的 `--config` 与 `--ignore-path`（后者默认值就是 cwd 下的 `.markdownlintignore`；
-而且**传了反而更脆** —— 源码 :271-273 在传参时把 `existsSync` 换成恒真，文件缺失会直接崩，
-不传时才是跳过）。规则取值一字未动，只搬家。
+定案（第二步）：换成 **`markdownlint-cli2@0.17.2`**，只留**仓库根一份** `.markdownlint-cli2.jsonc`，
+规则与 ignores **写在同一个文件里**。之所以值得换：
 
-**这条检查不会恒绿**（已变异验证）：把根配置临时挪走后立刻 rc=1、1770 条；还原后回到 rc=0。
+- cli2 **明确不支持** `.markdownlintignore`（官方原话 "…and `.markdownlintignore` are not supported"），
+  排除列表只能进配置的 `ignores`；而 `ignores` 在**配置文件里**，扩展读同一份文件
+  （扩展的配置优先级：`.markdownlint-cli2.*` > `.markdownlint.*` > VS Code 设置 > 默认）
+  → **CI 与编辑器第一次真正一致**。
+- 配置查找：cli2 以 **cwd 为配置根**，子目录可放配置，向上只到 cwd。所以我们放仓库根、从仓库根跑，正对。
+- 官方："`markdownlint-cli2` supports all the features of `markdownlint-cli` (sometimes a little differently)"，
+  且 "designed to work well in conjunction with `vscode-markdownlint`"。
 
-⚠️ **残留缺口**（未修，留待决策）：
+**换后实测**（`showFound` 取证，非估算）：扫描 **64 个文件**，`node_modules` / `web/content/skills`(24) /
+`web/content/mcp`(4) / `.workbuddy` **全部 0 个被扫到**。
+反向验证：删掉 `ignores` 里 skills 与 mcp 两行 → 扫描数从 64 涨到 **92**（正好 +24 +4）
+→ 证明 `"web/content/skills/"` 这种**带尾斜杠的目录写法 cli2 认**（这是 cli2 glob 实现的行为，
+不是 gitignore 语法通用，别照别的工具的习惯去"修正"）。
 
-1. 扩展**不读** `.markdownlintignore`（官方 README 全文无此字符串）。所以 `web/content/skills`、
-   `web/content/mcp`、`knowledge/px4/meta` 这些 CI 里被排除的拷贝/生成物，在编辑器里仍会报错。
-   要抹平只能换 `markdownlint-cli2`（它把 ignores 写进同一份 `.markdownlint-cli2.jsonc`，
-   扩展优先读它）—— 那是换工具，没做。
-2. cwd=`web` 跑 CLI 仍落回默认规则（不向上找）。目前仓库里没有这种调用点
-   （`web/package.json` 无 md lint 脚本），所以只是潜在坑。
-3. 若有人**新增**第二份 `.markdownlint.*`，CLI 会静默忽略它、只有编辑器认 —— CI 全绿但两边规则不一致。
+**这条检查不会恒绿**（已变异验证）：临时挪走根配置 → 立刻 rc=1；还原 → rc=0。
+注意挪走后违规行数暴涨到 20 万+ —— 因为 `ignores` 也一起没了，node_modules 被扫进去。
+**这同时说明 `**/node_modules/**` 那条是必需的**，不是可选装饰。
+
+⚠️ **剩余缺口**：
+
+1. cwd=`web` 跑会落回默认（cli2 以 cwd 为配置根）。目前没有这种调用点（`web/package.json` 无 md 脚本）。
+2. 若有人**新增**第二份 `.markdownlint*`，CLI 与扩展会各读各的 —— CI 全绿但两边规则不一致。
    这类"多一份配置"目前没有任何守卫拦着（prettier 那侧同样）。
 
 **三条限制**（用户已确认）：

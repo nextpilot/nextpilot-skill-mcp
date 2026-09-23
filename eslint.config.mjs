@@ -5,14 +5,15 @@ import globals from "globals";
 export default [
     {
         ignores: [
-            ".next/**",
+            "web/.next/**",
             "**/.next/**",
-            "content/skills/**",
-            "content/mcp/**",
+            "web/content/skills/**",
+            "web/content/mcp/**",
             "**/content/skills/**",
             "**/content/mcp/**",
             "**/node_modules/**",
-            "**/*.{ts,tsx}",
+            "**/*.ts",
+            "**/*.tsx",
         ],
     },
     js.configs.recommended,
@@ -21,7 +22,7 @@ export default [
         rules: { ...nextPlugin.configs.recommended.rules },
     },
     {
-        files: ["scripts/**/*.{js,mjs}", "lib/**/*.{js,mjs}", "app/**/*.{js,mjs}"],
+        files: ["web/scripts/**/*.{js,mjs}", "web/lib/**/*.{js,mjs}", "web/app/**/*.{js,mjs}"],
         languageOptions: {
             ecmaVersion: "latest",
             sourceType: "module",
@@ -36,7 +37,7 @@ export default [
         },
     },
     {
-        files: ["functions/**/*.js"],
+        files: ["web/functions/**/*.js"],
         languageOptions: {
             ecmaVersion: "latest",
             sourceType: "module",
@@ -64,7 +65,7 @@ export default [
         },
     },
     {
-        files: ["public/sw.js"],
+        files: ["web/public/sw.js"],
         languageOptions: {
             ecmaVersion: "latest",
             sourceType: "script",
@@ -78,7 +79,7 @@ export default [
         },
         rules: {
             "no-undef": "error",
-            "no-unused-vars": "off",
+            "no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
         },
     },
 ];
