@@ -1,7 +1,7 @@
 id: ekf
 title: EKF 创新检验
 description: 创新值与检验门限之比（≥1 表示该路观测被 EKF 拒绝），参考线 1.0。
-order: 4
+order: 6
 conditions:
   topics: [estimator_status]
 outputs:

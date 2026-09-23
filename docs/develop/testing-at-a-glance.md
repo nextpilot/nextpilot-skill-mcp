@@ -86,27 +86,28 @@
 
 **你敲**：`git push`
 
-**跑 `check_all.py --stage push`，14 项检查，30~40 秒。**
+**跑 `check_all.py --stage push`，15 项检查，30~40 秒。**
 清单定义在 `tools/ci/checklist.yml`（**单一事实源，改检查只改这里**）。
 
-| #   | 文件                                                   | 是什么        | 干什么                                                         | 耗时 |
-| --- | ------------------------------------------------------ | ------------- | -------------------------------------------------------------- | ---- |
-| 1   | `tools/ci/check_secrets.py`                            | 密钥扫描      | 有没有把密钥提交进去。**扫全部 313 个跟踪文件**（含 `.md`）    | 1.3s |
-| 2   | `ruff format --check`                                  | Python 格式化 | 风格统一吗（**只认 `.py`**）                                   | 2s   |
-| 3   | `ruff check`                                           | Python lint   | 有没有可疑写法                                                 | 1s   |
-| 4   | `engine/tests/`                                        | 单元测试      | 算子与 CEL 表达式**求值对不对**                                | 1.2s |
-| 5   | `tools/calibrate/check-pyodide-px4log-engine.py`       | 产物校验      | 生成的产物是合法可执行的 Python 吗；轨迹取不到时给没给逐条原因 | 1s   |
-| 6   | `tools/ci/check_engine_purity.py`                      | 纯净性守卫    | `engine/` 还是纯 Python 吗（浏览器与本机共用同一份的前提）     | 0.6s |
-| 7   | `tsc --noEmit`                                         | 类型检查      | TypeScript 类型对得上吗                                        | 2s   |
-| 8   | `prettier --check`                                     | 前端格式化    | 前端风格统一吗                                                 | 3.7s |
-| 9   | `eslint`                                               | JS lint       | JS 有没有可疑写法（**只认 `.js`/`.mjs`，不含 `.ts`**）         | 3s   |
-| 10  | `tools/ci/check_hygiene.py`                            | 元检查        | **校验机制自己**还健康吗（悬空引用、静默失败、守卫恒真）       | 4.2s |
-| 11  | `tools/calibrate/compare_baseline.py`                  | 基线比对      | 改规则后结论还准吗（6 份日志逐字段比对）                       | 3s   |
-| 12  | `tools/calibrate/guard-px4log-provider.py`             | 适配器契约    | 数据适配层契约还成立吗（逐份日志跑同一套断言）                 | 3s   |
-| 13  | `tools/calibrate/px4log_engine_runner.py --probe-data` | 数据层自检    | 数据层结构自洽吗                                               | 3s   |
-| 14  | `tools/calibrate/lint_rules.py --strict`               | 字段引用 lint | 规则里引用的**字段名真实存在**吗                               | 2s   |
+| #   | 文件                                                   | 是什么        | 干什么                                                            | 耗时 |
+| --- | ------------------------------------------------------ | ------------- | ----------------------------------------------------------------- | ---- |
+| 1   | `tools/ci/check_secrets.py`                            | 密钥扫描      | 有没有把密钥提交进去。**扫全部 313 个跟踪文件**（含 `.md`）       | 1.3s |
+| 2   | `ruff format --check`                                  | Python 格式化 | 风格统一吗（**只认 `.py`**）                                      | 2s   |
+| 3   | `ruff check`                                           | Python lint   | 有没有可疑写法                                                    | 1s   |
+| 4   | `engine/tests/`                                        | 单元测试      | 算子与 CEL 表达式**求值对不对**                                   | 1.2s |
+| 5   | `tools/calibrate/check-pyodide-px4log-engine.py`       | 产物校验      | 生成的产物是合法可执行的 Python 吗；轨迹取不到时给没给逐条原因    | 1s   |
+| 6   | `tools/ci/check_engine_purity.py`                      | 纯净性守卫    | `engine/` 还是纯 Python 吗（浏览器与本机共用同一份的前提）        | 0.6s |
+| 7   | `tools/ci/check_pnpm_filter.py`                        | 转发脚本守卫  | 每个 `pnpm --filter` 都命中真实项目吗（匹配不到时 pnpm 静默成功） | 0.5s |
+| 8   | `tsc --noEmit`                                         | 类型检查      | TypeScript 类型对得上吗                                           | 2s   |
+| 9   | `prettier --check`                                     | 前端格式化    | 前端风格统一吗                                                    | 3.7s |
+| 10  | `eslint`                                               | JS lint       | JS 有没有可疑写法（**只认 `.js`/`.mjs`，不含 `.ts`**）            | 3s   |
+| 11  | `tools/ci/check_hygiene.py`                            | 元检查        | **校验机制自己**还健康吗（悬空引用、静默失败、守卫恒真）          | 4.2s |
+| 12  | `tools/calibrate/compare_baseline.py`                  | 基线比对      | 改规则后结论还准吗（6 份日志逐字段比对）                          | 3s   |
+| 13  | `tools/calibrate/guard-px4log-provider.py`             | 适配器契约    | 数据适配层契约还成立吗（逐份日志跑同一套断言）                    | 3s   |
+| 14  | `tools/calibrate/px4log_engine_runner.py --probe-data` | 数据层自检    | 数据层结构自洽吗                                                  | 3s   |
+| 15  | `tools/calibrate/lint_rules.py --strict`               | 字段引用 lint | 规则里引用的**字段名真实存在**吗                                  | 2s   |
 
-**⚠ 第 11~14 项只在你的开发机跑。** 它们要真实 `.ulg` 日志，而原始日志含 GPS 轨迹、
+**⚠ 第 12~15 项只在你的开发机跑。** 它们要真实 `.ulg` 日志，而原始日志含 GPS 轨迹、
 **不入仓库**——云端 checkout 里没有，所以这四项在 CI 上必然跳过。
 
 **后果：`CI 全绿 ≠ 回归过了`。**
@@ -114,7 +115,7 @@
 **三种姿势：**
 
 ```bash
-git push                # 只跑上面这 14 项（默认）
+git push                # 只跑上面这 15 项（默认）
 WITH_E2E=1 git push     # 连 CI 那批一起跑（+5~7min）
 FULL_PUSH=1 git push    # 和 CI 一样全（+144s 的 next build）
 ```
@@ -143,7 +144,7 @@ FULL_PUSH=1 git push    # 和 CI 一样全（+144s 的 next build）
 
 | 文件                        | 是什么         | 干什么                                              | 耗时     |
 | --------------------------- | -------------- | --------------------------------------------------- | -------- |
-| `tools/ci/mutate_guards.py` | **守卫自证机** | 43 条变异逐条注入，断言**恰好一条**守卫变红，再还原 | 约 20min |
+| `tools/ci/mutate_guards.py` | **守卫自证机** | 46 条变异逐条注入，断言**恰好一条**守卫变红，再还原 | 约 20min |
 
 > **为什么单独一个 job**：27 条变异打在 `test-issue-filer` 上（44s × 27），
 > 和主 job 并行才各有独立超时预算。
@@ -192,7 +193,7 @@ pnpm test:e2e            # 全量 42 条
 | -------------- | ----------------------------------------------------------- | ------------------------------------ |
 | **单测**       | `engine/tests/`                                             | 我写的这段逻辑对不对                 |
 | **守卫**       | `test-issue-filer.mjs`（21 节）、`check_hygiene.py`（6 项） | 这个不变量还成立吗（扫源码防回潮）   |
-| **守卫的自证** | `mutate_guards.py`（43 条）                                 | 守卫**真的会红**吗，还是恒绿着当摆设 |
+| **守卫的自证** | `mutate_guards.py`（46 条）                                 | 守卫**真的会红**吗，还是恒绿着当摆设 |
 
 第三层是本项目最看重的：**一条永远不红的守卫比没有守卫更坏**，
 因为它让人以为有人在看。所以每加一条守卫，就必须同时加一条能证明它会红的变异。
@@ -217,6 +218,9 @@ pnpm test:e2e            # 全量 42 条
 - **本地 `pnpm audit` 必须带 `--registry=https://registry.npmjs.org/`**：
   本机 `~/.npmrc` 指向 npmmirror，那镜像没实现 audit 端点，不带就本机红、CI 绿。
 - **`pnpm` 是全局工具**，`web/node_modules/` 下没有它。
+- **根 `package.json` 的转发脚本必须写 `pnpm --filter ./web`**（带 `./`）：`web` 是**目录**
+  不是包名（`web/package.json` 的 `name` 是 `nextpilot-skill-mcp`），不带 `./` 时 pnpm 按包名
+  匹配 → 匹配 0 个项目 → **rc=0、零输出、静默空跑**。由 `check_pnpm_filter` 拦。
 - **E2E 首次跑要 7 分钟**：Pyodide 要下 WASM + numpy + pyulog，别在前 2 分钟就以为卡死。
 - **`--with-e2e` 与 `--stage` 是两个维度**：前者控制阶段内的步骤，后者控制跑哪些阶段。
   从阶段列表反推开关会静默失效。

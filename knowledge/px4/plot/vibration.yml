@@ -1,7 +1,7 @@
 id: vibration
 title: 振动
 description: 每个 IMU 的高频振动指标（accel_vibration_metric，m/s²），参考线 4.905 / 9.81。
-order: 1
+order: 15
 conditions:
   topics: [vehicle_imu_status]
 outputs:

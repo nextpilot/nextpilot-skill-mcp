@@ -1,6 +1,7 @@
 id: attitude
 title: 姿态
 description: 四元数经 quat_to_euler 转欧拉角（Roll / Pitch / Yaw，度）；换算在引擎侧做，前端只画。
+order: 13
 conditions:
   topics: [vehicle_attitude]
 # 换算节点：与规则 compute 同一套表达式与算子。

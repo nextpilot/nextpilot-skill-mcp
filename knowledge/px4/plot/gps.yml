@@ -1,7 +1,7 @@
 id: gps
 title: GPS
 description: 卫星数与定位精度（HDOP/EPH/EPV）。
-order: 6
+order: 5
 conditions:
   topics: ["vehicle_gps_position || sensor_gps"]
 outputs:

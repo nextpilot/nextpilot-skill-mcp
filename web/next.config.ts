@@ -54,12 +54,23 @@ const nextConfig: NextConfig = {
     experimental: {},
     // 仓库根目录已有 CLAUDE.md，关闭 Next 16 自动生成 AGENTS.md/CLAUDE.md
     agentRules: false,
-    // Turbopack 应用根钉在 web/ 自身：仓库根有一个空的 pnpm-lock.yaml（根 package.json
-    // 零依赖、纯转发壳），与 web/ 里真正有依赖的 lockfile 撞车，Turbopack 向上推断会误选
-    // 仓库根并警告 "inferred workspace root may not be correct"。显式给定 root 后不再自动
-    // 推断；本仓库所有 next 命令都经根 package.json 的 `pnpm -C web` 转发，运行 cwd 就是 web/。
+    // HMR 跨域：通过 127.0.0.1 访问时允许 /_next/hmr 的 WebSocket
+    allowedDevOrigins: ["127.0.0.1"],
+    // Turbopack 应用根 = **仓库根**（web/ 的上一级）。
+    //
+    // 必须指向上一级，不能钉在 web/：本仓库是 pnpm workspace（根 pnpm-workspace.yaml 收 web），
+    // 依赖装在**仓库根**的 node_modules/.pnpm 里，web/node_modules/* 只是指向那里的 junction。
+    // 而 Turbopack 对 root 之外的文件有一条硬规则「files outside of the workspace root are not
+    // compiled」，root 一旦钉成 web/，它就解析不到 next 包本身：
+    //   ./app → Error: Could not find the Next.js package (next/package.json)
+    //           Filesystem root used for resolution: <repo>/web
+    // 结果是所有路由 500（PageNotFoundError），且**只在冷启动暴露** —— .next/dev 里还留着上次
+    // 编译产物时它直接复用、不重新解析，看起来一切正常；清掉 .next 或换台机器就立刻炸。
+    //
+    // 反向的坑也要记：早先这里写的是 process.cwd()（= web/），理由是"根目录有空 lockfile 会让
+    // Turbopack 误判"。那只是条警告，而现在这个是硬错误 —— 两害相权取其轻。
     turbopack: {
-        root: process.cwd(),
+        root: process.cwd() + "/..",
     },
     // 站点内容在构建期由 scripts/sync-content.mjs 拷进 content/，运行期只读那里。
     // 它不在模块图里（是 fs.readdirSync 读的），打包器不会自动跟踪：默认输出是把整个

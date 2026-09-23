@@ -149,6 +149,14 @@ jobs:
         command: ["{PYTHON}", "tools/ci/check_engine_purity.py"]
         hint: "The engine/ directory contains non-Pyodide-safe code. Review the violations above; engine/ must work in both browser (Pyodide) and native CPython."
 
+      # pnpm 的 --filter 匹配不到项目时**静默成功**（rc=0、无输出），
+      # 2026-09-23 让 11 个转发脚本全空跑（含 typecheck / test）—— 没有任何运行时信号，只能静态拦。
+      - id: "check-pnpm-filter"
+        name: "pnpm --filter targets exist (check_pnpm_filter)"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "tools/ci/check_pnpm_filter.py"]
+        hint: "A `pnpm --filter <value>` matched nothing. pnpm exits 0 with no output in that case, so the script silently does nothing. Use --filter ./web (directory match) or a real workspace package name."
+
       - id: "check-hygiene"
         name: "Validator hygiene (check_hygiene)"
         workdir: "{ROOT}"

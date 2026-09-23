@@ -1,7 +1,7 @@
 id: power
 title: 电源
 description: 电压 / 电流 / 剩余电量，多面板共享时间轴。
-order: 5
+order: 3
 conditions:
   topics: [battery_status]
 outputs:

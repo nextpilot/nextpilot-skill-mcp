@@ -1,0 +1,23 @@
+id: distance
+title: 测距
+description: 距离传感器读数与信号质量；部分固件未开启该传感器。
+order: 4
+conditions:
+  topics: [distance_sensor]
+outputs:
+  - container: axes
+    title: 距离
+    ylabel: m
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("distance_sensor[0].current_distance")
+        label: [当前距离]
+  - container: axes
+    title: 信号质量
+    ylabel: "%"
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("distance_sensor[0].signal_quality")
+        label: [信号质量]

@@ -1,0 +1,18 @@
+id: rc
+title: 遥控输入
+description: 手动遥控器摇杆输入（归一化 -1..1）。
+order: 9
+conditions:
+  topics: [manual_control_setpoint]
+outputs:
+  - container: axes
+    title: 摇杆输入
+    ylabel: "归一化 [-1,1]"
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("manual_control_setpoint[0].roll")
+          - ref("manual_control_setpoint[0].pitch")
+          - ref("manual_control_setpoint[0].yaw")
+          - ref("manual_control_setpoint[0].throttle")
+        label: [Roll, Pitch, Yaw, Throttle]

@@ -1,7 +1,7 @@
 id: imu-accel
 title: IMU 原始加速度
 description: 三轴加速度（m/s²）。旧固件可能未记录该话题。
-order: 2
+order: 12
 conditions:
   topics: ["sensor_combined || sensor_accel"]
 outputs:

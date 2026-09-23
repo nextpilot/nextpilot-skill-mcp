@@ -1,0 +1,17 @@
+id: mag
+title: 磁罗盘
+description: 磁场强度三轴分量（Gauss），用于航向估计。
+order: 8
+conditions:
+  topics: [sensor_mag]
+outputs:
+  - container: axes
+    title: 磁场强度
+    ylabel: Gauss
+    children:
+      - mode: TimeSeries
+        ydata:
+          - ref("sensor_mag[0].x")
+          - ref("sensor_mag[0].y")
+          - ref("sensor_mag[0].z")
+        label: [X, Y, Z]

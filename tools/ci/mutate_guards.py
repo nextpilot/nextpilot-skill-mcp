@@ -111,6 +111,8 @@ GUARDS = {
     "hygiene": ([PY, "tools/ci/check_hygiene.py"], ROOT, "卫生检查（check_hygiene）", "fail-lines"),
     # 引擎纯度：只扫 engine/ 的源码文本，无依赖、无网络、不需要日志 —— 快，所以每次都跑
     "engine": ([PY, "tools/ci/check_engine_purity.py"], ROOT, "引擎纯度（check_engine_purity）", "fail-lines"),
+    # pnpm 转发脚本：只扫 package.json 的 scripts 文本 —— 快、无依赖、不需要日志
+    "pnpm-filter": ([PY, "tools/ci/check_pnpm_filter.py"], ROOT, "pnpm 转发脚本（check_pnpm_filter）", "fail-lines"),
 }
 
 
@@ -567,6 +569,40 @@ MUTATIONS: list[Mutation] = [
         guard="ui",
         expect="没有新的文件在消费 quota（回潮信号）",
         note="清单守卫的意义：新长出来的第 6 个消费点会被点名，而不是等它显示歪了才发现",
+    ),
+    # ---- 转发脚本：pnpm --filter 匹配不到项目时静默成功（2026-09-23） ----
+    #
+    # 这条的失败形态是**没有任何信号**：pnpm 匹配 0 个项目时不报错、不红、不写日志，
+    # 退出码 0。11 个转发脚本（含 typecheck 与 test）就这样空跑了一段时间，
+    # 于是「`pnpm typecheck` 全绿」是假绿。三条自保分支各自都要证明会红 ——
+    # 第四条（找不到根 package.json）要删文件，脚本做不到，只能留给代码审查。
+    Mutation(
+        name="转发脚本的 filter 又退回裸目录名 web（静默空跑的原形）",
+        path="package.json",
+        old='"web:dev": "pnpm --filter ./web dev"',
+        new='"web:dev": "pnpm --filter web dev"',
+        guard="pnpm-filter",
+        expect="filter-value-resolves",
+        note="原形：`web` 不是包名（web/package.json 的 name 是 nextpilot-skill-mcp），"
+        "不带 `./` 前缀时 pnpm 按包名匹配 → 匹配 0 个项目 → rc=0 无输出",
+    ),
+    Mutation(
+        name="守卫的 filter 正则被改坏（一个都扫不到，门被架空）",
+        path="tools/ci/check_pnpm_filter.py",
+        old='FILTER_RE = re.compile(r"pnpm\\s+--filter[= ]\\s*(\\S+)")',
+        new='FILTER_RE = re.compile(r"pnpm\\s+--no-such-flag[= ]\\s*(\\S+)")',
+        guard="pnpm-filter",
+        expect="filter-scan-found-any",
+        note="防「门还在吗」：正则跟不上写法（比如大家换成 `pnpm -C web`）之后 11 条一条都扫不到，而守卫会一直绿",
+    ),
+    Mutation(
+        name="workspace 成员目录写错（包名集合残缺，判定不可信）",
+        path="pnpm-workspace.yaml",
+        old='    - "web"',
+        new='    - "web-typo"',
+        guard="pnpm-filter",
+        expect="workspace-members-nonempty",
+        note="防「判空分支是死代码」：解析不出成员目录时守卫会悄悄按残缺的包名集合下结论",
     ),
 ]
 
