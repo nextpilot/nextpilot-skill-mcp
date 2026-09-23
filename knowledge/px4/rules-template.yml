@@ -30,8 +30,8 @@ conditions:
   firmware: any
   # 机架：any（缺省）/ 机架名 / 机架名列表。词表见 facts.yaml 的 vehicle_types
   # （rotary_wing / fixed_wing / rover / airship，另有 unknown）；简写 mc / fw 也认
-  # （facts.yaml 的 airframe_aliases），构建期换成规范名，产物里只留规范名。
-  airframe: any
+  # （facts.yaml 的 vehicle_aliases），构建期换成规范名，产物里只留规范名。
+  vehicle: any
   # 数据依赖：日志里得有这些 topic，缺了记一条 skipped（文案自动生成 "X not in log"）。
   # 项内 `||` = **其中任意一个在日志里就够**（"改名/另有别名"用它），项间 = 都要有。
   # 只列"缺了就不该判"的 topic——走过 _try 的可选字段别列进来，那会把能跑的规则变成跳过。

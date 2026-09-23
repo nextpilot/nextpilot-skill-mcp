@@ -261,7 +261,7 @@ class Px4Provider:
         """
         return {
             "FW_MINOR": self.fw_minor,
-            "AIRFRAME": self.vehicle_type,
+            "VEHICLE": self.vehicle_type,
             "IS_FIXED_WING": self.vehicle_type == "fixed_wing",
             "DURATION_S": self.duration_s if self.duration_s is not None else 0,
             "ARMED_S": self.armed_duration_s,

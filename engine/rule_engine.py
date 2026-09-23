@@ -203,21 +203,21 @@ def _precheck_hit(spec, env):
     return None
 
 
-def _airframe_label(spec):
+def _vehicle_label(spec):
     """机架约束的展示写法（只用于 skipped 文案）：列表用 ` / ` 连接。"""
     if isinstance(spec, list):
         return " / ".join(str(s).strip() for s in spec)
     return str(spec).strip()
 
 
-def _match_airframe(spec, env):
+def _match_vehicle(spec, env):
     """机架适用范围：`any` ｜ 单个机架名 ｜ 列表（如 `[fixed_wing, unknown]`）。
 
     **只做字符串精确比对，不解释语义**：拿 provider 在 `builtin_variables()` 里报的
-    `AIRFRAME` 值去比（PX4 报 rotary_wing / fixed_wing / vtol / rover / unknown）。
+    `VEHICLE` 值去比（PX4 报 rotary_wing / fixed_wing / vtol / rover / unknown）。
     所以换一种日志格式不用改这里——它的机架词表由它自己的适配器定义。
 
-    写成 `IS_FIXED_WING or AIRFRAME == 'unknown'` 那种表达式是旧写法，构建期已拦。
+    写成 `IS_FIXED_WING or VEHICLE == 'unknown'` 那种表达式是旧写法，构建期已拦。
     """
     if isinstance(spec, str):
         name = spec.strip()
@@ -226,11 +226,11 @@ def _match_airframe(spec, env):
         wanted = [name]
     elif isinstance(spec, list):
         if not spec:
-            raise ValueError("airframe 列表为空（不限就写 any）")
+            raise ValueError("vehicle 列表为空（不限就写 any）")
         wanted = [str(s).strip() for s in spec]
     else:
-        raise ValueError("airframe 必须是 any / 机架名 / 列表，收到 %r" % (spec,))
-    current = (env or {}).get("AIRFRAME")
+        raise ValueError("vehicle 必须是 any / 机架名 / 列表，收到 %r" % (spec,))
+    current = (env or {}).get("VEHICLE")
     return current is not None and str(current) in wanted
 
 
@@ -538,8 +538,8 @@ def _run_rules(group):
         try:
             if not provider.match_version(_rule["firmware"]):
                 _not_applicable = "固件不满足 %s" % _rule["firmware"]
-            elif not _match_airframe(_rule["airframe"], _env):
-                _not_applicable = "机架不适用 %s" % _airframe_label(_rule["airframe"])
+            elif not _match_vehicle(_rule["vehicle"], _env):
+                _not_applicable = "机架不适用 %s" % _vehicle_label(_rule["vehicle"])
         except Exception:
             _not_applicable = None
         if _not_applicable:

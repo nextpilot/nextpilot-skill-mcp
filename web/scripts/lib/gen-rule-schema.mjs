@@ -1,7 +1,7 @@
 /**
  * `rules/*.yaml` 的**编辑器用 JSON Schema**（给 yaml-language-server 消费）。
  *
- * 为什么要有它：规则的键名、`group` / `airframe` / `severity` 词表都不是随手写的字符串，
+ * 为什么要有它：规则的键名、`group` / `vehicle` / `severity` 词表都不是随手写的字符串，
  * 拼错要等 `pnpm build:kb` 才报。给编辑器一份 schema，敲键名就有补全、写错当场飘红。
  *
  * ⚠ **这份 schema 是生成出来的，不是手写的** —— 词表全部从 `facts.yaml`、
@@ -16,7 +16,7 @@
  *     JSON Schema 只看得到"这是个字符串"，仍然只有 `rule-expr.mjs` 查得到
  *
  *
- * ⚠ **enum 只给「构建期本来就强制校验」的词表**（group / severity / airframe）。
+ * ⚠ **enum 只给「构建期本来就强制校验」的词表**（group / severity / vehicle）。
  * 反过来——schema 比构建期更严——会在**合法写法**上飘红，而假红比没有提示更糟：
  * 作者会以为自己写错了，去改一个本来对的值。`category` 与 `outputs.check` 就是活例子：
  * 构建期允许它们偏离派生值（px4-cpu-load 的 check 是 `cpu_load` ≠ group `cpu`），
@@ -41,16 +41,16 @@ const TAG_PATTERN = "^[a-zA-Z0-9_:]+$";
  * @param {object} args
  * @param {object} args.signatures  算子签名表（`parseOperatorSignatures` 的产物）
  * @param {object} args.facts       facts.yaml 解析结果
- * @param {object} args.airframes   { aliases, valid }（规范名来自 facts.yaml 的 vehicle_types）
+ * @param {object} args.vehicles   { aliases, valid }（规范名来自 facts.yaml 的 vehicle_types）
  * @param {Set<string>} args.builtinVars  表达式能直接引用的内置变量名
  * @returns {object} JSON Schema（draft-07）
  */
-export function buildRuleSchema({ signatures, facts, airframes, builtinVars }) {
+export function buildRuleSchema({ signatures, facts, vehicles, builtinVars }) {
     const groupOrder = Array.isArray(facts.group_order) ? facts.group_order.slice() : [];
     const byGroup = facts.rule_meta?.by_group ?? {};
     const categories = uniqSorted(Object.values(byGroup).map((g) => g?.category));
     // 机架合法值 = 规范名（含 unknown）+ 简写（mc / fw）+ any
-    const airframesAll = uniqSorted([...(airframes.valid ?? []), ...Object.keys(airframes.aliases ?? {}), "any"]);
+    const vehiclesAll = uniqSorted([...(vehicles.valid ?? []), ...Object.keys(vehicles.aliases ?? {}), "any"]);
 
     const computeDesc = [
         "取值表达式：自上而下求值，输出的名字供后面与 triggers 引用。",
@@ -109,11 +109,11 @@ export function buildRuleSchema({ signatures, facts, airframes, builtinVars }) {
                         examples: ["any", ">=1.15", "<1.15", ">=1.14,<1.15"],
                         description: '固件：any（缺省）/ ">=1.15" / "<1.15" / ">=1.14,<1.15"（逗号 = 与）',
                     },
-                    airframe: {
+                    vehicle: {
                         description: "机架：any（缺省）/ 机架名 / 机架名列表。简写 mc、fw 也认",
                         oneOf: [
-                            { type: "string", enum: airframesAll },
-                            { type: "array", items: { type: "string", enum: airframesAll } },
+                            { type: "string", enum: vehiclesAll },
+                            { type: "array", items: { type: "string", enum: vehiclesAll } },
                         ],
                     },
                     topics: {

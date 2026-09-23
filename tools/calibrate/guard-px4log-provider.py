@@ -143,17 +143,17 @@ def check_provider(ns: dict, path: Path) -> list[tuple[str, str]]:
     if not (isinstance(facts, dict) and facts):
         failed.append(f"{where}: get_report_facts() 为空")
     else:
-        if "vehicleType" in facts and facts["vehicleType"] != sem["AIRFRAME"]:
+        if "vehicleType" in facts and facts["vehicleType"] != sem["VEHICLE"]:
             failed.append(
-                f"{where}: get_report_facts().vehicleType 与 builtin_variables().airframe 不一致"
-                f"（{facts['vehicleType']!r} vs {sem['AIRFRAME']!r}）"
+                f"{where}: get_report_facts().vehicleType 与 builtin_variables().vehicle 不一致"
+                f"（{facts['vehicleType']!r} vs {sem['VEHICLE']!r}）"
             )
         if facts.get("armedDurationSec", sem["ARMED_S"]) != sem["ARMED_S"]:
             failed.append(f"{where}: get_report_facts().armedDurationSec 与 builtin_variables().armed_s 不一致")
         if "phases" in facts and not isinstance(facts["phases"], list):
             failed.append(f"{where}: get_report_facts().phases 应当是 list")
     ok = not failed
-    detail = f"airframe={sem.get('AIRFRAME')}, armed_s={sem.get('ARMED_S')}s"
+    detail = f"vehicle={sem.get('VEHICLE')}, armed_s={sem.get('ARMED_S')}s"
     err = "\n".join(failed)
     log.print_check(step, TOTAL_STEPS, rule_name, ok, detail, err)
     results.append((rule_name, "ok" if ok else "fail"))

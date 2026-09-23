@@ -60,14 +60,14 @@ export function isFirmwareSpec(v) {
 }
 
 /** 机架适用范围：`any` ｜ 机架名 ｜ 机架名列表（如 [fixed_wing, unknown]） */
-const AIRFRAME_NAME = /^[a-z][a-z0-9_]*$/;
+const VEHICLE_NAME = /^[a-z][a-z0-9_]*$/;
 
-export function isAirframeSpec(v) {
-    if (typeof v === "string") return v.trim() === "any" || AIRFRAME_NAME.test(v.trim());
+export function isVehicleSpec(v) {
+    if (typeof v === "string") return v.trim() === "any" || VEHICLE_NAME.test(v.trim());
     return (
         Array.isArray(v) &&
         v.length > 0 &&
-        v.every((x) => typeof x === "string" && x.trim() !== "any" && AIRFRAME_NAME.test(x.trim()))
+        v.every((x) => typeof x === "string" && x.trim() !== "any" && VEHICLE_NAME.test(x.trim()))
     );
 }
 

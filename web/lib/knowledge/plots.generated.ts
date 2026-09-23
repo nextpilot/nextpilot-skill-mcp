@@ -7,7 +7,7 @@ export const PLOT_PRESETS = [
     "description": "2D 位置轨迹（vehicle_local_position y vs x），及 setpoint、GPS setpoint。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_local_position"
@@ -86,7 +86,7 @@ export const PLOT_PRESETS = [
     "description": "GPS / 气压计 / 融合高度估计值与 setpoint。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_gps_position",
@@ -153,7 +153,7 @@ export const PLOT_PRESETS = [
     "description": "Roll 欧拉角估计值与 setpoint、groundtruth。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_attitude"
@@ -208,7 +208,7 @@ export const PLOT_PRESETS = [
     "description": "Roll 角速度估计值与 setpoint、积分。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_attitude"
@@ -292,7 +292,7 @@ export const PLOT_PRESETS = [
     "description": "Pitch 欧拉角估计值与 setpoint、groundtruth。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_attitude"
@@ -358,7 +358,7 @@ export const PLOT_PRESETS = [
     "description": "Pitch 角速度估计值与 setpoint、积分。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_attitude"
@@ -442,7 +442,7 @@ export const PLOT_PRESETS = [
     "description": "Yaw 欧拉角估计值与 setpoint、FF。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_attitude"
@@ -525,7 +525,7 @@ export const PLOT_PRESETS = [
     "description": "Yaw 角速度估计值与 setpoint、积分。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_attitude"
@@ -609,7 +609,7 @@ export const PLOT_PRESETS = [
     "description": "局部位置 X 轴估计值与 setpoint。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_local_position"
@@ -675,7 +675,7 @@ export const PLOT_PRESETS = [
     "description": "局部位置 Y 轴估计值与 setpoint。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_local_position"
@@ -741,7 +741,7 @@ export const PLOT_PRESETS = [
     "description": "局部位置 Z 轴估计值与 setpoint（向上为正）。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_local_position"
@@ -807,7 +807,7 @@ export const PLOT_PRESETS = [
     "description": "三轴速度估计值与 setpoint（vx/vy/vz）。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_local_position"
@@ -901,7 +901,7 @@ export const PLOT_PRESETS = [
     "description": "视觉里程计位置（仅当 topic 存在时显示）。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_visual_odometry"
@@ -964,7 +964,7 @@ export const PLOT_PRESETS = [
     "description": "视觉里程计速度（仅当 topic 存在时显示）。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_visual_odometry"
@@ -1027,7 +1027,7 @@ export const PLOT_PRESETS = [
     "description": "视觉里程计姿态角（仅当 topic 存在时显示）。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_visual_odometry"
@@ -1090,7 +1090,7 @@ export const PLOT_PRESETS = [
     "description": "视觉里程计角速率（仅当 topic 存在时显示）。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_visual_odometry"
@@ -1153,7 +1153,7 @@ export const PLOT_PRESETS = [
     "description": "视觉里程计延迟（仅当 topic 存在时显示）。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_visual_odometry"
@@ -1202,7 +1202,7 @@ export const PLOT_PRESETS = [
     "description": "地速 / 真空速 / 指示空速与 GPS 地速、空速 setpoint。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "airspeed",
@@ -1279,7 +1279,7 @@ export const PLOT_PRESETS = [
     "description": "TECS 高度变化率与 setpoint（固定翼/VTOL）。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "tecs_status"
@@ -1335,7 +1335,7 @@ export const PLOT_PRESETS = [
     "description": "手动控制输入（遥控器/手柄）：Roll/Pitch/Yaw/Throttle + Aux + Flight Mode + Kill Switch。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "manual_control_setpoint"
@@ -1445,7 +1445,7 @@ export const PLOT_PRESETS = [
     "description": "Actuator Controls 0：扭矩轴（Roll/Pitch/Yaw）+ 推力。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_torque_setpoint",
@@ -1512,7 +1512,7 @@ export const PLOT_PRESETS = [
     "description": "第二组 Actuator Controls（仅 VTOL/固定翼配置时存在）。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_torque_setpoint",
@@ -1596,7 +1596,7 @@ export const PLOT_PRESETS = [
     "description": "执行机构输出（Motor/Servo 或 Main/AUX/EXTRA），取决于 dynamic_control_alloc。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "actuator_motors",
@@ -1939,7 +1939,7 @@ export const PLOT_PRESETS = [
     "description": "传感器原始加速度（sensor_combined.accelerometer_m_s2）。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "sensor_combined"
@@ -2002,7 +2002,7 @@ export const PLOT_PRESETS = [
     "description": "每个 IMU 的高频振动指标 IMU0-3 合在一张图上，参考线 4.905 / 9.81。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_imu_status"
@@ -2083,7 +2083,7 @@ export const PLOT_PRESETS = [
     "description": "传感器原始角速度（sensor_combined.gyro_rad）。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "sensor_combined"
@@ -2146,7 +2146,7 @@ export const PLOT_PRESETS = [
     "description": "FIFO 加速度计原始数据（每 IMU 一张），仅当 sensor_accel_fifo 存在时显示。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "sensor_accel_fifo"
@@ -2209,7 +2209,7 @@ export const PLOT_PRESETS = [
     "description": "FIFO 陀螺仪原始数据（每 IMU 一张），仅当 sensor_gyro_fifo 存在时显示。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "sensor_gyro_fifo"
@@ -2272,7 +2272,7 @@ export const PLOT_PRESETS = [
     "description": "传感器原始磁场强度（magnetometer_ga），兼容 vehicle_magnetometer / sensor_combined。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_magnetometer",
@@ -2339,7 +2339,7 @@ export const PLOT_PRESETS = [
     "description": "距离传感器读数（current_distance / variance / dist_bottom）。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "distance_sensor"
@@ -2419,7 +2419,7 @@ export const PLOT_PRESETS = [
     "description": "GPS 不确定度：eph / epv / hdop / vdop / s_variance_m_s / satellites_used / fix_type。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_gps_position",
@@ -2518,7 +2518,7 @@ export const PLOT_PRESETS = [
     "description": "GPS 噪声与干扰指示器。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_gps_position",
@@ -2577,7 +2577,7 @@ export const PLOT_PRESETS = [
     "description": "推力与磁场强度范数对比。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_magnetometer",
@@ -2644,7 +2644,7 @@ export const PLOT_PRESETS = [
     "description": "电池电压 / 电流 / 放电量 / 剩余电量 / OCV / 内阻 / 5V / 3.3V。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "battery_status"
@@ -2762,7 +2762,7 @@ export const PLOT_PRESETS = [
     "description": "传感器温度：Baro / Accel / Airspeed / Battery / ESC。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "sensor_baro"
@@ -2852,7 +2852,7 @@ export const PLOT_PRESETS = [
     "description": "EKF 健康/超时/创新检验标志位。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "estimator_status"
@@ -2974,7 +2974,7 @@ export const PLOT_PRESETS = [
     "description": "失效保护标志：failsafe / user_took_over / failsafe_flags。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "vehicle_status"
@@ -3187,7 +3187,7 @@ export const PLOT_PRESETS = [
     "description": "CPU 负载与 RAM 使用率。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "cpuload"
@@ -3243,7 +3243,7 @@ export const PLOT_PRESETS = [
     "description": "sensor_combined 采样间隔与 estimator_status time_slip。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "sensor_combined"
@@ -3292,7 +3292,7 @@ export const PLOT_PRESETS = [
     "description": "地图上的飞行轨迹（原始 GNSS），多条轨道叠画、可点选隐藏。",
     "conditions": {
       "firmware": "any",
-      "airframe": "any",
+      "vehicle": "any",
       "topics": [
         [
           "sensor_gps",

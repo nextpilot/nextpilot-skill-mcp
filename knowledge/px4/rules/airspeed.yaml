@@ -11,7 +11,7 @@ order: 1
 # 机型未知过去靠机架轴放行 + 一条 skip 记录留痕，现在 skip 已退役——未知直接被轴挡在门外。
 # 原外层条件还要求存在 vehicle_attitude_setpoint（本经验并不读它），该条件一并去掉。
 conditions:
-    airframe: fixed_wing
+    vehicle: fixed_wing
     topics:
         - airspeed_validated
 

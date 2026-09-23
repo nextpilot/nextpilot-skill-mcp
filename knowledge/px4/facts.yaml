@@ -84,7 +84,7 @@ vehicle_types: { 1: rotary_wing, 2: fixed_wing, 3: rover, 4: airship }
 
 # 机架名的简写（写规则时用，构建期换成规范名——产物里只留规范名，引擎不认识别名）
 # 注意 `vtol` 在 PX4 里既是机型也可能出现在别的上下文，这里就按字面对待，不做语义推断。
-airframe_aliases: { mc: rotary_wing, fw: fixed_wing }
+vehicle_aliases: { mc: rotary_wing, fw: fixed_wing }
 
 # 飞行模式的显示名（报告页用；码值同 PX4 commander，与 meta/<tag>.json 的 nav_state 枚举同源）
 nav_state_names:

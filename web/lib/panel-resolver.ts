@@ -340,7 +340,7 @@ function firstRangeTopic(out: UnifiedAxes): string | null {
 }
 
 /** 预设整份是否适用：声明的 topic 至少有一个在日志里（与规则 conditions.topics 同一语义）。
- *  firmware / airframe 这两个轴留给引擎侧（图上用不着按机型换图），这里只按 topic 判。 */
+ *  firmware / vehicle 这两个轴留给引擎侧（图上用不着按机型换图），这里只按 topic 判。 */
 export function presetApplies(m: TopicManifest, conditions?: { topics?: string[][] }): boolean {
     const names = new Set(m.topics.map((t) => t.topic));
     for (const cands of conditions?.topics ?? []) {

@@ -83,15 +83,16 @@ def targets_of(expr_src):
 
 
 def main(argv):
-    log, rule_id = Path(argv[1]), argv[2]
-    ns = build_namespace(log)
+    # 局部变量不能叫 log：模块顶部的 `log` 是 logger，被日志路径顶掉后下面每次 log.info 都会崩。
+    log_path, rule_id = Path(argv[1]), argv[2]
+    ns = build_namespace(log_path)
     rule = next((r for r in ns["RULES"] if r["id"] == rule_id), None)
     if rule is None:
         log.warning("找不到规则 %s；现有：%s" % (rule_id, ", ".join(r["id"] for r in ns["RULES"])))
         return 2
     env = ns["_rule_env"]()
     log.info("rule %s  group=%s  checks=%s" % (rule_id, rule.get("group"), (rule.get("outputs") or {}).get("check")))
-    log.info("  firmware=%s airframe=%s skip=%s" % (rule.get("firmware"), rule.get("airframe"), rule.get("skip")))
+    log.info("  firmware=%s vehicle=%s skip=%s" % (rule.get("firmware"), rule.get("vehicle"), rule.get("skip")))
     declared = []
     for i, expr in enumerate(rule.get("compute") or [], 1):
         log.info("\n  [%d] %s" % (i, expr))

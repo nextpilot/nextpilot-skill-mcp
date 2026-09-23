@@ -44,12 +44,12 @@ for (const f of readdirSync(resolve(KN, "rules"))
             for (const k of Object.keys(r.conditions)) {
                 if (!(k in props.conditions.properties)) bad(where, `conditions.${k} 不在 schema 里`);
             }
-            const af = r.conditions.airframe;
+            const af = r.conditions.vehicle;
             if (af !== undefined) {
                 const list = Array.isArray(af) ? af : [af];
                 for (const v of list) {
-                    if (!props.conditions.properties.airframe.oneOf[0].enum.includes(v)) {
-                        bad(where, `airframe「${v}」不在 enum`);
+                    if (!props.conditions.properties.vehicle.oneOf[0].enum.includes(v)) {
+                        bad(where, `vehicle「${v}」不在 enum`);
                     }
                 }
             }

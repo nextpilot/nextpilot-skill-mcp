@@ -47,7 +47,7 @@ const KNOWLEDGE: { icon: React.ReactNode; title: string; titleEn: string; desc: 
         title: "检查规则",
         titleEn: "Check rules",
         desc: "一条经验一个 YAML：阈值、适用固件与机架、判定表达式、官方文档出处都写在里面，可评审、可回归。",
-        descEn: "One YAML per piece of experience: thresholds, applicable firmware and airframe, the decision expression and the doc reference.",
+        descEn: "One YAML per piece of experience: thresholds, applicable firmware and vehicle, the decision expression and the doc reference.",
     },
     {
         icon: <BookOpen className="h-4 w-4" />,

@@ -17,7 +17,7 @@
   //
   // **那份 schema 是构建期生成的**（`cd web && pnpm build:kb` →
   // knowledge/px4/rules-editor-schema.generated.json），**不要手改**：它的词表
-  // （group / airframe / severity / 算子名）全部从 facts.yaml 与 engine/ 派生。
+  // （group / vehicle / severity / 算子名）全部从 facts.yaml 与 engine/ 派生。
   // 手抄一份就是第二份真源 —— 改了 facts.yaml 而 schema 没跟上时，IDE 会拿旧词表
   // 去纠正新写法，比完全没有提示更糟。`pnpm build:kb --check` 会比对它与源是否一致。
   //

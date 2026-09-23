@@ -11,7 +11,7 @@
 **已完成**：15 组过程式检查（原 `engine/ulog_checks.py` 1095 行，已迁移为 `engine/rule_engine.py`）→ **32 条自包含经验**（含 4 条数据质量
 guard），**73 个通用算子**；`px4-thresholds.toml` 已退场（阈值随各自经验内联）。引擎侧每个
 检查块只剩一行 `_run_rules("<slot>")`。6 条真实日志的冻结基线逐字段一致；生成产物真实执行
-通过；构建期护栏生效（算子名/入参数量、表达式与文案里的未声明名字、缺 `firmware`/`airframe`、
+通过；构建期护栏生效（算子名/入参数量、表达式与文案里的未声明名字、缺 `firmware`/`vehicle`、
 guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 
 **2026-09-16 追加**：报告页数据层（`engine/report_data.py`）的若干硬规则——时间基准改为
@@ -118,7 +118,7 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 | ---------------------------------------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `compute`                                                                          | 算子节点链 `- {out: x, from: a.b, op: max}`，构建期编译成表达式 | **直接写表达式** `- x = max(a.b)`；节点写法已从构建期移除（写了会报错并提示改写）。85 个节点 → 70 条表达式                                                                                   |
 | `requires` / `not_applicable` / `silent_when` / `skip_reason_no_data`              | 四个字段各管一摊                                                | 合成 **一个 `skip` 列表** `[{when: 表达式, reason?: 文案}]`（**不写 `reason` = 静默**）；"数据不足"靠新增内置变量 `no_data` 表达。— **2026-09-18 起 `skip` 与 `no_data` 都已退役**，见上一节 |
-| `firmware` / `airframe`                                                            | `any` ｜ `">=1.15"` ｜ `fixed_wing` 这类自造小语言              | **Python 表达式**（`"True"` / `"is_fixed_wing"`），在 compute 之前求值、只认内置变量                                                                                                         |
+| `firmware` / `vehicle`                                                             | `any` ｜ `">=1.15"` ｜ `fixed_wing` 这类自造小语言              | **Python 表达式**（`"True"` / `"is_fixed_wing"`），在 compute 之前求值、只认内置变量                                                                                                         |
 | `slot`                                                                             | 槽位（技术隐喻）                                                | **`group`**；`facts.yaml` 的 `slot_order` → `group_order`，`nav_groups` → `nav_state_groups`（消歧义）                                                                                       |
 | `version`/`category`/`status`/`author`/`license`/`changelog`/`outputs.check`/`doc` | 每条规则各写一遍                                                | **按 `group` 从 `facts.yaml` 的 `rule_meta` 派生**，偏离时才显式写。每条规则顶层字段 17 → 10                                                                                                 |
 | `_run_rules` 的判定顺序                                                            | 不适用声明 → 轴 → 依赖                                          | **轴先判**（"这台机器根本不适用"仍静默），再判 `skip` 映射；compute 失败后再判一轮（`no_data`）。— **2026-09-18 起**：轴 → `topics` → ran → compute，没有第二轮了                            |
@@ -179,14 +179,14 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 ```yaml
 conditions: # 整块可省
   firmware: any # any / ">=1.15" / ">=1.14,<1.15"；省 = any
-  airframe: any # any / 机架名 / 机架名列表；省 = any
+  vehicle: any # any / 机架名 / 机架名列表；省 = any
   topics: # 项内 `||` = 其中任意一个在日志里就够，项间 = 都要有
     - vehicle_gps_position || sensor_gps
   precheck: # 先决条件：命中即不跑（文案就是命中的那句）
     - "not HAS_ARMED"
 ```
 
-四个键的分工：`firmware` / `airframe` 判"这台机器是不是本来就无关"，`topics` 判"日志里
+四个键的分工：`firmware` / `vehicle` 判"这台机器是不是本来就无关"，`topics` 判"日志里
 有没有这份数据"，`precheck` 放"不用算就知道跟我无关"的场合（如 `not HAS_ARMED` 就谈不上
 飞行中的零偏判定）。`precheck` 在 compute **之前**求值，所以只认内置变量与 `has_topic()`——
 **没有 `no_data`**："数据不足"由 compute 抛异常自己表达。
@@ -202,8 +202,8 @@ conditions: # 整块可省
   原生判 `topics`。`skip` 在 YAML / 产物 / 引擎里都不存在；`has_topic()` 保留（guard 与将来的
   表达式仍可用）。
 - **构建期**：`requiredKeys` 去掉两轴；`conditions` 有未知键、`topics` 项不是 topic 名、
-  `firmware`/`airframe` 不合规一律构建失败；**顶层残留 `skip` 会明确报错**，不静默忽略。
-  归一化后产物里仍是两个平铺的 `firmware` / `airframe` + 新的 `topics` 嵌套列表
+  `firmware`/`vehicle` 不合规一律构建失败；**顶层残留 `skip` 会明确报错**，不静默忽略。
+  归一化后产物里仍是两个平铺的 `firmware` / `vehicle` + 新的 `topics` 嵌套列表
   （`lint_rules.py` 读产物取 `firmware`，所以它不用改）。
 - **基线差异**（这一轮重冻结的依据，全部落在 `checksSkipped`）：`motor-balance` 的
   `no_data` 行消失（6 份日志里都有）、`imu-bias` 的 `not has_armed` 行消失、
@@ -219,7 +219,7 @@ conditions: # 整块可省
   （`not HAS_ARMED`）显式拦下**，那层 `_try` 仍去掉——它现在只负责"整份日志都没有零偏数据"
   这一种中止。顺带一提：`require_true` 的"门控"语义只有在**下游真的引用了那个变量**时才成立，
   这是个容易踩的坑（airspeed 的 `cruise_ok` 同样没人引用）。
-- **内置变量一律大写**（`FW_MINOR` / `AIRFRAME` / `IS_FIXED_WING` / `DURATION_S` / `ARMED_S` /
+- **内置变量一律大写**（`FW_MINOR` / `VEHICLE` / `IS_FIXED_WING` / `DURATION_S` / `ARMED_S` /
   `ARMED_INTERVALS` / `T0_US` / `HAS_ARMED` / `RESTART_DETECTED` / `DROPOUT_MS` / `MESSAGES`）：
   规则里自己赋的变量是小写，一眼分得清"这个数是引擎给的还是自己算的"。事实源是
   `engine/providers/api.py` 的 `BUILTIN_VARIABLES`（`build-knowledge.mjs` 的 §6.1 表与
@@ -235,11 +235,11 @@ conditions: # 整块可省
 目标流程写死为 **conditions 拦 → compute 算 → 判定**，前两步的失败一律**自动留痕**、
 不用作者写文案：
 
-| 步骤                                            | 不满足时                                                   |
-| ----------------------------------------------- | ---------------------------------------------------------- |
-| `conditions.firmware` / `airframe` / `precheck` | **记一条 skipped + 自动文案**（原先静默，2026-09-18 起改） |
-| `conditions.topics`                             | 记一条 skipped，文案自动生成（`X not in log`）             |
-| **compute 抛异常**                              | **记一条 skipped：`数据不足，本条没算出结论`**             |
+| 步骤                                           | 不满足时                                                   |
+| ---------------------------------------------- | ---------------------------------------------------------- |
+| `conditions.firmware` / `vehicle` / `precheck` | **记一条 skipped + 自动文案**（原先静默，2026-09-18 起改） |
+| `conditions.topics`                            | 记一条 skipped，文案自动生成（`X not in log`）             |
+| **compute 抛异常**                             | **记一条 skipped：`数据不足，本条没算出结论`**             |
 
 - 因此 **`ran()` 统一挪到 compute 成功之后**——同一条 check 不能既 ran 又 skipped。
   `ran_on_success` 字段**已删**（它想要的就是这个行为，现在成了默认）；`ran_when` 保留
@@ -315,7 +315,7 @@ conditions: # 整块可省
      裸写的字段引用**不能**带实例下标（`cpuload[0].load` 会报错并提示改写）。
 2. **`provider._read_concat` 删除**：以前"不加修饰 = 所有实例拼成一条"是默认语义，
    隐性且危险（一条曲线里混着几个传感器的数据）。现在必须写明要哪个实例。
-3. **机架名支持简写**：`airframe: mc` / `fw`（表在 `facts.yaml` 的 `airframe_aliases`），
+3. **机架名支持简写**：`vehicle: mc` / `fw`（表在 `facts.yaml` 的 `vehicle_aliases`），
    **构建期归一化成规范名**，产物里只留 `rotary_wing` / `fixed_wing`——引擎与适配器都不认识别名。
 4. **`ref(..., unit="期望单位")`**：把取到的值换算成声明的单位再交给算子。
    - 源单位**不在规则里猜**：构建期按 `meta/topic-map.yaml` 找到字典键、去 `meta/<tag>.json`
@@ -366,7 +366,7 @@ conditions: # 整块可省
 w_p95 = percentile(hypot(ref("estimator_wind.windspeed_north", "wind_estimate.windspeed_north"), …))
 ```
 
-规则级 `firmware: ">=1.15"` 还在，但它管的是"**整条经验**适不适用"（连同 `airframe` / `topics`
+规则级 `firmware: ">=1.15"` 还在，但它管的是"**整条经验**适不适用"（连同 `vehicle` / `topics`
 一起进 `conditions`），不是"该读哪个字段"。
 
 **已经删掉的两样**（别再写回去）：节点级 `when_fw=`（同一字段换了**语义**就拆成两条规则，
@@ -560,7 +560,7 @@ load_crit = 0.95
   web/workers/pyodide-px4log-engine.ts   ← Python 源码，内联 __RULES__/__FACTS__/__TOPICS__ 的 JSON 字面量
   web/workers/fault-kb.generated.json
         ↓ 浏览器运行时
-  Web Worker + Pyodide  →  执行 Python：基础事实层 → 匹配 firmware/airframe → 取字段
+  Web Worker + Pyodide  →  执行 Python：基础事实层 → 匹配 firmware/vehicle → 取字段
                             → 调 operators.py 的 fn → 受限表达式求值 → 发射 finding
 ```
 
@@ -570,7 +570,7 @@ load_crit = 0.95
    零运行时解析开销、离线也能跑。
 2. **表达式求值全在浏览器端**，但只用 Python 标准库 `ast` 做白名单求值——Pyodide 自带，
    不需要新 wheel。
-3. **校验全在构建期**：写错的经验（缺 `airframe`、算子名拼错、表达式引用未声明变量）
+3. **校验全在构建期**：写错的经验（缺 `vehicle`、算子名拼错、表达式引用未声明变量）
    在你 `pnpm build:kb` 时就失败，**根本进不了浏览器**，不会等到用户端才炸。
 4. **不采用"浏览器直接读 YAML"**：那要多带一个 JS YAML 解析器、每次加载解析 20+ 个文件，
    而且丢掉构建期校验（错误延迟到用户端）。构建期编译在这里是明确更优的选择。
@@ -611,7 +611,7 @@ def eval_expr(expr, env):
 
 # ── 框架主循环 ──
 for rule in RULES + GUARDS:
-    if not match_version(rule["firmware"], FW) or not match_airframe(rule["airframe"], vehicle_type):
+    if not match_version(rule["firmware"], FW) or not match_vehicle(rule["vehicle"], vehicle_type):
         continue
     if rule.get("requires") and not has_topics(rule["requires"]):
         skipped(rule["id"], "缺少依赖 topic"); continue
@@ -659,14 +659,14 @@ for rule in RULES + GUARDS:
 
 ### 第 2 层：适用范围 —— 比「固件 + 机架」更细的边界
 
-| 字段          | 为什么必须有                                                                                                               |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `firmware`    | 适用固件（`any` \| `">=1.15"` \| `"<1.15"` \| `">=1.14,<1.15"`）                                                           |
-| `airframe`    | 适用机架（`any` \| `[rotary_wing, fixed_wing, vtol, rover]`）                                                              |
-| `phase`       | 只在某些飞行阶段判定（与 `firmware`/`airframe` 并列的第三个适用轴）。节点级的 `scope.phase` 同名：同一个概念、更窄的作用域 |
-| `min_samples` | 样本不足不出结论，抗小样本误报                                                                                             |
-| `requires`    | **数据依赖**：缺哪些 topic/字段就 `skipped`。这是现在命令式 `skipped()` 的声明式版本——声明出来后不会再漏                   |
-| `excludes_if` | **反向证据**：命中这些标签/条件时本条失效。故障库已有 `exclude_tags`，经验层一直缺                                         |
+| 字段          | 为什么必须有                                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `firmware`    | 适用固件（`any` \| `">=1.15"` \| `"<1.15"` \| `">=1.14,<1.15"`）                                                          |
+| `vehicle`     | 适用机架（`any` \| `[rotary_wing, fixed_wing, vtol, rover]`）                                                             |
+| `phase`       | 只在某些飞行阶段判定（与 `firmware`/`vehicle` 并列的第三个适用轴）。节点级的 `scope.phase` 同名：同一个概念、更窄的作用域 |
+| `min_samples` | 样本不足不出结论，抗小样本误报                                                                                            |
+| `requires`    | **数据依赖**：缺哪些 topic/字段就 `skipped`。这是现在命令式 `skipped()` 的声明式版本——声明出来后不会再漏                  |
+| `excludes_if` | **反向证据**：命中这些标签/条件时本条失效。故障库已有 `exclude_tags`，经验层一直缺                                        |
 
 ### 第 3 层：计算（数据流）—— 支持多输入 / 多输出 / 可串联
 
@@ -829,7 +829,7 @@ changelog:
   - { version: 1.3.0, date: 2026-09-14, note: "削波阈值按 5 份真实日志校准" }
 
 firmware: ">=1.14"
-airframe: any
+vehicle: any
 phase: [takeoff, hover, maneuver, fw_cruise, cruise]
 min_samples: 50
 requires:
@@ -919,9 +919,9 @@ fixtures:
 
 ## 必填 vs 可选（防"空洞经验"）
 
-- **必填**：`id` `name` `firmware` `airframe` `compute`(≥1 个算子节点，每个节点的
+- **必填**：`id` `name` `firmware` `vehicle` `compute`(≥1 个算子节点，每个节点的
   `in`/`out` 数量须与算子签名一致) `triggers`(≥1，每项 `expr/severity` 齐全) `emit`
-- **`firmware`/`airframe` 即使不限也必须显式写 `any`** —— 不允许"没写就是任意"的隐式豁免，
+- **`firmware`/`vehicle` 即使不限也必须显式写 `any`** —— 不允许"没写就是任意"的隐式豁免，
   隐式豁免正是空洞条目的入口
 - 可选但强烈建议：`requires` `min_samples` `confidence` `safety` `thresholds_source`
   `calibration` `fixtures` —— 缺失时构建成功但打警告（列出"未声明数据依赖的经验"清单）
@@ -944,8 +944,8 @@ fixtures:
 | 变量                                                  | 含义                                                  |
 | ----------------------------------------------------- | ----------------------------------------------------- |
 | `firmware` `fw_major` `fw_minor` `fw_profile`         | 固件版本对象 / 主次版本号 / `px4-1.15+`\|`px4-legacy` |
-| `airframe` `vehicle_type`                             | 机架字符串（`rotary_wing`…）/ PX4 原始码（1/2/3/4）   |
-| `is_rotary_wing` `is_fixed_wing` `is_vtol` `is_rover` | 布尔别名，比 `airframe == 'fixed_wing'` 好读          |
+| `vehicle` `vehicle_type`                              | 机架字符串（`rotary_wing`…）/ PX4 原始码（1/2/3/4）   |
+| `is_rotary_wing` `is_fixed_wing` `is_vtol` `is_rover` | 布尔别名，比 `vehicle == 'fixed_wing'` 好读           |
 | `duration_s` `armed_s`                                | 日志总时长 / armed 总时长（`armed_s` 现由 guard 用）  |
 | `dropout_ms` `restart_detected`                       | 丢包总时长 / 是否中途重启                             |
 | `phases`                                              | 本次日志出现过的阶段集合（`'hover' in phases`）       |
@@ -1357,7 +1357,7 @@ knowledge/px4/
 
 ## 验证
 
-1. **反空洞护栏**：删掉某条的 `airframe` 或 `triggers` → `pnpm build:kb` 必须失败；
+1. **反空洞护栏**：删掉某条的 `vehicle` 或 `triggers` → `pnpm build:kb` 必须失败；
    算子名拼错、表达式引用未声明变量同样失败
 2. **等价回归（核心）**：`compare_baseline.py` 要求 5 个日志输出与冻结基线逐条逐字段完全相同。
    基线：ce302d3b=9/F004、39f26cce=4/F001·F006·F009、95b077d9=0、两个 sample=0

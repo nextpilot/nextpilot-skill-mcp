@@ -15,7 +15,7 @@ order: 5 # 可选，页面里这组图的先后（缺省 999）
 # ── 适用范围：整块可省（省 = 总是适用）。**与规则同形**（同一份校验代码）
 conditions:
   topics: [battery_status] # 项内 `||` = 任意一个存在即可；项间 = 都要有
-  # firmware / airframe / precheck 同样可用（图上一般只用 topics）
+  # firmware / vehicle / precheck 同样可用（图上一般只用 topics）
 
 # ── 换算节点：可选，整块可省。与规则的 compute **同一套表达式与算子**（engine/operators.py）
 #    用途：图上要先算再画（四元数→欧拉角、多字段合成、按版本分流…）。算出来的变量供 ydata 引用。

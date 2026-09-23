@@ -37,7 +37,7 @@ import {
     normalizeCompute,
     validateComputeList,
     isFirmwareSpec,
-    isAirframeSpec,
+    isVehicleSpec,
     parseTopicReq,
     collectRefs,
     normalizeUnit,
@@ -293,7 +293,7 @@ function parseProviderApi(py) {
 }
 
 /** 校验并加载 rules/*.yaml；任何不完整都构建失败（杜绝"空洞经验"） */
-function loadRules(dir, signatures, ruleMeta, airframes) {
+function loadRules(dir, signatures, ruleMeta, vehicles) {
     const files = readdirSync(dir)
         .filter((f) => f.endsWith(".yaml"))
         .sort();
@@ -349,7 +349,7 @@ function loadRules(dir, signatures, ruleMeta, airframes) {
             ]) {
                 if (raw[key] !== undefined) throw new Error(`${where}: ${key} 已移除——${hint}`);
             }
-            const cond = normalizeConditions(raw.conditions, where, airframes);
+            const cond = normalizeConditions(raw.conditions, where, vehicles);
             delete raw.conditions;
             Object.assign(raw, cond);
             if (seen.has(raw.id)) throw new Error(`${where}: 规则 id 重复 ${raw.id}`);
@@ -621,21 +621,21 @@ function resolveFieldUnits(refs, metaDir) {
 /**
 
 /**
- * 机架名归一化：`mc` / `fw` 这类简写换成规范名（表在 facts.yaml 的 `airframe_aliases`）。
+ * 机架名归一化：`mc` / `fw` 这类简写换成规范名（表在 facts.yaml 的 `vehicle_aliases`）。
  *
- * 简写只是**书写方便**：产物里只留规范名，所以引擎 `_match_airframe` 与各适配器都不用
+ * 简写只是**书写方便**：产物里只留规范名，所以引擎 `_match_vehicle` 与各适配器都不用
  * 认识别名——"同一个意思只留一种写法"这条在运行时那边成立。
  * 表里没有、又不在合法机架名集合（facts.yaml 的 `vehicle_types` 值 + unknown）里的 → 报错，
  * 不静默放过（写错的机架名会让那条经验**永远不跑**，最难发现的一种坏）。
  */
-function normalizeAirframe(spec, airframes, where) {
+function normalizeVehicle(spec, vehicles, where) {
     const canon = (name) => {
         const n = String(name).trim();
-        if (airframes.aliases[n]) return airframes.aliases[n];
-        if (airframes.valid.has(n)) return n;
+        if (vehicles.aliases[n]) return vehicles.aliases[n];
+        if (vehicles.valid.has(n)) return n;
         throw new Error(
-            `${where}: conditions.airframe 里的「${n}」不认识（可用：${[...airframes.valid].sort().join(" / ")}；` +
-                `简写见 facts.yaml 的 airframe_aliases）`,
+            `${where}: conditions.vehicle 里的「${n}」不认识（可用：${[...vehicles.valid].sort().join(" / ")}；` +
+                `简写见 facts.yaml 的 vehicle_aliases）`,
         );
     };
     if (typeof spec === "string") return spec.trim() === "any" ? "any" : canon(spec);
@@ -915,7 +915,7 @@ function compileMap(out, where, declaredVars, refs) {
  * 内联在 `_run_rules` 里的）。写了非默认值就在**构建期**报错，别让它在运行期悄悄不生效。
  */
 function withMapConditions(map, conditions, where) {
-    const unsupported = ["firmware", "airframe"].filter((k) => conditions[k] && conditions[k] !== "any");
+    const unsupported = ["firmware", "vehicle"].filter((k) => conditions[k] && conditions[k] !== "any");
     if (conditions.precheck) unsupported.push("precheck");
     if (unsupported.length) {
         throw new Error(
@@ -927,7 +927,7 @@ function withMapConditions(map, conditions, where) {
 }
 
 /** 一份预设 → `{plot, map, refs}`（plot 进前端产物，map 进 facts.track）。 */
-function compilePreset(spec, where, airframes) {
+function compilePreset(spec, where, vehicles) {
     for (const key of ["id", "title", "description", "outputs"]) {
         if (spec[key] === undefined || spec[key] === null || spec[key] === "") {
             throw new Error(`${where}: 缺少必填字段 ${key}`);
@@ -936,7 +936,7 @@ function compilePreset(spec, where, airframes) {
     if (spec.order !== undefined && !Number.isFinite(Number(spec.order))) {
         throw new Error(`${where}: order 必须是数字`);
     }
-    const conditions = normalizeConditions(spec.conditions, where, airframes);
+    const conditions = normalizeConditions(spec.conditions, where, vehicles);
     const compute = (spec.compute ?? []).map((s) => String(s).trim());
     let declaredVars = new Set();
     if (compute.length) {
@@ -979,7 +979,7 @@ function compilePreset(spec, where, airframes) {
 }
 
 /** plot/ 下所有预设 → `{plots, mapSpec, refs}`。`*-template.yml` 是给人抄的骨架，不加载。 */
-function loadPresets(dir, airframes) {
+function loadPresets(dir, vehicles) {
     const files = readdirSync(dir)
         .filter((f) => f.endsWith(".yml") && !f.endsWith("-template.yml"))
         .sort();
@@ -990,7 +990,7 @@ function loadPresets(dir, airframes) {
     let mapSpec = null;
     for (const file of files) {
         const where = `plot/${file}`;
-        const { plot, map, refs: r } = compilePreset(parseYaml(read(resolve(dir, file))), where, airframes);
+        const { plot, map, refs: r } = compilePreset(parseYaml(read(resolve(dir, file))), where, vehicles);
         if (seen.has(plot.id)) throw new Error(`${where}: 预设 id 重复 ${plot.id}`);
         seen.add(plot.id);
         if (map) {
@@ -1009,21 +1009,21 @@ function loadPresets(dir, airframes) {
  * 适用范围（`conditions`）→ 运行期形态。**规则与绘图预设共用这一处**（别造第三种方言）：
  *
  *   firmware  固件约束串（any / ">=1.15" / ">=1.14,<1.15"），由 provider.match_version 解释
- *   airframe  any / 机架名 / 机架名列表；简写（mc / fw）在这里换成规范名
+ *   vehicle  any / 机架名 / 机架名列表；简写（mc / fw）在这里换成规范名
  *   topics    日志里得有这些 topic，缺了记一条 skipped；项内 `||` = 任意一个存在即可
  *   precheck  compute **之前**求值的先决条件（命中即不跑，只认内置变量与 has_topic()）
  *
  * 没写的键**省略掉**——产物里不留空壳。退役的顶层键（skip / ran_on_success / known_legacy）
  * 由调用方各自拦（规则那边有历史包袱，预设那边写了直接报错）。
  */
-function normalizeConditions(raw, where, airframes) {
+function normalizeConditions(raw, where, vehicles) {
     const cond = raw ?? {};
     if (typeof cond !== "object" || cond === null || Array.isArray(cond)) {
-        throw new Error(`${where}: conditions 必须是对象（可用键：firmware / airframe / topics / precheck）`);
+        throw new Error(`${where}: conditions 必须是对象（可用键：firmware / vehicle / topics / precheck）`);
     }
     for (const k of Object.keys(cond)) {
-        if (!["firmware", "airframe", "topics", "precheck"].includes(k)) {
-            throw new Error(`${where}: conditions 里有未知键 ${k}（可用：firmware / airframe / topics / precheck）`);
+        if (!["firmware", "vehicle", "topics", "precheck"].includes(k)) {
+            throw new Error(`${where}: conditions 里有未知键 ${k}（可用：firmware / vehicle / topics / precheck）`);
         }
     }
     if (cond.firmware !== undefined && !isFirmwareSpec(cond.firmware)) {
@@ -1032,10 +1032,10 @@ function normalizeConditions(raw, where, airframes) {
                 `实际是 ${JSON.stringify(cond.firmware)}`,
         );
     }
-    if (cond.airframe !== undefined && !isAirframeSpec(cond.airframe)) {
+    if (cond.vehicle !== undefined && !isVehicleSpec(cond.vehicle)) {
         throw new Error(
-            `${where}: conditions.airframe 必须是 any / 机架名 / 机架名列表（如 [fixed_wing, unknown]），` +
-                `实际是 ${JSON.stringify(cond.airframe)}`,
+            `${where}: conditions.vehicle 必须是 any / 机架名 / 机架名列表（如 [fixed_wing, unknown]），` +
+                `实际是 ${JSON.stringify(cond.vehicle)}`,
         );
     }
     if (cond.topics !== undefined && !Array.isArray(cond.topics)) {
@@ -1064,7 +1064,7 @@ function normalizeConditions(raw, where, airframes) {
     }
     const out = {
         firmware: cond.firmware ?? "any",
-        airframe: normalizeAirframe(cond.airframe ?? "any", airframes, where),
+        vehicle: normalizeVehicle(cond.vehicle ?? "any", vehicles, where),
     };
     if (topics.length) out.topics = topics;
     if (cond.precheck !== undefined) out.precheck = cond.precheck.map((s) => s.trim());
@@ -1080,7 +1080,7 @@ function fmtApplicability(raw) {
     const parts = [];
     // conditions 的三个键（不限就整个省掉）：固件 / 机架 / 依赖的 topic
     if (raw.firmware !== "any") parts.push("固件 " + raw.firmware);
-    if (raw.airframe !== "any") parts.push("机架 " + listOr(raw.airframe, ""));
+    if (raw.vehicle !== "any") parts.push("机架 " + listOr(raw.vehicle, ""));
     for (const cand of raw.topics ?? []) parts.push("需要 " + cand.join(" 或 "));
     for (const w of raw.precheck ?? []) parts.push("不跑当 " + w);
     return parts.join(" ｜ ") || "总是适用";
@@ -1513,18 +1513,18 @@ function build() {
     if (Object.keys(signatures).length === 0) throw new Error("operators.py 里没解析到任何算子签名");
     // facts.yaml 要在规则校验**之前**读：规则的 category / doc / 身份块默认值都在 rule_meta 里
     const facts = parseYaml(read(FACTS_PATH));
-    const airframes = {
+    const vehicles = {
         // 简写 → 规范名（facts.yaml 里的人工数据）；合法名 = vehicle_types 的值 + unknown
-        aliases: facts.airframe_aliases ?? {},
+        aliases: facts.vehicle_aliases ?? {},
         valid: new Set([...Object.values(facts.vehicle_types ?? {}).map(String), "unknown"]),
     };
-    const { rules, sources } = loadRules(RULES_DIR, signatures, facts.rule_meta ?? {}, airframes);
+    const { rules, sources } = loadRules(RULES_DIR, signatures, facts.rule_meta ?? {}, vehicles);
     // guards 类经验没有 compute（其判定在 outputs.guard_tags），逐条校验已在 loadRules 里做
 
     // 3) 绘图预设（plot/*.yml）—— 曲线与地图**同一套声明**。编译结果两处消费：
     //    · 曲线与布局 → plots.generated.ts（前端）
     //    · `container: map` 那一份 → facts.track（provider 在引擎侧取数、换算、抽稀）
-    const { plots, mapSpec, refs: plotRefs } = loadPresets(PLOT_DIR, airframes);
+    const { plots, mapSpec, refs: plotRefs } = loadPresets(PLOT_DIR, vehicles);
     facts.track = mapSpec ?? {};
     // 单位表：规则与预设里所有写了 `unit=` 的引用一起查（源单位在 meta/<tag>.json，见 resolveFieldUnits）
     const ruleRefs = rules.flatMap((r) =>
@@ -1783,7 +1783,7 @@ function build() {
     //      与别的产物一样走 writeArtifact：`--check` 会比对它与源是否一致。
     writeArtifact(
         resolve(KN, "rules-editor-schema.generated.json"),
-        JSON.stringify(buildRuleSchema({ signatures, facts, airframes, builtinVars: BUILTIN_VARS }), null, 2) + "\n",
+        JSON.stringify(buildRuleSchema({ signatures, facts, vehicles, builtinVars: BUILTIN_VARS }), null, 2) + "\n",
     );
 
     // 5) 指南的「开发指南」分组：规则清单 + 规则编写参考（改规则/算子/内置变量后自动跟上，不用谁记得手动同步）

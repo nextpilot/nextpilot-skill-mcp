@@ -130,11 +130,11 @@ BUILTIN_VARIABLES = {
         "type": "int|None",
         "doc": "固件次版本号。**版本分支唯一常用的量**；None = 这份日志没写版本号",
     },
-    "AIRFRAME": {
+    "VEHICLE": {
         "type": "str",
         "doc": "机型：rotary_wing / fixed_wing / rover / airship / unknown",
     },
-    "IS_FIXED_WING": {"type": "bool", "doc": "机型别名（比 AIRFRAME == 'fixed_wing' 好读）"},
+    "IS_FIXED_WING": {"type": "bool", "doc": "机型别名（比 VEHICLE == 'fixed_wing' 好读）"},
     "DURATION_S": {"type": "float", "doc": "日志总时长（秒）"},
     "ARMED_S": {"type": "float", "doc": "armed 总时长（秒）"},
     "ARMED_INTERVALS": {

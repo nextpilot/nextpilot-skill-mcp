@@ -100,7 +100,7 @@
           ],
           "description": "固件：any（缺省）/ \">=1.15\" / \"<1.15\" / \">=1.14,<1.15\"（逗号 = 与）"
         },
-        "airframe": {
+        "vehicle": {
           "description": "机架：any（缺省）/ 机架名 / 机架名列表。简写 mc、fw 也认",
           "oneOf": [
             {
@@ -469,7 +469,6 @@
     "us"
   ],
   "x-builtin-vars": [
-    "AIRFRAME",
     "ARMED_INTERVALS",
     "ARMED_S",
     "DROPOUT_MS",
@@ -480,6 +479,7 @@
     "MESSAGES",
     "RESTART_DETECTED",
     "T0_US",
+    "VEHICLE",
     "has_topic"
   ]
 }
