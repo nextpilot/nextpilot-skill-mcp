@@ -9,11 +9,11 @@
 #   1. 构建期：web/scripts/build-knowledge.mjs 用 ast 解析 providers/*.py，
 #      查 REQUIRED 的方法有没有定义、builtin_variables() 返回的字典字面量键齐不齐
 #   2. 运行期：下面的 check_provider()，引擎建好 provider 之后立刻跑一次
-#   3. 契约测试：tools/engine/guard-px4log-provider.py，对每个 provider 跑同一套断言
+#   3. 契约测试：tools/engine/guard_provider_contract.py，对每个 provider 跑同一套断言
 #      （失败语义、get_topic_meta() 与 get_series() 自洽、armed_intervals 的形状……）
 #
 # 加一个适配器（如 ardupilot.py）要做的事：实现 REQUIRED，按需实现 OPTIONAL，
-# 把工厂追加进 FORMATS，然后跑通 guard-px4log-provider.py —— 引擎一行都不用改。
+# 把工厂追加进 FORMATS，然后跑通 guard_provider_contract.py —— 引擎一行都不用改。
 
 # ---------------- 必需能力：规则与曲线会直接依赖 ----------------
 REQUIRED = {

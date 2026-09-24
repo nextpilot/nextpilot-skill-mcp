@@ -34,7 +34,7 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 
 - 契约本体是 `engine/providers/api.py` 的三张常量表（REQUIRED / OPTIONAL / SEMANTICS）。
   它同时是**构建期**（`build-knowledge.mjs` 派生 `BUILTIN_VARS`、查每个适配器有没有漏实现）、
-  **运行期**（`check_provider()` 自检类型与缺席）、**测试**（`tools/engine/guard-px4log-provider.py`）
+  **运行期**（`check_provider()` 自检类型与缺席）、**测试**（`tools/engine/guard_provider_contract.py`）
   三处的输入 —— 一处定义、三处使用。**不写 `typing.Protocol`**：两端都没有类型检查器
   （构建期不执行 Python、Pyodide 里没有 mypy），写了只是"看着有约束、实际没人管"。
 - 内置变量从 23 个收敛到 **11 个 + `has_topic()`**（实测 10 个零引用：
@@ -54,7 +54,7 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
   （**2026-09-18 起 plot 的单位已改由 meta 派生**，见下面第五段——这条从"不做"里划掉。）
 
 验证口径同前：`compare_baseline.py` 6 条日志**逐字段零差异**（这次是纯搬家，
-出现任何差异都说明搬错了），外加新增的 `guard-px4log-provider.py`（契约测试）。
+出现任何差异都说明搬错了），外加新增的 `guard_provider_contract.py`（契约测试）。
 
 **2026-09-17 追加（第三段）：provider 初始化按「数据来源」分组 + 解析器版本改由 provider 给**
 
@@ -94,7 +94,7 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
   `"parserVersion": "pyulog/pyodide-0.3.0"` 写死——一个与实际装的解析器无关的假版本串，
   而且把 `pyulog` 这个名字钉进了**格式无关层**（正是上面「机制 / 数据 / 格式」三分要避免的）。
   现在由 provider 给真值（`pyulog.__version__`）。构建期查漏实现、运行期 `check_provider()`
-  查类型、`guard-px4log-provider.py` 契约测试查非空，三道都跟着 REQUIRED 表自动生效
+  查类型、`guard_provider_contract.py` 契约测试查非空，三道都跟着 REQUIRED 表自动生效
   （`build-knowledge.mjs` 的 `parseProviderApi` 从表里派生，**不用改构建脚本**）。
 - 浏览器里解析器版本**不受本站控制**：worker 用 `micropip.install("pyulog")` 装的是
   PyPI 当时的最新版（除非配了 `NEXT_PUBLIC_PYULOG_WHEEL` 自托管）。所以报告里记的这个值
@@ -141,7 +141,7 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
   `guard_tags`→`guardTags`），所以 `outputs` 名实相符，也与站内「规则编写参考」页（构建期生成、
   不入库，所以这里不写小节号）里讲 `outputs` 那一节的标题「输出与副作用」对齐。
   改动范围：24 个规则文件 + `engine/rule_engine.py`（局部变量 `_emit` → `_out`）+
-  `tools/dev/probe_rule.py` + `web/scripts/build-knowledge.mjs` + 指南页 + `engine/README.md` +
+  `tools/engine/check_rules_compute.py` + `web/scripts/build-knowledge.mjs` + 指南页 + `engine/README.md` +
   `facts.yaml` 注释。
 - **顺带消掉一处同名**：`build-knowledge.mjs` 里本来就有个**写产物的辅助函数** `emit(path, content)`，
   与规则键同名。规则键改叫 `outputs` 后它更刺眼，已一并改名 `writeArtifact()`（纯内部函数，9 个调用点）。
@@ -160,7 +160,7 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 - **验证**：`compare_baseline.py` 6 条日志零差异（它逐字段比 finding 的
   `id/ruleId/severity/tag/title/evidence/docUrl/suggestion`，**覆盖 `docUrl`**）；
   构建产物解析成对象后逐条与改名前**相等**（只有 key 顺序变了）；
-  `check-pyodide-px4log-engine.py` / `guard-px4log-provider.py` / `build:kb --check` 全过。
+  `check_engine_pyodide.py` / `guard_provider_contract.py` / `build:kb --check` 全过。
   **`derived-version`会变**（`rule_engine.py` 在哈希里），用户存档打开时自动重解析一次；
   `rules/*.yaml` 仍**不进**哈希，所以改名 / 改阈值不会让历史结论重算。
 - **顺带统一了分段格式**（同一批的第二笔提交，**只动空行、无语义变化**）：原先「每个顶层键前都空一行」
@@ -205,7 +205,7 @@ conditions: # 整块可省
 - **构建期**：`requiredKeys` 去掉两轴；`conditions` 有未知键、`topics` 项不是 topic 名、
   `firmware`/`vehicle` 不合规一律构建失败；**顶层残留 `skip` 会明确报错**，不静默忽略。
   归一化后产物里仍是两个平铺的 `firmware` / `vehicle` + 新的 `topics` 嵌套列表
-  （`lint_rules.py` 读产物取 `firmware`，所以它不用改）。
+  （`check_rules_fields.py` 读产物取 `firmware`，所以它不用改）。
 - **基线差异**（这一轮重冻结的依据，全部落在 `checksSkipped`）：`motor-balance` 的
   `no_data` 行消失（6 份日志里都有）、`imu-bias` 的 `not has_armed` 行消失、
   attitude 两条的缺 topic 文案从手写的 `vehicle_attitude(_setpoint) 或 armed 段缺失`
@@ -251,7 +251,7 @@ conditions: # 整块可省
   `alias=` 与它是同一个东西的两种写法（`ref("名", alias="旧名")` ≈ `ref("名", "旧名")`）。
 - **`known_legacy` 字段已删**。字段的版本差异只有三种表达：整条规则写死 `conditions.firmware`、
   同义改名用候选组、同名换单位/语义配 `unit=` 或拆规则。**没有白名单**。
-- **lint 的数组盲点已修**（`tools/engine/lint_rules.py` 的 `has_field`）：原先只在引用那一侧
+- **lint 的数组盲点已修**（`tools/engine/check_rules_fields.py` 的 `has_field`）：原先只在引用那一侧
   剥下标，而日志侧字段名是 `states[0]` 这种带下标的、字典侧是裸名，于是**数组字段在日志里永远
   匹配不上**——`estimator_status.states` 明明就在 1.11 的日志里，却被判成"哪里都没有"，
   当初 `known_legacy` 就是为它加的。现在两边都归一化到基名再比。
@@ -373,7 +373,7 @@ w_p95 = percentile(hypot(ref("estimator_wind.windspeed_north", "wind_estimate.wi
 **已经删掉的两样**（别再写回去）：节点级 `when_fw=`（同一字段换了**语义**就拆成两条规则，
 不该用版本门在一条规则里分叉）、`known_legacy`（白名单挡不住漏，字段能不能取到由存在性说话）。
 
-**字段校验（`tools/engine/lint_rules.py`）**按规则级 `firmware` 圈定的版本范围，在
+**字段校验（`tools/engine/check_rules_fields.py`）**按规则级 `firmware` 圈定的版本范围，在
 **回归日志实测字段**与**上游字典**里找，分类为 命中 / 版本错配 / 可疑。自检过：把
 `wind_estimate` 那支错标成 `>=1.15` 会精确报出"仅存在于 1.11"。
 
@@ -451,7 +451,7 @@ ydata, compute}`），引擎侧求值、单位换算、降采样都在引擎里�
 **怎么验证**：`python tools/engine/compare_baseline.py`（6 条日志逐字段比对）、
 `python tools/calibrate/check-artifact.py`（生成产物真实执行）、
 `python tools/calibrate/lint-rules.py`（字段引用 + 版本错配）、
-`python tools/dev/probe_rule.py <log.ulg> <rule_id>`（单条经验逐节点诊断）。
+`python tools/engine/check_rules_compute.py <log.ulg> <rule_id>`（单条经验逐节点诊断）。
 
 ---
 

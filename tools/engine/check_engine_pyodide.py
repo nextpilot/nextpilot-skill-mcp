@@ -11,7 +11,7 @@
 原因"（并**构造两道反向用例**逼出失败分支）、"像经纬度"的判据不会把 `relative` 里的 `lat`
 当成纬度、worker 查的全局名真的存在。
 
-用法：python tools/engine/check-pyodide-px4log-engine.py
+用法：python tools/engine/check_engine_pyodide.py
 """
 
 from __future__ import annotations
@@ -82,7 +82,7 @@ def extract_json_const(src: str, name: str):
 
 
 def main() -> int:
-    log.print_header("产物校验（check-pyodide-px4log-engine）", f"python {Path(__file__).name}")
+    log.print_header("产物校验（check_engine_pyodide）", f"python {Path(__file__).name}")
 
     total = 8
     results: list[tuple[str, str]] = []

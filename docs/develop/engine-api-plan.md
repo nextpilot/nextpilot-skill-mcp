@@ -85,7 +85,7 @@ runner）全部改用新名；旧名没有"保留过渡期"，直接删除。文
 1. 构建期 AST：`build-knowledge.mjs` 自动要求每个 provider 定义新 REQUIRED 方法、
    `builtin_variables()` 含新键（已存在的机制，自动生效）
 2. 运行期：`check_provider()` 补 `get_time_bounds` 形状断言
-3. 契约测试 `tools/engine/guard-px4log-provider.py`（曾几度搬家：calibrate→guards→engine，
+3. 契约测试 `tools/engine/guard_provider_contract.py`（曾几度搬家：calibrate→guards→engine，
    以 checklist.yml 为准）：
    - **修复既有恒绿**：第 7 步 `hasattr(p, "phases")` / `"dropouts"` 查的属性名根本不存在，
      可选能力检查从来只跳过不检查——改为查真实方法

@@ -116,7 +116,7 @@ lastmod: 2026-09-24T12:44:00+08:00
 
 ## 验证结果（2026-09-24，全实测）
 
-- 契约守卫 `tools/engine/guard-px4log-provider.py` 9 步：2 份真实 PX4 +
+- 契约守卫 `tools/engine/guard_provider_contract.py` 9 步：2 份真实 PX4 +
   **36 份真实 APM**（Copter/Plane/Rover）+ 合成 APM = **333 checks 全过**
 - PX4 规则回归（`tools/px4log_engine_runner.py`）20 份真实日志全过
 - `build-knowledge.mjs` 构建期契约检查通过（31 规则 / 73 算子）；pyright 0 errors

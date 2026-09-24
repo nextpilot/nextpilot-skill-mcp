@@ -12,10 +12,10 @@
 - `python tools/px4log_engine_runner.py --probe-data <file.ulg> ...`：校验数据层三个 API
   （`np_manifest` / `np_log_info` / `np_series`）的结构、JSON 合法性（NaN→null）
   与降采样点数。
-- `probe_stats.py <file.ulg> ...`：dump 三个关键消息的原始指标分布，用于定阈值。
-- `inspect_fields.py <file.ulg>`：打印 `vehicle_imu_status / estimator_status /
+- `dump_px4log_stats.py <file.ulg> ...`：dump 三个关键消息的原始指标分布，用于定阈值。
+- `dump_px4log_fields.py <file.ulg>`：打印 `vehicle_imu_status / estimator_status /
 battery_status / sensor_imu` 的真实字段名（不同 PX4 版本字段差异很大）。
-- `probe_rule.py <file.ulg> <rule_id>`：**表达式级**调试——把规则的 compute 拆成子表达式
+- `check_rules_compute.py <file.ulg> <rule_id>`（**已搬到 `tools/engine/`**）：**表达式级**调试——把规则的 compute 拆成子表达式
   逐个求值，回答"这一层为什么算不出来"，纯文本输出。
 - `workbench.py <file.ulg> <rule_id|规则文件名>`：**单条规则体检**——在同一份日志上跑
   compute 与 triggers，给出结论、一张自包含 HTML（曲线 + 阈值线 + 规则算出的值 + 缺什么），
@@ -46,9 +46,9 @@ battery_status / sensor_imu` 的真实字段名（不同 PX4 版本字段差异�
 
 ## 冻结基线与等价比对（规则重构时必用）
 
-- `dump_baseline.py`：把 `tools/testdata/logs/*.ulg` 的**完整引擎输出**冻结到 `baseline/<slug>.json`。
+- `dump_baseline.py`（**已搬到 `tools/engine/`**）：把 `tools/testdata/logs/*.ulg` 的**完整引擎输出**冻结到 `baseline/<slug>.json`。
   这是"一条经验一个 YAML"重构前的唯一真相，重构规则时不得改动（除非单独提交并说明理由）。
-- `compare_baseline.py`（**已搬到 `tools/engine/`**——它是门禁，不是探查）：重新跑同一份日志，
+- `compare_baseline.py`（**已搬到 `tools/engine/`**）：重新跑同一份日志，
   与冻结基线**逐字段深度比较**（findings 的 id/ruleId/severity/tag/title/evidence/docUrl/suggestion
   与 stats/tags/guards/phases/checks*/matchedFaults）。退出码 0/1，任何差异（含 finding 的
   **顺序变化**，id 是按顺序分配的）都算回归。重构每一步都必须 `tools/engine/compare_baseline.py` 全绿。
@@ -60,7 +60,7 @@ battery_status / sensor_imu` 的真实字段名（不同 PX4 版本字段差异�
 ## 在哪儿跑（云端 CI 覆盖不到）
 
 本目录现在**全是手动探查**，都要 `logs/` 下的真实 `.ulg`——目录名终于和里面装的东西对上了。
-以前这里还混着门禁类脚本（其中 `check-pyodide-px4log-engine.py` 根本不需要日志，却挂着 push 阶段
+以前这里还混着门禁类脚本（其中 `check_engine_pyodide.py` 根本不需要日志，却挂着 push 阶段
 每次都跑），现已搬到 `tools/engine/`（引擎与规则）与 `tools/common/`（通用，不绑定本仓库）。
 
 这些日志含 GPS 轨迹、按隐私规则不入库（见 `.gitignore`），**云端 CI 的 checkout 里没有它们，

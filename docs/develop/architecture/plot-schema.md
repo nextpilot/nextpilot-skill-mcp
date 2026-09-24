@@ -290,7 +290,7 @@ compute:
 | 契约       | `providers/api.py` 登记可选能力 `map_layers`；`np_series` 返回从「键 = `out_names`」改成「键 = YAML 给的名字」                                                                       |
 | 前端       | `LogCharts.tsx` 删掉 `opLabels[i]` 位置对齐、改按名字取图例；`LogFlightMap` 改成吃 `layers[]`，按 `mode` 分派到 Leaflet 的 `Polyline` / `CircleMarker` / 2 点 `Polyline` / `Polygon` |
 | 构建期校验 | 见下表——**声明式配置的成败在这**，否则"字段写错就跳过"的结果是页面少一条线、没人发现                                                                                                 |
-| 回归       | 沿用 `tools/engine/`：`guard-px4log-provider.py` 对 6 份冻结基线逐份校验 `map_layers` 契约；`compute` 求值进基线逐字段比对                                                           |
+| 回归       | 沿用 `tools/engine/`：`guard_provider_contract.py` 对 6 份冻结基线逐份校验 `map_layers` 契约；`compute` 求值进基线逐字段比对                                                           |
 
 构建期必须卡住的：
 

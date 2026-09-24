@@ -963,7 +963,7 @@
 > **三次都不是 "少写一个判断"，都是 "判断本身没有被任何东西检查过"。**
 > 守住这条的是
 >
-> `tools/engine/check-pyodide-px4log-engine.py`
+> `tools/engine/check_engine_pyodide.py`
 >
 > ：它真执行编译产物，把
 >
@@ -1031,7 +1031,7 @@
 > ，
 > 改运行期配置把分支逼出来，见
 >
-> `check-pyodide-px4log-engine.py`
+> `check_engine_pyodide.py`
 >
 > 的两道 probe）；以及
 > `px4log_engine_runner.py --probe-data`
@@ -1226,7 +1226,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 
    于是引擎 "看不到" 闸门，只能退回那句概括。搬家的丢失只有产物看得见，所以
 
-   `check-pyodide-px4log-engine.py` 拿 `track.yml` 的声明与产物里的 `facts.track.conditions.topics` 对账。
+   `check_engine_pyodide.py` 拿 `track.yml` 的声明与产物里的 `facts.track.conditions.topics` 对账。
 
 5. **"缺什么" 要和 "实际有什么" 成对出现。** 只说缺，用户分不清是固件版本不同、还是字段改了名；
 
@@ -1318,7 +1318,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 > 这类 "声明" 在链路上每经过一次搬运，都值得配一道对账的守卫。
 > 守住这条的是
 >
-> `tools/engine/check-pyodide-px4log-engine.py`
+> `tools/engine/check_engine_pyodide.py`
 >
 > （对账
 >
@@ -1372,7 +1372,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 
 │   · build:kb --check（知识库契约与产物一致）    │
 
-│   · check-pyodide-px4log-engine（产物是合法 Python）  │
+│   · check_engine_pyodide（产物是合法 Python）  │
 
 │   · check\_engine\_purity（三处共用源码纯净性）   │
 
@@ -1400,7 +1400,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 
 │     （6 条冻结日志基线逐字段比对）              │
 
-│   · guard-px4log-provider.py（适配器契约测试）        │
+│   · guard_provider_contract.py（适配器契约测试）        │
 
 │   · px4log\_engine\_runner.py --probe-data      │
 
@@ -1515,7 +1515,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 
 3. **既有代码警告**：ESLint 当前 0 错误 / 5 警告（均为既存未使用变量），不阻断合并，但新增代码引入的警告需关注。
 
-4. **日志类校验不在云端 CI**：`compare_baseline`、`guard-px4log-provider` 等需要真实 `.ulg` 日志的检查仅在本地有日志时运行；云端 CI 全绿**不等于**规则 / 引擎回归过了，改规则 / 引擎后必须在本地跑一次完整检查。
+4. **日志类校验不在云端 CI**：`compare_baseline`、`guard_provider_contract` 等需要真实 `.ulg` 日志的检查仅在本地有日志时运行；云端 CI 全绿**不等于**规则 / 引擎回归过了，改规则 / 引擎后必须在本地跑一次完整检查。
 
 ### 6.9.1 `mutate_guards.py` Windows 兼容说明
 

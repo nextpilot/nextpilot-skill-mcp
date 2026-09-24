@@ -1,6 +1,6 @@
 """规则调试探针：把某条经验的 compute 逐条真跑一遍并打印，用于定位“为什么不触发”。
 
-用法：python tools/dev/probe_rule.py <log.ulg> <rule_id>
+用法：python tools/engine/check_rules_compute.py <log.ulg> <rule_id>
 
 compute 是表达式，所以这里按表达式调试：
 每条打印原文，再把其中**每个子表达式**单独求值一遍——失败的那一层一眼可见。

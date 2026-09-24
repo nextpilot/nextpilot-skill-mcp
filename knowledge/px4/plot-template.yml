@@ -1,7 +1,7 @@
 # 一份绘图预设的完整骨架 —— 复制成 plot/<名字>.yml 后逐项填。
 # 字段级权威参考：knowledge/px4/plot/README.md；改完跑：
 #   cd web && pnpm build:kb                      # 构建 + 校验（写错就构建失败）
-#   python tools/engine/guard-px4log-provider.py     # 取数契约（可选，需真日志）
+#   python tools/engine/guard_provider_contract.py     # 取数契约（可选，需真日志）
 #
 # **必填只有四个**：id / title / description / outputs。其余每一项都能省，省掉的含义写在各自注释里。
 # 这个文件本身**不会被加载**（`*-template.yml` 是给人抄的骨架）。

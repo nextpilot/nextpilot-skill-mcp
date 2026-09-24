@@ -598,7 +598,7 @@ function infer(node, ctx) {
         }
         case "attr": {
             // 形状校验：topic 与字段都必须是小写 snake_case、且只有一段点号。
-            // **存在性**（这个名字在本固件里到底有没有）不在这里查：那是 lint_rules.py 的活，
+            // **存在性**（这个名字在本固件里到底有没有）不在这里查：那是 check_rules_fields.py 的活，
             // 它按「规则 firmware ∩ 引用级 when_fw」圈定版本范围去比回归日志实测字段与上游字典，
             // 而 requires 管的是 skip 语义、并不列举规则读到的全部 topic（如 imu-bias.yaml 一个都没列）。
             const full = `${node.topic}.${node.field}`;

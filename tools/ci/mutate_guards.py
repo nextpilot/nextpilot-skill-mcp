@@ -23,7 +23,7 @@
 
 ## 为什么改产物而不改引擎源码
 
-产物侧守卫（`check-pyodide-px4log-engine.py`）读的是编译产物 `web/workers/pyodide-px4log-engine.ts`，
+产物侧守卫（`check_engine_pyodide.py`）读的是编译产物 `web/workers/pyodide-px4log-engine.ts`，
 不是 `engine/providers/px4.py`。所以变异要打在**产物**上——打源码的话守卫根本看不到，
 自证会得出"守卫红不起来"的假结论。产物与源码一致由另一道门（`build:kb --check`）保证，
 两层各管各的，这才是它们各自的职责边界。
@@ -102,9 +102,9 @@ FLIGHT_MAP = "web/components/LogFlightMap.tsx"
 # （第一版就是这么写的，四条界面侧变异全部误报"牵连 3 条"）。
 GUARDS = {
     "artifact": (
-        [PY, "tools/engine/check-pyodide-px4log-engine.py"],
+        [PY, "tools/engine/check_engine_pyodide.py"],
         ROOT,
-        "产物侧（check-pyodide-px4log-engine）",
+        "产物侧（check_engine_pyodide）",
         "prose",
     ),
     "ui": ([NODE, "scripts/test-issue-filer.mjs"], WEB, "界面侧（test-issue-filer）", "fail-lines"),
@@ -877,7 +877,7 @@ def _failed_names(key: str, out: str) -> set[str]:
       两个箭头都收（`→` 与 `->`）：仓库的 ASCII/GBK 约定让有的脚本用 `->`。
       **因此被解析的守卫有一条格式契约**：它的总结行不要写成 `FAIL <名字>`（第一版 check_hygiene
       的 `FAIL 1 项卫生检查未过` 就被当成了检查名，六条变异全报"牵连 1 条"）。写成 `N 项未过` 这种。
-    - `prose`（check-pyodide-px4log-engine.py）：失败时打印一段人话再 `return 1`，没有统一前缀——
+    - `prose`（check_engine_pyodide.py）：失败时打印一段人话再 `return 1`，没有统一前缀——
       只能拿注册表里的文案去对，但**产物侧的文案只在失败时才打印**，所以这么对是准的。
     """
     kind = GUARDS[key][3]

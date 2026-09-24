@@ -1,6 +1,6 @@
 # 校验体系整改方案（命名 + 目录 + 阶段）
 
-> **状态**：整改 plan。第一批改名已落地（`check-pyodide-px4log-engine.py`、`guard-px4log-provider.py`），
+> **状态**：已完成。`check_engine_pyodide.py`、`guard_provider_contract.py`、`check_rules_fields.py`、`check_rules_compute.py` 等已在 `tools/engine/` 下。
 > 其余批次待确认。本文先给结论与盘点，再给方案与落地顺序，最后是必须同步改的点与风险。
 >
 > **2026-09-22 注**：本文件曾因一次有损转码丢失 776 个字符，且已随 `92d39ba` 入库，git 里没有干净版本。
@@ -59,7 +59,7 @@
 | `tools/ci/check_all.py`                                                       | check | 🎯 跑手（编排）                                                                                                                                | —                           | —                          |
 | `tools/ci/checklist.yml`                                                      | —     | 🎯 清单（单一事实源）                                                                                                                          | —                           | —                          |
 | `tools/ci/mutate_guards.py`                                                   | —     | 🎯 守卫的自证机（43 条变异）                                                                                                                   | ci                          | `--with-mutate`            |
-| `probe_stats.py` / `probe_rule.py` / `inspect_fields.py` / `dump_baseline.py` | probe | 🔍 手动探查（定阈值、查字段、打基线）                                                                                                          | 手动                        | —                          |
+| `dump_px4log_stats.py` / `probe_rule.py` / `dump_px4log_fields.py` / `dump_baseline.py` | probe | 🔍 手动探查（定阈值、查字段、打基线）                                                                                                          | 手动                        | —                          |
 | `web/scripts/browser/check-upload.mjs` / `check-restore.mjs`                  | check | 🔍 手动 CDP 链路自检                                                                                                                           | 手动                        | 需 9222 端口 Chrome        |
 
 ### 1.2 JS / TS 侧
@@ -229,9 +229,9 @@ check-pyodide-px4log-engine.py     →  check · pyodide-px4log-engine（产物�
 | `web/scripts/check-skill-spec.mjs`                  | `web/guards/guard-skill-dir-spec.mjs`                                  | guard | `-`                         |
 | `web/scripts/check-mcp-spec.mjs`                    | `web/guards/guard-mcp-dir-spec.mjs`                                    | guard | `-`                         |
 | `tools/calibrate/px4log_engine_runner.py`（主用途） | `tools/calibrate/probe-px4log-findings.py`                             | probe | `-`                         |
-| `tools/calibrate/probe_stats.py`                    | `tools/calibrate/probe-px4log-stats.py`                                | probe | `-`                         |
+| `tools/calibrate/dump_px4log_stats.py`               | `tools/calibrate/probe-px4log-stats.py`                                | probe | `-`                         |
 | `tools/calibrate/probe_rule.py`                     | `tools/calibrate/probe-rule-why-matched.py`                            | probe | `-`                         |
-| `tools/calibrate/inspect_fields.py`                 | `tools/calibrate/probe-px4log-fields.py`                               | probe | `-`                         |
+| `tools/calibrate/dump_px4log_fields.py`              | `tools/calibrate/probe-px4log-fields.py`                               | probe | `-`                         |
 | `tools/calibrate/dump_baseline.py`                  | `tools/calibrate/dump-px4log-baseline.py`                              | dump  | `-`                         |
 | `tools/ci/check_prereq.py`                          | `tools/setup/check-toolchain-installed.py`                             | check | `-`                         |
 | `engine/tests/test_operators.py`                    | `tools/tests/test_engine_operators.py`                                 | test  | **`_`**（pytest 会 import） |
@@ -533,7 +533,7 @@ run: python tools/ci/check_all.py --with-mutate # ← 没有 --stage
        check_hygiene.py       → guard-meta-self-honest.py
        test-issue-filer.mjs   → guard-web-invariants.mjs
        test_operators.py      → test_engine_operators.py（下划线：pytest 要 import）
-       probe_stats.py         → probe-px4log-stats.py
+       dump_px4log_stats.py   → probe-px4log-stats.py
 
 豁免（不是检查，是"作用于检查"的东西）
        tools/ci/check_all.py     跑手

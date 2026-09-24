@@ -149,9 +149,9 @@ jobs:
 
       # ── 其它测试 ──
       - id: "check-artifact"
-        name: "Artifact is valid Python (check-pyodide-px4log-engine)"
+        name: "Artifact is valid Python (check_engine_pyodide)"
         workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/engine/check-pyodide-px4log-engine.py"]
+        command: ["{PYTHON}", "tools/engine/check_engine_pyodide.py"]
         hint: "The artifact file contains invalid Python syntax. Check the error output above for the exact location."
 
       - id: "check-engine-purity"
@@ -208,10 +208,10 @@ jobs:
         hint: "The baseline has changed unexpectedly. Review the diff output above. If the change is intentional, re-baseline by running the comparison tool."
 
       - id: "check-provider"
-        name: "Adapter contract test (guard-px4log-provider)"
+        name: "Adapter contract test (guard_provider_contract)"
         when: "has_logs"
         workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/engine/guard-px4log-provider.py", "{LOGS}"]
+        command: ["{PYTHON}", "tools/engine/guard_provider_contract.py", "{LOGS}"]
         hint: "One or more log files failed the adapter contract test. Check the output above for which adapter and what contract was violated."
 
       - id: "probe-data"
@@ -222,10 +222,10 @@ jobs:
         hint: "The data layer structure is inconsistent. Review the probe output above for details."
 
       - id: "lint-rules"
-        name: "Field-reference lint (lint_rules --strict)"
+        name: "Field-reference lint (check_rules_fields --strict)"
         when: "has_logs"
         workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/engine/lint_rules.py", "--strict"]
+        command: ["{PYTHON}", "tools/engine/check_rules_fields.py", "--strict"]
         hint: "Field reference linting found violations. Review the output above and fix the referenced fields."
 
   - id: ci

@@ -153,7 +153,7 @@ python tools/calibrate/check-artifact.py
 # 字段引用与版本错配（字段名写错时引擎只会静默取到 None，这条能揪出来）
 python tools/calibrate/lint-rules.py
 # 单条经验为什么不触发：逐节点打印
-python tools/dev/probe_rule.py tools/testdata/logs/<log>.ulg <rule_id>
+python tools/dev/check_rules_compute.py tools/testdata/logs/<log>.ulg <rule_id>
 ```
 
 改完算子后，记得重跑 `python tools/px4/gen-rule-reference.py`（把算子目录与内置变量表注入

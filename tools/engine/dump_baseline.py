@@ -5,8 +5,8 @@ guardTags、phases、checksRun/checksSkipped、matchedFaults）冻结到 baselin
 作为后续"一条经验一个 YAML"重构的等价比对真相。
 
 用法：
-  python tools/dev/dump_baseline.py             # 冻结全部回归日志
-  python tools/dev/dump_baseline.py <ulg> ...    # 只冻结指定日志
+  python tools/engine/dump_baseline.py             # 冻结全部回归日志
+  python tools/engine/dump_baseline.py <ulg> ...    # 只冻结指定日志
 
 产物是**冻结的快照**：重构规则时不允许改基线（除非有明确理由并单独提交）。
 """
@@ -26,7 +26,7 @@ log = get_logger()
 import px4log_engine_runner as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-# 数据在 tools/testdata/，工具在 tools/dev/——分住两处，所以用仓库根往下数，
+# 数据在 tools/testdata/，工具在 tools/engine/——分住两处，所以用仓库根往下数，
 # 不用"相对自身"（否则本文件一搬家就指到空目录，且 mkdir 会静默造出一个假的 baseline/）。
 TESTDATA = REPO_ROOT / "tools" / "testdata"
 LOG_DIR = TESTDATA / "logs"  # 校准用真实日志（不入库，需自备）

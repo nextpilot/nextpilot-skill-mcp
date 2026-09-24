@@ -8,8 +8,8 @@
   这三道合起来 = 契约可执行；加一种新格式（ArduPilot .bin）时，跑通这里就不用重读引擎。
 
 用法：
-  python tools/engine/guard-px4log-provider.py <log.ulg> [more.ulg ...]
-  python tools/engine/guard-px4log-provider.py --list          # 列出已注册的格式
+  python tools/engine/guard_provider_contract.py <log.ulg> [more.ulg ...]
+  python tools/engine/guard_provider_contract.py --list          # 列出已注册的格式
 日志文件的格式由**文件头**判定（适配器自己探测），所以不用告诉它用哪个 provider。
 """
 

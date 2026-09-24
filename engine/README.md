@@ -28,7 +28,7 @@
 | 场景                             | 谁把它跑起来                                                                                                                                                                                                                                                                                                                                                     |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **用户上传 `.ulg` 分析**         | 浏览器 Worker 里的 Pyodide。构建期 `web/scripts/build-knowledge.mjs` 把这些文件**当文本读走**，按 `operators.py → providers/api.py → providers/*.py → rule_engine.py` 的顺序拼成一份内联进 `web/workers/pyodide-px4log-engine.ts`，`report_data.py` 单独进 `pyodide-px4log-data.ts`（两者在同一个 `__main__` globals 里执行，数据层直接用那边建好的 `provider`） |
-| **本地回归 / 校准**              | `tools/px4log_engine_runner.py` 按同样顺序拼接后 `exec`——跑的是**同一份源码**，所以本地结果与浏览器一致。其余校准脚本（`compare_baseline.py` / `dump_baseline.py` / `probe_rule.py` / `guard-px4log-provider.py`）都 import 它                                                                                                                                   |
+| **本地回归 / 校准**              | `tools/px4log_engine_runner.py` 按同样顺序拼接后 `exec`——跑的是**同一份源码**，所以本地结果与浏览器一致。其余校准脚本（`compare_baseline.py` / `dump_baseline.py` / `check_rules_compute.py` / `guard_provider_contract.py`）都 import 它                                                                                                                                   |
 | 生成指南页的算子目录与内置变量表 | `build-knowledge.mjs` 从 `operators.py` 与 `providers/api.py` 派生                                                                                                                                                                                                                                                                                               |
 | 阶段二服务端 / MCP（未实现）     | 把本目录包成可 `import` 的 `nextpilot_engine`（parsers / models / rules 三层），规则仍从 `knowledge/` 加载，不另存一份                                                                                                                                                                                                                                           |
 
@@ -105,14 +105,14 @@ python tools/ci/check_all.py
 
 - **不需要日志**（`ruff` / `build:kb --check` / 指南页算子表与源码一致 / 产物合法 / `tsc`）：
   任何地方都能跑，云端 CI 每次提交都跑。
-- **需要日志**（`compare_baseline` / `guard-px4log-provider` / `--probe-data` / `lint_rules`）：日志含
+- **需要日志**（`compare_baseline` / `guard_provider_contract` / `--probe-data` / `check_rules_fields`）：日志含
   GPS 轨迹、不入库（见 `.gitignore`），**云端 CI 跑不了**，只在有日志的开发机上跑 —— 改本目录后必跑。
 
 要单独调试某一项时：
 
 ```bash
 cd web && pnpm build:kb                      # 内联进浏览器产物 + 生成指南页
-python tools/engine/guard-px4log-provider.py tools/testdata/logs/*.ulg   # 适配器契约测试
+python tools/engine/guard_provider_contract.py tools/testdata/logs/*.ulg   # 适配器契约测试
 python tools/engine/compare_baseline.py   # 6 条真实日志与冻结基线逐字段比对
-python tools/engine/lint_rules.py         # 字段引用与版本错配（只报告）
+python tools/engine/check_rules_fields.py         # 字段引用与版本错配（只报告）
 ```

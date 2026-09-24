@@ -20,7 +20,7 @@
 
 规则取自**构建产物**（compute 已是表达式，老节点写法在构建期被编译掉了）。
 
-用法：python tools/engine/lint_rules.py [--strict]
+用法：python tools/engine/check_rules_fields.py [--strict]
     --strict 时 version-gap 与 suspicious 都算失败（默认只报告、返回 0）
 """
 

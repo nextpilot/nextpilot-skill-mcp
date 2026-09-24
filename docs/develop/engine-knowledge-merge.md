@@ -109,7 +109,7 @@ knowledge/                  ← 独立项目根（一级目录）
 ### 4.3 不需要改（这是方案 C 的收益）
 
 `web/lib/constants.ts:59` 的 `contentRoot: "knowledge"`、
-`web/scripts/sync-content.mjs:25-26`、`_verify-schema.mjs:9`、`lint_rules.py:10`、
+`web/scripts/sync-content.mjs:25-26`、`_verify-schema.mjs:9`、`check_rules_fields.py:10`、
 `.prettierignore`、`.markdownlintignore`、`.vscode/settings.json` —— **全部保持不变**。
 
 ### 4.4 顺带做：`rule_engine.py` + `report_data.py` 合并成一个文件（2026-09-24 拍板）
@@ -143,7 +143,7 @@ knowledge/                  ← 独立项目根（一级目录）
 `build-knowledge.mjs` 21、`knowledge/px4/CLAUDE.md` 22、`engine/README.md` 14、`CLAUDE.md` 7、
 `knowledge/README.md` 4、`pyproject.toml` 4、`check-taxonomy-rework.md` 4、
 `testing-at-a-glance.md` 3、`engine/tests/test_rule_engine.py` 3、`providers/px4.py` 5、
-`check-pyodide-px4log-engine.py` 2（L218 **单独**读 data 产物做跨语言名字核对——最容易漏的一处）、
+`check_engine_pyodide.py` 2（L218 **单独**读 data 产物做跨语言名字核对——最容易漏的一处）、
 `check_hygiene.py:85-86`（产物跳过清单）、`dump_baseline.py` + `baseline/*.json` 6 份、
 `engine/providers/README.md` 2、`plot-schema.md` 2、`rule-schema.mdx` 2、`useLogAnalyzer.ts` /
 `report-history.ts` / `types.ts` / `rule-expr.mjs` / `checks-by-stage.md` 各 1。
@@ -267,7 +267,7 @@ python tools/ci/check_all.py --with-mutate
 
 ⚠️ 现状实证：`git ls-files knowledge` 里**没有任何** check / validate / lint / schema / test
 项 —— 本体既没有编译器，也没有校验入口。三个相关校验脚本全在别处：
-`web/scripts/check-skill-spec.mjs`、`web/scripts/check-mcp-spec.mjs`、`tools/engine/lint_rules.py`。
+`web/scripts/check-skill-spec.mjs`、`web/scripts/check-mcp-spec.mjs`、`tools/engine/check_rules_fields.py`。
 
 ### 7.5.1 编译器搬走时真正的难点：产物现在散落在 web/ 的四个地方
 
