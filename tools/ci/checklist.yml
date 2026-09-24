@@ -208,13 +208,13 @@ jobs:
         name: "Skill directory spec (check-skill-spec)"
         workdir: "{WEB}"
         command: ["{NODE}", "scripts/check-skill-spec.mjs"]
-        hint: "knowledge/skills/ 下有目录不合规范（缺 SKILL.md / README.md / CHANGELOG.md，或字段不合规）。按上面的输出补齐对应目录。"
+        hint: "web/content/skills/ 下有目录不合规范（缺 SKILL.md / README.md / CHANGELOG.md，或字段不合规）。按上面的输出补齐对应目录。"
 
       - id: "check-mcp-spec"
         name: "MCP directory spec (check-mcp-spec)"
         workdir: "{WEB}"
         command: ["{NODE}", "scripts/check-mcp-spec.mjs"]
-        hint: "knowledge/mcp/ 下有目录不合 server.json（MCP Registry）规范。按上面的输出补齐；upstream_status: pending 的条目是 SKIP 不是放行，核实后要补 server.json 并删掉该字段。"
+        hint: "web/content/mcp/ 下有目录不合 server.json（MCP Registry）规范。按上面的输出补齐；upstream_status: pending 的条目是 SKIP 不是放行，核实后要补 server.json 并删掉该字段。"
 
       # 需要真实日志的回归。日志不入仓库（CLAUDE.md 第 9 节：原始日志不上传服务器），
       # 所以 CI 上这四项必然 SKIP —— 这就是它们归 push 而不是 ci 的原因。

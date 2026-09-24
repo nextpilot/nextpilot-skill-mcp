@@ -30,15 +30,11 @@ px4/
 （浏览器与本地工具共用同一份）。这个目录只放**经验与字典**——"算完怎么判定"，不放"怎么算"。
 此处曾同时放这两类东西，2026-09 分开。
 
-**站点内容也有一部分挂在这里**（给人读的展示内容，不做计算——与上面的"经验与字典"是两回事）：
+**站点内容不在这里**：给人读的展示内容（guide/skills/mcp，不做计算——与上面的"经验与字典"是两回事）
+真源在 [web/content/](../web/content/)，直接入库，`web/lib/{skills,mcp}.ts` 运行期读盘。
+以前 skills/ 与 mcp/ 挂在本目录、由 `sync-content` 构建期拷过去；真源唯一化后已退役。
 
-- `skills/<slug>/` —— Skill（8 个种子），对应站内 `/skills`
-- `mcp/<slug>/` —— 收录的第三方 MCP 服务，对应站内 `/mcp`
-
-构建期由 `web/scripts/sync-content.mjs` 拷进 `web/.generated/{skills,mcp}/`，
-运行期 `web/lib/{skills,mcp}.ts` 只读那里（`web/` 部署时只上传自己这一个目录）。
-
-## skills/ 一个 Skill 一个目录
+## web/content/skills/ 一个 Skill 一个目录
 
 ```text
 skills/<slug>/
@@ -81,7 +77,7 @@ cd web && pnpm check:skills     # 合规校验（CI 里也跑，见 tools/ci/che
 三份文件都能在仓库里直接改、提 PR：详情页每个内容 Tab 右上角就是**那一份文件**的编辑入口
 （地址集中在 `web/lib/constants.ts` 的 `CONTENT_REPO`，换仓库只改一处）。
 
-### mcp/ 一个 MCP 服务一个目录（**与 skills/ 不是同一份规范**）
+### web/content/mcp/ 一个 MCP 服务一个目录（**与 skills/ 不是同一份规范**）
 
 ```text
 mcp/<slug>/
@@ -119,7 +115,7 @@ mcp/<slug>/
 cd web && pnpm check:mcp
 ```
 
-**「知识库」分组的两个页面不在这个目录里**（构建期写在 `web/.generated/guide/`，`/guide` 站内可见）：
+**「知识库」分组的两个页面在 `web/content/guide/` 里**（构建期生成、入库，`/guide` 站内可见）：
 
 - 「如何编写知识规则」`rule-schema.mdx`：由 `build-knowledge.mjs` 自动生成（算子目录与内置变量表从 `knowledge/engine/` 源码派生），**唯一一份**。
 - 「现有规则清单」`rule-catalogue.mdx`：构建时从 `rules/*.yaml` 现读现算，**只出网站这一份**。
@@ -129,8 +125,8 @@ cd web && pnpm check:mcp
 | 我要……                                                              | 看 / 改                                                                                       |
 | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | 了解整套规则体系为什么这么设计                                      | [px4/CLAUDE.md](px4/CLAUDE.md)（给 AI 与维护者的设计上下文）                                  |
-| **新增 / 改一个 Skill**                                             | `knowledge/skills/<slug>/` 三份文件（结构见上节），改完 `pnpm check:skills`                   |
-| **新增 / 改一个 MCP 条目**                                          | `knowledge/mcp/<slug>/`（结构见上节；规范与 Skill **不同**），改完 `pnpm check:mcp`           |
+| **新增 / 改一个 Skill**                                             | `web/content/skills/<slug>/` 三份文件（结构见上节），改完 `pnpm check:skills`                 |
+| **新增 / 改一个 MCP 条目**                                          | `web/content/mcp/<slug>/`（结构见上节；规范与 Skill **不同**），改完 `pnpm check:mcp`         |
 | **写一条新规则 / 改一条现有规则**                                   | 站内 `/guide/rule-schema`（字段、算子、常见坑；构建期生成，仓库里不留拷贝）                   |
 | 弄清自己这类经验该写在哪                                            | [px4/CLAUDE.md](px4/CLAUDE.md) 的「四类经验 → 四种载体」                                      |
 | 查现在有哪些规则、各自读什么字段、什么条件触发                      | 网站 `/guide/rule-catalogue`（构建时从 `rules/*.yaml` 生成，仓库里不留拷贝）                  |
@@ -171,9 +167,7 @@ cd web && pnpm build:kb --check    # 只比对不写入：任一产物与 knowle
 `web/lib/knowledge/prompts.generated.js`、
 `px4/rules-editor-schema.generated.json`（编辑器用，见下节）。
 
-另有两页**不入库**的生成物（`web/.generated/` 在 `.gitignore` 里，每次 dev / build 现生成）：
-`web/.generated/guide/rule-catalogue.mdx`（指南「知识库」分组的规则清单页）、
-`web/.generated/guide/rule-schema.mdx`（规则编写参考页）。
+指南的两页生成物（`rule-catalogue.mdx` / `rule-schema.mdx`）也入库，就在 `web/content/guide/`。
 
 ### 编辑器提示（键名补全 / 拼写检查）
 

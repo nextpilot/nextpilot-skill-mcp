@@ -62,12 +62,12 @@
 │   ├── calibrate/      # 回归校准
 │   └── ci/             # CI 校验入口
 └── web/                # Next.js 站点 + Pages Functions（独立项目，有自己的 package.json）
-    ├── .generated/     # 构建期从仓库拷进来的站点内容（不入库）
+    ├── content/        # 站点内容唯一真源（guide/skills/mcp，入库）
     ├── app/            # 页面与 /api/auth 路由
     ├── components/     # React 组件
     ├── functions/      # EdgeOne 边缘函数（KV、配额、DeepSeek 转发）
     ├── lib/            # 工具库
-    ├── scripts/        # 构建脚本（sync-content.mjs + build-knowledge.mjs）
+    ├── scripts/        # 构建脚本（build-knowledge.mjs）
     └── workers/        # Pyodide Web Worker + 自动生成的 Python 规则脚本（勿手改）
 ```
 
@@ -133,7 +133,7 @@ pnpm web:dev
 
 ### 新增 Skill
 
-在 `knowledge/skills/<slug>/` 下创建目录，放入三份文件：
+在 `web/content/skills/<slug>/` 下创建目录，放入三份文件：
 
 | 文件           | 用途               |
 | -------------- | ------------------ |
@@ -145,7 +145,7 @@ pnpm web:dev
 
 ### 新增 MCP 条目
 
-在 `knowledge/mcp/<slug>/` 下创建目录，走 MCP Registry 规范：
+在 `web/content/mcp/<slug>/` 下创建目录，走 MCP Registry 规范：
 
 - 使用反向 DNS 命名（与 Skill 的 kebab 命名不同）
 - 需要提供 `server.json`
@@ -153,10 +153,10 @@ pnpm web:dev
 
 ### 新增指南页
 
-在 `docs/guide/` 下添加 Markdown 文件即可。
+在 `web/content/guide/` 下添加 Markdown 文件即可。
 
-> **注意**：以上三者都在 `web/` 目录之外。构建期由 `pnpm sync:content` 同步到 `web/.generated/`。
-> 如果改完页面没变化，先检查这一步是否执行了。
+> **注意**：站点内容（guide/skills/mcp）的真源全部在 `web/content/` 下、直接入库，
+> 没有构建期拷贝这一步。如果改完页面没变化，刷新一次即可（dev 模式下内容是运行期读盘的）。
 
 ---
 

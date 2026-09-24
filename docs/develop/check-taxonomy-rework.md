@@ -70,7 +70,6 @@
 | `web/scripts/check-skill-spec.mjs`          | check | 内容规范校验（自带反例自检）                                             | ci          | always       |
 | `web/scripts/check-mcp-spec.mjs`            | check | 内容规范校验（自带反例自检）                                             | ci          | always       |
 | `web/scripts/build-knowledge.mjs`           | —     | ⚙️ 生成器（96KB，构建期）                                                | dev / build | —            |
-| `web/scripts/sync-content.mjs`              | —     | ⚙️ 生成器                                                                | dev / build | —            |
 | `web/scripts/dev.mjs`                       | —     | ⚙️ dev 启动器                                                            | dev         | —            |
 | `web/scripts/fix-node-links.mjs`            | —     | 🗄 一次性                                                                 | 手动        | —            |
 | `web/scripts/migrate-skills-to-spec.mjs`    | —     | 🗄 一次性（已跑过）                                                       | 手动        | —            |
@@ -192,7 +191,7 @@ check-pyodide-px4log-engine.py     →  check · pyodide-px4log-engine（产物�
 | 整个仓库的提交内容                          | `repo`          | 通用词，无歧义                                                                                                           |
 | 工具链（Python / node / ruff / tsc 在不在） | `toolchain`     | 比 `prereq` 具体                                                                                                         |
 | 前端源码（组件 / Worker / 边缘函数）        | `web`           | 就是目录名                                                                                                               |
-| `knowledge/skills` 与 `knowledge/mcp`       | `skill` / `mcp` | 就是目录名                                                                                                               |
+| `web/content/skills` 与 `web/content/mcp`   | `skill` / `mcp` | 就是目录名                                                                                                               |
 
 **"干什么"段（第三段）——判据是「念出来就知道它在做什么」**，要过两道闸门：
 
@@ -242,13 +241,13 @@ check-pyodide-px4log-engine.py     →  check · pyodide-px4log-engine（产物�
 
 **编排层豁免（不受命名规则约束，因为它不是检查）**：
 
-| 文件                                                               | 为什么豁免                                           |
-| ------------------------------------------------------------------ | ---------------------------------------------------- |
-| `tools/ci/check_all.py`                                            | 它是**跑手**（编排），不是检查                       |
-| `tools/ci/checklist.yml`                                           | 它是**清单**（单一事实源），不是检查                 |
-| `tools/ci/mutate_guards.py`                                        | 它是**自证机**（把变异注入再断言守卫会红），不是检查 |
-| `tools/_logging.py`、`conftest.py`                                 | 共用库                                               |
-| `web/scripts/build-knowledge.mjs` / `sync-content.mjs` / `dev.mjs` | **构建脚本**，不是检查                               |
+| 文件                                          | 为什么豁免                                           |
+| --------------------------------------------- | ---------------------------------------------------- |
+| `tools/ci/check_all.py`                       | 它是**跑手**（编排），不是检查                       |
+| `tools/ci/checklist.yml`                      | 它是**清单**（单一事实源），不是检查                 |
+| `tools/ci/mutate_guards.py`                   | 它是**自证机**（把变异注入再断言守卫会红），不是检查 |
+| `tools/_logging.py`、`conftest.py`            | 共用库                                               |
+| `web/scripts/build-knowledge.mjs` / `dev.mjs` | **构建脚本**，不是检查                               |
 
 **保留不改**：
 
@@ -294,7 +293,7 @@ tools/
 
 web/
   scripts/                只剩构建期脚本 + 一次性脚本
-    build-knowledge.mjs / sync-content.mjs / dev.mjs
+    build-knowledge.mjs / dev.mjs
     one-off/  fix-node-links.mjs / migrate-skills-to-spec.mjs / _verify-schema.mjs
   guards/                 前端侧守卫集
     guard-web-invariants.mjs    ← web/scripts/test-issue-filer.mjs

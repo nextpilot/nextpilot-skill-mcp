@@ -15,7 +15,7 @@ type TabKey = "overview" | "skill" | "changelog" | "comments";
  * `McpContentTabs`（那样就长出一对只差前缀的孪生组件，改一边漏一边）。
  * 家族名取的是两类共有的上位词"收录条目"，见 CLAUDE.md 的命名约定。
  *
- * Skill 的三个内容 Tab 各对应 `knowledge/skills/<slug>/` 下的一份文件，所以每个 Tab
+ * Skill 的三个内容 Tab 各对应 `web/content/skills/<slug>/` 下的一份文件，所以每个 Tab
  * 都能给出**那一份文件**的仓库编辑入口——改哪份就跳哪份，不让人在仓库里自己找
  * （三份文件用途不同，一律指向"编辑本 Skill"是没法下手的）。
  * 概述 / 版本历史给人看，SKILL.md 给 AI 看（原文展示 + 一键复制，复制的就是

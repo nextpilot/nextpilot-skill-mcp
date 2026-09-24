@@ -18,7 +18,7 @@
  *   web/content/guide/rule-catalogue.mdx（指南「开发指南」分组的规则清单页）
  *   web/content/guide/rule-schema.mdx   （指南「开发指南」分组的规则编写参考页）
  *
- * 最后两页落在 content/guide/ 里（与 sync-content.mjs 拷进来的人工页面同一处），
+ * 最后两页落在 content/guide/ 里（与人工写的指南页面同一处，一起入库），
  * 全部入库，`--check` 只比对前 5 个产物。
  *
  * 用法（在 web/ 下）：

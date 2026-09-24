@@ -55,7 +55,7 @@
 
 | 位置                   | 装什么                                                                              |
 | ---------------------- | ----------------------------------------------------------------------------------- |
-| `web/scripts/`         | 构建脚本（`build-knowledge.mjs` / `sync-content.mjs` / `make-icons.mjs`）与静态守卫 |
+| `web/scripts/`         | 构建脚本（`build-knowledge.mjs` / `make-icons.mjs`）与静态守卫                      |
 | `web/scripts/browser/` | 驱动本机 Chrome 的 CDP 工具（截图、上传/恢复链路自检、图标预览）                    |
 | `web/e2e/`             | 端到端（Playwright）                                                                |
 

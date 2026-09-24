@@ -10,27 +10,25 @@
 
 **你敲**：`pnpm dev`
 
-它**一次起三段**（`web/scripts/dev.mjs`）：先同步 + 构建，再同时起内容热拷贝、知识热重建与 Next。
+它**一次起两段**（`web/scripts/dev.mjs`）：先构建，再同时起知识热重建与 Next。
 
-| 文件                              | 是什么             | 干什么                                                                                                                                                  |
-| --------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `web/scripts/dev.mjs`             | **dev 启动器**     | 顺序：① `sync-content` ② `build-knowledge` ③ 并起 `sync-content --watch`、`build-knowledge --watch` 与 `next dev`。Ctrl+C 一起停                        |
-| `web/scripts/sync-content.mjs`    | 内容同步脚本       | 把内容真源（`docs/guide`、`knowledge/skills`、`knowledge/mcp`）拷进 `web/.generated/`。因为 `web/` 是独立项目、部署时只上传它自己，运行期读不到仓库别处 |
-| `web/scripts/build-knowledge.mjs` | 知识构建脚本       | 把引擎源码与人工经验拼成运行时的产物（见阶段 2）。**全是 `throw`**：规则缺字段、算子没注册、表达式编译不过，这里就报错                                  |
-| `next dev`                        | Next.js 开发服务器 | 起热更新的网站                                                                                                                                          |
+| 文件                              | 是什么             | 干什么                                                                                                                 |
+| --------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `web/scripts/dev.mjs`             | **dev 启动器**     | 顺序：① `build-knowledge` ② 并起 `build-knowledge --watch` 与 `next dev`。Ctrl+C 一起停                                |
+| `web/scripts/build-knowledge.mjs` | 知识构建脚本       | 把引擎源码与人工经验拼成运行时的产物（见阶段 2）。**全是 `throw`**：规则缺字段、算子没注册、表达式编译不过，这里就报错 |
+| `next dev`                        | Next.js 开发服务器 | 起热更新的网站                                                                                                         |
 
 **另开一个终端**（可选，看类型错用）：`tsc --noEmit --watch`。
 
-**热更新分三段**，`pnpm dev` 三段都拉起来了：
+**热更新分两段**，`pnpm dev` 两段都拉起来了：
 
-| 你改了                                                                                     | 谁负责                                                     |
-| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| `web/` 里的代码（`.tsx` / `.css`）                                                         | Next 自己热更新                                            |
-| 内容真源（`docs/guide/*.mdx`、`knowledge/skills/`、`knowledge/mcp/`）                      | `sync-content --watch` 重拷进 `.generated/`，Next 才看得到 |
-| 知识真源（`knowledge/px4/rules/*.yaml`、`facts.yaml`、`knowledge/engine/operators.py` 等） | `build-knowledge --watch` 重建产物，Next 才看得到          |
+| 你改了                                                                                     | 谁负责                                            |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| `web/` 里的代码与站点内容（`.tsx` / `.css` / `content/**/*.mdx`）                          | Next 自己热更新（内容是运行期读盘，刷新即见）     |
+| 知识真源（`knowledge/px4/rules/*.yaml`、`facts.yaml`、`knowledge/engine/operators.py` 等） | `build-knowledge --watch` 重建产物，Next 才看得到 |
 
-> **只想开一半**：`pnpm dev:no-watch` —— 同步 + 构建 + `next dev`，不挂 watch。
-> **单独开着两段热拷贝**：`pnpm sync:watch`、`pnpm kb:watch`（另开终端时用）。
+> **只想开一半**：`pnpm dev:no-watch` —— 构建 + `next dev`，不挂 watch。
+> **单独开着热重建**：`pnpm kb:watch`（另开终端时用）。
 >
 > **起不来往往不是 Next.js 的问题，是知识库写错了。** 报错会直指哪个文件哪个字段。
 > watch 模式下写坏了不会退出，改对了下次存盘自动重建。
@@ -131,17 +129,17 @@ FULL_PUSH=1 git push    # 和 CI 一样全（+144s 的 next build）
 
 **job 1 `checks` → 10 项：**
 
-| 文件                                        | 是什么          | 干什么                                               | 耗时    |
-| ------------------------------------------- | --------------- | ---------------------------------------------------- | ------- |
-| `next build`                                | 站点构建        | 真能编译出生产产物吗                                 | 144s    |
-| `web/scripts/build-knowledge.mjs --check`   | 产物一致性      | 提交的产物与 `knowledge/` 源还一致吗                 | 0.6s    |
-| `web/scripts/check-skill-spec.mjs`          | Skill 规范检查  | `knowledge/skills/*/SKILL.md` 合规吗（自带反例自检） | 0.4s    |
-| `web/scripts/check-mcp-spec.mjs`            | MCP 规范检查    | `knowledge/mcp/*/server.json` 合规吗（自带反例自检） | 0.3s    |
-| `web/scripts/test-issue-filer.mjs`          | **前端守卫集**  | 21 节共 131 条不变量还成立吗（扫源码防回潮）         | 44s     |
-| `pip-audit`                                 | Python 依赖审计 | `requirements-dev.txt` 里的依赖有已知漏洞吗          | 41s     |
-| `pnpm audit`                                | 前端依赖审计    | 前端依赖有已知漏洞吗（须带 `--registry`）            | 7.4s    |
-| `web/e2e/pages.spec.ts`（`@smoke`）         | 路由冒烟        | 16 条关键路由还能渲染吗                              | 分钟级  |
-| `web/e2e/analyze.spec.ts`（`日志分析流程`） | **全流程 E2E**  | 上传 `.ulg` → Pyodide 解析 → 显示，整条链路          | 约 7min |
+| 文件                                        | 是什么          | 干什么                                                 | 耗时    |
+| ------------------------------------------- | --------------- | ------------------------------------------------------ | ------- |
+| `next build`                                | 站点构建        | 真能编译出生产产物吗                                   | 144s    |
+| `web/scripts/build-knowledge.mjs --check`   | 产物一致性      | 提交的产物与 `knowledge/` 源还一致吗                   | 0.6s    |
+| `web/scripts/check-skill-spec.mjs`          | Skill 规范检查  | `web/content/skills/*/SKILL.md` 合规吗（自带反例自检） | 0.4s    |
+| `web/scripts/check-mcp-spec.mjs`            | MCP 规范检查    | `web/content/mcp/*/server.json` 合规吗（自带反例自检） | 0.3s    |
+| `web/scripts/test-issue-filer.mjs`          | **前端守卫集**  | 21 节共 131 条不变量还成立吗（扫源码防回潮）           | 44s     |
+| `pip-audit`                                 | Python 依赖审计 | `requirements-dev.txt` 里的依赖有已知漏洞吗            | 41s     |
+| `pnpm audit`                                | 前端依赖审计    | 前端依赖有已知漏洞吗（须带 `--registry`）              | 7.4s    |
+| `web/e2e/pages.spec.ts`（`@smoke`）         | 路由冒烟        | 16 条关键路由还能渲染吗                                | 分钟级  |
+| `web/e2e/analyze.spec.ts`（`日志分析流程`） | **全流程 E2E**  | 上传 `.ulg` → Pyodide 解析 → 显示，整条链路            | 约 7min |
 
 **job 2 `guard-self-proof` → 1 项：**
 
@@ -205,8 +203,8 @@ pnpm test:e2e            # 全量 42 条
 
 ## 附 · 几个坑
 
-- **内容真源由 `sync-content --watch` 负责同步**（`pnpm dev` 已带上）。若用 `pnpm dev:no-watch`，
-  改 `docs/guide`、`knowledge/skills`、`knowledge/mcp` 后页面不会变，要另开 `pnpm sync:watch`。
+- **站点内容不需要同步**：真源就在 `web/content/` 下（guide/skills/mcp，全部入库），
+  运行期读盘，dev 下改完刷新即见。以前那段 `sync-content --watch` 已随真源唯一化退役。
 - **知识真源由 `build-knowledge --watch` 负责重建**（`pnpm dev` 已带上）。同样地，用
   `pnpm dev:no-watch` 时改 `knowledge/px4/` 或 `knowledge/engine/` 后页面不会变，要另开 `pnpm kb:watch`。
 - **`build-knowledge` 的产物里有一个落在 `knowledge/px4/` 内部**（`rules-editor-schema.generated.json`）。

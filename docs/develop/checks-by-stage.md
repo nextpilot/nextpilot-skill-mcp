@@ -112,7 +112,7 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 | 日志回归 | `guard_provider_contract`                              | 3s                                     | 本地 push             | **本地**（同上）                       |
 | 日志回归 | `px4log_engine_runner --probe-data`                    | 3s                                     | 本地 push             | **本地**（同上）                       |
 | 日志回归 | `check_rules_fields --strict`                          | 2s                                     | 本地 push             | **本地**（同上）                       |
-| 构建     | `sync-content` + `build-knowledge`                     | —                                      | dev / build           | dev / build                            |
+| 构建     | `build-knowledge`                                      | —                                      | dev / build           | dev / build                            |
 | 构建     | `next build`                                           | **144s**                               | CI（`--stage build`） | CI                                     |
 | 自证     | `mutate_guards`（65 条变异）                           | **约 26min**                           | 无人跑                | CI 独立 job                            |
 | 冒烟     | `playwright --grep @smoke`                             | 分钟级                                 | 原在 pre-push         | CI（**标记重整见第 10 节**）           |
@@ -145,21 +145,20 @@ E2E 里那条"上传 .ulg 完成分析"约 420s（`playwright-analyze` 因此单
 
 ### 阶段速查
 
-| 阶段   | 入口                                                      | 触发方式     | 实测时长                |
-| ------ | --------------------------------------------------------- | ------------ | ----------------------- |
-| dev    | `pnpm dev` = `sync:content` + `build:kb` + `next dev`     | 手动         | 启动即跑构建期校验      |
-| build  | `pnpm build` = `sync:content` + `build:kb` + `next build` | 手动 / CI    | 144s（仅 `next build`） |
-| commit | `.githooks/pre-commit`                                    | `git commit` | 2s                      |
-| push   | `.githooks/pre-push` → `check_all.py --pre-push`          | `git push`   | 26s                     |
-| CI     | `.github/workflows/ci.yml` 两个 job                       | push / PR    | 约 25min                |
-| deploy | `.github/workflows/deploy.yml`                            | CI 成功后    | 部署 + 线上 E2E         |
+| 阶段   | 入口                                             | 触发方式     | 实测时长                |
+| ------ | ------------------------------------------------ | ------------ | ----------------------- |
+| dev    | `pnpm dev` = `build:kb` + `next dev`             | 手动         | 启动即跑构建期校验      |
+| build  | `pnpm build` = `build:kb` + `next build`         | 手动 / CI    | 144s（仅 `next build`） |
+| commit | `.githooks/pre-commit`                           | `git commit` | 2s                      |
+| push   | `.githooks/pre-push` → `check_all.py --pre-push` | `git push`   | 26s                     |
+| CI     | `.github/workflows/ci.yml` 两个 job              | push / PR    | 约 25min                |
+| deploy | `.github/workflows/deploy.yml`                   | CI 成功后    | 部署 + 线上 E2E         |
 
 ### dev 写代码时
 
 **`pnpm dev` 实际执行**：
 
 ```bash
-node scripts/sync-content.mjs      # docs/guide + knowledge/ → web/ 内的真源
 node scripts/build-knowledge.mjs   # 生成 workers/*.ts、lib/knowledge/*.generated.*
 next dev
 ```
@@ -178,14 +177,14 @@ next dev
 
 ### build 构建
 
-**`pnpm build` 实际执行**：上面三步 + `next build`（144s）。
-`pnpm build:kb` 只做前两步；`--check` 时只比对不写入。
+**`pnpm build` 实际执行**：上面两步 + `next build`（144s）。
+`pnpm build:kb` 只做第一步；`--check` 时只比对不写入。
 
 **已定（用户确认）：本地按需跑 `pnpm build`，不进 push 快检；CI 每次跑。**
 
 | 位置 | 跑什么                                                              | 触发           |
 | ---- | ------------------------------------------------------------------- | -------------- |
-| 本地 | `pnpm build`（= `sync:content` + `build:kb` + `next build`）        | 手动，按需     |
+| 本地 | `pnpm build`（= `build:kb` + `next build`）                         | 手动，按需     |
 | CI   | 只有 `next build`（清单里的 `next-build`，`when: args.with_build`） | 每次 push / PR |
 
 **为什么本地按需而不是每次**：`next build` 一次 144s，是 push 快检（26s）的 5.5 倍；

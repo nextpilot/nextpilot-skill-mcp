@@ -12,7 +12,6 @@
     "check:pre-commit": "python .githooks/pre-commit",
     "check:pre-push": "python .githooks/pre-push",
     "fix:links": "pnpm --filter ./web fix:links",
-    "sync:content": "pnpm --filter ./web sync:content",
     "lint": "node node_modules/eslint/bin/eslint.js web && node node_modules/markdownlint-cli2/markdownlint-cli2-bin.mjs \"**/*.md\" \"**/*.mdx\"",
     "lint:py": "python -m ruff check .",
     "lint:all": "pnpm lint && pnpm lint:py && pnpm typecheck && pnpm typecheck:py",

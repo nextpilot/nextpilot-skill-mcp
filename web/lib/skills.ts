@@ -32,7 +32,7 @@ function readFileOrThrow(dir: string, name: string): string {
     if (!fs.existsSync(full)) {
         // 缺哪份就说缺哪份：三份文件的用途不同，一句"内容不完整"让人无从下手
         throw new Error(
-            `Skill ${path.basename(dir)} 缺少 ${name}（真源目录：knowledge/skills/${path.basename(dir)}/）`,
+            `Skill ${path.basename(dir)} 缺少 ${name}（真源目录：web/content/skills/${path.basename(dir)}/）`,
         );
     }
     return fs.readFileSync(full, "utf8");

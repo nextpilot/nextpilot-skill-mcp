@@ -1,12 +1,10 @@
 import path from "node:path";
 
 /**
- * 站点内容在运行期的**唯一**位置：`web/content/`。
+ * 站点内容在运行期的**唯一**位置：`web/content/`，也是唯一真源（guide/skills/mcp 全部入库）。
  *
- * 指南真源（手动编写）在 `web/content/guide/`——直接入库，同仓库编辑即可。
- * Skill / MCP 真源在 `web/` 之外（`knowledge/skills`、`knowledge/mcp`），由
- * `scripts/sync-content.mjs` 构建期拷进 `web/content/skills/` 和 `web/content/mcp/`。
- * 部署包只有 `web/` 一个目录，所以运行期只读 `content/`：有没有仓库其余部分都不影响。
+ * `web/` 是独立项目、部署时只上传它自己，运行期只读 `content/`：
+ * 有没有仓库其余部分都不影响。不再有构建期拷贝——`sync-content` 已退役。
  */
 const CONTENT_DIR = path.join(process.cwd(), "content");
 

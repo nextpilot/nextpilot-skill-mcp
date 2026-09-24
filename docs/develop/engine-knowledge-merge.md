@@ -70,13 +70,13 @@ knowledge/                  ← 独立项目根（一级目录）
 它们本来就在 `knowledge/` 下，方案 C **不需要动它们** —— 这是 C 相对 A 的额外好处。
 但要认清它们的性质不同于 `px4/`：
 
-| 子目录            | 性质                   | 谁消费                                              |
-| ----------------- | ---------------------- | --------------------------------------------------- |
-| `px4/`            | **引擎知识**           | 编译进 Pyodide 产物；将来进后端 wheel               |
-| `skills/`、`mcp/` | **web 内容卡片的真源** | `sync-content.mjs` 拷进 `web/content/`，只有 web 用 |
+| 子目录            | 性质                   | 谁消费                                                                        |
+| ----------------- | ---------------------- | ----------------------------------------------------------------------------- |
+| `px4/`            | **引擎知识**           | 编译进 Pyodide 产物；将来进后端 wheel                                         |
+| `skills/`、`mcp/` | ~~web 内容卡片的真源~~ | **已搬走**（2026-09-24 真源唯一化）：`web/content/{skills,mcp}/`，只有 web 用 |
 
-→ 建议：位置不动，但在 `knowledge/README.md` 里写明这一点。
-（若将来要把 `px4/` 单独打进 wheel，靠 package-data 白名单排除 `skills/` `mcp/`，不必搬目录。）
+→ 建议：`px4/` 位置不动；skills/mcp 已经搬进 `web/content/`，
+将来把 `px4/` 单独打进 wheel 时不再需要排除它们。
 
 ---
 
@@ -111,6 +111,9 @@ knowledge/                  ← 独立项目根（一级目录）
 `web/lib/constants.ts:59` 的 `contentRoot: "knowledge"`、
 `web/scripts/sync-content.mjs:25-26`、`_verify-schema.mjs:9`、`check_rules_fields.py:10`、
 `.prettierignore`、`.markdownlintignore`、`.vscode/settings.json` —— **全部保持不变**。
+
+> ⚠️ 2026-09-24 后本节过时：skills/mcp 真源搬进 `web/content/` 后，`contentRoot` 已改为
+> `"web/content"`，`sync-content.mjs` 已删除。保留原文只为记录当时的决策依据。
 
 ### 4.4 顺带做：`rule_engine.py` + `report_data.py` 合并成一个文件（2026-09-24 拍板）
 
@@ -379,8 +382,9 @@ knowledge 的 Node 编译器**在云端不可用**。所以产物必须**入库*
 
    代价：新增文件类型（如 `.csv`）要记得补白名单 —— 白名单的固有代价。
 
-2. **保留 `include-package-data = true`，用 MANIFEST.in 排除**：`prune knowledge/skills`、
-   `prune knowledge/mcp`。注意 MANIFEST.in 主要影响 sdist，wheel 侧仍受上面那条默认值影响，
+2. **保留 `include-package-data = true`，用 MANIFEST.in 排除**：~~`prune knowledge/skills`、
+   `prune knowledge/mcp`~~（这两条已不需要——skills/mcp 已搬进 `web/content/`，不在 wheel 范围）。
+   注意 MANIFEST.in 主要影响 sdist，wheel 侧仍受上面那条默认值影响，
    **必须实测**。
 3. **不接 setuptools-scm**：那 `include-package-data` 只认 MANIFEST.in，
    但版本号要手写或走 `[tool.setuptools.dynamic]`。

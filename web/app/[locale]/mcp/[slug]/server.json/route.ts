@@ -5,7 +5,7 @@ import { MCP_DIR } from "@/lib/content-dir";
 /**
  * 把 MCP 条目的 `server.json` 原样吐出来：`/mcp/<slug>/server.json`。
  *
- * 有这个路由，`knowledge/mcp/<slug>/server.json` 才不只是"仓库里躺着给守卫看的文件"——
+ * 有这个路由，`web/content/mcp/<slug>/server.json` 才不只是"仓库里躺着给守卫看的文件"——
  * MCP 客户端能直接照它装包。返回的是**文件原文**而不是 `lib/mcp.ts` 解析后的
  * `McpManifest`：那份 struct 只声明了站点要用的几个字段（见 `lib/mcp.ts` 顶部），
  * 拿它再序列化一次会静默丢掉站点不关心的字段，manifest 就不完整了。

@@ -49,14 +49,14 @@ export type Platform = (typeof PLATFORMS)[number];
  *
  * 地址写在这里一处，不散在组件里：git remote 目前是 Gitee（`gitee.com/nextpilot/nextpilot-skill-mcp`），
  * 哪天换成 GitHub 或改分支，只改这个对象。
- * `contentRoot` 是内容在仓库里的根（`knowledge/` 是唯一真源，`web/content/skills/`、`web/content/mcp/` 是构建期拷贝的产物）。
+ * `contentRoot` 是内容在仓库里的根（`web/content/` 是唯一真源，入库，无构建期拷贝）。
  */
 export const CONTENT_REPO = {
     host: "gitee.com",
     owner: "nextpilot",
     repo: "nextpilot-skill-mcp",
     branch: "master",
-    contentRoot: "knowledge",
+    contentRoot: "web/content",
 } as const;
 
 /** 拼出某个内容文件的「在仓库中编辑」地址 */

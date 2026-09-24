@@ -1,5 +1,5 @@
 /**
- * MCP 条目合规校验：`knowledge/mcp/<slug>/` 是否满足 MCP Registry 规范与本站的字段约定。
+ * MCP 条目合规校验：`web/content/mcp/<slug>/` 是否满足 MCP Registry 规范与本站的字段约定。
  *
  * 与 `check-skill-spec.mjs` 是一对，但**规范不同源**，别当成同一套：
  * Skill 走 Agent Skills 规范（SKILL.md，name 是 kebab 且必须等于目录名）；
@@ -36,8 +36,7 @@ import matter from "gray-matter";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
-const repoRoot = resolve(webRoot, "..");
-const MCP_DIR = join(repoRoot, "knowledge", "mcp");
+const MCP_DIR = join(webRoot, "content", "mcp");
 
 /** 反向 DNS：`io.github.furkanisikay/ardupilot-mcp` */
 const NAME_RE = /^[a-z0-9]+(?:\.[a-z0-9-]+)*\/[a-z0-9-]+$/;
@@ -378,7 +377,7 @@ function main() {
         .filter((d) => d.isDirectory())
         .map((d) => d.name);
     if (slugs.length === 0) {
-        console.error("  FAIL mcp/empty -> knowledge/mcp/ 下没有任何 MCP 目录");
+        console.error("  FAIL mcp/empty -> web/content/mcp/ 下没有任何 MCP 目录");
         process.exitCode = 1;
         return;
     }

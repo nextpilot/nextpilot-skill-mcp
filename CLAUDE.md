@@ -64,7 +64,7 @@
 >
 > ：每个 Skill 是
 >
-> `knowledge/skills/<slug>/`
+> `web/content/skills/<slug>/`
 >
 > 下的一个目录，
 > `SKILL.md`
@@ -92,7 +92,7 @@
 >
 > 的编辑入口。
 
-**MCP 条目是另一回事，别照抄上面这套。** 它也拆成了 `knowledge/mcp/<slug>/`，但规范文件是
+**MCP 条目是另一回事，别照抄上面这套。** 它也拆成了 `web/content/mcp/<slug>/`，但规范文件是
 
 `server.json`（MCP Registry）而不是 `SKILL.md`——`name` 是反向 DNS（`io.github.<owner>/<repo>`），
 

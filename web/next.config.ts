@@ -72,7 +72,7 @@ const nextConfig: NextConfig = {
     turbopack: {
         root: process.cwd() + "/..",
     },
-    // 站点内容在构建期由 scripts/sync-content.mjs 拷进 content/，运行期只读那里。
+    // 站点内容真源就在 content/ 下（入库），运行期只读那里。
     // 它不在模块图里（是 fs.readdirSync 读的），打包器不会自动跟踪：默认输出是把整个
     // web/ 传上去所以没事，一旦将来切成 `output: "standalone"`，少了这一行部署包里就
     // 没有内容目录，线上会**静默**变成"0 篇指南 / 0 个 Skill"，而不是报错。

@@ -1,5 +1,5 @@
 /**
- * Skill 目录合规校验：每个 `knowledge/skills/<slug>/` 是否真的满足 Agent Skills 规范。
+ * Skill 目录合规校验：每个 `web/content/skills/<slug>/` 是否真的满足 Agent Skills 规范。
  *
  * 为什么必须有它：转换脚本**跑完就删了原 .mdx**，之后没人再审查这些目录。少了这道校验，
  * 「我们说它合规」就只是一句没有机器背书的话——而规范里 name / description 的约束
@@ -40,8 +40,7 @@ import matter from "gray-matter";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
-const repoRoot = resolve(webRoot, "..");
-const SKILLS_DIR = join(repoRoot, "knowledge", "skills");
+const SKILLS_DIR = join(webRoot, "content", "skills");
 
 const NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RESERVED = ["claude", "anthropic"];
@@ -351,7 +350,7 @@ function main() {
         .map((d) => d.name);
 
     if (slugs.length === 0) {
-        console.error("  FAIL skills/empty -> knowledge/skills/ 下没有任何 Skill 目录");
+        console.error("  FAIL skills/empty -> web/content/skills/ 下没有任何 Skill 目录");
         process.exitCode = 1;
         return;
     }
