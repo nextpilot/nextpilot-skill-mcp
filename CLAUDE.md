@@ -261,7 +261,7 @@
 
 5. 6 条真实日志冻结基线回归，逐字段比对通过；构建期校验（字段名 / 算子名 / 表达式）保证错误不进浏览器。
 
-6. ArduPilot `.bin` 支持（pymavlink，复用 ardupilot-mcp 的检查套件，同样打包进 Pyodide）待排期。
+6. ArduPilot `.bin` 支持：**已落地**，`engine/providers/ardupilot.py` 是本项目唯一认识 ArduPilot 的地方（按 `providers/api.py` 契约自注册，引擎一行未改）。解析是**自研**的（只依赖 `struct` + `numpy`，不引 pymavlink —— `.bin` 开头自带 FMT 声明，按表通解即可；pymavlink 带整套 mavlink 协议表，进 Pyodide 代价大而这里用不上）。ardupilot-mcp 那 16 项检查套件仍待排期。
 
 ### 4.4 参考实现与研究项目
 
@@ -347,7 +347,7 @@
 
    从第一天起封装薄存储接口，实体字段对齐远期关系型表结构，控制阶段间迁移成本。
 
-- **日志解析（端侧优先）**：**Pyodide（WASM Python）运行在 Web Worker 中**，首发加载 pyulog（PX4 `.ulg`），ArduPilot `.bin`（pymavlink）待排期；规则检查器与解析器为同一份纯 Python 包，浏览器与服务端共用。**blackbox\_decode（Betaflight）推后**：它是 C 编译二进制、无法直接进 Pyodide，需 WASM 重写或等阶段二服务端引擎支持
+- **日志解析（端侧优先）**：**Pyodide（WASM Python）运行在 Web Worker 中**，首发加载 pyulog（PX4 `.ulg`）；ArduPilot `.bin` 已支持，解析器自研（无 pymavlink，随引擎一起内联进产物，不需额外下载）；规则检查器与解析器为同一份纯 Python 包，浏览器与服务端共用。**blackbox\_decode（Betaflight）推后**：它是 C 编译二进制、无法直接进 Pyodide，需 WASM 重写或等阶段二服务端引擎支持
 
 - **任务形态**：解析在端侧异步进行，无需服务端队列；当前不部署独立 Python 服务。大文件（约 50MB 以上）或批量分析 API 阶段，再把同一套引擎下沉为 FastAPI + Redis（ARQ / BullMQ）常驻容器服务
 
