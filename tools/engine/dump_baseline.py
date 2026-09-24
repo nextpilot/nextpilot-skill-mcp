@@ -62,7 +62,7 @@ def dump_one(path: Path) -> Path:
         "log": path.name,
         "slug": slug(path),
         "source": source_of(path),
-        "engine": "knowledge/engine/rule_engine.py + knowledge/engine/report_data.py",
+        "engine": "knowledge/engine/engine.py",
         "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
         "result": result,
     }

@@ -1,6 +1,6 @@
 # PX4 .ulg（ULog）适配器 —— **本项目唯一认识 PX4 的地方**
 #
-# 契约见 providers/api.py。引擎（rule_engine.py / operators.py / report_data.py）不认识
+# 契约见 providers/api.py。引擎（engine.py / operators.py）不认识
 # topic 名、字段名、info 键名、码值，只认这份契约给的东西；要加一种日志格式（ArduPilot .bin）
 # 就是再加一个这样的文件，引擎一行不改。
 #
@@ -10,7 +10,7 @@
 #   · engine/*.py：与格式无关的机制
 #
 # 注意本文件是**文本拼接**进产物里的（没有 import 机制）：直接用 api.py 的
-# FORMATS / check_provider，以及 rule_engine.py 注入的那份数据配置（FACTS，由 open_log 传进来）。
+# FORMATS / check_provider，以及 engine.py 注入的那份数据配置（FACTS，由 open_log 传进来）。
 # 这里**别写出构建期那四个哨兵名**（两下划线夹的名字，如 rules/facts/单位表/KB 的占位符原文）：
 # 拼接后 JS 的 replace 只换第一处，注释里先出现一次就会把真正的赋值漏掉、浏览器直接报 NameError
 # （构建期有"每个哨兵恰好一次"的护栏，写进去就构建失败）。
@@ -35,7 +35,7 @@ _RELEASE_TYPE_SUFFIX = {64: "-alpha", 128: "-beta", 192: "-rc", 255: ""}
 
 # 地图轨迹的取数**声明**（读哪个 topic 的哪几列、各按什么量纲换算）在
 # knowledge/px4/plot/track.yml —— 它按「要画什么、从哪几列画」归在 plot/ 下，
-# 构建期并进引擎内联的那份数据配置（FACTS，见 rule_engine.py），这里从 `self._cfg["track"]` 读。
+# 构建期并进引擎内联的那份数据配置（FACTS，见 engine.py），这里从 `self._cfg["track"]` 读。
 # **解析逻辑留在本文件**（get_flight_track()）：按顺序取第一个存在的候选、剔未定位点、等距抽样——
 # 这些是分支，写进 YAML 只能再造一门小语言（见 track.yml 的说明）。
 
@@ -548,7 +548,7 @@ class Px4Provider:
             return {"error": "这份格式没有声明轨迹取数来源（knowledge/px4/plot/track.yml）"}
         # ① 先过声明里的闸门（`conditions.topics`，构建期从预设搬到 facts.track）：一个都不在
         #    日志里时，这份预设**本就不适用**，该说的是"缺哪个 topic"而不是"坐标候选取不到"。
-        #    文案复用 `rule_engine._missing_topics`——规则与绘图预设共用这一处，别在这儿再写
+        #    文案复用 `engine._missing_topics`——规则与绘图预设共用这一处，别在这儿再写
         #    第二份（它给的正是缺什么：`sensor_gps / vehicle_gps_position not in log`）。
         missing = _missing_topics((cfg.get("conditions") or {}).get("topics"))
         if missing:

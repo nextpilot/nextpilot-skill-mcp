@@ -115,7 +115,12 @@ knowledge/                  ← 独立项目根（一级目录）
 > ⚠️ 2026-09-24 后本节过时：skills/mcp 真源搬进 `web/content/` 后，`contentRoot` 已改为
 > `"web/content"`，`sync-content.mjs` 已删除。保留原文只为记录当时的决策依据。
 
-### 4.4 顺带做：`rule_engine.py` + `report_data.py` 合并成一个文件（2026-09-24 拍板）
+### 4.4 顺带做：`rule_engine.py` + `report_data.py` 合并成一个文件（✅ 2026-09-24 已执行）
+
+> **执行结果**：新文件定名 **`knowledge/engine/engine.py`**（1112 行；没选 analysis_engine.py——
+> 目录已叫 engine，文件再叫 engine_x 反而绕）。产物同步归一：`pyodide-px4log-data.ts` 已删、
+> 导出名 `PY_ULG_CHECKS` → `PY_ULG_ENGINE`（原名在含数据层后已名不副实）、worker 改单串执行。
+> 下表与调查记录保留当时的决策依据。
 
 **决定**：用户原话「那放在 engine 和 knowledge 合并的时候一起做」—— 即**本次迁移时一并执行**，
 不单独提前做。**为什么必须绑在一起**：§4.1 #6 与 §4.2 的头两条已经要改 `report_data.py` 的路径，
@@ -135,12 +140,12 @@ knowledge/                  ← 独立项目根（一级目录）
 
 **在 §4.1~4.3 清单之上，本次要额外决定 / 执行的**：
 
-| 项                    | 说明                                                                                                                                                        |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **新文件名**          | 合起来 1114 行，叫 `rule_engine.py` 就名不副实（里面有 LTTB / `np_track` / `np_log_info` / 时间口径）。倾向 `analysis_engine.py`，**待拍板**，见 §8 第 8 条 |
-| **产物也要合**        | 只合源文件不合产物，就成了"一份源拆成两个产物"，比现状更绕 → `pyodide-px4log-data.ts` 退场、`PY_ULG_DATA_HELPERS` 取消、worker 那句字符串拼接去掉           |
-| 拼接顺序              | rule_engine 段必须**在前**：`RULES.sort`、`provider = open_log(...)`、`_COMPUTE_GLOBALS["has_topic"] = provider.has_topic` 都是它的顶层语句                 |
-| `test_rule_engine.py` | 它只把 operators + rule_engine 拼进沙箱做 CEL 单测；合并会顺带 exec 掉 296 行数据层（能跑，但稀释针对性）→ 接受，还是给数据层留门，做时定                   |
+| 项                    | 说明                                                                                                                                                 |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **新文件名**          | 合起来 1114 行，叫 `rule_engine.py` 就名不副实（里面有 LTTB / `np_track` / `np_log_info` / 时间口径）。**已定 `engine.py`**（2026-09-24 执行时拍板） |
+| **产物也要合**        | 只合源文件不合产物，就成了"一份源拆成两个产物"，比现状更绕 → `pyodide-px4log-data.ts` 退场、`PY_ULG_DATA_HELPERS` 取消、worker 那句字符串拼接去掉    |
+| 拼接顺序              | rule_engine 段必须**在前**：`RULES.sort`、`provider = open_log(...)`、`_COMPUTE_GLOBALS["has_topic"] = provider.has_topic` 都是它的顶层语句          |
+| `test_rule_engine.py` | 它只把 operators + rule_engine 拼进沙箱做 CEL 单测；合并会顺带 exec 掉 296 行数据层（能跑，但稀释针对性）→ 接受，还是给数据层留门，做时定            |
 
 **引用面（2026-09-24 实测计数，模式 `rule_engine|report_data|PY_ULG_*|pyodide-px4log-data`）**：
 `build-knowledge.mjs` 21、`knowledge/px4/CLAUDE.md` 22、`engine/README.md` 14、`CLAUDE.md` 7、
@@ -422,10 +427,9 @@ knowledge 的 Node 编译器**在云端不可用**。所以产物必须**入库*
    就装（或拆第二个包 `nextpilot-content`）。取决于后端需求清单。见 §7.6.1。
 7. **`pull-knowledge.mjs` 的映射表**放哪、由谁守（见 §7.5.2）。
    建议 `knowledge/dist-map.json` 作为单一事实源，两侧脚本都读它。
-8. **§4.4 合并后的新文件名**：合起来 1114 行，`rule_engine.py` 这个名字盖不住
-   LTTB / `np_track` / `np_log_info` / 时间口径（违反了「名字读出来的关系必须和真实关系一致」）。
-   倾向 `analysis_engine.py`（与 `operators.py` / `providers/` 同层的"引擎部件"命名）；
-   备选 `log_engine.py`（但引擎同时服务规则与出图，`analysis` 比 `log` 准）。
+8. **§4.4 合并后的新文件名**：~~倾向 `analysis_engine.py`~~ **已定 `engine.py`**（2026-09-24 执行）。
+   最终没选 `analysis_engine.py` / `log_engine.py`：目录已叫 `engine/`，与目录同名最直白
+   （拼接顺序里它就是最后一块"引擎本体"）。
    ⚠️ 改名会牵动 §4.4 列出的全部引用面，**做之前拍板，别中途改主意**。
 
 ---
@@ -440,6 +444,5 @@ knowledge 的 Node 编译器**在云端不可用**。所以产物必须**入库*
   加 `pyproject.toml` 是**赋予包身份**，可一起做也可分两步。
 - 本次**不动** Node 侧：部署上传范围仍只有 `web/`，且 web 产物是内联字符串、
   不依赖兄弟包，加 pnpm workspace 零收益。
-- 2026-09-24 新增的**并入项**：`rule_engine.py` + `report_data.py` 合并（§4.4）。
-  调查结论是"运行期零收益、纯静态搬运"，所以它不值得单独开一轮改动 ——
-  与迁移共用同一批引用改动（§4.1 #6 / §4.2），一次改完。
+- 2026-09-24 新增的**并入项**：`rule_engine.py` + `report_data.py` 合并（§4.4）——**已单独提前执行**
+  （迁移尚未开始，合并先行落地；执行时顺带做了产物归一与导出改名，见 §4.4 顶部注记）。

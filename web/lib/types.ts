@@ -175,7 +175,7 @@ export interface AnalysisReport {
     analyzedAt: string;
 }
 
-/* ---------- 报告页数据层（Flight Review 对标 A/B/C，见 pyodide-px4log-data.ts）---------- */
+/* ---------- 报告页数据层（Flight Review 对标 A/B/C，见 engine.py 第二部分）---------- */
 
 export interface FieldMeta {
     name: string;

@@ -1,6 +1,6 @@
 # providers/ —— 日志适配器（一格式一个文件）
 
-**这里唯一认识"某一种日志"的地方。** 框架（`../rule_engine.py`、`../report_data.py`）与算子
+**这里唯一认识"某一种日志"的地方。** 引擎本体（`../engine.py`：规则框架 + 报告数据层）与算子
 （`../operators.py`）都不认识 topic 名、字段名、info 键名、码值——它们只认 `api.py` 那份契约。
 
 ```text

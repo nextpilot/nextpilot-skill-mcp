@@ -26,7 +26,7 @@ px4/
     report-empty.md         无 finding 时的固定结论文案
 ```
 
-**引擎源码不在这里**：`operators.py`（算子注册表）、`rule_engine.py`（规则框架）、`report_data.py`（报告数据层）在 [knowledge/engine/](knowledge/engine/README.md)
+**引擎源码不在这里**：`operators.py`（算子注册表）、`engine.py`（规则框架 + 报告数据层）在 [knowledge/engine/](knowledge/engine/README.md)
 （浏览器与本地工具共用同一份）。这个目录只放**经验与字典**——"算完怎么判定"，不放"怎么算"。
 此处曾同时放这两类东西，2026-09 分开。
 
@@ -162,8 +162,8 @@ cd web && pnpm build:kb --check    # 只比对不写入：任一产物与 knowle
 ```
 
 生成产物（提交进仓库，EdgeOne 直接 `next build` 也有得用）：
-`web/workers/pyodide-px4log-engine.ts`（内联 knowledge/engine/operators.py + knowledge/engine/rule_engine.py + rules/*.yaml）、
-`web/workers/pyodide-px4log-data.ts`、`web/workers/fault-kb.generated.json`、
+`web/workers/pyodide-px4log-engine.ts`（内联 knowledge/engine/operators.py + knowledge/engine/engine.py + rules/*.yaml）、
+`web/workers/fault-kb.generated.json`、
 `web/lib/knowledge/prompts.generated.js`、
 `px4/rules-editor-schema.generated.json`（编辑器用，见下节）。
 

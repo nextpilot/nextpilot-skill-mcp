@@ -2,7 +2,7 @@
 
 > 状态：设计稿（未实现）。
 > 骨架取自 `knowledge/px4/plot-template.yml`（草案），保留其分层，修订三处（§1）。
-> 相关：`knowledge/px4/plot/`、`knowledge/engine/operators.py`、`knowledge/engine/report_data.py:np_series()`、`web/lib/chart-presets.ts`、`web/components/LogCharts.tsx`、`web/components/LogFlightMap.tsx`
+> 相关：`knowledge/px4/plot/`、`knowledge/engine/operators.py`、`knowledge/engine/engine.py:np_series()`、`web/lib/chart-presets.ts`、`web/components/LogCharts.tsx`、`web/components/LogFlightMap.tsx`
 
 ---
 

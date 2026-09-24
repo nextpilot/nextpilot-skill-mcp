@@ -1,7 +1,7 @@
 """校验**生成产物**（web/workers/pyodide-px4log-engine.ts）能被当作合法 Python 执行。
 
 为什么需要它：本地回归跑的是 knowledge/engine/ 下的源文件，而浏览器里跑的是构建产物
-（operators.py + ulog_checks.py 经 String.raw 内联 + __FAULT_KB__/__RULES__
+（operators.py + engine.py 经 String.raw 内联 + __FAULT_KB__/__RULES__
 三处替换）。只有这一步能证明"真正进 Pyodide 的东西"是合法的——否则语法错误只能在
 用户浏览器里炸出来。
 
@@ -42,7 +42,7 @@ def _declared_track_topics(text: str) -> list:
 
     YAML 里写成 `["sensor_gps || vehicle_gps_position"]`，`facts.track` 里存的是
     `[["sensor_gps", "vehicle_gps_position"]]`——项内 `||` 由构建期拆成候选列表
-    （`rule_engine._missing_topics` 只认折好的形态，它不认识 `||`）。比对时必须用同一个
+    （`engine._missing_topics` 只认折好的形态，它不认识 `||`）。比对时必须用同一个
     语义折过，否则守卫会对着"表示形式不同"报假失败。
 
     这里**不引 pyyaml**：只为一行声明装一个解析器不划算，而且这是"守卫读声明"的窄用途——
@@ -214,13 +214,7 @@ def main() -> int:
     step += 1
     rule_name = "产物真执行 + 返回体字段契约"
 
-    data_ts = (REPO_ROOT / "web" / "workers" / "pyodide-px4log-data.ts").read_text(encoding="utf-8")
-    m2 = re.search(r"String\.raw`(.*)`;", data_ts, re.S)
-    if not m2:
-        log.print_check(step, total, rule_name, False, err="数据层产物里找不到 String.raw 模板")
-        results.append((rule_name, "fail"))
-        return log.print_summary(results, skipped)
-
+    # 引擎本体已含数据层（engine.py 合并后单一产物），直接整段执行
     logs = sorted((REPO_ROOT / "tools" / "testdata" / "logs").glob("*.ulg"), key=lambda p: p.stat().st_size)
     if not logs:
         log.print_check(step, total, rule_name, True, detail="SKIP 没有回归日志")
@@ -234,7 +228,7 @@ def main() -> int:
     exec_err = ""
     result = None
     try:
-        exec(compile(final + "\n" + m2.group(1), "<artifact>", "exec"), ns)
+        exec(compile(final, "<artifact>", "exec"), ns)
         ns["np_report"]()
         result = json.loads(ns["__result"])
     except Exception as e:  # noqa: BLE001

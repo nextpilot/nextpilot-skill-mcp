@@ -293,7 +293,7 @@
 
 报告页之外还有两块常驻区域：**飞行阶段条**（`LogPhaseStrip.tsx`）紧贴 **飞行轨迹地图**（`LogFlightMap.tsx`，高德瓦片：国内可达；轨迹按 WGS-84 → GCJ-02 换算后绘制，换算见 `lib/coord.ts`）。
 
-时间口径全站统一：**开机以来的秒数**，显示成 `hh:MM:ss`（与 Flight Review 一致）。数据层的硬规则与坑（事件解码、多值信息拼接、参数默认值怎么来、派生数据版本）见 `knowledge/px4/CLAUDE.md`**&#x20;的「报告页数据层」**—— 改 `knowledge/engine/report_data.py` 前必读。
+时间口径全站统一：**开机以来的秒数**，显示成 `hh:MM:ss`（与 Flight Review 一致）。数据层的硬规则与坑（事件解码、多值信息拼接、参数默认值怎么来、派生数据版本）见 `knowledge/px4/CLAUDE.md`**&#x20;的「报告页数据层」**—— 改 `knowledge/engine/engine.py`（数据层部分）前必读。
 
 ---
 
@@ -415,19 +415,19 @@
 
 统一约定（新建文件务必遵循，命名不清时先查本节）：
 
-| 类型                                      | 规则                                                                                                | 示例                                                                                                  |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| React 组件                                | PascalCase + `.tsx`                                                                                 | `LogAnalyzer.tsx`、`SkillCard.tsx`                                                                    |
-| 分析页 tab 组件                           | 一个 tab 一个文件：`Log<用途>Msg.tsx`                                                               | `LogEventsMsg.tsx`、`LogParamsMsg.tsx`、`LogSystemMsg.tsx`、`LogFlightMap.tsx`                        |
-| 库 / 类型 / 常量                          | kebab-case + `.ts`                                                                                  | `chart-presets.ts`、`types.ts`、`constants.ts`                                                        |
-| **两侧共用**的库（浏览器 + 边缘函数都引） | kebab-case + `.js`（例外：边缘那 22 个文件全是 `.js`，`.ts` 能否被 EdgeOne 打包器吃下本地验证不了） | `lib/error-policy.js`                                                                                 |
-| Web Worker 入口                           | kebab-case + `-worker.ts`                                                                           | `pyodide-px4log-worker.ts`                                                                            |
-| Worker 内嵌脚本 /helper                   | kebab-case + `-script.ts` / `-engine.ts` / `-data.ts`                                               | 现由 `build-knowledge.mjs` **生成**，不手改                                                           |
-| Next.js 路由                              | `page.tsx` / `route.ts` / `layout.tsx`（目录即路由）                                                | `app/analyze/page.tsx`、`app/api/explain/route.ts`                                                    |
-| Python 模块                               | snake\_case + `.py`                                                                                 | `knowledge/engine/rule_engine.py`、`knowledge/engine/operators.py`、`knowledge/engine/report_data.py` |
-| 知识 / 经验文件                           | 见 `knowledge/README.md`；规则 `rules/*.yaml`、故障库 `fault-kb.yaml`                               | `rules/vibration.yaml`、`fault-kb.yaml`                                                               |
-| 文档                                      | kebab-case + `.md`                                                                                  | `llm/gjb841-system-prompt.md`                                                                         |
-| 边缘函数（`web/functions/`）              | kebab-case + `.js`，**文件名即路由**（`functions/api/x.js` → `/api/x`）                             | `api/me.js`、`api/issues.js`、`_lib/issue-filer.js`                                                   |
+| 类型                                      | 规则                                                                                                | 示例                                                                           |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| React 组件                                | PascalCase + `.tsx`                                                                                 | `LogAnalyzer.tsx`、`SkillCard.tsx`                                             |
+| 分析页 tab 组件                           | 一个 tab 一个文件：`Log<用途>Msg.tsx`                                                               | `LogEventsMsg.tsx`、`LogParamsMsg.tsx`、`LogSystemMsg.tsx`、`LogFlightMap.tsx` |
+| 库 / 类型 / 常量                          | kebab-case + `.ts`                                                                                  | `chart-presets.ts`、`types.ts`、`constants.ts`                                 |
+| **两侧共用**的库（浏览器 + 边缘函数都引） | kebab-case + `.js`（例外：边缘那 22 个文件全是 `.js`，`.ts` 能否被 EdgeOne 打包器吃下本地验证不了） | `lib/error-policy.js`                                                          |
+| Web Worker 入口                           | kebab-case + `-worker.ts`                                                                           | `pyodide-px4log-worker.ts`                                                     |
+| Worker 内嵌脚本 /helper                   | kebab-case + `-script.ts` / `-engine.ts` / `-data.ts`                                               | 现由 `build-knowledge.mjs` **生成**，不手改                                    |
+| Next.js 路由                              | `page.tsx` / `route.ts` / `layout.tsx`（目录即路由）                                                | `app/analyze/page.tsx`、`app/api/explain/route.ts`                             |
+| Python 模块                               | snake\_case + `.py`                                                                                 | `knowledge/engine/engine.py`、`knowledge/engine/operators.py`                  |
+| 知识 / 经验文件                           | 见 `knowledge/README.md`；规则 `rules/*.yaml`、故障库 `fault-kb.yaml`                               | `rules/vibration.yaml`、`fault-kb.yaml`                                        |
+| 文档                                      | kebab-case + `.md`                                                                                  | `llm/gjb841-system-prompt.md`                                                  |
+| 边缘函数（`web/functions/`）              | kebab-case + `.js`，**文件名即路由**（`functions/api/x.js` → `/api/x`）                             | `api/me.js`、`api/issues.js`、`_lib/issue-filer.js`                            |
 
 **名字要能望文生义**（只满足上面那张表的 "类型规则" 不够 —— 它只告诉你后缀是 `.ts` 还是 `.tsx`，看不出这个文件干什么）：
 
@@ -615,7 +615,7 @@
 >
 > （
 >
-> `knowledge/engine/report_data.py`
+> `knowledge/engine/engine.py`
 >
 > ）的硬规则
 > 也在那一份里（时间基准、事件解码、多值信息拼接、参数默认值怎么来、派生数据版本）。
@@ -733,11 +733,11 @@
 > ，构建期算的引擎源文件哈希）：
 > 改了
 >
-> `knowledge/engine/report_data.py`
+> `knowledge/engine/engine.py`
 >
 > /
 >
-> `knowledge/engine/rule_engine.py`
+> `knowledge/engine/engine.py`
 >
 > /
 >
@@ -1216,7 +1216,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 
    最后试的那个才是 "把整串试完" 的那一个，它前面几条只是 "为什么跳过了它"。
 
-3. **原因文案只许有一处实现。** 缺 topic 的判据复用 `rule_engine._missing_topics`（规则与绘图
+3. **原因文案只许有一处实现。** 缺 topic 的判据复用 `engine._missing_topics`（规则与绘图
 
    预设共用，见 §6.5）；provider 里再写一份，两边迟早分叉。
 

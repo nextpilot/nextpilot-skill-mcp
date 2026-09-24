@@ -6,7 +6,7 @@ r"""knowledge/engine/ 的**顶层名字不许跨片段重名**。
 （浏览器与本地工具同一份源码）：
 
 ```text
-operators.py → providers/api.py → providers/*.py → rule_engine.py → report_data.py
+operators.py → providers/api.py → providers/*.py → engine.py
 ```
 
 拼完之后它们共享**同一个命名空间**。两个片段顶层同名 = 后者静默覆盖前者：不报错、不告警，
@@ -52,7 +52,7 @@ STEP_ID = "guard-engine-names"
 
 # 与构建脚本同规则：`api.py` 是契约，不是格式适配器
 API_FILE = "api.py"
-FRAMEWORK = ("operators.py", "rule_engine.py", "report_data.py")
+FRAMEWORK = ("operators.py", "engine.py")
 
 # 判空下限：现在是 6 个片段、约 180 个顶层名字。定在远低于实际值的水平，只为抓住
 # "文件被改名 / 目录被搬空 / 新增 provider 没被扫到"，不给正常重构添堵。

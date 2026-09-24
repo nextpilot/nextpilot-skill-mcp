@@ -23,7 +23,7 @@ facts.yaml（码表/文案/    ──┤ 构建期校验（字段/算子/表达�
   展示口径/group 顺序）    ──┤  facts 键是否齐全、provider 有没有漏实现契约）
 knowledge/engine/operators.py      ──┤                                    ── 产物内联进 Python
   ↓                         │                                         ↓
-knowledge/engine/rule_engine.py  ← ──┘                                  运行时只读产物
+knowledge/engine/engine.py  ← ──┘                                  运行时只读产物
   └─ 逐行（`next_rule()`）跑检查经验                             （不读源 yaml）
      └─ `provider.read_timeseries(...)` 取原始浮点序列
         └─ 交给 `compute` 算子做流式计算
@@ -49,7 +49,7 @@ knowledge/engine/rule_engine.py  ← ──┘                                  
 
 ## 2. `slot`（执行位置）
 
-不同 slot 可用的原始 Topic 和上下文不同。具体去 `knowledge/engine/rule_engine.py` 找对应的 `_run_slot_*` 函数；该函数会列出哪些 provider 方法会在该阶段被调用，也就等于告诉你这段经验能读到什么数据。
+不同 slot 可用的原始 Topic 和上下文不同。具体去 `knowledge/engine/engine.py` 找对应的 `_run_slot_*` 函数；该函数会列出哪些 provider 方法会在该阶段被调用，也就等于告诉你这段经验能读到什么数据。
 
 SLOT 表见 YAML 构建产物或浏览器控制台——这里不手写。
 

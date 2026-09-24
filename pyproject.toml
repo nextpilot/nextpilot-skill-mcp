@@ -40,16 +40,15 @@ select = ["E4", "E7", "E9", "F"]
 
 [tool.ruff.lint.per-file-ignores]
 # engine/ 下的文件是**拼接片段**，不是独立模块：build-knowledge.mjs 把
-#   operators.py → providers/api.py → providers/*.py → rule_engine.py → report_data.py
+#   operators.py → providers/api.py → providers/*.py → engine.py
 # 按顺序拼成一份脚本再执行（浏览器里也一样，只是改用 String.raw 内联）。
-# 所以单文件看必然出现"未定义"的跨文件名字：__FAULTS__/__RULES__/__FACTS__、
+# 所以单文件看必然出现"未定义"的跨文件名字：__FAULT_KB__/__RULES__/__FACTS__、
 # OPERATORS、SIGNATURES、open_log、ulog_bytes、provider、run_all、FORMATS。
 # 这些名字的权威清单见 engine/README.md 的「拼接顺序」一节。
 #
 # F821 只对 engine/ 关掉——tools/ 下的脚本是独立可执行的，F821 在那里必须保持生效
 # （它已经抓到过 download_px4_logs.py 里 ulog_path 未定义这类真 bug）。
-"knowledge/engine/rule_engine.py" = ["F821"]
-"knowledge/engine/report_data.py" = ["F821"]
+"knowledge/engine/engine.py" = ["F821"]
 "knowledge/engine/providers/px4.py" = ["F821"]
 # ardupilot.py 是同一序列里的又一个片段（api.py → providers/*.py），它引用的
 # api.py 顶层名字（FORMATS / match_version_spec）单文件看同样"未定义"。加适配器时

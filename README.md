@@ -52,7 +52,7 @@
 ├── docs/               # 文档
 │   ├── guide/          # 面向用户的指南（发布到站内 /guide）
 │   └── develop/        # 面向开发与运维
-├── knowledge/engine/             # 确定性分析引擎源码（operators / rule_engine / report_data）
+├── knowledge/engine/             # 确定性分析引擎源码（operators / engine）
 ├── knowledge/          # 日志分析的经验与数据
 │   ├── px4/            # PX4 相关（rules/*.yaml / 故障库 / LLM 提示词 / meta）
 │   ├── skills/         # Skill 卡片内容

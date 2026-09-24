@@ -337,7 +337,7 @@ MUTATIONS: list[Mutation] = [
     # 消费者只剩一个时，这条约束就失去意义了，而它会安静地绿着。
     Mutation(
         name="knowledge/engine/ 里写一行 js 桥接",
-        path="knowledge/engine/report_data.py",
+        path="knowledge/engine/engine.py",
         old="import json",
         new="import json\nimport js",
         guard="engine",
@@ -819,7 +819,7 @@ MUTATIONS: list[Mutation] = [
     Mutation(
         name="拼接片段清单被清空（撞名规则会因为没东西可比而恒绿）",
         path="tools/engine/guard_engine_names.py",
-        old='FRAMEWORK = ("operators.py", "rule_engine.py", "report_data.py")',
+        old='FRAMEWORK = ("operators.py", "engine.py")',
         new="FRAMEWORK = ()",
         guard="engine-names",
         expect="拼接片段没走空",

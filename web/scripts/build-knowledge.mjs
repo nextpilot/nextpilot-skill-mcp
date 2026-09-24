@@ -3,16 +3,14 @@
  *
  * 单一数据源：
  *   knowledge/engine/operators.py           算子注册表（通用，不认识具体字段）
- *   knowledge/engine/rule_engine.py         第一层 pyulog 解析 + 第二层规则/guard 框架（Pyodide 执行）
- *   knowledge/engine/report_data.py         报告页数据层 helpers（图表/事件/参数）
+ *   knowledge/engine/engine.py              引擎本体：规则/guard 框架 + 报告页数据层（Pyodide 执行）
  *   knowledge/px4/rules/*.yaml    检查经验：阈值与判定条件（工程师最常改这里）
  *   knowledge/px4/px4-fault-kb.yaml  第三层故障知识库
  *   knowledge/px4/llm/*.md        第四层 GJB-841 思考范式（LLM 只做组装）
  *   knowledge/px4/meta/*.json     固件字段与参数字典
  *
  * 本脚本生成（产物提交进仓库，EdgeOne 直接 next build 也能跑）：
- *   web/workers/pyodide-px4log-engine.ts   （导出 PY_ULG_CHECKS，内联 KB）
- *   web/workers/pyodide-px4log-data.ts    （导出 PY_ULG_DATA_HELPERS）
+ *   web/workers/pyodide-px4log-engine.ts   （导出 PY_ULG_ENGINE，内联 KB）
  *   web/workers/fault-kb.generated.json
  *   web/lib/knowledge/prompts.generated.js（ESM，供边缘函数 import）
  *   web/content/guide/rule-catalogue.mdx（指南「开发指南」分组的规则清单页）
@@ -54,8 +52,7 @@ const webRoot = resolve(here, "..");
 const KN = resolve(webRoot, "../knowledge/px4");
 
 const ENGINE = resolve(webRoot, "../knowledge/engine"); // 确定性引擎源码（浏览器与本地工具共用一份）
-const PY_RULE_ENGINE = resolve(ENGINE, "rule_engine.py"); // 框架（与格式无关）
-const PY_REPORT_DATA = resolve(ENGINE, "report_data.py"); // 报告数据层（与格式无关）
+const PY_ENGINE = resolve(ENGINE, "engine.py"); // 引擎本体（框架 + 数据层，与格式无关）
 const PY_PROVIDER_API = resolve(ENGINE, "providers/api.py"); // provider 契约（常量表 + 自检）
 // 日志格式适配器：每个文件都实现同一份契约，引擎不认识它们内部
 const PROVIDER_DIR = resolve(ENGINE, "providers");
@@ -400,7 +397,7 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
             }
             // compute 是一串**字符串表达式**（与 triggers.when / skip.when 同一套 Python 子集）；
             // **算子节点**（旧）。旧写法在这里编译成等价表达式，于是产物里只有一种形态、
-            // 也只有一套校验（不写第二套）。运行期由 knowledge/engine/rule_engine.py 的 _eval_compute 求值。
+            // 也只有一套校验（不写第二套）。运行期由 knowledge/engine/engine.py 的 _eval_compute 求值。
             const compute = (raw.compute ?? []).map((item) => normalizeCompute(item, where));
             if (compute.length > 0) {
                 let types;
@@ -909,7 +906,7 @@ function compileMap(out, where, declaredVars, refs) {
  * （`knowledge/engine/providers/px4.py` 的 `get_flight_track`）。`facts.track` 以前只带 `children`，
  * 于是引擎**看不到这句声明**，取不到坐标时只能笼统报"声明里的坐标候选都不在日志里"——
  * 而真相常常是"这份日志根本没有 `sensor_gps` / `vehicle_gps_position`"。带上声明之后，
- * 引擎就能复用 `rule_engine._missing_topics` 说清缺哪个 topic（**文案只在那里生成一处**）。
+ * 引擎就能复用 `engine._missing_topics` 说清缺哪个 topic（**文案只在那里生成一处**）。
  *
  * 只认 `topics`：固件 / 机架 / 先决条件这三个轴，引擎的地图路径没有求值器（规则的闸门是
  * 内联在 `_run_rules` 里的）。写了非默认值就在**构建期**报错，别让它在运行期悄悄不生效。
@@ -1289,7 +1286,7 @@ facts.yaml（码表/文案/    ──┤ 构建期校验（字段/算子/表达�
   展示口径/group 顺序）    ──┤  facts 键是否齐全、provider 有没有漏实现契约）
 knowledge/engine/operators.py      ──┤                                    ── 产物内联进 Python
   ↓                         │                                         ↓
-knowledge/engine/rule_engine.py  ← ──┘                                  运行时只读产物
+knowledge/engine/engine.py  ← ──┘                                  运行时只读产物
   └─ 逐行（\`next_rule()\`）跑检查经验                             （不读源 yaml）
      └─ \`provider.read_timeseries(...)\` 取原始浮点序列
         └─ 交给 \`compute\` 算子做流式计算
@@ -1315,7 +1312,7 @@ knowledge/engine/rule_engine.py  ← ──┘                                  
 
 ## 2. \`slot\`（执行位置）
 
-不同 slot 可用的原始 Topic 和上下文不同。具体去 \`knowledge/engine/rule_engine.py\` 找对应的 \`_run_slot_*\` 函数；该函数会列出哪些 provider 方法会在该阶段被调用，也就等于告诉你这段经验能读到什么数据。
+不同 slot 可用的原始 Topic 和上下文不同。具体去 \`knowledge/engine/engine.py\` 找对应的 \`_run_slot_*\` 函数；该函数会列出哪些 provider 方法会在该阶段被调用，也就等于告诉你这段经验能读到什么数据。
 
 SLOT 表见 YAML 构建产物或浏览器控制台——这里不手写。
 
@@ -1532,18 +1529,18 @@ function build() {
     );
     const fieldUnits = resolveFieldUnits([...ruleRefs, ...plotRefs], resolve(KN, "meta"));
 
-    const ruleEnginePy = read(PY_RULE_ENGINE);
+    const enginePy = read(PY_ENGINE);
     // 单位词表在两边各有一份（构建期管"别名 → 规范名"，运行期管"规范名 → 换算因子"），
     // 规范名必须一模一样。各改各的会静默换算出错数，所以在这里比一次。
     {
-        const pyUnits = ruleEnginePy.slice(ruleEnginePy.indexOf("_UNIT_FACTORS"));
+        const pyUnits = enginePy.slice(enginePy.indexOf("_UNIT_FACTORS"));
         const names = [...pyUnits.matchAll(/^\s{4}"([a-z0-9]+)":\s*\(/gm)].map((m) => m[1]);
         const js = Object.keys(UNIT_KIND).map((x) => x.toLowerCase());
         const missing = js.filter((u) => !names.includes(u));
         const extra = names.filter((u) => !js.includes(u));
         if (missing.length || extra.length) {
             throw new Error(
-                `knowledge/engine/rule_engine.py 的 _UNIT_FACTORS 与 web/scripts/lib/rule-expr.mjs 的 UNIT_KIND 对不上` +
+                `knowledge/engine/engine.py 的 _UNIT_FACTORS 与 web/scripts/lib/rule-expr.mjs 的 UNIT_KIND 对不上` +
                     `（规则侧多：${missing.join(",") || "无"}；引擎侧多：${extra.join(",") || "无"}）`,
             );
         }
@@ -1638,7 +1635,7 @@ function build() {
         operatorsPy,
         read(PY_PROVIDER_API),
         ...providerFiles.map((f) => read(resolve(PROVIDER_DIR, f))),
-        ruleEnginePy,
+        enginePy,
     ].join("\n");
 
     // 四个占位符在拼接后的 Python 里**必须恰好出现一次**。
@@ -1648,7 +1645,7 @@ function build() {
     // 2026-09-17 就是这么挂的（provider 注释里提到占位符），所以这里按"恰好一次"卡住，不按"存在"。
     for (const ph of ["__FAULT_KB__", "__RULES__", "__FACTS__", "__FIELD_UNITS__"]) {
         const n = pyWithOperators.split(ph).length - 1;
-        if (n === 0) throw new Error(`knowledge/engine/ 里必须保留 ${ph} 占位符（见 rule_engine.py）`);
+        if (n === 0) throw new Error(`knowledge/engine/ 里必须保留 ${ph} 占位符（见 engine.py）`);
         if (n > 1) {
             throw new Error(
                 `${ph} 在拼接后的 Python 里出现了 ${n} 次，必须恰好 1 次：` +
@@ -1672,7 +1669,7 @@ function build() {
             "const fieldUnits = " +
             JSON.stringify(fieldUnits) +
             ";\n\n" +
-            "export const PY_ULG_CHECKS = String.raw`" +
+            "export const PY_ULG_ENGINE = String.raw`" +
             toRawTemplate(pyWithOperators) +
             "`\n" +
             '  .replace("__FAULT_KB__", JSON.stringify(faultKbJson.entries))\n' +
@@ -1681,14 +1678,7 @@ function build() {
             '  .replace("__FIELD_UNITS__", JSON.stringify(fieldUnits));\n',
     );
 
-    // 3) 数据层 .ts
-    const reportDataPy = read(PY_REPORT_DATA);
-    writeArtifact(
-        resolve(outWorkers, "pyodide-px4log-data.ts"),
-        banner + "export const PY_ULG_DATA_HELPERS = String.raw`" + toRawTemplate(reportDataPy) + "`;\n",
-    );
-
-    // 4) LLM 提示词与空结论文案（边缘函数是 .js，直接生成 ESM）
+    // 3) LLM 提示词与空结论文案（边缘函数是 .js，直接生成 ESM）
     const prompt = read(PROMPT_PATH).replace(/\s+$/, "\n");
     const emptyMd = read(EMPTY_PATH).trim();
     const outLib = resolve(webRoot, "lib/knowledge");
@@ -1727,11 +1717,10 @@ function build() {
     //      浏览器据此判断"这份存档的 info/曲线/轨迹是不是旧引擎生成的"，是就重解析一次。
     //      覆盖范围只放"决定派生数据形状"的源：data 层 Python、事实层 Python、facts.yaml、曲线预设；
     //      规则（rules/*.yaml）不在其内——那影响的是结论文本，不该因为改个阈值就让所有历史重算。
-    //      rule_engine.py 在列：它产出的 facts / findings **同样随报告一起归档**，口径一变
+    //      engine.py 在列：它产出的 facts / findings **同样随报告一起归档**，口径一变
     //      （如 2026-09-16 那次软件版本串）老存档也得跟着刷一次，否则只能靠用户重新上传。
     const versionSources = [
-        ["knowledge/engine/report_data.py", PY_REPORT_DATA],
-        ["knowledge/engine/rule_engine.py", PY_RULE_ENGINE],
+        ["knowledge/engine/engine.py", PY_ENGINE],
         ["knowledge/engine/providers/api.py", PY_PROVIDER_API],
         ...providerFiles.map((f) => [`knowledge/engine/providers/${f}`, resolve(PROVIDER_DIR, f)]),
         ["knowledge/px4/facts.yaml", FACTS_PATH],
@@ -1745,7 +1734,7 @@ function build() {
     writeArtifact(
         resolve(webRoot, "lib/knowledge/derived-version.generated.ts"),
         banner +
-            "// 源：knowledge/engine/{report_data,rule_engine}.py + knowledge/engine/providers/*.py + " +
+            "// 源：knowledge/engine/engine.py + knowledge/engine/providers/*.py + " +
             "knowledge/px4/{facts.yaml,plot/*.yml} 的内容哈希\n" +
             "// 用途：存档里的派生数据（info / 曲线 / 轨迹）带的版本，与这里不一致就重新解析一次。\n" +
             "export const DERIVED_DATA_VERSION = " +
@@ -1807,7 +1796,7 @@ function build() {
         console.log(
             `knowledge built: ${kb.length} fault entries, ${rules.length} rules, ` +
                 `${Object.keys(signatures).length} operators; ` +
-                "ulog-check-script.ts, ulog-data-script.ts, prompts.generated.js",
+                "ulog-check-script.ts, prompts.generated.js",
         );
         console.log("guide built: rule-catalogue.md, rule-schema.md");
     }

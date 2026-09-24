@@ -5,6 +5,10 @@
 > 与最初设计的落地差异（避免把有意为之当成 bug 改回去）、以及已知缺口。
 > 面向人的入口见 `../README.md`（怎么读）与站内 [规则编写参考](/guide/rule-schema)（怎么写经验）。
 > 本文件不发布到网站：里面有实施状态、已知缺口与提交记录。
+>
+> **文件合并（2026-09-24）**：原 `rule_engine.py`（规则框架）与 `report_data.py`（报告数据层）
+> 已合并为 `knowledge/engine/engine.py`。下文写「当前在哪」的引用指 engine.py
+> （框架=第一部分、数据层=第二部分）；历史变更记录里保留当时的旧文件名。
 
 ## 实施状态（2026-09-15：已实施）
 
@@ -22,15 +26,15 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 **2026-09-17 追加（第二段）：引擎与日志格式分家 —— provider 适配器**
 （**架构层面的改动，改 `knowledge/engine/` 前先读这一节**）：
 
-原先取数分散在四个地方（`facts.yaml` 的 `bindings`/`track`、`rule_engine.py` 里硬编码的
+原先取数分散在四个地方（`facts.yaml` 的 `bindings`/`track`、引擎框架（今 engine.py）里硬编码的
 固件解码与载具身份、`rules/*.yaml` 里裸写的字段、`plot/*.yml` 里裸写的字段）。
 现在的分工是"**机制 / 数据 / 格式**"三分：
 
-| 放哪                                                      | 是什么                                                                                           | 判据                                             |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
-| `knowledge/engine/providers/<格式>.py`                    | **唯一认识某一种日志的地方**：topic 名、字段名、固件版本怎么解码、取不到怎么回退、载具身份从哪来 | 有分支 / 回退 / 按版本挑 → 代码                  |
-| `knowledge/engine/{rule_engine,operators,report_data}.py` | 与格式无关的机制：调度、表达式求值、算子、报告数据层                                             | 里面 grep 不到 `vehicle_` / `ver_sw` / `cpuload` |
-| `knowledge/px4/facts.yaml`                                | 那一种格式的**纯数据**：码表、文案、展示口径、规则元数据、执行顺序                               | 纯映射 → YAML（改它不该碰 Python）               |
+| 放哪                                     | 是什么                                                                                           | 判据                                             |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| `knowledge/engine/providers/<格式>.py`   | **唯一认识某一种日志的地方**：topic 名、字段名、固件版本怎么解码、取不到怎么回退、载具身份从哪来 | 有分支 / 回退 / 按版本挑 → 代码                  |
+| `knowledge/engine/{engine,operators}.py` | 与格式无关的机制：调度、表达式求值、算子、报告数据层                                             | 里面 grep 不到 `vehicle_` / `ver_sw` / `cpuload` |
+| `knowledge/px4/facts.yaml`               | 那一种格式的**纯数据**：码表、文案、展示口径、规则元数据、执行顺序                               | 纯映射 → YAML（改它不该碰 Python）               |
 
 - 契约本体是 `knowledge/engine/providers/api.py` 的三张常量表（REQUIRED / OPTIONAL / SEMANTICS）。
   它同时是**构建期**（`build-knowledge.mjs` 派生 `BUILTIN_VARS`、查每个适配器有没有漏实现）、
@@ -77,7 +81,7 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
     `match_version()` 求值）。
   - `logged_messages` 改在构造期算一次并缓存。**不是**"也许用得上所以先存"：`builtin_variables()`
     里就有 `messages`，而 `_rule_env()` 在 `for _rule in RULES:` 循环体内
-    （`rule_engine.py:305/314`），即**每条规则各调一次 `builtin_variables()`**——不缓存就是每条
+    （今 engine.py 第一部分），即**每条规则各调一次 `builtin_variables()`**——不缓存就是每条
     规则把同一份列表重建一遍。契约方法 `get_logged_events()` 现在返回逐条复制的副本。
 - **`vehicle_status` 只读一次**，需要切段的东西在 `_read_data_list()` 里用同一批数组
   一次算完：armed 区间（`self.armed_intervals`）、出现过的阶段集合（`self.phases_present`，
@@ -104,7 +108,7 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
   `parserVersion` 从占位串变成 `pyulog/1.1.0`。`compare_baseline.py` 对 dict 做 `sorted`
   后比较，所以**键序变化不算差异**，重冻结前它报的正是"每条日志恰好 1 处差异 = parserVersion"，
   这就是"除版本外没动别的"的证据。重冻结后回到零差异。
-- **同一类越界还剩一处，本次没动**：`rule_engine.py` 的 `"platform": "PX4"` 也是格式名
+- **同一类越界还剩一处，本次没动**：`engine.py` 的 `"platform": "PX4"` 也是格式名
   写进格式无关层（`fmt` 契约项本就是干这个的）。改它要动基线里 `platform` 的值，
   另开一笔。
 - 报告页「软件版本」行原先显示的是**原料**（`ver_sw_branch（ver_sw 全文）`），
@@ -455,7 +459,7 @@ ydata, compute}`），引擎侧求值、单位换算、降采样都在引擎里�
 
 ---
 
-## 报告页数据层（`knowledge/engine/report_data.py`）：踩过的硬规则
+## 报告页数据层（`knowledge/engine/engine.py` 第二部分）：踩过的硬规则
 
 > 这一层的产出（`np_manifest` / `np_series` / `np_track` / `np_log_info`）直接决定报告页每个 tab 长什么样。
 > 下面每一条都是**实机日志逼出来的**，改之前先看一遍，别按"想当然"改回去。
@@ -472,7 +476,7 @@ ydata, compute}`），引擎侧求值、单位换算、降采样都在引擎里�
 | 参数「默认值」靠 **'Q' 消息的语义**推出来，不依赖外部字典                                                                              | PX4 只记录**与当前值不同**的默认值（`logger.cpp: write_parameter_defaults`）→ 没记录就说明当前值等于默认值。于是每一行都能给出具体数字，不需要"一致 / 已改"这类占位文字。取法：机架默认 → 固件默认 → 当前值                                                                                                                                                                                  |
 | 参数「最小值 / 最大值 / 说明」来自 `knowledge/px4/meta/main.json` → `web/public/params/px4-main.json`（按需拉取，175 KB / gzip 33 KB） | 上游**只有 main 分支**产出 `parameters.json`（release tag 没有，见 `meta/v1.15.0.json` 的 `parametersNote`），所以这是"最新分支快照"，与老固件可能有出入——界面必须如实标注来源。放 `public/` 而不是内联进 Pyodide：这份字典与具体日志无关，内联等于每份日志都要多下它一遍                                                                                                                    |
 
-### 「软件版本」的展示口径（`knowledge/engine/rule_engine.py` 的 `facts.firmwareDisplay`）
+### 「软件版本」的展示口径（`knowledge/engine/engine.py` 的 `facts.firmwareDisplay`）
 
 **照抄 FR 的 `_format_sw_version`**（`app/tornado_handlers/browse.py`，2026-09-16 从 upstream main 取回源码核过）。
 类型码 = `ver_sw_release & 0xFF`：
@@ -492,19 +496,19 @@ ydata, compute}`），引擎侧求值、单位换算、降采样都在引擎里�
 `facts.fwReleaseType` 另存了类型码：前端 `lib/format.ts` 的 `formatFirmware()` 凭它 + `firmware` + `verSw`
 能完整重算展示串，所以云端记录（只带摘要字段）与老存档都能在界面上纠正过来，不必重新解析日志。
 
-`knowledge/engine/rule_engine.py` 已进派生数据版本的哈希——facts / findings 同样随报告归档，
+`knowledge/engine/engine.py` 已进派生数据版本的哈希——facts / findings 同样随报告归档，
 口径一变老存档打开时会自动重解析一次（AI 报告不变，见下面）。
 
 ### 派生数据版本：改了数据层，旧存档自动重解析
 
-`web/scripts/build-knowledge.mjs` 对 `knowledge/engine/report_data.py` + `knowledge/engine/rule_engine.py` +
+`web/scripts/build-knowledge.mjs` 对 `knowledge/engine/engine.py` +
 `knowledge/px4/facts.yaml` + `plot/*.yml` 算内容哈希，写进 `web/lib/knowledge/derived-version.generated.ts`。
 本机存档里的派生数据（`info` / 曲线 / 轨迹）带着**生成时**的版本，与当前不一致就重新解析一次
 （`useLogAnalyzer.openSaved`：旧数据先渲染、后台重解析，解析完自动换成新的；facts / findings 也一并刷新，
 **AI 报告保留**）。所以改完引擎不用逐个提醒用户"重新上传一遍"。
 
 - 规则文件（`rules/*.yaml`）**故意不进哈希**：改阈值不该让所有历史结论跟着重算；
-- `rule_engine.py` 在**列**：它产出的 facts / findings 同样随报告归档，口径一变（如软件版本串）
+- `engine.py` 在**列**：它产出的 facts / findings 同样随报告归档，口径一变（如软件版本串）
   老存档也得刷一次；
 - 内容是**文件字节哈希**，所以连注释改动也会触发一次重解析——宁可多解析一次，也不漏掉真正的形状变化；
 - **已知缺口**：存档的原始日志已被 LRU 淘汰、且来自别的设备时，"重新解析"无从谈起，只能看旧格式数据
@@ -555,8 +559,7 @@ load_crit = 0.95
   knowledge/px4/facts.yaml        ─┤ 解析 + 校验（必填/算子白名单/表达式合法性）
   knowledge/px4/meta/** 与 topic-overrides.yaml   ─┤
   knowledge/engine/operators.py             ─┤
-  knowledge/engine/rule_engine.py           ─┤
-  knowledge/engine/report_data.py           ─┘
+  knowledge/engine/engine.py                ─┘
         ↓ 生成的产物（提交进仓库）
   web/workers/pyodide-px4log-engine.ts   ← Python 源码，内联 __RULES__/__FACTS__/__TOPICS__ 的 JSON 字面量
   web/workers/fault-kb.generated.json

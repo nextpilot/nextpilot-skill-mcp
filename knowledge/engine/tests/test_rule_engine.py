@@ -1,6 +1,6 @@
-"""rule_engine.py 的 CEL 沙箱与 compute 估值单元测试 —— 不需要真实日志。
+"""engine.py 的 CEL 沙箱与 compute 估值单元测试 —— 不需要真实日志。
 
-加载方式：与 web/scripts/build-knowledge.mjs 的拼接顺序一致（operators → rule_engine），
+加载方式：与 web/scripts/build-knowledge.mjs 的拼接顺序一致（operators → engine），
 把 engine/ 里的占位符 __FAULT_KB__ / __RULES__ / __FACTS__ / __FIELD_UNITS__ 替换成
 安全桩，再用一个桩 provider 顶替 `open_log(...)`，exec 进一个独立命名空间。
 
@@ -18,7 +18,7 @@ ENGINE = Path(__file__).resolve().parents[1]
 
 def _load_engine() -> dict:
     operators_src = (ENGINE / "operators.py").read_text(encoding="utf-8")
-    rule_src = (ENGINE / "rule_engine.py").read_text(encoding="utf-8")
+    rule_src = (ENGINE / "engine.py").read_text(encoding="utf-8")
     # 占位符替换（与 build-knowledge.mjs 的 .replace 链等价）：
     #   RULES 必须是 list（模块级 RULES.sort 会执行），FACTS/FIELD_UNITS 是 dict
     rule_src = (
@@ -27,7 +27,7 @@ def _load_engine() -> dict:
         .replace('r"""__FACTS__"""', '"{}"')
         .replace("__FIELD_UNITS__", "{}")
     )
-    # 拼接顺序即执行顺序：算子注册表在前，框架在后（与产物一致）
+    # 拼接顺序即执行顺序：算子注册表在前，引擎本体在后（与产物一致）
     combined = operators_src + "\n" + rule_src
     # 桩 provider：open_log 返回带 has_topic 的对象；本测试不触发 ref/_ref
     stub = (

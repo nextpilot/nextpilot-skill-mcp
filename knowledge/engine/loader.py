@@ -4,11 +4,11 @@
 
 **为什么是"拼文本 + exec"而不是正常 import**：本目录的 .py 是**片段**——`provider` /
 `run_all` / `OPERATORS` / `FORMATS` 这类名字来自别处，单文件视角下就是未定义
-（`pyproject.toml` 专门为 `rule_engine.py` / `report_data.py` / `providers/px4.py` 关掉了
+（`pyproject.toml` 专门为 `engine.py` / `providers/px4.py` 等片段关掉了
 F821）。所以它们不是完整模块，只能按顺序拼接后一次性执行。拼接顺序的单一事实源见本目录
 README「拼接顺序与桥接名字」：
 
-    operators.py → providers/api.py → providers/*.py → rule_engine.py → report_data.py
+    operators.py → providers/api.py → providers/*.py → engine.py
 
 **本模块绝不写 sys.stdout。** 它给 `server/` 的 stdio MCP 服务用，stdout 是协议线，
 任何多余输出都会让握手静默失败。也因此**不依赖 `tools/_logging.py`**——那份把 handler
@@ -41,8 +41,7 @@ PROVIDER_API_PY = ENGINE / "providers" / "api.py"  # provider 契约（常量表
 # 按文件名排序。加一种日志格式这里零改动——别再回到硬编码单文件（那样新适配器本地永远测不到）
 PROVIDER_DIR = ENGINE / "providers"
 PROVIDER_FILES = sorted(p for p in PROVIDER_DIR.glob("*.py") if p.name != "api.py")
-RULE_ENGINE_PY = ENGINE / "rule_engine.py"
-REPORT_DATA_PY = ENGINE / "report_data.py"
+ENGINE_PY = ENGINE / "engine.py"  # 引擎本体（规则框架 + 报告数据层，原 rule_engine/report_data）
 
 RULES_DIR = KN_PX4 / "rules"
 FAULT_KB_JSON = REPO_ROOT / "web" / "workers" / "fault-kb.generated.json"
@@ -96,9 +95,9 @@ def load_facts_payload() -> dict:
     return _product_const("facts")  # type: ignore[return-value]
 
 
-def _rule_engine_body() -> str:
-    """`rule_engine.py` 的正文，四个占位符已替换为与构建期同款的数据。"""
-    body = RULE_ENGINE_PY.read_text(encoding="utf-8")
+def _engine_body() -> str:
+    """`engine.py` 的正文，四个占位符已替换为与构建期同款的数据。"""
+    body = ENGINE_PY.read_text(encoding="utf-8")
     entries = json.loads(FAULT_KB_JSON.read_text(encoding="utf-8"))["entries"]
     body = body.replace("__FAULT_KB__", repr(entries))
     # 阈值已随经验内联（px4-thresholds.toml 退场），无需再注入
@@ -111,7 +110,7 @@ def _rule_engine_body() -> str:
 def assemble(log_bytes: bytes) -> dict:
     """把一段日志喂给引擎，返回执行完的命名空间。
 
-    顺序与线上一致：算子注册表 → provider 契约 → 各格式适配器（文件名序）→ 框架 → 数据层。
+    顺序与线上一致：算子注册表 → provider 契约 → 各格式适配器（文件名序）→ 引擎本体。
     `ulog_bytes` 是运行期注入项（浏览器 worker 与本地都走这个名字）。
     """
     script = (
@@ -121,12 +120,10 @@ def assemble(log_bytes: bytes) -> dict:
         + "\n"
         + "\n".join(p.read_text(encoding="utf-8") for p in PROVIDER_FILES)
         + "\n"
-        + _rule_engine_body()
-        + "\n"
-        + REPORT_DATA_PY.read_text(encoding="utf-8")
+        + _engine_body()
     )
     namespace: dict = {"ulog_bytes": log_bytes}
-    exec(compile(script, str(RULE_ENGINE_PY), "exec"), namespace)
+    exec(compile(script, str(ENGINE_PY), "exec"), namespace)
     return namespace
 
 
