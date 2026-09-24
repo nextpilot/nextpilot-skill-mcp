@@ -1,0 +1,90 @@
+# 端到端测试 —— 跑真脚本、读真文件
+#
+#   node eval-skills.mjs px4-ulog-diagnostics --e2e
+#
+# 与 cases.yaml 的分工：
+#   cases.yaml  测「SKILL.md 作为 prompt 有没有把模型教对」 —— 要调 LLM，慢、花钱、有抖动
+#   e2e.yaml    测「SKILL.md 附带的脚本能不能把数取对」     —— 纯确定性，秒级，无需 API key
+#
+# 这一层刻意不加 LLM judge：
+#   输入是固定 fixture，输出就该是固定结论。脚本吐的是 JSON，
+#   写成"必须包含 / 绝不能包含"的机械断言即可，加 judge 只会让 CI 变慢、
+#   失败原因变模糊。需要判断"措辞是否恰当"的地方才归 cases.yaml 管。
+#
+# 前置：pip install pyulog
+
+version: 1
+
+cases:
+  - id: e2e-healthy-reports-nothing
+    desc: 健康日志必须一声不吭。见谁咬谁的脚本等于没有脚本。
+    run: python3 scripts/quick_check.py assets/sample_healthy.ulg
+    expect_exit: 0
+    expect_max_critical: 0
+
+  - id: e2e-crash-traces-to-gyro-clipping
+    desc: 振动超标追到 gyro_clipping，且不能顺手把电源/GPS 也报一遍
+    run: python3 scripts/quick_check.py assets/sample_crash_vibration.ulg
+    expect_exit: 0
+    expect_critical_rules:
+      - accel_vibration
+      - gyro_clipping
+      - ekf_innovation
+    expect_critical_fields:
+      - vehicle_imu_status.gyro_clipping[0]
+    expect_clean_fields:
+      - battery_status
+      - vehicle_gps_position
+
+  - id: e2e-undervoltage-picks-worst-cell
+    desc: 必须锁定第 3 节电芯，而不是数组里那 4 个未使用的槽位
+    run: python3 scripts/quick_check.py assets/sample_undervoltage.ulg
+    expect_exit: 0
+    expect_critical_fields:
+      - battery_status.cell_voltage[2]
+    expect_clean_fields:
+      - vehicle_imu_status
+    must_not_mention:
+      - cell_voltage\[[6-9]\]
+
+  - id: e2e-refuses-to-invent-numbers
+    desc: 喂进去不是 ULog 的文件要说无法判定，而不是硬凑一个数值出来
+    run: python3 scripts/quick_check.py README.md
+    expect_exit: 2
+    must_mention:
+      - 无法判定
+    must_not_mention:
+      - accel_vibration_metric
+
+  - id: e2e-fixture-roundtrips-through-pyulog
+    desc: 生成出来的东西得是别人能读的真 ULog，不是一堆长得像 ULog 的字节
+    run: python3 scripts/make_fixture.py --outdir /tmp/fx-verify --verify
+    expect_exit: 0
+    must_mention:
+      - 主题 6 个
+
+  - id: e2e-fixture-is-deterministic
+    desc: 同一份代码两次生成必须字节一致，否则 eval 的失败无从归因
+    run: python3 scripts/make_fixture.py --outdir /tmp/fx-a >/dev/null && python3 scripts/make_fixture.py --outdir /tmp/fx-b >/dev/null && diff -r /tmp/fx-a /tmp/fx-b
+    expect_exit: 0
+
+  - id: e2e-scripts-compile
+    desc: 语法检查。没之一，最容易在改阈值时手滑。
+    run: python3 -m py_compile scripts/quick_check.py scripts/make_fixture.py
+    expect_exit: 0
+
+# ---------------------------------------------------------------- 判据说明
+#
+# 每个 case 可用的字段：
+#   run                      shell 命令，工作目录是 skill 根（所以路径写 assets/ 就行）
+#   expect_exit             期望退出码
+#   must_mention            正则，stdout 里必须出现
+#   must_not_mention        正则，stdout 里出现即判负
+#   expect_max_critical     critical 级 finding 的数量上限（0 = 一条都不许有）
+#   expect_critical_rules   必须出现的 critical rule 名
+#   expect_critical_fields  必须出现的 critical field 名（精确匹配）
+#   expect_clean_fields     任何非 ok 级别都不许出现在这些主题上（前缀匹配）
+#
+# 写 fixture 的忠告：
+#   每加一个新的 root cause 场景，就要同时配一条 expect_clean_fields。
+#   只验证"该报的报了"的测试，会纵容一个越来越爱假报警的脚本。

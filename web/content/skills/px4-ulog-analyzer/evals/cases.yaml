@@ -1,0 +1,127 @@
+# 回归测试用例 —— 改 SKILL.md 之后跑一遍，确认没改坏
+#
+#   node eval-skills.mjs px4-ulog-diagnostics              # dry-run，只列出用例
+#   node eval-skills.mjs px4-ulog-diagnostics --run        # 真跑（需要 LLM API）
+#
+# 为什么用 rubric 而不是"输入→期望输出完全一致"：
+#   模型输出是自然语言，逐字比对必然全红。这里判的是**要素**——
+#   必须提到什么、绝不能做什么、整体意图对不对。
+#
+# 三类判据：
+#   must_mention      机械检查，输出里必须出现（正则）
+#   must_not_mention  机械检查，出现即判负（正则）
+#   judge             自然语言判据，交给 LLM-as-judge 打分（用于"有没有拒绝"这类没法正则的）
+#
+# weight > 1 表示这条更重要——判错了说明 Skill 已经变质，不是小瑕疵。
+
+version: 1
+
+# 评审用的 judge 模型。换模型要重跑，不同模型对同一份 SKILL.md 的表现差异不小。
+judge_model: claude-opus-4
+target_models:
+  - claude-haiku-4
+  - deepseek-v3
+
+cases:
+  # ---------- 核心能力 ----------
+
+  - id: crash-root-cause-is-vibration
+    desc: 炸机日志，振动是根因，EKF 发散与电机饱和都是下游结果
+    input: |
+      四轴手动模式起飞，悬停约 20 秒后突然侧翻坠机。
+      日志里有这些值：
+        vehicle_imu_status.gyro_clipping[0] = 1847
+        estimator_status.innovation_check_flags = 6
+        actuator_outputs.output[1] = 2000（上限 1900）
+        logged_message 里没有 critical 告警
+      帮我分析原因。
+    must_mention:
+      - gyro_clipping
+      - innovation_check_flags
+    must_not_mention:
+      - MC_ROLLRATE
+      - MC_PITCHRATE
+    judge: |
+      必须指出振动/削波是根因，EKF 创新被拒和电机饱和是它的下游结果。
+      关键：不能建议直接去调 PID 增益——那样会把根源盖住。
+      如果模型径直给 PID 建议，判 0 分。
+    weight: 2
+
+  - id: refuse-when-vibration-exceeds
+    desc: 振动超标时必须拒绝继续分析，而不是凑一个结论出来
+    input: |
+      accel_vibration_metric = 45。
+      帮我看看姿态跟踪是不是也有问题。
+    must_mention:
+      - accel_vibration_metric
+    must_not_mention:
+      - MC_
+      - vehicle_rates_setpoint\.roll\s*与\s*vehicle_attitude
+    judge: |
+      必须拒绝给出姿态跟踪的结论，并说明振动超标时基于 IMU 的一切结论都不可信。
+      这是本 Skill 最重要的拒答行为——为了完成任务而勉强回答是最大的失效模式。
+      如果模型分析了姿态，判 0 分。
+    weight: 3
+
+  - id: honest-cannot-determine
+    desc: 字段在旧固件里不存在时，必须说无法判定，不许凭印象编数值
+    input: |
+      我这份是 PX4 v1.12 的日志。
+      帮我看下 estimator_sensor_bias.gyro_bias 是多少。
+    must_mention:
+      - estimator_status\.states
+    judge: |
+      必须说明该主题在 v1.12 不存在（当时零偏在 estimator_status.states[]），
+      并给出替代字段 + 需要确认索引定义的 caveat。
+      绝不能返回一个估算出来的数值——哪怕数值看起来很合理。
+      返回了具体偏差值即判 0 分。
+    weight: 3
+
+  - id: distinguish-operation-from-fault
+    desc: 区分飞控异常与飞行员操作，不能一律当故障报
+    input: |
+      日志显示某一时刻 actuator_outputs.output[] 全部拉满，
+      是不是飞控抽风了？
+    must_mention:
+      - manual_control_setpoint
+    judge: |
+      必须先要求交叉核对 manual_control_setpoint，确认那一刻飞行员在做什么。
+      在限位 = 正常输出；中位而拉满 = 真异常。
+      没有提 manual_control_setpoint 就下结论，最多给一半分。
+
+  # ---------- 负例：不该被触发的情况 ----------
+  # 这一类比正例更重要。误触发会污染所有对话，用户会觉得这个 Skill 到处乱插嘴。
+
+  - id: out-of-scope-parameter-lookup
+    desc: 问参数名归属应该走 px4-parameter-system，不是日志诊断
+    input: |
+      「悬停机头缓慢右偏」这种情况该看哪个参数？
+    expect_trigger: false
+    route_to: px4-parameter-system
+    judge: |
+      这个 Skill 不应该被激活。用户问的是"参数叫什么"，不是"日志怎么看"。
+      如果模型开始讲 ULog 字段分析，判 0 分。
+
+  - id: out-of-scope-pid-tuning
+    desc: 问增益取值该走 px4-pid-tuning
+    input: |
+      起飞就抖，MC_ROLLRATE_D 应该调到多少？
+    expect_trigger: false
+    route_to: px4-pid-tuning
+    judge: |
+      该由 PID 调参 Skill 接管。本 Skill 最多提供"用哪些字段验证"，
+      不应输出具体增益建议。
+
+# ---------- 端到端 ----------
+# 上面这些 case 测的都是「prompt 有没有把模型教对」，输入是纯文本。
+# 「脚本有没有把数取对」是另一回事，放在同级的 e2e.yaml：
+#
+#   node eval-skills.mjs px4-ulog-diagnostics --e2e
+#
+# 那边的 fixture 用 scripts/make_fixture.py 合成，不依赖 SITL、不涉及真实飞行数据：
+#   sample_crash_vibration.ulg   振动超标链式失效（根因 gyro_clipping）
+#   sample_healthy.ulg           全程正常，用来验证脚本不乱报
+#   sample_undervoltage.ulg      单节欠压，用来验证"找最差电芯"
+#
+# 为什么要有 healthy 那一份：只验证「该报的报了」的测试，
+# 会纵容一个越来越爱假报警的脚本。假报警报多了，真报警也没人看。

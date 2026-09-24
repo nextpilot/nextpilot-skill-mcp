@@ -1,0 +1,91 @@
+# 回归测试用例
+
+version: 1
+judge_model: claude-opus-4
+target_models:
+  - claude-haiku-4
+  - deepseek-v3
+
+cases:
+  - id: single-axis-refuse-tuning
+    desc: 只有单轴抖动必须先查物理，拒绝盲目调增益
+    input: |
+      俯仰轴（pitch）抖得很厉害，但横滚很正常。帮我调一下 pitch 的 PID。
+    must_not_mention:
+      - MC_PITCHRATE_P.*设|建议增大\s*MC_
+    judge: |
+      必须拒绝直接调参，说明对称性决定了单轴问题几乎不可能是增益问题。
+      要给出物理排查清单：该轴电机轴承/螺丝、桨是否磕碰、机臂是否松动、配重。
+      唯一可做的增益层面检查是确认 MC_PITCHRATE_* 与 MC_ROLLRATE_* 是否被改成了不同值。
+
+      这是本 Skill 最重要的拒答行为。照做一定能给出一组数字，
+      而且当场"好像好点了"（降增益确实能压住任何抖动），
+      但断桨、松螺丝还在。直接给增益建议判 0 分。
+    weight: 3
+
+  - id: check-physical-before-tuning
+    desc: 振动/零偏没排除之前不许开始调参
+    input: |
+      飞起来发抖，想从头调一遍 PID，给个顺序吧。
+    must_mention:
+      - gyro_clipping|振动
+    judge: |
+      必须先把"排除物理问题"作为前置条件：
+      gyro_clipping 计数必须为 0、零偏已校准、桨已平衡。
+      说明在这些前提下调 PID 只是在补偿故障。
+      如果直接给出"先 P 后 I 再 D"而跳过前置检查，判 0 分。
+    weight: 3
+
+  - id: inner-loop-first
+    desc: 调参顺序由内向外，角速率环优先
+    input: |
+      悬停有点飘，姿态跟不上，我该先动哪个参数？
+    must_mention:
+      - MC_ROLLRATE|MC_.*RATE
+    judge: |
+      必须说明内环（角速率环）没调好时外环怎么调都稳不下来，
+      给出「位置环 → 速度环 → 姿态环 → 角速率环」层级并指出从最内层开始。
+
+  - id: verify-with-setpoint-vs-actual
+    desc: 用设定值 vs 实际值验证，不凭手感
+    input: |
+      改完参数了，怎么确认改动有效？
+    must_mention:
+      - vehicle_rates_setpoint
+      - vehicle_attitude\.rollspeed
+    judge: |
+      必须给出设定值 vs 实际值的比对字段，以及三条判据：
+      持续滞后加 P、过冲加 D、稳态偏差加 I。
+      还应要求改前 param dump 备份。
+
+  - id: throttle-model-not-pid
+    desc: 只在大油门段变软是 THR_MDL_FAC 问题，不是增益问题
+    input: |
+      悬停手感很好，但推大油门时明显跟不上，像被拖着。
+    must_mention:
+      - THR_MDL_FAC
+    judge: |
+      必须判定为推力模型参数问题，并说明盲目加 P 会破坏已经调好的悬停手感。
+      如果只是建议加增益，判 0 分。
+
+  # ---------- 负例 ----------
+
+  - id: out-of-scope-log-analysis
+    desc: 判断振动是否超标是 ULog 诊断的活
+    input: |
+      怎么判断我这台飞机的振动指标是不是超标了？
+    expect_trigger: false
+    route_to: px4-ulog-diagnostics
+    judge: |
+      本 Skill 只把"gyro_clipping 必须为 0"当作前置条件，
+      真正的振动诊断（字段、阈值、判据）属于 ULog 诊断 Skill。
+
+  - id: out-of-scope-ardupilot-tuning
+    desc: ArduPilot 调参不在覆盖范围
+    input: |
+      ArduPilot 的 ATC_RAT_RLL_P/I/D 怎么调？
+    expect_trigger: false
+    judge: |
+      本 Skill 限定 PX4 多旋翼。ArduPilot 的参数名与单位约定都不同。
+      硬套会误导，应明确说明不在覆盖范围内。
+    weight: 2

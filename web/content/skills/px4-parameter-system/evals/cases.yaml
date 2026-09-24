@@ -1,0 +1,92 @@
+# 回归测试用例
+
+version: 1
+judge_model: claude-opus-4
+target_models:
+  - claude-haiku-4
+  - deepseek-v3
+
+cases:
+  - id: param-save-is-mandatory
+    desc: param set 不 save 会在断电后丢失，这是新人第一大坑
+    input: |
+      我在 mavlink shell 里 param set MPC_XY_P 1.2，手感变好了，
+      第二天上电发现还是 0.95。怎么回事？
+    must_mention:
+      - param save
+    judge: |
+      必须指出 param set 只改 RAM 里的值、断电即失，必须跟 param save，
+      且部分参数需重启才生效（save 后立刻 param show 已是新值，但运行中模块可能还用旧的）。
+      还要提到另两种可能：地面站同步覆盖了改动、启动脚本里的某行重置了。
+    weight: 3
+
+  - id: yaw-drift-check-mag-first
+    desc: 偏航漂移先排磁罗盘，不要把锅甩给 yaw PID
+    input: |
+      四轴悬停，不碰杆，机头持续缓慢向右偏转。该调什么参数？
+    must_mention:
+      - CAL_MAG0_ID|vehicle_magnetometer
+    judge: |
+      必须先要求排除磁罗盘干扰/ID 匹配，再考虑 MC_YAWRATE_I。
+      如果直接建议加大 yaw I 而不提磁罗盘，判 0 分——
+      那样能压住表象，换场地就复发。
+    weight: 2
+
+  - id: airframe-swap-needs-autoconfig
+    desc: 换机架必须 SYS_AUTOCONFIG=1 重启，否则旧参数残留
+    input: |
+      从四轴换成六轴，改了 SYS_AUTOSTART，
+      能解锁但某些失效保护不按预期触发。
+    must_mention:
+      - SYS_AUTOCONFIG
+    judge: |
+      必须给出「SYS_AUTOCONFIG=1 + reboot」流程，
+      并且**明确指出这一步会清掉之前所有参数改动**，
+      所以顺序是先 param dump 备份 → 重置 → 重新应用。
+      没提"会清掉改动"这个警告，最多给一半分。
+
+  - id: param-name-length-limit
+    desc: 参数名超 16 字符会被静默截断
+    input: |
+      我加了自定义参数 my_module_max_velocity_tuning，
+      param_find 返回 null，但没有报错。怎么回事？
+    must_mention:
+      - 16
+    judge: |
+      必须说明参数名长度上限约 16 字符，超了被静默截断导致 param_find 失败，
+      且不产生任何错误日志——这是它难查的原因。
+      还应给出缩短后的命名建议。
+
+  - id: runtime-param-refresh
+    desc: 模块读不到参数更新，需要 updateParams 或订阅 parameter_update
+    input: |
+      param set MY_MOD_MAX_VEL 10，但模块里 param_find 拿到的还是旧值 5。
+    must_mention:
+      - updateParams|parameter_update
+    judge: |
+      必须给出两种正解之一：继承 ModuleParams 后在 Run() 调 updateParams()，
+      或订阅 parameter_update 主题手动处理。
+
+  # ---------- 负例 ----------
+
+  - id: out-of-scope-pid-values
+    desc: 问增益应该调到多少是 PID 调参的活
+    input: |
+      起飞抖得厉害，MC_ROLLRATE_D 应该设成多少合适？
+    expect_trigger: false
+    route_to: px4-pid-tuning
+    judge: |
+      本 Skill 只回答"参数叫什么、怎么改才生效"，不回答"取值该是多少"。
+      应转交 PID 调参 Skill。
+    weight: 2
+
+  - id: out-of-scope-ardupilot
+    desc: ArduPilot 参数命名完全不同，不能混用
+    input: |
+      ArduPilot 的 ATC_RAT_RLL_P 对应 PX4 的哪个参数？
+    expect_trigger: false
+    judge: |
+      本 Skill 明确声明只覆盖 PX4 原生参数。
+      硬凑一个"大概对应 MC_ROLLRATE_P"的说法是有害的——
+      两者单位约定和控制结构不同。应说明不在覆盖范围内。
+    weight: 2
