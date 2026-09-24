@@ -1,24 +1,30 @@
-"""本地校准/验证用：直接跑 knowledge/engine/ 下的 Python 源，在真实 .ulg 上验证。
+"""本地校准/验证的命令行入口：在真实 .ulg 上跑 knowledge/engine/ 的 Python 源。
 
-放在 tools/ 根目录而不是某个子目录：它被 guards/ tests/ calibrate/ 三处的脚本共同
+**装配逻辑不在本文件里**——它已下沉到 `knowledge/engine/loader.py`。本文件只做两件事：
+
+1. **薄转发**：把既有调用点（`guards/` `tests/` `calibrate/` 共 8 处）用到的名字按签名
+   转发过去，import 路径与签名保持不变。
+2. **命令行外壳**：提供输出与退出码（用 `tools/_logging.py` 的清单式输出）。
+
+为什么装配逻辑要住在 `engine/` 而不是这里：`server/` 是产品、`tools/` 是开发工具，
+产品依赖开发工具会把 `_logging.py` 那条线（把 handler 挂在 `sys.stdout` 上）埋到 stdio
+协议线旁边。所以装配入口归 engine，本文件退回成命令行外壳。
+
+放在 `tools/` 根目录而不是某个子目录：它被 `guards/` `tests/` `calibrate/` 三处的脚本共同
 import，只有根目录能被各自那句「插 parent.parent 进 sys.path」覆盖到。
 
 用法：
   python tools/px4log_engine_runner.py <file.ulg> [more.ulg ...]
   python tools/px4log_engine_runner.py --probe-data <file.ulg> ...
 
-引擎实现在 knowledge/engine/（本脚本直接读源码，改完即可跑）；**规则读构建产物**
-（web/workers/pyodide-px4log-engine.ts 的 `const rules = [...]`）。
-为什么不直接读 rules/*.yaml：compute 的老节点写法要编译成表达式，而那份编译器只有构建期
-一份（web/scripts/lib/rule-expr.mjs）——Python 侧不再重复实现（两份一定漂移）。
-所以**改了 rules/ 要先 `cd web && pnpm build:kb` 再回归**，脚本会检查产物是否陈旧。
+**规则读构建产物**（`web/workers/pyodide-px4log-engine.ts` 的 `const rules = [...]`），
+所以改了 `knowledge/px4/rules/` 要先 `cd web && pnpm build:kb` 再回归（loader 会检查陈旧）。
 
 任何一份日志出错都以**非零退出码**结束（`check_all.py` 只看退出码）。别把它改回"只打印、
 不计数"——那会让这一项永远绿着，而它其实什么都没检（见 CLAUDE.md §6.6）。
 """
 
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -28,109 +34,31 @@ if hasattr(sys.stdout, "reconfigure"):
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _logging import get_logger  # noqa: E402
 
+# 装配逻辑的唯一实现在 engine/ 里；插路径后按签名转发（含被外部依赖的私有名）
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "knowledge" / "engine"))
+import loader  # noqa: E402
+from loader import (  # noqa: E402
+    build_namespace,
+    call,
+    load_facts_payload,
+    load_field_units,
+    run_one,
+)
+
+# 这些转发名不是本文件用的：guards/ tests/ calibrate/ 的既有调用点仍
+# `from px4log_engine_runner import ...`，列进 __all__ 既保住转发又过 ruff F401。
+__all__ = [
+    "build_namespace",
+    "call",
+    "load_facts_payload",
+    "load_field_units",
+    "probe_one",
+    "run_one",
+]
+
+_load_rules = loader.load_rules  # dev/workbench.py 直接 import 过这个私有名，保名转发
+
 log = get_logger()
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-KN_PX4 = REPO_ROOT / "knowledge" / "px4"  # 规则与阈值（知识）
-ENGINE = REPO_ROOT / "knowledge" / "engine"  # 引擎源码（通用算子与框架）
-OPERATORS_PY = ENGINE / "operators.py"
-PROVIDER_API_PY = ENGINE / "providers" / "api.py"  # provider 契约（常量表 + 自检）
-# 适配器目录：**自动扫描**（与 web/scripts/build-knowledge.mjs 同一规则：除 api.py 外全部拼接，
-# 按文件名排序）——加一种日志格式这里零改动，别再回到硬编码单文件（那样新适配器本地永远测不到）
-PROVIDER_DIR = ENGINE / "providers"
-PROVIDER_FILES = sorted(p for p in PROVIDER_DIR.glob("*.py") if p.name != "api.py")
-RULE_ENGINE_PY = ENGINE / "rule_engine.py"
-REPORT_DATA_PY = ENGINE / "report_data.py"
-RULES_DIR = KN_PX4 / "rules"
-FACTS_YAML = KN_PX4 / "facts.yaml"  # PX4 的数据（码表/文案/展示口径/规则元数据）
-FAULT_KB_JSON = REPO_ROOT / "web" / "workers" / "fault-kb.generated.json"
-CHECK_SCRIPT = REPO_ROOT / "web" / "workers" / "pyodide-px4log-engine.ts"
-
-
-def _load_rules() -> list:
-    """从构建产物里取规则（compute 已是表达式形态，老节点写法在构建期被编译掉了）。"""
-    if not CHECK_SCRIPT.exists():
-        raise RuntimeError("还没有构建产物，先 cd web && pnpm build:kb")
-    stale = [f.name for f in RULES_DIR.glob("*.yaml") if f.stat().st_mtime > CHECK_SCRIPT.stat().st_mtime]
-    if stale:
-        raise RuntimeError("构建产物比规则陈旧（%s 改过），先 cd web && pnpm build:kb 再回归" % "、".join(sorted(stale)[:5]))
-    src = CHECK_SCRIPT.read_text(encoding="utf-8")
-    m = re.search(r"^const rules = (.*?);$", src, re.M | re.S)
-    if not m:
-        raise RuntimeError("产物里找不到 `const rules = ...`，先 cd web && pnpm build:kb")
-    return json.loads(m.group(1))
-
-
-def load_field_units() -> dict:
-    """字段单位表（`ref(..., unit=)` 的源单位）——同样从产物里取，与浏览器用的是同一份。
-
-    它是构建期按 meta/<tag>.json + meta/topic-overrides.yaml 查好的；本地这边不重算
-    （那要再实现一遍查表逻辑），直接读产物，保证两边一致。
-    """
-    src = CHECK_SCRIPT.read_text(encoding="utf-8")
-    m = re.search(r"^const fieldUnits = (.*?);$", src, re.M | re.S)
-    if not m:
-        raise RuntimeError("产物里找不到 `const fieldUnits = ...`，先 cd web && pnpm build:kb")
-    return json.loads(m.group(1))
-
-
-def load_facts_payload() -> dict:
-    """provider 拿到的那份数据配置 —— **从产物里取**（`const facts = {...}`）。
-
-    为什么要从产物取、而不是本地重新装配：facts.yaml 与 plot/ 下的地图声明是**构建期**
-    合流的（预设要编译成候选组、单位要查表），本地再装配一遍就是"同一份规则有两处实现"——
-    两边一旦不一致，本地的表现是"轨迹声明丢了"（`get_flight_track()` 返回 error），
-    而浏览器没事。2026-09-17 与 2026-09-18 各踩过一次，所以改成只认产物。
-    """
-    src = CHECK_SCRIPT.read_text(encoding="utf-8")
-    m = re.search(r"^const facts = (.*?);$", src, re.M | re.S)
-    if not m:
-        raise RuntimeError("产物里找不到 `const facts = ...`，先 cd web && pnpm build:kb")
-    return json.loads(m.group(1))
-
-
-def _load_checks() -> str:
-    body = RULE_ENGINE_PY.read_text(encoding="utf-8")
-
-    entries = json.loads(FAULT_KB_JSON.read_text(encoding="utf-8"))["entries"]
-    body = body.replace("__FAULT_KB__", repr(entries))
-
-    # 阈值已随经验内联（px4-thresholds.toml 退场），无需再注入
-    body = body.replace("__RULES__", json.dumps(_load_rules(), ensure_ascii=False))
-
-    # 数据配置（facts.yaml + plot/track.yml），与构建期内联的是同一份
-    body = body.replace("__FACTS__", json.dumps(load_facts_payload(), ensure_ascii=False))
-    body = body.replace("__FIELD_UNITS__", json.dumps(load_field_units(), ensure_ascii=False))
-    return body
-
-
-def build_namespace(path: Path) -> dict:
-    # 顺序与线上一致：算子注册表 → provider 契约 → 各格式适配器（文件名序）→ 框架 → 数据层
-    script = (
-        OPERATORS_PY.read_text(encoding="utf-8")
-        + "\n"
-        + PROVIDER_API_PY.read_text(encoding="utf-8")
-        + "\n"
-        + "\n".join(p.read_text(encoding="utf-8") for p in PROVIDER_FILES)
-        + "\n"
-        + _load_checks()
-        + "\n"
-        + REPORT_DATA_PY.read_text(encoding="utf-8")
-    )
-    namespace: dict = {"ulog_bytes": path.read_bytes()}
-    exec(compile(script, str(RULE_ENGINE_PY), "exec"), namespace)
-    return namespace
-
-
-def run_one(path: Path) -> dict:
-    ns = build_namespace(path)
-    # 判定产物走具名入口（np_report 会把结果摆到 __result）；以前它靠"执行脚本的副作用"留下
-    return call(ns, "np_report()")
-
-
-def call(ns: dict, code: str):
-    exec(compile(code, "<calibrate>", "exec"), ns)
-    return json.loads(ns["__result"])
 
 
 def probe_one(path: Path) -> dict:

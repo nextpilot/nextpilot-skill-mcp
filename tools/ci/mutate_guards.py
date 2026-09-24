@@ -354,13 +354,16 @@ MUTATIONS: list[Mutation] = [
         note="防「前提消失」：不再共用之后，「纯 Python」只剩「写得干净」这一层意义，而规则会继续绿着",
     ),
     Mutation(
-        name="本机校准工具不再直接指到 knowledge/engine/",
-        path="tools/px4log_engine_runner.py",
-        old='ENGINE = REPO_ROOT / "knowledge" / "engine"',
-        new='ENGINE = REPO_ROOT / "knowledge" / "engine_moved"',
+        name="本机装配入口不再指到 knowledge/engine/",
+        path="knowledge/engine/loader.py",
+        # 守卫按"锚点子串在不在"判红，所以新串不得包含锚点——parents[1] 里藏着
+        # "parent" 子串这种看似指走了、实则还含着锚点的写法，自证会报 always-green。
+        old="ENGINE = Path(__file__).resolve().parent",
+        new='ENGINE_MOVED = Path(__file__).resolve().parents[1] / "knowledge"\nENGINE = ENGINE_MOVED',
         guard="engine",
         expect="knowledge/engine/ 仍被浏览器与本机共用（纯 Python 的前提还在）",
-        note="同上：另一侧消费者也消失时，这条规则该被删掉而不是继续绿",
+        note="同上：本机侧消费者也消失时，这条规则该被删掉而不是继续绿。"
+        "runner 与 server 都经这份装配入口取引擎，指错一层，两边一起红",
     ),
     # ---- 界面侧：站点版本只有一个读取口（2026-09-21） ----
     #
@@ -446,7 +449,7 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         name="侧栏与正文的间距又回到 40px",
-        path="web/app/guide/layout.tsx",
+        path="web/app/[locale]/guide/layout.tsx",
         old="lg:flex-row lg:gap-8",
         new="lg:flex-row lg:gap-10",
         guard="ui",
@@ -517,7 +520,7 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         name="上传区不再从唯一出处取文案",
-        path="web/app/analyze/AnalyzeEntryClient.tsx",
+        path="web/app/[locale]/analyze/AnalyzeEntryClient.tsx",
         old='from "@/lib/log-analysis-notes"',
         new="",
         guard="ui",
@@ -526,18 +529,18 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         name="上传区取到了免责声明却不再渲染",
-        path="web/app/analyze/AnalyzeEntryClient.tsx",
-        old="zh={ANALYSIS_DISCLAIMER.zh}",
-        new='zh=""',
+        path="web/app/[locale]/analyze/AnalyzeEntryClient.tsx",
+        old="zh={`${ANALYSIS_DISCLAIMER.zh}。`}",
+        new='zh={""}',
         guard="ui",
         expect="上传区把两句话都渲染出来",
         note="导入了但没渲染 = 用户在交出日志前仍然看不到这句",
     ),
     Mutation(
         name="组件里又手抄了一份措辞（上传区标题版）",
-        path="web/app/analyze/AnalyzeEntryClient.tsx",
-        old="选择或拖入 PX4 .ulg 日志，最大支持300MB",
-        new="选择或拖入 PX4 .ulg 日志，最大支持300MB。日志在浏览器本地解析，原始文件不上传。",
+        path="web/app/[locale]/analyze/AnalyzeEntryClient.tsx",
+        old="选择或拖入 PX4 .ulg 或 ArduPilot .bin 日志，最大支持300MB",
+        new="选择或拖入 PX4 .ulg 或 ArduPilot .bin 日志，最大支持300MB。日志在浏览器本地解析，原始文件不上传。",
         guard="ui",
         expect="别处不许手写这两句的字面量（措辞只许改一处）",
         note="原形就是这一类：字面量散回组件里，下一次改措辞必然漏一处",
@@ -549,7 +552,7 @@ MUTATIONS: list[Mutation] = [
     # 要防的回归有三种形态（文案 / 数字对 / 进度条），三条路各自都要证明会红。
     Mutation(
         name="上传卡又把次数文案加回来了",
-        path="web/app/analyze/AnalyzeEntryClient.tsx",
+        path="web/app/[locale]/analyze/AnalyzeEntryClient.tsx",
         old="<input",
         new='<p className="mt-3 text-xs text-faint">匿名试用：3/3 次</p>\n          <input',
         guard="ui",
@@ -558,7 +561,7 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         name="「我的」页又把额度进度条加回来了",
-        path="web/app/me/MeClient.tsx",
+        path="web/app/[locale]/me/MeClient.tsx",
         old='<div className="mt-6">',
         new=(
             '<div className="mt-6">\n'
@@ -886,7 +889,14 @@ def _apply(path: Path, old: str, new: str) -> bytes:
 
     要求锚点**恰好出现一次**（不是"出现过")：一处也找不到时脚本会"成功地什么都没测"，
     出现多次时全量替换会顺手改到别处。两种都要当场报错。
+
+    第三种失败模式：**目标文件不存在**（注册表里的路径过期）。为什么也要当场报错而不是
+    让 `read_bytes` 抛 `FileNotFoundError`：那个异常不会命中调用点的 `except AnchorError`，
+    整轮直接崩，而崩掉的位置离真正的原因（某条变异的路径漏了一段，如 `[locale]`）很远。
+    更糟的是它在"没跑到那层"时完全不显形——注册表可以安静地烂很久。
     """
+    if not path.is_file():
+        raise AnchorError(f"变异目标不存在：{path}（路径过期后这条变异无法自证，它自称证明的那条守卫其实一次都没被验过）")
     before = path.read_bytes()
     text = before.decode("utf-8")
     count = text.count(old)

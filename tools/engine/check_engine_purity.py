@@ -133,7 +133,9 @@ def check_engine_is_pure_python() -> list[str]:
 # ---------------------------------------------------------------------------
 
 BROWSER_MARKER = ("web/scripts/build-knowledge.mjs", 'resolve(webRoot, "../knowledge/engine")')
-LOCAL_MARKER = ("tools/px4log_engine_runner.py", 'REPO_ROOT / "knowledge" / "engine"')
+# 本机侧的消费锚点是装配入口本身（runner 与 server 都经它取引擎）；
+# runner 只是薄转发层，engine 根不再在它那里定义。
+LOCAL_MARKER = ("knowledge/engine/loader.py", "ENGINE = Path(__file__).resolve().parent")
 
 
 def check_sharing_premise_alive() -> list[str]:
