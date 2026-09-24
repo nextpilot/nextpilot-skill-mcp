@@ -1,8 +1,8 @@
 ---
 title: LOG 数据分析实战
 titleEn: Log analysis guide
-description: 上传 PX4 日志、看懂分析报告、定位飞行问题——从入门到能独立诊断。
-descriptionEn: Upload PX4 logs, read analysis reports, troubleshoot flight issues — from zero to independent diagnosis.
+description: 上传 PX4 / ArduPilot 日志、看懂分析报告、定位飞行问题——从入门到能独立诊断。
+descriptionEn: Upload PX4 / ArduPilot logs, read analysis reports, troubleshoot flight issues — from zero to independent diagnosis.
 group: 面向用户
 groupEn: For Users
 order: 3
@@ -10,15 +10,17 @@ order: 3
 
 <Zh>
 
-日志分析是 NextPilot 平台内置的核心能力：上传一份 PX4 `.ulg`，引擎在浏览器端完成确定性解析和规则检查，
-LLM 将结构化 findings 翻译成可读的中文报告。全程原始日志不离开你的浏览器。
+日志分析是 NextPilot 平台内置的核心能力：上传一份 PX4 `.ulg` 或 ArduPilot `.bin`，引擎在浏览器端完成确定性解析，
+规则检查（当前覆盖 PX4）与故障知识库匹配输出结构化 findings，
+LLM 将其翻译成可读的中文报告。全程原始日志不离开你的浏览器。
 
 </Zh>
 
 <En>
 
-Log analysis is NextPilot's built-in core capability: upload a PX4 `.ulg`, the engine runs deterministic parsing
-and rule checks in your browser, and the LLM translates structured findings into a readable report. The raw
+Log analysis is NextPilot's built-in core capability: upload a PX4 `.ulg` or ArduPilot `.bin`, the engine runs
+deterministic parsing in your browser, rule checks (currently covering PX4) and fault-knowledge-base matching
+produce structured findings, and the LLM translates them into a readable report. The raw
 log never leaves your browser.
 
 </En>
@@ -26,7 +28,7 @@ log never leaves your browser.
 ## 分析流程 | How it works
 
 ```text
-.ulg 上传 → Pyodide 解析（浏览器端） → 规则引擎逐条检查 → 结构化 findings
+.ulg / .bin 上传 → Pyodide 解析（浏览器端） → 规则引擎逐条检查 → 结构化 findings
                                                               ↓
                                             服务器 LLM → 中文报告 → 页面展示
 ```

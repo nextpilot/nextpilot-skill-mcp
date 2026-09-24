@@ -195,7 +195,7 @@ export function LogReport({
                     这份报告只存档了检查结论与 AI 解读（原始日志从不上传）。图表、消息、参数与轨迹需要重新解析原始日志——
                     {logCached
                         ? "这份日志本机有缓存，点下面的按钮即可恢复（之后就秒开）。"
-                        : "本机没有它的缓存（已被容量淘汰或来自其他设备），重新选择该 .ulg 文件即可恢复。"}
+                        : "本机没有它的缓存（已被容量淘汰或来自其他设备），重新选择该日志文件（.ulg / .bin）即可恢复。"}
                     <RestoreButton onRestore={onRestore} />
                 </p>
             )}
@@ -207,7 +207,7 @@ export function LogReport({
                     （旧版本生成的报告，或上次的分析被中断）——
                     {logCached
                         ? "本机有缓存，点下面的按钮解析一次即可补齐，之后就一直有了。"
-                        : "本机也没有它的原始日志缓存，重新选择该 .ulg 文件即可恢复图表与轨迹。"}
+                        : "本机也没有它的原始日志缓存，重新选择该日志文件（.ulg / .bin）即可恢复图表与轨迹。"}
                     <RestoreButton onRestore={onRestore} />
                 </p>
             )}
@@ -637,8 +637,10 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
             label: "机型机架",
             value: vt && af ? `${vehicleTypeLabel(vt)}（${af}）` : vehicleTypeLabel(vt) || String(af),
             title:
-                `PX4 机型分类 vehicle_status.vehicle_type = ${vt || "（无）"}` +
-                ` · 机架编号 SYS_AUTOSTART = ${af || "（无）"}（名称查 PX4 airframes 表）`,
+                report.platform === "ArduPilot"
+                    ? `机型分类（FRAME_CLASS 参数映射）= ${vt || "（无）"}` + ` · FRAME_CLASS 编号 = ${af ?? "（无）"}`
+                    : `PX4 机型分类 vehicle_status.vehicle_type = ${vt || "（无）"}` +
+                      ` · 机架编号 SYS_AUTOSTART = ${af || "（无）"}（名称查 PX4 airframes 表）`,
         });
     }
     if (g?.uuid) {
@@ -804,7 +806,7 @@ function GeneralInfo({ report }: { report: AnalysisReport }) {
  * 以前这些提示只写了这句话，但页面上根本没有选文件的入口——用户得自己猜出"回列表页再选一次"，
  * 而那条路以前也不会重新解析（存档不缺"版本"就跳过解析，见 useLogAnalyzer.handleFile）。
  */
-function RestoreButton({ onRestore, label = "重新选择该 .ulg 文件" }: { onRestore: () => void; label?: string }) {
+function RestoreButton({ onRestore, label = "重新选择该日志文件" }: { onRestore: () => void; label?: string }) {
     return (
         <button type="button" onClick={onRestore} className="btn-ghost ml-1.5 inline-flex gap-1.5 px-2.5 py-1 text-xs">
             <FileUp className="h-3.5 w-3.5" />

@@ -30,7 +30,7 @@ export default function SkillsPage() {
             </div>
             <div className="mb-7">
                 <h1 className="text-[26px] font-semibold tracking-[-0.02em]">
-                    <LocalizedText zh="飞控 AI Skill 技能库" en="Flight AI skill library" />
+                    <LocalizedText zh="Skill 技能库" en="AI skill library" />
                 </h1>
                 <p className="mt-2 text-sm text-muted">
                     {getSkillIndex().length}{" "}

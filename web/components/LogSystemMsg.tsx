@@ -35,7 +35,7 @@ export function LogSystemMsg({ info }: { info: LogInfo }) {
         return (
             <p className="rounded-lg bg-surface-2 p-3 text-xs leading-5 text-muted">
                 这份报告是<strong className="font-medium text-text">旧版本存档</strong>
-                的，当时没有采集消息记录统计与系统信息——重新选择该 .ulg 文件解析一次即可补齐。
+                的，当时没有采集消息记录统计与系统信息——重新选择该日志文件解析一次即可补齐。
             </p>
         );
     }
@@ -62,7 +62,7 @@ export function LogSystemMsg({ info }: { info: LogInfo }) {
                 {!hasDict ? (
                     <p className="rounded-lg bg-surface-2 p-3 text-xs leading-5 text-muted">
                         这份报告是<strong className="font-medium text-text">旧版本存档</strong>
-                        的，当时没有采集 Information Message 字典——重新选择该 .ulg 文件解析一次即可补齐。
+                        的，当时没有采集 Information Message 字典——重新选择该日志文件解析一次即可补齐。
                     </p>
                 ) : dictShown.length === 0 ? (
                     <p className="text-sm text-muted">

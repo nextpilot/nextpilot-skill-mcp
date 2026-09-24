@@ -281,7 +281,7 @@ const STAGE_LABELS: Record<string, string> = {
     idle: "待上传",
     reading: "读取文件…",
     "loading-runtime": "加载 Pyodide 运行时…",
-    "installing-parser": "安装 pyulog…",
+    "installing-parser": "安装解析器…",
     parsing: "解析日志…",
     done: "解析完成",
 };
@@ -330,7 +330,7 @@ export default function ProbePage() {
     if (!manifest) {
         return (
             <div className="page-shell pt-4 pb-10 sm:pt-5">
-                <h1 className="text-[24px] font-semibold tracking-[-0.02em]">ULog Probe</h1>
+                <h1 className="text-[24px] font-semibold tracking-[-0.02em]">Log Probe</h1>
                 <p className="mt-2 text-sm text-muted">
                     上传一份 .ulg / .bin 文件，浏览所有字段，选中即可即席绘图 —— 一切在浏览器内完成，原始日志不出本机。
                 </p>
@@ -376,7 +376,7 @@ export default function ProbePage() {
         <div className="page-shell flex h-[calc(100vh-64px)] flex-col pt-2">
             <div className="flex items-center justify-between border-b border-border py-2">
                 <div className="flex items-center gap-3">
-                    <h1 className="text-lg font-semibold">ULog Probe</h1>
+                    <h1 className="text-lg font-semibold">Log Probe</h1>
                     <span className="text-xs text-muted">
                         {manifest.topics.length} topics, {manifest.topics.reduce((sum, t) => sum + t.fields.length, 0)}{" "}
                         fields

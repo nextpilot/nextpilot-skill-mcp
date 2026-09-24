@@ -32,7 +32,7 @@ export function LogPhaseStrip({ phases }: { phases: FlightPhase[] }) {
             一个 12px 灰、一个 14px 黑，看着就是没对齐 */}
                 <h3
                     className="text-sm font-semibold"
-                    title="整段日志的飞行模式时间轴：颜色 = PX4 飞行模式（定点/任务/返航…），悬停任一段看起止时间。数据图表里的底色用的也是同一套配色。时间是**开机以来的秒数**（与 Flight Review 一致）"
+                    title="整段日志的飞行模式时间轴：颜色 = 飞行模式（定点/任务/返航…，按日志固件显示各自模式名），悬停任一段看起止时间。数据图表里的底色用的也是同一套配色。时间是**开机以来的秒数**（与 Flight Review 一致）"
                 >
                     飞行阶段
                 </h3>

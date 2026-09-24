@@ -53,20 +53,26 @@ order: 99
 ### 我的日志会被上传到服务器吗？
 
 <Zh>
-    不会。`.ulg` 文件在浏览器本地解析（通过 Pyodide / WebAssembly），原始日志不出浏览器。 只有解析后的结构化
-    findings（如"CPU 负载峰值 97%"）发送到服务器生成中文报告。
+    不会。日志文件（PX4 `.ulg` / ArduPilot `.bin`）在浏览器本地解析（通过 Pyodide / WebAssembly），原始日志不出浏览器。
+    只有解析后的结构化 findings（如"CPU 负载峰值 97%"）发送到服务器生成中文报告。
 </Zh>
 
 <En>
-    No. The `.ulg` file is parsed locally in your browser (via Pyodide / WebAssembly). Only the structured findings
-    (e.g. "CPU load peak 97%") are sent to the server to generate the Chinese report.
+    No. The log file (PX4 `.ulg` / ArduPilot `.bin`) is parsed locally in your browser (via Pyodide / WebAssembly). Only
+    the structured findings (e.g. "CPU load peak 97%") are sent to the server to generate the Chinese report.
 </En>
 
 ### 支持哪些日志格式？
 
-<Zh>目前支持 PX4 `.ulg` 格式。ArduPilot `.bin` / `.log` 在规划中。</Zh>
+<Zh>
+    目前支持 PX4 `.ulg` 与 ArduPilot `.bin`（解析与结构化报告均已可用，规则检查当前覆盖 PX4，ArduPilot
+    规则库扩展中）。`.log` 文本格式在规划中。
+</Zh>
 
-<En>Currently supports PX4 `.ulg` format. ArduPilot `.bin` / `.log` is planned.</En>
+<En>
+    Currently supports PX4 `.ulg` and ArduPilot `.bin` (parsing and structured reports are available; rule checks
+    currently cover PX4, with the ArduPilot rule set expanding). The `.log` text format is planned.
+</En>
 
 ### 为什么大日志分析很慢？
 
@@ -82,11 +88,14 @@ in your browser, speed depends on your device. Start with small logs (10-30 MB).
 
 ### 如何对比两次飞行的数据？
 
-<Zh>分别上传两次飞行的 `.ulg` 文件，打开两份报告页面，并列对比 findings 和参数曲线。 目前平台不提供自动 diff 功能。</Zh>
+<Zh>
+    分别上传两次飞行的日志文件（`.ulg` / `.bin`），打开两份报告页面，并列对比 findings 和参数曲线。 目前平台不提供自动
+    diff 功能。
+</Zh>
 
 <En>
-    Upload both `.ulg` files separately, open both report pages, and compare findings and parameter charts side by side.
-    The platform does not currently offer automatic diff.
+    Upload both log files (`.ulg` / `.bin`) separately, open both report pages, and compare findings and parameter
+    charts side by side. The platform does not currently offer automatic diff.
 </En>
 
 ## 规则相关 | About rules

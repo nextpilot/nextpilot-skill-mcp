@@ -199,7 +199,7 @@ const STAGE_LABELS: Record<string, string> = {
     idle: "待上传",
     reading: "读取文件…",
     "loading-runtime": "加载 Pyodide 运行时…",
-    "installing-parser": "安装 pyulog…",
+    "installing-parser": "安装解析器…",
     parsing: "解析日志…",
     done: "解析完成",
 };
@@ -242,7 +242,7 @@ export default function EditorPage() {
             <div className="page-shell pt-4 pb-10 sm:pt-5">
                 <h1 className="text-[24px] font-semibold tracking-[-0.02em]">Plot Editor</h1>
                 <p className="mt-2 text-sm text-muted">
-                    编写 YAML 定义要绘制的曲线，上传一份 .ulg 日志即可立即预览效果。
+                    编写 YAML 定义要绘制的曲线，上传一份 .ulg / .bin 日志即可立即预览效果。
                 </p>
 
                 <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -283,14 +283,14 @@ export default function EditorPage() {
                                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
                             )}
                             <p className="text-sm font-medium text-foreground">
-                                {stage === "idle" ? "拖入 .ulg 或点击选择" : STAGE_LABELS[stage]}
+                                {stage === "idle" ? "拖入 .ulg / .bin 或点击选择" : STAGE_LABELS[stage]}
                             </p>
-                            <p className="text-xs text-muted">.ulg 格式，解析在浏览器内进行</p>
+                            <p className="text-xs text-muted">支持 PX4 .ulg 与 ArduPilot .bin，解析在浏览器内进行</p>
                         </div>
                         <input
                             ref={inputRef}
                             type="file"
-                            accept=".ulg"
+                            accept=".ulg,.bin"
                             className="hidden"
                             onChange={(e) => {
                                 const f = e.target.files?.[0];

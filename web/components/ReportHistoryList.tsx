@@ -396,7 +396,7 @@ export function ReportHistoryList({
                     {localCount > 0 &&
                         (confirmingClear ? (
                             <span className="flex items-center gap-1.5 text-xs">
-                                <span className="text-muted">只清历史记录，保留原始日志与 pyulog 解析缓存</span>
+                                <span className="text-muted">只清历史记录，保留原始日志与解析缓存</span>
                                 <button
                                     type="button"
                                     onClick={() => {

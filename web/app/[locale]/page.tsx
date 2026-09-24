@@ -37,7 +37,7 @@ const COVERAGE: { label: string; value: string }[] = [
     { label: "确定性检查项", value: "15" },
     { label: "故障知识库条目（含根因与排查步骤）", value: "10" },
     { label: "识别飞行阶段", value: "7" },
-    { label: "支持固件", value: "PX4 1.15+ / 旧版字段自适应" },
+    { label: "支持固件", value: "PX4 1.15+ / ArduPilot 4.x" },
 ];
 
 /** 「知识库」小节的四张卡：引擎背后的经验都在仓库 knowledge/ 下，一条经验一个文件 */
@@ -145,7 +145,7 @@ export default function HomePage() {
                             <div className="mt-8 flex flex-wrap items-center gap-3">
                                 <Link href="/analyze" className="btn-primary px-5 py-2.5 text-[15px]">
                                     <FileSearch className="h-[18px] w-[18px]" />
-                                    <LocalizedText zh="在线分析 PX4 日志" en="Analyze a PX4 log" />
+                                    <LocalizedText zh="在线分析飞控日志" en="Analyze a flight log" />
                                     <ArrowRight className="h-4 w-4" />
                                 </Link>
                                 <Link href="/skills" className="btn-ghost px-5 py-2.5 text-[15px]">
@@ -325,7 +325,7 @@ export default function HomePage() {
                             title="确定性引擎分析"
                             titleEn="Deterministic analysis"
                             desc="执行 15 项确定性检查，输出结构化 JSON。数值判断全部由规则引擎完成，每条结论可溯源到字段、阈值和官方文档，LLM 只做翻译。"
-                            descEn="Pyodide runs pyulog in a Web Worker. 15 deterministic checks produce structured JSON findings."
+                            descEn="Pyodide parses the log in a Web Worker. 15 deterministic checks produce structured JSON findings."
                         />
                         <StepCard
                             step="03"

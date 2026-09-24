@@ -13,7 +13,7 @@ import type { HistoryItem } from "@/components/ReportHistoryList";
 
 const STAGE_TEXT: Record<string, string> = {
     "loading-runtime": "加载浏览器端 Pyodide 运行时",
-    "installing-parser": "安装 pyulog 解析器",
+    "installing-parser": "安装解析器",
     parsing: "解析日志并执行检查规则",
     done: "完成",
 };
@@ -123,8 +123,8 @@ export function AnalyzeEntryClient() {
                             (STAGE_TEXT[stage] ?? "处理中…")
                         ) : (
                             <LocalizedText
-                                zh="选择或拖入 PX4 .ulg 日志，最大支持300MB"
-                                en="Drop or choose a PX4 .ulg log — up to 300 MB"
+                                zh="选择或拖入 PX4 .ulg 或 ArduPilot .bin 日志，最大支持300MB"
+                                en="Drop or choose a PX4 .ulg or ArduPilot .bin log — up to 300 MB"
                             />
                         )}
                     </p>

@@ -378,7 +378,7 @@ function PanelChart({
                 // 那种情况说清楚，别让 Plotly 拿着半截请求去画
                 const stale = panel.requests.find((r) => !Array.isArray(r.ydata) || r.ydata.length === 0 || !r.series);
                 if (stale) {
-                    setError("这份存档的曲线是旧版格式，重新选择该 .ulg 文件解析一次即可恢复");
+                    setError("这份存档的曲线是旧版格式，重新选择该日志文件解析一次即可恢复");
                     setState("error");
                     return;
                 }
