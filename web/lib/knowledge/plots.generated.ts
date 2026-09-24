@@ -1,4 +1,4 @@
-// ⚠️ 自动生成，请勿手改。源文件在 engine/ 与 knowledge/px4/，改完跑 `pnpm build:kb`（dev/build 自动执行）。
+// ⚠️ 自动生成，请勿手改。源文件在 knowledge/engine/ 与 knowledge/px4/，改完跑 `pnpm build:kb`（dev/build 自动执行）。
 // 源：knowledge/px4/plot/*.yml（改图请改那边）
 export const PLOT_PRESETS = [
   {

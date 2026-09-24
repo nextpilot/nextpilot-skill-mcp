@@ -23,11 +23,11 @@
 
 **热更新分三段**，`pnpm dev` 三段都拉起来了：
 
-| 你改了                                                                           | 谁负责                                                     |
-| -------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `web/` 里的代码（`.tsx` / `.css`）                                               | Next 自己热更新                                            |
-| 内容真源（`docs/guide/*.mdx`、`knowledge/skills/`、`knowledge/mcp/`）            | `sync-content --watch` 重拷进 `.generated/`，Next 才看得到 |
-| 知识真源（`knowledge/px4/rules/*.yaml`、`facts.yaml`、`engine/operators.py` 等） | `build-knowledge --watch` 重建产物，Next 才看得到          |
+| 你改了                                                                                     | 谁负责                                                     |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| `web/` 里的代码（`.tsx` / `.css`）                                                         | Next 自己热更新                                            |
+| 内容真源（`docs/guide/*.mdx`、`knowledge/skills/`、`knowledge/mcp/`）                      | `sync-content --watch` 重拷进 `.generated/`，Next 才看得到 |
+| 知识真源（`knowledge/px4/rules/*.yaml`、`facts.yaml`、`knowledge/engine/operators.py` 等） | `build-knowledge --watch` 重建产物，Next 才看得到          |
 
 > **只想开一半**：`pnpm dev:no-watch` —— 同步 + 构建 + `next dev`，不挂 watch。
 > **单独开着两段热拷贝**：`pnpm sync:watch`、`pnpm kb:watch`（另开终端时用）。
@@ -50,7 +50,7 @@
 
 **耗时 2 秒**，基本无感。
 
-> - `ruff check` **刻意不加 `--fix`**：`engine/` 是分片拼装的，自动修复会删东西。
+> - `ruff check` **刻意不加 `--fix`**：`knowledge/engine/` 是分片拼装的，自动修复会删东西。
 > - 绕开：`git commit --no-verify`。
 
 ---
@@ -61,13 +61,13 @@
 
 **读这些（真源 —— 你要改的是它们）：**
 
-| 文件                          | 是什么                                                                   |
-| ----------------------------- | ------------------------------------------------------------------------ |
-| `engine/operators.py`         | **算子注册表** —— 经验规则里的 `op:` 只能引用这里注册的算子              |
-| `engine/rule_engine.py`       | **规则框架** —— 调度规则、求值表达式、调算子、发 finding。与日志格式无关 |
-| `engine/report_data.py`       | **报告页数据层** —— 抽时序、降采样、交给前端。与日志格式无关             |
-| `knowledge/px4/rules/*.yaml`  | **检查经验**：阈值与判定条件（工程师最常改这里）                         |
-| `knowledge/px4/fault-kb.yaml` | **故障知识库**                                                           |
+| 文件                              | 是什么                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------ |
+| `knowledge/engine/operators.py`   | **算子注册表** —— 经验规则里的 `op:` 只能引用这里注册的算子              |
+| `knowledge/engine/rule_engine.py` | **规则框架** —— 调度规则、求值表达式、调算子、发 finding。与日志格式无关 |
+| `knowledge/engine/report_data.py` | **报告页数据层** —— 抽时序、降采样、交给前端。与日志格式无关             |
+| `knowledge/px4/rules/*.yaml`      | **检查经验**：阈值与判定条件（工程师最常改这里）                         |
+| `knowledge/px4/fault-kb.yaml`     | **故障知识库**                                                           |
 
 **生成这 4 份产物（不要手改，改了下次构建就覆盖）：**
 
@@ -95,9 +95,9 @@
 | 1   | `tools/common/check_secrets.py`               | 密钥扫描      | 有没有把密钥提交进去。**扫全部 313 个跟踪文件**（含 `.md`）                  | 1.3s |
 | 2   | `ruff format --check`                         | Python 格式化 | 风格统一吗（**只认 `.py`**）                                                 | 2s   |
 | 3   | `ruff check`                                  | Python lint   | 有没有可疑写法                                                               | 1s   |
-| 4   | `engine/tests/`                               | 单元测试      | 算子与 CEL 表达式**求值对不对**                                              | 1.2s |
+| 4   | `knowledge/engine/tests/`                     | 单元测试      | 算子与 CEL 表达式**求值对不对**                                              | 1.2s |
 | 5   | `tools/engine/check_engine_pyodide.py`        | 产物校验      | 生成的产物是合法可执行的 Python 吗；轨迹取不到时给没给逐条原因               | 1s   |
-| 6   | `tools/engine/check_engine_purity.py`         | 纯净性守卫    | `engine/` 还是纯 Python 吗（浏览器与本机共用同一份的前提）                   | 0.6s |
+| 6   | `tools/engine/check_engine_purity.py`         | 纯净性守卫    | `knowledge/engine/` 还是纯 Python 吗（浏览器与本机共用同一份的前提）         | 0.6s |
 | 7   | `tools/common/check_pnpm_filter.py`           | 转发脚本守卫  | 每个 `pnpm --filter` 都命中真实项目吗（匹配不到时 pnpm 静默成功）            | 0.5s |
 | 8   | `tsc --noEmit`                                | 类型检查      | TypeScript 类型对得上吗                                                      | 2s   |
 | 9   | `prettier --check`                            | 前端格式化    | 前端风格统一吗                                                               | 3.7s |
@@ -108,7 +108,7 @@
 | 14  | `tools/px4log_engine_runner.py --probe-data`  | 数据层自检    | 数据层结构自洽吗                                                             | 3s   |
 | 15  | `tools/engine/check_rules_fields.py --strict` | 字段引用 lint | 规则里引用的**字段名真实存在**吗                                             | 2s   |
 | 16  | `tools/engine/guard_apm_parser_version.py`    | 解析器版本    | `.bin` 解析逻辑变了升 `parserVersion` 了吗（自研解析器没有上游版本号替它变） | 0.5s |
-| 17  | `tools/engine/guard_engine_names.py`          | 拼接命名守卫  | `engine/` 的片段拼进同一命名空间后，有没有顶层名字被后来者静默覆盖           | 0.4s |
+| 17  | `tools/engine/guard_engine_names.py`          | 拼接命名守卫  | `knowledge/engine/` 的片段拼进同一命名空间后，有没有顶层名字被后来者静默覆盖 | 0.4s |
 
 **⚠ 第 12~15 项只在你的开发机跑。** 它们要真实 `.ulg` 日志，而原始日志含 GPS 轨迹、
 **不入仓库**——云端 checkout 里没有，所以这四项在 CI 上必然跳过。
@@ -194,7 +194,7 @@ pnpm test:e2e            # 全量 42 条
 
 | 层             | 文件                                                        | 回答                                 |
 | -------------- | ----------------------------------------------------------- | ------------------------------------ |
-| **单测**       | `engine/tests/`                                             | 我写的这段逻辑对不对                 |
+| **单测**       | `knowledge/engine/tests/`                                   | 我写的这段逻辑对不对                 |
 | **守卫**       | `test-issue-filer.mjs`（23 节）、`check_hygiene.py`（6 项） | 这个不变量还成立吗（扫源码防回潮）   |
 | **守卫的自证** | `mutate_guards.py`（65 条，条数以 `--list` 为准）           | 守卫**真的会红**吗，还是恒绿着当摆设 |
 
@@ -208,7 +208,7 @@ pnpm test:e2e            # 全量 42 条
 - **内容真源由 `sync-content --watch` 负责同步**（`pnpm dev` 已带上）。若用 `pnpm dev:no-watch`，
   改 `docs/guide`、`knowledge/skills`、`knowledge/mcp` 后页面不会变，要另开 `pnpm sync:watch`。
 - **知识真源由 `build-knowledge --watch` 负责重建**（`pnpm dev` 已带上）。同样地，用
-  `pnpm dev:no-watch` 时改 `knowledge/px4/` 或 `engine/` 后页面不会变，要另开 `pnpm kb:watch`。
+  `pnpm dev:no-watch` 时改 `knowledge/px4/` 或 `knowledge/engine/` 后页面不会变，要另开 `pnpm kb:watch`。
 - **`build-knowledge` 的产物里有一个落在 `knowledge/px4/` 内部**（`rules-editor-schema.generated.json`）。
   所以 `--watch` 只监听 `rules/`、`plot/`、`llm/`、`meta/` 这些真源子目录，
   并在监听顶层目录时按文件名滤掉 `*.generated.*` —— 否则写产物会触发自己、无限重建。
@@ -232,10 +232,10 @@ pnpm test:e2e            # 全量 42 条
 
 ## 附 · 想再往下挖
 
-| 想找什么                           | 去哪                                                           |
-| ---------------------------------- | -------------------------------------------------------------- |
-| 为什么这样分档、各项完整实测档案   | [`checks-by-stage.md`](checks-by-stage.md)                     |
-| 校验命令的**定义**（唯一事实源）   | [`../../tools/ci/checklist.yml`](../../tools/ci/checklist.yml) |
-| 本地开发、部署、环境变量、故障排查 | [`operations/README.md`](operations/README.md)                 |
-| 引擎实现细节                       | [`../../engine/README.md`](../../engine/README.md)             |
-| 怎么**写**一条检查规则             | 网站 `/guide/rule-schema`                                      |
+| 想找什么                           | 去哪                                                                   |
+| ---------------------------------- | ---------------------------------------------------------------------- |
+| 为什么这样分档、各项完整实测档案   | [`checks-by-stage.md`](checks-by-stage.md)                             |
+| 校验命令的**定义**（唯一事实源）   | [`../../tools/ci/checklist.yml`](../../tools/ci/checklist.yml)         |
+| 本地开发、部署、环境变量、故障排查 | [`operations/README.md`](operations/README.md)                         |
+| 引擎实现细节                       | [`../../knowledge/engine/README.md`](../../knowledge/engine/README.md) |
+| 怎么**写**一条检查规则             | 网站 `/guide/rule-schema`                                              |

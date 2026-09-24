@@ -19,9 +19,9 @@
     "format": "node node_modules/prettier/bin/prettier.cjs --write . && python -m ruff format .",
     "format:check": "node node_modules/prettier/bin/prettier.cjs --check . && python -m ruff format --check .",
     "typecheck": "pnpm --filter ./web typecheck",
-    "typecheck:py": "node node_modules/pyright/index.js engine",
+    "typecheck:py": "node node_modules/pyright/index.js knowledge/engine",
     "test": "pnpm --filter ./web test:e2e",
-    "test:py": "python -m pytest engine/tests",
+    "test:py": "python -m pytest knowledge/engine/tests",
     "ci:push": "python tools/ci/check_all.py --stage push"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 # 检查规则改为「一条经验一个配置文件」：一条经验的完整画像
 
-> **这是给 AI（Claude Code）读的项目上下文**：改 `rules/*.yaml`、`engine/` 下的算子与框架、
+> **这是给 AI（Claude Code）读的项目上下文**：改 `rules/*.yaml`、`knowledge/engine/` 下的算子与框架、
 > 或构建脚本前，先按这里的约定来——它记着每条设计决策的动机、
 > 与最初设计的落地差异（避免把有意为之当成 bug 改回去）、以及已知缺口。
 > 面向人的入口见 `../README.md`（怎么读）与站内 [规则编写参考](/guide/rule-schema)（怎么写经验）。
@@ -8,31 +8,31 @@
 
 ## 实施状态（2026-09-15：已实施）
 
-**已完成**：15 组过程式检查（原 `engine/ulog_checks.py` 1095 行，已迁移为 `engine/rule_engine.py`）→ **32 条自包含经验**（含 4 条数据质量
+**已完成**：15 组过程式检查（原 `knowledge/engine/ulog_checks.py` 1095 行，已迁移为 `knowledge/engine/rule_engine.py`）→ **32 条自包含经验**（含 4 条数据质量
 guard），**73 个通用算子**；`px4-thresholds.toml` 已退场（阈值随各自经验内联）。引擎侧每个
 检查块只剩一行 `_run_rules("<slot>")`。6 条真实日志的冻结基线逐字段一致；生成产物真实执行
 通过；构建期护栏生效（算子名/入参数量、表达式与文案里的未声明名字、缺 `firmware`/`vehicle`、
 guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 
-**2026-09-16 追加**：报告页数据层（`engine/report_data.py`）的若干硬规则——时间基准改为
+**2026-09-16 追加**：报告页数据层（`knowledge/engine/report_data.py`）的若干硬规则——时间基准改为
 **开机时间**、PX4 事件解码与文本消息合并、多值信息的两种拼接形态、参数默认值的推导与
 参数元数据的来源、**派生数据版本**让旧存档自动重解析。都在本文档下面的
 「报告页数据层」一节，改数据层前必读。
 
 **2026-09-17 追加（第二段）：引擎与日志格式分家 —— provider 适配器**
-（**架构层面的改动，改 `engine/` 前先读这一节**）：
+（**架构层面的改动，改 `knowledge/engine/` 前先读这一节**）：
 
 原先取数分散在四个地方（`facts.yaml` 的 `bindings`/`track`、`rule_engine.py` 里硬编码的
 固件解码与载具身份、`rules/*.yaml` 里裸写的字段、`plot/*.yml` 里裸写的字段）。
 现在的分工是"**机制 / 数据 / 格式**"三分：
 
-| 放哪                                            | 是什么                                                                                           | 判据                                             |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
-| `engine/providers/<格式>.py`                    | **唯一认识某一种日志的地方**：topic 名、字段名、固件版本怎么解码、取不到怎么回退、载具身份从哪来 | 有分支 / 回退 / 按版本挑 → 代码                  |
-| `engine/{rule_engine,operators,report_data}.py` | 与格式无关的机制：调度、表达式求值、算子、报告数据层                                             | 里面 grep 不到 `vehicle_` / `ver_sw` / `cpuload` |
-| `knowledge/px4/facts.yaml`                      | 那一种格式的**纯数据**：码表、文案、展示口径、规则元数据、执行顺序                               | 纯映射 → YAML（改它不该碰 Python）               |
+| 放哪                                                      | 是什么                                                                                           | 判据                                             |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| `knowledge/engine/providers/<格式>.py`                    | **唯一认识某一种日志的地方**：topic 名、字段名、固件版本怎么解码、取不到怎么回退、载具身份从哪来 | 有分支 / 回退 / 按版本挑 → 代码                  |
+| `knowledge/engine/{rule_engine,operators,report_data}.py` | 与格式无关的机制：调度、表达式求值、算子、报告数据层                                             | 里面 grep 不到 `vehicle_` / `ver_sw` / `cpuload` |
+| `knowledge/px4/facts.yaml`                                | 那一种格式的**纯数据**：码表、文案、展示口径、规则元数据、执行顺序                               | 纯映射 → YAML（改它不该碰 Python）               |
 
-- 契约本体是 `engine/providers/api.py` 的三张常量表（REQUIRED / OPTIONAL / SEMANTICS）。
+- 契约本体是 `knowledge/engine/providers/api.py` 的三张常量表（REQUIRED / OPTIONAL / SEMANTICS）。
   它同时是**构建期**（`build-knowledge.mjs` 派生 `BUILTIN_VARS`、查每个适配器有没有漏实现）、
   **运行期**（`check_provider()` 自检类型与缺席）、**测试**（`tools/engine/guard_provider_contract.py`）
   三处的输入 —— 一处定义、三处使用。**不写 `typing.Protocol`**：两端都没有类型检查器
@@ -128,7 +128,7 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 "派生的 `category/version/status/license/author/outputs.check/doc` 与改动前逐条相同"的核对
 （基线只覆盖 6 份日志，**在那上面没触发的规则比不到**，所以那次核对是必需的）。
 
-字段级权威参考（写经验时看这份）：站内 **[规则编写参考](/guide/rule-schema)**（由 `web/scripts/build-knowledge.mjs` 从 `engine/` 源码生成 `web/.generated/guide/rule-schema.mdx`，不入库）；
+字段级权威参考（写经验时看这份）：站内 **[规则编写参考](/guide/rule-schema)**（由 `web/scripts/build-knowledge.mjs` 从 `knowledge/engine/` 源码生成 `web/.generated/guide/rule-schema.mdx`，不入库）；
 经验索引（站内页面，构建时生成）：**[/guide/rule-catalogue](/guide/rule-catalogue)**；迁移过程中顺带修掉的 6 处
 真实缺陷见提交 `6a081d5` 的说明（最要紧的一条：日志消息级别判据按 ASCII 语义修正后，
 `Kill engaged / Flight termination active`、`no barometer found` 这类"冒烟的枪"才浮出来）。
@@ -140,8 +140,8 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
   （`check`→`checksRun`/`checksSkipped`、`tag`→`finding`、`stats`→`metrics`、
   `guard_tags`→`guardTags`），所以 `outputs` 名实相符，也与站内「规则编写参考」页（构建期生成、
   不入库，所以这里不写小节号）里讲 `outputs` 那一节的标题「输出与副作用」对齐。
-  改动范围：24 个规则文件 + `engine/rule_engine.py`（局部变量 `_emit` → `_out`）+
-  `tools/engine/check_rules_compute.py` + `web/scripts/build-knowledge.mjs` + 指南页 + `engine/README.md` +
+  改动范围：24 个规则文件 + `knowledge/engine/rule_engine.py`（局部变量 `_emit` → `_out`）+
+  `tools/engine/check_rules_compute.py` + `web/scripts/build-knowledge.mjs` + 指南页 + `knowledge/engine/README.md` +
   `facts.yaml` 注释。
 - **顺带消掉一处同名**：`build-knowledge.mjs` 里本来就有个**写产物的辅助函数** `emit(path, content)`，
   与规则键同名。规则键改叫 `outputs` 后它更刺眼，已一并改名 `writeArtifact()`（纯内部函数，9 个调用点）。
@@ -223,7 +223,7 @@ conditions: # 整块可省
 - **内置变量一律大写**（`FW_MINOR` / `VEHICLE` / `IS_FIXED_WING` / `DURATION_S` / `ARMED_S` /
   `ARMED_INTERVALS` / `T0_US` / `HAS_ARMED` / `RESTART_DETECTED` / `DROPOUT_MS` / `MESSAGES`）：
   规则里自己赋的变量是小写，一眼分得清"这个数是引擎给的还是自己算的"。事实源是
-  `engine/providers/api.py` 的 `BUILTIN_VARIABLES`（`build-knowledge.mjs` 的 §6.1 表与
+  `knowledge/engine/providers/api.py` 的 `BUILTIN_VARIABLES`（`build-knowledge.mjs` 的 §6.1 表与
   它的 `BUILTIN_VARS` 都派生自它；原先那张表由 `tools/px4/gen_rule_reference.py` 生成，
   该脚本已并入 `build-knowledge.mjs`）。`has_topic()` 是函数，
   不大写。`web/scripts/lib/rule-expr.mjs` 里那个"版本号必须先判 `None`"的护栏跟着改成
@@ -455,7 +455,7 @@ ydata, compute}`），引擎侧求值、单位换算、降采样都在引擎里�
 
 ---
 
-## 报告页数据层（`engine/report_data.py`）：踩过的硬规则
+## 报告页数据层（`knowledge/engine/report_data.py`）：踩过的硬规则
 
 > 这一层的产出（`np_manifest` / `np_series` / `np_track` / `np_log_info`）直接决定报告页每个 tab 长什么样。
 > 下面每一条都是**实机日志逼出来的**，改之前先看一遍，别按"想当然"改回去。
@@ -472,7 +472,7 @@ ydata, compute}`），引擎侧求值、单位换算、降采样都在引擎里�
 | 参数「默认值」靠 **'Q' 消息的语义**推出来，不依赖外部字典                                                                              | PX4 只记录**与当前值不同**的默认值（`logger.cpp: write_parameter_defaults`）→ 没记录就说明当前值等于默认值。于是每一行都能给出具体数字，不需要"一致 / 已改"这类占位文字。取法：机架默认 → 固件默认 → 当前值                                                                                                                                                                                  |
 | 参数「最小值 / 最大值 / 说明」来自 `knowledge/px4/meta/main.json` → `web/public/params/px4-main.json`（按需拉取，175 KB / gzip 33 KB） | 上游**只有 main 分支**产出 `parameters.json`（release tag 没有，见 `meta/v1.15.0.json` 的 `parametersNote`），所以这是"最新分支快照"，与老固件可能有出入——界面必须如实标注来源。放 `public/` 而不是内联进 Pyodide：这份字典与具体日志无关，内联等于每份日志都要多下它一遍                                                                                                                    |
 
-### 「软件版本」的展示口径（`engine/rule_engine.py` 的 `facts.firmwareDisplay`）
+### 「软件版本」的展示口径（`knowledge/engine/rule_engine.py` 的 `facts.firmwareDisplay`）
 
 **照抄 FR 的 `_format_sw_version`**（`app/tornado_handlers/browse.py`，2026-09-16 从 upstream main 取回源码核过）。
 类型码 = `ver_sw_release & 0xFF`：
@@ -492,12 +492,12 @@ ydata, compute}`），引擎侧求值、单位换算、降采样都在引擎里�
 `facts.fwReleaseType` 另存了类型码：前端 `lib/format.ts` 的 `formatFirmware()` 凭它 + `firmware` + `verSw`
 能完整重算展示串，所以云端记录（只带摘要字段）与老存档都能在界面上纠正过来，不必重新解析日志。
 
-`engine/rule_engine.py` 已进派生数据版本的哈希——facts / findings 同样随报告归档，
+`knowledge/engine/rule_engine.py` 已进派生数据版本的哈希——facts / findings 同样随报告归档，
 口径一变老存档打开时会自动重解析一次（AI 报告不变，见下面）。
 
 ### 派生数据版本：改了数据层，旧存档自动重解析
 
-`web/scripts/build-knowledge.mjs` 对 `engine/report_data.py` + `engine/rule_engine.py` +
+`web/scripts/build-knowledge.mjs` 对 `knowledge/engine/report_data.py` + `knowledge/engine/rule_engine.py` +
 `knowledge/px4/facts.yaml` + `plot/*.yml` 算内容哈希，写进 `web/lib/knowledge/derived-version.generated.ts`。
 本机存档里的派生数据（`info` / 曲线 / 轨迹）带着**生成时**的版本，与当前不一致就重新解析一次
 （`useLogAnalyzer.openSaved`：旧数据先渲染、后台重解析，解析完自动换成新的；facts / findings 也一并刷新，
@@ -536,7 +536,7 @@ load_crit = 0.95
 ```
 
 裸数字飘在 TOML 里，看不出属于哪条经验、读哪个 topic 的哪个字段、什么条件下成立。
-同时原 15 组检查 / 39 个告警点写在 `engine/ulog_checks.py`（已迁移为 `engine/rule_engine.py`，1095 行），阈值与实现分离，
+同时原 15 组检查 / 39 个告警点写在 `knowledge/engine/ulog_checks.py`（已迁移为 `knowledge/engine/rule_engine.py`，1095 行），阈值与实现分离，
 「暂定」只存在于注释里，「误报率 <10%」只存在于文档里。
 
 目标：**一条经验 = 一个自包含、可评审、可验证、可分发的完整单元**。
@@ -554,9 +554,9 @@ load_crit = 0.95
   knowledge/px4/rules/*.yaml      ─┐
   knowledge/px4/facts.yaml        ─┤ 解析 + 校验（必填/算子白名单/表达式合法性）
   knowledge/px4/meta/** 与 topic-overrides.yaml   ─┤
-  engine/operators.py             ─┤
-  engine/rule_engine.py           ─┤
-  engine/report_data.py           ─┘
+  knowledge/engine/operators.py             ─┤
+  knowledge/engine/rule_engine.py           ─┤
+  knowledge/engine/report_data.py           ─┘
         ↓ 生成的产物（提交进仓库）
   web/workers/pyodide-px4log-engine.ts   ← Python 源码，内联 __RULES__/__FACTS__/__TOPICS__ 的 JSON 字面量
   web/workers/fault-kb.generated.json
@@ -957,7 +957,7 @@ fixtures:
 **内置函数**（并入表达式白名单）：
 
 > ⚠️ **这一节也是最初设计**：`has_topic()` / `in_armed()` / `phase_at()` 与 `scope` / `filter` /
-> `excludes_if` **都没有落地**。现在的表达式里只能调**算子**（见 `engine/operators.py`）加
+> `excludes_if` **都没有落地**。现在的表达式里只能调**算子**（见 `knowledge/engine/operators.py`）加
 > `ref(...)`（带修饰的取数）与 `_try(...)`（容错求值）；样本级筛选由算子自己的参数承担
 > （如 `masked_any_in` / `active_window_mask` 收 `armed_intervals` 与 `codes`）。
 
@@ -1111,7 +1111,7 @@ fields:
 ## 预定函数清单
 
 > ⚠️ **这一节同样是最初设计的清单**（同一个算子节点链的设想），只作历史留档：
-> 取数现在是 `ref("topic.field")`，没有 `read`；签名注册在 `engine/operators.py` 里
+> 取数现在是 `ref("topic.field")`，没有 `read`；签名注册在 `knowledge/engine/operators.py` 里
 > 用 `@operator` 声明（共 74 处），函数名以那里为准。
 > 修饰那一行里的 `per_instance` **不是现在图容器上的 `per_instance`**——它当年是节点级
 > 修饰（`per_instance: worst`，多实例取最差），**没落地**；现在图容器上的同名开关表示
@@ -1325,8 +1325,8 @@ knowledge/px4/
     v1.15.0.yaml ...
   tags.yaml      # tag 顺序与版本映射
   topic-overrides.yaml  # 跨 tag 人工语义层：aliases 别名、groups 命名集合、invalid、单位修正
-  engine/operators.py   # 预定函数（白名单注册表）
-  engine/rule_engine.py # 瘦身为框架：基础事实层 + 加载经验 + 取数 + 算子 + 表达式求值 + 发射（原 ulog_checks.py）
+  knowledge/engine/operators.py   # 预定函数（白名单注册表）
+  knowledge/engine/rule_engine.py # 瘦身为框架：基础事实层 + 加载经验 + 取数 + 算子 + 表达式求值 + 发射（原 ulog_checks.py）
   fault-kb.yaml
   px4-ulog-rules.md
 ```
@@ -1353,7 +1353,7 @@ knowledge/px4/
 - **阶段 1**：`operators.py` + 框架改造 + 12 条标准型 + 全部 guard 迁移 + `meta/<tag>.json` +
   `build-knowledge.mjs` 必填/表达式校验 + **删掉已无用的 TOML 解析器**（统一 YAML 后只剩一个）；
   `compare_baseline.py` 验等价
-- **阶段 2（已完成）**：补时序/掩码类 9 个函数，迁剩余 10 个告警点，引擎侧改为 `engine/rule_engine.py`，原 `ulog_checks.py` 已删除
+- **阶段 2（已完成）**：补时序/掩码类 9 个函数，迁剩余 10 个告警点，引擎侧改为 `knowledge/engine/rule_engine.py`，原 `ulog_checks.py` 已删除
 - **阶段 3（可选）**：`fixtures` 跑通后，回归从"比对整体基线"升级为"每条经验自带正反例"
 
 ## 验证

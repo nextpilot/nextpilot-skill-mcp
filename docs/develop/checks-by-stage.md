@@ -68,7 +68,7 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 | 格式化   | 代码风格一致吗（机器改，人不争论） | `ruff format`（Py）、`prettier`（前端）                                                                                                                  |
 | lint     | 有没有可疑写法                     | `ruff check`（Py）、`eslint`（JS，**TS 暂不覆盖**，第 5 节）                                                                                             |
 | 类型     | 类型对得上吗                       | `tsc --noEmit`                                                                                                                                           |
-| 单测     | 算子与表达式求值对不对             | `pytest engine/tests`                                                                                                                                    |
+| 单测     | 算子与表达式求值对不对             | `pytest knowledge/engine/tests`                                                                                                                          |
 | 契约     | 产物与源一致吗、产物合法吗         | `build:kb --check`、`check_engine_pyodide`、`check_engine_purity`、`check_pnpm_filter`、`guard_apm_parser_version`、`check-skill-spec`、`check-mcp-spec` |
 | 守卫集   | 前端不许退化的那批断言还成立吗     | `test-issue-filer`（23 节）                                                                                                                              |
 | 元检查   | **校验机制自己**还健康吗           | `check_hygiene`                                                                                                                                          |
@@ -98,10 +98,10 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 | lint     | `ruff check`                                           | 1s                                     | 每次                  | push                                   |
 | lint     | `eslint .`（**只覆盖 35 个 .js/.mjs，0 个 .ts/.tsx**） | 3s                                     | 每次                  | push                                   |
 | 类型     | `tsc --noEmit`                                         | 2s                                     | 每次                  | push（另加 dev 的 `--watch`）          |
-| 单测     | `pytest engine/tests`（算子 / CEL 沙箱）               | 3s                                     | 每次                  | push                                   |
+| 单测     | `pytest knowledge/engine/tests`（算子 / CEL 沙箱）     | 3s                                     | 每次                  | push                                   |
 | 契约     | `build:kb --check`（产物 vs `knowledge/` 源）          | 1s                                     | 静态（pre-push 跳过） | CI                                     |
 | 契约     | `check_engine_pyodide`（产物是合法 Python 且真执行）   | 1s                                     | 每次                  | push                                   |
-| 契约     | `check_engine_purity`（`engine/` 纯净性）              | 1s                                     | 每次                  | push                                   |
+| 契约     | `check_engine_purity`（`knowledge/engine/` 纯净性）    | 1s                                     | 每次                  | push                                   |
 | 契约     | `check_pnpm_filter`（`pnpm --filter` 值命中真实项目）  | **0.5s**                               | 每次                  | push                                   |
 | 契约     | `guard_apm_parser_version`（`.bin` 解析逻辑 vs 版本）  | 秒级                                   | 每次                  | push                                   |
 | 契约     | `check-skill-spec`                                     | 1s                                     | 每次                  | CI                                     |
@@ -237,7 +237,7 @@ python -m ruff check  <staged .py>
 统一原则：**只碰 staged 的文件**，改了自动 `git add` 重新暂存，2s 级结束。
 Prettier 的配置与排除清单见第 5 节。
 
-**注意 `ruff check --fix` 不加**——项目明令禁止（`pyproject.toml`：`engine/` 是拼接片段，
+**注意 `ruff check --fix` 不加**——项目明令禁止（`pyproject.toml`：`knowledge/engine/` 是拼接片段，
 `--fix` 会误删东西）；`.py` 侧只做 `ruff check`（不修）与 `ruff format`（只格式化）。
 
 **为什么格式化放在 commit 而不是 push**：改动多少文件就只处理多少文件，
@@ -390,12 +390,12 @@ npmmirror 而失败（该镜像无 audit 端点），但 **CI 未配 registry，
 
 **已定（用户确认）：commit 阶段仅加 `eslint --fix`，不加 `ruff check --fix`，全套 lint 留在 push。**
 
-| 动作                         | 位置       | 说明                                                                       |
-| ---------------------------- | ---------- | -------------------------------------------------------------------------- |
-| `eslint --fix`               | **commit** | 只对 staged 的前端文件，自动改完重新暂存                                   |
-| `ruff check --fix`           | **不加**   | 项目明令禁止（`pyproject.toml`：`engine/` 是拼接片段，`--fix` 会误删东西） |
-| `eslint`（全套，无 `--fix`） | **push**   | 需人判断的问题留给 push，有整段时间处理                                    |
-| `ruff check`（全套）         | **push**   | 同上                                                                       |
+| 动作                         | 位置       | 说明                                                                                 |
+| ---------------------------- | ---------- | ------------------------------------------------------------------------------------ |
+| `eslint --fix`               | **commit** | 只对 staged 的前端文件，自动改完重新暂存                                             |
+| `ruff check --fix`           | **不加**   | 项目明令禁止（`pyproject.toml`：`knowledge/engine/` 是拼接片段，`--fix` 会误删东西） |
+| `eslint`（全套，无 `--fix`） | **push**   | 需人判断的问题留给 push，有整段时间处理                                              |
+| `ruff check`（全套）         | **push**   | 同上                                                                                 |
 
 **这样安排的理由**：`eslint --fix` 能自动修的东西（格式类、可自动移除的冗余）与 prettier
 同性质——无争议、不用人判断，放 commit 是纯增量：commit 多花 4s，push 的 4s 照旧，

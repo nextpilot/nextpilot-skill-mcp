@@ -24,7 +24,7 @@
 ## 为什么改产物而不改引擎源码
 
 产物侧守卫（`check_engine_pyodide.py`）读的是编译产物 `web/workers/pyodide-px4log-engine.ts`，
-不是 `engine/providers/px4.py`。所以变异要打在**产物**上——打源码的话守卫根本看不到，
+不是 `knowledge/engine/providers/px4.py`。所以变异要打在**产物**上——打源码的话守卫根本看不到，
 自证会得出"守卫红不起来"的假结论。产物与源码一致由另一道门（`build:kb --check`）保证，
 两层各管各的，这才是它们各自的职责边界。
 
@@ -109,7 +109,7 @@ GUARDS = {
     ),
     "ui": ([NODE, "scripts/test-issue-filer.mjs"], WEB, "界面侧（test-issue-filer）", "fail-lines"),
     "hygiene": ([PY, "tools/common/check_hygiene.py"], ROOT, "卫生检查（check_hygiene）", "fail-lines"),
-    # 引擎纯度：只扫 engine/ 的源码文本，无依赖、无网络、不需要日志 —— 快，所以每次都跑
+    # 引擎纯度：只扫 knowledge/engine/ 的源码文本，无依赖、无网络、不需要日志 —— 快，所以每次都跑
     "engine": ([PY, "tools/engine/check_engine_purity.py"], ROOT, "引擎纯度（check_engine_purity）", "fail-lines"),
     # pnpm 转发脚本：只扫 package.json 的 scripts 文本 —— 快、无依赖、不需要日志
     "pnpm-filter": ([PY, "tools/common/check_pnpm_filter.py"], ROOT, "pnpm 转发脚本（check_pnpm_filter）", "fail-lines"),
@@ -121,7 +121,7 @@ GUARDS = {
         "fail-lines",
     ),
     # APM 解析器版本：解析逻辑的 AST 指纹 vs 手维护的 parserVersion —— 快、无依赖、不需要日志
-    # 拼接命名：engine/ 的片段顶层名字撞车 —— 只做 AST 遍历，快、无依赖
+    # 拼接命名：knowledge/engine/ 的片段顶层名字撞车 —— 只做 AST 遍历，快、无依赖
     "engine-names": (
         [PY, "tools/engine/guard_engine_names.py"],
         ROOT,
@@ -330,36 +330,36 @@ MUTATIONS: list[Mutation] = [
         note='原形：E2E 步骤住在 ci 阶段里，所以 `"ci" not in stages` 在每条想要 E2E 的路径上都不成立——'
         "WITH_E2E=1 打印出 --stage push,ci，看着像要跑，其实两步都被静默跳过",
     ),
-    # ---- 引擎侧：engine/ 是三处共用的纯 Python（2026-09-19） ----
+    # ---- 引擎侧：knowledge/engine/ 是三处共用的纯 Python（2026-09-19） ----
     #
     # 这两条守的不是"某段代码在不在"，而是**一份源码能同时跑在三个运行时里**这个前提。
     # 第 1 条是正向的（不许出现只在一处成立的东西），第 2、3 条是"前提还在"——
     # 消费者只剩一个时，这条约束就失去意义了，而它会安静地绿着。
     Mutation(
-        name="engine/ 里写一行 js 桥接",
-        path="engine/report_data.py",
+        name="knowledge/engine/ 里写一行 js 桥接",
+        path="knowledge/engine/report_data.py",
         old="import json",
         new="import json\nimport js",
         guard="engine",
-        expect="engine/ 是纯 Python（不碰 Pyodide / JS 桥接 / 浏览器全局）",
+        expect="knowledge/engine/ 是纯 Python（不碰 Pyodide / JS 桥接 / 浏览器全局）",
         note="js 是 Pyodide 注入的全局：浏览器能跑，本机 tools/engine 用 CPython 要到那一行才 NameError",
     ),
     Mutation(
-        name="浏览器不再把 engine/ 拼进 Pyodide 产物",
+        name="浏览器不再把 knowledge/engine/ 拼进 Pyodide 产物",
         path="web/scripts/build-knowledge.mjs",
-        old='resolve(webRoot, "../engine")',
-        new='resolve(webRoot, "../engine_moved")',
+        old='resolve(webRoot, "../knowledge/engine")',
+        new='resolve(webRoot, "../knowledge/engine_moved")',
         guard="engine",
-        expect="engine/ 仍被浏览器与本机共用（纯 Python 的前提还在）",
+        expect="knowledge/engine/ 仍被浏览器与本机共用（纯 Python 的前提还在）",
         note="防「前提消失」：不再共用之后，「纯 Python」只剩「写得干净」这一层意义，而规则会继续绿着",
     ),
     Mutation(
-        name="本机校准工具不再直接指到 engine/",
+        name="本机校准工具不再直接指到 knowledge/engine/",
         path="tools/px4log_engine_runner.py",
-        old='ENGINE = REPO_ROOT / "engine"',
-        new='ENGINE = REPO_ROOT / "engine_moved"',
+        old='ENGINE = REPO_ROOT / "knowledge" / "engine"',
+        new='ENGINE = REPO_ROOT / "knowledge" / "engine_moved"',
         guard="engine",
-        expect="engine/ 仍被浏览器与本机共用（纯 Python 的前提还在）",
+        expect="knowledge/engine/ 仍被浏览器与本机共用（纯 Python 的前提还在）",
         note="同上：另一侧消费者也消失时，这条规则该被删掉而不是继续绿",
     ),
     # ---- 界面侧：站点版本只有一个读取口（2026-09-21） ----
@@ -775,7 +775,7 @@ MUTATIONS: list[Mutation] = [
     # 改了还是解析器改了。三条路各自都要证明会红。
     Mutation(
         name="改了缩放系数却不升 parserVersion（报告头看不出解析换了）",
-        path="engine/providers/ardupilot.py",
+        path="knowledge/engine/providers/ardupilot.py",
         old='_SCALED = {"c": 0.01, "C": 0.01, "e": 0.01, "E": 0.01, "L": 1e-7}',
         new='_SCALED = {"c": 0.01, "C": 0.01, "e": 0.01, "E": 0.01, "L": 1e-6}',
         guard="apm",
@@ -784,7 +784,7 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         name="ApmProvider 被改名（指纹覆盖为 0，比对空转）",
-        path="engine/providers/ardupilot.py",
+        path="knowledge/engine/providers/ardupilot.py",
         old="class ApmProvider:",
         new="class ApmProviderV2:",
         guard="apm",
@@ -800,17 +800,17 @@ MUTATIONS: list[Mutation] = [
         expect="这道门还挂在 push 阶段（checklist.yml 里有这一步）",
         note="check_all.py 只按清单转发 —— 清单里没它，这份检查就再也不会被执行",
     ),
-    # ---- engine/ 拼接命名空间：顶层名字撞车 = 后者静默覆盖前者（2026-09-24） ----
+    # ---- knowledge/engine/ 拼接命名空间：顶层名字撞车 = 后者静默覆盖前者（2026-09-24） ----
     #
     # 片段被拼成**一份**脚本，所以"两个文件各写一个 `_MAGIC`"不是风格问题，是运行期
     # 静默覆盖。`_MAGIC` 真被踩过一次。三条：撞名本体、判空、门还在。
     Mutation(
         name="新 provider 顶层忘了带格式前缀（那次 _MAGIC 事故的原形）",
-        path="engine/providers/ardupilot.py",
+        path="knowledge/engine/providers/ardupilot.py",
         old='_APM_MAGIC = b"\\xa3\\x95"',
         new='_MAGIC = b"\\xa3\\x95"',
         guard="engine-names",
-        expect="engine/ 顶层名字不撞车",
+        expect="knowledge/engine/ 顶层名字不撞车",
         note="px4.py 顶层也有 `_MAGIC`：拼完之后 APM 的魔数把 ULog 的顶掉，且不报错",
     ),
     Mutation(

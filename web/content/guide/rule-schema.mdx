@@ -12,7 +12,7 @@ order: 11
 `knowledge/px4/CLAUDE.md`；现有规则清单：[规则目录](/guide/rule-catalogue)。
 
 > **本页由构建期 `build-knowledge.mjs` 自动生成**：正文是模板（随代码规范变动时更新此处），
-> 算子目录与内置变量表从 `engine/operators.py` 与 `engine/providers/api.py` 动态派生。
+> 算子目录与内置变量表从 `knowledge/engine/operators.py` 与 `knowledge/engine/providers/api.py` 动态派生。
 > 单一事实源是 `knowledge/px4/rules/*.yaml`；改完算子或内置变量后重跑 `pnpm build:kb`（dev/build 自动执行）。
 
 ## 0. 一条经验怎么跑起来
@@ -21,9 +21,9 @@ order: 11
 rules/<经验>.yaml        ──┐
 facts.yaml（码表/文案/    ──┤ 构建期校验（字段/算子/表达式/文案、group 是否登记、
   展示口径/group 顺序）    ──┤  facts 键是否齐全、provider 有没有漏实现契约）
-engine/operators.py      ──┤                                    ── 产物内联进 Python
+knowledge/engine/operators.py      ──┤                                    ── 产物内联进 Python
   ↓                         │                                         ↓
-engine/rule_engine.py  ← ──┘                                  运行时只读产物
+knowledge/engine/rule_engine.py  ← ──┘                                  运行时只读产物
   └─ 逐行（`next_rule()`）跑检查经验                             （不读源 yaml）
      └─ `provider.read_timeseries(...)` 取原始浮点序列
         └─ 交给 `compute` 算子做流式计算
@@ -49,7 +49,7 @@ engine/rule_engine.py  ← ──┘                                  运行时�
 
 ## 2. `slot`（执行位置）
 
-不同 slot 可用的原始 Topic 和上下文不同。具体去 `engine/rule_engine.py` 找对应的 `_run_slot_*` 函数；该函数会列出哪些 provider 方法会在该阶段被调用，也就等于告诉你这段经验能读到什么数据。
+不同 slot 可用的原始 Topic 和上下文不同。具体去 `knowledge/engine/rule_engine.py` 找对应的 `_run_slot_*` 函数；该函数会列出哪些 provider 方法会在该阶段被调用，也就等于告诉你这段经验能读到什么数据。
 
 SLOT 表见 YAML 构建产物或浏览器控制台——这里不手写。
 
@@ -99,11 +99,11 @@ compute:
 | `pick` | 算子有多个输出时选哪一个（名字和算子 `out_names` 对得上才算通过）。 |
 | `pick_t` | 跟 `pick` 类似但要的是「到达某阈值*过程中*`pick` 输出序列的百分比/时间」——如首次掉下 50\% 的时刻；不支持混合类型输出。 |
 | `threshold` | 用户手写的阈值（数值）。 |
-| `unit` | 输出单位（字符串；必须跟 engine/units.py 的规范名一致）。 |
+| `unit` | 输出单位（字符串；必须跟 knowledge/engine/units.py 的规范名一致）。 |
 
 ## 4. 算子
 
-内部实现与签名见 `engine/operators.py`。
+内部实现与签名见 `knowledge/engine/operators.py`。
 
 ### 4.1 算子目录
 

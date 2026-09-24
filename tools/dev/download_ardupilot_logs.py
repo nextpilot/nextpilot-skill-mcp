@@ -1,6 +1,6 @@
 """从 ArduPilot 官方 CI 站（https://autotest.ardupilot.org/）批量下载 .bin 日志。
 
-用途：为 ArduPilot provider（`engine/providers/ardupilot.py`）的规则校准与契约测试
+用途：为 ArduPilot provider（`knowledge/engine/providers/ardupilot.py`）的规则校准与契约测试
 积累基准日志集。文件落在 `.cache/ardupilot/logs/`（已在 .gitignore），不进仓库。
 
 与 `tools/dev/apm_make_sample.py` 的分工：那边**合成**最小夹具（写入端与读取端

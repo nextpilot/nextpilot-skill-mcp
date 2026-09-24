@@ -5,7 +5,7 @@
  * 拼错要等 `pnpm build:kb` 才报。给编辑器一份 schema，敲键名就有补全、写错当场飘红。
  *
  * ⚠ **这份 schema 是生成出来的，不是手写的** —— 词表全部从 `facts.yaml`、
- * `engine/operators.py`、`engine/providers/api.py` 派生（由 build-knowledge.mjs 调用）。
+ * `knowledge/engine/operators.py`、`knowledge/engine/providers/api.py` 派生（由 build-knowledge.mjs 调用）。
  * 手抄一份词表等于立刻造出第二份真源：改了 `facts.yaml` 而这里没跟上时，IDE 会**拿着旧
  * 词表去纠正新写法**，那种错误比没有提示更糟。所以它跟其它产物一样走 `writeArtifact`，
  * `--check` 会比对它是否与源一致。
@@ -65,7 +65,7 @@ export function buildRuleSchema({ signatures, facts, vehicles, builtinVars }) {
         $schema: "http://json-schema.org/draft-07/schema#",
         title: "PX4 检查经验（knowledge/px4/rules/*.yaml）",
         description:
-            "⚠ 自动生成，请勿手改 —— 源：facts.yaml / engine/operators.py / engine/providers/api.py。" +
+            "⚠ 自动生成，请勿手改 —— 源：facts.yaml / knowledge/engine/operators.py / knowledge/engine/providers/api.py。" +
             "改完跑 `cd web && pnpm build:kb`。\n" +
             "字段级权威参考见站内 /guide/rule-schema；可抄的骨架见 knowledge/px4/rules-template.yml。",
         type: "object",
@@ -238,7 +238,7 @@ export function buildRuleSchema({ signatures, facts, vehicles, builtinVars }) {
             },
         ],
         // 机器可读的派生词表（`x-` 前缀是 JSON Schema 允许的自定义字段）。
-        // 编辑器不消费，但脚本与其它工具可以查，省得再去解析 engine/ 源码
+        // 编辑器不消费，但脚本与其它工具可以查，省得再去解析 knowledge/engine/ 源码
         "x-operators": uniqSorted(Object.keys(signatures ?? {})),
         "x-units": uniqSorted(Object.keys(UNIT_ALIASES)),
         "x-builtin-vars": uniqSorted([...(builtinVars ?? [])]),

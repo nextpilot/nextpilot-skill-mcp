@@ -26,7 +26,7 @@ px4/
     report-empty.md         无 finding 时的固定结论文案
 ```
 
-**引擎源码不在这里**：`operators.py`（算子注册表）、`rule_engine.py`（规则框架）、`report_data.py`（报告数据层）在 [engine/](../engine/README.md)
+**引擎源码不在这里**：`operators.py`（算子注册表）、`rule_engine.py`（规则框架）、`report_data.py`（报告数据层）在 [knowledge/engine/](knowledge/engine/README.md)
 （浏览器与本地工具共用同一份）。这个目录只放**经验与字典**——"算完怎么判定"，不放"怎么算"。
 此处曾同时放这两类东西，2026-09 分开。
 
@@ -121,26 +121,26 @@ cd web && pnpm check:mcp
 
 **「知识库」分组的两个页面不在这个目录里**（构建期写在 `web/.generated/guide/`，`/guide` 站内可见）：
 
-- 「如何编写知识规则」`rule-schema.mdx`：由 `build-knowledge.mjs` 自动生成（算子目录与内置变量表从 `engine/` 源码派生），**唯一一份**。
+- 「如何编写知识规则」`rule-schema.mdx`：由 `build-knowledge.mjs` 自动生成（算子目录与内置变量表从 `knowledge/engine/` 源码派生），**唯一一份**。
 - 「现有规则清单」`rule-catalogue.mdx`：构建时从 `rules/*.yaml` 现读现算，**只出网站这一份**。
 
 ## 我要做什么 → 看哪里
 
-| 我要……                                                              | 看 / 改                                                                              |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| 了解整套规则体系为什么这么设计                                      | [px4/CLAUDE.md](px4/CLAUDE.md)（给 AI 与维护者的设计上下文）                         |
-| **新增 / 改一个 Skill**                                             | `knowledge/skills/<slug>/` 三份文件（结构见上节），改完 `pnpm check:skills`          |
-| **新增 / 改一个 MCP 条目**                                          | `knowledge/mcp/<slug>/`（结构见上节；规范与 Skill **不同**），改完 `pnpm check:mcp`  |
-| **写一条新规则 / 改一条现有规则**                                   | 站内 `/guide/rule-schema`（字段、算子、常见坑；构建期生成，仓库里不留拷贝）          |
-| 弄清自己这类经验该写在哪                                            | [px4/CLAUDE.md](px4/CLAUDE.md) 的「四类经验 → 四种载体」                             |
-| 查现在有哪些规则、各自读什么字段、什么条件触发                      | 网站 `/guide/rule-catalogue`（构建时从 `rules/*.yaml` 生成，仓库里不留拷贝）         |
-| **只是想"用网页看"这些内容**                                        | 站点 `/guide` 的「知识库」分组（怎么写规则 / 现有规则两页）                          |
-| 调一条阈值                                                          | 直接改 `px4/rules/<那条经验>.yaml` 的 `threshold` 与 `triggers[].expr`               |
-| 改字段绑定 / 码值 / 阶段分组 / slot 执行顺序 / 关键数据的名字与顺序 | `px4/facts.yaml`（引擎不含业务数据，全在这里）                                       |
-| 加一条故障模式（根因 / 排查步骤）                                   | `px4/fault-kb.yaml`（trigger_tags 必须是引擎会产出的标签）                           |
-| 加一个可复用计算步骤                                                | `engine/operators.py`（`@operator` 声明 in/out arity），再在经验的 `compute` 里引用  |
-| 改 AI 报告口径                                                      | `px4/llm/*.md`                                                                       |
-| 同步固件元数据                                                      | `python tools/dev/fetch_px4_uorb_msg.py --tags ...` → 生成物在 `px4/meta/<tag>.json` |
+| 我要……                                                              | 看 / 改                                                                                       |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 了解整套规则体系为什么这么设计                                      | [px4/CLAUDE.md](px4/CLAUDE.md)（给 AI 与维护者的设计上下文）                                  |
+| **新增 / 改一个 Skill**                                             | `knowledge/skills/<slug>/` 三份文件（结构见上节），改完 `pnpm check:skills`                   |
+| **新增 / 改一个 MCP 条目**                                          | `knowledge/mcp/<slug>/`（结构见上节；规范与 Skill **不同**），改完 `pnpm check:mcp`           |
+| **写一条新规则 / 改一条现有规则**                                   | 站内 `/guide/rule-schema`（字段、算子、常见坑；构建期生成，仓库里不留拷贝）                   |
+| 弄清自己这类经验该写在哪                                            | [px4/CLAUDE.md](px4/CLAUDE.md) 的「四类经验 → 四种载体」                                      |
+| 查现在有哪些规则、各自读什么字段、什么条件触发                      | 网站 `/guide/rule-catalogue`（构建时从 `rules/*.yaml` 生成，仓库里不留拷贝）                  |
+| **只是想"用网页看"这些内容**                                        | 站点 `/guide` 的「知识库」分组（怎么写规则 / 现有规则两页）                                   |
+| 调一条阈值                                                          | 直接改 `px4/rules/<那条经验>.yaml` 的 `threshold` 与 `triggers[].expr`                        |
+| 改字段绑定 / 码值 / 阶段分组 / slot 执行顺序 / 关键数据的名字与顺序 | `px4/facts.yaml`（引擎不含业务数据，全在这里）                                                |
+| 加一条故障模式（根因 / 排查步骤）                                   | `px4/fault-kb.yaml`（trigger_tags 必须是引擎会产出的标签）                                    |
+| 加一个可复用计算步骤                                                | `knowledge/engine/operators.py`（`@operator` 声明 in/out arity），再在经验的 `compute` 里引用 |
+| 改 AI 报告口径                                                      | `px4/llm/*.md`                                                                                |
+| 同步固件元数据                                                      | `python tools/dev/fetch_px4_uorb_msg.py --tags ...` → 生成物在 `px4/meta/<tag>.json`          |
 
 ## 改完怎么验证
 
@@ -166,7 +166,7 @@ cd web && pnpm build:kb --check    # 只比对不写入：任一产物与 knowle
 ```
 
 生成产物（提交进仓库，EdgeOne 直接 `next build` 也有得用）：
-`web/workers/pyodide-px4log-engine.ts`（内联 engine/operators.py + engine/rule_engine.py + rules/*.yaml）、
+`web/workers/pyodide-px4log-engine.ts`（内联 knowledge/engine/operators.py + knowledge/engine/rule_engine.py + rules/*.yaml）、
 `web/workers/pyodide-px4log-data.ts`、`web/workers/fault-kb.generated.json`、
 `web/lib/knowledge/prompts.generated.js`、
 `px4/rules-editor-schema.generated.json`（编辑器用，见下节）。
@@ -179,7 +179,7 @@ cd web && pnpm build:kb --check    # 只比对不写入：任一产物与 knowle
 
 `rules/*.yaml` 的 schema 已配在 `.vscode/settings.json`（需要扩展 `redhat.vscode-yaml`）：
 写规则时键名会补全、拼错会当场飘红。**那份 schema 同样是生成物**——词表从 `facts.yaml`
-与 `engine/` 派生，手改它就等于造出第二份真源（改了 `facts.yaml` 而它没跟上时，
+与 `knowledge/engine/` 派生，手改它就等于造出第二份真源（改了 `facts.yaml` 而它没跟上时，
 IDE 会拿旧词表去纠正新写法，比没有提示更糟）。
 
 它只管键名 / 枚举 / 类型这类「纯形状」的问题。`compute` 表达式**内部**的语法、算子名、

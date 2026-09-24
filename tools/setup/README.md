@@ -63,7 +63,7 @@ pnpm check:pre-push     # push 阶段的本地快检（check_all.py --stage push
    .\.venv\Scripts\python.exe tools\ci\check_all.py --stage push
    ```
 
-2. **`.venv` 只能在仓库根。** `pyrightconfig.json` 写的是 `venvPath "."` + `venv ".venv"`；挪地方会让 `engine/` 的类型检查集体报 import 解析不了（这条坑以前踩过：pyright 挑错解释器，51 个假失败）。
+2. **`.venv` 只能在仓库根。** `pyrightconfig.json` 写的是 `venvPath "."` + `venv ".venv"`；挪地方会让 `knowledge/engine/` 的类型检查集体报 import 解析不了（这条坑以前踩过：pyright 挑错解释器，51 个假失败）。
 
 3. **激活脚本可能被执行策略挡住**（`Activate.ps1`）。用上面的绝对路径，或临时放开：`Set-ExecutionPolicy -Scope Process RemoteSigned`。
 

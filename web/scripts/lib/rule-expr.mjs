@@ -2,7 +2,7 @@
  * rules/*.yaml 的 compute 表达式：构建期解析与校验。
  *
  * 为什么要有这个文件：compute 从"算子节点链"改成"Python 子集表达式"后，
- * 产物里存的就是作者写的原文，运行期由 `engine/rule_engine.py` 的 `_eval_compute`
+ * 产物里存的就是作者写的原文，运行期由 `knowledge/engine/rule_engine.py` 的 `_eval_compute`
  * 用 Python `ast` 求值。于是构建期必须自己看得懂这段表达式，否则
  * 「写错的经验根本进不了浏览器」这条不变量就断了（knowledge/px4/CLAUDE.md 的设计原则）。
  *
@@ -113,7 +113,7 @@ export function parseTopicReq(v) {
  * 单位词表：`unit=` 能写的**规范名**，以及 meta/<tag>.json 里那些自由文本（`metres` /
  * `radians` / `us`…）怎么归到规范名上。
  *
- * 规范名必须与 `engine/rule_engine.py` 的 `_UNIT_FACTORS` 键**完全一致**（那边存的是
+ * 规范名必须与 `knowledge/engine/rule_engine.py` 的 `_UNIT_FACTORS` 键**完全一致**（那边存的是
  * 到族基准的因子）——构建期会比对这两份，对不上直接构建失败，免得各改各的。
  */
 export const UNIT_ALIASES = {
@@ -666,7 +666,7 @@ function inferCall(node, ctx) {
 
     const sig = ctx.signatures[fn];
     if (!sig) {
-        fail(`未注册的算子 ${fn}（算子表在 engine/operators.py，名字必须完全一致）`, ctx.src, node.pos);
+        fail(`未注册的算子 ${fn}（算子表在 knowledge/engine/operators.py，名字必须完全一致）`, ctx.src, node.pos);
     }
     if (sig.out_arity > 1 && node !== ctx.topCall) {
         fail(

@@ -6,7 +6,7 @@
   // 同一份代码在不同机器上反复漂移（曾经一轮提交里混进 500 行纯格式改动）。
   // 需要装扩展 charliermarsh.ruff。
   //
-  // 只开"保存时格式化"，**不开** codeActionsOnSave 的 fixAll：engine/ 下的文件是
+  // 只开"保存时格式化"，**不开** codeActionsOnSave 的 fixAll：knowledge/engine/ 下的文件是
   // 拼接片段，自动修复会在单文件视角下删掉"看起来没用"的导入与名字。
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
@@ -17,7 +17,7 @@
   //
   // **那份 schema 是构建期生成的**（`cd web && pnpm build:kb` →
   // knowledge/px4/rules-editor-schema.generated.json），**不要手改**：它的词表
-  // （group / vehicle / severity / 算子名）全部从 facts.yaml 与 engine/ 派生。
+  // （group / vehicle / severity / 算子名）全部从 facts.yaml 与 knowledge/engine/ 派生。
   // 手抄一份就是第二份真源 —— 改了 facts.yaml 而 schema 没跟上时，IDE 会拿旧词表
   // 去纠正新写法，比完全没有提示更糟。`pnpm build:kb --check` 会比对它与源是否一致。
   //

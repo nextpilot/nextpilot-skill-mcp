@@ -2,7 +2,7 @@
 
 > 状态：设计稿（未实现）。
 > 骨架取自 `knowledge/px4/plot-template.yml`（草案），保留其分层，修订三处（§1）。
-> 相关：`knowledge/px4/plot/`、`engine/operators.py`、`engine/report_data.py:np_series()`、`web/lib/chart-presets.ts`、`web/components/LogCharts.tsx`、`web/components/LogFlightMap.tsx`
+> 相关：`knowledge/px4/plot/`、`knowledge/engine/operators.py`、`knowledge/engine/report_data.py:np_series()`、`web/lib/chart-presets.ts`、`web/components/LogCharts.tsx`、`web/components/LogFlightMap.tsx`
 
 ---
 
@@ -144,7 +144,7 @@ compute:
 三条硬规矩：
 
 1. **输出必须显式命名**，名字是下游唯一的引用方式。取代今天"靠 `out_names` 与 `labels` 位置对齐"的写法（个数一旦不等就静默错位：图例写着"横滚"、曲线是偏航）。
-2. **`in` / `out` 的个数按算子签名校验**。`engine/operators.py` 的 `SIGNATURES` 里已有 `in_arity` / `out_arity` / `out_names`，构建期直接拿来卡；名字由 YAML 定，个数必须对得上。
+2. **`in` / `out` 的个数按算子签名校验**。`knowledge/engine/operators.py` 的 `SIGNATURES` 里已有 `in_arity` / `out_arity` / `out_names`，构建期直接拿来卡；名字由 YAML 定，个数必须对得上。
 3. **派生通道必须显式声明 `unit`**。最容易漏的一条：`knowledge/px4/meta/*.json` 的单位只对**原始列**有效，运算之后单位不会自动跟着走——`scale_series(0.001)` 之后是 mV、`hypot(ax, ay)` 是 m/s²、`quat_to_euler` 是度。**缺 `unit` 的派生通道直接构建失败**，否则 y 轴标签会撒谎。
 
 ### 2.1 不是所有运算都能当曲线
@@ -250,7 +250,7 @@ compute:
 - `segments`：**故意**直连 A → B，不管中间发生过什么；
 - `path`：**顺便**连相邻样本，所以**缺口处必须断开**。
 
-今天的 `get_flight_track()` 没做这个区分。它先用有效掩码**剔除**未定位采样（`engine/providers/px4.py:321-329`，注释里写的正是「一条直线就从那儿连到真正的航迹上——地图上看着完全不对」），再把剩下的点顺序连起来。
+今天的 `get_flight_track()` 没做这个区分。它先用有效掩码**剔除**未定位采样（`knowledge/engine/providers/px4.py:321-329`，注释里写的正是「一条直线就从那儿连到真正的航迹上——地图上看着完全不对」），再把剩下的点顺序连起来。
 
 剔除发生在**开头**时是对的：整段都没了，连不起来。但发生在**中途**时——GPS 短暂丢失、lat/lon 记 0 二十秒后恢复——被剔掉的只是中间那几百个采样，**前后两段会被连成一条横穿地图的假直线**。注释诊断对了，但「剔除」只解决了开头那一次。**剔除 ≠ 断开。**
 

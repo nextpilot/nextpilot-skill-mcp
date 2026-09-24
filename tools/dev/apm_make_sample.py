@@ -1,6 +1,6 @@
 """合成一份最小 ArduPilot .bin（AP_Logger）样本 —— 给契约测试当夹具。
 
-为什么独立实现打包、不复用 engine/providers/ardupilot.py 的解析：
+为什么独立实现打包、不复用 knowledge/engine/providers/ardupilot.py 的解析：
 夹具的**写入端**与被测的**读取端**是两份独立实现——两边对"格式"的理解必须各自
 站得住才能对上；复用同一份代码就成了自证（写错读错，测试照样绿）。
 

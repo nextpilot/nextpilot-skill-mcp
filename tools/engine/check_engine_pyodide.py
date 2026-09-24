@@ -1,6 +1,6 @@
 """校验**生成产物**（web/workers/pyodide-px4log-engine.ts）能被当作合法 Python 执行。
 
-为什么需要它：本地回归跑的是 engine/ 下的源文件，而浏览器里跑的是构建产物
+为什么需要它：本地回归跑的是 knowledge/engine/ 下的源文件，而浏览器里跑的是构建产物
 （operators.py + ulog_checks.py 经 String.raw 内联 + __FAULT_KB__/__RULES__
 三处替换）。只有这一步能证明"真正进 Pyodide 的东西"是合法的——否则语法错误只能在
 用户浏览器里炸出来。

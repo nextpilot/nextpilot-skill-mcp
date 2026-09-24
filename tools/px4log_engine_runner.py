@@ -1,4 +1,4 @@
-"""本地校准/验证用：直接跑 engine/ 下的 Python 源，在真实 .ulg 上验证。
+"""本地校准/验证用：直接跑 knowledge/engine/ 下的 Python 源，在真实 .ulg 上验证。
 
 放在 tools/ 根目录而不是某个子目录：它被 guards/ tests/ calibrate/ 三处的脚本共同
 import，只有根目录能被各自那句「插 parent.parent 进 sys.path」覆盖到。
@@ -7,7 +7,7 @@ import，只有根目录能被各自那句「插 parent.parent 进 sys.path」�
   python tools/px4log_engine_runner.py <file.ulg> [more.ulg ...]
   python tools/px4log_engine_runner.py --probe-data <file.ulg> ...
 
-引擎实现在 engine/（本脚本直接读源码，改完即可跑）；**规则读构建产物**
+引擎实现在 knowledge/engine/（本脚本直接读源码，改完即可跑）；**规则读构建产物**
 （web/workers/pyodide-px4log-engine.ts 的 `const rules = [...]`）。
 为什么不直接读 rules/*.yaml：compute 的老节点写法要编译成表达式，而那份编译器只有构建期
 一份（web/scripts/lib/rule-expr.mjs）——Python 侧不再重复实现（两份一定漂移）。
@@ -32,7 +32,7 @@ log = get_logger()
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 KN_PX4 = REPO_ROOT / "knowledge" / "px4"  # 规则与阈值（知识）
-ENGINE = REPO_ROOT / "engine"  # 引擎源码（通用算子与框架）
+ENGINE = REPO_ROOT / "knowledge" / "engine"  # 引擎源码（通用算子与框架）
 OPERATORS_PY = ENGINE / "operators.py"
 PROVIDER_API_PY = ENGINE / "providers" / "api.py"  # provider 契约（常量表 + 自检）
 # 适配器目录：**自动扫描**（与 web/scripts/build-knowledge.mjs 同一规则：除 api.py 外全部拼接，

@@ -1,8 +1,8 @@
-r"""engine/ 的**顶层名字不许跨片段重名**。
+r"""knowledge/engine/ 的**顶层名字不许跨片段重名**。
 
 ## 为什么要有它
 
-`web/scripts/build-knowledge.mjs` 把 engine/ 下的片段按顺序拼成**一份**脚本再执行
+`web/scripts/build-knowledge.mjs` 把 knowledge/engine/ 下的片段按顺序拼成**一份**脚本再执行
 （浏览器与本地工具同一份源码）：
 
 ```text
@@ -24,7 +24,7 @@ operators.py → providers/api.py → providers/*.py → rule_engine.py → repo
    第 1 项会因为"没东西可比"而恒绿。
 4. **前提还在**：这道门必须真的挂在 `tools/ci/checklist.yml` 的 push 阶段。
 
-provider 的集合是**扫目录**得来的（`engine/providers/*.py` 去掉 `api.py`，与构建脚本同一条
+provider 的集合是**扫目录**得来的（`knowledge/engine/providers/*.py` 去掉 `api.py`，与构建脚本同一条
 规则），加格式零改动；框架三个文件是结构性的，写死并在 README 的「拼接顺序」里有权威清单。
 
 退出码：任一检查失败则为 1。
@@ -42,7 +42,7 @@ from _logging import get_logger  # noqa: E402
 log = get_logger()
 
 ROOT = Path(__file__).resolve().parents[2]
-ENGINE = ROOT / "engine"
+ENGINE = ROOT / "knowledge" / "engine"
 PROVIDERS = ENGINE / "providers"
 CHECKLIST = ROOT / "tools" / "ci" / "checklist.yml"
 BUILD = ROOT / "web" / "scripts" / "build-knowledge.mjs"
@@ -172,14 +172,14 @@ def check_gate_registered() -> list[str]:
 
 
 CHECKS = (
-    ("engine/ 顶层名字不撞车", check_no_name_clash),
+    ("knowledge/engine/ 顶层名字不撞车", check_no_name_clash),
     ("拼接片段没走空", check_coverage),
     ("这道门挂在统一入口上", check_gate_registered),
 )
 
 
 def main(argv: list[str]) -> int:
-    log.print_header("engine/ 拼接命名守卫")
+    log.print_header("knowledge/engine/ 拼接命名守卫")
 
     results: list[tuple[str, str]] = []
     for i, (name, fn) in enumerate(CHECKS, 1):

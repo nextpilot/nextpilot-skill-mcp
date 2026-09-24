@@ -1392,7 +1392,7 @@ def log_info_card(*, info: dict, log_path: Path, box_id: str = "params-box") -> 
     """右栏上半：这份日志除 `data_list`（时序采样）之外的全部元信息。
 
     数据来自 `np_log_info()`（引擎侧 `provider.report_materials()`），**不是**直读 pyulog 的
-    `ulog.msg_info_dict`——`engine/providers/px4.py:537` 写着「走契约能力取，别再直读
+    `ulog.msg_info_dict`——`knowledge/engine/providers/px4.py:537` 写着「走契约能力取，别再直读
     self.ulog（同一份数据两处知识）」。这份契约实际给 14 块：sysInfo / infoDict /
     msgTypeStats / messages / messagesMulti / dropouts / params / defaultParams /
     changedParams / phases 等，正好就是「除了 data_list 的所有字段」。

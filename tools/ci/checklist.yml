@@ -107,8 +107,8 @@ jobs:
       - id: "pyright"
         name: "Python type checking (pyright)"
         workdir: "{ROOT}"
-        command: ["{NODE}", "node_modules/pyright/index.js", "engine"]
-        hint: "Fix the Python type errors listed above. Run `npx pyright engine` locally for detailed output."
+        command: ["{NODE}", "node_modules/pyright/index.js", "knowledge/engine"]
+        hint: "Fix the Python type errors listed above. Run `npx pyright knowledge/engine` locally for detailed output."
 
       - id: "eslint"
         name: "TypeScript lint (eslint)"
@@ -144,8 +144,8 @@ jobs:
       - id: "pytest-engine"
         name: "Operator / CEL sandbox unit tests (pytest)"
         workdir: "{ROOT}"
-        command: ["{PYTHON}", "-m", "pytest", "engine/tests"]
-        hint: "Review the pytest output above. Run `python -m pytest engine/tests -v` locally for detailed failure info."
+        command: ["{PYTHON}", "-m", "pytest", "knowledge/engine/tests"]
+        hint: "Review the pytest output above. Run `python -m pytest knowledge/engine/tests -v` locally for detailed failure info."
 
       # ── 其它测试 ──
       - id: "check-artifact"
@@ -155,10 +155,10 @@ jobs:
         hint: "The artifact file contains invalid Python syntax. Check the error output above for the exact location."
 
       - id: "check-engine-purity"
-        name: "engine/ stays pure Python (check_engine_purity)"
+        name: "knowledge/engine/ stays pure Python (check_engine_purity)"
         workdir: "{ROOT}"
         command: ["{PYTHON}", "tools/engine/check_engine_purity.py"]
-        hint: "The engine/ directory contains non-Pyodide-safe code. Review the violations above; engine/ must work in both browser (Pyodide) and native CPython."
+        hint: "The knowledge/engine/ directory contains non-Pyodide-safe code. Review the violations above; knowledge/engine/ must work in both browser (Pyodide) and native CPython."
 
       # APM 侧解析器是自研的，版本串是**手维护常量**（不像 pyulog 那样随环境变）——
       # 跨机器稳定的代价是：改了解析行为不升版本号，报告头与冻结基线都看不出来。
@@ -167,16 +167,16 @@ jobs:
         name: "APM parser version follows parse logic (guard_apm_parser_version)"
         workdir: "{ROOT}"
         command: ["{PYTHON}", "tools/engine/guard_apm_parser_version.py"]
-        hint: "The ArduPilot parser changed but parser_version() did not. Bump the version string in engine/providers/ardupilot.py, then re-freeze with `python tools/engine/guard_apm_parser_version.py --update`."
+        hint: "The ArduPilot parser changed but parser_version() did not. Bump the version string in knowledge/engine/providers/ardupilot.py, then re-freeze with `python tools/engine/guard_apm_parser_version.py --update`."
 
-      # engine/ 下的片段被拼成**一份**脚本（同一命名空间）：两个片段顶层同名 = 后者静默
+      # knowledge/engine/ 下的片段被拼成**一份**脚本（同一命名空间）：两个片段顶层同名 = 后者静默
       # 覆盖前者，不报错不告警。`_MAGIC` 就这么被踩过一次。provider 靠扫目录纳入，
       # 加第三个格式时这条会自动覆盖到它。
       - id: "guard-engine-names"
-        name: "engine/ splice namespace has no name clash (guard_engine_names)"
+        name: "knowledge/engine/ splice namespace has no name clash (guard_engine_names)"
         workdir: "{ROOT}"
         command: ["{PYTHON}", "tools/engine/guard_engine_names.py"]
-        hint: "Two engine/ fragments define the same top-level name. Rename it with a format prefix (e.g. _APM_MAGIC) so the spliced script stops silently overwriting the earlier one."
+        hint: "Two knowledge/engine/ fragments define the same top-level name. Rename it with a format prefix (e.g. _APM_MAGIC) so the spliced script stops silently overwriting the earlier one."
 
       # pnpm 的 --filter 匹配不到项目时**静默成功**（rc=0、无输出），
       # 2026-09-23 让 11 个转发脚本全空跑（含 typecheck / test）—— 没有任何运行时信号，只能静态拦。

@@ -50,7 +50,7 @@ export interface SavedReport {
     /** 日志内容指纹（SHA-256 hex）；同一份日志重复上传时据此命中已有结果 */
     logHash?: string;
     findings: Finding[];
-    /** 事实层的两块（见 types.ts 的 LogFacts 与 engine/rule_engine.py 的报告组装） */
+    /** 事实层的两块（见 types.ts 的 LogFacts 与 knowledge/engine/rule_engine.py 的报告组装） */
     facts?: LogFacts;
     metrics?: MetricEntry[];
     tags?: string[];

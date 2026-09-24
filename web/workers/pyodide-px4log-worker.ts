@@ -236,7 +236,7 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
                     return;
                 }
                 // 取数声明整份由前端从预设拼好（字段引用/候选组/单位/换算节点），这里只转发给引擎：
-                // np_series 自己解释它（见 engine/report_data.py）。入参经 json.dumps 字符串传入，
+                // np_series 自己解释它（见 knowledge/engine/report_data.py）。入参经 json.dumps 字符串传入，
                 // 避免 Python 侧注入问题。
                 const code = `np_series(${JSON.stringify(JSON.stringify(msg.request))}, 3000)`;
                 const data = await runJson(pyodide, code);

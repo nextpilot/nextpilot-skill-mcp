@@ -1,19 +1,19 @@
 # PX4 的数据文件 —— 码表、文案、展示口径、规则元数据。
 #
 # 这里**只有数据，没有取数逻辑**：从日志的哪儿取、取不到怎么回退、按固件版本挑哪个字段，
-# 全在 `engine/providers/px4.py`（那是本项目唯一认识 PX4 的地方）。判据是：
+# 全在 `knowledge/engine/providers/px4.py`（那是本项目唯一认识 PX4 的地方）。判据是：
 # **同一个节里没有分支/回退/异常** → 留这里；有 → 进 provider。
 # 所以换一种日志格式（ArduPilot .bin）时，这个文件要另写一份，providers/px4.py 也要。
 #
 # 改这个文件不用碰 Python：`cd web && pnpm build:kb` 之后，浏览器与本地回归同时生效。
-# （注意它是**整份内联**进浏览器产物的，见 engine/providers/api.py 顶部的说明：
+# （注意它是**整份内联**进浏览器产物的，见 knowledge/engine/providers/api.py 顶部的说明：
 #   新增节前先问一句"运行期用得上吗"，只给构建期用的内容不该放这儿。）
 #
 # 谁读它：
-#   engine/rule_engine.py   规则执行顺序（group_order）、规则元数据（rule_meta）、概览指标的展示口径
-#   engine/providers/px4.py 机型码表 / 飞行阶段分组 / 日志级别名 / 信息字典文案 / 消息类型表
+#   knowledge/engine/rule_engine.py   规则执行顺序（group_order）、规则元数据（rule_meta）、概览指标的展示口径
+#   knowledge/engine/providers/px4.py 机型码表 / 飞行阶段分组 / 日志级别名 / 信息字典文案 / 消息类型表
 #
-# 下面这些**键名**是引擎与 provider 约定的（改了要同步改 engine/）；**值**（码值、文案、顺序）随 PX4 上游变。
+# 下面这些**键名**是引擎与 provider 约定的（改了要同步改 knowledge/engine/）；**值**（码值、文案、顺序）随 PX4 上游变。
 
 # 规则执行顺序：引擎就按这个列表逐个 group 执行，**顺序即报告里 finding 编号
 # （F01、F02…）的生成顺序**，也决定 guard 标签的先后。
@@ -199,7 +199,7 @@ info_key_docs:
 # （缺字段、机型不适用…），所以这里为重要的几项声明"兜底取数"：规则跑过就用规则的值（更贴合判定），
 # 没跑就按这里的 topic/field/op 现算。label/unit/顺序只看这张表，改它不用碰 Python。
 #   key   报告的键（与规则 outputs.stats 的键一致才能合并；撞名时**规则值优先**）
-#   op    兜底算子（必须已在 engine/operators.py 注册）；多输出的复合算子用 pick: <输出名>
+#   op    兜底算子（必须已在 knowledge/engine/operators.py 注册）；多输出的复合算子用 pick: <输出名>
 #   scale 兜底值再乘的系数（单位换算，如 eph 是 mm → m 用 0.001）
 metrics:
     - {

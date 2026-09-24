@@ -4,7 +4,7 @@ r"""ArduPilot `.bin` 解析器：解析逻辑变了必须升 `parserVersion`。
 
 `.ulg` 侧的解析器版本是**环境的指纹**（`pyulog/1.2.4`，换台机器就变，所以
 `compare_baseline.py` 的 `IGNORED_TOP_KEYS` 把它排除了）。而 `.bin` 侧是自研解析器，
-版本串是一个**手维护的常量** `apm-bin-parser/1.0.0`（`engine/providers/ardupilot.py`
+版本串是一个**手维护的常量** `apm-bin-parser/1.0.0`（`knowledge/engine/providers/ardupilot.py`
 的 `parser_version()`）——它跨机器稳定，但代价是：**改了解析行为不升版本号，没有任何东西会响**。
 
 后果是具体的：报告头写着同一个版本号，而两次解析出来的数含义已经不同；冻结基线比对看到的
@@ -52,7 +52,7 @@ from _logging import get_logger  # noqa: E402
 log = get_logger()
 
 ROOT = Path(__file__).resolve().parents[2]
-PROVIDER = ROOT / "engine" / "providers" / "ardupilot.py"
+PROVIDER = ROOT / "knowledge" / "engine" / "providers" / "ardupilot.py"
 BASELINE = Path(__file__).resolve().parent / "apm_parser_baseline.json"
 CHECKLIST = ROOT / "tools" / "ci" / "checklist.yml"
 

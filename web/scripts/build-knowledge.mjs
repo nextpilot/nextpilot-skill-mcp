@@ -1,10 +1,10 @@
 /**
- * 知识构建：把引擎源码（engine/）与人工经验（knowledge/px4/）拼成运行时所需的产物。
+ * 知识构建：把引擎源码（knowledge/engine/）与人工经验（knowledge/px4/）拼成运行时所需的产物。
  *
  * 单一数据源：
- *   engine/operators.py           算子注册表（通用，不认识具体字段）
- *   engine/rule_engine.py         第一层 pyulog 解析 + 第二层规则/guard 框架（Pyodide 执行）
- *   engine/report_data.py         报告页数据层 helpers（图表/事件/参数）
+ *   knowledge/engine/operators.py           算子注册表（通用，不认识具体字段）
+ *   knowledge/engine/rule_engine.py         第一层 pyulog 解析 + 第二层规则/guard 框架（Pyodide 执行）
+ *   knowledge/engine/report_data.py         报告页数据层 helpers（图表/事件/参数）
  *   knowledge/px4/rules/*.yaml    检查经验：阈值与判定条件（工程师最常改这里）
  *   knowledge/px4/px4-fault-kb.yaml  第三层故障知识库
  *   knowledge/px4/llm/*.md        第四层 GJB-841 思考范式（LLM 只做组装）
@@ -53,7 +53,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
 const KN = resolve(webRoot, "../knowledge/px4");
 
-const ENGINE = resolve(webRoot, "../engine"); // 确定性引擎源码（浏览器与本地工具共用一份）
+const ENGINE = resolve(webRoot, "../knowledge/engine"); // 确定性引擎源码（浏览器与本地工具共用一份）
 const PY_RULE_ENGINE = resolve(ENGINE, "rule_engine.py"); // 框架（与格式无关）
 const PY_REPORT_DATA = resolve(ENGINE, "report_data.py"); // 报告数据层（与格式无关）
 const PY_PROVIDER_API = resolve(ENGINE, "providers/api.py"); // provider 契约（常量表 + 自检）
@@ -62,7 +62,7 @@ const PROVIDER_DIR = resolve(ENGINE, "providers");
 const providerFiles = readdirSync(PROVIDER_DIR)
     .filter((f) => f.endsWith(".py") && f !== "api.py")
     .sort();
-if (providerFiles.length === 0) throw new Error("engine/providers/ 下没有任何适配器");
+if (providerFiles.length === 0) throw new Error("knowledge/engine/providers/ 下没有任何适配器");
 const YAML_PATH = resolve(KN, "fault-kb.yaml");
 const FACTS_PATH = resolve(KN, "facts.yaml"); // PX4 的数据：码表 / 文案 / 展示口径 / 规则元数据
 const RULES_DIR = resolve(KN, "rules");
@@ -192,7 +192,7 @@ const FRAMEWORK_VARS = ["has_topic"];
 /**
  * 规则表达式能引用的内置变量 = provider 契约的 BUILTIN_VARIABLES + 框架补的两个。
  *
- * **从 engine/providers/api.py 派生，不手抄**：这份名字以前是手维护的副本，
+ * **从 knowledge/engine/providers/api.py 派生，不手抄**：这份名字以前是手维护的副本，
  * 与引擎漂移时表现为"构建期放行、运行期 NameError"——引擎按"数据不足"静默处理，
  * 那条规则从此不出结论，没有任何提示（`no_data` 当初就是这么漏的）。
  */
@@ -273,16 +273,16 @@ function parseOperatorSignatures(py) {
 /**
  * 从 providers/api.py 解析契约的三张常量表（格式固定：`NAME = {` 起、顶层键各占一行）。
  *
- * 为什么在 Node 里用正则而不是"跑一下 Python"：构建期**不执行** engine/ 下的代码
- * （只当文本搬运，见 engine/README.md），这条约定不能破——所以契约表按固定格式解析，
+ * 为什么在 Node 里用正则而不是"跑一下 Python"：构建期**不执行** knowledge/engine/ 下的代码
+ * （只当文本搬运，见 knowledge/engine/README.md），这条约定不能破——所以契约表按固定格式解析，
  * 解析不到就构建失败（同 parseOperatorSignatures 的做法）。
  */
 function parseProviderApi(py) {
     const block = (name) => {
         const m = new RegExp(`^${name} = \\{([\\s\\S]*?)^\\}`, "m").exec(py);
-        if (!m) throw new Error(`engine/providers/api.py 里解析不到 ${name} 常量表`);
+        if (!m) throw new Error(`knowledge/engine/providers/api.py 里解析不到 ${name} 常量表`);
         const keys = [...m[1].matchAll(/^\s{4}"([A-Za-z_0-9]+)":/gm)].map((x) => x[1]);
-        if (keys.length === 0) throw new Error(`engine/providers/api.py 的 ${name} 是空的`);
+        if (keys.length === 0) throw new Error(`knowledge/engine/providers/api.py 的 ${name} 是空的`);
         return keys;
     };
     return {
@@ -400,7 +400,7 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
             }
             // compute 是一串**字符串表达式**（与 triggers.when / skip.when 同一套 Python 子集）；
             // **算子节点**（旧）。旧写法在这里编译成等价表达式，于是产物里只有一种形态、
-            // 也只有一套校验（不写第二套）。运行期由 engine/rule_engine.py 的 _eval_compute 求值。
+            // 也只有一套校验（不写第二套）。运行期由 knowledge/engine/rule_engine.py 的 _eval_compute 求值。
             const compute = (raw.compute ?? []).map((item) => normalizeCompute(item, where));
             if (compute.length > 0) {
                 let types;
@@ -503,7 +503,7 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
 // ─────────────────── 指南「开发指南」分组的规则清单 + 规则编写参考 ───────────────────
 //
 // 把 rules/*.yaml 渲染成 /guide/rule-catalogue 那一页（产物提交进仓库）。
-// 把 engine/ 源码的算子签名与内置变量渲染成 /guide/rule-schema 那一页（算子目录与内置变量表动态派生）。
+// 把 knowledge/engine/ 源码的算子签名与内置变量渲染成 /guide/rule-schema 那一页（算子目录与内置变量表动态派生）。
 // 与引擎产物同源、同一次构建生成：规则/算子改了页面就跟着变，不用谁记得手动同步。
 // 清单与参考页只出网站这一份，仓库里不留第二份拷贝（免得两处对不上）。
 
@@ -906,7 +906,7 @@ function compileMap(out, where, declaredVars, refs) {
  *
  * 地图与曲线**共用同一份声明**，但判据在两头：曲线在前端按 `conditions.topics` 判适用性
  * （`web/lib/chart-presets.ts` 的 `presetApplies`），地图的判据在引擎侧
- * （`engine/providers/px4.py` 的 `get_flight_track`）。`facts.track` 以前只带 `children`，
+ * （`knowledge/engine/providers/px4.py` 的 `get_flight_track`）。`facts.track` 以前只带 `children`，
  * 于是引擎**看不到这句声明**，取不到坐标时只能笼统报"声明里的坐标候选都不在日志里"——
  * 而真相常常是"这份日志根本没有 `sensor_gps` / `vehicle_gps_position`"。带上声明之后，
  * 引擎就能复用 `rule_engine._missing_topics` 说清缺哪个 topic（**文案只在那里生成一处**）。
@@ -1189,7 +1189,7 @@ function renderCataloguePage(rules, sources) {
     );
 }
 
-// ---------- 算子目录：从 engine/operators.py 的 @operator 装饰器与注释中提取 ----------
+// ---------- 算子目录：从 knowledge/engine/operators.py 的 @operator 装饰器与注释中提取 ----------
 function parseOperatorSections(py) {
     const sections = [];
     const re = /^# [-]{3,}\s*(.+?)\s*[-]{3,}\s*$/gm;
@@ -1261,9 +1261,9 @@ function builtinTable(api) {
     return lines.join("\n") + "\n";
 }
 
-/** 规则 schema 参考页：字段/算子/内置变量完整参考，算子目录与内置变量表从 engine/ 源码动态派生 */
+/** 规则 schema 参考页：字段/算子/内置变量完整参考，算子目录与内置变量表从 knowledge/engine/ 源码动态派生 */
 function renderSchemaPage(catalogueCount, providerApi) {
-    const CAT = `\`engine/operators.py\` 与 \`engine/providers/api.py\``;
+    const CAT = `\`knowledge/engine/operators.py\` 与 \`knowledge/engine/providers/api.py\``;
     return (
         catalogueFrontmatter({
             title: "规则编写参考",
@@ -1287,9 +1287,9 @@ function renderSchemaPage(catalogueCount, providerApi) {
 rules/<经验>.yaml        ──┐
 facts.yaml（码表/文案/    ──┤ 构建期校验（字段/算子/表达式/文案、group 是否登记、
   展示口径/group 顺序）    ──┤  facts 键是否齐全、provider 有没有漏实现契约）
-engine/operators.py      ──┤                                    ── 产物内联进 Python
+knowledge/engine/operators.py      ──┤                                    ── 产物内联进 Python
   ↓                         │                                         ↓
-engine/rule_engine.py  ← ──┘                                  运行时只读产物
+knowledge/engine/rule_engine.py  ← ──┘                                  运行时只读产物
   └─ 逐行（\`next_rule()\`）跑检查经验                             （不读源 yaml）
      └─ \`provider.read_timeseries(...)\` 取原始浮点序列
         └─ 交给 \`compute\` 算子做流式计算
@@ -1315,7 +1315,7 @@ engine/rule_engine.py  ← ──┘                                  运行时�
 
 ## 2. \`slot\`（执行位置）
 
-不同 slot 可用的原始 Topic 和上下文不同。具体去 \`engine/rule_engine.py\` 找对应的 \`_run_slot_*\` 函数；该函数会列出哪些 provider 方法会在该阶段被调用，也就等于告诉你这段经验能读到什么数据。
+不同 slot 可用的原始 Topic 和上下文不同。具体去 \`knowledge/engine/rule_engine.py\` 找对应的 \`_run_slot_*\` 函数；该函数会列出哪些 provider 方法会在该阶段被调用，也就等于告诉你这段经验能读到什么数据。
 
 SLOT 表见 YAML 构建产物或浏览器控制台——这里不手写。
 
@@ -1365,11 +1365,11 @@ compute:
 | \`pick\` | 算子有多个输出时选哪一个（名字和算子 \`out_names\` 对得上才算通过）。 |
 | \`pick_t\` | 跟 \`pick\` 类似但要的是「到达某阈值*过程中*\`pick\` 输出序列的百分比/时间」——如首次掉下 50\\% 的时刻；不支持混合类型输出。 |
 | \`threshold\` | 用户手写的阈值（数值）。 |
-| \`unit\` | 输出单位（字符串；必须跟 engine/units.py 的规范名一致）。 |
+| \`unit\` | 输出单位（字符串；必须跟 knowledge/engine/units.py 的规范名一致）。 |
 
 ## 4. 算子
 
-内部实现与签名见 \`engine/operators.py\`。
+内部实现与签名见 \`knowledge/engine/operators.py\`。
 
 ### 4.1 算子目录
 
@@ -1480,7 +1480,7 @@ Python \`str.format_map\` 支持的格式：
     );
 }
 
-const banner = `// ⚠️ 自动生成，请勿手改。源文件在 engine/ 与 knowledge/px4/，改完跑 \`pnpm build:kb\`（dev/build 自动执行）。\n`;
+const banner = `// ⚠️ 自动生成，请勿手改。源文件在 knowledge/engine/ 与 knowledge/px4/，改完跑 \`pnpm build:kb\`（dev/build 自动执行）。\n`;
 
 // 整份构建按顺序写在一个函数里（`--watch` 要复用它重建）。下面这两个是**唯一**被深层函数读到的值：
 // `signatures` 被 compileFieldOne / compilePreset 读，`operatorsPy` 被 renderSchemaPage 读。
@@ -1543,14 +1543,14 @@ function build() {
         const extra = names.filter((u) => !js.includes(u));
         if (missing.length || extra.length) {
             throw new Error(
-                `engine/rule_engine.py 的 _UNIT_FACTORS 与 web/scripts/lib/rule-expr.mjs 的 UNIT_KIND 对不上` +
+                `knowledge/engine/rule_engine.py 的 _UNIT_FACTORS 与 web/scripts/lib/rule-expr.mjs 的 UNIT_KIND 对不上` +
                     `（规则侧多：${missing.join(",") || "无"}；引擎侧多：${extra.join(",") || "无"}）`,
             );
         }
     }
     // facts.yaml：那一种格式的数据（码表 / 文案 / 展示口径 / 规则元数据）。
     // 键名是引擎与 provider 约定的，缺一个就构建失败（宁可构建失败，也不要在浏览器里
-    // 跑到某个码表是空的才发现）。取数逻辑不在这里——它在 engine/providers/<格式>.py。
+    // 跑到某个码表是空的才发现）。取数逻辑不在这里——它在 knowledge/engine/providers/<格式>.py。
     for (const key of [
         "group_order",
         "log_levels",
@@ -1605,20 +1605,22 @@ function build() {
         }
     }
     // ---------------- provider 契约：构建期查"漏写" ----------------
-    // 契约的事实源是 engine/providers/api.py 的两张常量表。这里查每个适配器是否**定义了**
+    // 契约的事实源是 knowledge/engine/providers/api.py 的两张常量表。这里查每个适配器是否**定义了**
     // 契约要求的能力、builtin_variables() 的字典字面量键是否齐全。
     // 查不了运行时行为（类型、失败语义）——那两道在引擎的运行期自检与
     // tools/engine/guard-px4log-provider.py 里，三道合起来才是完整的一道关。
     const providerApi = parseProviderApi(read(PY_PROVIDER_API));
     for (const f of providerFiles) {
         const src = read(resolve(PROVIDER_DIR, f));
-        const where = `engine/providers/${f}`;
+        const where = `knowledge/engine/providers/${f}`;
         if (!/^class\s+\w+/m.test(src)) throw new Error(`${where}: 里没有定义适配器类`);
         for (const name of providerApi.required) {
             const ok =
                 name === "log_type" ? /^\s+log_type\s*=/m.test(src) : new RegExp(`^\\s+def ${name}\\(`, "m").test(src);
             if (!ok) {
-                throw new Error(`${where}: 缺少契约要求的能力 ${name}（见 engine/providers/api.py 的 REQUIRED）`);
+                throw new Error(
+                    `${where}: 缺少契约要求的能力 ${name}（见 knowledge/engine/providers/api.py 的 REQUIRED）`,
+                );
             }
         }
         // builtin_variables() 必须给出契约里列的每一个内置变量——少一个，引用它的规则会**静默**算不出数据
@@ -1646,7 +1648,7 @@ function build() {
     // 2026-09-17 就是这么挂的（provider 注释里提到占位符），所以这里按"恰好一次"卡住，不按"存在"。
     for (const ph of ["__FAULT_KB__", "__RULES__", "__FACTS__", "__FIELD_UNITS__"]) {
         const n = pyWithOperators.split(ph).length - 1;
-        if (n === 0) throw new Error(`engine/ 里必须保留 ${ph} 占位符（见 rule_engine.py）`);
+        if (n === 0) throw new Error(`knowledge/engine/ 里必须保留 ${ph} 占位符（见 rule_engine.py）`);
         if (n > 1) {
             throw new Error(
                 `${ph} 在拼接后的 Python 里出现了 ${n} 次，必须恰好 1 次：` +
@@ -1728,10 +1730,10 @@ function build() {
     //      rule_engine.py 在列：它产出的 facts / findings **同样随报告一起归档**，口径一变
     //      （如 2026-09-16 那次软件版本串）老存档也得跟着刷一次，否则只能靠用户重新上传。
     const versionSources = [
-        ["engine/report_data.py", PY_REPORT_DATA],
-        ["engine/rule_engine.py", PY_RULE_ENGINE],
-        ["engine/providers/api.py", PY_PROVIDER_API],
-        ...providerFiles.map((f) => [`engine/providers/${f}`, resolve(PROVIDER_DIR, f)]),
+        ["knowledge/engine/report_data.py", PY_REPORT_DATA],
+        ["knowledge/engine/rule_engine.py", PY_RULE_ENGINE],
+        ["knowledge/engine/providers/api.py", PY_PROVIDER_API],
+        ...providerFiles.map((f) => [`knowledge/engine/providers/${f}`, resolve(PROVIDER_DIR, f)]),
         ["knowledge/px4/facts.yaml", FACTS_PATH],
         ...plotFiles.map((f) => [`knowledge/px4/plot/${f}`, resolve(PLOT_DIR, f)]),
     ];
@@ -1743,7 +1745,7 @@ function build() {
     writeArtifact(
         resolve(webRoot, "lib/knowledge/derived-version.generated.ts"),
         banner +
-            "// 源：engine/{report_data,rule_engine}.py + engine/providers/*.py + " +
+            "// 源：knowledge/engine/{report_data,rule_engine}.py + knowledge/engine/providers/*.py + " +
             "knowledge/px4/{facts.yaml,plot/*.yml} 的内容哈希\n" +
             "// 用途：存档里的派生数据（info / 曲线 / 轨迹）带的版本，与这里不一致就重新解析一次。\n" +
             "export const DERIVED_DATA_VERSION = " +
@@ -1778,7 +1780,7 @@ function build() {
     );
 
     // 4.8) rules/*.yaml 的**编辑器 schema**（yaml-language-server 消费，配 .vscode/settings.json）
-    //      词表全部从 facts.yaml / engine/ 派生（见 lib/gen-rule-schema.mjs）——手抄一份就多一个
+    //      词表全部从 facts.yaml / knowledge/engine/ 派生（见 lib/gen-rule-schema.mjs）——手抄一份就多一个
     //      真源：改了 facts.yaml 而这里没跟上时，IDE 会拿旧词表去纠正新写法，比没提示更糟。
     //      与别的产物一样走 writeArtifact：`--check` 会比对它与源是否一致。
     writeArtifact(

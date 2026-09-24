@@ -1,28 +1,28 @@
-r"""`engine/` 必须是**纯 Python** —— 不许碰 Pyodide / JS 桥接 / 浏览器全局。
+r"""`knowledge/engine/` 必须是**纯 Python** —— 不许碰 Pyodide / JS 桥接 / 浏览器全局。
 
 ## 为什么要有它
 
-`engine/` 是「一份源码、三个运行时」共用：
+`knowledge/engine/` 是「一份源码、三个运行时」共用：
 
 - **浏览器**：`web/scripts/build-knowledge.mjs` 把 `operators.py` / `providers/*.py` /
   `rule_engine.py` 拼成一段 Python 字符串，内联进 `web/workers/pyodide-px4log-engine.ts`，
   在 Pyodide 里跑（日志不出设备，所以只能这样）；
-- **本机**：`tools/calibrate/` 直接把 `engine/` 指进 `sys.path`，用 CPython 跑同一份；
+- **本机**：`tools/calibrate/` 直接把 `knowledge/engine/` 指进 `sys.path`，用 CPython 跑同一份；
 - **将来**：独立后端进程也打算复用这一份。
 
 三处共用的前提，就是它**不含任何只在一个运行时里成立的东西**。而这个前提此前没人看着：
-为调试在 `engine/` 里写一行 `js.console.log(...)`，浏览器能跑（`js` 是 Pyodide 注入的全局），
+为调试在 `knowledge/engine/` 里写一行 `js.console.log(...)`，浏览器能跑（`js` 是 Pyodide 注入的全局），
 本机 `tools/calibrate/` 立刻 `NameError` —— 而且只在**跑到那一行**时才炸，没跑到的路径上
 一直看不出来。
 
 ## 判据
 
-1. `engine/**/*.py` 的**代码**里（注释与 docstring 剥掉之后）不出现 Pyodide / JS 桥接 /
+1. `knowledge/engine/**/*.py` 的**代码**里（注释与 docstring 剥掉之后）不出现 Pyodide / JS 桥接 /
    浏览器全局。**剥注释是必须的**：本仓库习惯把"为什么"写进注释，注释里会原样复述这些
    标识符；不剥掉的话，把规则本身写进注释就能让检查恒绿（2026-09-18 在别处连踩两次）。
-2. 同时断言**真的扫到了文件** —— `engine/` 被搬空或改名时，第 1 项会因为没东西可扫而恒绿。
-3. 同时断言**三处共用的前提还在**：浏览器仍把 `engine/` 拼进 Pyodide 产物、本机校准工具
-   仍直接指到 `engine/`。哪天只剩一个消费者，"纯 Python"这条约束就失去了意义——
+2. 同时断言**真的扫到了文件** —— `knowledge/engine/` 被搬空或改名时，第 1 项会因为没东西可扫而恒绿。
+3. 同时断言**三处共用的前提还在**：浏览器仍把 `knowledge/engine/` 拼进 Pyodide 产物、本机校准工具
+   仍直接指到 `knowledge/engine/`。哪天只剩一个消费者，"纯 Python"这条约束就失去了意义——
    规则不该在失去意义之后还安静地绿着（`CLAUDE.md` §6.6）。
 
 ## 判据的分寸：别用裸子串
@@ -58,7 +58,7 @@ from _logging import get_logger  # noqa: E402
 log = get_logger()
 
 ROOT = Path(__file__).resolve().parents[2]
-ENGINE = ROOT / "engine"
+ENGINE = ROOT / "knowledge" / "engine"
 
 # 注释 / docstring 的剥离复用卫生检查里那份：两边用同一套语义，
 # 免得"什么叫代码"出现第二个答案（那正是裸子串守卫被注释喂饱的根因）。
@@ -66,7 +66,7 @@ sys.path.insert(0, str(ROOT / "tools" / "common"))
 from check_hygiene import py_code_only  # noqa: E402
 
 # ---------------------------------------------------------------------------
-# 1. engine/ 里不许出现的东西
+# 1. knowledge/engine/ 里不许出现的东西
 # ---------------------------------------------------------------------------
 
 FORBIDDEN: list[tuple[str, str]] = [
@@ -87,7 +87,7 @@ FORBIDDEN: list[tuple[str, str]] = [
     (r"\bsessionStorage\b", "浏览器全局 sessionStorage"),
 ]
 
-# 至少得扫到这么多 .py，少一个说明目录被搬空了（`engine/` 现有 6 个文件）
+# 至少得扫到这么多 .py，少一个说明目录被搬空了（`knowledge/engine/` 现有 6 个文件）
 MIN_SCANNED = 3
 
 
@@ -106,7 +106,7 @@ def check_engine_is_pure_python() -> list[str]:
     # 而不是安静地报"0 处违规"给人一个假的安全感。
     if len(files) < MIN_SCANNED:
         problems.append(
-            f"engine/ 下只找到 {len(files)} 个 .py（要求 ≥ {MIN_SCANNED}） —— 目录被搬空/改名了？那这条规则就是真空转的"
+            f"knowledge/engine/ 下只找到 {len(files)} 个 .py（要求 ≥ {MIN_SCANNED}） —— 目录被搬空/改名了？那这条规则就是真空转的"
         )
         return problems
 
@@ -117,7 +117,7 @@ def check_engine_is_pure_python() -> list[str]:
                 if re.search(pattern, line):
                     problems.append(
                         f"{_rel(path)} 出现 {why} —— {line.strip()[:80]}"
-                        f"\n        engine/ 是浏览器（Pyodide）、本机 tools/calibrate 与将来的服务端"
+                        f"\n        knowledge/engine/ 是浏览器（Pyodide）、本机 tools/calibrate 与将来的服务端"
                         f"三处共用的一份源码，不能含只在一个运行时里成立的东西"
                     )
     if not problems:
@@ -126,14 +126,14 @@ def check_engine_is_pure_python() -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# 2. 前提还在：engine/ 确实被三处共用
+# 2. 前提还在：knowledge/engine/ 确实被三处共用
 #
-# 光有第 1 项不够——如果哪天浏览器不再内联 engine/、本机工具也不再直接指过去，
+# 光有第 1 项不够——如果哪天浏览器不再内联 knowledge/engine/、本机工具也不再直接指过去，
 # "纯 Python"就只剩"写得干净"这一层意义了。那时候这条规则该被删掉，而不是继续绿着。
 # ---------------------------------------------------------------------------
 
-BROWSER_MARKER = ("web/scripts/build-knowledge.mjs", 'resolve(webRoot, "../engine")')
-LOCAL_MARKER = ("tools/px4log_engine_runner.py", 'REPO_ROOT / "engine"')
+BROWSER_MARKER = ("web/scripts/build-knowledge.mjs", 'resolve(webRoot, "../knowledge/engine")')
+LOCAL_MARKER = ("tools/px4log_engine_runner.py", 'REPO_ROOT / "knowledge" / "engine"')
 
 
 def check_sharing_premise_alive() -> list[str]:
@@ -141,11 +141,11 @@ def check_sharing_premise_alive() -> list[str]:
     for rel, marker in (BROWSER_MARKER, LOCAL_MARKER):
         path = ROOT / rel
         if not path.is_file():
-            problems.append(f"{rel} 不存在 —— 「engine/ 三处共用」的一个消费者不见了")
+            problems.append(f"{rel} 不存在 —— 「knowledge/engine/ 三处共用」的一个消费者不见了")
             continue
         if marker not in path.read_text(encoding="utf-8", errors="replace"):
             problems.append(
-                f"{rel} 里找不到 {marker!r} —— 它不再引用 engine/ 了；这条规则的前提（一份源码多处共用）需要重新确认"
+                f"{rel} 里找不到 {marker!r} —— 它不再引用 knowledge/engine/ 了；这条规则的前提（一份源码多处共用）需要重新确认"
             )
     return problems
 
@@ -153,8 +153,8 @@ def check_sharing_premise_alive() -> list[str]:
 # ---------------------------------------------------------------------------
 
 CHECKS: list[tuple[str, object]] = [
-    ("engine/ 是纯 Python（不碰 Pyodide / JS 桥接 / 浏览器全局）", check_engine_is_pure_python),
-    ("engine/ 仍被浏览器与本机共用（纯 Python 的前提还在）", check_sharing_premise_alive),
+    ("knowledge/engine/ 是纯 Python（不碰 Pyodide / JS 桥接 / 浏览器全局）", check_engine_is_pure_python),
+    ("knowledge/engine/ 仍被浏览器与本机共用（纯 Python 的前提还在）", check_sharing_premise_alive),
 ]
 
 
@@ -162,7 +162,7 @@ def main(argv: list[str]) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(line_buffering=True)  # 与 check_all.py 同理：重定向时不与子进程输出交错
 
-    log.print_header("engine/ 纯 Python 守卫")
+    log.print_header("knowledge/engine/ 纯 Python 守卫")
 
     failed: list[str] = []
     results: list[tuple[str, str]] = []

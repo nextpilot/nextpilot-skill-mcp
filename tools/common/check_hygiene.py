@@ -151,7 +151,7 @@ DOC_MENTION_RE = re.compile(r"([\w.\-/]*[\w\-]+\.mdx?)")
 # 只有 Markdown 才可能自成一册。两个真实的反例说明为什么必须限定后缀：
 #   - `web/scripts/build-knowledge.mjs` 里**内嵌着整份指南页模板**（模板字符串），于是它有
 #     25 个看着像标题的行；不限定后缀的话，它会被当成本仓库的"编号文档 25 节"；
-#   - `engine/providers/api.py` 的注释里有 `# 1.` / `# 2.` / `# 3.`，同样会让它"看起来有编号"。
+#   - `knowledge/engine/providers/api.py` 的注释里有 `# 1.` / `# 2.` / `# 3.`，同样会让它"看起来有编号"。
 # 语义上也不该算：代码文件没有"自己的 §"，它引用的永远是文档。条款见 `CLAUDE.md` §6.6。
 DOC_SUFFIXES = (".md", ".mdx")
 

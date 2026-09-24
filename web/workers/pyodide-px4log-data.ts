@@ -1,4 +1,4 @@
-// ⚠️ 自动生成，请勿手改。源文件在 engine/ 与 knowledge/px4/，改完跑 `pnpm build:kb`（dev/build 自动执行）。
+// ⚠️ 自动生成，请勿手改。源文件在 knowledge/engine/ 与 knowledge/px4/，改完跑 `pnpm build:kb`（dev/build 自动执行）。
 export const PY_ULG_DATA_HELPERS = String.raw`# ============================================================================
 # 报告页数据层 —— 与日志格式无关
 #

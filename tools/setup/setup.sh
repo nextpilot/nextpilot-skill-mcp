@@ -56,7 +56,7 @@ done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # tools/setup -> tools -> 仓库根。.venv 必须在仓库根：pyrightconfig.json 写的是
-# venvPath "." + venv ".venv"，换地方 engine/ 的类型检查就会集体报 import 解析不了。
+# venvPath "." + venv ".venv"，换地方 knowledge/engine/ 的类型检查就会集体报 import 解析不了。
 ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 VENV="$ROOT/.venv"
 VENV_PY="$VENV/bin/python"

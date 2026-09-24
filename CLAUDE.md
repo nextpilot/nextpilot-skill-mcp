@@ -261,7 +261,7 @@
 
 5. 6 条真实日志冻结基线回归，逐字段比对通过；构建期校验（字段名 / 算子名 / 表达式）保证错误不进浏览器。
 
-6. ArduPilot `.bin` 支持：**已落地**，`engine/providers/ardupilot.py` 是本项目唯一认识 ArduPilot 的地方（按 `providers/api.py` 契约自注册，引擎一行未改）。解析是**自研**的（只依赖 `struct` + `numpy`，不引 pymavlink —— `.bin` 开头自带 FMT 声明，按表通解即可；pymavlink 带整套 mavlink 协议表，进 Pyodide 代价大而这里用不上）。ardupilot-mcp 那 16 项检查套件仍待排期。
+6. ArduPilot `.bin` 支持：**已落地**，`knowledge/engine/providers/ardupilot.py` 是本项目唯一认识 ArduPilot 的地方（按 `providers/api.py` 契约自注册，引擎一行未改）。解析是**自研**的（只依赖 `struct` + `numpy`，不引 pymavlink —— `.bin` 开头自带 FMT 声明，按表通解即可；pymavlink 带整套 mavlink 协议表，进 Pyodide 代价大而这里用不上）。ardupilot-mcp 那 16 项检查套件仍待排期。
 
 ### 4.4 参考实现与研究项目
 
@@ -293,7 +293,7 @@
 
 报告页之外还有两块常驻区域：**飞行阶段条**（`LogPhaseStrip.tsx`）紧贴 **飞行轨迹地图**（`LogFlightMap.tsx`，高德瓦片：国内可达；轨迹按 WGS-84 → GCJ-02 换算后绘制，换算见 `lib/coord.ts`）。
 
-时间口径全站统一：**开机以来的秒数**，显示成 `hh:MM:ss`（与 Flight Review 一致）。数据层的硬规则与坑（事件解码、多值信息拼接、参数默认值怎么来、派生数据版本）见 `knowledge/px4/CLAUDE.md`**&#x20;的「报告页数据层」**—— 改 `engine/report_data.py` 前必读。
+时间口径全站统一：**开机以来的秒数**，显示成 `hh:MM:ss`（与 Flight Review 一致）。数据层的硬规则与坑（事件解码、多值信息拼接、参数默认值怎么来、派生数据版本）见 `knowledge/px4/CLAUDE.md`**&#x20;的「报告页数据层」**—— 改 `knowledge/engine/report_data.py` 前必读。
 
 ---
 
@@ -415,19 +415,19 @@
 
 统一约定（新建文件务必遵循，命名不清时先查本节）：
 
-| 类型                                      | 规则                                                                                                | 示例                                                                           |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| React 组件                                | PascalCase + `.tsx`                                                                                 | `LogAnalyzer.tsx`、`SkillCard.tsx`                                             |
-| 分析页 tab 组件                           | 一个 tab 一个文件：`Log<用途>Msg.tsx`                                                               | `LogEventsMsg.tsx`、`LogParamsMsg.tsx`、`LogSystemMsg.tsx`、`LogFlightMap.tsx` |
-| 库 / 类型 / 常量                          | kebab-case + `.ts`                                                                                  | `chart-presets.ts`、`types.ts`、`constants.ts`                                 |
-| **两侧共用**的库（浏览器 + 边缘函数都引） | kebab-case + `.js`（例外：边缘那 22 个文件全是 `.js`，`.ts` 能否被 EdgeOne 打包器吃下本地验证不了） | `lib/error-policy.js`                                                          |
-| Web Worker 入口                           | kebab-case + `-worker.ts`                                                                           | `pyodide-px4log-worker.ts`                                                     |
-| Worker 内嵌脚本 /helper                   | kebab-case + `-script.ts` / `-engine.ts` / `-data.ts`                                               | 现由 `build-knowledge.mjs` **生成**，不手改                                    |
-| Next.js 路由                              | `page.tsx` / `route.ts` / `layout.tsx`（目录即路由）                                                | `app/analyze/page.tsx`、`app/api/explain/route.ts`                             |
-| Python 模块                               | snake\_case + `.py`                                                                                 | `engine/rule_engine.py`、`engine/operators.py`、`engine/report_data.py`        |
-| 知识 / 经验文件                           | 见 `knowledge/README.md`；规则 `rules/*.yaml`、故障库 `fault-kb.yaml`                               | `rules/vibration.yaml`、`fault-kb.yaml`                                        |
-| 文档                                      | kebab-case + `.md`                                                                                  | `llm/gjb841-system-prompt.md`                                                  |
-| 边缘函数（`web/functions/`）              | kebab-case + `.js`，**文件名即路由**（`functions/api/x.js` → `/api/x`）                             | `api/me.js`、`api/issues.js`、`_lib/issue-filer.js`                            |
+| 类型                                      | 规则                                                                                                | 示例                                                                                                  |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| React 组件                                | PascalCase + `.tsx`                                                                                 | `LogAnalyzer.tsx`、`SkillCard.tsx`                                                                    |
+| 分析页 tab 组件                           | 一个 tab 一个文件：`Log<用途>Msg.tsx`                                                               | `LogEventsMsg.tsx`、`LogParamsMsg.tsx`、`LogSystemMsg.tsx`、`LogFlightMap.tsx`                        |
+| 库 / 类型 / 常量                          | kebab-case + `.ts`                                                                                  | `chart-presets.ts`、`types.ts`、`constants.ts`                                                        |
+| **两侧共用**的库（浏览器 + 边缘函数都引） | kebab-case + `.js`（例外：边缘那 22 个文件全是 `.js`，`.ts` 能否被 EdgeOne 打包器吃下本地验证不了） | `lib/error-policy.js`                                                                                 |
+| Web Worker 入口                           | kebab-case + `-worker.ts`                                                                           | `pyodide-px4log-worker.ts`                                                                            |
+| Worker 内嵌脚本 /helper                   | kebab-case + `-script.ts` / `-engine.ts` / `-data.ts`                                               | 现由 `build-knowledge.mjs` **生成**，不手改                                                           |
+| Next.js 路由                              | `page.tsx` / `route.ts` / `layout.tsx`（目录即路由）                                                | `app/analyze/page.tsx`、`app/api/explain/route.ts`                                                    |
+| Python 模块                               | snake\_case + `.py`                                                                                 | `knowledge/engine/rule_engine.py`、`knowledge/engine/operators.py`、`knowledge/engine/report_data.py` |
+| 知识 / 经验文件                           | 见 `knowledge/README.md`；规则 `rules/*.yaml`、故障库 `fault-kb.yaml`                               | `rules/vibration.yaml`、`fault-kb.yaml`                                                               |
+| 文档                                      | kebab-case + `.md`                                                                                  | `llm/gjb841-system-prompt.md`                                                                         |
+| 边缘函数（`web/functions/`）              | kebab-case + `.js`，**文件名即路由**（`functions/api/x.js` → `/api/x`）                             | `api/me.js`、`api/issues.js`、`_lib/issue-filer.js`                                                   |
 
 **名字要能望文生义**（只满足上面那张表的 "类型规则" 不够 —— 它只告诉你后缀是 `.ts` 还是 `.tsx`，看不出这个文件干什么）：
 
@@ -558,7 +558,7 @@
 > ；
 > 引擎机制在
 >
-> `engine/`
+> `knowledge/engine/`
 >
 > ，同样不含业务数据），web 与未来 MCP 服务都只消费其派生产物（
 >
@@ -615,13 +615,13 @@
 >
 > （
 >
-> `engine/report_data.py`
+> `knowledge/engine/report_data.py`
 >
 > ）的硬规则
 > 也在那一份里（时间基准、事件解码、多值信息拼接、参数默认值怎么来、派生数据版本）。
 > **Python（**
 >
-> `engine/`
+> `knowledge/engine/`
 >
 > **&#x20;与&#x20;**
 >
@@ -654,11 +654,11 @@
 >
 > ：
 >
-> `engine/`
+> `knowledge/engine/`
 >
 > 下的文件是拼接片段，那样会误删东西（清单见
 >
-> `engine/README.md`
+> `knowledge/engine/README.md`
 >
 > ）。
 > 这条约定的由来：在它之前每个编辑器各按自己的默认格式化器改文件，有一轮提交里混进了 500 行纯格式改动。
@@ -693,7 +693,7 @@
 > /
 > 指南页算子表是否跟上
 >
-> `engine/`
+> `knowledge/engine/`
 >
 > 源码 / 产物是否为合法 Python /
 >
@@ -723,7 +723,7 @@
 >
 > ：改规则、算子或
 >
-> `engine/`
+> `knowledge/engine/`
 >
 > 之后必须在本机跑一次。
 > 派生数据版本（
@@ -733,11 +733,11 @@
 > ，构建期算的引擎源文件哈希）：
 > 改了
 >
-> `engine/report_data.py`
+> `knowledge/engine/report_data.py`
 >
 > /
 >
-> `engine/rule_engine.py`
+> `knowledge/engine/rule_engine.py`
 >
 > /
 >
@@ -1557,7 +1557,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 
 **冲刺 4 的三步顺序（不可颠倒）：**
 
-1. **采购腾讯云轻量服务器**（前置依赖 ——MCP 是长连接，边缘 Functions 承载不了）：迁关系型数据库（SQLite + sqlite-vec 或 PostgreSQL，支撑复杂统计 / 团队空间 / 向量检索）、部署独立 FastAPI + Redis 日志解析服务（大文件与批量 API 下沉），并为后续支付 / 订单等有状态服务提供常驻环境。届时把 `engine/*.py` 包成可 `import` 的 `nextpilot_engine`（parsers /models/rules 三层，规则仍从 `knowledge/` 加载，不另存一份），供服务端与 MCP 复用；ArduPilot `.bin` 适配器也加在这一层。
+1. **采购腾讯云轻量服务器**（前置依赖 ——MCP 是长连接，边缘 Functions 承载不了）：迁关系型数据库（SQLite + sqlite-vec 或 PostgreSQL，支撑复杂统计 / 团队空间 / 向量检索）、部署独立 FastAPI + Redis 日志解析服务（大文件与批量 API 下沉），并为后续支付 / 订单等有状态服务提供常驻环境。届时把 `knowledge/engine/*.py` 包成可 `import` 的 `nextpilot_engine`（parsers /models/rules 三层，规则仍从 `knowledge/` 加载，不另存一份），供服务端与 MCP 复用；ArduPilot `.bin` 适配器也加在这一层。
 
 2. **平台 MCP 服务上线**（依赖第 1 步）：对外提供 `search_skills` / `get_skill` / `analyze_findings` / `explain_finding` / `submit_skill`；检索走数据库向量列，解析走已下沉的 FastAPI，鉴权复用 KV/DB 里的用户与配额。
 

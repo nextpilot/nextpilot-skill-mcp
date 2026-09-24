@@ -97,7 +97,7 @@ export interface MatchedFault {
     matchedPhases: string[];
 }
 
-/** 事实层产出之一：日志客观"是什么"（离散、驱动判定），由 engine/rule_engine.py 按 facts.yaml 的绑定取出 */
+/** 事实层产出之一：日志客观"是什么"（离散、驱动判定），由 knowledge/engine/rule_engine.py 按 facts.yaml 的绑定取出 */
 export interface LogFacts {
     durationSec?: number;
     /** 机型：rotary_wing / fixed_wing / rover / airship / unknown（见 vehicle_status.vehicle_type） */

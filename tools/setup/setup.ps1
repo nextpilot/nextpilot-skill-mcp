@@ -35,7 +35,7 @@ $ErrorActionPreference = "Continue"
 # 本脚本住在 tools/setup/ 下，仓库根要往上两级（tools/setup -> tools -> 仓库根）。
 $ROOT = (Get-Item $PSScriptRoot).Parent.Parent.FullName
 # .venv 必须在仓库根：pyrightconfig.json 写的是 venvPath "." + venv ".venv"，
-# 换地方就要改那份配置，而它一旦指错，engine/ 的类型检查会集体报 import 解析不了。
+# 换地方就要改那份配置，而它一旦指错，knowledge/engine/ 的类型检查会集体报 import 解析不了。
 $VENV = Join-Path $ROOT ".venv"
 $VENV_PY = Join-Path $VENV "Scripts\python.exe"
 

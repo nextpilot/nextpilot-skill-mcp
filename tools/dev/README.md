@@ -1,7 +1,7 @@
 # 日志规则校准脚本
 
 用真实 `.ulg` 校准阈值（CLAUDE.md 4.3 / 8）的本地工具。
-它**直接跑 engine/ 下的 Python 引擎与 knowledge/px4/rules/\*.yaml 中的规则**，
+它**直接跑 knowledge/engine/ 下的 Python 引擎与 knowledge/px4/rules/\*.yaml 中的规则**，
 与浏览器端 Pyodide 执行的是同一份规则源码、同一套逻辑——改完 `knowledge/` 无需 Node 构建即可回归。
 
 本地跑引擎的入口在**上一级**（`tools/px4log_engine_runner.py`）——它不在这里，是因为
