@@ -170,7 +170,7 @@ export function AnalyzeResultClient() {
             <input
                 ref={inputRef}
                 type="file"
-                accept=".ulg,.ULG"
+                accept=".ulg,.ULG,.bin,.BIN"
                 className="hidden"
                 onChange={(e) => {
                     const f = e.target.files?.[0];

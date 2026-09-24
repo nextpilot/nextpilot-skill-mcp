@@ -87,14 +87,14 @@ export function AnalyzeEntryClient() {
         <div className="page-shell pt-4 pb-10 sm:pt-5">
             <Breadcrumbs items={[{ label: "日志分析" }]} />
             <h1 className="text-[24px] font-semibold tracking-[-0.02em]">
-                <LocalizedText zh="PX4 飞行日志分析" en="PX4 flight log analysis" />
+                <LocalizedText zh="飞控日志分析" en="Flight log analysis" />
             </h1>
             {/* 占满容器宽度（原来 max-w-3xl 会在宽屏上提前折行，看着像半截的说明）。
           注意 LocalizedText 只输出纯文本，不解析 markdown——别在里面写 ** 强调，会原样显示出来 */}
             <p className="mt-2 text-sm leading-6 text-muted">
                 <LocalizedText
-                    zh="把 .ulg 拖进来，几分钟读完一份中文诊断报告：解析、32 条规则检查和故障知识库匹配全部在你的浏览器里完成，原始日志与 GPS 轨迹一步不出本机。结论里的每个数字都能对回具体字段、阈值和官方文档；DeepSeek 只把结果讲成人话——是什么问题、为什么、先查哪里，不参与任何数值判断。"
-                    en="Drop in a .ulg and get a Chinese diagnostic report in minutes: parsing, 32 rule checks and fault-knowledge-base matching all run inside your browser — the raw log and its GPS track never leave your device. Every number traces back to a field, a threshold and an official doc; DeepSeek only puts the result into plain language — what it is, why, and what to check first — it makes no numeric judgement of its own."
+                    zh="把 PX4 .ulg 或 ArduPilot .bin 拖进来，几分钟读完一份中文诊断报告：解析、规则检查和故障知识库匹配全部在你的浏览器里完成，原始日志与 GPS 轨迹一步不出本机（规则检查当前覆盖 PX4，ArduPilot 规则库扩展中）。结论里的每个数字都能对回具体字段、阈值和官方文档；DeepSeek 只把结果讲成人话——是什么问题、为什么、先查哪里，不参与任何数值判断。"
+                    en="Drop in a PX4 .ulg or ArduPilot .bin and get a Chinese diagnostic report in minutes: parsing, rule checks and fault-knowledge-base matching all run inside your browser — the raw log and its GPS track never leave your device (rule checks currently cover PX4; the ArduPilot rule set is expanding). Every number traces back to a field, a threshold and an official doc; DeepSeek only puts the result into plain language — what it is, why, and what to check first — it makes no numeric judgement of its own."
                 />
             </p>
 
@@ -147,7 +147,7 @@ export function AnalyzeEntryClient() {
                     <input
                         ref={inputRef}
                         type="file"
-                        accept=".ulg,.ULG"
+                        accept=".ulg,.ULG,.bin,.BIN"
                         className="hidden"
                         onChange={(e) => {
                             const f = e.target.files?.[0];

@@ -316,8 +316,8 @@ export default function HomePage() {
                             icon={<Upload className="h-5 w-5" />}
                             title="上传飞控日志"
                             titleEn="Upload flight log"
-                            desc="选择 PX4 .ulg 文件（ArduPilot .bin 后续支持），文件经 Pyodide 在本地浏览器中解析，原始日志不上传服务器，仅提交结构化检查结果。"
-                            descEn="Select your PX4 .ulg file (ArduPilot .bin coming soon). Files stay in your browser — never uploaded."
+                            desc="选择 PX4 .ulg 或 ArduPilot .bin 文件，文件经 Pyodide 在本地浏览器中解析，原始日志不上传服务器，仅提交结构化检查结果。"
+                            descEn="Select your PX4 .ulg or ArduPilot .bin file. Files stay in your browser — never uploaded."
                         />
                         <StepCard
                             step="02"

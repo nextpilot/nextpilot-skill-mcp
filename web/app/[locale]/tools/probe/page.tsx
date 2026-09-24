@@ -332,7 +332,7 @@ export default function ProbePage() {
             <div className="page-shell pt-4 pb-10 sm:pt-5">
                 <h1 className="text-[24px] font-semibold tracking-[-0.02em]">ULog Probe</h1>
                 <p className="mt-2 text-sm text-muted">
-                    上传一份 .ulg 文件，浏览所有字段，选中即可即席绘图 —— 一切在浏览器内完成，原始日志不出本机。
+                    上传一份 .ulg / .bin 文件，浏览所有字段，选中即可即席绘图 —— 一切在浏览器内完成，原始日志不出本机。
                 </p>
 
                 <div
@@ -347,15 +347,15 @@ export default function ProbePage() {
                         <Loader2 className="h-10 w-10 animate-spin text-primary" />
                     )}
                     <p className="text-sm font-medium text-foreground">
-                        {stage === "idle" ? "拖入 .ulg 或点击选择" : STAGE_LABELS[stage]}
+                        {stage === "idle" ? "拖入 .ulg / .bin 或点击选择" : STAGE_LABELS[stage]}
                     </p>
-                    <p className="text-xs text-muted">支持 .ulg 格式，解析在浏览器内进行</p>
+                    <p className="text-xs text-muted">支持 PX4 .ulg 与 ArduPilot .bin，解析在浏览器内进行</p>
                 </div>
 
                 <input
                     ref={inputRef}
                     type="file"
-                    accept=".ulg"
+                    accept=".ulg,.bin"
                     className="hidden"
                     onChange={(e) => {
                         const file = e.target.files?.[0];

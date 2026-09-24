@@ -1038,7 +1038,19 @@ class Px4Provider:
 
         ver_sw_release 的打包：major<<24 | minor<<16 | patch<<8 | 类型。
         """
-        self.parser_version_str = "pyulog/%s" % getattr(pyulog, "__version__", "unknown")
+        # pyulog 1.2 起不再暴露 `__version__` 属性（迁到分发元数据），只查属性会把整个
+        # 1.2.x 一律报成 `unknown`。这个串是给人判断"这份日志是哪版解析器读的"用的，
+        # 报 unknown 等于把信息丢掉，所以再兜一层 importlib.metadata。
+        # 兜底失败仍回 unknown：Pyodide 里未必装得出分发元数据，不能因此让报告生成失败。
+        _pv = getattr(pyulog, "__version__", None)
+        if not _pv:
+            try:
+                from importlib.metadata import version as _dist_version
+
+                _pv = _dist_version("pyulog")
+            except Exception:
+                _pv = "unknown"
+        self.parser_version_str = "pyulog/%s" % _pv
 
         info = self.ulog.msg_info_dict
         rel = info.get("ver_sw_release")

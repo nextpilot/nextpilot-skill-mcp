@@ -182,7 +182,7 @@ let loadedLogId: string | null = null;
  */
 function logNotLoadedReason(pyodide: Pyodide, logId: string): string | null {
     if (!pyodide.globals.get("provider")) {
-        return "这份日志本次还没解析过，重新选择该 .ulg 文件即可恢复。";
+        return "这份日志本次还没解析过，重新选择该日志文件即可恢复。";
     }
     if (!logId) {
         // 极老的记录没有日志指纹（内容哈希是后加的）：无从比对。这里说的是"确认不了"，
@@ -190,7 +190,7 @@ function logNotLoadedReason(pyodide: Pyodide, logId: string): string | null {
         return "这份报告没有记录日志指纹，无法确认当前解析的就是它，重新选择该 .ulg 文件即可恢复。";
     }
     if (logId !== loadedLogId) {
-        return "当前解析的是另一份日志，重新选择该 .ulg 文件即可恢复。";
+        return "当前解析的是另一份日志，重新选择该日志文件即可恢复。";
     }
     return null;
 }

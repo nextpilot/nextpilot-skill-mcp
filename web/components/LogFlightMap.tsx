@@ -558,7 +558,7 @@ export function LogFlightMap({
                                         className="btn-ghost gap-1.5 px-2.5 py-1 text-xs"
                                     >
                                         <FileUp className="h-3.5 w-3.5" />
-                                        重新选择该 .ulg 文件
+                                        重新选择该日志文件
                                     </button>
                                 )}
                             </div>

@@ -855,13 +855,16 @@ export function useLogAnalyzer() {
             setAiMarkdown(null);
             setDedupeNotice(null);
 
-            if (!file.name.toLowerCase().endsWith(".ulg")) {
-                setError("冲刺 1 仅支持 PX4 .ulg 日志，ArduPilot .bin 将在冲刺 3 支持");
+            // 扩展名只是预筛（文件选择器也拦不住改名文件）：真正的格式判定在引擎里
+            // 按文件头 magic 走（open_log → FORMATS 逐个探测），这里拦的只是明显不对的
+            const name = file.name.toLowerCase();
+            if (!name.endsWith(".ulg") && !name.endsWith(".bin")) {
+                setError("目前支持 PX4 .ulg 与 ArduPilot .bin 日志，请选择正确的日志文件。");
                 return null;
             }
 
             if (file.size === 0) {
-                setError("日志文件为空，请选择有效的 PX4 .ulg 文件。");
+                setError("日志文件为空，请选择有效的日志文件。");
                 return null;
             }
 
@@ -953,12 +956,12 @@ export function useLogAnalyzer() {
     const recoverWithFile = useCallback(
         async (file: File): Promise<boolean> => {
             setError(null);
-            if (!file.name.toLowerCase().endsWith(".ulg")) {
-                setError("只支持 PX4 .ulg 日志，请选择要恢复的那份 .ulg 文件。");
+            if (!/\.(ulg|bin)$/.test(file.name.toLowerCase())) {
+                setError("目前支持 PX4 .ulg 与 ArduPilot .bin 日志，请选择要恢复的那份日志文件。");
                 return false;
             }
             if (file.size === 0) {
-                setError("日志文件为空，请选择有效的 PX4 .ulg 文件。");
+                setError("日志文件为空，请选择有效的日志文件。");
                 return false;
             }
             try {

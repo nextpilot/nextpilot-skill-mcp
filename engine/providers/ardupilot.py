@@ -13,12 +13,14 @@
 #   · 列名：TimeUS 在 get_dataset() 里改名为 timestamp（规则与曲线统一写 timestamp；
 #     get_dataset_description() 仍给日志原始字段名，那是格式声明）
 #
-# ⚠️ 待真实样本核对（仓库里还没有 ArduPilot 样本；合成样本只自证"解析器与契约自洽"，
-#    不证明"对真实日志读出的数是对的"。以下按 AP_Logger 公开格式定义实现）：
-#   · 格式字符的缩放：c/C/e/E = ×0.01、L = ×1e-7（经纬度）
-#   · EV 事件码：10 = 解锁（ARMED）、11 = 上锁（DISARMED）——armed 区间靠它
-#   · FRAME_CLASS → 机型：只映射有把握的（3=固定翼、1/2/4~8=旋翼），其余 unknown(N)
-#   · FMTU（单位/乘子）**只解析不应用**：乘子表没核对，应用了才是猜数
+# 数据源核对情况（2026-09-24，36 份 autotest SITL 日志对账，Copter/Plane/Rover）：
+#   · EV 事件码 10=ARMED / 11=DISARMED：经 AP_Logger.h 官方源码核对无误
+#     （真实 Copter 日志里的 [25, 62] = SET_HOME / EKF_YAW_RESET）；但 autotest Copter
+#     日志**不写** ARMED/DISARMED 事件且无 ARM topic → armed 还要回退 STAT.Armed 状态沿
+#   · ⚠️ FORMAT_VERSION 参数是 **DataFlash 日志格式版本**（Copter 120 / Plane 13），
+#     不是固件版本——绝不可当固件版本回退（踩过，已删）；固件版本从 MSG 横幅 / VER 消息取
+#   · 仍未逐字段验证（v1 只解析不应用，应用了才是猜数）：
+#     格式字符缩放、FRAME_CLASS 全表（且 Copter/Rover 语境同码不同义）、FMTU 乘子
 #   · 消息 Length 字段是否含 3 字节头——已做自校准（见 _calibrate_len_hdr），但兜底逻辑本身要样本验
 
 import struct as _struct
@@ -314,14 +316,27 @@ class ApmProvider:
         self._changed = changed
 
     def _read_version(self):
-        """固件版本：优先 MSG 文本里的 "ArduPilot Version X.Y.Z (hash)"，回退 FORMAT_VERSION 参数。"""
+        """固件版本：MSG 横幅 / VER 消息。
+
+        真实横幅长这样：`ArduCopter V4.8.0-dev (665c0dee)`——正则要兼容 `-dev` 之类的
+        后缀与可选哈希。**绝不回退 FORMAT_VERSION 参数**：那是 DataFlash 日志格式版本
+        （Copter 120 / Plane 13），不是固件版本，拿它当版本号是把"容器格式"读成"固件"。
+        """
         import re as _re
 
         self.fw = {"major": None, "minor": None, "patch": None, "git": ""}
-        for row in self._iter_named("MSG"):
-            rec = dict(zip(self._fmt_by_name.get("MSG", {}).get("fields", []), row))
-            text = str(rec.get("Message") or "")
-            m = _re.search(r"ArduPilot Version (\d+)\.(\d+)\.(\d+)(?:\s*\((\w+)\))?", text)
+        texts = [
+            str(dict(zip(self._fmt_by_name.get("MSG", {}).get("fields", []), r)).get("Message") or "")
+            for r in self._iter_named("MSG")
+        ]
+        if self._fmt_by_name.get("VER"):
+            texts += [
+                " ".join(str(v) for v in dict(zip(self._fmt_by_name["VER"].get("fields", []), r)).values())
+                for r in self._iter_named("VER")
+            ]
+        for text in texts:
+            # 车型名后的 `V<major>.<minor>.<patch>`；后缀（-dev 等）与 (hash) 都可选
+            m = _re.search(r"\bV(\d+)\.(\d+)\.(\d+)(?:[-.\w]*)?(?:\s*\((\w+)\))?", text)
             if m:
                 self.fw = {
                     "major": int(m.group(1)),
@@ -330,14 +345,6 @@ class ApmProvider:
                     "git": m.group(4) or "",
                 }
                 break
-        if self.fw["minor"] is None:
-            fv = self._params.get("FORMAT_VERSION")
-            if fv is not None:
-                try:
-                    v = float(fv)
-                    self.fw = {"major": int(v), "minor": int(round((v - int(v)) * 10)), "patch": 0, "git": ""}
-                except Exception:
-                    pass
         self.fw_minor = self.fw["minor"]
         self.fw_label = (
             "%d.%d.%d" % (self.fw["major"], self.fw["minor"], self.fw["patch"])
@@ -362,7 +369,11 @@ class ApmProvider:
             self.vehicle_type = "unknown(%d)" % fc
 
     def _read_armed(self):
-        """armed 区间：EV 事件的 10/11（码值待真实样本核对）。全程没有 EV 就如实给空。"""
+        """armed 区间：EV 事件的 10/11（码值经 AP_Logger.h 核对）→ STAT.Armed 状态沿回退。
+
+        autotest Copter 日志不写 ARMED/DISARMED 事件、也无 ARM/STAT——那就如实给空，
+        不编造；Plane 有低频 STAT.Armed（0/1 状态量），取跳变沿切区间。
+        """
         intervals = []
         start = None
         for row in self._iter_named("EV"):
@@ -378,6 +389,27 @@ class ApmProvider:
                 start = None
         if start is not None:
             intervals.append((start, None))
+        if not intervals:
+            # EV 没给：STAT.Armed 状态沿（前值 0 → 1 是解锁，1 → 0 是上锁）
+            stat = self._fmt_by_name.get("STAT")
+            if stat and "Armed" in stat.get("fields", []):
+                prev = None
+                seg_start = None
+                for row in self._iter_named("STAT"):
+                    rec = dict(zip(stat.get("fields", []), row))
+                    t_us = rec.get("TimeUS")
+                    if t_us is None:
+                        continue
+                    cur = 1 if rec.get("Armed") else 0
+                    if prev is not None and cur != prev:
+                        if cur == 1:
+                            seg_start = int(t_us)
+                        elif seg_start is not None:
+                            intervals.append((seg_start, int(t_us)))
+                            seg_start = None
+                    prev = cur
+                if seg_start is not None:
+                    intervals.append((seg_start, None))
         self.armed_intervals = intervals
         total = sum(((e if e is not None else self.t_max_us) - s) for s, e in intervals)
         self.armed_duration_s = round(total / 1e6, 1)
