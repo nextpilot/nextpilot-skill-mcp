@@ -8,7 +8,7 @@
 
 1. **Skill / MCP 社区（Skill Hub）**：飞控 AI Skill 与 MCP 服务的提交、浏览、语义搜索、在线试用与评分分享，免费开放引流。
 
-2. **飞控日志分析服务（内置核心服务）**：平台自营的确定性日志诊断服务，**首发支持 PX4&#x20;**`.ulg`**（已上线，32 条检查经验 + 74 个算子），ArduPilot&#x20;**`.bin`**&#x20;待排期**，输出结构化检查结果与 LLM 中文报告，是主要收费锚点。
+2. **飞控日志分析服务（内置核心服务）**：平台自营的确定性日志诊断服务，**首发支持 PX4 **`.ulg`**（已上线，32 条检查经验 + 74 个算子），ArduPilot **`.bin`** 待排期**，输出结构化检查结果与 LLM 中文报告，是主要收费锚点。
 
 内容与能力按 **感知 → 决策 → 控制 → 工具链** 四个维度组织。
 
@@ -82,7 +82,7 @@
 >
 > `knowledge/README.md`
 >
-> **&#x20;的「skills/ 一个 Skill 一个目录」**
+> ** 的「skills/ 一个 Skill 一个目录」**
 >
 > ，
 > 不在本节重复（本节只说卡片上要有哪几类信息）。
@@ -146,7 +146,7 @@
 | ---------------- | --------------------------------------------------------------- |
 | 自然语言任务规划 | 说 "去东边那块田看看"，LLM 自动分解为飞行计划                   |
 | LLM 自主导航决策 | LLM 作为 drone operator，结合视觉输入推理出行动指令，下发给 PX4 |
-| 路径规划算法     | Ego-Planner、Fast-Planner、RRT\* 等，多旋翼 / 固定翼通用        |
+| 路径规划算法     | Ego-Planner、Fast-Planner、RRT* 等，多旋翼 / 固定翼通用        |
 | 避障策略生成     | 学习辅助导航，加速局部避障决策                                  |
 
 #### 三、控制类 Skill（让飞控 "飞得稳"）
@@ -204,7 +204,7 @@
 ```text
 用户选择 .ulg（首发）/ .bin（后续）文件（全程留在浏览器，不上传原始文件）
 
-&#x20;       ↓
+        ↓
 
 ┌─────────────────────────────────────┐
 
@@ -214,13 +214,13 @@
 
 │ Worker 中：首发 pyulog；第3-4周加    │
 
-│ pymavlink（blackbox\_decode 推后）   │
+│ pymavlink（blackbox_decode 推后）   │
 
 │ 输出：结构化 JSON（时间序列 + 统计）  │
 
 └─────────────────────────────────────┘
 
-&#x20;       ↓
+        ↓
 
 ┌─────────────────────────────────────┐
 
@@ -234,7 +234,7 @@
 
 └─────────────────────────────────────┘
 
-&#x20;       ↓ 仅上传结构化 findings（不含完整原始日志）
+        ↓ 仅上传结构化 findings（不含完整原始日志）
 
 ┌─────────────────────────────────────┐
 
@@ -268,7 +268,7 @@
 | 项目                             | 作者 / 来源       | 借鉴点                                                                                                                                                                                                                                                                            |
 | -------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **PX4 ULog Analyzer** ⭐首发底座 | robotto-xyz       | PX4 `.ulg` 日志分析，"确定性工具解析 + LLM 只做解释" 架构（pyulog 解析 + 检查器骨架）                                                                                                                                                                                             |
-| **ardupilot-mcp**                | furkanisikay，MIT | ArduPilot `.bin` 诊断 MCP 服务，16 项检查（振动、EKF、电源、GPS、电机平衡、参数审计等），每条发现附带阈值来源（docs/SOURCES.md）与官方文档链接；40 个真实炸机日志验证；贡献指南开放。检查套件设计（analyze\_log 返回严重度排序的 findings）是规则层的直接模板，接入 `.bin` 时复用 |
+| **ardupilot-mcp**                | furkanisikay，MIT | ArduPilot `.bin` 诊断 MCP 服务，16 项检查（振动、EKF、电源、GPS、电机平衡、参数审计等），每条发现附带阈值来源（docs/SOURCES.md）与官方文档链接；40 个真实炸机日志验证；贡献指南开放。检查套件设计（analyze_log 返回严重度排序的 findings）是规则层的直接模板，接入 `.bin` 时复用 |
 | **ArduPilot 实时连接 MCP**       | rmeadomavic，MIT  | 通过 MAVLink 实时读状态、改参数、切模式、诊断无法解锁原因；**默认只读**，致动功能需显式传参启用，对真实载具有额外安全门禁 —— 平台安全设计的参照                                                                                                                                   |
 | **PX4 SITL MCP**                 | —                 | 仅仿真环境，向 PX4 SITL 发送指令并带安全门禁                                                                                                                                                                                                                                      |
 | **UAV-Insight-Toolkit**          | —                 | Streamlit + pymavlink + GLM-4.5 已跑通同类流程，可作为工程参考                                                                                                                                                                                                                    |
@@ -293,7 +293,7 @@
 
 报告页之外还有两块常驻区域：**飞行阶段条**（`LogPhaseStrip.tsx`）紧贴 **飞行轨迹地图**（`LogFlightMap.tsx`，高德瓦片：国内可达；轨迹按 WGS-84 → GCJ-02 换算后绘制，换算见 `lib/coord.ts`）。
 
-时间口径全站统一：**开机以来的秒数**，显示成 `hh:MM:ss`（与 Flight Review 一致）。数据层的硬规则与坑（事件解码、多值信息拼接、参数默认值怎么来、派生数据版本）见 `knowledge/px4/CLAUDE.md`**&#x20;的「报告页数据层」**—— 改 `knowledge/engine/engine.py`（数据层部分）前必读。
+时间口径全站统一：**开机以来的秒数**，显示成 `hh:MM:ss`（与 Flight Review 一致）。数据层的硬规则与坑（事件解码、多值信息拼接、参数默认值怎么来、派生数据版本）见 `knowledge/px4/CLAUDE.md`** 的「报告页数据层」**—— 改 `knowledge/engine/engine.py`（数据层部分）前必读。
 
 ---
 
@@ -327,7 +327,7 @@
 
 面向国内用户选型：
 
-- **前端 / 全栈**：Next.js + TypeScript + Tailwind CSS + shadcn/ui，**代码位于&#x20;**`web/`**&#x20;子目录**；校验用真实日志放 `tools/testdata/logs/`（不入库，含 GPS 轨迹），冻结基线在 `tools/testdata/baseline/`，脚本在 `tools/engine/` 与 `tools/dev/`
+- **前端 / 全栈**：Next.js + TypeScript + Tailwind CSS + shadcn/ui，**代码位于 **`web/`** 子目录**；校验用真实日志放 `tools/testdata/logs/`（不入库，含 GPS 轨迹），冻结基线在 `tools/testdata/baseline/`，脚本在 `tools/engine/` 与 `tools/dev/`
 
 - **登录认证**：Auth.js（NextAuth）。**当前支持 GitHub + 邮箱验证码 / Magic Link（零资质，个人开发者可直接上线）**；**微信扫码、手机号验证码待注册企业主体后再接入**（微信开放平台网站应用需企业资质 + 300 元认证，短信签名 / 模板需企业资质审核）
 
@@ -347,7 +347,7 @@
 
    从第一天起封装薄存储接口，实体字段对齐远期关系型表结构，控制阶段间迁移成本。
 
-- **日志解析（端侧优先）**：**Pyodide（WASM Python）运行在 Web Worker 中**，首发加载 pyulog（PX4 `.ulg`）；ArduPilot `.bin` 已支持，解析器自研（无 pymavlink，随引擎一起内联进产物，不需额外下载）；规则检查器与解析器为同一份纯 Python 包，浏览器与服务端共用。**blackbox\_decode（Betaflight）推后**：它是 C 编译二进制、无法直接进 Pyodide，需 WASM 重写或等阶段二服务端引擎支持
+- **日志解析（端侧优先）**：**Pyodide（WASM Python）运行在 Web Worker 中**，首发加载 pyulog（PX4 `.ulg`）；ArduPilot `.bin` 已支持，解析器自研（无 pymavlink，随引擎一起内联进产物，不需额外下载）；规则检查器与解析器为同一份纯 Python 包，浏览器与服务端共用。**blackbox_decode（Betaflight）推后**：它是 C 编译二进制、无法直接进 Pyodide，需 WASM 重写或等阶段二服务端引擎支持
 
 - **任务形态**：解析在端侧异步进行，无需服务端队列；当前不部署独立 Python 服务。大文件（约 50MB 以上）或批量分析 API 阶段，再把同一套引擎下沉为 FastAPI + Redis（ARQ / BullMQ）常驻容器服务
 
@@ -376,7 +376,7 @@
 | KV 键模式                                 | 内容                                                                                                                                                                                              |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `user:{id}` / `user:wx:{openid}` 等索引键 | 用户资料、贡献者等级（对应远期 `profiles`）                                                                                                                                                       |
-| `skill:{slug}`                            | Skill 元数据：name /description/prompt /examples/platform\_tags /model\_tags/category /status/downloads\_count /rating；当前仍以 MDX 为唯一数据源，KV 仅在支持在线提交后启用（对应远期 `skills`） |
+| `skill:{slug}`                            | Skill 元数据：name /description/prompt /examples/platform_tags /model_tags/category /status/downloads_count /rating；当前仍以 MDX 为唯一数据源，KV 仅在支持在线提交后启用（对应远期 `skills`） |
 | `review:{skillSlug}:{userId}`             | 评分 + 评论 + 实测用例结果，按前缀列举（对应远期 `reviews`）                                                                                                                                      |
 | `report:{id}`                             | 报告元数据与结构化结果摘要（findings JSON + LLM 解释，控制单值大小）；完整 HTML / PDF 放 Blob；**原始日志不入库、不上传，仅存在于用户浏览器**（对应远期 `analysis_reports`）                      |
 | `share:{id}`                              | 报告分享索引：→ Blob 公开 URL、所属用户、时间、严重度统计                                                                                                                                         |
@@ -424,7 +424,7 @@
 | Web Worker 入口                           | kebab-case + `-worker.ts`                                                                           | `pyodide-px4log-worker.ts`                                                     |
 | Worker 内嵌脚本 /helper                   | kebab-case + `-script.ts` / `-engine.ts` / `-data.ts`                                               | 现由 `build-knowledge.mjs` **生成**，不手改                                    |
 | Next.js 路由                              | `page.tsx` / `route.ts` / `layout.tsx`（目录即路由）                                                | `app/analyze/page.tsx`、`app/api/explain/route.ts`                             |
-| Python 模块                               | snake\_case + `.py`                                                                                 | `knowledge/engine/engine.py`、`knowledge/engine/operators.py`                  |
+| Python 模块                               | snake_case + `.py`                                                                                 | `knowledge/engine/engine.py`、`knowledge/engine/operators.py`                  |
 | 知识 / 经验文件                           | 见 `knowledge/README.md`；规则 `rules/*.yaml`、故障库 `fault-kb.yaml`                               | `rules/vibration.yaml`、`fault-kb.yaml`                                        |
 | 文档                                      | kebab-case + `.md`                                                                                  | `llm/gjb841-system-prompt.md`                                                  |
 | 边缘函数（`web/functions/`）              | kebab-case + `.js`，**文件名即路由**（`functions/api/x.js` → `/api/x`）                             | `api/me.js`、`api/issues.js`、`_lib/issue-filer.js`                            |
@@ -511,7 +511,7 @@
 
    SKILL.md 那一格 "（MCP 走 server.json，没有这一格），所以组件本身不含任何 `if (是 Skill)`
 
-   的分支。**不带&#x20;**`kind`**&#x20;的那个（**`EntryContentTabs`**）不是漏了，是它压根不需要知道类别**
+   的分支。**不带 **`kind`** 的那个（**`EntryContentTabs`**）不是漏了，是它压根不需要知道类别**
 
    —— 按 "有没有这份文件" 分就够了。
 
@@ -623,7 +623,7 @@
 >
 > `knowledge/engine/`
 >
-> **&#x20;与&#x20;**
+> ** 与 **
 >
 > `tools/`
 >
@@ -645,7 +645,7 @@
 >
 > 。
 >
-> **别跑&#x20;**
+> **别跑 **
 >
 > `ruff check --fix`
 >
@@ -737,10 +737,6 @@
 >
 > /
 >
-> `knowledge/engine/engine.py`
->
-> /
->
 > `facts.yaml`
 >
 > /
@@ -764,7 +760,7 @@
 
 就可能缺字段、多字段、甚至换了个形状。而 **TypeScript 在这里一点用都没有**：类型是编译期的，JSON 是运行期的。
 
-**Worker 的&#x20;**`done`**&#x20;消息在这一列**（2026-09-18 更正；原文写的是 "不在"，错了）：Worker 是模块级单例、
+**Worker 的 **`done`** 消息在这一列**（2026-09-18 更正；原文写的是 "不在"，错了）：Worker 是模块级单例、
 
 **常驻且从不因代码更新重建**（见 `hooks/useLogAnalyzer.ts` 文件头），所以 " 页面已经是新代码、Worker
 
@@ -776,13 +772,13 @@
 
 规则：
 
-1. **一个外部形状，一个&#x20;**`normalizeXxx(raw: unknown): T`，且在**唯一入口**调用一次。
+1. **一个外部形状，一个 **`normalizeXxx(raw: unknown): T`，且在**唯一入口**调用一次。
 
    入参写 `unknown` 而不是 `Partial<T>`—— 边界上的 JSON 本来就没有类型，写 `Partial` 只是让读者
 
    误以为字段已经对上了。禁止 `as T`：强转把类型检查关掉，缺字段的值会一路走到 UI 才炸，
 
-   而**炸在入口有文件名和行号，炸在 UI 只有一句&#x20;**`Cannot read properties of undefined`。
+   而**炸在入口有文件名和行号，炸在 UI 只有一句 **`Cannot read properties of undefined`。
 
 2. **归一只做三件事**：补默认值、收窄类型（`typeof x === "number"`）、丢掉坏记录（返回 `null` 或过滤）。
 
@@ -841,7 +837,7 @@
 > `GeneralInfo`
 >
 > 白屏）。
-> **两次都不是 " 少写一个&#x20;**
+> **两次都不是 " 少写一个 **
 >
 > `?.`
 >
@@ -859,7 +855,7 @@
 > **同一行里同时出现**
 > `.json()`
 >
-> **&#x20;与&#x20;**
+> ** 与 **
 >
 > `as <具名类型>`
 >
@@ -1036,7 +1032,7 @@
 > 的两道 probe）；以及
 > `px4log_engine_runner.py --probe-data`
 >
-> **对每一份日志都打 ERROR 却&#x20;**
+> **对每一份日志都打 ERROR 却 **
 >
 > `return 0`
 >
@@ -1077,7 +1073,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 
 规则：
 
-1. **取数据（**`track`**&#x20;/&#x20;**`series`**）之前，先&#x20;**`await ensureLogLoaded(pendingHashRef.current)`**。**
+1. **取数据（**`track`** / **`series`**）之前，先 **`await ensureLogLoaded(pendingHashRef.current)`**。**
 
    装着 → 直接走；不是这份 → 用手里的字节补一次解析并等它结束；**手里也没字节**（历史记录 +
 
@@ -1097,7 +1093,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 
    界面卡在 "加载中"—— 用户连 "重新选择文件" 的按钮都看不到。
 
-6. `done`**&#x20;要认领自己的结果**：补解析是在页面**已经把报告渲染出来之后**才发起的，而 Pyodide
+6. `done`** 要认领自己的结果**：补解析是在页面**已经把报告渲染出来之后**才发起的，而 Pyodide
 
    首次初始化要十几秒 —— 用户完全可能在这中间回列表打开另一份报告。所以 `done` 只在
 
@@ -1356,15 +1352,15 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 ```
 代码提交
 
-&#x20; │
+  │
 
-&#x20; ▼
+  ▼
 
 ┌─────────────────────────────────────────────┐
 
 │ 第一关：静态检查（必须全绿）                   │
 
-│ python tools/ci/check\_all.py --skip-logs    │
+│ python tools/ci/check_all.py --skip-logs    │
 
 │   · ruff format --check（Python 风格）       │
 
@@ -1374,47 +1370,47 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 
 │   · check_engine_pyodide（产物是合法 Python）  │
 
-│   · check\_engine\_purity（三处共用源码纯净性）   │
+│   · check_engine_purity（三处共用源码纯净性）   │
 
 │   · tsc --noEmit（TypeScript 类型检查）       │
 
 │   · test-issue-filer.mjs（报错上报自测）      │
 
-│   · check\_hygiene（校验机制自身卫生）          │
+│   · check_hygiene（校验机制自身卫生）          │
 
-│   · mutate\_guards（守卫自证：每条先红一次）     │
+│   · mutate_guards（守卫自证：每条先红一次）     │
 
 │ · eslint .（Web 侧 ESLint）                  │
 
 └──────────────┬──────────────────────────────┘
 
-&#x20;              │ 全部通过
+               │ 全部通过
 
-&#x20;              ▼
+               ▼
 
 ┌─────────────────────────────────────────────┐
 
 │ 第二关：单元测试（算子 / CEL 表达式）           │
 
-│   · compare\_baseline.py                     │
+│   · compare_baseline.py                     │
 
 │     （6 条冻结日志基线逐字段比对）              │
 
 │   · guard_provider_contract.py（适配器契约测试）        │
 
-│   · px4log\_engine\_runner.py --probe-data      │
+│   · px4log_engine_runner.py --probe-data      │
 
 │     （数据层结构自检 + 真抽一次 series）        │
 
-│   · lint\_rules.py --strict                  │
+│   · lint_rules.py --strict                  │
 
 │     （字段引用 / 版本错配校验）                 │
 
 └──────────────┬──────────────────────────────┘
 
-&#x20;              │ 全部通过
+               │ 全部通过
 
-&#x20;              ▼
+               ▼
 
 ┌─────────────────────────────────────────────┐
 
@@ -1432,23 +1428,23 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 
 └──────────────┬──────────────────────────────┘
 
-&#x20;              │
+               │
 
-&#x20;         ┌────┴────┐
+          ┌────┴────┐
 
-&#x20;         │ 冒烟通过？ │
+          │ 冒烟通过？ │
 
-&#x20;         └────┬────┘
+          └────┬────┘
 
-&#x20;      不通过   │   通过
+       不通过   │   通过
 
-&#x20;        ▼      │    ▼
+         ▼      │    ▼
 
-&#x20;   ❌ 阻断合并   │  ✅ 合并放行
+    ❌ 阻断合并   │  ✅ 合并放行
 
-&#x20;                │
+                 │
 
-&#x20;                ▼
+                 ▼
 
 ┌─────────────────────────────────────────────┐
 
@@ -1460,9 +1456,9 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 
 └──────────────┬──────────────────────────────┘
 
-&#x20;              │ 全部通过
+               │ 全部通过
 
-&#x20;              ▼
+               ▼
 
 ┌─────────────────────────────────────────────┐
 
@@ -1476,17 +1472,17 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 **本地一键检查**（开发者提交前运行）：
 
 ```bash
-\# 仅静态检查 + ESLint（快速，每次提交前跑）
+# 仅静态检查 + ESLint（快速，每次提交前跑）
 
-.\tools\check\_all.ps1 -SkipLogs
+.\tools\check_all.ps1 -SkipLogs
 
-\# 含冒烟测试（需要 dev server 已在运行）
+# 含冒烟测试（需要 dev server 已在运行）
 
-.\tools\check\_all.ps1 -SkipLogs -WithE2E
+.\tools\check_all.ps1 -SkipLogs -WithE2E
 
-\# 全套（含日志类单元测试 + 冒烟 + 编译）
+# 全套（含日志类单元测试 + 冒烟 + 编译）
 
-.\tools\check\_all.ps1 -WithE2E -WithBuild
+.\tools\check_all.ps1 -WithE2E -WithBuild
 ```
 
 **脚本说明**：
@@ -1495,7 +1491,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 | --------------------------------------- | --------------------------------------------------------- | --------------------- |
 | `tools/ci/check_all.ps1`                | 本地一键检查入口：调用 `check_all.py` + ESLint + 可选 E2E | 手动，提交前          |
 | `tools/ci/check_all.py`                 | CI 规范入口：静态检查 + 单元测试 + 编译                   | CI workflow 自动调用  |
-| `web/package.json` → `lint`             | ESLint 静态分析（`eslint .`）                             | check\_all.ps1 内调用 |
+| `web/package.json` → `lint`             | ESLint 静态分析（`eslint .`）                             | check_all.ps1 内调用 |
 | `web/package.json` → `test:e2e`         | Playwright 全量 E2E（`playwright test`）                  | CI 第四关             |
 | `web/package.json` → `test:e2e:smoke`   | Playwright 冒烟（排除日志分析流程）                       | CI 第三关             |
 | `web/package.json` → `test:e2e:analyze` | Playwright 日志分析流程专用                               | 本地调试用            |
@@ -1551,7 +1547,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 | 阶段                               | 状态                         | 目标                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | ---------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 冲刺 1：Skill/MCP 社区网站         | ✅ 已上线                    | 网站基础框架与内容：预制 Skill（8 个种子）+ MCP 专区 + 使用指南；**登录与账号体系（GitHub + 邮箱验证码，微信 / 手机号待企业资质）**；EdgeOne KV 持久化；**社区指标：真实下载 / 获取次数（设备 + IP 每日去重的 KV 事件计数）、1-5 星评分、按下载 / 评分 / 更新排序、热门排行榜**；关键词搜索（客户端 Fuse.js）。语义搜索（BGE 端侧 embedding）待补。详情页：头部元信息、复制提示词 / 安装命令、评分与获取入口、版本 / 许可证 / 更新时间。 |
-| 冲刺 2：日志分析（核心收费锚点）   | ✅ 核心已上线（.bin 待排期） | **确定性日志诊断引擎 + 所有用户免费试用**。PX4 `.ulg`：32 条检查经验覆盖 16 个维度，六条真实日志冻结基线回归；四层架构（pyulog 解析 → rule\_engine/operators → 规则匹配 → LLM 按 GJB-841 组装输出中文报告）。**ArduPilot&#x20;**`.bin`**&#x20;待排期**（pymavlink + ardupilot-mcp 检查套件，同样打包进 Pyodide）。多日志趋势对比与误报率精细校准待后续迭代。                                                                             |
+| 冲刺 2：日志分析（核心收费锚点）   | ✅ 核心已上线（.bin 待排期） | **确定性日志诊断引擎 + 所有用户免费试用**。PX4 `.ulg`：32 条检查经验覆盖 16 个维度，六条真实日志冻结基线回归；四层架构（pyulog 解析 → rule_engine/operators → 规则匹配 → LLM 按 GJB-841 组装输出中文报告）。**ArduPilot **`.bin`** 待排期**（pymavlink + ardupilot-mcp 检查套件，同样打包进 Pyodide）。多日志趋势对比与误报率精细校准待后续迭代。                                                                             |
 | 冲刺 3：会员与社区商业化           | ⏳ 待启动                    | **会员 / 付费体系**（免费 / Pro / 团队，微信支付 + 支付宝），在线试用（不跳转就能跑）；规则 / 故障知识包贡献与 **70/30 分成**；Skill 组合编排；LLM 自动实测评分；语义搜索；**微信 / 手机号登录（取得企业资质后）**。                                                                                                                                                                                                                     |
 | 冲刺 4：轻量服务器 → 平台 MCP 服务 | ⏳ 待启动                    | **先解决承载，再对外分发**。见下方分步说明。                                                                                                                                                                                                                                                                                                                                                                                             |
 
