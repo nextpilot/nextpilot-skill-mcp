@@ -22,7 +22,11 @@ target-version = "py311"
 # 已经不存在的 `__GUARDS__` / `__TOPICS__` 占位符），重排它们只是把文档改花，
 # 还会让文档与它记录的当时形态对不上。发现过程：`ruff format .` 把 CLAUDE.md 的
 # 「执行链路」一节整段重排了。
-include = ["*.py"]
+#
+# 但 `.githooks/` 下的三个钩子是**没有 .py 扩展名的 Python**（Git 只认钩子名，改名就不再是钩子），
+# 默认匹配不到 —— 于是它们长期不在全仓扫描范围内，钩子自己写坏了没人报。
+# 逐个点名（就这三个，是 Git 固定的钩子名，不会生长）。
+include = ["*.py", ".githooks/commit-msg", ".githooks/pre-commit", ".githooks/pre-push"]
 
 [tool.ruff.lint]
 # 刻意**不开**这些（不是遗漏，是设计决定，改之前先读这段）：

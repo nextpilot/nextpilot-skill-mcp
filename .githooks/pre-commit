@@ -77,7 +77,11 @@ def main() -> int:
         web = root / "web"
         eslint = web / "node_modules" / "eslint" / "bin" / "eslint.js"
         if eslint.exists():
-            rel = [str((root / f).resolve().relative_to(web)).replace("\\", "/") for f in ts_files if (root / f).resolve().is_relative_to(web)]
+            rel = [
+                str((root / f).resolve().relative_to(web)).replace("\\", "/")
+                for f in ts_files
+                if (root / f).resolve().is_relative_to(web)
+            ]
             if rel:
                 print("[pre-commit] eslint --fix on staged TS files...")
                 ef = run([_node(), str(eslint), "--fix", *rel], cwd=web)
