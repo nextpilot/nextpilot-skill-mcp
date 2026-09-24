@@ -8,6 +8,9 @@ node_modules/
 out/
 dist/
 *.tsbuildinfo
+# next-env.d.ts 是 Next 自己写的：dev 与 build 指向的类型目录不同（.next/dev/types ↔ .next/types），
+# 交替跑一次就改一次内容。官方要求它不入库：nextjs.org/docs/app/api-reference/config/typescript
+next-env.d.ts
 
 # ========== Next.js / 站点 ==========
 # 站点内容全部在 web/content/ 下，全部入库
