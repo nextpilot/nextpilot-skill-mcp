@@ -22,7 +22,7 @@ import type { SeriesRequest } from "@/lib/chart-presets";
 const PYODIDE_INDEX_URL = process.env.NEXT_PUBLIC_PYODIDE_URL ?? "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/";
 
 // pyulog 的 wheel 地址（可选）。给了就直接装这个文件：**跳过 PyPI 索引查询**（那一步每次
-// 都要联网、且不受缓存保护），配合自托管就是"下载一次"。用 tools/px4/fetch-pyodide-assets.py 抓。
+// 都要联网、且不受缓存保护），配合自托管就是"下载一次"。用 tools/dev/fetch_pyodide_assets.py 抓。
 const PYULOG_WHEEL = process.env.NEXT_PUBLIC_PYULOG_WHEEL ?? "";
 
 export type WorkerStage = "loading-runtime" | "installing-parser" | "parsing" | "done";
@@ -168,7 +168,7 @@ let loadedLogId: string | null = null;
  *    import ULog` 只带来 `ULog`）。守卫于是恒真：轨迹请求**永远**被判成"没解析过"，
  *    轨迹画不出来、也从没进过存档，界面还一直说"重选文件即可恢复"——
  *    用户照做一遍，回到报告页看到同一句（复解析是成功的，只是 track 请求又被这道守卫挡了）。
- *    `tools/calibrate/check-pyodide-px4log-engine.py` 现在会真执行产物、拿命名空间核对这里查的名字。
+ *    `tools/engine/check-pyodide-px4log-engine.py` 现在会真执行产物、拿命名空间核对这里查的名字。
  *
  * 2. **装的就是这一份。** 探到 provider 就直接发数据的话，工作区里装着日志 A、
  *    用户打开没有轨迹存档的报告 B 时，会把 A 的轨迹画成 B 的飞行记录——

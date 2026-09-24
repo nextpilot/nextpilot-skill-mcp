@@ -9,7 +9,7 @@
 #   1. 构建期：web/scripts/build-knowledge.mjs 用 ast 解析 providers/*.py，
 #      查 REQUIRED 的方法有没有定义、builtin_variables() 返回的字典字面量键齐不齐
 #   2. 运行期：下面的 check_provider()，引擎建好 provider 之后立刻跑一次
-#   3. 契约测试：tools/calibrate/guard-px4log-provider.py，对每个 provider 跑同一套断言
+#   3. 契约测试：tools/engine/guard-px4log-provider.py，对每个 provider 跑同一套断言
 #      （失败语义、get_topic_meta() 与 get_series() 自洽、armed_intervals 的形状……）
 #
 # 加一个适配器（如 ardupilot.py）要做的事：实现 REQUIRED，按需实现 OPTIONAL，
@@ -35,12 +35,6 @@ REQUIRED = {
         "doc": "有哪些消息/话题：[{name, instance, n, fields:[{name, dtype}]}]。"
         "驱动 np_manifest（曲线可用性）与契约测试的自洽校验",
     },
-    "get_topic_data": {
-        "kind": "method",
-        "sig": "(topic, instance=0) -> dict|None",
-        "doc": "某个 topic 某实例的**原样列** {列名: 数组}（含 'field[0]' 这种数组列）。"
-        "报告页抽时序、概览指标兜底取数用它。取不到返回 None",
-    },
     "get_first_existing_column": {
         "kind": "method",
         "sig": "(topic, names) -> array|None",
@@ -62,20 +56,17 @@ REQUIRED = {
         "sig": "(spec) -> bool",
         "doc": "固件约束串是否满足（规则级 conditions.firmware 用）。约束串的语法由格式自己定，引擎不解释",
     },
-    "get_logged_information": {
+    "get_info_dict": {
         "kind": "method",
-        "sig": "() -> dict",
-        "doc": "日志自带的键值信息（PX4 是 Information Message）。没有就返回 {}",
+        "sig": "() -> (dict, dict)",
+        "doc": "日志自带的键值信息：`(info, info_multi)` 二元组——"
+        "第一样是键值对（PX4 是 Information Message，如 ver_sw），第二样是多值信息（'M' 消息，如多组件版本）。"
+        "没有就返回 ({}, {})",
     },
     "get_initial_parameters": {
         "kind": "method",
         "sig": "() -> dict",
         "doc": "初始参数表。没有就返回 {}",
-    },
-    "get_logged_messages": {
-        "kind": "method",
-        "sig": "() -> list[dict]",
-        "doc": "[{tSec, message, level, level_name}]：日志消息条目（tSec 是相对日志起点的秒数）",
     },
     "builtin_variables": {
         "kind": "method",
@@ -87,24 +78,136 @@ REQUIRED = {
         "sig": "() -> dict",
         "doc": "报告头的离散事实：机型 / 固件 / 时长 / 模式 / 载具身份……键名见各 provider",
     },
+    # ---- 知识引擎查询 API（docs/develop/engine-api-rework.md 并入契约）----
+    # 这组方法就是 provider 的**正式名字**（2026-09-24 迁移：get_topic_data→get_dataset、
+    # get_logged_information→get_info_dict、get_logged_messages→get_logged_events、
+    # get_flight_phases→get_mode_changed，旧名一律退场，不搞双轨）。
+    # 取不到一律返回 None / [] / {}（不抛异常），与上面同一套失败语义。
+    "get_start_timestamp": {
+        "kind": "method",
+        "sig": "() -> int|None",
+        "doc": "日志第一条消息的时间戳（µs，格式各自的时基：PX4 是开机起，APM 是 TimeUS）",
+    },
+    "get_last_timestamp": {
+        "kind": "method",
+        "sig": "() -> int|None",
+        "doc": "日志最后一条消息的时间戳（µs）",
+    },
+    "get_time_bounds": {
+        "kind": "method",
+        "sig": "() -> dict",
+        "doc": "时间边界 {start_us, end_us, duration_s, has_wraparound}；has_wraparound=有 topic 时间戳回退（疑似中途重启）",
+    },
+    "get_dataset": {
+        "kind": "method",
+        "sig": "(topic, instance=0) -> dict|None",
+        "doc": "某个 topic 某实例的**原样列** {列名: 数组}（含 'field[0]' 这种数组列）。"
+        "报告页抽时序、概览指标兜底取数用它。取不到返回 None（原 get_topic_data 迁移到此名）",
+    },
+    "get_dataset_description": {
+        "kind": "method",
+        "sig": "(topic=None) -> dict|None",
+        "doc": "消息格式定义 {name: {name, fields:[{name, type}]}}——是**格式声明**（含这份日志没录到的消息）；topic 给了就只回那一个。取不到返回 None",
+    },
+    "get_field_dtype": {
+        "kind": "method",
+        "sig": "(topic, field) -> str|None",
+        "doc": "字段的 dtype 名（如 float32 / uint8）。取不到返回 None",
+    },
+    "get_field_sizeof": {
+        "kind": "method",
+        "sig": "(topic, field) -> int|None",
+        "doc": "字段的单元素字节数（数组字段是每元素的大小，不是整列）。取不到返回 None",
+    },
+    "get_field_unit": {
+        "kind": "method",
+        "sig": "(topic, field) -> str|None",
+        "doc": "字段的源单位（规范名）。**查不到返回 None**——单位表只含构建期收录的字段，不许编一个空的糊弄",
+    },
+    "get_changed_parameters": {
+        "kind": "method",
+        "sig": "() -> list[dict]",
+        "doc": "运行中变更的参数 [{tSec, name, value}]。没有就返回 []",
+    },
+    "get_home_position": {
+        "kind": "method",
+        "sig": "() -> dict|None",
+        "doc": "Home 点 {lat, lon, alt, ...}。这份日志给不出（没定位）就返回 None",
+    },
+    "get_ref_position": {
+        "kind": "method",
+        "sig": "() -> dict|None",
+        "doc": "参考原点（局部 NED 原点，与 Home 不是一回事）{lat, lon, alt}。给不出返回 None",
+    },
+    "get_logged_events": {
+        "kind": "method",
+        "sig": "(t_start=None, t_end=None, level=None, pattern=None) -> list[dict]",
+        "doc": "[{tSec, message, level, level_name}]：日志消息条目（tSec 是相对日志起点的秒数）；"
+        "四个过滤参数都可省——省了就是全量。原 get_logged_messages 迁移到此名",
+    },
+    "get_mode_changed": {
+        "kind": "method",
+        "sig": "() -> list[dict]",
+        "doc": "模式变化的连续区间 [{t_start_us, t_end_us, mode, ...}]（µs，格式各自时基）",
+    },
+    "get_armed_changed": {
+        "kind": "method",
+        "sig": "() -> list[dict]",
+        "doc": "解锁/上锁的连续区间 [{t_start_us, t_end_us}]（µs；end 不会是 None，日志截止就用最后时间戳封口）",
+    },
+    "get_firmware_version": {
+        "kind": "method",
+        "sig": "() -> str",
+        "doc": "固件版本号串（如 1.15.4 / 4.5.7）。这份日志没写版本号要如实说（返回带「未知」字样的串）",
+    },
+    "get_version_info": {
+        "kind": "method",
+        "sig": "() -> tuple|None",
+        "doc": "(major, minor, patch, release_type)。解析不出返回 None",
+    },
+    "get_version_info_str": {
+        "kind": "method",
+        "sig": "() -> str",
+        "doc": "版本号的展示串（含 alpha/beta/rc 后缀的完整写法）",
+    },
+    "get_vehicle_identity": {
+        "kind": "method",
+        "sig": "() -> dict",
+        "doc": "载具身份 {vehicle_type, uid, hardware, ...}。没有的键给空串，不给省略——形态稳定",
+    },
+    "get_log_integrity": {
+        "kind": "method",
+        "sig": "() -> dict",
+        "doc": "日志完整性 {total_dropout_ms, n_gaps, gaps, end_reached, ...}。没有丢包概念的格式给 0/[]，别装作查过",
+    },
+    "has_file_corruption": {
+        "kind": "method",
+        "sig": "() -> bool",
+        "doc": "文件里有没有解析器认不出的字节段（截断/损坏旁证）",
+    },
 }
 
 # ---------------- 可选能力：缺席时报告页对应 tab 自动隐藏 ----------------
 # 不同格式能给的东西本来就不一样（PX4 的 ULog 有事件解码与逐字节消息统计，
 # ArduPilot 的 .bin 是另一套消息流），所以可选能力由格式自己决定。
 OPTIONAL = {
-    "get_flight_phases": {
-        "sig": "() -> list[dict]",
-        "doc": "连续飞行阶段（报告页阶段条）。缺席则该条不显示",
-    },
+    # get_flight_phases 已并入 get_mode_changed（REQUIRED，µs 形态）——旧键名退场，勿再添加
     "get_logged_dropouts": {"sig": "() -> list[dict]", "doc": "[{tSec, durationMs}] 丢包记录"},
     "get_message_type_counts": {
         "sig": "() -> dict | None",
         "doc": "逐字节的消息类型统计（**只对能按帧走的格式有意义**）+ 走到文件末尾没有",
     },
     "get_decoded_events": {
-        "sig": "() -> list[dict] | None",
-        "doc": "事件解码（PX4 靠日志自带的 metadata_events）。None = 这份日志解不出",
+        "sig": "(t_start=None, t_end=None, level=None, pattern=None) -> list[dict] | None",
+        "doc": "事件解码（PX4 靠日志自带的 metadata_events；过滤参数与 get_logged_events 同义）。None = 这份日志解不出",
+    },
+    "has_default_parameters": {
+        "sig": "() -> bool",
+        "doc": "日志里带不带默认参数表（ULog 的 'Q' 消息机制）。没有这个概念的格式不必实现",
+    },
+    "get_default_parameters": {
+        "sig": "() -> dict | None",
+        "doc": "默认参数表 {param: value}。没有就返回 None（「没记录」与「没这机制」是两回事，前端要能区分）",
     },
     "report_materials": {
         "sig": "() -> dict",
@@ -118,6 +221,15 @@ OPTIONAL = {
     "get_flight_track": {
         "sig": "(...) -> dict | None",
         "doc": "地图轨迹（取数字段候选与量纲也是格式专有）",
+    },
+    # ---- 知识引擎查询 API（可选部分：格式间差异大，缺席就隐藏对应能力）----
+    "has_data_appended": {
+        "sig": "() -> bool",
+        "doc": "日志是否带追加数据段（ULog 的 append 机制；没有这个概念的格式不必实现）",
+    },
+    "get_parameter_description": {
+        "sig": "(name=None) -> dict|None",
+        "doc": "参数说明 {param: {min, max, desc}}。**v1 无数据源（参数字典是前端按需拉的静态 JSON）→ 返回 None**",
     },
 }
 
@@ -146,6 +258,21 @@ BUILTIN_VARIABLES = {
     "RESTART_DETECTED": {"type": "bool", "doc": "是否有 topic 时间戳回退（疑似中途重启）"},
     "DROPOUT_MS": {"type": "int", "doc": "全日志丢包累计（毫秒）"},
     "MESSAGES": {"type": "list[dict]", "doc": "日志消息条目（供消息类经验按级别筛选）"},
+    # ---- 知识引擎内置变量（docs/develop/engine-api-rework.md 并入）----
+    # 缺什么给 None / ""（类型里写明 |None 或直接给空串），**不许编值**。
+    "SYS_UUID": {"type": "str", "doc": "系统唯一 ID。这份日志没写就给空串"},
+    "AIRFRAME_ID": {
+        "type": "int|None",
+        "doc": "机架编号（PX4: SYS_AUTOSTART；APM: FRAME_CLASS）。没有就 None——与 AIRFRAME（机型字符串）是两个东西",
+    },
+    "HOME_LAT": {"type": "float|None", "doc": "Home 点纬度（度）。给不出定位就 None"},
+    "HOME_LON": {"type": "float|None", "doc": "Home 点经度（度）"},
+    "HOME_ALT": {"type": "float|None", "doc": "Home 点高度（米）"},
+    "SW_VER": {"type": "str", "doc": "软件版本号串（如 1.15.4）。没写版本号给「未知」字样的串"},
+    "SW_VER_HASH": {"type": "str", "doc": "软件版本 git 哈希。没写就空串"},
+    "HW_VER": {"type": "str", "doc": "硬件版本名。没写就空串"},
+    "HW_VER_SUBTYPE": {"type": "str", "doc": "硬件版本子型号。没写就空串"},
+    "FLIGHT_TIME_S": {"type": "float|None", "doc": "载具累计飞行时长（秒，参数里的计数器）。没有就 None"},
 }
 
 # 框架自己往 env 里补的名字（**不属于** provider）：
@@ -168,6 +295,38 @@ _VALUE_TYPES = {
     "list": (list, tuple),
     "dict": (dict,),
 }
+
+
+def match_version_spec(cur, spec):
+    """固件约束串的**共享解释器**（各 provider 的 match_version 都走这里，别各写一份）。
+
+    语法：any / ">=1.15" / "<1.15" / ">=1.14,<1.15"（逗号=与）。cur 是 (major, minor)
+    二元组；None = 版本未知。
+    解析失败**一律抛 ValueError**——那是规则作者的笔误，与这份日志有没有版本号无关，
+    不能被"版本未知就放行"盖过去；版本未知时按"不因版本排除"处理（返回 True）。
+    """
+    import re as _re
+
+    if not spec or spec == "any":
+        return True
+    conds = []
+    for part in str(spec).split(","):
+        m = _re.match(r"^\s*(>=|<=|==|>|<)?\s*(\d+)\.?(\d+)?\s*$", part)
+        if not m:
+            raise ValueError("无法解析 firmware 约束：%r" % spec)
+        conds.append((m.group(1) or ">=", (int(m.group(2)), int(m.group(3) or 0))))
+    if cur is None:
+        return True
+    for op, want in conds:
+        if not {
+            ">=": cur >= want,
+            "<=": cur <= want,
+            "==": cur == want,
+            ">": cur > want,
+            "<": cur < want,
+        }[op]:
+            return False
+    return True
 
 
 def open_log(raw, facts_cfg=None):
@@ -223,4 +382,9 @@ def check_provider(provider, where="provider"):
         raise ValueError("%s.messages() 必须返回 list" % where)
     if not isinstance(provider.parser_version(), str):
         raise ValueError("%s.parser_version() 必须返回 str" % where)
+    # 时间边界是这批查询 API 里唯一被其他断言拿来做基准的聚合（guard 用它核对 duration），
+    # 形状错了要让所有下游跟着错——在这里先拦住
+    tb = provider.get_time_bounds()
+    if not isinstance(tb, dict) or not {"start_us", "end_us", "duration_s", "has_wraparound"} <= set(tb):
+        raise ValueError("%s.get_time_bounds() 必须返回含 start_us/end_us/duration_s/has_wraparound 的 dict" % where)
     return provider

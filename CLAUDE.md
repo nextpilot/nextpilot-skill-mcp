@@ -1493,7 +1493,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 
 | 脚本                                    | 用途                                                      | 调用方式              |
 | --------------------------------------- | --------------------------------------------------------- | --------------------- |
-| `tools/ci/check_all.ps1`                   | 本地一键检查入口：调用 `check_all.py` + ESLint + 可选 E2E | 手动，提交前          |
+| `tools/ci/check_all.ps1`                | 本地一键检查入口：调用 `check_all.py` + ESLint + 可选 E2E | 手动，提交前          |
 | `tools/ci/check_all.py`                 | CI 规范入口：静态检查 + 单元测试 + 编译                   | CI workflow 自动调用  |
 | `web/package.json` → `lint`             | ESLint 静态分析（`eslint .`）                             | check\_all.ps1 内调用 |
 | `web/package.json` → `test:e2e`         | Playwright 全量 E2E（`playwright test`）                  | CI 第四关             |

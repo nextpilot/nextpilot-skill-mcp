@@ -84,23 +84,23 @@ knowledge/                  ← 独立项目根（一级目录）
 
 ### 4.1 必改（改错就坏）
 
-| #   | 文件:行                                      | 现在                                                      | 改为                                                                     |
-| --- | -------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------ |
-| 1   | `web/scripts/build-knowledge.mjs`            | `resolve(webRoot, "../engine")`                           | `resolve(webRoot, "../knowledge/engine")`                                |
-| 2   | `tools/calibrate/px4log_engine_runner.py:32` | `ENGINE = REPO_ROOT / "engine"`                           | `ENGINE = REPO_ROOT / "knowledge" / "engine"`                            |
-| 3   | `tools/ci/check_engine_purity.py:61`         | `ENGINE = ROOT / "engine"`                                | `ENGINE = ROOT / "knowledge" / "engine"`                                 |
-| 4   | `tools/ci/check_engine_purity.py:135`        | `BROWSER_MARKER = (..., 'resolve(webRoot, "../engine")')` | `'resolve(webRoot, "../knowledge/engine")'`                              |
-| 5   | `tools/ci/check_engine_purity.py:136`        | `LOCAL_MARKER = (..., 'REPO_ROOT / "engine"')`            | `'REPO_ROOT / "knowledge" / "engine"'` ⚠️ 须与 #2 的**实际写法逐字一致** |
-| 6   | `tools/ci/mutate_guards.py:330`              | `path="engine/report_data.py"`                            | `"knowledge/engine/report_data.py"`                                      |
-| 7   | `tools/ci/mutate_guards.py:334`              | `old='resolve(webRoot, "../engine")'`                     | 同步新路径                                                               |
-| 8   | `tools/ci/mutate_guards.py:339`              | `old='ENGINE = REPO_ROOT / "engine"'`                     | 同步新路径                                                               |
-| 9   | `pyproject.toml:47-49`                       | `"engine/rule_engine.py" = ["F821"]` 等三条               | 前缀加 `knowledge/`                                                      |
-| 10  | `pyproject.toml:58`                          | `testpaths = ["engine/tests"]`                            | `["knowledge/engine/tests"]`                                             |
+| #   | 文件:行                                   | 现在                                                      | 改为                                                                     |
+| --- | ----------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 1   | `web/scripts/build-knowledge.mjs`         | `resolve(webRoot, "../engine")`                           | `resolve(webRoot, "../knowledge/engine")`                                |
+| 2   | `tools/px4log_engine_runner.py:32`        | `ENGINE = REPO_ROOT / "engine"`                           | `ENGINE = REPO_ROOT / "knowledge" / "engine"`                            |
+| 3   | `tools/engine/check_engine_purity.py:61`  | `ENGINE = ROOT / "engine"`                                | `ENGINE = ROOT / "knowledge" / "engine"`                                 |
+| 4   | `tools/engine/check_engine_purity.py:135` | `BROWSER_MARKER = (..., 'resolve(webRoot, "../engine")')` | `'resolve(webRoot, "../knowledge/engine")'`                              |
+| 5   | `tools/engine/check_engine_purity.py:136` | `LOCAL_MARKER = (..., 'REPO_ROOT / "engine"')`            | `'REPO_ROOT / "knowledge" / "engine"'` ⚠️ 须与 #2 的**实际写法逐字一致** |
+| 6   | `tools/ci/mutate_guards.py:330`           | `path="engine/report_data.py"`                            | `"knowledge/engine/report_data.py"`                                      |
+| 7   | `tools/ci/mutate_guards.py:334`           | `old='resolve(webRoot, "../engine")'`                     | 同步新路径                                                               |
+| 8   | `tools/ci/mutate_guards.py:339`           | `old='ENGINE = REPO_ROOT / "engine"'`                     | 同步新路径                                                               |
+| 9   | `pyproject.toml:47-49`                    | `"engine/rule_engine.py" = ["F821"]` 等三条               | 前缀加 `knowledge/`                                                      |
+| 10  | `pyproject.toml:58`                       | `testpaths = ["engine/tests"]`                            | `["knowledge/engine/tests"]`                                             |
 
 ### 4.2 不改不坏，但会误导（建议一并更新）
 
-- `tools/calibrate/dump_baseline.py:63` 的 `"engine": "engine/rule_engine.py + engine/report_data.py"`
-- `tools/calibrate/baseline/*.json` 6 个文件里的同名字段
+- `tools/dev/dump_baseline.py:63` 的 `"engine": "engine/rule_engine.py + engine/report_data.py"`
+- `tools/testdata/baseline/*.json` 6 个文件里的同名字段
   （**已核实不参与比对**：`compare_baseline.py` 里没有任何对该字段的引用，只是描述性元数据 ——
   所以新旧 baseline 描述不一致不会让校验变红，只会误导读的人）
 - 各 `.generated.*` 产物头部注释里的"源文件在 `engine/` 与 `knowledge/px4/`"
@@ -111,6 +111,42 @@ knowledge/                  ← 独立项目根（一级目录）
 `web/lib/constants.ts:59` 的 `contentRoot: "knowledge"`、
 `web/scripts/sync-content.mjs:25-26`、`_verify-schema.mjs:9`、`lint_rules.py:10`、
 `.prettierignore`、`.markdownlintignore`、`.vscode/settings.json` —— **全部保持不变**。
+
+### 4.4 顺带做：`rule_engine.py` + `report_data.py` 合并成一个文件（2026-09-24 拍板）
+
+**决定**：用户原话「那放在 engine 和 knowledge 合并的时候一起做」—— 即**本次迁移时一并执行**，
+不单独提前做。**为什么必须绑在一起**：§4.1 #6 与 §4.2 的头两条已经要改 `report_data.py` 的路径，
+分批做等于同一批引用改两遍。
+
+**为什么这件事本身是安全的**（2026-09-24 调查，只读）：
+
+- 这两份**本来就是同一个命名空间**：`px4log_engine_runner.py` 按文本拼接后**单次 exec**（L103-115）；
+  浏览器侧 `pyodide-px4log-worker.ts:259` 是 `runPythonAsync(PY_ULG_CHECKS + PY_ULG_DATA_HELPERS)`，
+  全仓只有这一处引用点。→ 合并**不改变任何运行行为**，是纯静态搬运。
+- `report_data.py` 直接用 rule_engine 才有的 `provider` / `run_all` / `_rule_env` / `_eval_compute` /
+  `_pick_ref` / `_split_ref`；`pyproject.toml` 专为这两份（+`providers/px4.py`）关 F821
+  —— 合并后这份豁免可以少一条。**假模块边界是有账单的。**
+- 顶层定义**零重名**（rule_engine 23 个 / report_data 10 个，交集为空）→ 合并**不去重**任何代码，
+  收益只在"少一个假模块"，别把它当成重构收益。
+- `derived-version` 已把两份都算进哈希（`build-knowledge.mjs:1730-1737`），合并后重解析行为不变。
+
+**在 §4.1~4.3 清单之上，本次要额外决定 / 执行的**：
+
+| 项                    | 说明                                                                                                                                                        |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **新文件名**          | 合起来 1114 行，叫 `rule_engine.py` 就名不副实（里面有 LTTB / `np_track` / `np_log_info` / 时间口径）。倾向 `analysis_engine.py`，**待拍板**，见 §8 第 8 条 |
+| **产物也要合**        | 只合源文件不合产物，就成了"一份源拆成两个产物"，比现状更绕 → `pyodide-px4log-data.ts` 退场、`PY_ULG_DATA_HELPERS` 取消、worker 那句字符串拼接去掉           |
+| 拼接顺序              | rule_engine 段必须**在前**：`RULES.sort`、`provider = open_log(...)`、`_COMPUTE_GLOBALS["has_topic"] = provider.has_topic` 都是它的顶层语句                 |
+| `test_rule_engine.py` | 它只把 operators + rule_engine 拼进沙箱做 CEL 单测；合并会顺带 exec 掉 296 行数据层（能跑，但稀释针对性）→ 接受，还是给数据层留门，做时定                   |
+
+**引用面（2026-09-24 实测计数，模式 `rule_engine|report_data|PY_ULG_*|pyodide-px4log-data`）**：
+`build-knowledge.mjs` 21、`knowledge/px4/CLAUDE.md` 22、`engine/README.md` 14、`CLAUDE.md` 7、
+`knowledge/README.md` 4、`pyproject.toml` 4、`check-taxonomy-rework.md` 4、
+`testing-at-a-glance.md` 3、`engine/tests/test_rule_engine.py` 3、`providers/px4.py` 5、
+`check-pyodide-px4log-engine.py` 2（L218 **单独**读 data 产物做跨语言名字核对——最容易漏的一处）、
+`check_hygiene.py:85-86`（产物跳过清单）、`dump_baseline.py` + `baseline/*.json` 6 份、
+`engine/providers/README.md` 2、`plot-schema.md` 2、`rule-schema.mdx` 2、`useLogAnalyzer.ts` /
+`report-history.ts` / `types.ts` / `rule-expr.mjs` / `checks-by-stage.md` 各 1。
 
 ---
 
@@ -126,12 +162,20 @@ knowledge/                  ← 独立项目根（一级目录）
 
 它做了两件超出本职的事：
 
-- L90/L109：断言 `engine/` 下**至少扫到 6 个 .py**，否则报"目录被搬空/改名了？那这条规则就是真空转的"
+- L91：`MIN_SCANNED = 3` —— 断言 `engine/` 下**至少扫到 3 个 .py**，
+  否则报"目录被搬空/改名了？那这条规则就是真空转的"
 - L135-136：用**硬编码字符串**断言两个消费者还在（浏览器仍拼进产物、本机工具仍指过去）
 
 → 移动 `engine/` 后它**必然变红**，且两处 marker 是精确字符串匹配，必须同步改（§4 #4 #5）。
-**变红是守卫正常工作的证据。** 迁移时应：先确认它红在"`knowledge/engine` 找不到"，
-改完后确认**转绿且仍扫到 ≥6 个 .py**。
+**变红是守卫正常工作的证据。** 迁移时应：先确认它红在"`knowledge/engine` 找不到"，改完后确认**转绿**。
+
+⚠️ **2026-09-24 订正两处已过期的事实**（原文写"至少扫到 6 个 .py"，两处都不对）：
+阈值现在是 **3**（`MIN_SCANNED`），而 `engine/` 下现有 **8 个** .py
+（`operators` / `rule_engine` / `report_data` / `providers/{api,px4,ardupilot}` /
+`tests/{test_operators,test_rule_engine}`），源码里那句"现有 6 个文件"的注释也已过期。
+（`test_pyulog.py` 已于 2026-09-24 删除，同时 `providers/ardupilot.py` 并入，总数不变）
+→ 于是 **§6 第 2 条原配方失效**：移走一个文件后是 7 个，仍 ≥ 3，守卫**不会红**（详见 §6）。
+§4.4 的合并会让它从 8 降到 7，仍然安全。
 
 ⚠️ **改 marker 有个反向陷阱**：如果把 marker 改得比实际写法更宽松（比如只匹配 `"engine"`），
 守卫会**恒绿** —— 那才是真事故。改完必须按 §6 自证。
@@ -155,10 +199,15 @@ knowledge/                  ← 独立项目根（一级目录）
 迁移完成后必须验证守卫**仍然会红**（不是恒绿）：
 
 1. `python tools/ci/check_all.py --with-mutate` —— 让每条守卫先红一次。
-2. 针对 `check_engine_purity.py`：临时移走 `knowledge/engine/` 下一个 .py，
-   断言它报"只找到 N 个 .py…目录被搬空/改名了"。**断言完还原。**
+2. 针对 `check_engine_purity.py` 的"扫到文件数"那一路 —— ⚠️ **原配方是错的，2026-09-24 订正**：
+   阈值是 `MIN_SCANNED = 3`，而 `engine/` 下现有 8 个 .py
+   （`knowledge/engine/` 下同理，§4.4 合并后是 7 个）→ **移走一个不会变红**（7 ≥ 3）。
+   要证明这条分支活着，得把 .py 移到**只剩 2 个**，或临时把 `MIN_SCANNED` 改大。
+   另注：`mutate_guards.py` 给这个守卫的三条变异覆盖的是**纯 Python 违规**与**两个 marker**，
+   **不覆盖**这一条 —— 所以"目录被搬空"目前**没有机器自证**，只有这份手工配方。**断言完还原。**
 3. 针对 marker（§5.2）：临时把 `build-knowledge.mjs` 里的路径改回 `../engine`，
    断言守卫报"前提不在了"。**断言完还原。**
+   （`mutate_guards.py` 的 `browser-marker` / `local-marker` 两条变异已经覆盖它，这一步是复核。）
 4. **必须新增的守卫（本方案引入的漂移风险）**：
 
    > `web/` 内被拉取的产物，必须与 `knowledge/dist/` 下的对应文件**逐字节一致**。
@@ -181,7 +230,7 @@ knowledge/                  ← 独立项目根（一级目录）
 python -m pytest                       # testpaths 已改指 knowledge/engine/tests
 
 # 2. 引擎纯度守卫（重点：是否仍扫到 ≥6 个 .py，marker 是否转绿）
-python tools/ci/check_engine_purity.py
+python tools/engine/check_engine_purity.py
 
 # 3. 知识构建：一致性比对（注意 §5.4 的行尾误报）
 cd web && pnpm build:kb && node scripts/build-knowledge.mjs --check
@@ -218,7 +267,7 @@ python tools/ci/check_all.py --with-mutate
 
 ⚠️ 现状实证：`git ls-files knowledge` 里**没有任何** check / validate / lint / schema / test
 项 —— 本体既没有编译器，也没有校验入口。三个相关校验脚本全在别处：
-`web/scripts/check-skill-spec.mjs`、`web/scripts/check-mcp-spec.mjs`、`tools/calibrate/lint_rules.py`。
+`web/scripts/check-skill-spec.mjs`、`web/scripts/check-mcp-spec.mjs`、`tools/engine/lint_rules.py`。
 
 ### 7.5.1 编译器搬走时真正的难点：产物现在散落在 web/ 的四个地方
 
@@ -369,6 +418,11 @@ knowledge 的 Node 编译器**在云端不可用**。所以产物必须**入库*
    就装（或拆第二个包 `nextpilot-content`）。取决于后端需求清单。见 §7.6.1。
 7. **`pull-knowledge.mjs` 的映射表**放哪、由谁守（见 §7.5.2）。
    建议 `knowledge/dist-map.json` 作为单一事实源，两侧脚本都读它。
+8. **§4.4 合并后的新文件名**：合起来 1114 行，`rule_engine.py` 这个名字盖不住
+   LTTB / `np_track` / `np_log_info` / 时间口径（违反了「名字读出来的关系必须和真实关系一致」）。
+   倾向 `analysis_engine.py`（与 `operators.py` / `providers/` 同层的"引擎部件"命名）；
+   备选 `log_engine.py`（但引擎同时服务规则与出图，`analysis` 比 `log` 准）。
+   ⚠️ 改名会牵动 §4.4 列出的全部引用面，**做之前拍板，别中途改主意**。
 
 ---
 
@@ -382,3 +436,6 @@ knowledge 的 Node 编译器**在云端不可用**。所以产物必须**入库*
   加 `pyproject.toml` 是**赋予包身份**，可一起做也可分两步。
 - 本次**不动** Node 侧：部署上传范围仍只有 `web/`，且 web 产物是内联字符串、
   不依赖兄弟包，加 pnpm workspace 零收益。
+- 2026-09-24 新增的**并入项**：`rule_engine.py` + `report_data.py` 合并（§4.4）。
+  调查结论是"运行期零收益、纯静态搬运"，所以它不值得单独开一轮改动 ——
+  与迁移共用同一批引用改动（§4.1 #6 / §4.2），一次改完。

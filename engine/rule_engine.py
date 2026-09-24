@@ -4,11 +4,11 @@
 # 这里只做四件事：调度规则、求值表达式、调算子、发射 finding。
 # 它不认识任何 topic 名 / 字段名 / 码值 —— 那些全在 providers/<格式>.py 与
 # knowledge/<格式>/facts.yaml 里。判据：本文件里 grep 不到 `vehicle_` / `ver_sw` / `cpuload`
-# 之类的名字（tools/calibrate/lint_rules.py 有一条检查盯着）。
+# 之类的名字（tools/engine/lint_rules.py 有一条检查盯着）。
 #
 # 数据从哪来：providers/api.py 的契约。provider 由 open_log() 按文件头挑出来，
-# 本文件只调它的 get_topic_meta/get_topic_data/get_series/has_topic/match_version/
-# get_logged_information/get_initial_parameters/get_logged_messages/
+# 本文件只调它的 get_topic_meta/get_dataset/get_series/has_topic/match_version/
+# get_info_dict/get_initial_parameters/get_logged_events/
 # builtin_variables/get_report_facts 与可选能力，不碰 pyulog 对象。
 # ============================================================================
 

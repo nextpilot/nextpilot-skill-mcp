@@ -1364,7 +1364,7 @@ def op_cell_voltage_min(cell_cols, volt_v, volt_filtered, cell_count, **kw):
 #   1. 构建期：web/scripts/build-knowledge.mjs 用 ast 解析 providers/*.py，
 #      查 REQUIRED 的方法有没有定义、builtin_variables() 返回的字典字面量键齐不齐
 #   2. 运行期：下面的 check_provider()，引擎建好 provider 之后立刻跑一次
-#   3. 契约测试：tools/calibrate/guard-px4log-provider.py，对每个 provider 跑同一套断言
+#   3. 契约测试：tools/engine/guard-px4log-provider.py，对每个 provider 跑同一套断言
 #      （失败语义、get_topic_meta() 与 get_series() 自洽、armed_intervals 的形状……）
 #
 # 加一个适配器（如 ardupilot.py）要做的事：实现 REQUIRED，按需实现 OPTIONAL，
@@ -1390,12 +1390,6 @@ REQUIRED = {
         "doc": "有哪些消息/话题：[{name, instance, n, fields:[{name, dtype}]}]。"
         "驱动 np_manifest（曲线可用性）与契约测试的自洽校验",
     },
-    "get_topic_data": {
-        "kind": "method",
-        "sig": "(topic, instance=0) -> dict|None",
-        "doc": "某个 topic 某实例的**原样列** {列名: 数组}（含 'field[0]' 这种数组列）。"
-        "报告页抽时序、概览指标兜底取数用它。取不到返回 None",
-    },
     "get_first_existing_column": {
         "kind": "method",
         "sig": "(topic, names) -> array|None",
@@ -1417,20 +1411,17 @@ REQUIRED = {
         "sig": "(spec) -> bool",
         "doc": "固件约束串是否满足（规则级 conditions.firmware 用）。约束串的语法由格式自己定，引擎不解释",
     },
-    "get_logged_information": {
+    "get_info_dict": {
         "kind": "method",
-        "sig": "() -> dict",
-        "doc": "日志自带的键值信息（PX4 是 Information Message）。没有就返回 {}",
+        "sig": "() -> (dict, dict)",
+        "doc": "日志自带的键值信息：\`(info, info_multi)\` 二元组——"
+        "第一样是键值对（PX4 是 Information Message，如 ver_sw），第二样是多值信息（'M' 消息，如多组件版本）。"
+        "没有就返回 ({}, {})",
     },
     "get_initial_parameters": {
         "kind": "method",
         "sig": "() -> dict",
         "doc": "初始参数表。没有就返回 {}",
-    },
-    "get_logged_messages": {
-        "kind": "method",
-        "sig": "() -> list[dict]",
-        "doc": "[{tSec, message, level, level_name}]：日志消息条目（tSec 是相对日志起点的秒数）",
     },
     "builtin_variables": {
         "kind": "method",
@@ -1442,24 +1433,136 @@ REQUIRED = {
         "sig": "() -> dict",
         "doc": "报告头的离散事实：机型 / 固件 / 时长 / 模式 / 载具身份……键名见各 provider",
     },
+    # ---- 知识引擎查询 API（docs/develop/engine-api-rework.md 并入契约）----
+    # 这组方法就是 provider 的**正式名字**（2026-09-24 迁移：get_topic_data→get_dataset、
+    # get_logged_information→get_info_dict、get_logged_messages→get_logged_events、
+    # get_flight_phases→get_mode_changed，旧名一律退场，不搞双轨）。
+    # 取不到一律返回 None / [] / {}（不抛异常），与上面同一套失败语义。
+    "get_start_timestamp": {
+        "kind": "method",
+        "sig": "() -> int|None",
+        "doc": "日志第一条消息的时间戳（µs，格式各自的时基：PX4 是开机起，APM 是 TimeUS）",
+    },
+    "get_last_timestamp": {
+        "kind": "method",
+        "sig": "() -> int|None",
+        "doc": "日志最后一条消息的时间戳（µs）",
+    },
+    "get_time_bounds": {
+        "kind": "method",
+        "sig": "() -> dict",
+        "doc": "时间边界 {start_us, end_us, duration_s, has_wraparound}；has_wraparound=有 topic 时间戳回退（疑似中途重启）",
+    },
+    "get_dataset": {
+        "kind": "method",
+        "sig": "(topic, instance=0) -> dict|None",
+        "doc": "某个 topic 某实例的**原样列** {列名: 数组}（含 'field[0]' 这种数组列）。"
+        "报告页抽时序、概览指标兜底取数用它。取不到返回 None（原 get_topic_data 迁移到此名）",
+    },
+    "get_dataset_description": {
+        "kind": "method",
+        "sig": "(topic=None) -> dict|None",
+        "doc": "消息格式定义 {name: {name, fields:[{name, type}]}}——是**格式声明**（含这份日志没录到的消息）；topic 给了就只回那一个。取不到返回 None",
+    },
+    "get_field_dtype": {
+        "kind": "method",
+        "sig": "(topic, field) -> str|None",
+        "doc": "字段的 dtype 名（如 float32 / uint8）。取不到返回 None",
+    },
+    "get_field_sizeof": {
+        "kind": "method",
+        "sig": "(topic, field) -> int|None",
+        "doc": "字段的单元素字节数（数组字段是每元素的大小，不是整列）。取不到返回 None",
+    },
+    "get_field_unit": {
+        "kind": "method",
+        "sig": "(topic, field) -> str|None",
+        "doc": "字段的源单位（规范名）。**查不到返回 None**——单位表只含构建期收录的字段，不许编一个空的糊弄",
+    },
+    "get_changed_parameters": {
+        "kind": "method",
+        "sig": "() -> list[dict]",
+        "doc": "运行中变更的参数 [{tSec, name, value}]。没有就返回 []",
+    },
+    "get_home_position": {
+        "kind": "method",
+        "sig": "() -> dict|None",
+        "doc": "Home 点 {lat, lon, alt, ...}。这份日志给不出（没定位）就返回 None",
+    },
+    "get_ref_position": {
+        "kind": "method",
+        "sig": "() -> dict|None",
+        "doc": "参考原点（局部 NED 原点，与 Home 不是一回事）{lat, lon, alt}。给不出返回 None",
+    },
+    "get_logged_events": {
+        "kind": "method",
+        "sig": "(t_start=None, t_end=None, level=None, pattern=None) -> list[dict]",
+        "doc": "[{tSec, message, level, level_name}]：日志消息条目（tSec 是相对日志起点的秒数）；"
+        "四个过滤参数都可省——省了就是全量。原 get_logged_messages 迁移到此名",
+    },
+    "get_mode_changed": {
+        "kind": "method",
+        "sig": "() -> list[dict]",
+        "doc": "模式变化的连续区间 [{t_start_us, t_end_us, mode, ...}]（µs，格式各自时基）",
+    },
+    "get_armed_changed": {
+        "kind": "method",
+        "sig": "() -> list[dict]",
+        "doc": "解锁/上锁的连续区间 [{t_start_us, t_end_us}]（µs；end 不会是 None，日志截止就用最后时间戳封口）",
+    },
+    "get_firmware_version": {
+        "kind": "method",
+        "sig": "() -> str",
+        "doc": "固件版本号串（如 1.15.4 / 4.5.7）。这份日志没写版本号要如实说（返回带「未知」字样的串）",
+    },
+    "get_version_info": {
+        "kind": "method",
+        "sig": "() -> tuple|None",
+        "doc": "(major, minor, patch, release_type)。解析不出返回 None",
+    },
+    "get_version_info_str": {
+        "kind": "method",
+        "sig": "() -> str",
+        "doc": "版本号的展示串（含 alpha/beta/rc 后缀的完整写法）",
+    },
+    "get_vehicle_identity": {
+        "kind": "method",
+        "sig": "() -> dict",
+        "doc": "载具身份 {vehicle_type, uid, hardware, ...}。没有的键给空串，不给省略——形态稳定",
+    },
+    "get_log_integrity": {
+        "kind": "method",
+        "sig": "() -> dict",
+        "doc": "日志完整性 {total_dropout_ms, n_gaps, gaps, end_reached, ...}。没有丢包概念的格式给 0/[]，别装作查过",
+    },
+    "has_file_corruption": {
+        "kind": "method",
+        "sig": "() -> bool",
+        "doc": "文件里有没有解析器认不出的字节段（截断/损坏旁证）",
+    },
 }
 
 # ---------------- 可选能力：缺席时报告页对应 tab 自动隐藏 ----------------
 # 不同格式能给的东西本来就不一样（PX4 的 ULog 有事件解码与逐字节消息统计，
 # ArduPilot 的 .bin 是另一套消息流），所以可选能力由格式自己决定。
 OPTIONAL = {
-    "get_flight_phases": {
-        "sig": "() -> list[dict]",
-        "doc": "连续飞行阶段（报告页阶段条）。缺席则该条不显示",
-    },
+    # get_flight_phases 已并入 get_mode_changed（REQUIRED，µs 形态）——旧键名退场，勿再添加
     "get_logged_dropouts": {"sig": "() -> list[dict]", "doc": "[{tSec, durationMs}] 丢包记录"},
     "get_message_type_counts": {
         "sig": "() -> dict | None",
         "doc": "逐字节的消息类型统计（**只对能按帧走的格式有意义**）+ 走到文件末尾没有",
     },
     "get_decoded_events": {
-        "sig": "() -> list[dict] | None",
-        "doc": "事件解码（PX4 靠日志自带的 metadata_events）。None = 这份日志解不出",
+        "sig": "(t_start=None, t_end=None, level=None, pattern=None) -> list[dict] | None",
+        "doc": "事件解码（PX4 靠日志自带的 metadata_events；过滤参数与 get_logged_events 同义）。None = 这份日志解不出",
+    },
+    "has_default_parameters": {
+        "sig": "() -> bool",
+        "doc": "日志里带不带默认参数表（ULog 的 'Q' 消息机制）。没有这个概念的格式不必实现",
+    },
+    "get_default_parameters": {
+        "sig": "() -> dict | None",
+        "doc": "默认参数表 {param: value}。没有就返回 None（「没记录」与「没这机制」是两回事，前端要能区分）",
     },
     "report_materials": {
         "sig": "() -> dict",
@@ -1473,6 +1576,15 @@ OPTIONAL = {
     "get_flight_track": {
         "sig": "(...) -> dict | None",
         "doc": "地图轨迹（取数字段候选与量纲也是格式专有）",
+    },
+    # ---- 知识引擎查询 API（可选部分：格式间差异大，缺席就隐藏对应能力）----
+    "has_data_appended": {
+        "sig": "() -> bool",
+        "doc": "日志是否带追加数据段（ULog 的 append 机制；没有这个概念的格式不必实现）",
+    },
+    "get_parameter_description": {
+        "sig": "(name=None) -> dict|None",
+        "doc": "参数说明 {param: {min, max, desc}}。**v1 无数据源（参数字典是前端按需拉的静态 JSON）→ 返回 None**",
     },
 }
 
@@ -1501,6 +1613,21 @@ BUILTIN_VARIABLES = {
     "RESTART_DETECTED": {"type": "bool", "doc": "是否有 topic 时间戳回退（疑似中途重启）"},
     "DROPOUT_MS": {"type": "int", "doc": "全日志丢包累计（毫秒）"},
     "MESSAGES": {"type": "list[dict]", "doc": "日志消息条目（供消息类经验按级别筛选）"},
+    # ---- 知识引擎内置变量（docs/develop/engine-api-rework.md 并入）----
+    # 缺什么给 None / ""（类型里写明 |None 或直接给空串），**不许编值**。
+    "SYS_UUID": {"type": "str", "doc": "系统唯一 ID。这份日志没写就给空串"},
+    "AIRFRAME_ID": {
+        "type": "int|None",
+        "doc": "机架编号（PX4: SYS_AUTOSTART；APM: FRAME_CLASS）。没有就 None——与 AIRFRAME（机型字符串）是两个东西",
+    },
+    "HOME_LAT": {"type": "float|None", "doc": "Home 点纬度（度）。给不出定位就 None"},
+    "HOME_LON": {"type": "float|None", "doc": "Home 点经度（度）"},
+    "HOME_ALT": {"type": "float|None", "doc": "Home 点高度（米）"},
+    "SW_VER": {"type": "str", "doc": "软件版本号串（如 1.15.4）。没写版本号给「未知」字样的串"},
+    "SW_VER_HASH": {"type": "str", "doc": "软件版本 git 哈希。没写就空串"},
+    "HW_VER": {"type": "str", "doc": "硬件版本名。没写就空串"},
+    "HW_VER_SUBTYPE": {"type": "str", "doc": "硬件版本子型号。没写就空串"},
+    "FLIGHT_TIME_S": {"type": "float|None", "doc": "载具累计飞行时长（秒，参数里的计数器）。没有就 None"},
 }
 
 # 框架自己往 env 里补的名字（**不属于** provider）：
@@ -1523,6 +1650,38 @@ _VALUE_TYPES = {
     "list": (list, tuple),
     "dict": (dict,),
 }
+
+
+def match_version_spec(cur, spec):
+    """固件约束串的**共享解释器**（各 provider 的 match_version 都走这里，别各写一份）。
+
+    语法：any / ">=1.15" / "<1.15" / ">=1.14,<1.15"（逗号=与）。cur 是 (major, minor)
+    二元组；None = 版本未知。
+    解析失败**一律抛 ValueError**——那是规则作者的笔误，与这份日志有没有版本号无关，
+    不能被"版本未知就放行"盖过去；版本未知时按"不因版本排除"处理（返回 True）。
+    """
+    import re as _re
+
+    if not spec or spec == "any":
+        return True
+    conds = []
+    for part in str(spec).split(","):
+        m = _re.match(r"^\s*(>=|<=|==|>|<)?\s*(\d+)\.?(\d+)?\s*$", part)
+        if not m:
+            raise ValueError("无法解析 firmware 约束：%r" % spec)
+        conds.append((m.group(1) or ">=", (int(m.group(2)), int(m.group(3) or 0))))
+    if cur is None:
+        return True
+    for op, want in conds:
+        if not {
+            ">=": cur >= want,
+            "<=": cur <= want,
+            "==": cur == want,
+            ">": cur > want,
+            "<": cur < want,
+        }[op]:
+            return False
+    return True
 
 
 def open_log(raw, facts_cfg=None):
@@ -1578,7 +1737,830 @@ def check_provider(provider, where="provider"):
         raise ValueError("%s.messages() 必须返回 list" % where)
     if not isinstance(provider.parser_version(), str):
         raise ValueError("%s.parser_version() 必须返回 str" % where)
+    # 时间边界是这批查询 API 里唯一被其他断言拿来做基准的聚合（guard 用它核对 duration），
+    # 形状错了要让所有下游跟着错——在这里先拦住
+    tb = provider.get_time_bounds()
+    if not isinstance(tb, dict) or not {"start_us", "end_us", "duration_s", "has_wraparound"} <= set(tb):
+        raise ValueError("%s.get_time_bounds() 必须返回含 start_us/end_us/duration_s/has_wraparound 的 dict" % where)
     return provider
+
+# ArduPilot .bin（AP_Logger）适配器 —— **本项目唯一认识 ArduPilot 的地方**
+#
+# 契约见 providers/api.py。格式是**自描述**的：文件开头是一串 FMT 消息，声明每种消息的
+# 名字、长度、字段与格式字符——所以解析器按 FMT 表通解，不逐消息类型硬编码；
+# MSG/PARM/EV/MODE/GPS 一律按 **FMT 名字**查表，不写死消息 ID（不同固件版本的 ID 会变）。
+#
+# 分工（与 px4.py 同一条纪律）：
+#   · 本文件：怎么从 AP_Logger 字节流里把数据取出来——FMT 解析、格式字符缩放、消息名定位
+#   · engine/*.py：与格式无关的机制；契约常量在 api.py
+#
+# 与 PX4 适配器的两个约定差异（消费方要知情）：
+#   · 时基：TimeUS 是开机以来的 µs（与 PX4 同为"开机起"，但两者不共享同一块表）
+#   · 列名：TimeUS 在 get_dataset() 里改名为 timestamp（规则与曲线统一写 timestamp；
+#     get_dataset_description() 仍给日志原始字段名，那是格式声明）
+#
+# ⚠️ 待真实样本核对（仓库里还没有 ArduPilot 样本；合成样本只自证"解析器与契约自洽"，
+#    不证明"对真实日志读出的数是对的"。以下按 AP_Logger 公开格式定义实现）：
+#   · 格式字符的缩放：c/C/e/E = ×0.01、L = ×1e-7（经纬度）
+#   · EV 事件码：10 = 解锁（ARMED）、11 = 上锁（DISARMED）——armed 区间靠它
+#   · FRAME_CLASS → 机型：只映射有把握的（3=固定翼、1/2/4~8=旋翼），其余 unknown(N)
+#   · FMTU（单位/乘子）**只解析不应用**：乘子表没核对，应用了才是猜数
+#   · 消息 Length 字段是否含 3 字节头——已做自校准（见 _calibrate_len_hdr），但兜底逻辑本身要样本验
+
+import struct as _struct
+
+import numpy as np
+
+# 文件头 magic 与 FMT 消息（保留 ID：所有版本都一样，这两个可以写死）。
+# 命名带 _APM_ 前缀：构建期各 provider 拼进**同一个命名空间**，顶层名字撞了就是
+# 静默互踩（_MAGIC 曾被 px4.py 的同名常量覆盖，探测永远 False）——有守卫拦同名。
+_APM_MAGIC = b"\xa3\x95"
+_FMT_TYPE = 128
+# FMT 消息自身的 payload 恒为 86 字节：Type(1) + Length(1) + Name(4) + Format(16) + Columns(64)
+_FMT_PAYLOAD = 86
+
+# 格式字符 → (struct 格式, 字节数)。缩放另见 _SCALED。
+# n/N/Z 是定长文本（char[4]/[16]/[64]），用 s 格式整体取，解出来再剥 \x00。
+_FMT_CHARS = {
+    "b": ("<b", 1),
+    "B": ("<B", 1),
+    "M": ("<B", 1),  # 飞行模式（uint8）
+    "h": ("<h", 2),
+    "H": ("<H", 2),
+    "i": ("<i", 4),
+    "I": ("<I", 4),
+    "f": ("<f", 4),
+    "d": ("<d", 8),
+    "q": ("<q", 8),
+    "Q": ("<Q", 8),
+    "n": ("4s", 4),
+    "N": ("16s", 16),
+    "Z": ("64s", 64),
+    "c": ("<h", 2),  # int16 × 0.01
+    "C": ("<H", 2),  # uint16 × 0.01
+    "e": ("<H", 2),  # uint16 × 0.01
+    "E": ("<I", 4),  # uint32 × 0.01
+    "L": ("<i", 4),  # int32 × 1e-7（经纬度）
+}
+_SCALED = {"c": 0.01, "C": 0.01, "e": 0.01, "E": 0.01, "L": 1e-7}
+
+# 格式字符 → dtype 名（get_field_dtype 用；文本给 str）
+_FMT_DTYPES = {
+    "b": "int8",
+    "B": "uint8",
+    "M": "uint8",
+    "h": "int16",
+    "H": "uint16",
+    "i": "int32",
+    "I": "uint32",
+    "f": "float32",
+    "d": "float64",
+    "q": "int64",
+    "Q": "uint64",
+    "c": "int16",
+    "C": "uint16",
+    "e": "uint16",
+    "E": "uint32",
+    "L": "int32",
+    "n": "str",
+    "N": "str",
+    "Z": "str",
+}
+
+# 日志级别的数字语义与 PX4 对齐（3=ERROR 4=WARNING 6=INFO），名字给固定的英文串：
+# PX4 的 level_name 来自 facts.yaml（那份码表是 PX4 的），APM 不借用别人的码表
+_LEVEL_NAMES = {3: "ERROR", 4: "WARNING", 6: "INFO"}
+
+# FRAME_CLASS → 机型。**只映射有把握的**（待真实样本核对，见文件头）：
+# 1=Quad 2=Tricopter 4=Coax 5=Hexa 6=Octa 7=Helicopter 8=OctaQuad 都是旋翼；
+# 3=Plane 是固定翼；9(潜艇)/10/11(VTOL 变体)/0(未设) 与 rover 系不猜，给 unknown(N)
+_FRAME_CLASS_MAP = {
+    1: "rotary_wing",
+    2: "rotary_wing",
+    4: "rotary_wing",
+    5: "rotary_wing",
+    6: "rotary_wing",
+    7: "rotary_wing",
+    8: "rotary_wing",
+    3: "fixed_wing",
+}
+
+# EV 事件码 → 解锁/上锁（待真实样本核对，见文件头）
+_EV_ARMED = 10
+_EV_DISARMED = 11
+
+
+def _text(raw):
+    """定长 char[N] → 去掉 \x00 与首尾空白的文本。"""
+    return raw.decode("ascii", "replace").rstrip("\x00").strip()
+
+
+class ApmProvider:
+    """ArduPilot .bin 适配器。契约见 providers/api.py。"""
+
+    log_type = "ardupilot-bin"
+
+    def __init__(self, raw, facts_cfg):
+        # facts_cfg 是 PX4 的数据配置（构建期只有一份 facts.yaml）——本适配器**不读它**，
+        # 码表都在本文件里（待迁 knowledge/apm/）。参数保留只为与工厂签名一致。
+        self._cfg = facts_cfg or {}
+        self.raw = bytes(raw)
+        self._parse_errors = 0  # 认不出的字节段数（has_file_corruption 的判据）
+        self._parse()
+
+    # ================= 解析 =================
+
+    def _parse(self):
+        """两遍扫描：先收 FMT 声明，再按格式解码。都从文件头顺序走，认不出就重同步到下一个 magic。"""
+        raw, n = self.raw, len(self.raw)
+        by_id, by_name = {}, {}
+        self._len_hdr = 3  # 消息 Length 字段是否含 3 字节头：第一条 FMT 解出来后校准
+
+        # ---- 第一遍：FMT 声明（payload 恒 86 字节，不依赖长度约定）----
+        off = 0
+        while off + 3 <= n:
+            if raw[off] != _APM_MAGIC[0] or raw[off + 1] != _APM_MAGIC[1]:
+                nxt = raw.find(_APM_MAGIC, off + 1)
+                if nxt == -1:
+                    break
+                off = nxt
+                continue
+            mtype = raw[off + 2]
+            if mtype == _FMT_TYPE:
+                if off + 3 + _FMT_PAYLOAD > n:
+                    self._parse_errors += 1
+                    break
+                f = self._parse_fmt_row(raw[off + 3 : off + 3 + _FMT_PAYLOAD])
+                if f is not None:
+                    by_id[f["id"]] = f
+                    by_name[f["name"]] = f
+                    if f["name"] == "FMT":
+                        # 自校准：FMT 自己的 Length 字段值 - 86 = 头部长度（89 → 含头；86 → 不含）
+                        self._len_hdr = 3 if f["len"] > _FMT_PAYLOAD else 0
+                off += 3 + _FMT_PAYLOAD
+                continue
+            f = by_id.get(mtype)
+            if f is None or f.get("unsupported"):
+                # 还没见到定义（或解不了的消息）：只能按字节找下一个头
+                nxt = raw.find(_APM_MAGIC, off + 3)
+                if nxt == -1:
+                    break
+                off = nxt
+                continue
+            plen = f["len"] - self._len_hdr
+            if plen <= 0 or off + 3 + plen > n:
+                self._parse_errors += 1
+                break
+            off += 3 + plen
+
+        self._fmt_by_id, self._fmt_by_name = by_id, by_name
+
+        # ---- 第二遍：按格式解码数据消息 ----
+        rows = {}  # name → list[tuple]（顺序 = fmt["fields"]）
+        walked_ok = True
+        off = 0
+        while off + 3 <= n:
+            if raw[off] != _APM_MAGIC[0] or raw[off + 1] != _APM_MAGIC[1]:
+                nxt = raw.find(_APM_MAGIC, off + 1)
+                if nxt == -1:
+                    walked_ok = False
+                    break
+                off = nxt
+                continue
+            mtype = raw[off + 2]
+            f = by_id.get(mtype)
+            if f is None or f.get("unsupported"):
+                if f is None:
+                    self._parse_errors += 1
+                nxt = raw.find(_APM_MAGIC, off + 3)
+                if nxt == -1:
+                    walked_ok = False
+                    break
+                off = nxt
+                continue
+            plen = f["len"] - self._len_hdr
+            if plen <= 0 or off + 3 + plen > n:
+                self._parse_errors += 1
+                walked_ok = False
+                break
+            payload = raw[off + 3 : off + 3 + plen]
+            off += 3 + plen
+            if mtype in (_FMT_TYPE, 129):  # FMT 已收；FMTU 只解析不应用（见文件头）
+                continue
+            row = self._decode_row(f, payload)
+            if row is None:
+                self._parse_errors += 1
+                continue
+            rows.setdefault(f["name"], []).append(row)
+        self._rows = rows
+        self._walked_ok = walked_ok
+
+        # ---- 行 → 列（TimeUS 改名 timestamp；见文件头的约定差异说明）----
+        self._cols = {}
+        for name, fmt in by_name.items():
+            rws = rows.get(name)
+            if not rws:
+                continue
+            cols = {}
+            for i, fld in enumerate(fmt["fields"]):
+                key = "timestamp" if fld == "TimeUS" else fld
+                cols[key] = np.array([r[i] for r in rws])
+            self._cols[name] = cols
+
+        # ---- 时间基准与数据质量 ----
+        t_min, t_max = None, None
+        restart = 0
+        for cols in self._cols.values():
+            ts = cols.get("timestamp")
+            if ts is None or len(ts) == 0:
+                continue
+            a = np.asarray(ts, dtype=np.int64)
+            t_min = int(a[0]) if t_min is None else min(t_min, int(a[0]))
+            t_max = int(a[-1]) if t_max is None else max(t_max, int(a[-1]))
+            if len(a) > 10 and int(np.count_nonzero(np.diff(a) < 0)) > 0:
+                restart += 1
+        self.t0_us = t_min or 0
+        self.t_max_us = t_max if t_max is not None else self.t0_us
+        self.duration_s = round((self.t_max_us - self.t0_us) / 1e6, 1) if t_min is not None else None
+        self.restart_topics = restart
+
+        self._read_params()
+        self._read_version()
+        self._read_vehicle_type()
+        self._read_armed()
+        self._read_home()
+
+    def _parse_fmt_row(self, payload):
+        """FMT payload（86B）→ 声明 {id, len, name, format, fields}。格式字符解不了标记 unsupported。"""
+        try:
+            mtype = payload[0]
+            length = payload[1]
+            name = _text(payload[2:6])
+            fstr = _text(payload[6:22])
+            fields = [_text(c) for c in payload[22:86].split(b",")]
+            fields = [f for f in fields if f]
+        except Exception:
+            self._parse_errors += 1
+            return None
+        if not name or len(fstr) != len(fields):
+            # 格式串与列数对不上：这份 FMT 没法可靠解码，标记后跳过它的消息（不硬猜）
+            self._parse_errors += 1
+            return None
+        unsupported = any(ch not in _FMT_CHARS for ch in fstr)
+        return {
+            "id": int(mtype),
+            "len": int(length),
+            "name": name,
+            "format": fstr,
+            "fields": fields,
+            "unsupported": unsupported,
+        }
+
+    def _decode_row(self, fmt, payload):
+        """按格式声明解一行 → tuple（顺序与 fmt["fields"] 一致）。解不了返回 None。"""
+        out = []
+        off = 0
+        try:
+            for ch, fld in zip(fmt["format"], fmt["fields"]):
+                sf, size = _FMT_CHARS[ch]
+                chunk = payload[off : off + size]
+                if len(chunk) < size:
+                    return None
+                # _FMT_CHARS 的 sf 已带字节序前缀（"<Q"）；字符串格式（"16s"）无需前缀。
+                # 别再拼一个 "<"——会变成 "<<Q"，struct 直接报 bad char（静默吞掉后整行解不出）
+                (v,) = _struct.unpack(sf, chunk)
+                off += size
+                if sf.endswith("s"):
+                    out.append(_text(v))
+                elif ch in _SCALED:
+                    out.append(float(v) * _SCALED[ch])
+                else:
+                    out.append(v)
+        except Exception:
+            return None
+        return tuple(out)
+
+    def _read_params(self):
+        """PARM 消息：首现值 = 初始参数，后续不同值 = 运行中变更。"""
+        params, changed = {}, []
+        for row in self._iter_named("PARM"):
+            rec = dict(zip(self._fmt_by_name.get("PARM", {}).get("fields", []), row))
+            name = str(rec.get("Name") or "")
+            if not name:
+                continue
+            value = rec.get("Value")
+            t_us = rec.get("TimeUS")
+            if name not in params:
+                params[name] = value
+            elif params[name] != value:
+                t_sec = round((int(t_us) - self.t0_us) / 1e6, 2) if t_us is not None else None
+                changed.append({"tSec": t_sec, "name": name, "value": value})
+                params[name] = value
+        self._params = params
+        self._changed = changed
+
+    def _read_version(self):
+        """固件版本：优先 MSG 文本里的 "ArduPilot Version X.Y.Z (hash)"，回退 FORMAT_VERSION 参数。"""
+        import re as _re
+
+        self.fw = {"major": None, "minor": None, "patch": None, "git": ""}
+        for row in self._iter_named("MSG"):
+            rec = dict(zip(self._fmt_by_name.get("MSG", {}).get("fields", []), row))
+            text = str(rec.get("Message") or "")
+            m = _re.search(r"ArduPilot Version (\d+)\.(\d+)\.(\d+)(?:\s*\((\w+)\))?", text)
+            if m:
+                self.fw = {
+                    "major": int(m.group(1)),
+                    "minor": int(m.group(2)),
+                    "patch": int(m.group(3)),
+                    "git": m.group(4) or "",
+                }
+                break
+        if self.fw["minor"] is None:
+            fv = self._params.get("FORMAT_VERSION")
+            if fv is not None:
+                try:
+                    v = float(fv)
+                    self.fw = {"major": int(v), "minor": int(round((v - int(v)) * 10)), "patch": 0, "git": ""}
+                except Exception:
+                    pass
+        self.fw_minor = self.fw["minor"]
+        self.fw_label = (
+            "%d.%d.%d" % (self.fw["major"], self.fw["minor"], self.fw["patch"])
+            if self.fw["minor"] is not None
+            else "未知（未解析到版本）"
+        )
+        self.fw_display = self.fw_label if self.fw["minor"] is not None else "未知"
+
+    def _read_vehicle_type(self):
+        """机型：FRAME_CLASS 参数映射（表见文件头，待真实样本核对）。"""
+        fc = self._params.get("FRAME_CLASS")
+        try:
+            fc = int(fc)
+        except (TypeError, ValueError):
+            fc = None
+        self.airframe_id = fc
+        if fc is None:
+            self.vehicle_type = "unknown"
+        elif fc in _FRAME_CLASS_MAP:
+            self.vehicle_type = _FRAME_CLASS_MAP[fc]
+        else:
+            self.vehicle_type = "unknown(%d)" % fc
+
+    def _read_armed(self):
+        """armed 区间：EV 事件的 10/11（码值待真实样本核对）。全程没有 EV 就如实给空。"""
+        intervals = []
+        start = None
+        for row in self._iter_named("EV"):
+            rec = dict(zip(self._fmt_by_name.get("EV", {}).get("fields", []), row))
+            t_us = rec.get("TimeUS")
+            if t_us is None:
+                continue
+            code = rec.get("Id")
+            if code == _EV_ARMED and start is None:
+                start = int(t_us)
+            elif code == _EV_DISARMED and start is not None:
+                intervals.append((start, int(t_us)))
+                start = None
+        if start is not None:
+            intervals.append((start, None))
+        self.armed_intervals = intervals
+        total = sum(((e if e is not None else self.t_max_us) - s) for s, e in intervals)
+        self.armed_duration_s = round(total / 1e6, 1)
+
+    def _read_home(self):
+        """Home 点：GPS 首个有效定位（Status>=3、坐标合法非零）。APM 没有 ref 原点概念，ref 给 None。"""
+        self.home_position = None
+        for row in self._iter_named("GPS"):
+            rec = dict(zip(self._fmt_by_name.get("GPS", {}).get("fields", []), row))
+            lat, lon = rec.get("Lat"), rec.get("Lng")
+            alt = rec.get("Alt")
+            status = rec.get("Status")
+            if None in (lat, lon, alt) or (status is not None and int(status) < 3):
+                continue
+            if abs(lat) <= 90 and abs(lon) <= 180 and not (abs(lat) < 1e-7 and abs(lon) < 1e-7):
+                self.home_position = {"lat": float(lat), "lon": float(lon), "alt": float(alt), "source": "GPS"}
+                break
+
+    def _iter_named(self, name):
+        return self._rows.get(name, [])
+
+    # ================= 数据访问层 =================
+
+    def parser_version(self):
+        """自研解析器（不依赖 pymavlink）：版本号在这里维护，进报告头的 parserVersion。"""
+        return "apm-bin-parser/1.0.0"
+
+    def get_topic_meta(self):
+        out = []
+        for name, fmt in sorted(self._fmt_by_name.items()):
+            cols = self._cols.get(name)
+            if not cols:
+                continue  # 声明了但一条都没录到（或解不了）：不进 meta
+            ts = cols.get("timestamp")
+            out.append(
+                {
+                    "topic": name,
+                    "instance": 0,
+                    "n": int(len(ts)) if ts is not None else 0,
+                    "fields": [{"name": k, "dtype": str(v.dtype)} for k, v in cols.items() if k != "timestamp"],
+                }
+            )
+        return out
+
+    def get_dataset(self, topic, instance=0):
+        """某消息类型的原样列（TimeUS 已改名 timestamp，见文件头）。APM 无多实例：instance≠0 给 None。"""
+        if instance not in (0, slice(None, None), None):
+            return None
+        cols = self._cols.get(topic)
+        return dict(cols) if cols else None
+
+    def get_series(self, ref, instance=slice(None, None), alias=None):
+        """按 'topic.field' 取一条序列；取不到一律返回 None。APM 单实例，instance 只认 0 / 全部。"""
+        if isinstance(instance, int) and instance != 0:
+            return None
+        topic, _, field = ref.partition(".")
+        cols = self._cols.get(topic)
+        if not cols:
+            return None
+        aliases = [alias] if isinstance(alias, str) else list(alias or [])
+        for name in [field] + aliases:
+            v = cols.get(name)
+            if v is None or len(v) == 0:
+                continue
+            try:
+                return np.asarray(v, dtype=float)
+            except (TypeError, ValueError):
+                return None  # 文本列给不出浮点序列：如实 None，不硬转
+        return None
+
+    def get_first_existing_column(self, topic, names):
+        cols = self.get_dataset(topic, 0)
+        if not cols:
+            return None
+        for nm in names if isinstance(names, (list, tuple)) else [names]:
+            if nm in cols:
+                return cols[nm]
+        return None
+
+    def has_topic(self, name):
+        return name in self._cols
+
+    def match_version(self, spec):
+        cur = None
+        if self.fw_minor is not None:
+            cur = (self.fw["major"] if self.fw["major"] is not None else 0, self.fw_minor)
+        return match_version_spec(cur, spec)
+
+    def get_info_dict(self):
+        """APM 日志没有键值信息消息：如实给空二元组（版本/身份走 get_report_facts 与专用方法）。"""
+        return ({}, {})
+
+    def get_initial_parameters(self):
+        return dict(self._params)
+
+    def get_logged_events(self, t_start=None, t_end=None, level=None, pattern=None):
+        """MSG 文本 + ERR 错误合成的时间轴。MSG 无级别给 INFO；ERR 给 ERROR（子系统和码值原样进文本）。
+
+        TimeUS 缺失的消息 tSec 给 None——如实说"不知道几点"，不编 0。
+        """
+        out = []
+        for row in self._iter_named("MSG"):
+            rec = dict(zip(self._fmt_by_name.get("MSG", {}).get("fields", []), row))
+            t_us = rec.get("TimeUS")
+            out.append(
+                {
+                    "tSec": round((int(t_us) - self.t0_us) / 1e6, 2) if t_us is not None else None,
+                    "message": str(rec.get("Message") or "").strip(),
+                    "level": 6,
+                    "level_name": _LEVEL_NAMES[6],
+                }
+            )
+        err_fields = self._fmt_by_name.get("ERR", {}).get("fields", [])
+        for row in self._iter_named("ERR"):
+            rec = dict(zip(err_fields, row))
+            t_us = rec.get("TimeUS")
+            out.append(
+                {
+                    "tSec": round((int(t_us) - self.t0_us) / 1e6, 2) if t_us is not None else None,
+                    "message": "ERR subsys=%s code=%s" % (rec.get("Subsys"), rec.get("ECode")),
+                    "level": 3,
+                    "level_name": _LEVEL_NAMES[3],
+                }
+            )
+        out.sort(key=lambda m: (m["tSec"] is None, m["tSec"] if m["tSec"] is not None else 0))
+        if t_start is not None:
+            out = [m for m in out if m["tSec"] is not None and m["tSec"] >= t_start]
+        if t_end is not None:
+            out = [m for m in out if m["tSec"] is not None and m["tSec"] <= t_end]
+        if level is not None:
+            lv = set(level) if isinstance(level, (list, tuple)) else {level}
+            out = [m for m in out if m["level"] in lv]
+        if pattern:
+            out = [m for m in out if str(pattern).lower() in m["message"].lower()]
+        return out
+
+    def builtin_variables(self):
+        """内置变量表。**每次返回新 dict**（引擎会往里写 compute 的输出）。
+
+        键一律大写；APM 给不出的值给 None / 空串（不编值）。"""
+        home = self.home_position or {}
+        return {
+            "FW_MINOR": self.fw_minor,
+            "VEHICLE": self.vehicle_type,
+            "IS_FIXED_WING": self.vehicle_type == "fixed_wing",
+            "DURATION_S": self.duration_s if self.duration_s is not None else 0,
+            "ARMED_S": self.armed_duration_s,
+            "ARMED_INTERVALS": list(self.armed_intervals),
+            "T0_US": self.t0_us,
+            "HAS_ARMED": bool(self.armed_intervals),
+            "RESTART_DETECTED": self.restart_topics > 0,
+            "DROPOUT_MS": 0,  # .bin 没有丢包记录的概念：给 0，不装作查过
+            "MESSAGES": self.get_logged_events(),
+            # ---- 知识引擎内置变量 ----
+            "SYS_UUID": "",  # v1 无来源（APM 的 UID 在 INFO 多值消息里，解析待真实样本）
+            "AIRFRAME_ID": self.airframe_id,
+            "HOME_LAT": home.get("lat"),
+            "HOME_LON": home.get("lon"),
+            "HOME_ALT": home.get("alt"),
+            "SW_VER": self.fw_label,
+            "SW_VER_HASH": self.fw["git"],
+            "HW_VER": "",  # 板名在 MSG "Frame: ..." 文本里，格式不保证，v1 不猜
+            "HW_VER_SUBTYPE": "",
+            "FLIGHT_TIME_S": None,  # 累计飞行时长 v1 无对应参数
+        }
+
+    def get_report_facts(self):
+        """报告头的离散事实。键与 PX4 版本保持同一套（前端按同一张表渲染）。"""
+        facts = {
+            "durationSec": self.duration_s if self.duration_s is not None else 0,
+            "vehicleType": self.vehicle_type,
+            "firmware": self.fw_label,
+            "firmwareDisplay": self.fw_display,
+            "armedDurationSec": self.armed_duration_s,
+            "phases": [],
+            "dropoutTotalMs": 0,
+        }
+        if self.fw["git"]:
+            facts["verSw"] = self.fw["git"]
+        if self.airframe_id is not None:
+            facts["airframeId"] = self.airframe_id
+        return facts
+
+    # ================= 知识引擎查询 API =================
+
+    def get_start_timestamp(self):
+        return int(self.t0_us)
+
+    def get_last_timestamp(self):
+        return int(self.t_max_us)
+
+    def get_time_bounds(self):
+        return {
+            "start_us": int(self.t0_us),
+            "end_us": int(self.t_max_us),
+            "duration_s": self.duration_s,
+            "has_wraparound": self.restart_topics > 0,
+        }
+
+    def get_dataset_description(self, topic=None):
+        """FMT 表就是格式声明：含这份日志没录到的消息（声明在、数据没来）。"""
+
+        def one(fmt):
+            return {
+                "name": fmt["name"],
+                "fields": [{"name": fn, "type": ch} for ch, fn in zip(fmt["format"], fmt["fields"])],
+            }
+
+        if topic is not None:
+            fmt = self._fmt_by_name.get(topic)
+            return one(fmt) if fmt is not None else None
+        return {name: one(fmt) for name, fmt in self._fmt_by_name.items()}
+
+    def get_field_dtype(self, topic, field):
+        fmt = self._fmt_by_name.get(topic)
+        if fmt is None:
+            return None
+        for ch, fn in zip(fmt["format"], fmt["fields"]):
+            if fn == field:
+                return _FMT_DTYPES.get(ch)
+        return None
+
+    def get_field_sizeof(self, topic, field):
+        fmt = self._fmt_by_name.get(topic)
+        if fmt is None:
+            return None
+        for ch, fn in zip(fmt["format"], fmt["fields"]):
+            if fn == field:
+                size = _FMT_CHARS.get(ch)
+                return int(size[1]) if size is not None else None
+        return None
+
+    def get_field_unit(self, topic, field):
+        """FMTU 里有单位声明但乘子/单位表没核对（文件头）：给 None，不用猜的数冒充。"""
+        return None
+
+    def get_changed_parameters(self):
+        return list(self._changed)
+
+    def get_home_position(self):
+        return dict(self.home_position) if self.home_position else None
+
+    def get_ref_position(self):
+        """APM 日志没有局部 NED 参考原点的等价物：如实 None。"""
+        return None
+
+    def get_mode_changed(self):
+        """MODE 消息切段（µs）。APM 没有 nav_state 数值轴：nav_state 给 -1，mode 用日志原文。"""
+        segs = []
+        last_mode, seg_start, seg_end = None, None, None
+        for row in self._iter_named("MODE"):
+            rec = dict(zip(self._fmt_by_name.get("MODE", {}).get("fields", []), row))
+            t_us = rec.get("TimeUS")
+            mode = str(rec.get("Mode") or rec.get("CMode") or rec.get("ModeNum") or "")
+            if t_us is None or not mode:
+                continue
+            t_us = int(t_us)
+            if mode != last_mode:
+                if last_mode is not None:
+                    segs.append(
+                        {
+                            "t_start_us": seg_start,
+                            "t_end_us": t_us,
+                            "nav_state": -1,
+                            "mode": last_mode,
+                            "armed": self._armed_at(seg_start),
+                        }
+                    )
+                last_mode, seg_start = mode, t_us
+            seg_end = t_us
+        if last_mode is not None:
+            segs.append(
+                {
+                    "t_start_us": seg_start,
+                    "t_end_us": seg_end or seg_start,
+                    "nav_state": -1,
+                    "mode": last_mode,
+                    "armed": self._armed_at(seg_start),
+                }
+            )
+        return segs
+
+    def _armed_at(self, t_us):
+        """时刻是否落在 armed 区间内（MODE 段没有 armed 字段，用区间折算）。"""
+        for s, e in self.armed_intervals:
+            if s <= t_us and (e is None or t_us < e):
+                return True
+        return False
+
+    def get_armed_changed(self):
+        """解锁/上锁区间（µs）。end 不会是 None：日志截止就用最后时间戳封口。"""
+        return [{"t_start_us": int(s), "t_end_us": int(e if e is not None else self.t_max_us)} for s, e in self.armed_intervals]
+
+    def get_firmware_version(self):
+        return self.fw_label
+
+    def get_version_info(self):
+        if self.fw["minor"] is None:
+            return None
+        return (self.fw["major"], self.fw["minor"], self.fw["patch"], None)
+
+    def get_version_info_str(self):
+        return self.fw_display
+
+    def get_vehicle_identity(self):
+        return {
+            "vehicle_type": self.vehicle_type,
+            "uid": None,
+            "hardware": None,
+            "hardware_subtype": None,
+            "airframe_id": self.airframe_id,
+            "ver_sw_branch": None,
+        }
+
+    def get_log_integrity(self):
+        """.bin 没有丢包记录：n_gaps/total 给 0；完整性看"有没有走到文件尾"与解析错误数。"""
+        return {
+            "total_dropout_ms": 0,
+            "n_gaps": 0,
+            "gaps": [],
+            "end_reached": bool(self._walked_ok),
+            "restart_topics": self.restart_topics,
+            "has_file_corruption": self._parse_errors > 0,
+        }
+
+    def has_file_corruption(self):
+        return self._parse_errors > 0
+
+    # ================= 可选能力 =================
+
+    def get_message_type_counts(self):
+        """按 FMT 名计数（.bin 按帧走，天然自描述）。走到尾 = walked_ok。"""
+        counts = {name: len(rows) for name, rows in self._rows.items()}
+        return counts, self._walked_ok, 0, len(self.raw)
+
+    def get_flight_track(self, max_points=None):
+        """地图轨迹：GPS 消息（Status>=3、坐标合法非零），等距抽样。取不到给 error + 原因。"""
+        cols = self._cols.get("GPS")
+        if not cols:
+            return {
+                "title": "轨迹",
+                "legend": True,
+                "tracks": [],
+                "error": "这份日志里没有 GPS 消息",
+                "errorReasons": ["日志里没有名为 GPS 的消息类型"],
+            }
+        lat, lon = cols.get("Lat"), cols.get("Lng")
+        alt, status = cols.get("Alt"), cols.get("Status")
+        ts = cols.get("timestamp")
+        if lat is None or lon is None or alt is None or ts is None:
+            missing = "/".join(nm for nm, v in (("Lat", lat), ("Lng", lon), ("Alt", alt), ("timestamp", ts)) if v is None)
+            return {
+                "title": "轨迹",
+                "legend": True,
+                "tracks": [],
+                "error": "GPS 消息缺坐标字段（%s）" % missing,
+                "errorReasons": ["GPS 缺 %s 列" % missing],
+            }
+        lat = np.asarray(lat, dtype=float)
+        lon = np.asarray(lon, dtype=float)
+        alt = np.asarray(alt, dtype=float)
+        ts = np.asarray(ts, dtype=np.int64)
+        valid = np.isfinite(lat) & np.isfinite(lon) & np.isfinite(alt)
+        valid &= (np.abs(lat) <= 90.0) & (np.abs(lon) <= 180.0)
+        valid &= ~((np.abs(lat) < 1e-7) & (np.abs(lon) < 1e-7))
+        if status is not None:
+            valid &= np.asarray(status, dtype=float) >= 3  # 3 = 3D fix（MAVLink GPS_FIX_TYPE）
+        idx_valid = np.nonzero(valid)[0]
+        if len(idx_valid) < 2:
+            return {
+                "title": "轨迹",
+                "legend": True,
+                "tracks": [],
+                "error": "GPS %d 个采样里只有 %d 个有效定位（要 Status>=3、坐标非 0 非 NaN）" % (len(ts), len(idx_valid)),
+                "errorReasons": ["有效定位不足"],
+            }
+        limit = int(max_points or 1500)
+        step = max(1, int(np.ceil(len(idx_valid) / limit)))
+        idx = [int(i) for i in idx_valid[::step]]
+        return {
+            "title": "轨迹",
+            "legend": True,
+            "tracks": [
+                {
+                    "label": "gps",
+                    "t": [round(int(ts[i]) / 1e6, 2) for i in idx],
+                    "lat": [float(lat[i]) for i in idx],
+                    "lon": [float(lon[i]) for i in idx],
+                    "alt": [float(alt[i]) for i in idx],
+                    "fullCount": int(len(idx_valid)),
+                    "dropped": int(len(ts) - len(idx_valid)),
+                }
+            ],
+        }
+
+    def report_materials(self):
+        """报告页原料。形态与 PX4 版本对齐（前端同一张表渲染）：能给的给，给不了给空。"""
+        counts, walked_ok, _off, file_size = self.get_message_type_counts()
+        return {
+            "sysInfo": {},
+            "infoDict": [],
+            "msgTypeStats": [
+                {"code": name, "name": name, "en": "", "desc": "", "count": n} for name, n in sorted(counts.items())
+            ],
+            "msgTypeWalkOk": bool(walked_ok),
+            "msgTypeWalkedBytes": 0,
+            "fileSizeBytes": int(file_size),
+            "messages": self.get_logged_events(),
+            "messagesMulti": [],
+            "dropouts": [],
+            "params": {str(k): v for k, v in self._params.items()},
+            "defaultParams": {},
+            # PARM 没有"默认值"机制：前端要按 False 处理（「没记录」≠「与默认一致」）
+            "defaultParamsKnown": False,
+            "changedParams": self.get_changed_parameters(),
+            "phases": [
+                {
+                    "startSec": round(seg["t_start_us"] / 1e6, 2),
+                    "endSec": round(seg["t_end_us"] / 1e6, 2),
+                    "navState": seg["nav_state"],
+                    "mode": seg["mode"],
+                    "armed": seg["armed"],
+                }
+                for seg in self.get_mode_changed()
+            ],
+        }
+
+
+def _is_apm(raw):
+    return bytes(raw[:2]) == _APM_MAGIC
+
+
+def _make_apm(raw, facts_cfg):
+    return ApmProvider(raw, facts_cfg)
+
+
+FORMATS.append((_is_apm, _make_apm, "ArduPilot .bin（AP_Logger）"))
 
 # PX4 .ulg（ULog）适配器 —— **本项目唯一认识 PX4 的地方**
 #
@@ -1680,6 +2662,7 @@ class Px4Provider:
         self._read_msg_info_dict()
         self._read_initial_parameters()
         self._read_data_list()
+        self._read_positions()
         self._read_logged_messages()
 
     # ================= 数据访问层 =================
@@ -1706,10 +2689,10 @@ class Px4Provider:
             )
         return out
 
-    def get_topic_data(self, topic, instance=0):
+    def get_dataset(self, topic, instance=0):
         """某个 topic 某个实例的**原样列**：{列名: 数组}（含 'field[0]' 这种数组列）。
 
-        取不到返回 None（不抛异常——契约要求）。
+        原 get_topic_data（2026-09-24 迁移到文档 API 名）。取不到返回 None（不抛异常——契约要求）。
         """
         d = self._find_topic(topic, instance)
         return d.data if d is not None else None
@@ -1779,7 +2762,7 @@ class Px4Provider:
 
     def get_first_existing_column(self, topic, names):
         """只取第一个实例、按候选名取第一个存在的**原样列**（概览指标兜底取数用）。"""
-        cols = self.get_topic_data(topic, 0)
+        cols = self.get_dataset(topic, 0)
         if not cols:
             return None
         for n in names if isinstance(names, (list, tuple)) else [names]:
@@ -1792,49 +2775,199 @@ class Px4Provider:
         return name in self._topics
 
     def match_version(self, spec):
-        """固件约束串：any / ">=1.15" / "<1.15" / ">=1.14,<1.15"（逗号=与）。
+        """固件约束串：any / ">=1.15" / "<1.15" / ">=1.15,<=1.16"（逗号=与）。
 
+        语法解释在 \`match_version_spec\`（api.py，与 ArduPilot 适配器共用同一份）：
         规则级的适用范围轴与节点级 \`ref(..., when_fw=)\` **共用这一个**（同一个概念、
-        同一套语法）；写错了先抛出来，别被下面"版本未知就放行"盖过去。
-        版本未知（老日志没写版本号）时不因版本排除——与迁移前"按字段存在性判定"一致。
+        同一套语法）。版本未知（老日志没写版本号）时不因版本排除——与迁移前
+        "按字段存在性判定"一致；写错的约束串先抛出来，不被"版本未知"盖过去。
         """
-        if not spec or spec == "any":
-            return True
-        # 先把约束串解析完：写得不对是**作者的笔误**，与这份日志有没有版本号无关，
-        # 所以先抛出来，而不是被"版本未知就放行"盖过去。
-        conds = []
-        for part in str(spec).split(","):
-            m = _re.match(r"^\s*(>=|<=|==|>|<)?\s*(\d+)\.?(\d+)?\s*$", part)
-            if not m:
-                raise ValueError("无法解析 firmware 约束：%r" % spec)
-            conds.append((m.group(1) or ">=", (int(m.group(2)), int(m.group(3) or 0))))
         if self.fw_minor is None:
-            return True
-        cur = (self.fw["major"] if self.fw["major"] is not None else 0, self.fw_minor)
-        for op, want in conds:
-            if not {
-                ">=": cur >= want,
-                "<=": cur <= want,
-                "==": cur == want,
-                ">": cur > want,
-                "<": cur < want,
-            }[op]:
-                return False
-        return True
+            cur = None
+        else:
+            cur = (self.fw["major"] if self.fw["major"] is not None else 0, self.fw_minor)
+        return match_version_spec(cur, spec)
 
-    def get_logged_information(self):
-        return dict(self.ulog.msg_info_dict)
+    def get_info_dict(self):
+        """(info, info_multi) 二元组：Information Message 键值对 + 多值信息（'M' 消息）。
+
+        原 get_logged_information（迁移到文档 API 名，并把多值信息一起交出——
+        报告页的 messagesMulti 从这里取，不再直读 self.ulog，同一份数据不写两条路）。
+        """
+        return (
+            dict(self.ulog.msg_info_dict),
+            dict(getattr(self.ulog, "msg_info_multiple_dict", None) or {}),
+        )
 
     def get_initial_parameters(self):
         return getattr(self.ulog, "initial_parameters", {}) or {}
 
-    def get_logged_messages(self):
+    def get_logged_events(self, t_start=None, t_end=None, level=None, pattern=None):
         """[{tSec, message, level, level_name}]（tSec = 相对日志起点的秒数）。
+
+        原 get_logged_messages（2026-09-24 迁移到文档 API 名），并按契约补四个可选过滤：
+        t_start/t_end 是相对秒，level 给单个值或列表，pattern 是大小写不敏感的子串；
+        全省 = 全量。过滤条件自相矛盾时返回空列表——"没有满足条件的消息"是个正常答案。
 
         内容在构造时由 \`_read_logged_messages()\` 算好一次——\`builtin_variables()\` 每条规则都要它，
         每次重建纯属白干。这里返回逐条复制的新 dict：调用方拿到的不能是内部状态。
         """
-        return [dict(m) for m in self._logged_messages]
+        out = [dict(m) for m in self._logged_messages]
+        if t_start is not None:
+            out = [m for m in out if m["tSec"] is not None and m["tSec"] >= t_start]
+        if t_end is not None:
+            out = [m for m in out if m["tSec"] is not None and m["tSec"] <= t_end]
+        if level is not None:
+            lv = set(level) if isinstance(level, (list, tuple)) else {level}
+            out = [m for m in out if m["level"] in lv]
+        if pattern:
+            out = [m for m in out if str(pattern).lower() in m["message"].lower()]
+        return out
+
+    # ================= 知识引擎查询 API =================
+    # 契约见 api.py 的 REQUIRED（docs/develop/engine-api-rework.md 并入）。
+    # 取数尽量委托上面已有的方法（同一份数据不写两条路）；新聚合只在没有现成入口时才算。
+
+    def get_start_timestamp(self):
+        return int(self.t0_us)
+
+    def get_last_timestamp(self):
+        return int(self.t_max_us)
+
+    def get_time_bounds(self):
+        return {
+            "start_us": int(self.t0_us),
+            "end_us": int(self.t_max_us),
+            # 从返回的 bounds 推导，不用 self.duration_s——那是显示口径（数据首末、0.1s 精度），
+            # 而这里 start_us 是日志头部起点（数据开始前），两个口径差可以超过 0.3s，
+            # 查询 API 内部必须自洽（guard step 9 就是这条）
+            "duration_s": round((int(self.t_max_us) - int(self.t0_us)) / 1e6, 3),
+            # 与 RESTART_DETECTED 同一判据（_read_data_list 扫全局数出来的回退 topic 数）
+            "has_wraparound": self.restart_topics > 0,
+        }
+
+    def get_dataset_description(self, topic=None):
+        """消息格式声明（pyulog 的 message_formats）：**含这份日志没录到的消息**——
+        它答"这种格式长什么样"，与 get_topic_meta() 答"这份日志录到了什么"互补。"""
+        formats = getattr(self.ulog, "message_formats", None) or {}
+
+        def one(fmt):
+            return {
+                "name": str(fmt.name),
+                "fields": [
+                    {
+                        "name": str(fn),
+                        # 数组字段带上长度（float32[3]），与日志里的写法一致
+                        "type": ("%s[%d]" % (t, arr)) if arr else str(t),
+                    }
+                    for (t, arr, fn) in fmt.fields
+                ],
+            }
+
+        if topic is not None:
+            fmt = formats.get(topic)
+            return one(fmt) if fmt is not None else None
+        return {str(name): one(fmt) for name, fmt in formats.items()}
+
+    def get_field_dtype(self, topic, field):
+        """字段 dtype 名。列名优先直接匹配（含 'q[0]' 这种数组列），取不到再试裸字段名。"""
+        for d in self._find_topic_all(topic):
+            for name in (field, "%s[0]" % field):
+                v = d.data.get(name)
+                if v is not None and len(v):
+                    return str(getattr(v, "dtype", type(v).__name__))
+        return None
+
+    def get_field_sizeof(self, topic, field):
+        """单元素字节数（数组字段是每元素的大小）。从格式声明里查基础类型，查不到返回 None。"""
+        fmt = (getattr(self.ulog, "message_formats", None) or {}).get(topic)
+        if fmt is None:
+            return None
+        for t, _arr, fn in fmt.fields:
+            if fn != field:
+                continue
+            base = str(t).split("[")[0]
+            try:
+                return int(ULog.get_field_size(base))
+            except Exception:
+                return None  # 嵌套复合类型没有定长：如实给 None，不猜
+        return None
+
+    def get_field_unit(self, topic, field):
+        """源单位（规范名）。表是构建期按"规则/图里写了 unit= 的引用"收录的——
+        **只含收录过的字段**，没收录的返回 None（不是没有单位，是本站不知道）。"""
+        return (FIELD_UNITS or {}).get("%s.%s" % (topic, field))
+
+    def get_changed_parameters(self):
+        """运行中变更的参数 [{tSec, name, value}]。report_materials 与查询 API 共用这一份。"""
+        changed = []
+        cp = getattr(self.ulog, "changed_parameters", None)
+        if cp is None:
+            cp = getattr(self.ulog, "_changed_parameters", [])
+        for p in cp:
+            changed.append(
+                {
+                    "tSec": round(int(getattr(p, "timestamp", 0) or 0) / 1e6, 2),
+                    "name": str(getattr(p, "name", "")),
+                    "value": _json_clean(getattr(p, "value", None)),
+                }
+            )
+        return changed
+
+    def get_home_position(self):
+        return dict(self.home_position) if self.home_position else None
+
+    def get_ref_position(self):
+        return dict(self.ref_position) if self.ref_position else None
+
+    def get_mode_changed(self):
+        """模式变化的连续区间（µs）。切段只在 \`_read_data_list()\` 做一次：
+        这里给查询 API 的 µs 形态；报告页阶段条的秒形态由 report_materials 从它换算。"""
+        return [dict(seg) for seg in self.mode_runs_us]
+
+    def get_armed_changed(self):
+        """解锁/上锁的连续区间（µs）。end 不会是 None——日志截止就用最后时间戳封口，
+        时序算子用的 ARMED_INTERVALS 才保留 None 的开口语义，两份形态各按各的用途来。"""
+        return [{"t_start_us": int(s), "t_end_us": int(e if e is not None else self.t_max_us)} for s, e in self.armed_intervals]
+
+    def get_firmware_version(self):
+        return self.fw_label
+
+    def get_version_info(self):
+        if self.fw["minor"] is None:
+            return None
+        return (self.fw["major"], self.fw["minor"], self.fw["patch"], self.fw_release_type)
+
+    def get_version_info_str(self):
+        return self.fw_display
+
+    def get_vehicle_identity(self):
+        """载具身份。**形态稳定**：没有的键给空串（None），让消费方按键取而不用探键。"""
+        return {
+            "vehicle_type": self.vehicle_type,
+            "uid": self.uuid or None,
+            "hardware": self.fw["hw"] or None,
+            "hardware_subtype": self.hw_subtype or None,
+            "airframe_id": self.airframe_id,
+            "ver_sw_branch": self.ver_sw_branch or None,
+        }
+
+    def get_log_integrity(self):
+        """完整性聚合：丢包 + 有没有走到文件尾 + 重启 + 损坏标记。
+        逐字节统计在这里重跑一次（它还顺带给 msgTypeStats 用；计算很便宜）。"""
+        _counts, walked_to_end, _off, _n = self.get_message_type_counts()
+        drops = getattr(self.ulog, "dropouts", [])
+        return {
+            "total_dropout_ms": self.dropout_total_ms,
+            "n_gaps": len(drops),
+            "gaps": [{"t_us": int(d.timestamp), "duration_us": int(d.duration)} for d in drops],
+            "end_reached": bool(walked_to_end),
+            "restart_topics": self.restart_topics,
+            "has_file_corruption": bool(getattr(self.ulog, "file_corruption", False)),
+        }
+
+    def has_file_corruption(self):
+        return bool(getattr(self.ulog, "file_corruption", False))
 
     def builtin_variables(self):
         """内置变量表。**每次返回新 dict**（引擎会往里写 compute 的输出）。
@@ -1856,7 +2989,18 @@ class Px4Provider:
             "RESTART_DETECTED": self.restart_topics > 0,
             "DROPOUT_MS": self.dropout_total_ms,
             # 日志消息：供「日志消息聚合」类经验按级别筛选
-            "MESSAGES": self.get_logged_messages(),
+            "MESSAGES": self.get_logged_events(),
+            # ---- 知识引擎内置变量（api.py 的 BUILTIN_VARIABLES；缺的给 None/空串，不编值）----
+            "SYS_UUID": self.uuid,
+            "AIRFRAME_ID": self.airframe_id,
+            "HOME_LAT": self.home_position["lat"] if self.home_position else None,
+            "HOME_LON": self.home_position["lon"] if self.home_position else None,
+            "HOME_ALT": self.home_position["alt"] if self.home_position else None,
+            "SW_VER": self.fw_label,
+            "SW_VER_HASH": self.ver_sw,
+            "HW_VER": self.fw["hw"],
+            "HW_VER_SUBTYPE": self.hw_subtype,
+            "FLIGHT_TIME_S": self.vehicle_life_s,
         }
 
     def get_report_facts(self):
@@ -1865,13 +3009,15 @@ class Px4Provider:
 
     # ================= 可选能力 =================
 
-    def get_flight_phases(self):
-        """连续的飞行阶段区间（报告页阶段条用）：按 nav_state 变化切段。
+    def has_data_appended(self):
+        """日志是否带追加数据段（pyulog 的同名 property，读 ULog 头部的追加偏移表）。"""
+        return bool(getattr(self.ulog, "has_data_appended", False))
 
-        数据在 \`_read_data_list()\` 里就一起算好了（同一批数组），这里只交出去。
-        返回逐段复制的新 dict：调用方拿到的不能是 provider 的内部状态。
-        """
-        return [dict(seg) for seg in self.phase_intervals]
+    def get_parameter_description(self, name=None):
+        """参数说明。**v1 返回 None**：参数字典（min/max/desc）是构建期从 meta 摘出来的
+        静态 JSON，由前端在「飞控参数」tab 按需拉取，没进引擎——这里没有数据源，
+        返回 None 如实说"给不出"，不冒充查过。"""
+        return None
 
     def get_logged_dropouts(self):
         return [
@@ -1898,13 +3044,14 @@ class Px4Provider:
             off += 3 + size
         return counts, off == n, off, n
 
-    def get_decoded_events(self):
+    def get_decoded_events(self, t_start=None, t_end=None, level=None, pattern=None):
         """PX4 事件（\`event\` topic）解码。解不出返回 None。
 
         pyulog 的 PX4Events 用**日志自带**的 metadata_events（那个 xz blob 就是这份固件的
         事件定义），所以不联网、与固件版本严格对应；定义里没有的 ID 显示
         [Unknown event with ID N]。Flight Review 的 Logged Messages 表就是
-        "解码事件 + 文本消息"两路合并，这里对齐它。
+        "解码事件 + 文本消息"两路合并，这里对齐它。过滤参数与 get_logged_events 同义
+        （t_start/t_end 相对秒、level 数值、pattern 子串）。
         """
         try:
             from pyulog.px4_events import PX4Events
@@ -1924,9 +3071,22 @@ class Px4Provider:
                         "message": str(text).strip(),
                     }
                 )
-            return out
+            return self._filter_event_list(out, t_start, t_end, level, pattern)
         except Exception:
             return None
+
+    def _filter_event_list(self, out, t_start, t_end, level, pattern):
+        """get_decoded_events 的过滤（与 get_logged_events 同一套语义，事件条目也带 tSec/level/message）。"""
+        if t_start is not None:
+            out = [m for m in out if m["tSec"] is not None and m["tSec"] >= t_start]
+        if t_end is not None:
+            out = [m for m in out if m["tSec"] is not None and m["tSec"] <= t_end]
+        if level is not None:
+            lv = set(level) if isinstance(level, (list, tuple)) else {level}
+            out = [m for m in out if m["level"] in lv]
+        if pattern:
+            out = [m for m in out if str(pattern).lower() in m["message"].lower()]
+        return out
 
     def get_flight_track(self, max_points=None):
         """地图轨迹（**可以多条**）：每条轨道按声明取数、换算、剔除未定位采样、等距抽样。
@@ -2041,7 +3201,7 @@ class Px4Provider:
             topic = bare.partition(".")[0]
             if isinstance(inst, slice):
                 continue  # 构建期就要求写死实例；这里防御性跳过
-            cols = self.get_topic_data(topic, inst)
+            cols = self.get_dataset(topic, inst)
             if not cols:
                 why.append("%s[%s]：日志里没有这个 topic" % (topic, inst))
                 continue
@@ -2147,7 +3307,7 @@ class Px4Provider:
         'M' 多值信息怎么拼回文本、'Q' 默认值怎么推、逐字节的消息类型统计……换一种日志格式
         就是另一套。
         """
-        info = self.get_logged_information()  # 走契约能力取，别再直读 self.ulog（同一份数据两处知识）
+        info, info_multi = self.get_info_dict()  # 走契约能力取，别再直读 self.ulog（同一份数据两处知识）
         cfgsys = self._cfg.get("sys_info_keys") or []
         info_types = getattr(self.ulog, "_msg_info_dict_types", None) or {}
         info_docs = self._cfg.get("info_key_docs") or {}
@@ -2219,7 +3379,7 @@ class Px4Provider:
         #   · 流式型（boot_console_output）：一整段控制台文本按定长切片，换行在段**内部**，
         #     一行还可能跨段 —— 只能直接拼接，补 \n 会凭空断行。
         # 判据：任一段自带换行 → 流式；否则逐行。实机日志两种键都出现过，别按一种写死。
-        multi_src = getattr(self.ulog, "msg_info_multiple_dict", None) or {}
+        multi_src = info_multi
         multi_types = getattr(self.ulog, "msg_info_multiple_dict_types", None) or {}
 
         def _fmt(v):
@@ -2264,18 +3424,7 @@ class Px4Provider:
                 for key, val in (get_defaults(bit) or {}).items():
                     default_params.setdefault(str(key), {})[field] = clean(val)
 
-        changed = []
-        cp = getattr(self.ulog, "changed_parameters", None)
-        if cp is None:
-            cp = getattr(self.ulog, "_changed_parameters", [])
-        for p in cp:
-            changed.append(
-                {
-                    "tSec": boot(getattr(p, "timestamp", 0) or 0),
-                    "name": str(getattr(p, "name", "")),
-                    "value": clean(getattr(p, "value", None)),
-                }
-            )
+        changed = self.get_changed_parameters()
 
         # ULog 消息类型统计：顺序与名字来自 facts.yaml 的 ulog_msg_types，没出现过的类型计 0
         counts, walked_to_end, walked_off, file_size = self.get_message_type_counts()
@@ -2321,7 +3470,17 @@ class Px4Provider:
             # 「与默认一致」，前端要区别对待，不能替它下结论。
             "defaultParamsKnown": bool(getattr(self.ulog, "has_default_parameters", False)),
             "changedParams": changed,
-            "phases": self.get_flight_phases(),
+            # 阶段条：从 get_mode_changed() 的 µs 形态换算成秒——切段只有 _read_data_list 一处
+            "phases": [
+                {
+                    "startSec": round(seg["t_start_us"] / 1e6, 2),
+                    "endSec": round(seg["t_end_us"] / 1e6, 2),
+                    "navState": seg["nav_state"],
+                    "mode": seg["mode"],
+                    "armed": seg["armed"],
+                }
+                for seg in self.get_mode_changed()
+            ],
         }
 
     # ================= 内部：解析与事实 =================
@@ -2523,7 +3682,7 @@ class Px4Provider:
 
         分两部分：先读**基准 topic** \`vehicle_status\`（机型 / 模式 / armed 区间 / 飞行阶段），
         再**扫全局**（总时长与时间基准、记录起始 UTC、数据质量）。这个 topic 只读这一处，
-        需要切段的都在同一批数组上算完——原先 \`get_flight_phases()\` 要为此把整份 dataset 留到运行期再切。
+        需要切段的都在同一批数组上算完——模式切段（\`get_mode_changed()\` 与报告页阶段条同源）在这里一次做完。
         条件值（这份日志没有的）统一用 None / "" 表示，由 \`_collect_facts()\` 决定给不给键。
         """
         ulog = self.ulog
@@ -2559,7 +3718,7 @@ class Px4Provider:
         # ---- armed 区间与飞行阶段 ----
         # 三样东西都从同一批数组切出来：armed 区间（时序算子按它切窗）、这次日志出现过的
         # 阶段集合（喂故障库）、连续阶段区间（报告页阶段条）。一起算，同一批数据不必切两遍。
-        armed_intervals, phases_present, phase_intervals = [], set(), []
+        armed_intervals, phases_present, mode_runs_us = [], set(), []
         armed_duration_s = 0.0
         if vs is not None:
             nav = self._first_field(vs, "nav_state")
@@ -2607,12 +3766,15 @@ class Px4Provider:
                 for lo_i, hi_i in runs:
                     code = int(nav_arr[lo_i])
                     seg_arm = int(np.median(arm_arr[lo_i : hi_i + 1])) if arm_arr is not None else None
-                    phase_intervals.append(
+                    mode_name = self._nav_names.get(code, "Mode %d" % code)
+                    # get_mode_changed() 的 µs 形态（查询 API，单一切段器）；
+                    # 报告页阶段条的秒形态由 report_materials 从它换算，别再写第二个切段器
+                    mode_runs_us.append(
                         {
-                            "startSec": round(int(vts[lo_i]) / 1e6, 2),
-                            "endSec": round(int(vts[hi_i]) / 1e6, 2),
-                            "navState": code,
-                            "mode": self._nav_names.get(code, "Mode %d" % code),
+                            "t_start_us": int(vts[lo_i]),
+                            "t_end_us": int(vts[hi_i]),
+                            "nav_state": code,
+                            "mode": mode_name,
                             "armed": seg_arm == _ARMING_STATE_ARMED,
                         }
                     )
@@ -2624,7 +3786,7 @@ class Px4Provider:
         self.armed_intervals = armed_intervals
         self.armed_duration_s = armed_duration_s
         self.phases_present = phases_present
-        self.phase_intervals = phase_intervals
+        self.mode_runs_us = mode_runs_us
 
         # ---- 扫全局：总时长与时间基准 ----
         # 时间基准是**开机以来的秒数**（PX4 时间戳本身就是开机起的微秒），这里不换算，
@@ -2637,6 +3799,8 @@ class Px4Provider:
                 t_min = a if t_min is None else min(t_min, a)
                 t_max = b if t_max is None else max(t_max, b)
         self.t0_us = int(getattr(ulog, "start_timestamp", 0) or (t_min or 0))
+        # 最后一条消息的时间戳：get_time_bounds() / get_armed_changed() 封口用
+        self.t_max_us = int(t_max) if t_max is not None else self.t0_us
         self.duration_s = round((t_max - t_min) / 1e6, 1) if t_min is not None else None
 
         # ---- 扫全局：记录起始的 UTC 时刻 ----
@@ -2666,6 +3830,67 @@ class Px4Provider:
         self.restart_topics = restart
         # 丢包累计
         self.dropout_total_ms = int(sum(getattr(d, "duration", 0) for d in getattr(ulog, "dropouts", [])))
+
+    def _read_positions(self):
+        """读 Home 点与参考原点——**两个不同概念，别混**：
+
+          · ref（参考原点）：局部 NED 坐标的原点，\`vehicle_local_position\` 的
+            \`ref_lat/ref_lon/ref_alt\`（EKF 对齐后的第一组非零值）。
+          · home（Home 点）：解锁/起飞的位置，取 \`vehicle_global_position\` 的首个有效
+            定位——armed 起点之后的第一个优先，全程没解锁就退回全程第一个。
+            与轨迹取数同一套合法性判据（非 0 非 NaN、范围合法），没有 fix_type 可看。
+
+        两份结果都缓存（builtin_variables 每条规则都取 HOME_*），构造期算一次。
+        """
+        self.home_position = None
+        self.ref_position = None
+
+        vgp = self._find_topic("vehicle_global_position", 0)
+        if vgp is not None:
+            lat = self._first_field(vgp, "latitude", "lat")
+            lon = self._first_field(vgp, "longitude", "lon", "lng")
+            alt = self._first_field(vgp, "altitude", "alt")
+            if lat is not None and lon is not None and alt is not None and len(lat):
+                a_lat = np.asarray(lat, dtype=float)
+                a_lon = np.asarray(lon, dtype=float)
+                a_alt = np.asarray(alt, dtype=float)
+                valid = np.isfinite(a_lat) & np.isfinite(a_lon) & np.isfinite(a_alt)
+                valid &= (np.abs(a_lat) <= 90.0) & (np.abs(a_lon) <= 180.0)
+                valid &= ~((np.abs(a_lat) < 1e-7) & (np.abs(a_lon) < 1e-7))
+                idx = np.nonzero(valid)[0]
+                if len(idx):
+                    # armed 起点之后的第一个有效点更接近"Home"；没有 armed 段就取全程第一个
+                    pick = int(idx[0])
+                    if self.armed_intervals and self.armed_intervals[0][0] is not None:
+                        vts = np.asarray(self._first_field(vgp, "timestamp"), dtype=np.int64)
+                        after = idx[vts[idx] >= self.armed_intervals[0][0]]
+                        if len(after):
+                            pick = int(after[0])
+                    self.home_position = {
+                        "lat": float(a_lat[pick]),
+                        "lon": float(a_lon[pick]),
+                        "alt": float(a_alt[pick]),
+                        "source": "vehicle_global_position",
+                    }
+
+        vlp = self._find_topic("vehicle_local_position", 0)
+        if vlp is not None:
+            r_lat = self._first_field(vlp, "ref_lat")
+            r_lon = self._first_field(vlp, "ref_lon")
+            r_alt = self._first_field(vlp, "ref_alt")
+            if r_lat is not None and r_lon is not None and r_alt is not None and len(r_lat):
+                a_lat = np.asarray(r_lat, dtype=float)
+                a_lon = np.asarray(r_lon, dtype=float)
+                a_alt = np.asarray(r_alt, dtype=float)
+                idx = np.nonzero((a_lat != 0) & (a_lon != 0) & np.isfinite(a_lat) & np.isfinite(a_lon))[0]
+                if len(idx):
+                    pick = int(idx[0])
+                    self.ref_position = {
+                        "lat": float(a_lat[pick]),
+                        "lon": float(a_lon[pick]),
+                        "alt": float(a_alt[pick]),
+                        "source": "vehicle_local_position.ref_*",
+                    }
 
     def _read_logged_messages(self):
         """读 \`ulog.logged_messages\`：日志消息（PX4 的 \`[模块] 文案\`，含警告 / 错误级别）。
@@ -2764,11 +3989,11 @@ FORMATS.append((_is_ulog, _make_px4, "PX4 ULog（.ulg）"))
 # 这里只做四件事：调度规则、求值表达式、调算子、发射 finding。
 # 它不认识任何 topic 名 / 字段名 / 码值 —— 那些全在 providers/<格式>.py 与
 # knowledge/<格式>/facts.yaml 里。判据：本文件里 grep 不到 \`vehicle_\` / \`ver_sw\` / \`cpuload\`
-# 之类的名字（tools/calibrate/lint_rules.py 有一条检查盯着）。
+# 之类的名字（tools/engine/lint_rules.py 有一条检查盯着）。
 #
 # 数据从哪来：providers/api.py 的契约。provider 由 open_log() 按文件头挑出来，
-# 本文件只调它的 get_topic_meta/get_topic_data/get_series/has_topic/match_version/
-# get_logged_information/get_initial_parameters/get_logged_messages/
+# 本文件只调它的 get_topic_meta/get_dataset/get_series/has_topic/match_version/
+# get_info_dict/get_initial_parameters/get_logged_events/
 # builtin_variables/get_report_facts 与可选能力，不碰 pyulog 对象。
 # ============================================================================
 

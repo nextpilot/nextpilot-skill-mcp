@@ -34,7 +34,7 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
 
 - 契约本体是 `engine/providers/api.py` 的三张常量表（REQUIRED / OPTIONAL / SEMANTICS）。
   它同时是**构建期**（`build-knowledge.mjs` 派生 `BUILTIN_VARS`、查每个适配器有没有漏实现）、
-  **运行期**（`check_provider()` 自检类型与缺席）、**测试**（`tools/calibrate/guard-px4log-provider.py`）
+  **运行期**（`check_provider()` 自检类型与缺席）、**测试**（`tools/engine/guard-px4log-provider.py`）
   三处的输入 —— 一处定义、三处使用。**不写 `typing.Protocol`**：两端都没有类型检查器
   （构建期不执行 Python、Pyodide 里没有 mypy），写了只是"看着有约束、实际没人管"。
 - 内置变量从 23 个收敛到 **11 个 + `has_topic()`**（实测 10 个零引用：
@@ -78,17 +78,18 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
   - `logged_messages` 改在构造期算一次并缓存。**不是**"也许用得上所以先存"：`builtin_variables()`
     里就有 `messages`，而 `_rule_env()` 在 `for _rule in RULES:` 循环体内
     （`rule_engine.py:305/314`），即**每条规则各调一次 `builtin_variables()`**——不缓存就是每条
-    规则把同一份列表重建一遍。契约方法 `get_logged_messages()` 现在返回逐条复制的副本。
+    规则把同一份列表重建一遍。契约方法 `get_logged_events()` 现在返回逐条复制的副本。
 - **`vehicle_status` 只读一次**，需要切段的东西在 `_read_data_list()` 里用同一批数组
   一次算完：armed 区间（`self.armed_intervals`）、出现过的阶段集合（`self.phases_present`，
-  喂故障库）、连续阶段区间（`self.phase_intervals`，报告页阶段条）。
-  原先这两件事分在两处（`_build` 里取一次、`get_flight_phases()` 自己再取一次），而且 `get_flight_phases()`
+  喂故障库）、连续模式区间（`self.mode_runs_us`，µs 形态；报告页阶段条由
+  `get_mode_changed()` 换算成秒）。
+  原先这两件事分在两处（`_build` 里取一次、阶段查询方法自己再取一次），而且查询方法
   为此要把整份 dataset 留到运行期再切一次——**留的是结果，不留 dataset**。
   顺带把"只取第一个"的写法都换成按 `instance` 取（`_find_topic`）：原先 `_find_topic_all(...)[0]`
   与 `_find_topic(topic, 0)` 混着用，前者是"列表第 0 个"、后者才是"某个实例"。
   两者在 PX4 的单实例 `vehicle_status` 上等价，已用数据层前后对照验证
   （`np_manifest` / `np_track` / `np_log_info` 逐字节一致——**基线盖不到数据层**，
-  它只比 result JSON，所以动 `get_flight_phases()` 必须另做这个对照）。
+  它只比 result JSON，所以动 `get_mode_changed()` 必须另做这个对照）。
 - **新增契约能力 `parser_version()`**（REQUIRED）：`rule_engine.py` 原先把
   `"parserVersion": "pyulog/pyodide-0.3.0"` 写死——一个与实际装的解析器无关的假版本串，
   而且把 `pyulog` 这个名字钉进了**格式无关层**（正是上面「机制 / 数据 / 格式」三分要避免的）。
@@ -140,7 +141,7 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
   `guard_tags`→`guardTags`），所以 `outputs` 名实相符，也与站内「规则编写参考」页（构建期生成、
   不入库，所以这里不写小节号）里讲 `outputs` 那一节的标题「输出与副作用」对齐。
   改动范围：24 个规则文件 + `engine/rule_engine.py`（局部变量 `_emit` → `_out`）+
-  `tools/calibrate/probe_rule.py` + `web/scripts/build-knowledge.mjs` + 指南页 + `engine/README.md` +
+  `tools/dev/probe_rule.py` + `web/scripts/build-knowledge.mjs` + 指南页 + `engine/README.md` +
   `facts.yaml` 注释。
 - **顺带消掉一处同名**：`build-knowledge.mjs` 里本来就有个**写产物的辅助函数** `emit(path, content)`，
   与规则键同名。规则键改叫 `outputs` 后它更刺眼，已一并改名 `writeArtifact()`（纯内部函数，9 个调用点）。
@@ -250,7 +251,7 @@ conditions: # 整块可省
   `alias=` 与它是同一个东西的两种写法（`ref("名", alias="旧名")` ≈ `ref("名", "旧名")`）。
 - **`known_legacy` 字段已删**。字段的版本差异只有三种表达：整条规则写死 `conditions.firmware`、
   同义改名用候选组、同名换单位/语义配 `unit=` 或拆规则。**没有白名单**。
-- **lint 的数组盲点已修**（`tools/calibrate/lint_rules.py` 的 `has_field`）：原先只在引用那一侧
+- **lint 的数组盲点已修**（`tools/engine/lint_rules.py` 的 `has_field`）：原先只在引用那一侧
   剥下标，而日志侧字段名是 `states[0]` 这种带下标的、字典侧是裸名，于是**数组字段在日志里永远
   匹配不上**——`estimator_status.states` 明明就在 1.11 的日志里，却被判成"哪里都没有"，
   当初 `known_legacy` 就是为它加的。现在两边都归一化到基名再比。
@@ -372,7 +373,7 @@ w_p95 = percentile(hypot(ref("estimator_wind.windspeed_north", "wind_estimate.wi
 **已经删掉的两样**（别再写回去）：节点级 `when_fw=`（同一字段换了**语义**就拆成两条规则，
 不该用版本门在一条规则里分叉）、`known_legacy`（白名单挡不住漏，字段能不能取到由存在性说话）。
 
-**字段校验（`tools/calibrate/lint_rules.py`）**按规则级 `firmware` 圈定的版本范围，在
+**字段校验（`tools/engine/lint_rules.py`）**按规则级 `firmware` 圈定的版本范围，在
 **回归日志实测字段**与**上游字典**里找，分类为 命中 / 版本错配 / 可疑。自检过：把
 `wind_estimate` 那支错标成 `>=1.15` 会精确报出"仅存在于 1.11"。
 
@@ -447,10 +448,10 @@ ydata, compute}`），引擎侧求值、单位换算、降采样都在引擎里�
 而 1.15+ 已改名成 `latitude_deg/longitude_deg`（单位也从 1e7 度变成度）——
 该经验在现代固件上其实一直静默不生效、连统计量都不产出；补上版本分流后才恢复正常。
 
-**怎么验证**：`python tools/calibrate/compare_baseline.py`（6 条日志逐字段比对）、
+**怎么验证**：`python tools/engine/compare_baseline.py`（6 条日志逐字段比对）、
 `python tools/calibrate/check-artifact.py`（生成产物真实执行）、
 `python tools/calibrate/lint-rules.py`（字段引用 + 版本错配）、
-`python tools/calibrate/probe_rule.py <log.ulg> <rule_id>`（单条经验逐节点诊断）。
+`python tools/dev/probe_rule.py <log.ulg> <rule_id>`（单条经验逐节点诊断）。
 
 ---
 
@@ -799,9 +800,9 @@ calibration:
 ```yaml
 fixtures:
   positive:
-    - { log: tools/calibrate/logs/39f26cce-*.ulg, expect: { severity: warning, fault_tags: [high_vibration] } }
+    - { log: tools/testdata/logs/39f26cce-*.ulg, expect: { severity: warning, fault_tags: [high_vibration] } }
   negative:
-    - { log: tools/calibrate/logs/95b077d9-*.ulg }
+    - { log: tools/testdata/logs/95b077d9-*.ulg }
 ```
 
 没有这一层，第三方的规则无法被验证，70/30 分成也就无从谈起；
@@ -908,11 +909,11 @@ calibration:
 fixtures:
   positive:
     - {
-        log: tools/calibrate/logs/39f26cce-337a-4f83-a967-45352f6e1e82.ulg,
+        log: tools/testdata/logs/39f26cce-337a-4f83-a967-45352f6e1e82.ulg,
         expect: { severity: warning, fault_tags: [high_vibration] },
       }
   negative:
-    - { log: tools/calibrate/logs/95b077d9-d719-45ea-bf91-5926170cbc52.ulg }
+    - { log: tools/testdata/logs/95b077d9-d719-45ea-bf91-5926170cbc52.ulg }
 ```
 
 **统一用 YAML**（经验、guard、字典同一格式，详见下方「格式结论」一节）。
@@ -1180,10 +1181,10 @@ fields:
 
 ```bash
 # 拉取指定 release tag 的 msg 与 parameters.json，生成/更新 meta/<tag>.json
-python tools/px4/fetch_px4_uorb_msg.py --tags v1.13.3,v1.14.4,v1.15.0,v1.16.0,main
+python tools/dev/fetch_px4_uorb_msg.py --tags v1.13.3,v1.14.4,v1.15.0,v1.16.0,main
 
 # CI / 本地校验：只比对不写入，若上游已变则非零退出
-python tools/px4/fetch_px4_uorb_msg.py --check
+python tools/dev/fetch_px4_uorb_msg.py --check
 ```
 
 **落盘结构：缓存与产物都按 tag 组织**——一个 tag 一个文件夹，里面的东西都属于该版本。
@@ -1343,9 +1344,9 @@ knowledge/px4/
 
 ## 实施步骤
 
-- **阶段 0 冻结基线**：`tools/calibrate/dump_baseline.py` 把 5 个日志的完整输出冻结成
-  `tools/calibrate/baseline/*.json` 提交（findings 全字段 + tags/guards/phases/checks*）
-- **阶段 0.5 同步字段与参数字典**：`tools/px4/fetch_px4_uorb_msg.py` 按 tag（v1.13.3 / v1.14.4 /
+- **阶段 0 冻结基线**：`tools/dev/dump_baseline.py` 把 5 个日志的完整输出冻结成
+  `tools/testdata/baseline/*.json` 提交（findings 全字段 + tags/guards/phases/checks*）
+- **阶段 0.5 同步字段与参数字典**：`tools/dev/fetch_px4_uorb_msg.py` 按 tag（v1.13.3 / v1.14.4 /
   v1.15.0 / v1.16.0 / main）各建一个文件夹，下载 `msg/` 与 `parameters.json`，生成
   `meta/<tag>.json`（该版本字段字典 + 参数字典）；
   人工补 `topic-overrides.yaml` 的 `aliases` / `groups` / `invalid`
@@ -1362,7 +1363,7 @@ knowledge/px4/
 2. **等价回归（核心）**：`compare_baseline.py` 要求 5 个日志输出与冻结基线逐条逐字段完全相同。
    基线：ce302d3b=9/F004、39f26cce=4/F001·F006·F009、95b077d9=0、两个 sample=0
 3. `px4log_engine_runner.py --probe-data` 结构不变
-4. `tsc --noEmit` + `pnpm build`；`node tools/browser/check-upload.mjs <ulog> <png>` 浏览器端跑通
+4. `tsc --noEmit` + `pnpm build`；`node web/scripts/browser/check-upload.mjs <ulog> <png>` 浏览器端跑通
 5. 抽查：改 `rules/vibration.yaml` 的阈值 → 报告页 finding 文案随之变化
 
 ## 风险与边界

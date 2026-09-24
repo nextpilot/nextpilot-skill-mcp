@@ -140,20 +140,20 @@ cd web && pnpm check:mcp
 | 加一条故障模式（根因 / 排查步骤）                                   | `px4/fault-kb.yaml`（trigger_tags 必须是引擎会产出的标签）                           |
 | 加一个可复用计算步骤                                                | `engine/operators.py`（`@operator` 声明 in/out arity），再在经验的 `compute` 里引用  |
 | 改 AI 报告口径                                                      | `px4/llm/*.md`                                                                       |
-| 同步固件元数据                                                      | `python tools/px4/fetch_px4_uorb_msg.py --tags ...` → 生成物在 `px4/meta/<tag>.json` |
+| 同步固件元数据                                                      | `python tools/dev/fetch_px4_uorb_msg.py --tags ...` → 生成物在 `px4/meta/<tag>.json` |
 
 ## 改完怎么验证
 
 ```bash
 cd web && node scripts/build-knowledge.mjs     # 构建；校验失败会直接报错（或 pnpm build:kb）
 # 等价回归：6 条真实日志与冻结基线逐字段比对（不依赖 Node）
-python tools/calibrate/compare_baseline.py
+python tools/engine/compare_baseline.py
 # 生成产物是否真的可执行（不只是语法）
 python tools/calibrate/check-artifact.py
 # 字段引用与版本错配（字段名写错时引擎只会静默取到 None，这条能揪出来）
 python tools/calibrate/lint-rules.py
 # 单条经验为什么不触发：逐节点打印
-python tools/calibrate/probe_rule.py tools/calibrate/logs/<log>.ulg <rule_id>
+python tools/dev/probe_rule.py tools/testdata/logs/<log>.ulg <rule_id>
 ```
 
 改完算子后，记得重跑 `python tools/px4/gen-rule-reference.py`（把算子目录与内置变量表注入

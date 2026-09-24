@@ -1,4 +1,4 @@
 // ⚠️ 自动生成，请勿手改。源文件在 engine/ 与 knowledge/px4/，改完跑 `pnpm build:kb`（dev/build 自动执行）。
 // 源：engine/{report_data,rule_engine}.py + engine/providers/*.py + knowledge/px4/{facts.yaml,plot/*.yml} 的内容哈希
 // 用途：存档里的派生数据（info / 曲线 / 轨迹）带的版本，与这里不一致就重新解析一次。
-export const DERIVED_DATA_VERSION = "c2a1e649a9c8";
+export const DERIVED_DATA_VERSION = "290fc0e28b0e";
