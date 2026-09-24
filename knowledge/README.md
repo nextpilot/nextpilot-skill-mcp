@@ -71,7 +71,7 @@ EdgeOne KV（站点已按「种子 + KV 增量」合并）。迁走后这两项�
 改完跑：
 
 ```bash
-cd web && pnpm check:skills     # 合规校验（CI 里也跑，见 tools/ci/check_all.py）
+pnpm web:check:skills     # 合规校验（CI 里也跑，见 tools/ci/check_all.py）
 ```
 
 三份文件都能在仓库里直接改、提 PR：详情页每个内容 Tab 右上角就是**那一份文件**的编辑入口
@@ -112,7 +112,7 @@ mcp/<slug>/
 改完跑：
 
 ```bash
-cd web && pnpm check:mcp
+pnpm web:check:mcp
 ```
 
 **「知识库」分组的两个页面在 `web/content/guide/` 里**（构建期生成、入库，`/guide` 站内可见）：
@@ -125,8 +125,8 @@ cd web && pnpm check:mcp
 | 我要……                                                              | 看 / 改                                                                                       |
 | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | 了解整套规则体系为什么这么设计                                      | [px4/CLAUDE.md](px4/CLAUDE.md)（给 AI 与维护者的设计上下文）                                  |
-| **新增 / 改一个 Skill**                                             | `web/content/skills/<slug>/` 三份文件（结构见上节），改完 `pnpm check:skills`                 |
-| **新增 / 改一个 MCP 条目**                                          | `web/content/mcp/<slug>/`（结构见上节；规范与 Skill **不同**），改完 `pnpm check:mcp`         |
+| **新增 / 改一个 Skill**                                             | `web/content/skills/<slug>/` 三份文件（结构见上节），改完 `pnpm web:check:skills`             |
+| **新增 / 改一个 MCP 条目**                                          | `web/content/mcp/<slug>/`（结构见上节；规范与 Skill **不同**），改完 `pnpm web:check:mcp`     |
 | **写一条新规则 / 改一条现有规则**                                   | 站内 `/guide/rule-schema`（字段、算子、常见坑；构建期生成，仓库里不留拷贝）                   |
 | 弄清自己这类经验该写在哪                                            | [px4/CLAUDE.md](px4/CLAUDE.md) 的「四类经验 → 四种载体」                                      |
 | 查现在有哪些规则、各自读什么字段、什么条件触发                      | 网站 `/guide/rule-catalogue`（构建时从 `rules/*.yaml` 生成，仓库里不留拷贝）                  |
@@ -157,12 +157,12 @@ python tools/dev/check_rules_compute.py tools/testdata/logs/<log>.ulg <rule_id>
 直接生成网站页面；产物是否与知识源一致，用 `--check` 比对（CI 用，不一致则退出码 1）：
 
 ```bash
-cd web && pnpm build:kb            # 生成全部产物（= node scripts/build-knowledge.mjs）
-cd web && pnpm build:kb --check    # 只比对不写入：任一产物与 knowledge/ 不一致就退出码 1
+pnpm web:build:kb            # 生成全部产物（= node scripts/build-knowledge.mjs）
+pnpm web:build:kb -- --check    # 只比对不写入：任一产物与 knowledge/ 不一致就退出码 1
 ```
 
 生成产物（提交进仓库，EdgeOne 直接 `next build` 也有得用）：
-`web/workers/pyodide-px4log-engine.ts`（内联 knowledge/engine/operators.py + knowledge/engine/engine.py + rules/*.yaml）、
+`web/workers/analysis-engine.generated.ts`（内联 knowledge/engine/operators.py + knowledge/engine/engine.py + rules/*.yaml）、
 `web/workers/fault-kb.generated.json`、
 `web/lib/knowledge/prompts.generated.js`、
 `px4/rules-editor-schema.generated.json`（编辑器用，见下节）。
@@ -177,7 +177,7 @@ cd web && pnpm build:kb --check    # 只比对不写入：任一产物与 knowle
 IDE 会拿旧词表去纠正新写法，比没有提示更糟）。
 
 它只管键名 / 枚举 / 类型这类「纯形状」的问题。`compute` 表达式**内部**的语法、算子名、
-字段存在性它查不了——那些在字符串里，仍然只有 `pnpm build:kb` 能查。
+字段存在性它查不了——那些在字符串里，仍然只有 `pnpm web:build:kb` 能查。
 
 **铁律**：生成物不要手改；所有数值判断只在 `px4/rules/*.yaml` + 引擎框架里发生，
 LLM 只做翻译与组装。

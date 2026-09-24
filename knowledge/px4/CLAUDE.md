@@ -92,7 +92,7 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
   顺带把"只取第一个"的写法都换成按 `instance` 取（`_find_topic`）：原先 `_find_topic_all(...)[0]`
   与 `_find_topic(topic, 0)` 混着用，前者是"列表第 0 个"、后者才是"某个实例"。
   两者在 PX4 的单实例 `vehicle_status` 上等价，已用数据层前后对照验证
-  （`np_manifest` / `np_track` / `np_log_info` 逐字节一致——**基线盖不到数据层**，
+  （`np_manifest` / `np_track` / `np_materials` 逐字节一致——**基线盖不到数据层**，
   它只比 result JSON，所以动 `get_mode_changed()` 必须另做这个对照）。
 - **新增契约能力 `parser_version()`**（REQUIRED）：`rule_engine.py` 原先把
   `"parserVersion": "pyulog/pyodide-0.3.0"` 写死——一个与实际装的解析器无关的假版本串，
@@ -461,7 +461,7 @@ ydata, compute}`），引擎侧求值、单位换算、降采样都在引擎里�
 
 ## 报告页数据层（`knowledge/engine/engine.py` 第二部分）：踩过的硬规则
 
-> 这一层的产出（`np_manifest` / `np_series` / `np_track` / `np_log_info`）直接决定报告页每个 tab 长什么样。
+> 这一层的产出（`np_manifest` / `np_series` / `np_track` / `np_materials`）直接决定报告页每个 tab 长什么样。
 > 下面每一条都是**实机日志逼出来的**，改之前先看一遍，别按"想当然"改回去。
 
 | 规则                                                                                                                                   | 为什么                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -561,7 +561,7 @@ load_crit = 0.95
   knowledge/engine/operators.py             ─┤
   knowledge/engine/engine.py                ─┘
         ↓ 生成的产物（提交进仓库）
-  web/workers/pyodide-px4log-engine.ts   ← Python 源码，内联 __RULES__/__FACTS__/__TOPICS__ 的 JSON 字面量
+  web/workers/analysis-engine.generated.ts   ← Python 源码，内联 __RULES__/__FACTS__/__TOPICS__ 的 JSON 字面量
   web/workers/fault-kb.generated.json
         ↓ 浏览器运行时
   Web Worker + Pyodide  →  执行 Python：基础事实层 → 匹配 firmware/vehicle → 取字段
@@ -575,7 +575,7 @@ load_crit = 0.95
 2. **表达式求值全在浏览器端**，但只用 Python 标准库 `ast` 做白名单求值——Pyodide 自带，
    不需要新 wheel。
 3. **校验全在构建期**：写错的经验（缺 `vehicle`、算子名拼错、表达式引用未声明变量）
-   在你 `pnpm build:kb` 时就失败，**根本进不了浏览器**，不会等到用户端才炸。
+   在你 `pnpm web:build:kb` 时就失败，**根本进不了浏览器**，不会等到用户端才炸。
 4. **不采用"浏览器直接读 YAML"**：那要多带一个 JS YAML 解析器、每次加载解析 20+ 个文件，
    而且丢掉构建期校验（错误延迟到用户端）。构建期编译在这里是明确更优的选择。
 5. 隐私口径不变：经验产物随站点发布，日志解析仍全部在本机。
@@ -586,7 +586,7 @@ load_crit = 0.95
 生成的 Python 大致长这样（`__RULES__` 等占位符在构建期被替换成 JSON 字面量）：
 
 ```python
-# web/workers/pyodide-px4log-engine.ts 里的 Python（自动生成，勿手改）
+# web/workers/analysis-engine.generated.ts 里的 Python（自动生成，勿手改）
 import json, ast
 import numpy as np
 from pyulog import ULog
@@ -740,7 +740,7 @@ triggers:
   def angle_diff_deg(a, b): ...      # 2 进 1 出
   ```
 
-  规则里写成 `in: [q_att], out: [...]` 而算子声明是 `in_arity=1` 对不上 → `pnpm build:kb` 直接失败。
+  规则里写成 `in: [q_att], out: [...]` 而算子声明是 `in_arity=1` 对不上 → `pnpm web:build:kb` 直接失败。
   **多输入/多输出不会被写成隐式约定，而是被签名强制校验。**
 
 - `out` 命名的变量在报告里可作为**中间量追溯**（校准阈值时能看到"欧拉角算出来是多少"），
@@ -1361,11 +1361,11 @@ knowledge/px4/
 
 ## 验证
 
-1. **反空洞护栏**：删掉某条的 `vehicle` 或 `triggers` → `pnpm build:kb` 必须失败；
+1. **反空洞护栏**：删掉某条的 `vehicle` 或 `triggers` → `pnpm web:build:kb` 必须失败；
    算子名拼错、表达式引用未声明变量同样失败
 2. **等价回归（核心）**：`compare_baseline.py` 要求 5 个日志输出与冻结基线逐条逐字段完全相同。
    基线：ce302d3b=9/F004、39f26cce=4/F001·F006·F009、95b077d9=0、两个 sample=0
-3. `px4log_engine_runner.py --probe-data` 结构不变
+3. `run_engine.py --probe-data` 结构不变
 4. `tsc --noEmit` + `pnpm build`；`node web/scripts/browser/check-upload.mjs <ulog> <png>` 浏览器端跑通
 5. 抽查：改 `rules/vibration.yaml` 的阈值 → 报告页 finding 文案随之变化
 

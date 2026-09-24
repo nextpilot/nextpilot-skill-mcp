@@ -23,7 +23,8 @@ from _logging import get_logger  # noqa: E402
 log = get_logger()
 
 # 复用同一套加载/执行逻辑，保证"基线跑的是什么，比对跑的就是什么"
-import px4log_engine_runner as runner  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "knowledge" / "engine"))
+import loader as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 # 数据在 tools/testdata/，工具在 tools/engine/——分住两处，所以用仓库根往下数，

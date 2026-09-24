@@ -1,4 +1,4 @@
-"""校验**生成产物**（web/workers/pyodide-px4log-engine.ts）能被当作合法 Python 执行。
+"""校验**生成产物**（web/workers/analysis-engine.generated.ts）能被当作合法 Python 执行。
 
 为什么需要它：本地回归跑的是 knowledge/engine/ 下的源文件，而浏览器里跑的是构建产物
 （operators.py + engine.py 经 String.raw 内联 + __FAULT_KB__/__RULES__
@@ -29,10 +29,11 @@ log = get_logger()
 
 # 数据配置的装配规则与本地回归共用一处（facts.yaml + plot/track.yml）——
 # 别在这里再手写一遍，两边不一致时本地跑得出、浏览器跑不出。
-import px4log_engine_runner as runner  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "knowledge" / "engine"))
+import loader as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-TS = REPO_ROOT / "web" / "workers" / "pyodide-px4log-engine.ts"
+TS = REPO_ROOT / "web" / "workers" / "analysis-engine.generated.ts"
 FAULT_KB = REPO_ROOT / "web" / "workers" / "fault-kb.generated.json"
 TRACK_YML = REPO_ROOT / "knowledge" / "px4" / "plot" / "track.yml"
 
@@ -263,12 +264,12 @@ def main() -> int:
     step += 1
     rule_name = "worker globals.get 名字核对"
 
-    worker_src = (REPO_ROOT / "web" / "workers" / "pyodide-px4log-worker.ts").read_text(encoding="utf-8")
+    worker_src = (REPO_ROOT / "web" / "workers" / "analysis-worker.ts").read_text(encoding="utf-8")
     asked = sorted(set(re.findall(r'globals\.get\("([A-Za-z_$][\w$]*)"\)', worker_src)))
     set_by_worker = set(re.findall(r'globals\.set\("([A-Za-z_$][\w$]*)"', worker_src))
 
     produced: dict[str, object] = {}
-    for entry in ("np_report", "np_manifest", "np_log_info", "np_track"):
+    for entry in ("np_report", "np_manifest", "np_materials", "np_track"):
         if entry not in ns:
             continue
         ns[entry]()

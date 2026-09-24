@@ -4,7 +4,7 @@
  * 为什么需要它：知识库是编译型内容，缺这段就会出现「改了规则没反应」——
  *   1. Next 自己热更新 `web/` 里的代码；
  *   2. `build-knowledge.mjs --watch` 重编译 `knowledge/{px4,engine}`（产物是
- *      `web/workers/pyodide-px4log-engine.ts` 等入库文件），Next 才会看到。
+ *      `web/workers/analysis-engine.generated.ts` 等入库文件），Next 才会看到。
  * 站点内容（guide/skills/mcp）真源就在 `web/content/` 下、运行期直接读盘，
  * 不需要拷贝；以前那段 `sync-content --watch` 已随真源唯一化退役。
  *

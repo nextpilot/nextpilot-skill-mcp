@@ -236,7 +236,7 @@ jobs:
         name: "Data-layer structure self-check (--probe-data)"
         when: "has_logs"
         workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/px4log_engine_runner.py", "--probe-data", "{LOGS}"]
+        command: ["{PYTHON}", "tools/engine/run_engine.py", "--probe-data", "{LOGS}"]
         hint: "The data layer structure is inconsistent. Review the probe output above for details."
 
       - id: "lint-rules"

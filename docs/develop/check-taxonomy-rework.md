@@ -26,7 +26,7 @@
 
 1. **名叫 `test` 的其实不是测试**：`web/scripts/test-issue-filer.mjs` 是全仓库最大的**守卫集**（21 节 131 条静态断言），而且是 `mutate_guards` 的主要变异目标；它跟生成器 `build-knowledge.mjs` 平铺在同一个目录里。
 2. **名叫 `check` 的其实是契约测试**：`tools/calibrate/guard-px4log-provider.py` 是逐份日志跑同一套断言的**契约测试**；`compare_baseline.py` 连 `test`/`check` 前缀都没有，却是**最硬的一道回归测试**。
-3. **目录名在撒谎**：`tools/calibrate/README.md` 说这里"都要真实 `.ulg`"，但 `check-pyodide-px4log-engine.py` **不需要日志**且挂在 push 阶段每次都跑——它是清单里唯一一个"住在 `calibrate/` 却不需要日志"的项。
+3. **目录名在撒谎**：`tools/calibrate/README.md` 说这里"都要真实 `.ulg`"，但 `check_engine_pyodide.py`**不需要日志**且挂在 push 阶段每次都跑——它是清单里唯一一个"住在 `calibrate/` 却不需要日志"的项。
 4. **阶段划分与执行时机脱钩**：`checklist.yml` 声明 6 个阶段，其中 **3 个是空占位**；而真正的执行时机由 4 套机制各说一遍（YAML 的 `stage`/`when`、CLI 的 `--stage`/`--with-*`、hook 的 `WITH_E2E`/`FULL_PUSH`、CI workflow 里的显式命令）。
 
 **整改思路**：按「怎么判定」分目录（轴 A），按「谁跑」分阶段（轴 C），两轴各自单一事实源；轴 B（作用域）不进目录结构，写进 `--list-stages` 的展示里。
@@ -51,7 +51,7 @@
 | `tools/calibrate/guard-px4log-provider.py`                                              | guard | ✅ **契约测试**（逐份日志跑同一套断言）                                                                                                        | push                        | needs-logs                 |
 | `tools/calibrate/px4log_engine_runner.py`                                               | check | ⚠️ **双身份**：主用途是探查工具；`--probe-data` 那一路是数据层测试                                                                             | push（仅 probe-data）/ 手动 | needs-logs                 |
 | `tools/calibrate/lint_rules.py`                                                         | lint  | 规则数据的字段引用 lint                                                                                                                        | push                        | needs-logs                 |
-| `tools/calibrate/check-pyodide-px4log-engine.py`                                        | check | 🛡 **产物检查**（真执行编译产物 + 核跨语言名字）                                                                                                | push                        | **always**（不需要日志！） |
+| `tools/calibrate/check_engine_pyodide.py`                                               | check | 🛡 **产物检查**（真执行编译产物 + 核跨语言名字）                                                                                                | push                        | **always**（不需要日志！） |
 | `tools/ci/check_engine_purity.py`                                                       | check | 🛡 源码守卫（engine 纯净性）                                                                                                                    | push                        | always                     |
 | `tools/ci/check_secrets.py`                                                             | check | 🛡 源码守卫（扫全部跟踪文件）                                                                                                                   | push                        | always                     |
 | `tools/ci/check_hygiene.py`                                                             | check | 🛡 **元守卫**（校验机制自身的卫生，多项）                                                                                                       | push                        | always                     |
@@ -97,7 +97,7 @@
 
 ```text
 guard-px4log-provider.py          跑日志，断言适配器契约         （A=执行断言，B=契约）
-check-pyodide-px4log-engine.py    真执行编译产物，核跨语言名字    （A=执行断言，但对象是产物）
+check_engine_pyodide.py    真执行编译产物，核跨语言名字    （A=执行断言，但对象是产物）
 check_secrets.py                  扫源码文本，找密钥形态          （A=静态扫描）
 check_hygiene.py                  扫源码，查校验机制有没有说谎     （A=静态扫描，B=元）
 ```
@@ -137,16 +137,16 @@ check_hygiene.py                  扫源码，查校验机制有没有说谎    
 
 | 调用方式                   | 分隔符 | 为什么                                                                                                                                                            |
 | -------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **命令行直接跑**的脚本     | `-`    | 连字符更像一条命令；仓库既有（`check-pyodide-px4log-engine.py`、`build-knowledge.mjs`）                                                                           |
+| **命令行直接跑**的脚本     | `-`    | 连字符更像一条命令；仓库既有（`check_engine_pyodide.py`、`build-knowledge.mjs`）                                                                                  |
 | **需要被 `import`** 的模块 | `_`    | 连字符 `.py` **不能 import**（`from check-x import y` 是语法错误）。这一类包括：共用库、`conftest.py`、以及**被 pytest 收集的 `test_*`**（pytest 会 import 它们） |
 
 > 这条同时解释了两件事：
-> ① 为什么 `test_engine_operators.py` 是下划线而 `check-pyodide-px4log-engine.py` 是连字符——
+> ① 为什么 `test_engine_operators.py` 是下划线而 `check_engine_pyodide.py` 是连字符——
 > 前者被 pytest import，后者只在命令行跑；
 > ② 为什么 `pyproject.toml` 的 `python_files` **不需要改**——所有 `test_*` 都保持下划线。
 >
 > **本仓库现成的例子**：`tools/calibrate/px4log_engine_runner.py`。
-> 它有 **6 个 importer**（`check-pyodide-px4log-engine.py`、`compare_baseline.py`、`dump_baseline.py`、
+> 它有 **6 个 importer**（`check_engine_pyodide.py`、`compare_baseline.py`、`dump_baseline.py`、
 > `guard-px4log-provider.py`、`lint_rules.py`、`probe_rule.py`），所以它用下划线——
 > 尽管它同时也是命令行入口。改成连字符这 6 处会在 import 时**直接 SyntaxError**（实测）。
 > 判定顺序：**先看有没有人 import 它，有就用 `_`**，命令行身份不影响这个结论。
@@ -173,25 +173,25 @@ check_hygiene.py                  扫源码，查校验机制有没有说谎    
 **允许第四段**：当被检对象是**产物**时，直接写产物在仓库里的全名。
 
 ```text
-check-pyodide-px4log-engine.py     →  check · pyodide-px4log-engine（产物全名）
+check_engine_pyodide.py     →  check · analysis-engine.generated（产物全名）
 ```
 
-念出来是"检查 pyodide-px4log-engine 这个产物"。比抽象成 `check-artifact-xxx` 更望文生义——
+念出来是"检查 analysis-engine.generated 这个产物"。比抽象成 `check-artifact-xxx` 更望文生义——
 被检对象那一格直接写了它在仓库里的准确名字。
 
 **"什么模块"段（第二段）——用本仓库内部名词**：
 
-| 模块                                        | 用哪个词        | 为什么不用别的                                                                                                           |
-| ------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| PX4 `.ulg` 日志链路                         | **`px4log`**    | 产物就叫 `pyodide-px4log-engine.ts` / `-worker.ts` / `-data.ts`；**不用 `ulog`**（仓库里已无 `ulog-*` 工具文件，属死词） |
-| 规则文件（`knowledge/px4/rules/*.yaml`）    | `rule`          | 单数，与目录名对齐                                                                                                       |
-| Python 引擎源码（`engine/`）                | `engine`        | 就是目录名                                                                                                               |
-| 编译产物（整体，不指名时）                  | `artifact`      | 文档里一直叫它"产物"                                                                                                     |
-| 校验机制自身                                | `meta`          | "元检查"项目里已在用                                                                                                     |
-| 整个仓库的提交内容                          | `repo`          | 通用词，无歧义                                                                                                           |
-| 工具链（Python / node / ruff / tsc 在不在） | `toolchain`     | 比 `prereq` 具体                                                                                                         |
-| 前端源码（组件 / Worker / 边缘函数）        | `web`           | 就是目录名                                                                                                               |
-| `web/content/skills` 与 `web/content/mcp`   | `skill` / `mcp` | 就是目录名                                                                                                               |
+| 模块                                        | 用哪个词        | 为什么不用别的                                                                                                          |
+| ------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| PX4 `.ulg` 日志链路                         | **`px4log`**    | 产物就叫 `analysis-engine.generated.ts` / `analysis-worker.ts`；**不用 `ulog`**（仓库里已无 `ulog-*` 工具文件，属死词） |
+| 规则文件（`knowledge/px4/rules/*.yaml`）    | `rule`          | 单数，与目录名对齐                                                                                                      |
+| Python 引擎源码（`engine/`）                | `engine`        | 就是目录名                                                                                                              |
+| 编译产物（整体，不指名时）                  | `artifact`      | 文档里一直叫它"产物"                                                                                                    |
+| 校验机制自身                                | `meta`          | "元检查"项目里已在用                                                                                                    |
+| 整个仓库的提交内容                          | `repo`          | 通用词，无歧义                                                                                                          |
+| 工具链（Python / node / ruff / tsc 在不在） | `toolchain`     | 比 `prereq` 具体                                                                                                        |
+| 前端源码（组件 / Worker / 边缘函数）        | `web`           | 就是目录名                                                                                                              |
+| `web/content/skills` 与 `web/content/mcp`   | `skill` / `mcp` | 就是目录名                                                                                                              |
 
 **"干什么"段（第三段）——判据是「念出来就知道它在做什么」**，要过两道闸门：
 
@@ -214,27 +214,27 @@ check-pyodide-px4log-engine.py     →  check · pyodide-px4log-engine（产物�
 
 **改名定案**：
 
-| 现状                                                | 新名                                                                   | 类型  | 分隔符                      |
-| --------------------------------------------------- | ---------------------------------------------------------------------- | ----- | --------------------------- |
-| `tools/calibrate/check-pyodide-px4log-engine.py`    | `tools/tests/check-pyodide-px4log-engine.py`（**名字不动**，只换目录） | check | `-`（命令行跑）             |
-| `tools/calibrate/guard-px4log-provider.py`          | `tools/guards/guard-px4log-provider.py`（**名字不动**，只换目录）      | guard | `-`（命令行跑）             |
-| `tools/calibrate/compare_baseline.py`               | `tools/tests/check-px4log-verdict-unchanged.py`                        | check | `-`                         |
-| （`px4log_engine_runner.py --probe-data` 那一路）   | `tools/tests/check-px4log-data-shape.py`                               | check | `-`                         |
-| `tools/calibrate/lint_rules.py`                     | `tools/guards/guard-rule-field-exists.py`                              | guard | `-`                         |
-| `tools/ci/check_engine_purity.py`                   | `tools/guards/guard-engine-pyodide-safe.py`                            | guard | `-`                         |
-| `tools/ci/check_secrets.py`                         | `tools/guards/guard-repo-no-secrets.py`                                | guard | `-`                         |
-| `tools/ci/check_hygiene.py`                         | `tools/guards/guard-meta-self-honest.py`                               | guard | `-`                         |
-| `web/scripts/test-issue-filer.mjs`                  | `web/guards/guard-web-invariants.mjs`                                  | guard | `-`                         |
-| `web/scripts/check-skill-spec.mjs`                  | `web/guards/guard-skill-dir-spec.mjs`                                  | guard | `-`                         |
-| `web/scripts/check-mcp-spec.mjs`                    | `web/guards/guard-mcp-dir-spec.mjs`                                    | guard | `-`                         |
-| `tools/calibrate/px4log_engine_runner.py`（主用途） | `tools/calibrate/probe-px4log-findings.py`                             | probe | `-`                         |
-| `tools/calibrate/dump_px4log_stats.py`              | `tools/calibrate/probe-px4log-stats.py`                                | probe | `-`                         |
-| `tools/calibrate/probe_rule.py`                     | `tools/calibrate/probe-rule-why-matched.py`                            | probe | `-`                         |
-| `tools/calibrate/dump_px4log_fields.py`             | `tools/calibrate/probe-px4log-fields.py`                               | probe | `-`                         |
-| `tools/calibrate/dump_baseline.py`                  | `tools/calibrate/dump-px4log-baseline.py`                              | dump  | `-`                         |
-| `tools/ci/check_prereq.py`                          | `tools/setup/check-toolchain-installed.py`                             | check | `-`                         |
-| `engine/tests/test_operators.py`                    | `tools/tests/test_engine_operators.py`                                 | test  | **`_`**（pytest 会 import） |
-| `engine/tests/test_rule_engine.py`                  | `tools/tests/test_engine_cel_sandbox.py`                               | test  | **`_`**（pytest 会 import） |
+| 现状                                                | 新名                                                              | 类型  | 分隔符                      |
+| --------------------------------------------------- | ----------------------------------------------------------------- | ----- | --------------------------- |
+| `tools/calibrate/check_engine_pyodide.py`           | `tools/tests/check_engine_pyodide.py`（**名字不动**，只换目录）   | check | `-`（命令行跑）             |
+| `tools/calibrate/guard-px4log-provider.py`          | `tools/guards/guard-px4log-provider.py`（**名字不动**，只换目录） | guard | `-`（命令行跑）             |
+| `tools/calibrate/compare_baseline.py`               | `tools/tests/check-px4log-verdict-unchanged.py`                   | check | `-`                         |
+| （`px4log_engine_runner.py --probe-data` 那一路）   | `tools/tests/check-px4log-data-shape.py`                          | check | `-`                         |
+| `tools/calibrate/lint_rules.py`                     | `tools/guards/guard-rule-field-exists.py`                         | guard | `-`                         |
+| `tools/ci/check_engine_purity.py`                   | `tools/guards/guard-engine-pyodide-safe.py`                       | guard | `-`                         |
+| `tools/ci/check_secrets.py`                         | `tools/guards/guard-repo-no-secrets.py`                           | guard | `-`                         |
+| `tools/ci/check_hygiene.py`                         | `tools/guards/guard-meta-self-honest.py`                          | guard | `-`                         |
+| `web/scripts/test-issue-filer.mjs`                  | `web/guards/guard-web-invariants.mjs`                             | guard | `-`                         |
+| `web/scripts/check-skill-spec.mjs`                  | `web/guards/guard-skill-dir-spec.mjs`                             | guard | `-`                         |
+| `web/scripts/check-mcp-spec.mjs`                    | `web/guards/guard-mcp-dir-spec.mjs`                               | guard | `-`                         |
+| `tools/calibrate/px4log_engine_runner.py`（主用途） | `tools/calibrate/probe-px4log-findings.py`                        | probe | `-`                         |
+| `tools/calibrate/dump_px4log_stats.py`              | `tools/calibrate/probe-px4log-stats.py`                           | probe | `-`                         |
+| `tools/calibrate/probe_rule.py`                     | `tools/calibrate/probe-rule-why-matched.py`                       | probe | `-`                         |
+| `tools/calibrate/dump_px4log_fields.py`             | `tools/calibrate/probe-px4log-fields.py`                          | probe | `-`                         |
+| `tools/calibrate/dump_baseline.py`                  | `tools/calibrate/dump-px4log-baseline.py`                         | dump  | `-`                         |
+| `tools/ci/check_prereq.py`                          | `tools/setup/check-toolchain-installed.py`                        | check | `-`                         |
+| `engine/tests/test_operators.py`                    | `tools/tests/test_engine_operators.py`                            | test  | **`_`**（pytest 会 import） |
+| `engine/tests/test_rule_engine.py`                  | `tools/tests/test_engine_cel_sandbox.py`                          | test  | **`_`**（pytest 会 import） |
 
 > 注意最后两行是**唯一**用下划线的新名——因为 pytest 必须 import 它们。这不是两套规则打架，
 > 是同一条规则（"被 import 的用 `_`"）在两个场景下的自然结果。
@@ -277,7 +277,7 @@ tools/
     guard-meta-self-honest.py          ← tools/ci/check_hygiene.py
     _shared.py                         共用函数（下划线：被 import 的那个）
   tests/                  「跑单个对象」+ 被 pytest 收集的用例
-    check-pyodide-px4log-engine.py     ← tools/calibrate/（已落地，只需换目录）
+    check_engine_pyodide.py     ← tools/calibrate/（已落地，只需换目录）
     check-px4log-verdict-unchanged.py  ← tools/calibrate/compare_baseline.py
     check-px4log-data-shape.py         ← px4log_engine_runner.py --probe-data 那一路
     test_engine_operators.py           ← engine/tests/test_operators.py
@@ -405,7 +405,7 @@ run: python tools/ci/check_all.py --with-mutate # ← 没有 --stage
 **批次 3 建议再切成 5 小步**，每小步独立提交、独立验证：
 
 - 3.0 两个**已改名**的文件换目录（名字不动）：
-  `check-pyodide-px4log-engine.py` → `tools/tests/`；`guard-px4log-provider.py` → `tools/guards/`
+  `check_engine_pyodide.py` → `tools/tests/`；`guard-px4log-provider.py` → `tools/guards/`
 - 3.1 `tools/calibrate/lint_rules.py` → `tools/guards/guard-rule-field-exists.py`
 - 3.2 `tools/ci/check_*.py` → `tools/guards/`，改名 `guard-engine-pyodide-safe.py` /
   `guard-repo-no-secrets.py` / `guard-meta-self-honest.py`。
@@ -491,12 +491,12 @@ run: python tools/ci/check_all.py --with-mutate # ← 没有 --stage
        setup 不是类型词，是目录名（tools/setup/）
 
 分隔符（按调用方式分，不按语言分）
-       命令行直接跑的脚本      →  -     例：check-pyodide-px4log-engine.py
+       命令行直接跑的脚本      →  -     例：check_engine_pyodide.py
        需要被 import 的模块    →  _     例：test_engine_operators.py、_logging.py、conftest.py
        理由：连字符 .py 不能 import（from check-x import y 是语法错误）
 
 模块（用本仓库内部名词）
-       px4log     PX4 .ulg 日志链路（产物叫 pyodide-px4log-*；不用 ulog，仓库里已无 ulog-* 工具）
+       px4log     PX4 .ulg 日志链路（产物叫 analysis-engine.generated.ts / analysis-worker.ts；不用 ulog，仓库里已无 ulog-* 工具）
        rule       规则文件 knowledge/px4/rules/
        engine     Python 引擎源码 engine/
        artifact   编译产物（不指名时）
@@ -522,7 +522,7 @@ run: python tools/ci/check_all.py --with-mutate # ← 没有 --stage
        baseline / contract / schema / purity / leak / self / spec / invariant
 
 允许第四段：被检对象是产物时，直接写产物全名
-       check-pyodide-px4log-engine.py   念出来 = "检查 pyodide-px4log-engine 这个产物"
+       check_engine_pyodide.py   念出来 = "检查 analysis-engine.generated 这个产物"
 
 改名实例
        compare_baseline.py    → check-px4log-verdict-unchanged.py

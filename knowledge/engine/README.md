@@ -24,14 +24,14 @@
 
 ## 什么时候跑
 
-| 场景                             | 谁把它跑起来                                                                                                                                                                                                                                                          |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **用户上传 `.ulg` 分析**         | 浏览器 Worker 里的 Pyodide。构建期 `web/scripts/build-knowledge.mjs` 把这些文件**当文本读走**，按 `operators.py → providers/api.py → providers/*.py → engine.py` 的顺序拼成一份内联进 `web/workers/pyodide-px4log-engine.ts`（导出 `PY_ULG_ENGINE`，worker 整段执行） |
-| **本地回归 / 校准**              | `tools/px4log_engine_runner.py` 按同样顺序拼接后 `exec`——跑的是**同一份源码**，所以本地结果与浏览器一致。其余校准脚本（`compare_baseline.py` / `dump_baseline.py` / `check_rules_compute.py` / `guard_provider_contract.py`）都 import 它                             |
-| 生成指南页的算子目录与内置变量表 | `build-knowledge.mjs` 从 `operators.py` 与 `providers/api.py` 派生                                                                                                                                                                                                    |
-| 阶段二服务端 / MCP               | `knowledge/engine/loader.py`（本地工具与 `server/` 共用的装配入口）：同序拼接后 `exec`，规则仍从 `knowledge/` 产物加载，不另存一份                                                                                                                                    |
+| 场景                             | 谁把它跑起来                                                                                                                                                                                                                                                              |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **用户上传 `.ulg` 分析**         | 浏览器 Worker 里的 Pyodide。构建期 `web/scripts/build-knowledge.mjs` 把这些文件**当文本读走**，按 `operators.py → providers/api.py → providers/*.py → engine.py` 的顺序拼成一份内联进 `web/workers/analysis-engine.generated.ts`（导出 `PY_ULG_ENGINE`，worker 整段执行） |
+| **本地回归 / 校准**              | `tools/engine/run_engine.py` 提供命令行入口，校准脚本（`compare_baseline.py` / `dump_baseline.py` / `check_rules_compute.py` / `guard_provider_contract.py`）都 import `knowledge/engine/loader.py` 直接                                                                  |
+| 生成指南页的算子目录与内置变量表 | `build-knowledge.mjs` 从 `operators.py` 与 `providers/api.py` 派生                                                                                                                                                                                                        |
+| 阶段二服务端 / MCP               | `knowledge/engine/loader.py`（本地工具与 `server/` 共用的装配入口）：同序拼接后 `exec`，规则仍从 `knowledge/` 产物加载，不另存一份                                                                                                                                        |
 
-注意：**构建期不执行这些代码**，只是搬运。改了它们必须重新 `cd web && pnpm build:kb`，
+注意：**构建期不执行这些代码**，只是搬运。改了它们必须重新 `pnpm web:build:kb`，
 否则浏览器里跑的还是旧的一份。
 
 ## 报告结构（引擎的输出）
@@ -85,7 +85,7 @@ operators.py → providers/api.py → providers/*.py → engine.py
 | `__FAULT_KB__` 之外，`OPERATORS` / `SIGNATURES`                        | `operators.py`（最先拼）                                        |
 | `open_log` / `REQUIRED` / `OPTIONAL` / `BUILTIN_VARIABLES` / `FORMATS` | `providers/api.py`                                              |
 | `provider` / `run_all`                                                 | `engine.py` 第一部分（第二部分的数据层直接用同一个 `provider`） |
-| `ulog_bytes`                                                           | 运行期注入（浏览器 worker / `px4log_engine_runner.py`）         |
+| `ulog_bytes`                                                           | 运行期注入（浏览器 worker / `loader.py`）                       |
 
 因此 `pyproject.toml` 对 `engine.py` / `providers/px4.py` 等片段关掉了
 **F821（未定义名）**——**只关这一个规则，且只关这几个文件**；`tools/` 下 F821 仍然生效
@@ -102,7 +102,7 @@ python tools/ci/check_all.py
 
 它按「是否需要真实 `.ulg` 日志」分两组：
 
-- **不需要日志**（`ruff` / `build:kb --check` / 指南页算子表与源码一致 / 产物合法 / `tsc`）：
+- **不需要日志**（`ruff` / `pnpm web:build:kb -- --check` / 指南页算子表与源码一致 / 产物合法 / `tsc`）：
   任何地方都能跑，云端 CI 每次提交都跑。
 - **需要日志**（`compare_baseline` / `guard_provider_contract` / `--probe-data` / `check_rules_fields`）：日志含
   GPS 轨迹、不入库（见 `.gitignore`），**云端 CI 跑不了**，只在有日志的开发机上跑 —— 改本目录后必跑。
@@ -110,7 +110,7 @@ python tools/ci/check_all.py
 要单独调试某一项时：
 
 ```bash
-cd web && pnpm build:kb                      # 内联进浏览器产物 + 生成指南页
+pnpm web:build:kb                      # 内联进浏览器产物 + 生成指南页
 python tools/engine/guard_provider_contract.py tools/testdata/logs/*.ulg   # 适配器契约测试
 python tools/engine/compare_baseline.py   # 6 条真实日志与冻结基线逐字段比对
 python tools/engine/check_rules_fields.py         # 字段引用与版本错配（只报告）

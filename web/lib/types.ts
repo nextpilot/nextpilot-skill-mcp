@@ -332,7 +332,7 @@ export interface LogMsgTypeStat {
     count: number;
 }
 
-/** np_log_info() 的返回：系统信息 / 事件 / 多值信息 / 丢包 / 参数 / 飞行阶段 */
+/** np_materials() 的返回：系统信息 / 事件 / 多值信息 / 丢包 / 参数 / 飞行阶段 */
 export interface LogInfo {
     sysInfo: Record<string, string>;
     /** 'I' 消息的完整字典（sysInfo 是它按 facts.yaml 挑出来的子集） */

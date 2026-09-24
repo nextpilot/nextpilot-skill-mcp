@@ -87,15 +87,15 @@
 
 ## 3. 落点
 
-| 文件                                   | 作用                                                                                                     |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `web/functions/_lib/issue-filer.js`    | **新建**。指纹计算、脱敏、KV 去重、限流、调 issue API。平台无关（GitHub / Gitee 由 `ISSUE_PROVIDER` 选） |
-| `web/functions/api/issues.js`          | **新建**。浏览器报错的唯一入口（POST），校验 + 限流 + 转交                                               |
-| `web/functions/api/explain.js` 等      | 在 catch 分支调 `reportIssue(env, waitUntil, {...})`——服务端本地就有完整栈，最划算                       |
-| `web/lib/issue-bridge.ts`              | **新建**。`window.onerror` + `unhandledrejection` + 导出手动 `reportError()`；采样与去抖在前端也做一层   |
-| `web/app/global-error.tsx`             | **新建**。App Router 渲染错误兜底（现在完全没有）                                                        |
-| `web/workers/pyodide-px4log-worker.ts` | Worker 内 `catch` 调 `reportError()`——**解析类错误是最该上报的一类**                                     |
-| `docs/operations/README.md`            | 补环境变量表与排查条目                                                                                   |
+| 文件                                | 作用                                                                                                     |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `web/functions/_lib/issue-filer.js` | **新建**。指纹计算、脱敏、KV 去重、限流、调 issue API。平台无关（GitHub / Gitee 由 `ISSUE_PROVIDER` 选） |
+| `web/functions/api/issues.js`       | **新建**。浏览器报错的唯一入口（POST），校验 + 限流 + 转交                                               |
+| `web/functions/api/explain.js` 等   | 在 catch 分支调 `reportIssue(env, waitUntil, {...})`——服务端本地就有完整栈，最划算                       |
+| `web/lib/issue-bridge.ts`           | **新建**。`window.onerror` + `unhandledrejection` + 导出手动 `reportError()`；采样与去抖在前端也做一层   |
+| `web/app/global-error.tsx`          | **新建**。App Router 渲染错误兜底（现在完全没有）                                                        |
+| `web/workers/analysis-worker.ts`    | Worker 内 `catch` 调 `reportError()`——**解析类错误是最该上报的一类**                                     |
+| `docs/operations/README.md`         | 补环境变量表与排查条目                                                                                   |
 
 环境变量（EdgeOne 控制台）：
 

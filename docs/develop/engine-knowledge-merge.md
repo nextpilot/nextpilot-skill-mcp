@@ -129,7 +129,7 @@ knowledge/                  ← 独立项目根（一级目录）
 **为什么这件事本身是安全的**（2026-09-24 调查，只读）：
 
 - 这两份**本来就是同一个命名空间**：`px4log_engine_runner.py` 按文本拼接后**单次 exec**（L103-115）；
-  浏览器侧 `pyodide-px4log-worker.ts:259` 是 `runPythonAsync(PY_ULG_CHECKS + PY_ULG_DATA_HELPERS)`，
+  浏览器侧 `analysis-worker.ts:259` 是 `runPythonAsync(PY_ULG_CHECKS + PY_ULG_DATA_HELPERS)`，
   全仓只有这一处引用点。→ 合并**不改变任何运行行为**，是纯静态搬运。
 - `report_data.py` 直接用 rule_engine 才有的 `provider` / `run_all` / `_rule_env` / `_eval_compute` /
   `_pick_ref` / `_split_ref`；`pyproject.toml` 专为这两份（+`providers/px4.py`）关 F821
@@ -140,12 +140,12 @@ knowledge/                  ← 独立项目根（一级目录）
 
 **在 §4.1~4.3 清单之上，本次要额外决定 / 执行的**：
 
-| 项                    | 说明                                                                                                                                                 |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **新文件名**          | 合起来 1114 行，叫 `rule_engine.py` 就名不副实（里面有 LTTB / `np_track` / `np_log_info` / 时间口径）。**已定 `engine.py`**（2026-09-24 执行时拍板） |
-| **产物也要合**        | 只合源文件不合产物，就成了"一份源拆成两个产物"，比现状更绕 → `pyodide-px4log-data.ts` 退场、`PY_ULG_DATA_HELPERS` 取消、worker 那句字符串拼接去掉    |
-| 拼接顺序              | rule_engine 段必须**在前**：`RULES.sort`、`provider = open_log(...)`、`_COMPUTE_GLOBALS["has_topic"] = provider.has_topic` 都是它的顶层语句          |
-| `test_rule_engine.py` | 它只把 operators + rule_engine 拼进沙箱做 CEL 单测；合并会顺带 exec 掉 296 行数据层（能跑，但稀释针对性）→ 接受，还是给数据层留门，做时定            |
+| 项                    | 说明                                                                                                                                                  |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **新文件名**          | 合起来 1114 行，叫 `rule_engine.py` 就名不副实（里面有 LTTB / `np_track` / `np_materials` / 时间口径）。**已定 `engine.py`**（2026-09-24 执行时拍板） |
+| **产物也要合**        | 只合源文件不合产物，就成了"一份源拆成两个产物"，比现状更绕 → `pyodide-px4log-data.ts` 退场、`PY_ULG_DATA_HELPERS` 取消、worker 那句字符串拼接去掉     |
+| 拼接顺序              | rule_engine 段必须**在前**：`RULES.sort`、`provider = open_log(...)`、`_COMPUTE_GLOBALS["has_topic"] = provider.has_topic` 都是它的顶层语句           |
+| `test_rule_engine.py` | 它只把 operators + rule_engine 拼进沙箱做 CEL 单测；合并会顺带 exec 掉 296 行数据层（能跑，但稀释针对性）→ 接受，还是给数据层留门，做时定             |
 
 **引用面（2026-09-24 实测计数，模式 `rule_engine|report_data|PY_ULG_*|pyodide-px4log-data`）**：
 `build-knowledge.mjs` 21、`knowledge/px4/CLAUDE.md` 22、`engine/README.md` 14、`CLAUDE.md` 7、
@@ -198,7 +198,7 @@ knowledge/                  ← 独立项目根（一级目录）
 
 `.gitattributes:6` 记录了踩过的坑：行尾处理不当会让 **8 个产物全部被误报成"与 knowledge/ 不一致"**，
 且只在 Windows 全新 clone 上复现。
-→ `git mv` 后务必跑 `pnpm build:kb --check`；若出现"全部产物不一致"，先查行尾再查逻辑。
+→ `git mv` 后务必跑 `pnpm web:build:kb --check`；若出现"全部产物不一致"，先查行尾再查逻辑。
 
 ---
 
@@ -241,10 +241,10 @@ python -m pytest                       # testpaths 已改指 knowledge/engine/te
 python tools/engine/check_engine_purity.py
 
 # 3. 知识构建：一致性比对（注意 §5.4 的行尾误报）
-cd web && pnpm build:kb && node scripts/build-knowledge.mjs --check
+pnpm web:build:kb && cd web && node scripts/build-knowledge.mjs --check
 
 # 4. 类型与 lint
-cd web && pnpm typecheck && pnpm lint
+pnpm web:typecheck && pnpm web:lint
 
 # 5. 守卫自证
 python tools/ci/check_all.py --with-mutate
@@ -283,7 +283,7 @@ python tools/ci/check_all.py --with-mutate
 
 | 产物                                                                           | 现在写到哪                                                |
 | ------------------------------------------------------------------------------ | --------------------------------------------------------- |
-| `pyodide-px4log-engine.ts` / `-data.ts` / `fault-kb.generated.json`            | `web/workers/`                                            |
+| `analysis-engine.generated.ts` / `fault-kb.generated.json`                     | `web/workers/`                                            |
 | `prompts.generated.js` / `plots.generated.ts` / `derived-version.generated.ts` | `web/lib/knowledge/`                                      |
 | `rule-catalogue.mdx` / `rule-schema.mdx`                                       | `web/content/guide/`                                      |
 | `px4-main.json`（参数字典）                                                    | `web/public/params/`                                      |
@@ -304,7 +304,7 @@ knowledge/
 ├── px4/  engine/              源 + 工具
 ├── scripts/build.mjs          编译器（原 web/scripts/build-knowledge.mjs）
 ├── dist/                      ★ knowledge 自己的产物（源与产物分离）
-│   ├── workers/               pyodide-px4log-engine.ts · -data.ts · fault-kb.generated.json
+│   ├── workers/               analysis-engine.generated.ts · fault-kb.generated.json
 │   ├── lib/                   prompts.generated.js · plots.generated.ts · derived-version.generated.ts
 │   ├── guide/                 rule-catalogue.mdx · rule-schema.mdx
 │   ├── params/                px4-main.json

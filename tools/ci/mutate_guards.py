@@ -23,7 +23,7 @@
 
 ## 为什么改产物而不改引擎源码
 
-产物侧守卫（`check_engine_pyodide.py`）读的是编译产物 `web/workers/pyodide-px4log-engine.ts`，
+产物侧守卫（`check_engine_pyodide.py`）读的是编译产物 `web/workers/analysis-engine.generated.ts`，
 不是 `knowledge/engine/providers/px4.py`。所以变异要打在**产物**上——打源码的话守卫根本看不到，
 自证会得出"守卫红不起来"的假结论。产物与源码一致由另一道门（`build:kb --check`）保证，
 两层各管各的，这才是它们各自的职责边界。
@@ -90,7 +90,7 @@ LOG_DIR = ROOT / "tools" / "testdata" / "logs"
 PY = sys.executable
 NODE = shutil.which("node")
 
-ARTIFACT = "web/workers/pyodide-px4log-engine.ts"
+ARTIFACT = "web/workers/analysis-engine.generated.ts"
 FLIGHT_MAP = "web/components/LogFlightMap.tsx"
 
 # 守卫的两种"层"：产物侧真执行编译产物（慢、要科学栈、要真实日志），
@@ -307,7 +307,7 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         name="坏输入不再让校验脚本非零退出",
-        path="tools/px4log_engine_runner.py",
+        path="tools/engine/run_engine.py",
         # 锚点必须在**探针真走到的那条路**上：探针跑的是 `--probe-data`，进的是 `_main_probe`，
         # 而 `_main_run` 的 `return 1 if failed else 0` 它一次都不会经过——打在那里等于
         # 什么都没测（第一版就这么写的，自证因此报"守卫恒绿"）。
@@ -863,7 +863,7 @@ def _install_signal_guard() -> None:
     """被中断时也要还原 —— `finally` 挡不住 SIGTERM / Ctrl-C。
 
     `finally` 只在异常/正常返回时执行；SIGTERM 的默认处理是**立刻终止进程**，不走 finally。
-    2026-09-19 真踩到了：全量自证跑到第 17 条被超时杀掉，`px4log_engine_runner.py` 的
+    2026-09-19 真踩到了：全量自证跑到第 17 条被超时杀掉，`run_engine.py` 的
     `return 1 if failed else 0` 就留在了 `return 0` 的状态——下一次跑**任何**守卫，
     看到的都是一条假的基线失败（而且提示指向的方向完全不对）。
     """

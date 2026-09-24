@@ -5,7 +5,7 @@ r"""`knowledge/engine/` 必须是**纯 Python** —— 不许碰 Pyodide / JS �
 `knowledge/engine/` 是「一份源码、三个运行时」共用：
 
 - **浏览器**：`web/scripts/build-knowledge.mjs` 把 `operators.py` / `providers/*.py` /
-  `engine.py` 拼成一段 Python 字符串，内联进 `web/workers/pyodide-px4log-engine.ts`，
+  `engine.py` 拼成一段 Python 字符串，内联进 `web/workers/analysis-engine.generated.ts`，
   在 Pyodide 里跑（日志不出设备，所以只能这样）；
 - **本机**：`tools/calibrate/` 直接把 `knowledge/engine/` 指进 `sys.path`，用 CPython 跑同一份；
 - **将来**：独立后端进程也打算复用这一份。

@@ -5,7 +5,7 @@
 # **同一个节里没有分支/回退/异常** → 留这里；有 → 进 provider。
 # 所以换一种日志格式（ArduPilot .bin）时，这个文件要另写一份，providers/px4.py 也要。
 #
-# 改这个文件不用碰 Python：`cd web && pnpm build:kb` 之后，浏览器与本地回归同时生效。
+# 改这个文件不用碰 Python：`pnpm web:build:kb` 之后，浏览器与本地回归同时生效。
 # （注意它是**整份内联**进浏览器产物的，见 knowledge/engine/providers/api.py 顶部的说明：
 #   新增节前先问一句"运行期用得上吗"，只给构建期用的内容不该放这儿。）
 #

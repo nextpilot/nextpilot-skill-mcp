@@ -47,7 +47,7 @@ YAML」，那会冲掉注释与 `>-` 折叠写法；而一个文件本来就可�
 
 ⚠️ 规则读的是**构建产物**：`compute` 由构建期的编译器（`web/scripts/lib/rule-expr.mjs`）
 编译成表达式，Python 侧不重复实现。所以改完 `knowledge/px4/rules/*.yaml` 必须先
-`cd web && pnpm build:kb`，本脚本才会看到新规则；产物比源旧时它会直接报错并退出 2。
+`pnpm web:build:kb`，本脚本才会看到新规则；产物比源旧时它会直接报错并退出 2。
 
 退出码（以后要接 CI，别改成「只打印不计数」）：
   0 = 规则跑通了（触发与不触发都算跑通）
@@ -85,14 +85,16 @@ log = get_logger()
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from probe_rule import describe, probe_expr, targets_of  # noqa: E402
-from px4log_engine_runner import _load_rules, build_namespace, call  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "knowledge" / "engine"))
+from loader import load_rules, build_namespace, call  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RULES_DIR = REPO_ROOT / "knowledge" / "px4" / "rules"
 PLOTS_TS = REPO_ROOT / "web" / "lib" / "knowledge" / "plots.generated.ts"
 REPORT_DIR = REPO_ROOT / ".cache" / "px4" / "rule-reports"
 LOG_DIR = REPO_ROOT / ".cache" / "px4" / "logs"
-ARTIFACT_TS = REPO_ROOT / "web" / "workers" / "pyodide-px4log-engine.ts"
+ARTIFACT_TS = REPO_ROOT / "web" / "workers" / "analysis-engine.generated.ts"
 PLOT_DIR = REPO_ROOT / "knowledge" / "px4" / "plot"
 # 编辑时**保存前**的原文落在这里：编译不过要能还原，不能把坏文件留在 knowledge/ 里。
 # rules 与 plot 共用一个备份目录：分开的话「改坏了要去哪个目录找」就多了一个要记的地方。
@@ -707,7 +709,7 @@ def html_page(
 <title>%(title)s · 规则体检</title>
 <style>%(css)s</style></head><body><div class="wrap">
 %(body)s
-<footer>%(back)s改了 <code>knowledge/px4/rules/*.yaml</code> 之后要先 <code>cd web &amp;&amp; pnpm build:kb</code>，
+<footer>%(back)s改了 <code>knowledge/px4/rules/*.yaml</code> 之后要先 <code>pnpm web:build:kb</code>，
 本脚本读的是构建产物。</footer>
 </div></body></html>
 """ % {
@@ -750,7 +752,7 @@ def find_rule(ns: dict, wanted: str) -> tuple[dict | None, str]:
     if not src.exists():
         src = RULES_DIR / (stem + ".yml")
     if src.exists():
-        hint += "。源文件 %s 存在但产物里没有这条 —— 先 `cd web && pnpm build:kb`" % src.name
+        hint += "。源文件 %s 存在但产物里没有这条 —— 先 `pnpm web:build:kb`" % src.name
     return None, "产物里没有这条规则（共 %d 条）：%s%s" % (len(rules), wanted, hint)
 
 
@@ -930,7 +932,7 @@ def main(argv: list[str]) -> int:
         log.error("FAIL 日志不存在：%s" % log_path)
         return 2
     if not PLOTS_TS.exists():
-        log.error("FAIL 找不到绘图产物 %s —— 先 cd web && pnpm build:kb" % PLOTS_TS.name)
+        log.error("FAIL 找不到绘图产物 %s —— 先 pnpm web:build:kb" % PLOTS_TS.name)
         return 2
 
     log.print_header("单条规则体检", "python tools/dev/workbench.py %s %s" % (args.log, args.rule))
@@ -992,12 +994,12 @@ def discover_logs() -> list[Path]:
 def built_rules() -> tuple[list[dict], str]:
     """首页要列规则，可那时还没选日志、也就没有 namespace（规则表挂在 namespace 上）。
 
-    直接复用 `px4log_engine_runner._load_rules`：产物里那份规则表**只该有一处实现**，
+    直接复用 `loader.load_rules`：产物里那份规则表**只该有一处实现**，
     在这里再写一遍正则就是给自己埋一个「两处漂移」的坑（这个仓库已经在别的地
     方为这种事付过账单）。返回 (规则列表, 读不到时的原因)。
     """
     try:
-        return _load_rules(), ""
+        return load_rules(), ""
     except Exception as exc:  # noqa: BLE001 —— 产物缺失/陈旧要在页面上说，不是崩掉
         return [], str(exc)
 
@@ -1031,7 +1033,7 @@ def rule_ids_in(path: Path) -> list[str]:
     """一个规则文件里装了哪几条规则（按 YAML 里出现的顺序）。
 
     产物里的规则**不带源文件名**（`loadRules` 内部那个 `sources` 只喂给了规则清单页
-    `rule-catalogue.mdx`，没进 `pyodide-px4log-engine.ts`），所以「这个文件对应哪几条
+    `rule-catalogue.mdx`，没进 `analysis-engine.generated.ts`），所以「这个文件对应哪几条
     规则」只能回源里读。一个文件可以装多条：顶层写成数组就是多条（`failsafe.yaml`
     有 6 条），写成对象就是一条。
     """
@@ -1391,7 +1393,7 @@ def _log_info_tabs(blocks: list[tuple[str, str]]) -> str:
 def log_info_card(*, info: dict, log_path: Path, box_id: str = "params-box") -> str:
     """右栏上半：这份日志除 `data_list`（时序采样）之外的全部元信息。
 
-    数据来自 `np_log_info()`（引擎侧 `provider.report_materials()`），**不是**直读 pyulog 的
+    数据来自 `np_materials()`（引擎侧 `provider.report_materials()`），**不是**直读 pyulog 的
     `ulog.msg_info_dict`——`knowledge/engine/providers/px4.py:537` 写着「走契约能力取，别再直读
     self.ulog（同一份数据两处知识）」。这份契约实际给 14 块：sysInfo / infoDict /
     msgTypeStats / messages / messagesMulti / dropouts / params / defaultParams /
@@ -2312,7 +2314,7 @@ def serve(port: int = 0, open_browser: bool = True) -> int:
             return hit[2]
         ns = namespace_for(path)
         try:
-            info = call(ns, "np_log_info()") or {}
+            info = call(ns, "np_materials()") or {}
         except Exception as exc:  # noqa: BLE001 —— 元信息读不出来不该拖垮整个页面
             return {"_error": "%s: %s" % (type(exc).__name__, exc)}
         if hit and hit[0] == stamp:

@@ -241,7 +241,7 @@ def main(argv: list[str]) -> int:
         if mod == "node":
             hints.append("Install Node.js 22+ (see README)")
     if any(m != "node" for m in node_failed):
-        hints.append("cd web && pnpm install")
+        hints.append("pnpm web:install")
 
     if hints:
         for h in sorted(set(hints)):

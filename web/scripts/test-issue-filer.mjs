@@ -488,7 +488,7 @@ console.log('\n[12] 取数据前先让 Worker 装上这份日志（共享 Worker
     // 文件"——而字节往往就在手里（刚选过的那份、或本机缓存里的）。2026-09-18 用户连着报了三轮
     // "还是这个问题"，就是这么来的：每一步看起来都对，但没有人负责"把这份日志装进 Worker"。
     // 现在这个责任归前端：取数前先 ensureLogLoaded。下面几条把结构钉住。
-    const worker = read("../workers/pyodide-px4log-worker.ts");
+    const worker = read("../workers/analysis-worker.ts");
     const hook = read("../hooks/useLogAnalyzer.ts");
 
     // Worker 必须回传"这次装的是哪一份"——前端不许靠"我发过 analyze"推断（analyze 会失败）

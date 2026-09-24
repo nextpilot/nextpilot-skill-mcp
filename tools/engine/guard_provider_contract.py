@@ -23,7 +23,8 @@ from _logging import get_logger  # noqa: E402
 
 log = get_logger()
 
-import px4log_engine_runner as runner  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "knowledge" / "engine"))
+import loader as runner  # noqa: E402
 
 TOTAL_STEPS = 9
 

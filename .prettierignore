@@ -14,8 +14,7 @@
 **/params/px4-main.json
 
 # ========== build:kb 生成物 ==========
-**/pyodide-px4log-engine.ts
-**/pyodide-px4log-data.ts
+# analysis-engine.generated.ts 已被下面 **/*.generated.* 覆盖
 
 # ========== 任意目录下的 *.generated.* ==========
 # 覆盖 lib/knowledge/*.generated.ts|.js、workers/*.generated.json、rules-editor-schema.generated.json 等

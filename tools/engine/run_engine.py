@@ -1,24 +1,11 @@
-"""本地校准/验证的命令行入口：在真实 .ulg 上跑 knowledge/engine/ 的 Python 源。
-
-**装配逻辑不在本文件里**——它已下沉到 `knowledge/engine/loader.py`。本文件只做两件事：
-
-1. **薄转发**：把既有调用点（`guards/` `tests/` `calibrate/` 共 8 处）用到的名字按签名
-   转发过去，import 路径与签名保持不变。
-2. **命令行外壳**：提供输出与退出码（用 `tools/_logging.py` 的清单式输出）。
-
-为什么装配逻辑要住在 `engine/` 而不是这里：`server/` 是产品、`tools/` 是开发工具，
-产品依赖开发工具会把 `_logging.py` 那条线（把 handler 挂在 `sys.stdout` 上）埋到 stdio
-协议线旁边。所以装配入口归 engine，本文件退回成命令行外壳。
-
-放在 `tools/` 根目录而不是某个子目录：它被 `guards/` `tests/` `calibrate/` 三处的脚本共同
-import，只有根目录能被各自那句「插 parent.parent 进 sys.path」覆盖到。
+"""本地在真实日志上跑 knowledge/engine/ 的命令行入口。
 
 用法：
-  python tools/px4log_engine_runner.py <file.ulg> [more.ulg ...]
-  python tools/px4log_engine_runner.py --probe-data <file.ulg> ...
+  python tools/engine/run_engine.py <file.ulg> [more.ulg ...]
+  python tools/engine/run_engine.py --probe-data <file.ulg> ...
 
-**规则读构建产物**（`web/workers/pyodide-px4log-engine.ts` 的 `const rules = [...]`），
-所以改了 `knowledge/px4/rules/` 要先 `cd web && pnpm build:kb` 再回归（loader 会检查陈旧）。
+**规则读构建产物**（`web/workers/analysis-engine.generated.ts` 的 `const rules = [...]`），
+所以改了 `knowledge/px4/rules/` 要先 `pnpm web:build:kb` 再回归（loader 会检查陈旧）。
 
 任何一份日志出错都以**非零退出码**结束（`check_all.py` 只看退出码）。别把它改回"只打印、
 不计数"——那会让这一项永远绿着，而它其实什么都没检（见 CLAUDE.md §6.6）。
@@ -31,46 +18,19 @@ from pathlib import Path
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from _logging import get_logger  # noqa: E402
 
-# 装配逻辑的唯一实现在 engine/ 里；插路径后按签名转发（含被外部依赖的私有名）
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "knowledge" / "engine"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "knowledge" / "engine"))
 import loader  # noqa: E402
-from loader import (  # noqa: E402
-    build_namespace,
-    call,
-    load_facts_payload,
-    load_field_units,
-    run_one,
-)
-
-# 这些转发名不是本文件用的：guards/ tests/ calibrate/ 的既有调用点仍
-# `from px4log_engine_runner import ...`，列进 __all__ 既保住转发又过 ruff F401。
-__all__ = [
-    "build_namespace",
-    "call",
-    "load_facts_payload",
-    "load_field_units",
-    "probe_one",
-    "run_one",
-]
-
-_load_rules = loader.load_rules  # dev/workbench.py 直接 import 过这个私有名，保名转发
 
 log = get_logger()
 
 
 def probe_one(path: Path) -> dict:
-    """对数据层三个 API 做结构 / JSON 合法性 / 降采样点数的自检。
-
-    注意：本函数只负责**数据层探查**（纯 driver 角色），断言检查由 main() 的
-    `--probe-data` 分支通过 `print_check` 完成。返回 dict 里附带 `_probe_errors`
-    收集探查过程中的非致命问题（如 series 返回 error 字段），供上层决定是否 fail。
-    """
-    ns = build_namespace(path)
-    manifest = call(ns, "np_manifest()")
-    info = call(ns, "np_log_info()")
+    ns = loader.build_namespace(path)
+    manifest = loader.call(ns, "np_manifest()")
+    info = loader.call(ns, "np_materials()")
     topics = manifest["topics"]
 
     errors: list[str] = []
@@ -88,7 +48,7 @@ def probe_one(path: Path) -> dict:
             "ydata": [{"kind": "field", "fields": [f"{sample['topic']}.{fld}"]}],
         }
         try:
-            series = call(ns, f"np_series({json.dumps(json.dumps(req, ensure_ascii=False))}, 3000)")
+            series = loader.call(ns, f"np_series({json.dumps(json.dumps(req, ensure_ascii=False))}, 3000)")
         except Exception as exc:
             errors.append(f"np_series 调用抛异常：{type(exc).__name__}: {exc}")
 
@@ -126,7 +86,6 @@ def probe_one(path: Path) -> dict:
 
 
 def _probe_checks(path: Path) -> tuple[list[tuple[str, str]], dict]:
-    """对一份日志跑 probe_one 并把结果拆成结构化 check 列表。"""
     result = probe_one(path)
     errors = result.pop("_probe_errors")
     checks: list[tuple[str, str]] = []
@@ -172,7 +131,7 @@ def _main_run(args: list[str]) -> int:
         path = Path(name)
         log.info(f"\n· {path.name}")
         try:
-            log.info(json.dumps(run_one(path), ensure_ascii=False, indent=2))
+            log.info(json.dumps(loader.run_one(path), ensure_ascii=False, indent=2))
         except Exception as exc:
             failed += 1
             log.error(f"ERROR: {type(exc).__name__}: {exc}")

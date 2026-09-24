@@ -40,13 +40,13 @@
 不用等 git 触发，两条 script 直接调钩子本体（都在根 `package.json`）：
 
 ```bash
-pnpm check:pre-commit   # 暂存文件的 ruff format / prettier / eslint
-pnpm check:pre-push     # push 阶段的本地快检（check_all.py --stage push）
+pnpm hook:pre-commit   # 暂存文件的 ruff format / prettier / eslint
+pnpm hook:pre-push     # push 阶段的本地快检（check_all.py --stage push）
 ```
 
 `python` 解析到哪个解释器都行——钩子开头会把自己切到 `.venv` 重跑，这也是它们唯一被支持的执行方式。两条注意：
 
-- `check:pre-commit` 只对**已暂存**的文件动手（`git diff --cached`），没暂存时它会直接返回 0，看着像没跑，其实是没活干。
+- `hook:pre-commit` 只对**已暂存**的文件动手（`git diff --cached`），没暂存时它会直接返回 0，看着像没跑，其实是没活干。
 - 它跑完会把格式化过的文件重新 `git add`，与真正提交时的行为一致。
 
 ## 为什么是 uv

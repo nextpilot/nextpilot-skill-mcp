@@ -16,12 +16,11 @@ README「拼接顺序与桥接名字」：
 
 **规则与数据只从构建产物读**：compute 的老节点写法要在构建期编译成表达式，而那个编译器
 只有 JS 一份（`web/scripts/lib/rule-expr.mjs`）——Python 侧再实现一份必然漂移，所以不重复
-实现。代价是改了 `knowledge/px4/rules/` 必须先 `cd web && pnpm build:kb`；本模块会检查产物
+实现。代价是改了 `knowledge/px4/rules/` 必须先 `pnpm web:build:kb`；本模块会检查产物
 是否陈旧并当场报错。
 
 **接口签名是兼容契约**：`build_namespace(path)` / `call(ns, code)` / `run_one(path)` /
-`load_facts_payload()` 被 `tools/` 下 8 处脚本依赖，改名或换参等于同时改 8 个调用点
-（见 `.workbuddy/memory/topics/mcp-server.md`）。要动就先数清调用点。
+`load_facts_payload()` 被 `tools/` 下多处脚本依赖，改名或换参等于同时改多个调用点。
 """
 
 from __future__ import annotations
@@ -45,7 +44,7 @@ ENGINE_PY = ENGINE / "engine.py"  # 引擎本体（规则框架 + 报告数据�
 
 RULES_DIR = KN_PX4 / "rules"
 FAULT_KB_JSON = REPO_ROOT / "web" / "workers" / "fault-kb.generated.json"
-CHECK_SCRIPT = REPO_ROOT / "web" / "workers" / "pyodide-px4log-engine.ts"
+CHECK_SCRIPT = REPO_ROOT / "web" / "workers" / "analysis-engine.generated.ts"
 
 
 def _product_text() -> str:
@@ -55,10 +54,10 @@ def _product_text() -> str:
     最难查的那类问题——报告看着正常，只是没反映改动。
     """
     if not CHECK_SCRIPT.exists():
-        raise RuntimeError("还没有构建产物，先 cd web && pnpm build:kb")
+        raise RuntimeError("还没有构建产物，先 pnpm web:build:kb")
     stale = [f.name for f in RULES_DIR.glob("*.yaml") if f.stat().st_mtime > CHECK_SCRIPT.stat().st_mtime]
     if stale:
-        raise RuntimeError("构建产物比规则陈旧（%s 改过），先 cd web && pnpm build:kb 再跑" % "、".join(sorted(stale)[:5]))
+        raise RuntimeError("构建产物比规则陈旧（%s 改过），先 pnpm web:build:kb 再跑" % "、".join(sorted(stale)[:5]))
     return CHECK_SCRIPT.read_text(encoding="utf-8")
 
 
@@ -66,7 +65,7 @@ def _product_const(name: str) -> object:
     """取产物里 `const <name> = ...;` 的 JSON 值。"""
     m = re.search(rf"^const {name} = (.*?);$", _product_text(), re.M | re.S)
     if not m:
-        raise RuntimeError(f"产物里找不到 `const {name} = ...`，先 cd web && pnpm build:kb")
+        raise RuntimeError(f"产物里找不到 `const {name} = ...`，先 pnpm web:build:kb")
     return json.loads(m.group(1))
 
 

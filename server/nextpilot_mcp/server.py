@@ -111,7 +111,7 @@ async def log_summary(path: str) -> LogSummary:
         path: 本地 PX4 `.ulg` 日志路径。
     """
     ns = _namespace(path)
-    info = loader.call(ns, "np_log_info()")
+    info = loader.call(ns, "np_materials()")
     facts = loader.call(ns, "np_report()")
     messages = info["messages"]
     return LogSummary(
@@ -148,7 +148,7 @@ async def list_events(
         start_s: 起始时间（秒，相对日志起点）。
         end_s: 结束时间（秒）。
     """
-    raw = loader.call(_namespace(path), "np_log_info()")["messages"]
+    raw = loader.call(_namespace(path), "np_materials()")["messages"]
     events = raw
     if kinds:
         events = [e for e in events if e.get("kind") in kinds]
@@ -224,7 +224,7 @@ async def get_params(path: str, name_glob: str | None = None) -> ParamResult:
         path: 本地 PX4 `.ulg` 日志路径。
         name_glob: 参数名匹配模式（fnmatch 语义）；不给则返回全部。
     """
-    params: dict[str, Any] = loader.call(_namespace(path), "np_log_info()")["params"]
+    params: dict[str, Any] = loader.call(_namespace(path), "np_materials()")["params"]
     if name_glob:
         selected = {k: v for k, v in params.items() if fnmatch.fnmatch(k, name_glob)}
         note = None if selected else f"没有参数匹配 {name_glob!r}——换个模式试试，或先不传 name_glob 看全量。"

@@ -110,7 +110,7 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 | 元检查   | `check_hygiene`（校验机制自身卫生）                    | 4s                                     | 每次                  | push                                   |
 | 日志回归 | `compare_baseline`                                     | 3s                                     | 本地 push             | **本地**（`.ulg` 不入库，第 9 节）     |
 | 日志回归 | `guard_provider_contract`                              | 3s                                     | 本地 push             | **本地**（同上）                       |
-| 日志回归 | `px4log_engine_runner --probe-data`                    | 3s                                     | 本地 push             | **本地**（同上）                       |
+| 日志回归 | `run_engine --probe-data`                              | 3s                                     | 本地 push             | **本地**（同上）                       |
 | 日志回归 | `check_rules_fields --strict`                          | 2s                                     | 本地 push             | **本地**（同上）                       |
 | 构建     | `build-knowledge`                                      | —                                      | dev / build           | dev / build                            |
 | 构建     | `next build`                                           | **144s**                               | CI（`--stage build`） | CI                                     |
@@ -423,14 +423,14 @@ npmmirror 而失败（该镜像无 audit 端点），但 **CI 未配 registry，
 
 ### 已定方案
 
-| 步骤           | 落点                                        | 决定                                                                                                                       |
-| -------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| 装 prettier    | `web/package.json` devDependencies          | 装子项目，依赖不进仓库根                                                                                                   |
-| 配置           | `.prettierrc`（**仓库根**，见下方变更）     | `tabWidth: 4`、`printWidth: 120`、`semi`、`singleQuote: false`、**`endOfLine: "auto"`**                                    |
-| 排除生成物     | `.prettierignore`（**仓库根**，见下方变更） | `.generated/`、`workers/pyodide-px4log-engine.ts`、`workers/pyodide-px4log-data.ts`、`lib/knowledge/*.generated.*`、锁文件 |
-| ESLint 扩到 TS | `web/eslint.config.mjs`                     | **放弃** —— `typescript-eslint` 不支持 TS 7，详见下方「TS lint 为什么没接」                                                |
-| pre-commit     | `.githooks/pre-commit`                      | 对 staged 的 `.ts/.tsx/.js/.mjs/.css` 跑 `prettier --write`，对 `.ts/.tsx` 跑 `eslint --fix`，并重新暂存                   |
-| 接入清单       | `tools/ci/checklist.yml`                    | 静态阶段加 `prettier --check`，接在 `eslint` 之后                                                                          |
+| 步骤           | 落点                                        | 决定                                                                                                     |
+| -------------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| 装 prettier    | `web/package.json` devDependencies          | 装子项目，依赖不进仓库根                                                                                 |
+| 配置           | `.prettierrc`（**仓库根**，见下方变更）     | `tabWidth: 4`、`printWidth: 120`、`semi`、`singleQuote: false`、**`endOfLine: "auto"`**                  |
+| 排除生成物     | `.prettierignore`（**仓库根**，见下方变更） | `.generated/`、`workers/analysis-engine.generated.ts`、`lib/knowledge/*.generated.*`、锁文件             |
+| ESLint 扩到 TS | `web/eslint.config.mjs`                     | **放弃** —— `typescript-eslint` 不支持 TS 7，详见下方「TS lint 为什么没接」                              |
+| pre-commit     | `.githooks/pre-commit`                      | 对 staged 的 `.ts/.tsx/.js/.mjs/.css` 跑 `prettier --write`，对 `.ts/.tsx` 跑 `eslint --fix`，并重新暂存 |
+| 接入清单       | `tools/ci/checklist.yml`                    | 静态阶段加 `prettier --check`，接在 `eslint` 之后                                                        |
 
 **`endOfLine: "auto"` 是"默认零 diff"成立的前提**：工作区是 CRLF，而 prettier 默认 `"lf"`，
 用默认值会让首次 `--check` 把 100 个文件全报成"要改"，全量 `--write` 把行尾整个重写。
@@ -740,7 +740,7 @@ python tools/ci/mutate_guards.py --list                 # 看变异注册表（�
 
 **`--with-e2e` 现在控制两条 E2E**：`playwright-smoke`（@smoke，约 1~2min）
 与 `playwright-analyze`（`--grep 日志分析流程` 11 条，约 5~7min）。
-只跑后者：`cd web && pnpm test:e2e:analyze`。
+只跑后者：`pnpm web:test:e2e:analyze`。
 
 **旧 flag（`--pre-push` / `--with-build`）仍可用**，是别名；但新代码一律用 `--stage`，
 别名留到所有调用点换完后再单独一个提交删除。
@@ -791,12 +791,12 @@ CI 里这 4 项**继续 SKIP**。补充日志集**暂不做**。
 
 ### 9.3 日志回归现状（本地，保持）
 
-| 项                 | 命令                                | 实测 | 前提                              |
-| ------------------ | ----------------------------------- | ---- | --------------------------------- |
-| 冻结基线逐字段比对 | `compare_baseline`                  | 3s   | 6 份日志在 `tools/testdata/logs/` |
-| 适配器契约         | `guard_provider_contract`           | 3s   | 同上                              |
-| probe-data         | `px4log_engine_runner --probe-data` | 3s   | 同上                              |
-| 字段引用 lint      | `check_rules_fields --strict`       | 2s   | 同上                              |
+| 项                 | 命令                          | 实测 | 前提                              |
+| ------------------ | ----------------------------- | ---- | --------------------------------- |
+| 冻结基线逐字段比对 | `compare_baseline`            | 3s   | 6 份日志在 `tools/testdata/logs/` |
+| 适配器契约         | `guard_provider_contract`     | 3s   | 同上                              |
+| probe-data         | `run_engine --probe-data`     | 3s   | 同上                              |
+| 字段引用 lint      | `check_rules_fields --strict` | 2s   | 同上                              |
 
 4 项共 11s，全部秒级，**留在本地 push 完全不影响"检查不卡进度"**。
 这也是它当初能被放进 push 的原因。

@@ -72,7 +72,7 @@
 ```
 
 > **经验法则**：日志分析的规则、阈值与提示词**只在 `knowledge/` 下维护**。
-> 改完后在根目录运行 `pnpm build:kb -- --check` 验证一致性。详见 [knowledge/README.md](knowledge/README.md)。
+> 改完后在根目录运行 `pnpm web:build:kb --check` 验证一致性。详见 [knowledge/README.md](knowledge/README.md)。
 
 ---
 
@@ -141,7 +141,7 @@ pnpm web:dev
 | `README.md`    | 给人看的展示页     |
 | `CHANGELOG.md` | 版本历史           |
 
-字段约束见 `knowledge/README.md`，完成后运行 `pnpm check:skills` 校验。
+字段约束见 `knowledge/README.md`，完成后运行 `pnpm web:check:skills` 校验。
 
 ### 新增 MCP 条目
 
@@ -149,7 +149,7 @@ pnpm web:dev
 
 - 使用反向 DNS 命名（与 Skill 的 kebab 命名不同）
 - 需要提供 `server.json`
-- 完成后运行 `pnpm check:mcp` 校验
+- 完成后运行 `pnpm web:check:mcp` 校验
 
 ### 新增指南页
 
@@ -184,10 +184,10 @@ python tools/ci/check_all.py --list-stages
 
 按是否需要真实 `.ulg` 日志文件分为两组：
 
-| 分组           | 检查内容                                                                      | 运行位置                              |
-| -------------- | ----------------------------------------------------------------------------- | ------------------------------------- |
-| **不需要日志** | ruff 风格检查、`build:kb --check` 产物一致性、`tsc --noEmit`、`next build` 等 | 云端 CI + 本地                        |
-| **需要日志**   | 6 条冻结基线逐字段比对、适配器契约测试、数据层自查、字段引用检查              | **仅本地**（日志含 GPS 轨迹，不入库） |
+| 分组           | 检查内容                                                                          | 运行位置                              |
+| -------------- | --------------------------------------------------------------------------------- | ------------------------------------- |
+| **不需要日志** | ruff 风格检查、`web:build:kb --check` 产物一致性、`tsc --noEmit`、`next build` 等 | 云端 CI + 本地                        |
+| **需要日志**   | 6 条冻结基线逐字段比对、适配器契约测试、数据层自查、字段引用检查                  | **仅本地**（日志含 GPS 轨迹，不入库） |
 
 ### 启用 Git Hook
 

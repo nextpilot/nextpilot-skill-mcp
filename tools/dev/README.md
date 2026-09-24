@@ -1,16 +1,15 @@
 # 日志规则校准脚本
 
 用真实 `.ulg` 校准阈值（CLAUDE.md 4.3 / 8）的本地工具。
-它**直接跑 knowledge/engine/ 下的 Python 引擎与 knowledge/px4/rules/*.yaml 中的规则**，
+它**直接跑 knowledge/engine/ 下的 Python 引擎与 knowledge/px4/rules/\*.yaml 中的规则**，
 与浏览器端 Pyodide 执行的是同一份规则源码、同一套逻辑——改完 `knowledge/` 无需 Node 构建即可回归。
 
-本地跑引擎的入口在**上一级**（`tools/px4log_engine_runner.py`）——它不在这里，是因为
-`guards/` 与 `tests/` 也要 import 它，只有 `tools/` 根目录能被三处的 `sys.path` 同时覆盖到：
+本地跑引擎的命令行入口在 `tools/engine/run_engine.py`：
 
-- `python tools/px4log_engine_runner.py <file.ulg> ...`：输出完整 findings JSON（规则清单见站内
+- `python tools/engine/run_engine.py <file.ulg> ...`：输出完整 findings JSON（规则清单见站内
   `/guide/rule-catalogue`，构建期生成在 `web/.generated/guide/rule-catalogue.mdx`，不入库）。
-- `python tools/px4log_engine_runner.py --probe-data <file.ulg> ...`：校验数据层三个 API
-  （`np_manifest` / `np_log_info` / `np_series`）的结构、JSON 合法性（NaN→null）
+- `python tools/engine/run_engine.py --probe-data <file.ulg> ...`：校验数据层三个 API
+  （`np_manifest` / `np_materials` / `np_series`）的结构、JSON 合法性（NaN→null）
   与降采样点数。
 - `dump_px4log_stats.py <file.ulg> ...`：dump 三个关键消息的原始指标分布，用于定阈值。
 - `dump_px4log_fields.py <file.ulg>`：打印 `vehicle_imu_status / estimator_status /

@@ -12,7 +12,7 @@
  * 请求都带 `logId`（日志内容指纹）：这个 Worker 是**共享**的、跨报告存活，
  * 一旦里面装的是另一份日志，取数据会静默拿错——见 logNotLoadedReason 的说明。
  */
-import { PY_ULG_ENGINE } from "./pyodide-px4log-engine";
+import { PY_ULG_ENGINE } from "./analysis-engine.generated";
 import type { LogInfo, TopicManifest } from "@/lib/types";
 import type { SeriesRequest } from "@/lib/chart-presets";
 
@@ -261,7 +261,7 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
         // 那个顺序约束只写在注释里。现在没有这回事了。
         const report = await runJson(pyodide, "np_report()");
         const manifest = (await runJson(pyodide, "np_manifest()")) as TopicManifest;
-        const info = (await runJson(pyodide, "np_log_info()")) as LogInfo;
+        const info = (await runJson(pyodide, "np_materials()")) as LogInfo;
 
         // **成功之后**才记"现在装的是这一份"：解析中途失败时命名空间里可能还留着上一份的
         // provider，先记就会让 track / series 把旧日志的数据当成新日志的交出去

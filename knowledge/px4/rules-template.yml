@@ -1,6 +1,6 @@
 # 一条检查经验的完整骨架 —— 复制成 rules/<名字>.yaml 后逐项填。
 # 字段级权威参考：站内 /guide/rule-schema；改完跑：
-#   cd web && pnpm build:kb                      # 构建 + 校验（写错就构建失败）
+#   pnpm web:build:kb                      # 构建 + 校验（写错就构建失败）
 #   python tools/engine/compare_baseline.py   # 6 条真实日志与冻结基线逐字段比对
 #
 # 编辑器里键名会补全、拼错会飘红：schema 配在 .vscode/settings.json，文件本体

@@ -17,7 +17,7 @@ export function getSharedWorker(): Worker | null {
     if (typeof Worker === "undefined") return null;
     if (sharedWorker) return sharedWorker;
     try {
-        const w = new Worker(new URL("../workers/pyodide-px4log-worker.ts", import.meta.url), { type: "module" });
+        const w = new Worker(new URL("../workers/analysis-worker.ts", import.meta.url), { type: "module" });
         w.onmessage = (e: MessageEvent<WorkerMsg>) => {
             for (const l of sharedListeners) l(e.data);
         };

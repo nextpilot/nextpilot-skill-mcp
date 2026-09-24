@@ -4043,7 +4043,7 @@ FORMATS.append((_is_ulog, _make_px4, "PX4 ULog（.ulg）"))
 # builtin_variables/get_report_facts 与可选能力，不碰 pyulog 对象。
 #
 # 装载方式：本文件与 operators/providers 跑在**同一个 __main__ globals** 里——
-# 浏览器由 pyodide-px4log-worker.ts 整段执行拼接产物，本地由 loader.py 同序拼接，
+# 浏览器由 analysis-worker.ts 整段执行拼接产物，本地由 loader.py 同序拼接，
 # 所以直接用那边建好的 \`provider\`。
 # ============================================================================
 
@@ -4920,7 +4920,7 @@ def np_report():
     """跑完全部规则，把判定产物摆到 \`__result\`（= 前端那份 report）。
 
     跑规则是第一部分 \`run_all()\` 的活，这里只负责把结果交出去；
-    np_report 与 np_manifest / np_series / np_track / np_log_info 同一形状——
+    np_report 与 np_manifest / np_series / np_track / np_materials 同一形状——
     前端面对的 Python 面因此是 5 个对称的具名入口，没有"谁先读 __result"的隐含顺序。
 
     取数过程中"要的实例超出日志里有的"这类说明在这里一并带出（规则侧没人取走会攒着，
@@ -5133,11 +5133,11 @@ def np_track(max_points=None):
     __result = json.dumps(data, ensure_ascii=False)
 
 
-# ============ np_log_info：系统信息 / 事件 / 丢包 / 参数 / 阶段 ============
+# ============ np_materials：系统信息 / 事件 / 丢包 / 参数 / 阶段 ============
 # 这一块全是"某种日志的消息形态"的展示（'I' 信息字典、事件与文本消息合并、
 # 'M' 多值信息怎么拼、'Q' 默认值怎么推、逐字节的消息类型统计），换格式就是另一套，
 # 所以整块由 provider 的 report_materials() 提供（可选能力）。
-def np_log_info():
+def np_materials():
     global __result
     __result = json.dumps(provider.report_materials(), ensure_ascii=False)
 `

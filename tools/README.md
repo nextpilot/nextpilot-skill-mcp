@@ -33,11 +33,9 @@
 `testdata/` 单独成目录而不是塞进某个模块目录：样本日志与冻结基线同时被
 `knowledge/engine/`（跑回归）和 `dev/`（探查、打基线）使用，放进任何一边的私目录都会让另一边跨目录取数。
 
-## 两个文件直接在 tools/ 根
+## 日志引擎
 
-- `_logging.py` —— 共用日志库。
-- `px4log_engine_runner.py` —— 本地跑引擎的入口，**被 `knowledge/engine/` `dev/` 等多处 import**。
-  放根目录而不是子目录：各脚本的 `sys.path` 只往上插到 `tools/`，只有根目录能被多处同时覆盖到。
+- `engine/run_engine.py` —— 本地跑引擎的命令行入口。
 
 ## 编排层（`ci/`）
 
@@ -53,11 +51,11 @@
 `web/` 是**独立部署单元**（EdgeOne 从 `web/` 源码目录构建），它自己的脚本跟着它走，
 不进 `tools/`——单独 checkout `web/` 时得连守卫一起带走：
 
-| 位置                   | 装什么                                                                              |
-| ---------------------- | ----------------------------------------------------------------------------------- |
-| `web/scripts/`         | 构建脚本（`build-knowledge.mjs` / `make-icons.mjs`）与静态守卫                      |
-| `web/scripts/browser/` | 驱动本机 Chrome 的 CDP 工具（截图、上传/恢复链路自检、图标预览）                    |
-| `web/e2e/`             | 端到端（Playwright）                                                                |
+| 位置                   | 装什么                                                           |
+| ---------------------- | ---------------------------------------------------------------- |
+| `web/scripts/`         | 构建脚本（`build-knowledge.mjs` / `make-icons.mjs`）与静态守卫   |
+| `web/scripts/browser/` | 驱动本机 Chrome 的 CDP 工具（截图、上传/恢复链路自检、图标预览） |
+| `web/e2e/`             | 端到端（Playwright）                                             |
 
 `web/scripts/browser/` 下 5 个脚本都要求**已用 `--remote-debugging-port=9222` 启动的 Chrome**，
 自己不起浏览器也不装依赖；其中只有 `check-upload` / `check-restore` 还需要 `pnpm dev` 起来了

@@ -32,7 +32,7 @@
 - Node `v22.22.3`（CDP 走原生 `WebSocket`，无 puppeteer）
 - Next.js `16.3.5`（App Router + **Turbopack dev**，`next dev`，localhost:3000）
 - 浏览器端引擎：Pyodide `v0.27.7`（从 `https://cdn.jsdelivr.net/pyodide/v0.27.7/full/`
-  动态加载）跑在 **module worker**（`web/workers/pyodide-px4log-worker.ts`）里，解析在 worker 线程，
+  动态加载）跑在 **module worker**（`web/workers/analysis-worker.ts`）里，解析在 worker 线程，
   主线程只接收结果并渲染（含 plotly 图表）。
 - 测试日志：`tools/testdata/logs/ce302d3b-06bc-43ab-9c2a-027d29fcefd3.ulg`（约 9.5 MB 量级）
 
@@ -40,7 +40,7 @@
 
 ```bash
 # 1) 起 dev（pnpm dev 会先跑 node scripts/build-knowledge.mjs）
-cd web && pnpm dev
+pnpm web:dev
 
 # 2) 用上面的命令行起 headless Chrome（远程调试 9222）
 
@@ -96,7 +96,7 @@ node web/scripts/browser/check-upload.mjs \
 2. **去掉 `--headless=new`（用有头 Chrome）跑同一条链路**，判断是否 headless 特有
    （`--disable-gpu` 软件合成 + plotly/canvas 是常见嫌疑，尽管本次卡死早于图表渲染）。
 3. 重启 `next dev`，排除 Turbopack dev 对 module worker（
-   `new Worker(new URL('../workers/pyodide-px4log-worker.ts', import.meta.url), {type:'module'})`，
+   `new Worker(new URL('../workers/analysis-worker.ts', import.meta.url), {type:'module'})`，
    按需经 `turbopack-worker-[client-fs]` 编译）的劣化状态。
 4. 用 `Target.setAutoAttach` 抓到 Pyodide worker target，在其 Runtime 里埋点/收 console，
    确认卡顿时 worker 是否还活着、停在哪一步（加载 pyodide.js / micropip / pyulog / 执行 Python）。

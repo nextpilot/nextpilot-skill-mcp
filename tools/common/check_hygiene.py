@@ -84,8 +84,7 @@ SCAN_SUFFIXES = {".py", ".ts", ".tsx", ".mjs", ".js", ".md", ".mdx", ".yml", ".y
 # 扫它们只会让同一条问题报两遍，而产物不手改——报在源码上才有可操作性。
 SKIP_FILES = frozenset(
     {
-        "web/workers/pyodide-px4log-engine.ts",
-        "web/workers/pyodide-px4log-data.ts",
+        "web/workers/analysis-engine.generated.ts",
         "web/workers/prompts.generated.js",
         "tools/_logging.py",
     }
@@ -563,7 +562,7 @@ class Probe:
 PROBES: list[Probe] = [
     Probe(
         name="数据层自检拿到不存在的日志",
-        argv=[PY, "tools/px4log_engine_runner.py", "--probe-data", "tools/testdata/logs/__no_such_log__.ulg"],
+        argv=[PY, "tools/engine/run_engine.py", "--probe-data", "tools/testdata/logs/__no_such_log__.ulg"],
         marker="ERROR",
         needs=("numpy", "pyulog"),
     ),

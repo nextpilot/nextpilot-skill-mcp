@@ -38,7 +38,8 @@ from _logging import _c, YELLOW, RED  # noqa: E402
 
 log = get_logger()
 
-import px4log_engine_runner as runner  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "knowledge" / "engine"))
+import loader as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RULES_DIR = REPO_ROOT / "knowledge" / "px4" / "rules"
@@ -191,7 +192,7 @@ def rule_refs() -> list[tuple[str, list[str], list]]:
     （引用上不再有 when_fw）：一条经验服务哪个版本段，写在 `conditions.firmware` 上。
     """
     out = []
-    for raw in runner._load_rules():
+    for raw in runner.load_rules():
         rule_fw = raw.get("firmware")
         for expr in raw.get("compute") or []:
             for names in field_refs(expr):

@@ -74,7 +74,7 @@ export interface ReportData {
     /** 产出这份派生数据的引擎版本（build 期算的源文件哈希）。
      *  与当前版本不一致 = 旧引擎生成的（比如多值信息的分行规则变了），打开时重解析一次。 */
     derivedVersion?: string;
-    /** np_log_info() 的产物：系统信息 / 消息 / 丢包 / 参数 / 变更参数 / 阶段 */
+    /** np_materials() 的产物：系统信息 / 消息 / 丢包 / 参数 / 变更参数 / 阶段 */
     info?: LogInfo;
     /** 曲线：各预设解析出的面板（含标题/单位/参考线/字段），打开历史时不必再要 manifest */
     plotPanels?: StoredPlotPanel[];

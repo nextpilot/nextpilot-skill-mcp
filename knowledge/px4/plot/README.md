@@ -5,12 +5,12 @@
 
 构建期由 `web/scripts/build-knowledge.mjs` 编译并校验，两处产物：
 
-| 产物                                                      | 消费者                                             | 内容                        |
-| --------------------------------------------------------- | -------------------------------------------------- | --------------------------- |
-| `web/lib/knowledge/plots.generated.ts`                    | 前端（`lib/chart-presets.ts` 解析布局）            | 全部预设（曲线 + 地图声明） |
-| `web/workers/pyodide-px4log-engine.ts` 里的 `facts.track` | 引擎（`knowledge/engine/providers/px4.py` 取轨迹） | `container: map` 那一份     |
+| 产物                                                          | 消费者                                             | 内容                        |
+| ------------------------------------------------------------- | -------------------------------------------------- | --------------------------- |
+| `web/lib/knowledge/plots.generated.ts`                        | 前端（`lib/chart-presets.ts` 解析布局）            | 全部预设（曲线 + 地图声明） |
+| `web/workers/analysis-engine.generated.ts` 里的 `facts.track` | 引擎（`knowledge/engine/providers/px4.py` 取轨迹） | `container: map` 那一份     |
 
-写错了**构建就失败**（`pnpm build:kb`）：字段引用过不了校验、`label` 个数与 `ydata` 对不上、
+写错了**构建就失败**（`pnpm web:build:kb`）：字段引用过不了校验、`label` 个数与 `ydata` 对不上、
 一张图里混了两种单位、两个预设都声明地图……都在这里拦住，别指望运行期报错。
 
 ## 骨架

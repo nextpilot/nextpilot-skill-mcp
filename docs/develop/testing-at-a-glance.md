@@ -28,7 +28,7 @@
 | 知识真源（`knowledge/px4/rules/*.yaml`、`facts.yaml`、`knowledge/engine/operators.py` 等） | `build-knowledge --watch` 重建产物，Next 才看得到 |
 
 > **只想开一半**：`pnpm dev:no-watch` —— 构建 + `next dev`，不挂 watch。
-> **单独开着热重建**：`pnpm kb:watch`（另开终端时用）。
+> **单独开着热重建**：`pnpm web:kb:watch`（另开终端时用）。
 >
 > **起不来往往不是 Next.js 的问题，是知识库写错了。** 报错会直指哪个文件哪个字段。
 > watch 模式下写坏了不会退出，改对了下次存盘自动重建。
@@ -71,7 +71,7 @@
 
 | 产物                                               | 是什么                               |
 | -------------------------------------------------- | ------------------------------------ |
-| `web/workers/pyodide-px4log-engine.ts`             | 引擎的浏览器版（Pyodide 里跑的那份） |
+| `web/workers/analysis-engine.generated.ts`         | 引擎的浏览器版（Pyodide 里跑的那份） |
 | `web/workers/fault-kb.generated.json`              | 故障知识库的内联版                   |
 | `knowledge/px4/rules-editor-schema.generated.json` | 规则编辑器的 JSON Schema             |
 
@@ -102,7 +102,7 @@
 | 11  | `tools/common/check_hygiene.py`               | 元检查        | **校验机制自己**还健康吗（悬空引用、静默失败、守卫恒真）                     | 4.2s |
 | 12  | `tools/engine/compare_baseline.py`            | 基线比对      | 改规则后结论还准吗（6 份日志逐字段比对）                                     | 3s   |
 | 13  | `tools/engine/guard_provider_contract.py`     | 适配器契约    | 数据适配层契约还成立吗（逐份日志跑同一套断言）                               | 3s   |
-| 14  | `tools/px4log_engine_runner.py --probe-data`  | 数据层自检    | 数据层结构自洽吗                                                             | 3s   |
+| 14  | `tools/engine/run_engine.py --probe-data`     | 数据层自检    | 数据层结构自洽吗                                                             | 3s   |
 | 15  | `tools/engine/check_rules_fields.py --strict` | 字段引用 lint | 规则里引用的**字段名真实存在**吗                                             | 2s   |
 | 16  | `tools/engine/guard_apm_parser_version.py`    | 解析器版本    | `.bin` 解析逻辑变了升 `parserVersion` 了吗（自研解析器没有上游版本号替它变） | 0.5s |
 | 17  | `tools/engine/guard_engine_names.py`          | 拼接命名守卫  | `knowledge/engine/` 的片段拼进同一命名空间后，有没有顶层名字被后来者静默覆盖 | 0.4s |
@@ -205,7 +205,7 @@ pnpm test:e2e            # 全量 42 条
 - **站点内容不需要同步**：真源就在 `web/content/` 下（guide/skills/mcp，全部入库），
   运行期读盘，dev 下改完刷新即见。以前那段 `sync-content --watch` 已随真源唯一化退役。
 - **知识真源由 `build-knowledge --watch` 负责重建**（`pnpm dev` 已带上）。同样地，用
-  `pnpm dev:no-watch` 时改 `knowledge/px4/` 或 `knowledge/engine/` 后页面不会变，要另开 `pnpm kb:watch`。
+  `pnpm dev:no-watch` 时改 `knowledge/px4/` 或 `knowledge/engine/` 后页面不会变，要另开 `pnpm web:kb:watch`。
 - **`build-knowledge` 的产物里有一个落在 `knowledge/px4/` 内部**（`rules-editor-schema.generated.json`）。
   所以 `--watch` 只监听 `rules/`、`plot/`、`llm/`、`meta/` 这些真源子目录，
   并在监听顶层目录时按文件名滤掉 `*.generated.*` —— 否则写产物会触发自己、无限重建。

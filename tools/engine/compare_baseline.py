@@ -25,7 +25,8 @@ from _logging import get_logger  # noqa: E402
 
 log = get_logger()
 
-import px4log_engine_runner as runner  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "knowledge" / "engine"))
+import loader as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 # 两份数据都住在 tools/testdata/，不跟着本文件走：它们是要入库/自备的"数据"，

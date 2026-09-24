@@ -66,7 +66,7 @@ export function buildRuleSchema({ signatures, facts, vehicles, builtinVars }) {
         title: "PX4 检查经验（knowledge/px4/rules/*.yaml）",
         description:
             "⚠ 自动生成，请勿手改 —— 源：facts.yaml / knowledge/engine/operators.py / knowledge/engine/providers/api.py。" +
-            "改完跑 `cd web && pnpm build:kb`。\n" +
+            "改完跑 `pnpm web:build:kb`。\n" +
             "字段级权威参考见站内 /guide/rule-schema；可抄的骨架见 knowledge/px4/rules-template.yml。",
         type: "object",
         // 身份三件套是所有经验都必填的

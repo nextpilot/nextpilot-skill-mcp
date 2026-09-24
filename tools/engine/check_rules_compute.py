@@ -15,7 +15,8 @@ from _logging import get_logger  # noqa: E402
 
 log = get_logger()
 
-from px4log_engine_runner import build_namespace  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "knowledge" / "engine"))
+from loader import build_namespace  # noqa: E402
 
 
 def describe(a):
