@@ -142,6 +142,13 @@ else
     run git config core.hooksPath .githooks
     echo "  core.hooksPath = $(git config core.hooksPath)"
 
+    # 光指过去还不够：git 会**静默跳过**没有可执行位的钩子（只给一行 hint，
+    # 不报错、不改退出码）。仓库里已把三个钩子按 100755 提交，但 zip 下载、
+    # 异常 umask、或某些 CI 的 checkout 会把它抹成 644 —— 那时的表现是
+    # hooksPath 配得对、钩子一个都不跑。所以这里显式补一次，成本一行。
+    run chmod +x .githooks/pre-commit .githooks/pre-push .githooks/commit-msg
+    echo "  钩子可执行位：$(ls -l .githooks/pre-commit | cut -c1-10)"
+
     # 同 Windows 版：照 git 的方式（PATH 上的 python）真跑一次钩子里的解释器切换，
     # 核对它最终落在 .venv 上。"钩子悄悄用了另一个 Python"不报错也不失败，只能这样拦。
     probe=$(cat <<'PY'
