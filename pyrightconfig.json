@@ -1,6 +1,7 @@
 {
   "venvPath": ".",
   "venv": ".venv",
+  "extraPaths": ["knowledge/engine"],
   "exclude": ["**/node_modules", "**/__pycache__", ".venv", "tools"],
   "typeCheckingMode": "standard",
   "reportMissingTypeStubs": false,
