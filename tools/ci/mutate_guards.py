@@ -85,7 +85,7 @@ def _safe(text: str) -> str:
 
 ROOT = Path(__file__).resolve().parents[2]
 WEB = ROOT / "web"
-LOG_DIR = ROOT / "tools" / "calibrate" / "logs"
+LOG_DIR = ROOT / "tools" / "testdata" / "logs"
 
 PY = sys.executable
 NODE = shutil.which("node")
@@ -102,17 +102,17 @@ FLIGHT_MAP = "web/components/LogFlightMap.tsx"
 # （第一版就是这么写的，四条界面侧变异全部误报"牵连 3 条"）。
 GUARDS = {
     "artifact": (
-        [PY, "tools/calibrate/check-pyodide-px4log-engine.py"],
+        [PY, "tools/engine/check-pyodide-px4log-engine.py"],
         ROOT,
         "产物侧（check-pyodide-px4log-engine）",
         "prose",
     ),
     "ui": ([NODE, "scripts/test-issue-filer.mjs"], WEB, "界面侧（test-issue-filer）", "fail-lines"),
-    "hygiene": ([PY, "tools/ci/check_hygiene.py"], ROOT, "卫生检查（check_hygiene）", "fail-lines"),
+    "hygiene": ([PY, "tools/common/check_hygiene.py"], ROOT, "卫生检查（check_hygiene）", "fail-lines"),
     # 引擎纯度：只扫 engine/ 的源码文本，无依赖、无网络、不需要日志 —— 快，所以每次都跑
-    "engine": ([PY, "tools/ci/check_engine_purity.py"], ROOT, "引擎纯度（check_engine_purity）", "fail-lines"),
+    "engine": ([PY, "tools/engine/check_engine_purity.py"], ROOT, "引擎纯度（check_engine_purity）", "fail-lines"),
     # pnpm 转发脚本：只扫 package.json 的 scripts 文本 —— 快、无依赖、不需要日志
-    "pnpm-filter": ([PY, "tools/ci/check_pnpm_filter.py"], ROOT, "pnpm 转发脚本（check_pnpm_filter）", "fail-lines"),
+    "pnpm-filter": ([PY, "tools/common/check_pnpm_filter.py"], ROOT, "pnpm 转发脚本（check_pnpm_filter）", "fail-lines"),
     # 面板解析器：只跑纯函数（内置假 manifest），无浏览器无日志 —— 快
     "panel-resolver": (
         [NODE, "--experimental-strip-types", "scripts/check-panel-resolver.mjs"],
@@ -281,7 +281,7 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         name="Python 校验脚本不把 main 的返回值交给退出码",
-        path="tools/calibrate/compare_baseline.py",
+        path="tools/engine/compare_baseline.py",
         old="raise SystemExit(main(sys.argv))",
         new="main(sys.argv)",
         guard="hygiene",
@@ -299,7 +299,7 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         name="坏输入不再让校验脚本非零退出",
-        path="tools/calibrate/px4log_engine_runner.py",
+        path="tools/px4log_engine_runner.py",
         old="return 1 if failed else 0",
         new="return 0",
         guard="hygiene",
@@ -331,7 +331,7 @@ MUTATIONS: list[Mutation] = [
         new="import json\nimport js",
         guard="engine",
         expect="engine/ 是纯 Python（不碰 Pyodide / JS 桥接 / 浏览器全局）",
-        note="js 是 Pyodide 注入的全局：浏览器能跑，本机 tools/calibrate 用 CPython 要到那一行才 NameError",
+        note="js 是 Pyodide 注入的全局：浏览器能跑，本机 tools/engine 用 CPython 要到那一行才 NameError",
     ),
     Mutation(
         name="浏览器不再把 engine/ 拼进 Pyodide 产物",
@@ -344,7 +344,7 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         name="本机校准工具不再直接指到 engine/",
-        path="tools/calibrate/px4log_engine_runner.py",
+        path="tools/px4log_engine_runner.py",
         old='ENGINE = REPO_ROOT / "engine"',
         new='ENGINE = REPO_ROOT / "engine_moved"',
         guard="engine",
@@ -595,7 +595,7 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         name="守卫的 filter 正则被改坏（一个都扫不到，门被架空）",
-        path="tools/ci/check_pnpm_filter.py",
+        path="tools/common/check_pnpm_filter.py",
         old='FILTER_RE = re.compile(r"pnpm\\s+--filter[= ]\\s*(\\S+)")',
         new='FILTER_RE = re.compile(r"pnpm\\s+--no-such-flag[= ]\\s*(\\S+)")',
         guard="pnpm-filter",

@@ -1,0 +1,118 @@
+{
+  "log": "sample.ulg",
+  "slug": "sample",
+  "source": "本仓库自带（tools/testdata/logs/，未入库，需自备）",
+  "engine": "engine/rule_engine.py + engine/report_data.py",
+  "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
+  "result": {
+    "platform": "PX4",
+    "parserVersion": "pyulog/1.1.0",
+    "facts": {
+      "durationSec": 181.5,
+      "vehicleType": "rotary_wing",
+      "firmware": "未知（旧固件或无版本号）",
+      "firmwareProfile": "px4-legacy",
+      "firmwareDisplay": "fd4833",
+      "fwReleaseType": null,
+      "armedDurationSec": 0.0,
+      "phases": [],
+      "dropoutTotalMs": 119,
+      "hardware": "AUAV_X21",
+      "verSw": "fd483321a5cf50ead91164356d15aa474643aa73",
+      "modes": ["Manual"],
+      "mainMode": "Manual",
+      "airframeId": 10020
+    },
+    "metrics": [
+      {
+        "key": "cpuLoadMax",
+        "label": "CPU 峰值",
+        "value": 0.833,
+        "unit": "0..1"
+      },
+      {
+        "key": "navStateChanges",
+        "label": "模式切换次数",
+        "value": 0,
+        "unit": "次"
+      }
+    ],
+    "tags": [],
+    "guardTags": ["topic_missing:battery_status"],
+    "checksRun": ["ekf_faults", "cpu_load", "failsafe", "mode_thrash", "logged_messages"],
+    "checksSkipped": [
+      {
+        "check": "vibration",
+        "reason": "vehicle_imu_status not in log"
+      },
+      {
+        "check": "ekf_innovations",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "check": "battery",
+        "reason": "battery_status not in log"
+      },
+      {
+        "check": "gps_health",
+        "reason": "vehicle_gps_position not in log"
+      },
+      {
+        "check": "motor_balance",
+        "reason": "actuator_motors not in log"
+      },
+      {
+        "check": "imu_bias",
+        "reason": "先决条件命中：not HAS_ARMED"
+      },
+      {
+        "check": "airspeed",
+        "reason": "机架不适用 fixed_wing"
+      },
+      {
+        "check": "vtol_transition",
+        "reason": "vtol_vehicle_status not in log"
+      },
+      {
+        "check": "wind_estimate",
+        "reason": "estimator_wind / wind_estimate not in log"
+      }
+    ],
+    "matchedFaults": [],
+    "findings": [
+      {
+        "id": "F01",
+        "severity": "critical",
+        "ruleId": "px4-log-errors",
+        "tag": null,
+        "title": "日志中出现 4 条 ERROR 及以上消息",
+        "evidence": {
+          "field": "ulog.logged_messages(log_level<=3)",
+          "value": 4,
+          "threshold": 0,
+          "unit": "条",
+          "samples": [
+            {
+              "tSec": 45.72,
+              "message": "[sensors] no barometer found on /dev/baro0 (2)"
+            },
+            {
+              "tSec": 49.57,
+              "message": "[sensors] no barometer found on /dev/baro0 (2)"
+            },
+            {
+              "tSec": 59.12,
+              "message": "[sensors] no barometer found on /dev/baro0 (2)"
+            },
+            {
+              "tSec": 63.91,
+              "message": "[sensors] no barometer found on /dev/baro0 (2)"
+            }
+          ]
+        },
+        "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html",
+        "suggestion": "按时间顺序核对错误原文，这通常是定位根因最直接的证据。"
+      }
+    ]
+  }
+}

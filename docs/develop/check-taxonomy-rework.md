@@ -5,6 +5,10 @@
 >
 > **2026-09-22 注**：本文件曾因一次有损转码丢失 776 个字符，且已随 `92d39ba` 入库，git 里没有干净版本。
 > 当前版本是按残留内容重建的，措辞与原文可能有出入。
+>
+> **2026-09-24 注**：3.B 的**目录重组已部分落地**——只搬目录、**文件名一律未改**（改名留给后续批次）。
+> 因此本文正文表格「现状」列里的路径指的是**重组前**的位置，读的时候请对照 `tools/README.md` 的新结构；
+> 这些旧路径被有意保留，因为它们说明的是"从哪搬到哪"。
 
 ---
 
@@ -38,25 +42,25 @@
 
 ### 1.1 Python 侧
 
-| 文件                                                                          | 前缀  | **实际是什么**                                                                                  | 在哪个阶段                  | 条件                       |
-| ----------------------------------------------------------------------------- | ----- | ----------------------------------------------------------------------------------------------- | --------------------------- | -------------------------- |
-| `engine/tests/test_operators.py`                                              | test  | ✅ 真单测（pytest，断言求值结果，8 条）                                                         | push                        | always                     |
-| `engine/tests/test_rule_engine.py`                                            | test  | ✅ 真单测（10 条）                                                                              | push                        | always                     |
-| `engine/test_pyulog.py`                                                       | test  | ⚠️ demo/验证脚本，**不测任何东西**（被 `pyproject.toml` 的 `testpaths` 排除，**实测收集不到**） | 从不自动跑                  | —                          |
-| `tools/calibrate/compare_baseline.py`                                         | 无    | ✅ **回归测试**（与冻结基线逐字段比对）                                                         | push                        | needs-logs                 |
-| `tools/calibrate/guard-px4log-provider.py`                                    | guard | ✅ **契约测试**（逐份日志跑同一套断言）                                                         | push                        | needs-logs                 |
-| `tools/calibrate/px4log_engine_runner.py`                                     | check | ⚠️ **双身份**：主用途是探查工具；`--probe-data` 那一路是数据层测试                              | push（仅 probe-data）/ 手动 | needs-logs                 |
-| `tools/calibrate/lint_rules.py`                                               | lint  | 规则数据的字段引用 lint                                                                         | push                        | needs-logs                 |
-| `tools/calibrate/check-pyodide-px4log-engine.py`                              | check | 🛡 **产物检查**（真执行编译产物 + 核跨语言名字）                                                 | push                        | **always**（不需要日志！） |
-| `tools/ci/check_engine_purity.py`                                             | check | 🛡 源码守卫（engine 纯净性）                                                                     | push                        | always                     |
-| `tools/ci/check_secrets.py`                                                   | check | 🛡 源码守卫（扫全部跟踪文件）                                                                    | push                        | always                     |
-| `tools/ci/check_hygiene.py`                                                   | check | 🛡 **元守卫**（校验机制自身的卫生，多项）                                                        | push                        | always                     |
-| `tools/ci/check_prereq.py`                                                    | check | 💀 **已废弃，全仓无引用**                                                                       | —                           | —                          |
-| `tools/ci/check_all.py`                                                       | check | 🎯 跑手（编排）                                                                                 | —                           | —                          |
-| `tools/ci/checklist.yml`                                                      | —     | 🎯 清单（单一事实源）                                                                           | —                           | —                          |
-| `tools/ci/mutate_guards.py`                                                   | —     | 🎯 守卫的自证机（43 条变异）                                                                    | ci                          | `--with-mutate`            |
-| `probe_stats.py` / `probe_rule.py` / `inspect_fields.py` / `dump_baseline.py` | probe | 🔍 手动探查（定阈值、查字段、打基线）                                                           | 手动                        | —                          |
-| `tools/browser/check-upload.mjs` / `check-restore.mjs`                        | check | 🔍 手动 CDP 链路自检                                                                            | 手动                        | 需 9222 端口 Chrome        |
+| 文件                                                                          | 前缀  | **实际是什么**                                                                                                                                 | 在哪个阶段                  | 条件                       |
+| ----------------------------------------------------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | -------------------------- |
+| `engine/tests/test_operators.py`                                              | test  | ✅ 真单测（pytest，断言求值结果，8 条）                                                                                                        | push                        | always                     |
+| `engine/tests/test_rule_engine.py`                                            | test  | ✅ 真单测（10 条）                                                                                                                             | push                        | always                     |
+| ~~`engine/test_pyulog.py`~~                                                   | test  | ⚠️ demo/验证脚本，**不测任何东西**（被 `pyproject.toml` 的 `testpaths` 排除，**实测收集不到**）—— **2026-09-24 已删除**，见 §「待你定」第 2 条 | 从不自动跑                  | —                          |
+| `tools/calibrate/compare_baseline.py`                                         | 无    | ✅ **回归测试**（与冻结基线逐字段比对）                                                                                                        | push                        | needs-logs                 |
+| `tools/calibrate/guard-px4log-provider.py`                                    | guard | ✅ **契约测试**（逐份日志跑同一套断言）                                                                                                        | push                        | needs-logs                 |
+| `tools/calibrate/px4log_engine_runner.py`                                     | check | ⚠️ **双身份**：主用途是探查工具；`--probe-data` 那一路是数据层测试                                                                             | push（仅 probe-data）/ 手动 | needs-logs                 |
+| `tools/calibrate/lint_rules.py`                                               | lint  | 规则数据的字段引用 lint                                                                                                                        | push                        | needs-logs                 |
+| `tools/calibrate/check-pyodide-px4log-engine.py`                              | check | 🛡 **产物检查**（真执行编译产物 + 核跨语言名字）                                                                                                | push                        | **always**（不需要日志！） |
+| `tools/ci/check_engine_purity.py`                                             | check | 🛡 源码守卫（engine 纯净性）                                                                                                                    | push                        | always                     |
+| `tools/ci/check_secrets.py`                                                   | check | 🛡 源码守卫（扫全部跟踪文件）                                                                                                                   | push                        | always                     |
+| `tools/ci/check_hygiene.py`                                                   | check | 🛡 **元守卫**（校验机制自身的卫生，多项）                                                                                                       | push                        | always                     |
+| `tools/ci/check_prereq.py`                                                    | check | 💀 **已废弃，全仓无引用**                                                                                                                      | —                           | —                          |
+| `tools/ci/check_all.py`                                                       | check | 🎯 跑手（编排）                                                                                                                                | —                           | —                          |
+| `tools/ci/checklist.yml`                                                      | —     | 🎯 清单（单一事实源）                                                                                                                          | —                           | —                          |
+| `tools/ci/mutate_guards.py`                                                   | —     | 🎯 守卫的自证机（43 条变异）                                                                                                                   | ci                          | `--with-mutate`            |
+| `probe_stats.py` / `probe_rule.py` / `inspect_fields.py` / `dump_baseline.py` | probe | 🔍 手动探查（定阈值、查字段、打基线）                                                                                                          | 手动                        | —                          |
+| `web/scripts/browser/check-upload.mjs` / `check-restore.mjs`                  | check | 🔍 手动 CDP 链路自检                                                                                                                           | 手动                        | 需 9222 端口 Chrome        |
 
 ### 1.2 JS / TS 侧
 
@@ -250,8 +254,8 @@ check-pyodide-px4log-engine.py     →  check · pyodide-px4log-engine（产物�
 
 - `web/package.json` 的 `test:e2e*` —— Playwright 社区惯例名（`test:` 是 npm script 命名空间，不是本规则的类型词）。文档里说清「`test:e2e:*` 是真 E2E，与 `guard-*`（守契约）是两回事」。
 - `web/e2e/*.spec.ts` —— Playwright 只认 `testMatch`，改名即收集不到。类型由目录 `e2e/` 表达。
-- `engine/test_pyulog.py` —— 是 demo 不是测试（已排除在 `testpaths` 外）。建议改名为 `demo-pyulog-read.py`，**待你定**。
-- `tools/browser/check-upload.mjs` / `check-restore.mjs` —— 手动 CDP 自检，不进任何门禁。建议改 `probe-site-*.mjs`，或原样保留，**待你定**。
+- ~~`engine/test_pyulog.py`~~ —— 是 demo 不是测试（已排除在 `testpaths` 外）。原建议改名 `demo-pyulog-read.py`；**2026-09-24 已直接删除**（它连"验证 pyulog 能跑"这唯一用途也已被 `engine/tests/` 覆盖），改名提议作废。
+- `web/scripts/browser/check-upload.mjs` / `check-restore.mjs` —— 手动 CDP 自检，不进任何门禁。建议改 `probe-site-*.mjs`，或原样保留，**待你定**。
 
 **同词异义一处**：`web/functions/issue-probe.js` / `kv-probe.js` 是**边缘函数路由**（`/api/issue-probe`），
 里面的 `probe` 意思是"诊断接口"，与本规则的"手动探查工具"撞词。建议**不动**（运行时由目录表达），
@@ -446,18 +450,18 @@ run: python tools/ci/check_all.py --with-mutate # ← 没有 --stage
 
 ## 6. 风险与待确认
 
-| 项                                          | 说明                                                                                                                                           | 建议                                                                                                                 |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| **批次 3 的验证成本**                       | 43 条变异完整跑一次约 20 分钟；拆成 5 小步就要跑 5 次                                                                                          | 建议每小步只跑**受影响的那几条**（`mutate_guards --only <名字>`），最后整跑一次                                      |
-| **`engine/tests/` 搬不搬**                  | 会牵动 `pyproject.toml` 的 `testpaths`，`engine/README.md` 也要同步                                                                            | 想压小改动面可**先不做 3.4**：`engine/tests/` 原样保留。代价是"引擎单测"与"日志回归"仍分居两地。**待你定**           |
-| **`check-px4log-data-shape.py` 是一次拆分** | `px4log_engine_runner.py` 一身两职（探查 + `--probe-data` 测试），拆完要保证 `guard-meta-self-honest` 的探针指向新文件                         | 先只搬不改逻辑，跑通再调                                                                                             |
-| **`web/guards/` 会不会被打进部署包**        | EdgeOne 从 `web/` 源码目录构建，未被 import 的 `.mjs` 不会被打包，但**可能仍被上传**。现状它们也在 `web/scripts/` 下，风险**没有新增**         | 若在意可移到仓库根 `tools/web-guards/`，但那样跨了部署边界，读取 `web/` 源码要靠相对路径——**不建议**                 |
-| **`test-issue-filer` 改名要连带改的东西**   | 段 [10]/[12]/[16] 里有些断言**已经在核"归一函数还被导出"这类自身代码**，改文件名不影响；但 `mutate_guards` 注册表里 27 条打它的变异要改 `path` | 单独提交，改完必须跑完整 `mutate_guards`                                                                             |
-| **`one-off/` 还是 `_once/`**                | 一次性脚本的目录名                                                                                                                             | 倾向 `one-off/`（望文生义；`_` 前缀在本仓库已有"内部"含义，如 `_verify-schema.mjs`）                                 |
-| **`engine/test_pyulog.py`**                 | 是 demo 不是测试，且**实测收集不到**（不在 `testpaths` 里）                                                                                    | 建议改名 `demo-pyulog-read.py`，明确它不是测试。**待你定**                                                           |
-| **`tools/browser/check-*.mjs` 改不改**      | 两段式，且不进任何门禁                                                                                                                         | 建议改 `probe-site-*.mjs`，或按"不进清单就不强求"原样保留。**待你定**                                                |
-| **`build` 阶段的默认语义变更**              | 现状省略 `--stage` 会跑 build；改后不跑。有人（含脚本）可能依赖现状                                                                            | 改的时候在 `check_all.py` 的 docstring 与输出头里**明说**"build 需显式点名"                                          |
-| **文档漂移会不会重演**                      | 三份文档已经漂移过（40 vs 42 用例）                                                                                                            | 加一条 `guard-meta-self-honest` 检查：**文档里出现的 E2E 用例数 / 变异条数，必须与 `--list` 实测对得上**。放在批次 4 |
+| 项                                           | 说明                                                                                                                                           | 建议                                                                                                                 |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **批次 3 的验证成本**                        | 43 条变异完整跑一次约 20 分钟；拆成 5 小步就要跑 5 次                                                                                          | 建议每小步只跑**受影响的那几条**（`mutate_guards --only <名字>`），最后整跑一次                                      |
+| **`engine/tests/` 搬不搬**                   | 会牵动 `pyproject.toml` 的 `testpaths`，`engine/README.md` 也要同步                                                                            | 想压小改动面可**先不做 3.4**：`engine/tests/` 原样保留。代价是"引擎单测"与"日志回归"仍分居两地。**待你定**           |
+| **`check-px4log-data-shape.py` 是一次拆分**  | `px4log_engine_runner.py` 一身两职（探查 + `--probe-data` 测试），拆完要保证 `guard-meta-self-honest` 的探针指向新文件                         | 先只搬不改逻辑，跑通再调                                                                                             |
+| **`web/guards/` 会不会被打进部署包**         | EdgeOne 从 `web/` 源码目录构建，未被 import 的 `.mjs` 不会被打包，但**可能仍被上传**。现状它们也在 `web/scripts/` 下，风险**没有新增**         | 若在意可移到仓库根 `tools/web-guards/`，但那样跨了部署边界，读取 `web/` 源码要靠相对路径——**不建议**                 |
+| **`test-issue-filer` 改名要连带改的东西**    | 段 [10]/[12]/[16] 里有些断言**已经在核"归一函数还被导出"这类自身代码**，改文件名不影响；但 `mutate_guards` 注册表里 27 条打它的变异要改 `path` | 单独提交，改完必须跑完整 `mutate_guards`                                                                             |
+| **`one-off/` 还是 `_once/`**                 | 一次性脚本的目录名                                                                                                                             | 倾向 `one-off/`（望文生义；`_` 前缀在本仓库已有"内部"含义，如 `_verify-schema.mjs`）                                 |
+| **`engine/test_pyulog.py`**                  | 是 demo 不是测试，且**实测收集不到**（不在 `testpaths` 里）                                                                                    | 建议改名 `demo-pyulog-read.py`，明确它不是测试。**待你定**                                                           |
+| **`web/scripts/browser/check-*.mjs` 改不改** | 两段式，且不进任何门禁                                                                                                                         | 建议改 `probe-site-*.mjs`，或按"不进清单就不强求"原样保留。**待你定**                                                |
+| **`build` 阶段的默认语义变更**               | 现状省略 `--stage` 会跑 build；改后不跑。有人（含脚本）可能依赖现状                                                                            | 改的时候在 `check_all.py` 的 docstring 与输出头里**明说**"build 需显式点名"                                          |
+| **文档漂移会不会重演**                       | 三份文档已经漂移过（40 vs 42 用例）                                                                                                            | 加一条 `guard-meta-self-honest` 检查：**文档里出现的 E2E 用例数 / 变异条数，必须与 `--list` 实测对得上**。放在批次 4 |
 
 ---
 

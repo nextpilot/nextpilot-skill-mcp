@@ -1,0 +1,387 @@
+{
+  "log": "ce302d3b-06bc-43ab-9c2a-027d29fcefd3.ulg",
+  "slug": "ce302d3b",
+  "source": "logs.px4.io 公开日志：GET https://logs.px4.io/download?log=ce302d3b-06bc-43ab-9c2a-027d29fcefd3（或 python tools/dev/download_px4_logs.py）",
+  "engine": "engine/rule_engine.py + engine/report_data.py",
+  "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
+  "result": {
+    "platform": "PX4",
+    "parserVersion": "pyulog/1.1.0",
+    "facts": {
+      "durationSec": 632.8,
+      "vehicleType": "fixed_wing",
+      "firmware": "1.17.0",
+      "firmwareProfile": "px4-1.15+",
+      "firmwareDisplay": "v1.17.0-alpha",
+      "fwReleaseType": 64,
+      "armedDurationSec": 308.5,
+      "phases": ["fw_cruise", "hover", "landing", "maneuver"],
+      "dropoutTotalMs": 40,
+      "hardware": "PX4_FMU_V5",
+      "hardwareSubtype": "V5006000",
+      "verSw": "c2fb48990aacebc938c4e9998c7d5348f858fd22",
+      "modes": ["Hold", "Return", "Mission", "Manual"],
+      "mainMode": "Hold",
+      "uuid": "000200000000323335373233510100410023",
+      "vehicleLifeS": 650.9,
+      "airframeId": 2100,
+      "startUtc": 1761301959
+    },
+    "metrics": [
+      {
+        "key": "imuAccelVibrationMax",
+        "label": "最大振动",
+        "value": 8.661,
+        "unit": "m/s²"
+      },
+      {
+        "key": "batteryVoltageMin",
+        "label": "最低电压",
+        "value": 13.36,
+        "unit": "V"
+      },
+      {
+        "key": "batteryCellVoltageMin",
+        "label": "最低电芯电压",
+        "value": 3.339,
+        "unit": "V"
+      },
+      {
+        "key": "currentMax",
+        "label": "最大电流",
+        "value": 42.63,
+        "unit": "A"
+      },
+      {
+        "key": "batteryRemainingMin",
+        "label": "最低剩余电量",
+        "value": 0.075,
+        "unit": "0..1"
+      },
+      {
+        "key": "gpsSatellitesMin",
+        "label": "最少搜星",
+        "value": 15,
+        "unit": "颗"
+      },
+      {
+        "key": "gpsEphMaxM",
+        "label": "最大定位误差",
+        "value": 0.0,
+        "unit": "m"
+      },
+      {
+        "key": "cpuLoadMax",
+        "label": "CPU 峰值",
+        "value": 0.766,
+        "unit": "0..1"
+      },
+      {
+        "key": "imuAccelClippingCountMax",
+        "label": "加速度计削波计数",
+        "value": 81,
+        "unit": "次"
+      },
+      {
+        "key": "imuTempRangeC",
+        "label": "IMU 温度跨度",
+        "value": 9.9,
+        "unit": "°C"
+      },
+      {
+        "key": "ekfRejectRatioPct",
+        "label": "EKF 拒绝占比",
+        "value": 1.15,
+        "unit": "比例"
+      },
+      {
+        "key": "attitudeErrDegP99",
+        "label": "姿态误差 p99",
+        "value": 10.4,
+        "unit": "°"
+      },
+      {
+        "key": "attitudeOscHz",
+        "label": "姿态振荡频率",
+        "value": 1.62,
+        "unit": "Hz"
+      },
+      {
+        "key": "gyroBiasMaxRadS",
+        "label": "陀螺零偏最大",
+        "value": 0.0073,
+        "unit": "rad/s"
+      },
+      {
+        "key": "gyroBiasDriftRadS",
+        "label": "陀螺零偏漂移",
+        "value": 0.0051,
+        "unit": "rad/s"
+      },
+      {
+        "key": "windSpeedP95M",
+        "label": "风速 p95",
+        "value": 2.3,
+        "unit": "m/s"
+      },
+      {
+        "key": "airspeedMinM",
+        "label": "最低空速",
+        "value": 2.0,
+        "unit": "m/s"
+      },
+      {
+        "key": "gpsJumpCount",
+        "label": "GPS 跳变次数",
+        "value": 0,
+        "unit": "次"
+      },
+      {
+        "key": "navStateChanges",
+        "label": "模式切换次数",
+        "value": 6,
+        "unit": "次"
+      },
+      {
+        "key": "batteryCellCount",
+        "label": "电芯数",
+        "value": 4,
+        "unit": "个"
+      },
+      {
+        "key": "imuAccelVibrationMean",
+        "label": "imuAccelVibrationMean",
+        "value": 1.052
+      },
+      {
+        "key": "imuAccelVibrationP95",
+        "label": "imuAccelVibrationP95",
+        "value": 1.655
+      },
+      {
+        "key": "gpsEphP95M",
+        "label": "gpsEphP95M",
+        "value": 0.0
+      },
+      {
+        "key": "gyroBiasSource",
+        "label": "gyroBiasSource",
+        "value": "estimator_sensor_bias.gyro_bias[]"
+      }
+    ],
+    "tags": ["ekf_innovation_failure", "battery_voltage_drop", "failsafe"],
+    "guardTags": [],
+    "checksRun": [
+      "vibration",
+      "ekf_innovations",
+      "ekf_faults",
+      "battery",
+      "cpu_load",
+      "gps_health",
+      "failsafe",
+      "mode_thrash",
+      "imu_bias",
+      "attitude_tracking",
+      "airspeed",
+      "wind_estimate",
+      "logged_messages"
+    ],
+    "checksSkipped": [
+      {
+        "check": "battery",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "check": "motor_balance",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "check": "vtol_transition",
+        "reason": "vtol_vehicle_status not in log"
+      }
+    ],
+    "matchedFaults": [
+      {
+        "faultId": "F004",
+        "faultTag": "battery_voltage_drop",
+        "riskLevel": "高",
+        "possibleRootCause": [
+          "电池电芯老化、内阻增大",
+          "电源插头、接线端子虚接接触不良",
+          "动力线缆线径不足，大电流压降过大",
+          "飞行负载超过动力系统设计能力"
+        ],
+        "troubleshootingSteps": [
+          "地面静态大电流测试电池电压压降",
+          "检查插头、接线端子有无发热、氧化松动",
+          "复核整机起飞重量，确认不超过最大起飞重量"
+        ],
+        "note": "大机动动作瞬时压降属于正常，持续压降才判定故障",
+        "matchedPhases": ["hover", "maneuver"]
+      }
+    ],
+    "findings": [
+      {
+        "id": "F04",
+        "severity": "critical",
+        "ruleId": "px4-power-cell-voltage",
+        "tag": "battery_voltage_drop",
+        "title": "电芯电压严重过低",
+        "evidence": {
+          "field": "battery_status.voltage_v(min)/cell_count",
+          "value": "3.339",
+          "threshold": 3.55,
+          "unit": "V/cell"
+        },
+        "docUrl": "https://docs.px4.io/main/en/config/battery.html",
+        "suggestion": "存在过放风险，检查电池老化、放电倍率匹配与低压告警阈值。"
+      },
+      {
+        "id": "F05",
+        "severity": "critical",
+        "ruleId": "px4-power-remaining",
+        "tag": "battery_voltage_drop",
+        "title": "电池剩余电量极低（8%）",
+        "evidence": {
+          "field": "battery_status.remaining(min)",
+          "value": "0.075",
+          "threshold": 0.1
+        },
+        "docUrl": "https://docs.px4.io/main/en/config/battery.html",
+        "suggestion": "剩余电量低于 10%，应立即返航；检查电量估算与电池健康。"
+      },
+      {
+        "id": "F06",
+        "severity": "critical",
+        "ruleId": "px4-failsafe-failsafe",
+        "tag": "failsafe",
+        "title": "触发失效保护（飞行中，t=25.6s）",
+        "evidence": {
+          "field": "vehicle_status.failsafe",
+          "value": "set at 25.6s"
+        },
+        "docUrl": "https://docs.px4.io/main/en/config/safety.html",
+        "suggestion": "结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"
+      },
+      {
+        "id": "F07",
+        "severity": "critical",
+        "ruleId": "px4-failsafe-failsafe",
+        "tag": "failsafe",
+        "title": "触发失效保护（飞行中，t=162.2s）",
+        "evidence": {
+          "field": "vehicle_status.failsafe",
+          "value": "set at 162.2s"
+        },
+        "docUrl": "https://docs.px4.io/main/en/config/safety.html",
+        "suggestion": "结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"
+      },
+      {
+        "id": "F08",
+        "severity": "critical",
+        "ruleId": "px4-failsafe-nav",
+        "tag": "failsafe",
+        "title": "飞行中导航状态切换为 AUTO_RTL（t=150.0s）",
+        "evidence": {
+          "field": "vehicle_status.nav_state",
+          "value": "AUTO_RTL"
+        },
+        "docUrl": "https://docs.px4.io/main/en/config/safety.html",
+        "suggestion": "说明飞控进入失效保护状态，需结合前文事件定位触发原因。"
+      },
+      {
+        "id": "F09",
+        "severity": "critical",
+        "ruleId": "px4-failsafe-nav",
+        "tag": "failsafe",
+        "title": "飞行中导航状态切换为 AUTO_RTL（t=228.6s）",
+        "evidence": {
+          "field": "vehicle_status.nav_state",
+          "value": "AUTO_RTL"
+        },
+        "docUrl": "https://docs.px4.io/main/en/config/safety.html",
+        "suggestion": "说明飞控进入失效保护状态，需结合前文事件定位触发原因。"
+      },
+      {
+        "id": "F02",
+        "severity": "warning",
+        "ruleId": "px4-ekf-innovation",
+        "tag": "ekf_innovation_failure",
+        "title": "EKF 创新检验偶发失败（estimator #2：空速）",
+        "evidence": {
+          "field": "estimator_status 创新检验拒绝样本占比",
+          "value": "1.15",
+          "threshold": 1,
+          "unit": "%"
+        },
+        "docUrl": "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html",
+        "suggestion": "涉及：空速。关注 GPS 卫星数、磁罗盘干扰、振动与气压计异常。"
+      },
+      {
+        "id": "F10",
+        "severity": "warning",
+        "ruleId": "px4-log-warnings",
+        "tag": null,
+        "title": "日志中出现 18 条 WARNING 消息",
+        "evidence": {
+          "field": "ulog.logged_messages(log_level=4)",
+          "value": 18,
+          "threshold": 0,
+          "unit": "条",
+          "samples": [
+            {
+              "tSec": 24.56,
+              "message": "[health_and_arming_checks] Low battery"
+            },
+            {
+              "tSec": 25.62,
+              "message": "[failsafe] Failsafe activated"
+            },
+            {
+              "tSec": 159.95,
+              "message": "[health_and_arming_checks] Low battery"
+            },
+            {
+              "tSec": 162.22,
+              "message": "[health_and_arming_checks] Low battery"
+            },
+            {
+              "tSec": 162.22,
+              "message": "[health_and_arming_checks] Geofence: approaching or outside geofence"
+            }
+          ]
+        },
+        "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html"
+      },
+      {
+        "id": "F01",
+        "severity": "info",
+        "ruleId": "px4-imu-clipping",
+        "tag": null,
+        "title": "偶发加速度计削波：IMU #1 轴 0 全日志累计削波 81 次（理想值为 0）",
+        "evidence": {
+          "field": "vehicle_imu_status.accel_clipping[0](末值-首值)",
+          "value": 81,
+          "threshold": 0,
+          "unit": "count"
+        },
+        "docUrl": "https://docs.px4.io/main/en/assembly/vibration_isolation.html",
+        "suggestion": "少量削波可先观察；频次升高或伴随振动告警需排查机械问题。"
+      },
+      {
+        "id": "F03",
+        "severity": "info",
+        "ruleId": "px4-ekf-fault",
+        "tag": null,
+        "title": "EKF 报告非核心辅助传感器融合拒绝（filter_fault_flags=1024，常见为未使用视觉/光流）",
+        "evidence": {
+          "field": "estimator_status.filter_fault_flags",
+          "value": 1024,
+          "threshold": 0
+        },
+        "docUrl": "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html",
+        "suggestion": "若该机确实未启用视觉/光流定位，此位可忽略；否则检查对应传感器。"
+      }
+    ]
+  }
+}

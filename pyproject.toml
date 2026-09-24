@@ -53,8 +53,8 @@ select = ["E4", "E7", "E9", "F"]
 quote-style = "double"
 
 [tool.pytest.ini_options]
-# 只收 engine/tests/ 下的用例；engine/test_pyulog.py 是个 demo 脚本（顶层 import pyulog），
-# 不该被当成测试收集，否则没装 pyulog 的机器上 pytest 会直接 collection error。
+# 只收 engine/tests/ 下的用例：engine/ 根目录下现在没有测试文件，早先那个 demo 脚本
+# （顶层 import pyulog）已删——它若被当成测试收集，没装 pyulog 的机器会直接 collection error。
 testpaths = ["engine/tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]

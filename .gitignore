@@ -28,7 +28,7 @@ __pycache__/
 # 本地类型检查用的虚拟环境（pyright 靠它找到 numpy / pyulog；每台机器路径不同，不入库）
 # 建法见 docs/develop/ 里的 pyright 一节：项目解释器 -m venv .venv，再装 numpy 与 pyulog
 .venv/
-# PX4 消息定义缓存（由 tools/px4/fetch_px4_uorb_msg.py 拉取，不入库）
+# PX4 消息定义缓存（由 tools/dev/fetch_px4_uorb_msg.py 拉取，不入库）
 .cache/
 .pytest_cache/
 
@@ -52,8 +52,8 @@ test-results/
 
 # ========== 校准用真实飞行日志 ==========
 # 含 GPS 轨迹，勿入库；用小样本/合成日志做 CI
-tools/calibrate/logs/*.ulg
-tools/calibrate/logs/*.bin
+tools/testdata/logs/*.ulg
+tools/testdata/logs/*.bin
 
 # ========== IDE / 编辑器 ==========
 .vscode/

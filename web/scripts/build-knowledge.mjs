@@ -1608,7 +1608,7 @@ function build() {
     // 契约的事实源是 engine/providers/api.py 的两张常量表。这里查每个适配器是否**定义了**
     // 契约要求的能力、builtin_variables() 的字典字面量键是否齐全。
     // 查不了运行时行为（类型、失败语义）——那两道在引擎的运行期自检与
-    // tools/calibrate/guard-px4log-provider.py 里，三道合起来才是完整的一道关。
+    // tools/engine/guard-px4log-provider.py 里，三道合起来才是完整的一道关。
     const providerApi = parseProviderApi(read(PY_PROVIDER_API));
     for (const f of providerFiles) {
         const src = read(resolve(PROVIDER_DIR, f));

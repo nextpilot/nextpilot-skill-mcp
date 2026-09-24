@@ -204,7 +204,7 @@ next dev
 | pre-push 默认               | `--stage push`                                 | **不跑**                   |
 | pre-push `WITH_E2E=1`       | `--stage push,ci --with-e2e`                   | 不跑                       |
 | pre-push `FULL_PUSH=1`      | `--stage push,ci,build`                        | 跑（显式选择，符合"按需"） |
-| `tools/check_all.ps1`       | 默认 `--stage push`，`-WithBuild` 才加 `build` | 默认不跑                   |
+| `tools/ci/check_all.ps1`    | 默认 `--stage push`，`-WithBuild` 才加 `build` | 默认不跑                   |
 
 判据是阶段划分本身——`build` 是独立阶段，**不并入 `push` 与 `ci` 的默认集合**
 （`--stage ci` 不含 `build`）。这条决定因此**不需要在清单里另设开关**：
@@ -268,7 +268,7 @@ python tools/ci/check_all.py --stage push    # 无工具链检查，26s
 
 **日志回归为什么去不了 CI**（第 9 节）：
 
-`.gitignore` 第 24-25 行明确排除 `tools/calibrate/logs/*.ulg` 与 `*.bin`，
+`.gitignore` 第 24-25 行明确排除 `tools/testdata/logs/*.ulg` 与 `*.bin`，
 云端 checkout 里没有日志 → `when: has_logs` → 4 项全部 SKIP。
 
 这不是"配置漏了"，是**故意的**：原始日志含真实 GPS 轨迹，
@@ -277,7 +277,7 @@ python tools/ci/check_all.py --stage push    # 无工具链检查，26s
 判据与事实一致。（早先的文档把它描述成"判据落点没跟着数据搬家"的 bug，**那个说法作废**。）
 
 **谁能在这台机器以外跑这 4 项**：不能。新克隆的人需要自己备日志
-（`tools/calibrate/logs/` 里两个 `sample*` 是仓库自带的，其余需按第 9.4 节的脚本下），
+（`tools/testdata/logs/` 里两个 `sample*` 是仓库自带的，其余需按第 9.4 节的脚本下），
 否则这 4 项会安静地 SKIP。**这是有意的行为，不是故障。**
 
 **决策前的原始分析**（保留作判断依据，结论见上）：
@@ -311,10 +311,10 @@ python tools/ci/check_all.py --stage push    # 无工具链检查，26s
 
 **`checks` job 里日志回归的状态：SKIP，且有意的**（第 9 节）。
 
-`check_all.py:256-257` 的判据查的是日志目录下有没有 `.ulg` / `.bin`：
+`check_all.py:314-315` 的判据查的是日志目录下有没有 `.ulg` / `.bin`：
 
 ```python
-log_dir = ROOT / "tools" / "calibrate" / "logs"
+log_dir = ROOT / "tools" / "testdata" / "logs"
 logs = sorted(log_dir.glob("*.ulg")) + sorted(log_dir.glob("*.bin"))
 ```
 
@@ -383,7 +383,7 @@ npmmirror 而失败（该镜像无 audit 端点），但 **CI 未配 registry，
    （含 GPS 首点 63.417°N/10.408°E，挪威），与「原始日志不入库」纪律存在张力，
    用户判断来源为公开的 logs.px4.io 且已在库，**接受继续入库**。
    ⚠️ **这意味着"原始日志不入库"这条纪律今后不能作为通用红线引用**——
-   它现在只对 `tools/calibrate/logs/*.ulg` 成立，对 E2E fixture 已有例外。
+   它现在只对 `tools/testdata/logs/*.ulg` 成立，对 E2E fixture 已有例外。
 
 ### lint 位置（已定）
 
@@ -440,7 +440,7 @@ npmmirror 而失败（该镜像无 audit 端点），但 **CI 未配 registry，
 
 **2026-09-23 变更：两份配置合并到仓库根**。原先配置只住在 `web/`，靠 CI 与 `pre-commit`
 **显式 `--config web/.prettierrc`** 把 4 空格/120 强行套到全仓。问题是 prettier 对
-`web/` 之外的文件（`tools/browser/*.mjs`、`docs/**/*.md`）**按目录向上找不到配置**，落回内置默认
+`web/` 之外的文件（如 `docs/**/*.md`）**按目录向上找不到配置**，落回内置默认
 （2 空格 / 80 宽）—— 于是任何不传 `--config` 的路径（编辑器保存、手工 `npx prettier --write`）
 都会把它们改坏，下次 CI 再按 4/120 判不合格，来回拉锯。
 
@@ -643,7 +643,7 @@ critical，删掉后该逻辑变成死代码。
 | `.githooks/commit-msg`                        | 无                              | **新增**（第 11.4 节）                              |
 | `.github/workflows/ci.yml` `checks`           | `--with-build --with-e2e`       | `--stage build,ci --with-e2e`                       |
 | `.github/workflows/ci.yml` `guard-self-proof` | `--with-mutate`                 | **保持不变**                                        |
-| `tools/check_all.ps1`                         | 自己实现 eslint / E2E           | **改为纯转调**，只把开关翻译成 `--stage`            |
+| `tools/ci/check_all.ps1`                      | 自己实现 eslint / E2E           | **改为纯转调**，只把开关翻译成 `--stage`            |
 
 **`--stage ci` 为什么必须带上 `build`**：`--stage ci` 不含 `build`（第 3 节已定：build 是显式触发，
 不得隐含），所以 CI 写 `--stage ci` 会**少跑 `next build`**。
@@ -657,7 +657,7 @@ critical，删掉后该逻辑变成死代码。
 它继续用 `--with-mutate` 即可，`mutate_guards.py` 自己已有 `--only`，
 不必在 `check_all.py` 里再造一套按步骤筛选的机制。
 
-**`tools/check_all.ps1` 为什么从"自己实现"改成"纯转调"**：它原先在 Group 2/3 里
+**`tools/ci/check_all.ps1` 为什么从"自己实现"改成"纯转调"**：它原先在 Group 2/3 里
 另写了一版 eslint 与 E2E 命令——那是同一批检查的**第二个事实源**，
 与"检查内容只住 `checklist.yml`"直接冲突，两处必然漂移。
 现在它只做一件事：把 `-Stage` / `-WithBuild` / `-WithE2E` / `-SkipLogs` 翻译成
@@ -677,7 +677,7 @@ critical，删掉后该逻辑变成死代码。
 
 1. 改 `checklist.yml`：重排阶段、删 `check_prereq`、加三个空阶段；
 2. 改 `check_all.py`：加 `--stage` / `--list-stages` 与老 flag 别名；
-3. 同步改两个 pre-push hook、CI workflow、`tools/check_all.ps1`；
+3. 同步改两个 pre-push hook、CI workflow、`tools/ci/check_all.ps1`；
 4. 更新本文档第 2、3 节；
 
 验证清单：
@@ -706,14 +706,14 @@ critical，删掉后该逻辑变成死代码。
 未经确认先动了 6 个代码文件（另有 2 个文档改动是本文档本身）。回滚：
 
 ```bash
-git checkout -- tools/ci/check_hygiene.py tools/ci/mutate_guards.py \
+git checkout -- tools/common/check_hygiene.py tools/ci/mutate_guards.py \
   tools/ci/checklist.yml .githooks/pre-push .githooks/pre-push.ps1 \
   .github/workflows/ci.yml
 ```
 
 | 文件                                 | 改动                                                           | 为什么                                                                                |
 | ------------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `tools/ci/check_hygiene.py`          | 「产物新鲜度门还在」的判据改到 `checklist.yml`                 | 它还在搜 `check_all.py` 源码，而命令已搬到清单 → **恒红**，整轮 `check_all` 跟着 FAIL |
+| `tools/common/check_hygiene.py`      | 「产物新鲜度门还在」的判据改到 `checklist.yml`                 | 它还在搜 `check_all.py` 源码，而命令已搬到清单 → **恒红**，整轮 `check_all` 跟着 FAIL |
 | `tools/ci/mutate_guards.py`          | `ruff format` 修 1 处（:524）                                  | `ruff format --check` 此前是红的                                                      |
 | `tools/ci/checklist.yml`             | 接入 `check-skill-spec` / `check-mcp-spec`                     | 各 ~1s 且自带反例自检，白捡的覆盖                                                     |
 | `.githooks/pre-push`、`pre-push.ps1` | 默认 `--pre-push`（26s），E2E 改为 `WITH_E2E=1`                | 两版参数原本不一致；E2E 移云端                                                        |
@@ -745,7 +745,7 @@ python tools/ci/mutate_guards.py --list                 # 看变异注册表（�
 **旧 flag（`--pre-push` / `--with-build`）仍可用**，是别名；但新代码一律用 `--stage`，
 别名留到所有调用点换完后再单独一个提交删除。
 
-**日志回归 4 项包含在 `--stage push` 里**（本机 `tools/calibrate/logs/` 有日志时）。
+**日志回归 4 项包含在 `--stage push` 里**（本机 `tools/testdata/logs/` 有日志时）。
 换机器或新克隆的人跑出来会是 SKIP——**这是有意的**，不是坏了（第 9 节）。
 
 **自证必须单独跑**：跑单条要给足超时（`test-issue-filer` 一次 42s），
@@ -791,12 +791,12 @@ CI 里这 4 项**继续 SKIP**。补充日志集**暂不做**。
 
 ### 9.3 日志回归现状（本地，保持）
 
-| 项                 | 命令                                | 实测 | 前提                               |
-| ------------------ | ----------------------------------- | ---- | ---------------------------------- |
-| 冻结基线逐字段比对 | `compare_baseline`                  | 3s   | 6 份日志在 `tools/calibrate/logs/` |
-| 适配器契约         | `guard-px4log-provider`             | 3s   | 同上                               |
-| probe-data         | `px4log_engine_runner --probe-data` | 3s   | 同上                               |
-| 字段引用 lint      | `lint_rules --strict`               | 2s   | 同上                               |
+| 项                 | 命令                                | 实测 | 前提                              |
+| ------------------ | ----------------------------------- | ---- | --------------------------------- |
+| 冻结基线逐字段比对 | `compare_baseline`                  | 3s   | 6 份日志在 `tools/testdata/logs/` |
+| 适配器契约         | `guard-px4log-provider`             | 3s   | 同上                              |
+| probe-data         | `px4log_engine_runner --probe-data` | 3s   | 同上                              |
+| 字段引用 lint      | `lint_rules --strict`               | 2s   | 同上                              |
 
 4 项共 11s，全部秒级，**留在本地 push 完全不影响"检查不卡进度"**。
 这也是它当初能被放进 push 的原因。
@@ -807,15 +807,15 @@ CI 里这 4 项**继续 SKIP**。补充日志集**暂不做**。
 ### 9.4 日志从哪来（本地自备）
 
 `.cache/px4/ulog/` 目前有 9 条已下载（含 4 条未入基线），
-`tools/px4/download_px4_logs.py` 可继续下。**这些都在 `.gitignore` 里，不会误提交。**
+`tools/dev/download_px4_logs.py` 可继续下。**这些都在 `.gitignore` 里，不会误提交。**
 
 **关键核对**（`git check-ignore` 实测，确保不会有人手滑提交）：
 
-| 路径                         | 会被提交吗                                  |
-| ---------------------------- | ------------------------------------------- |
-| `tools/calibrate/logs/*.ulg` | **不会**（`.gitignore:24` 的 `*.ulg` 规则） |
-| `tools/calibrate/logs/*.bin` | **不会**（`.gitignore:25`）                 |
-| `.cache/px4/ulog/*`          | **不会**                                    |
+| 路径                        | 会被提交吗                                  |
+| --------------------------- | ------------------------------------------- |
+| `tools/testdata/logs/*.ulg` | **不会**（`.gitignore:24` 的 `*.ulg` 规则） |
+| `tools/testdata/logs/*.bin` | **不会**（`.gitignore:25`）                 |
+| `.cache/px4/ulog/*`         | **不会**                                    |
 
 **这条要在每次有新人加入时验一次**——忽略规则是"日志不入库"这个决定的**唯一执行机制**，
 它一旦被改动或加白名单，决定就失效了。
@@ -882,10 +882,10 @@ enterprise`，对照组 `oschina/git-osc` 同请求 200）。**将来真要存�
 **`sample.ulg` 这个名字在仓库里指向两份内容完全不同的文件**，
 这一点在把 E2E 接进 CI 时是决定性的：
 
-| 路径                              | 入库                      | 大小  | topic 数 | 时长  | GPS                 |
-| --------------------------------- | ------------------------- | ----- | -------- | ----- | ------------------- |
-| `tools/calibrate/logs/sample.ulg` | ❌ 不入库（`.gitignore`） | 4.0MB | 15       | 69s   | —                   |
-| `web/e2e/fixtures/sample.ulg`     | ✅ **入库**               | 921KB | 70       | 1174s | 63.417°N / 10.408°E |
+| 路径                             | 入库                      | 大小  | topic 数 | 时长  | GPS                 |
+| -------------------------------- | ------------------------- | ----- | -------- | ----- | ------------------- |
+| `tools/testdata/logs/sample.ulg` | ❌ 不入库（`.gitignore`） | 4.0MB | 15       | 69s   | —                   |
+| `web/e2e/fixtures/sample.ulg`    | ✅ **入库**               | 921KB | 70       | 1174s | 63.417°N / 10.408°E |
 
 **结论**：`playwright-analyze` 能在云端真跑，靠的是右边那份
 （`web/e2e/fixtures/sample.ulg`，已入库）；而左边那份与日志回归 4 项一样，
@@ -897,7 +897,7 @@ enterprise`，对照组 `oschina/git-osc` 同请求 200）。**将来真要存�
 来源为公开的 logs.px4.io）。
 
 ⚠️ **这条裁决的连带影响**：今后引用"原始日志不入库"时**不能当作通用红线**——
-它现在只对 `tools/calibrate/logs/*.ulg` 成立，对 E2E fixture 已有既定例外。
+它现在只对 `tools/testdata/logs/*.ulg` 成立，对 E2E fixture 已有既定例外。
 若要彻底消除张力，可改用合成 fixture（脚本生成、无真实轨迹），
 但那是独立一项工作，不在本轮范围内。
 
@@ -1034,9 +1034,9 @@ node node_modules/@playwright/test/cli.js test --grep '日志分析流程' --lis
 跑 `--grep 日志分析流程` 共 11 条。用户 2026-09-22 拍板：「CI 要跑 test:e2e:analyze」。
 
 **为什么这条能在云端真跑（而日志回归不能）**：它上传的是
-`web/e2e/fixtures/sample.ulg`——**已入库**的 fixture，不是 `tools/calibrate/logs/` 下的
+`web/e2e/fixtures/sample.ulg`——**已入库**的 fixture，不是 `tools/testdata/logs/` 下的
 本地日志。所以云端 checkout 里也有，不需要 `has_logs` 门控。
-**这两类"日志"必须分清**：`tools/calibrate/logs/*.ulg` 是校准用的真实飞行日志（不入库），
+**这两类"日志"必须分清**：`tools/testdata/logs/*.ulg` 是校准用的真实飞行日志（不入库），
 `web/e2e/fixtures/sample.ulg` 是 E2E 的固定输入（入库）。**同名不同物——文件内容都不一样**
 （前者 4.0MB / 15 条 topic / 69 秒，后者 921KB / 70 条 topic / 1174 秒）。
 
@@ -1123,7 +1123,7 @@ email / JWT(eyJ…) / Bearer token / 24+ 位 hex / Windows 用户路径 / POSIX 
 最后一定有人把扫描关掉**。现状里 `test-issue-filer.mjs:322` 已经明令
 "这些字面量只许活在 `lib/error-policy.js` 里"，扫描器接进来正好遵守同一条纪律。
 
-**新增 `tools/ci/check_secrets.py`**（Python，与其它 `tools/ci/` 检查同语言）：
+**新增 `tools/common/check_secrets.py`**（Python，与其它 `tools/ci/` 检查同语言）：
 
 | 判据       | 说明                                                                                                                                      |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1248,7 +1248,7 @@ feat(web): … / fix(ci): … / chore: … / refactor(ci): … / perf(ci): … /
 
 1. **11.1**：删 `checklist.yml:154` 的 `{ENV.SKIP_LOG_ANALYSIS}`
    → 跑一次 `--grep @smoke --list` 确认命令仍能拼出（占位符删掉后不该留空参数）；
-2. **11.2**：写 `tools/ci/check_secrets.py`
+2. **11.2**：写 `tools/common/check_secrets.py`
    → **先对当前仓库跑一遍，应当零命中**（若命中，说明仓库里真有东西，先报给我）；
    → 造一个形态像密钥的假值验证它会红，**再删掉**（这一步确实红了——见上面的实测结果表）；
    → ⚠️ **别把这句假值写进任何入库文件**：本检查扫的是全仓跟踪文件，

@@ -19,7 +19,6 @@
 | `report_data.py`   | 报告页数据层（按需抽时序 + LTTB 降采样，取数走 provider）                                                                                                         |
 | `providers/api.py` | **适配器契约**：三张常量表（必需/可选能力、内置变量）+ 运行期自检                                                                                                 |
 | `providers/px4.py` | PX4 `.ulg` 适配器（固件解码 / 机型 / armed / 阶段 / 载具身份 / 轨迹 / 事件解码）                                                                                  |
-| `test_pyulog.py`   | pyulog 在本机跑通的最小验证                                                                                                                                       |
 
 非格式相关的数据仍在 `knowledge/px4/facts.yaml`（码表、文案、展示口径、规则元数据、执行顺序）；
 格式相关的数据与逻辑在 `providers/<格式>.py` 与它的那份 `facts.yaml` 里。
@@ -29,7 +28,7 @@
 | 场景                             | 谁把它跑起来                                                                                                                                                                                                                                                                                                                                                     |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **用户上传 `.ulg` 分析**         | 浏览器 Worker 里的 Pyodide。构建期 `web/scripts/build-knowledge.mjs` 把这些文件**当文本读走**，按 `operators.py → providers/api.py → providers/*.py → rule_engine.py` 的顺序拼成一份内联进 `web/workers/pyodide-px4log-engine.ts`，`report_data.py` 单独进 `pyodide-px4log-data.ts`（两者在同一个 `__main__` globals 里执行，数据层直接用那边建好的 `provider`） |
-| **本地回归 / 校准**              | `tools/calibrate/px4log_engine_runner.py` 按同样顺序拼接后 `exec`——跑的是**同一份源码**，所以本地结果与浏览器一致。其余校准脚本（`compare_baseline.py` / `dump_baseline.py` / `probe_rule.py` / `guard-px4log-provider.py`）都 import 它                                                                                                                         |
+| **本地回归 / 校准**              | `tools/px4log_engine_runner.py` 按同样顺序拼接后 `exec`——跑的是**同一份源码**，所以本地结果与浏览器一致。其余校准脚本（`compare_baseline.py` / `dump_baseline.py` / `probe_rule.py` / `guard-px4log-provider.py`）都 import 它                                                                                                                                   |
 | 生成指南页的算子目录与内置变量表 | `build-knowledge.mjs` 从 `operators.py` 与 `providers/api.py` 派生                                                                                                                                                                                                                                                                                               |
 | 阶段二服务端 / MCP（未实现）     | 把本目录包成可 `import` 的 `nextpilot_engine`（parsers / models / rules 三层），规则仍从 `knowledge/` 加载，不另存一份                                                                                                                                                                                                                                           |
 
@@ -113,7 +112,7 @@ python tools/ci/check_all.py
 
 ```bash
 cd web && pnpm build:kb                      # 内联进浏览器产物 + 生成指南页
-python tools/calibrate/guard-px4log-provider.py tools/calibrate/logs/*.ulg   # 适配器契约测试
-python tools/calibrate/compare_baseline.py   # 6 条真实日志与冻结基线逐字段比对
-python tools/calibrate/lint_rules.py         # 字段引用与版本错配（只报告）
+python tools/engine/guard-px4log-provider.py tools/testdata/logs/*.ulg   # 适配器契约测试
+python tools/engine/compare_baseline.py   # 6 条真实日志与冻结基线逐字段比对
+python tools/engine/lint_rules.py         # 字段引用与版本错配（只报告）
 ```

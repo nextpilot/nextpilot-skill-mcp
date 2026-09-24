@@ -21,8 +21,8 @@
 # 覆盖 lib/knowledge/*.generated.ts|.js、workers/*.generated.json、rules-editor-schema.generated.json 等
 **/*.generated.*
 
-# ========== calibrate baseline ==========
-tools/calibrate/baseline/
+# ========== 冻结基线（tools/testdata/baseline/）==========
+tools/testdata/baseline/
 
 # ========== 自动生成的 knowledge 元数据 ==========
 knowledge/px4/meta/

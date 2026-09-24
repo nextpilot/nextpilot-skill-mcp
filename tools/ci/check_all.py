@@ -311,7 +311,7 @@ def main(argv: list[str]) -> int:
     # rather than selecting a stage (mutate-guards alone would duplicate the checks job).
     _ARGS = args
 
-    log_dir = ROOT / "tools" / "calibrate" / "logs"
+    log_dir = ROOT / "tools" / "testdata" / "logs"
     logs = sorted(log_dir.glob("*.ulg")) + sorted(log_dir.glob("*.bin")) if not args.skip_logs else []
     has_logs = bool(logs)
     log_paths = [str(p) for p in logs]

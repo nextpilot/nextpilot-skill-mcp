@@ -327,7 +327,7 @@
 
 面向国内用户选型：
 
-- **前端 / 全栈**：Next.js + TypeScript + Tailwind CSS + shadcn/ui，**代码位于&#x20;**`web/`**&#x20;子目录**；校验用真实日志放 `tools/calibrate/logs/`（不入库，含 GPS 轨迹），校准脚本与冻结基线在 `tools/calibrate/`
+- **前端 / 全栈**：Next.js + TypeScript + Tailwind CSS + shadcn/ui，**代码位于&#x20;**`web/`**&#x20;子目录**；校验用真实日志放 `tools/testdata/logs/`（不入库，含 GPS 轨迹），冻结基线在 `tools/testdata/baseline/`，脚本在 `tools/engine/` 与 `tools/dev/`
 
 - **登录认证**：Auth.js（NextAuth）。**当前支持 GitHub + 邮箱验证码 / Magic Link（零资质，个人开发者可直接上线）**；**微信扫码、手机号验证码待注册企业主体后再接入**（微信开放平台网站应用需企业资质 + 300 元认证，短信签名 / 模板需企业资质审核）
 
@@ -963,7 +963,7 @@
 > **三次都不是 "少写一个判断"，都是 "判断本身没有被任何东西检查过"。**
 > 守住这条的是
 >
-> `tools/calibrate/check-pyodide-px4log-engine.py`
+> `tools/engine/check-pyodide-px4log-engine.py`
 >
 > ：它真执行编译产物，把
 >
@@ -1318,7 +1318,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 > 这类 "声明" 在链路上每经过一次搬运，都值得配一道对账的守卫。
 > 守住这条的是
 >
-> `tools/calibrate/check-pyodide-px4log-engine.py`
+> `tools/engine/check-pyodide-px4log-engine.py`
 >
 > （对账
 >
@@ -1493,7 +1493,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 
 | 脚本                                    | 用途                                                      | 调用方式              |
 | --------------------------------------- | --------------------------------------------------------- | --------------------- |
-| `tools/check_all.ps1`                   | 本地一键检查入口：调用 `check_all.py` + ESLint + 可选 E2E | 手动，提交前          |
+| `tools/ci/check_all.ps1`                   | 本地一键检查入口：调用 `check_all.py` + ESLint + 可选 E2E | 手动，提交前          |
 | `tools/ci/check_all.py`                 | CI 规范入口：静态检查 + 单元测试 + 编译                   | CI workflow 自动调用  |
 | `web/package.json` → `lint`             | ESLint 静态分析（`eslint .`）                             | check\_all.ps1 内调用 |
 | `web/package.json` → `test:e2e`         | Playwright 全量 E2E（`playwright test`）                  | CI 第四关             |

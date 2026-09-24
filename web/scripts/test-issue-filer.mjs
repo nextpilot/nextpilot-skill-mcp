@@ -743,7 +743,7 @@ console.log("\n[16] 轨迹取不到要说清缺什么（不许再退回一句空
     // 用户的原话："这段日志里没有可用的定位轨迹 直接告诉用户缺少什么字段，不要这么空洞的提示"。
     // 空洞只是表象：那句概括只对应六种原因里的一种（缺 topic / 缺字段 / 字段改名 / 有采样但
     // 全程没定位 / 采样数对不上 / 没 timestamp），另外五种下它是**错的**。
-    // 引擎侧那半（返回体必须带 errorReasons）由 tools/calibrate/check-pyodide-px4log-engine.py 动态核；
+    // 引擎侧那半（返回体必须带 errorReasons）由 tools/engine/check-pyodide-px4log-engine.py 动态核；
     // 这里管界面这半——失败分支真的填、列表真的渲染、切了日志清空。
     // 只留 `tsc` **看不见**的那几条：`TrackData` 的字段声明、state 声明、setter 调用，少一环
     // tsc 都会当场报错，再给它们配守卫就是"恒绿的守卫"（§6.6 那条"守卫自己也要被校验"——

@@ -6,7 +6,7 @@
 #
 # ⚠ **CI 全绿 ≠ 回归过了**：需要真实 .ulg 的那组校验（6 条冻结基线逐字段比对、适配器契约
 # 测试、数据层 probe、字段引用 lint）在这里必然被跳过——原始日志含 GPS 轨迹，按项目隐私
-# 规则不入库（见 .gitignore 的 tools/calibrate/logs/*.ulg），checkout 里根本没有这些文件。
+# 规则不入库（见 .gitignore 的 tools/testdata/logs/*.ulg），checkout 里根本没有这些文件。
 # 那几项挂在 .githooks/pre-push 上，只在开发机跑。详情见 tools/ci/check_all.py 的文档。
 name: CI
 

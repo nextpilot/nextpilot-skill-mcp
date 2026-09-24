@@ -23,7 +23,7 @@
    现状即 `web/public/`，正确；**不存在 `src/public` 这个位置**。
 4. `web/app/` 已存在，`findDir` 优先 `./app` 再 `./src/app`。
    所以**不要新建 `web/src/app`** —— 它会被静默忽略，不报错。
-5. `tools/calibrate/logs/*.ulg` 含 GPS 轨迹，靠"在 `web/` 之外"物理隔离。
+5. `tools/testdata/logs/*.ulg` 含 GPS 轨迹，靠"在 `web/` 之外"物理隔离。
    **不要把这些日志移进 `web/`**，也不要把 EdgeOne 的上传范围放宽到仓库根。
 6. `web/lib/content-dir.ts` 是运行期 `process.cwd()/content`。
    任何改变进程 cwd 的调整都会让内容**静默变空**（指南 0 篇 / Skill 0 个），不报错。
@@ -223,18 +223,18 @@ function findDir(dir, name) {
 
 ### 4.3 Python 与 CI（`tools/`、`tools/ci/`）
 
-| 文件                                             | 引用点                                                                        | 改成                                |
-| ------------------------------------------------ | ----------------------------------------------------------------------------- | ----------------------------------- |
-| `tools/calibrate/px4log_engine_runner.py`        | `ENGINE = REPO_ROOT/"engine"`                                                 | 不变（引擎不动）                    |
-| 同上                                             | `FAULT_KB_JSON` / `CHECK_SCRIPT` = `REPO_ROOT/"web"/"workers"/…`              | `REPO_ROOT/"src"/"workers"/…`       |
-| `tools/calibrate/check-pyodide-px4log-engine.py` | `TS` / `FAULT_KB` / `data_ts` / `worker_src` 四处 `REPO_ROOT/"web"/"workers"` | 同上                                |
-| `tools/ci/checklist.yml`                         | `{WEB}` 占位（9 处）                                                          | `{ROOT}`，或新增 `{SRC}` = ROOT/src |
-| `tools/ci/check_all.py`                          | 2 处 `web/`                                                                   | 相应路径                            |
-| `tools/ci/check_engine_purity.py`                | 3 处                                                                          | 同上                                |
-| `tools/ci/check_hygiene.py`                      | 7 处                                                                          | 同上                                |
-| `tools/ci/check_prereq.py` / `check_secrets.py`  | 2 + 4 处                                                                      | 同上                                |
-| **`tools/ci/mutate_guards.py`**                  | **29 处**                                                                     | ⚠ 见 §8.2                           |
-| `tools/browser/make-icons.mjs` 等                | 3 处                                                                          | 同上                                |
+| 文件                                                | 引用点                                                                        | 改成                                |
+| --------------------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------- |
+| `tools/px4log_engine_runner.py`                     | `ENGINE = REPO_ROOT/"engine"`                                                 | 不变（引擎不动）                    |
+| 同上                                                | `FAULT_KB_JSON` / `CHECK_SCRIPT` = `REPO_ROOT/"web"/"workers"/…`              | `REPO_ROOT/"src"/"workers"/…`       |
+| `tools/engine/check-pyodide-px4log-engine.py`       | `TS` / `FAULT_KB` / `data_ts` / `worker_src` 四处 `REPO_ROOT/"web"/"workers"` | 同上                                |
+| `tools/ci/checklist.yml`                            | `{WEB}` 占位（9 处）                                                          | `{ROOT}`，或新增 `{SRC}` = ROOT/src |
+| `tools/ci/check_all.py`                             | 2 处 `web/`                                                                   | 相应路径                            |
+| `tools/engine/check_engine_purity.py`               | 3 处                                                                          | 同上                                |
+| `tools/common/check_hygiene.py`                     | 7 处                                                                          | 同上                                |
+| `tools/common/check_prereq.py` / `check_secrets.py` | 2 + 4 处                                                                      | 同上                                |
+| **`tools/ci/mutate_guards.py`**                     | **29 处**                                                                     | ⚠ 见 §8.2                           |
+| `web/scripts/browser/*.mjs` 等                      | 3 处                                                                          | 同上                                |
 
 ### 4.4 GitHub Actions
 
@@ -333,11 +333,11 @@ python tools/ci/check_all.py --with-mutate
 
 ### 8.4 部署单元变大（本次迁移新引入的隐私风险）
 
-**迁移前**，EdgeOne 的构建目录是 `web/` —— 部署包天然只包含这一个目录，`tools/calibrate/logs/*.ulg`
+**迁移前**，EdgeOne 的构建目录是 `web/` —— 部署包天然只包含这一个目录，`tools/testdata/logs/*.ulg`
 （含 GPS 轨迹）无论是否被 gitignore，都不可能进部署包。这是一个**物理隔离**。
 
 **迁移后**，构建目录变成仓库根，部署单元扩到整个仓库。原始日志不上传这条隐私红线，
-从此**只剩 `.gitignore` 一道闸**（根 `.gitignore` 有 `tools/calibrate/logs/*.ulg` 与 `.bin` 两条）。
+从此**只剩 `.gitignore` 一道闸**（根 `.gitignore` 有 `tools/testdata/logs/*.ulg` 与 `.bin` 两条）。
 
 因此必须在阶段 0 先确认：**EdgeOne CLI 上传时是否严格遵循 `.gitignore`**。
 若只遵循自己的 ignore 配置，就要显式补一份 `.edgeoneignore`（或等价机制），

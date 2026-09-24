@@ -126,8 +126,8 @@ jobs:
       - id: "check-secrets"
         name: "No committed credentials (check_secrets)"
         workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/ci/check_secrets.py"]
-        hint: "A credential-shaped value was found in a tracked file. Move it to an environment variable; if it is a legitimate placeholder, add it to the allowlist in tools/ci/check_secrets.py."
+        command: ["{PYTHON}", "tools/common/check_secrets.py"]
+        hint: "A credential-shaped value was found in a tracked file. Move it to an environment variable; if it is a legitimate placeholder, add it to the allowlist in tools/common/check_secrets.py."
 
       # 面板解析器：实例怎么数、区间引用怎么展开。只跑纯函数（内置假 manifest），
       # 无浏览器无日志，实测不到 1s。这些规矩改坏时前端不会崩、只会**少画几张图**——
@@ -151,13 +151,13 @@ jobs:
       - id: "check-artifact"
         name: "Artifact is valid Python (check-pyodide-px4log-engine)"
         workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/calibrate/check-pyodide-px4log-engine.py"]
+        command: ["{PYTHON}", "tools/engine/check-pyodide-px4log-engine.py"]
         hint: "The artifact file contains invalid Python syntax. Check the error output above for the exact location."
 
       - id: "check-engine-purity"
         name: "engine/ stays pure Python (check_engine_purity)"
         workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/ci/check_engine_purity.py"]
+        command: ["{PYTHON}", "tools/engine/check_engine_purity.py"]
         hint: "The engine/ directory contains non-Pyodide-safe code. Review the violations above; engine/ must work in both browser (Pyodide) and native CPython."
 
       # pnpm 的 --filter 匹配不到项目时**静默成功**（rc=0、无输出），
@@ -165,13 +165,13 @@ jobs:
       - id: "check-pnpm-filter"
         name: "pnpm --filter targets exist (check_pnpm_filter)"
         workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/ci/check_pnpm_filter.py"]
+        command: ["{PYTHON}", "tools/common/check_pnpm_filter.py"]
         hint: "A `pnpm --filter <value>` matched nothing. pnpm exits 0 with no output in that case, so the script silently does nothing. Use --filter ./web (directory match) or a real workspace package name."
 
       - id: "check-hygiene"
         name: "Validator hygiene (check_hygiene)"
         workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/ci/check_hygiene.py"]
+        command: ["{PYTHON}", "tools/common/check_hygiene.py"]
         hint: "Review the hygiene violations listed above and fix them. Common issues: dangling section references, silent failures, stale freshness gates."
 
       # 以下三项原本住在 ci 阶段跑。它们都只读源码、不碰日志、各不到 1s
@@ -204,28 +204,28 @@ jobs:
         name: "Frozen baseline field-by-field diff (compare_baseline)"
         when: "has_logs"
         workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/calibrate/compare_baseline.py"]
+        command: ["{PYTHON}", "tools/engine/compare_baseline.py"]
         hint: "The baseline has changed unexpectedly. Review the diff output above. If the change is intentional, re-baseline by running the comparison tool."
 
       - id: "check-provider"
         name: "Adapter contract test (guard-px4log-provider)"
         when: "has_logs"
         workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/calibrate/guard-px4log-provider.py", "{LOGS}"]
+        command: ["{PYTHON}", "tools/engine/guard-px4log-provider.py", "{LOGS}"]
         hint: "One or more log files failed the adapter contract test. Check the output above for which adapter and what contract was violated."
 
       - id: "probe-data"
         name: "Data-layer structure self-check (--probe-data)"
         when: "has_logs"
         workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/calibrate/px4log_engine_runner.py", "--probe-data", "{LOGS}"]
+        command: ["{PYTHON}", "tools/px4log_engine_runner.py", "--probe-data", "{LOGS}"]
         hint: "The data layer structure is inconsistent. Review the probe output above for details."
 
       - id: "lint-rules"
         name: "Field-reference lint (lint_rules --strict)"
         when: "has_logs"
         workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/calibrate/lint_rules.py", "--strict"]
+        command: ["{PYTHON}", "tools/engine/lint_rules.py", "--strict"]
         hint: "Field reference linting found violations. Review the output above and fix the referenced fields."
 
   - id: ci
@@ -277,7 +277,7 @@ jobs:
       # 而不是等部署后才发现。代价约 5~7 分钟，故与冒烟分开、各自独立超时。
       #
       # 与冒烟的关键差别：这条**不依赖 has_logs**。它上传的是仓库里的
-      # `web/e2e/fixtures/sample.ulg`（已入库），不是 `tools/calibrate/logs/` 下的
+      # `web/e2e/fixtures/sample.ulg`（已入库），不是 `tools/testdata/logs/` 下的
       # 真实日志——所以云端 checkout 里也有，能真跑而不是 SKIP。
       - id: "playwright-analyze"
         name: "E2E analyze flow (Playwright 日志分析流程)"
