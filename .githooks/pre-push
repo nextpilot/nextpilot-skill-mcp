@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _python_with_ruff import ensure_python_with_ruff  # noqa: E402
+from _venv_python import ensure_venv_python  # noqa: E402
 
 
 def main() -> int:
@@ -48,4 +48,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(ensure_python_with_ruff(main))
+    raise SystemExit(ensure_venv_python(main))
