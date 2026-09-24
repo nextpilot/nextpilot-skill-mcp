@@ -63,22 +63,22 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 
 按**检查什么**分类（不是按跑在哪），共 11 类。
 
-| 类别     | 回答什么问题                       | 检查                                                                                                                                |
-| -------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| 格式化   | 代码风格一致吗（机器改，人不争论） | `ruff format`（Py）、`prettier`（前端）                                                                                             |
-| lint     | 有没有可疑写法                     | `ruff check`（Py）、`eslint`（JS，**TS 暂不覆盖**，第 5 节）                                                                        |
-| 类型     | 类型对得上吗                       | `tsc --noEmit`                                                                                                                      |
-| 单测     | 算子与表达式求值对不对             | `pytest engine/tests`                                                                                                               |
+| 类别     | 回答什么问题                       | 检查                                                                                                                         |
+| -------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| 格式化   | 代码风格一致吗（机器改，人不争论） | `ruff format`（Py）、`prettier`（前端）                                                                                      |
+| lint     | 有没有可疑写法                     | `ruff check`（Py）、`eslint`（JS，**TS 暂不覆盖**，第 5 节）                                                                 |
+| 类型     | 类型对得上吗                       | `tsc --noEmit`                                                                                                               |
+| 单测     | 算子与表达式求值对不对             | `pytest engine/tests`                                                                                                        |
 | 契约     | 产物与源一致吗、产物合法吗         | `build:kb --check`、`check_engine_pyodide`、`check_engine_purity`、`check_pnpm_filter`、`check-skill-spec`、`check-mcp-spec` |
-| 守卫集   | 前端不许退化的那批断言还成立吗     | `test-issue-filer`（23 节）                                                                                                         |
-| 元检查   | **校验机制自己**还健康吗           | `check_hygiene`                                                                                                                     |
-| 自证     | 守卫真的会红吗（不是恒绿）         | `mutate_guards`（53 条变异）                                                                                                        |
-| 回归     | 改规则后结论还准吗                 | 日志回归 4 项                                                                                                                       |
-| 冒烟     | 关键路径还能跑通吗                 | Playwright `@smoke`                                                                                                                 |
-| E2E      | 全量链路还能跑通吗                 | Playwright 全量、`playwright.live`（线上）                                                                                          |
-| 机密     | 有没有把密钥提交进去               | `check_secrets`（第 11.2 节）                                                                                                       |
-| 审计     | 依赖有没有已知漏洞                 | `pip-audit`、`pnpm audit`（第 11.3 节）                                                                                             |
-| 提交规范 | 提交标题能读懂吗、能自动分类吗     | `.githooks/commit-msg`（第 11.4 节）                                                                                                |
+| 守卫集   | 前端不许退化的那批断言还成立吗     | `test-issue-filer`（23 节）                                                                                                  |
+| 元检查   | **校验机制自己**还健康吗           | `check_hygiene`                                                                                                              |
+| 自证     | 守卫真的会红吗（不是恒绿）         | `mutate_guards`（53 条变异）                                                                                                 |
+| 回归     | 改规则后结论还准吗                 | 日志回归 4 项                                                                                                                |
+| 冒烟     | 关键路径还能跑通吗                 | Playwright `@smoke`                                                                                                          |
+| E2E      | 全量链路还能跑通吗                 | Playwright 全量、`playwright.live`（线上）                                                                                   |
+| 机密     | 有没有把密钥提交进去               | `check_secrets`（第 11.2 节）                                                                                                |
+| 审计     | 依赖有没有已知漏洞                 | `pip-audit`、`pnpm audit`（第 11.3 节）                                                                                      |
+| 提交规范 | 提交标题能读懂吗、能自动分类吗     | `.githooks/commit-msg`（第 11.4 节）                                                                                         |
 
 **原"前提"类（`check_prereq`）已删除**——CI 的 pip / pnpm 安装步骤已等价保证，
 本地再查一遍环境没有增量信息（第 1 节第二条依据）。
@@ -88,39 +88,39 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 
 ### 逐项明细
 
-| 类别     | 检查                                                        | 实测                                   | 现在挂在哪            | 目标位置                               |
-| -------- | ----------------------------------------------------------- | -------------------------------------- | --------------------- | -------------------------------------- |
-| 格式化   | `ruff format --check`                                       | 2s                                     | 每次                  | push                                   |
-| 格式化   | `ruff format`（自动改，仅 staged .py）                      | 2s                                     | commit                | commit                                 |
-| 格式化   | `prettier --check`（前端）                                  | **3.7s**                               | 无                    | push                                   |
-| 格式化   | `prettier --write`（仅 staged 前端）                        | 秒级                                   | 无                    | commit                                 |
-| lint     | `eslint --fix`（仅 staged 前端，已定）                      | 秒级                                   | 无                    | commit                                 |
-| lint     | `ruff check`                                                | 1s                                     | 每次                  | push                                   |
-| lint     | `eslint .`（**只覆盖 35 个 .js/.mjs，0 个 .ts/.tsx**）      | 3s                                     | 每次                  | push                                   |
-| 类型     | `tsc --noEmit`                                              | 2s                                     | 每次                  | push（另加 dev 的 `--watch`）          |
-| 单测     | `pytest engine/tests`（算子 / CEL 沙箱）                    | 3s                                     | 每次                  | push                                   |
-| 契约     | `build:kb --check`（产物 vs `knowledge/` 源）               | 1s                                     | 静态（pre-push 跳过） | CI                                     |
-| 契约     | `check_engine_pyodide`（产物是合法 Python 且真执行） | 1s                                     | 每次                  | push                                   |
-| 契约     | `check_engine_purity`（`engine/` 纯净性）                   | 1s                                     | 每次                  | push                                   |
-| 契约     | `check_pnpm_filter`（`pnpm --filter` 值命中真实项目）       | **0.5s**                               | 每次                  | push                                   |
-| 契约     | `check-skill-spec`                                          | 1s                                     | 每次                  | CI                                     |
-| 契约     | `check-mcp-spec`                                            | 1s                                     | 每次                  | CI                                     |
-| 守卫集   | `test-issue-filer`（前端守卫）                              | **约 45s**                             | 静态（pre-push 跳过） | CI                                     |
-| 元检查   | `check_hygiene`（校验机制自身卫生）                         | 4s                                     | 每次                  | push                                   |
-| 日志回归 | `compare_baseline`                                          | 3s                                     | 本地 push             | **本地**（`.ulg` 不入库，第 9 节）     |
-| 日志回归 | `guard_provider_contract`                                   | 3s                                     | 本地 push             | **本地**（同上）                       |
-| 日志回归 | `px4log_engine_runner --probe-data`                         | 3s                                     | 本地 push             | **本地**（同上）                       |
-| 日志回归 | `check_rules_fields --strict`                                | 2s                                     | 本地 push             | **本地**（同上）                       |
-| 构建     | `sync-content` + `build-knowledge`                          | —                                      | dev / build           | dev / build                            |
-| 构建     | `next build`                                                | **144s**                               | CI（`--stage build`） | CI                                     |
-| 自证     | `mutate_guards`（53 条变异）                                | **约 26min**                           | 无人跑                | CI 独立 job                            |
-| 冒烟     | `playwright --grep @smoke`                                  | 分钟级                                 | 原在 pre-push         | CI（**标记重整见第 10 节**）           |
-| E2E      | `playwright --grep 日志分析流程`（11 条）                   | 约 5~7min                              | 无人跑                | CI（`playwright-analyze`，第 10.6 节） |
-| E2E      | `playwright.live.config.ts`（打线上）                       | —                                      | deploy 后             | deploy 后                              |
-| 机密     | `check_secrets`（复用 `SCRUB_RULES`）                       | **1.9s**（306 个跟踪文件，零命中）     | 无                    | push                                   |
-| 审计     | `pnpm audit`（**须带 `--registry` 官方源**）                | **6s**（实测，命令走 `{PNPM}` 占位符） | 无                    | CI                                     |
-| 审计     | `pip-audit`                                                 | 秒级                                   | 无                    | CI                                     |
-| 提交规范 | `.githooks/commit-msg`                                      | < 1s                                   | 无                    | commit                                 |
+| 类别     | 检查                                                   | 实测                                   | 现在挂在哪            | 目标位置                               |
+| -------- | ------------------------------------------------------ | -------------------------------------- | --------------------- | -------------------------------------- |
+| 格式化   | `ruff format --check`                                  | 2s                                     | 每次                  | push                                   |
+| 格式化   | `ruff format`（自动改，仅 staged .py）                 | 2s                                     | commit                | commit                                 |
+| 格式化   | `prettier --check`（前端）                             | **3.7s**                               | 无                    | push                                   |
+| 格式化   | `prettier --write`（仅 staged 前端）                   | 秒级                                   | 无                    | commit                                 |
+| lint     | `eslint --fix`（仅 staged 前端，已定）                 | 秒级                                   | 无                    | commit                                 |
+| lint     | `ruff check`                                           | 1s                                     | 每次                  | push                                   |
+| lint     | `eslint .`（**只覆盖 35 个 .js/.mjs，0 个 .ts/.tsx**） | 3s                                     | 每次                  | push                                   |
+| 类型     | `tsc --noEmit`                                         | 2s                                     | 每次                  | push（另加 dev 的 `--watch`）          |
+| 单测     | `pytest engine/tests`（算子 / CEL 沙箱）               | 3s                                     | 每次                  | push                                   |
+| 契约     | `build:kb --check`（产物 vs `knowledge/` 源）          | 1s                                     | 静态（pre-push 跳过） | CI                                     |
+| 契约     | `check_engine_pyodide`（产物是合法 Python 且真执行）   | 1s                                     | 每次                  | push                                   |
+| 契约     | `check_engine_purity`（`engine/` 纯净性）              | 1s                                     | 每次                  | push                                   |
+| 契约     | `check_pnpm_filter`（`pnpm --filter` 值命中真实项目）  | **0.5s**                               | 每次                  | push                                   |
+| 契约     | `check-skill-spec`                                     | 1s                                     | 每次                  | CI                                     |
+| 契约     | `check-mcp-spec`                                       | 1s                                     | 每次                  | CI                                     |
+| 守卫集   | `test-issue-filer`（前端守卫）                         | **约 45s**                             | 静态（pre-push 跳过） | CI                                     |
+| 元检查   | `check_hygiene`（校验机制自身卫生）                    | 4s                                     | 每次                  | push                                   |
+| 日志回归 | `compare_baseline`                                     | 3s                                     | 本地 push             | **本地**（`.ulg` 不入库，第 9 节）     |
+| 日志回归 | `guard_provider_contract`                              | 3s                                     | 本地 push             | **本地**（同上）                       |
+| 日志回归 | `px4log_engine_runner --probe-data`                    | 3s                                     | 本地 push             | **本地**（同上）                       |
+| 日志回归 | `check_rules_fields --strict`                          | 2s                                     | 本地 push             | **本地**（同上）                       |
+| 构建     | `sync-content` + `build-knowledge`                     | —                                      | dev / build           | dev / build                            |
+| 构建     | `next build`                                           | **144s**                               | CI（`--stage build`） | CI                                     |
+| 自证     | `mutate_guards`（53 条变异）                           | **约 26min**                           | 无人跑                | CI 独立 job                            |
+| 冒烟     | `playwright --grep @smoke`                             | 分钟级                                 | 原在 pre-push         | CI（**标记重整见第 10 节**）           |
+| E2E      | `playwright --grep 日志分析流程`（11 条）              | 约 5~7min                              | 无人跑                | CI（`playwright-analyze`，第 10.6 节） |
+| E2E      | `playwright.live.config.ts`（打线上）                  | —                                      | deploy 后             | deploy 后                              |
+| 机密     | `check_secrets`（复用 `SCRUB_RULES`）                  | **1.9s**（306 个跟踪文件，零命中）     | 无                    | push                                   |
+| 审计     | `pnpm audit`（**须带 `--registry` 官方源**）           | **6s**（实测，命令走 `{PNPM}` 占位符） | 无                    | CI                                     |
+| 审计     | `pip-audit`                                            | 秒级                                   | 无                    | CI                                     |
+| 提交规范 | `.githooks/commit-msg`                                 | < 1s                                   | 无                    | commit                                 |
 
 **`{PNPM}` 是新增占位符，不是笔误**：pnpm 是**全局工具**，`web/node_modules/` 下没有它。
 清单里原先写 `{NODE} node_modules/pnpm/bin/pnpm.cjs` —— **那条路径不存在**，
@@ -796,7 +796,7 @@ CI 里这 4 项**继续 SKIP**。补充日志集**暂不做**。
 | 冻结基线逐字段比对 | `compare_baseline`                  | 3s   | 6 份日志在 `tools/testdata/logs/` |
 | 适配器契约         | `guard_provider_contract`           | 3s   | 同上                              |
 | probe-data         | `px4log_engine_runner --probe-data` | 3s   | 同上                              |
-| 字段引用 lint      | `check_rules_fields --strict`        | 2s   | 同上                              |
+| 字段引用 lint      | `check_rules_fields --strict`       | 2s   | 同上                              |
 
 4 项共 11s，全部秒级，**留在本地 push 完全不影响"检查不卡进度"**。
 这也是它当初能被放进 push 的原因。

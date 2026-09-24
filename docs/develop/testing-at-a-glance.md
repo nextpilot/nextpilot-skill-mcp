@@ -95,7 +95,7 @@
 | 2   | `ruff format --check`                         | Python 格式化 | 风格统一吗（**只认 `.py`**）                                      | 2s   |
 | 3   | `ruff check`                                  | Python lint   | 有没有可疑写法                                                    | 1s   |
 | 4   | `engine/tests/`                               | 单元测试      | 算子与 CEL 表达式**求值对不对**                                   | 1.2s |
-| 5   | `tools/engine/check_engine_pyodide.py`  | 产物校验      | 生成的产物是合法可执行的 Python 吗；轨迹取不到时给没给逐条原因    | 1s   |
+| 5   | `tools/engine/check_engine_pyodide.py`        | 产物校验      | 生成的产物是合法可执行的 Python 吗；轨迹取不到时给没给逐条原因    | 1s   |
 | 6   | `tools/engine/check_engine_purity.py`         | 纯净性守卫    | `engine/` 还是纯 Python 吗（浏览器与本机共用同一份的前提）        | 0.6s |
 | 7   | `tools/common/check_pnpm_filter.py`           | 转发脚本守卫  | 每个 `pnpm --filter` 都命中真实项目吗（匹配不到时 pnpm 静默成功） | 0.5s |
 | 8   | `tsc --noEmit`                                | 类型检查      | TypeScript 类型对得上吗                                           | 2s   |
@@ -103,7 +103,7 @@
 | 10  | `eslint`                                      | JS lint       | JS 有没有可疑写法（**只认 `.js`/`.mjs`，不含 `.ts`**）            | 3s   |
 | 11  | `tools/common/check_hygiene.py`               | 元检查        | **校验机制自己**还健康吗（悬空引用、静默失败、守卫恒真）          | 4.2s |
 | 12  | `tools/engine/compare_baseline.py`            | 基线比对      | 改规则后结论还准吗（6 份日志逐字段比对）                          | 3s   |
-| 13  | `tools/engine/guard_provider_contract.py`    | 适配器契约    | 数据适配层契约还成立吗（逐份日志跑同一套断言）                    | 3s   |
+| 13  | `tools/engine/guard_provider_contract.py`     | 适配器契约    | 数据适配层契约还成立吗（逐份日志跑同一套断言）                    | 3s   |
 | 14  | `tools/px4log_engine_runner.py --probe-data`  | 数据层自检    | 数据层结构自洽吗                                                  | 3s   |
 | 15  | `tools/engine/check_rules_fields.py --strict` | 字段引用 lint | 规则里引用的**字段名真实存在**吗                                  | 2s   |
 
@@ -169,10 +169,10 @@ FULL_PUSH=1 git push    # 和 CI 一样全（+144s 的 next build）
 | `tools/ci/check_all.py`                  | 手动跑任意阶段：`--stage push`；`--list-stages` 看全貌          |
 | `tools/ci/check_all.ps1`                 | 同上，PowerShell 包装（**Git hook 不会调它**，`.ps1` 只手动用） |
 | `tools/common/check_prereq.py`           | 首次配环境时查工具链齐不齐（CI 装依赖就顶替了，不重复跑）       |
-| `tools/engine/dump_baseline.py`           | **确认改规则是有意的**之后，重新打基线                          |
-| `tools/dev/dump_px4log_fields.py`         | 查某份日志里有哪些字段（写规则时用）                            |
-| `tools/engine/check_rules_compute.py`       | 调单条规则，看它为什么命中/没命中                               |
-| `tools/dev/dump_px4log_stats.py`          | 探某字段的统计分布（定阈值时用）                                |
+| `tools/engine/dump_baseline.py`          | **确认改规则是有意的**之后，重新打基线                          |
+| `tools/dev/dump_px4log_fields.py`        | 查某份日志里有哪些字段（写规则时用）                            |
+| `tools/engine/check_rules_compute.py`    | 调单条规则，看它为什么命中/没命中                               |
+| `tools/dev/dump_px4log_stats.py`         | 探某字段的统计分布（定阈值时用）                                |
 | `web/scripts/fix-node-links.mjs`         | 批量修网站里的内部链接                                          |
 | `web/scripts/migrate-skills-to-spec.mjs` | 一次性迁移脚本（已跑过）                                        |
 | `web/scripts/_verify-schema.mjs`         | 一次性验证脚本（已跑过）                                        |

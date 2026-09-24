@@ -227,7 +227,7 @@ function findDir(dir, name) {
 | --------------------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------- |
 | `tools/px4log_engine_runner.py`                     | `ENGINE = REPO_ROOT/"engine"`                                                 | 不变（引擎不动）                    |
 | 同上                                                | `FAULT_KB_JSON` / `CHECK_SCRIPT` = `REPO_ROOT/"web"/"workers"/…`              | `REPO_ROOT/"src"/"workers"/…`       |
-| `tools/engine/check_engine_pyodide.py`             | `TS` / `FAULT_KB` / `data_ts` / `worker_src` 四处 `REPO_ROOT/"web"/"workers"` | 同上                                |
+| `tools/engine/check_engine_pyodide.py`              | `TS` / `FAULT_KB` / `data_ts` / `worker_src` 四处 `REPO_ROOT/"web"/"workers"` | 同上                                |
 | `tools/ci/checklist.yml`                            | `{WEB}` 占位（9 处）                                                          | `{ROOT}`，或新增 `{SRC}` = ROOT/src |
 | `tools/ci/check_all.py`                             | 2 处 `web/`                                                                   | 相应路径                            |
 | `tools/engine/check_engine_purity.py`               | 3 处                                                                          | 同上                                |
