@@ -63,22 +63,22 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 
 按**检查什么**分类（不是按跑在哪），共 11 类。
 
-| 类别     | 回答什么问题                       | 检查                                                                                                                         |
-| -------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| 格式化   | 代码风格一致吗（机器改，人不争论） | `ruff format`（Py）、`prettier`（前端）                                                                                      |
-| lint     | 有没有可疑写法                     | `ruff check`（Py）、`eslint`（JS，**TS 暂不覆盖**，第 5 节）                                                                 |
-| 类型     | 类型对得上吗                       | `tsc --noEmit`                                                                                                               |
-| 单测     | 算子与表达式求值对不对             | `pytest engine/tests`                                                                                                        |
-| 契约     | 产物与源一致吗、产物合法吗         | `build:kb --check`、`check_engine_pyodide`、`check_engine_purity`、`check_pnpm_filter`、`check-skill-spec`、`check-mcp-spec` |
-| 守卫集   | 前端不许退化的那批断言还成立吗     | `test-issue-filer`（23 节）                                                                                                  |
-| 元检查   | **校验机制自己**还健康吗           | `check_hygiene`                                                                                                              |
-| 自证     | 守卫真的会红吗（不是恒绿）         | `mutate_guards`（53 条变异）                                                                                                 |
-| 回归     | 改规则后结论还准吗                 | 日志回归 4 项                                                                                                                |
-| 冒烟     | 关键路径还能跑通吗                 | Playwright `@smoke`                                                                                                          |
-| E2E      | 全量链路还能跑通吗                 | Playwright 全量、`playwright.live`（线上）                                                                                   |
-| 机密     | 有没有把密钥提交进去               | `check_secrets`（第 11.2 节）                                                                                                |
-| 审计     | 依赖有没有已知漏洞                 | `pip-audit`、`pnpm audit`（第 11.3 节）                                                                                      |
-| 提交规范 | 提交标题能读懂吗、能自动分类吗     | `.githooks/commit-msg`（第 11.4 节）                                                                                         |
+| 类别     | 回答什么问题                       | 检查                                                                                                                                                     |
+| -------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 格式化   | 代码风格一致吗（机器改，人不争论） | `ruff format`（Py）、`prettier`（前端）                                                                                                                  |
+| lint     | 有没有可疑写法                     | `ruff check`（Py）、`eslint`（JS，**TS 暂不覆盖**，第 5 节）                                                                                             |
+| 类型     | 类型对得上吗                       | `tsc --noEmit`                                                                                                                                           |
+| 单测     | 算子与表达式求值对不对             | `pytest engine/tests`                                                                                                                                    |
+| 契约     | 产物与源一致吗、产物合法吗         | `build:kb --check`、`check_engine_pyodide`、`check_engine_purity`、`check_pnpm_filter`、`guard_apm_parser_version`、`check-skill-spec`、`check-mcp-spec` |
+| 守卫集   | 前端不许退化的那批断言还成立吗     | `test-issue-filer`（23 节）                                                                                                                              |
+| 元检查   | **校验机制自己**还健康吗           | `check_hygiene`                                                                                                                                          |
+| 自证     | 守卫真的会红吗（不是恒绿）         | `mutate_guards`（65 条变异，条数以 `--list` 为准）                                                                                                       |
+| 回归     | 改规则后结论还准吗                 | 日志回归 4 项                                                                                                                                            |
+| 冒烟     | 关键路径还能跑通吗                 | Playwright `@smoke`                                                                                                                                      |
+| E2E      | 全量链路还能跑通吗                 | Playwright 全量、`playwright.live`（线上）                                                                                                               |
+| 机密     | 有没有把密钥提交进去               | `check_secrets`（第 11.2 节）                                                                                                                            |
+| 审计     | 依赖有没有已知漏洞                 | `pip-audit`、`pnpm audit`（第 11.3 节）                                                                                                                  |
+| 提交规范 | 提交标题能读懂吗、能自动分类吗     | `.githooks/commit-msg`（第 11.4 节）                                                                                                                     |
 
 **原"前提"类（`check_prereq`）已删除**——CI 的 pip / pnpm 安装步骤已等价保证，
 本地再查一遍环境没有增量信息（第 1 节第二条依据）。
@@ -103,6 +103,7 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 | 契约     | `check_engine_pyodide`（产物是合法 Python 且真执行）   | 1s                                     | 每次                  | push                                   |
 | 契约     | `check_engine_purity`（`engine/` 纯净性）              | 1s                                     | 每次                  | push                                   |
 | 契约     | `check_pnpm_filter`（`pnpm --filter` 值命中真实项目）  | **0.5s**                               | 每次                  | push                                   |
+| 契约     | `guard_apm_parser_version`（`.bin` 解析逻辑 vs 版本）  | 秒级                                   | 每次                  | push                                   |
 | 契约     | `check-skill-spec`                                     | 1s                                     | 每次                  | CI                                     |
 | 契约     | `check-mcp-spec`                                       | 1s                                     | 每次                  | CI                                     |
 | 守卫集   | `test-issue-filer`（前端守卫）                         | **约 45s**                             | 静态（pre-push 跳过） | CI                                     |
@@ -113,7 +114,7 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 | 日志回归 | `check_rules_fields --strict`                          | 2s                                     | 本地 push             | **本地**（同上）                       |
 | 构建     | `sync-content` + `build-knowledge`                     | —                                      | dev / build           | dev / build                            |
 | 构建     | `next build`                                           | **144s**                               | CI（`--stage build`） | CI                                     |
-| 自证     | `mutate_guards`（53 条变异）                           | **约 26min**                           | 无人跑                | CI 独立 job                            |
+| 自证     | `mutate_guards`（65 条变异）                           | **约 26min**                           | 无人跑                | CI 独立 job                            |
 | 冒烟     | `playwright --grep @smoke`                             | 分钟级                                 | 原在 pre-push         | CI（**标记重整见第 10 节**）           |
 | E2E      | `playwright --grep 日志分析流程`（11 条）              | 约 5~7min                              | 无人跑                | CI（`playwright-analyze`，第 10.6 节） |
 | E2E      | `playwright.live.config.ts`（打线上）                  | —                                      | deploy 后             | deploy 后                              |
@@ -133,7 +134,7 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 **代价是一个巨型 diff**，换来门禁可满足。格式化后 `--stage push` **14/14 全绿**。
 
 **四类检查的耗时是分档的关键**：`test-issue-filer` 约 45s、`next build` 144s、
-`mutate_guards` 约 26 分钟（53 条变异里 34 条打在 `test-issue-filer` 上，45s × 34）、
+`mutate_guards` 约 26 分钟（65 条变异里 34 条打在 `test-issue-filer` 上，45s × 34）、
 E2E 里那条"上传 .ulg 完成分析"约 420s（`playwright-analyze` 因此单独一步、超时 900s）。
 
 **表末四行（机密 / 审计 ×2 / 提交规范）是第 11 节新增项**，决定依据与实测数据见第 11 节。

@@ -160,6 +160,24 @@ jobs:
         command: ["{PYTHON}", "tools/engine/check_engine_purity.py"]
         hint: "The engine/ directory contains non-Pyodide-safe code. Review the violations above; engine/ must work in both browser (Pyodide) and native CPython."
 
+      # APM 侧解析器是自研的，版本串是**手维护常量**（不像 pyulog 那样随环境变）——
+      # 跨机器稳定的代价是：改了解析行为不升版本号，报告头与冻结基线都看不出来。
+      # 这条把「解析逻辑的 AST 指纹」与 parserVersion 绑在一起：变了不升就红。
+      - id: "guard-apm-parser-version"
+        name: "APM parser version follows parse logic (guard_apm_parser_version)"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "tools/engine/guard_apm_parser_version.py"]
+        hint: "The ArduPilot parser changed but parser_version() did not. Bump the version string in engine/providers/ardupilot.py, then re-freeze with `python tools/engine/guard_apm_parser_version.py --update`."
+
+      # engine/ 下的片段被拼成**一份**脚本（同一命名空间）：两个片段顶层同名 = 后者静默
+      # 覆盖前者，不报错不告警。`_MAGIC` 就这么被踩过一次。provider 靠扫目录纳入，
+      # 加第三个格式时这条会自动覆盖到它。
+      - id: "guard-engine-names"
+        name: "engine/ splice namespace has no name clash (guard_engine_names)"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "tools/engine/guard_engine_names.py"]
+        hint: "Two engine/ fragments define the same top-level name. Rename it with a format prefix (e.g. _APM_MAGIC) so the spliced script stops silently overwriting the earlier one."
+
       # pnpm 的 --filter 匹配不到项目时**静默成功**（rc=0、无输出），
       # 2026-09-23 让 11 个转发脚本全空跑（含 typecheck / test）—— 没有任何运行时信号，只能静态拦。
       - id: "check-pnpm-filter"

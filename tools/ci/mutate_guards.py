@@ -120,6 +120,14 @@ GUARDS = {
         "面板解析器（check-panel-resolver）",
         "fail-lines",
     ),
+    # APM 解析器版本：解析逻辑的 AST 指纹 vs 手维护的 parserVersion —— 快、无依赖、不需要日志
+    # 拼接命名：engine/ 的片段顶层名字撞车 —— 只做 AST 遍历，快、无依赖
+    "engine-names": (
+        [PY, "tools/engine/guard_engine_names.py"],
+        ROOT,
+        "拼接命名（guard_engine_names）",
+        "fail-lines",
+    ),
 }
 
 
@@ -300,11 +308,14 @@ MUTATIONS: list[Mutation] = [
     Mutation(
         name="坏输入不再让校验脚本非零退出",
         path="tools/px4log_engine_runner.py",
-        old="return 1 if failed else 0",
+        # 锚点必须在**探针真走到的那条路**上：探针跑的是 `--probe-data`，进的是 `_main_probe`，
+        # 而 `_main_run` 的 `return 1 if failed else 0` 它一次都不会经过——打在那里等于
+        # 什么都没测（第一版就这么写的，自证因此报"守卫恒绿"）。
+        old="return log.print_summary(all_results, [])",
         new="return 0",
         guard="hygiene",
         expect="坏输入必须非零退出",
-        note="静态规则看不见这一半：确实 return 1 了，但那条路根本没被走到过",
+        note="静态规则看不见这一半：ERROR 照打、fail 照记，最后 return 0——退出码还是 0",
     ),
     Mutation(
         name="pre-push 从阶段列表反推 --with-e2e",
@@ -756,6 +767,70 @@ MUTATIONS: list[Mutation] = [
         expect="构建期放行二维下标",
         note="field[i,j]（i 行 j 列）过不了校验，作者只能退回写死",
     ),
+    # ---- APM 解析器版本：解析逻辑变了就要升 parserVersion（2026-09-24） ----
+    #
+    # `.bin` 侧的解析器是自研的，报告头的 parserVersion 是一个**手维护常量** —— 它不像
+    # pyulog 那个随环境变，所以也**不会**因为换机器而自己动。坏法不是报错，而是"报告头写着
+    # 同一个版本号，两次解析出来的数含义已经不同"：冻结基线只会说"结论变了"，分不清是规则
+    # 改了还是解析器改了。三条路各自都要证明会红。
+    Mutation(
+        name="改了缩放系数却不升 parserVersion（报告头看不出解析换了）",
+        path="engine/providers/ardupilot.py",
+        old='_SCALED = {"c": 0.01, "C": 0.01, "e": 0.01, "E": 0.01, "L": 1e-7}',
+        new='_SCALED = {"c": 0.01, "C": 0.01, "e": 0.01, "E": 0.01, "L": 1e-6}',
+        guard="apm",
+        expect="解析逻辑变了就要升 parserVersion（并重冻基线）",
+        note="原形就是这一类：缩放系数改了，经纬度直接差一个数量级，而报告头还是 1.0.0",
+    ),
+    Mutation(
+        name="ApmProvider 被改名（指纹覆盖为 0，比对空转）",
+        path="engine/providers/ardupilot.py",
+        old="class ApmProvider:",
+        new="class ApmProviderV2:",
+        guard="apm",
+        expect="解析逻辑变了就要升 parserVersion（并重冻基线）",
+        note="防「判空分支是死代码」：类一改名指纹就只剩常量表，守卫会安静地绿着",
+    ),
+    Mutation(
+        name="这道门从 checklist.yml 里被摘掉（没人再跑它）",
+        path="tools/ci/checklist.yml",
+        old='      - id: "guard-apm-parser-version"',
+        new="",
+        guard="apm",
+        expect="这道门还挂在 push 阶段（checklist.yml 里有这一步）",
+        note="check_all.py 只按清单转发 —— 清单里没它，这份检查就再也不会被执行",
+    ),
+    # ---- engine/ 拼接命名空间：顶层名字撞车 = 后者静默覆盖前者（2026-09-24） ----
+    #
+    # 片段被拼成**一份**脚本，所以"两个文件各写一个 `_MAGIC`"不是风格问题，是运行期
+    # 静默覆盖。`_MAGIC` 真被踩过一次。三条：撞名本体、判空、门还在。
+    Mutation(
+        name="新 provider 顶层忘了带格式前缀（那次 _MAGIC 事故的原形）",
+        path="engine/providers/ardupilot.py",
+        old='_APM_MAGIC = b"\\xa3\\x95"',
+        new='_MAGIC = b"\\xa3\\x95"',
+        guard="engine-names",
+        expect="engine/ 顶层名字不撞车",
+        note="px4.py 顶层也有 `_MAGIC`：拼完之后 APM 的魔数把 ULog 的顶掉，且不报错",
+    ),
+    Mutation(
+        name="拼接片段清单被清空（撞名规则会因为没东西可比而恒绿）",
+        path="tools/engine/guard_engine_names.py",
+        old='FRAMEWORK = ("operators.py", "rule_engine.py", "report_data.py")',
+        new="FRAMEWORK = ()",
+        guard="engine-names",
+        expect="拼接片段没走空",
+        note="判空不是摆设：片段被改名或搬空之后，撞名比对必须自己喊出来，而不是安静地变成 0 处冲突",
+    ),
+    Mutation(
+        name="这道门从 checklist.yml 里被摘掉（没人再跑它）",
+        path="tools/ci/checklist.yml",
+        old='      - id: "guard-engine-names"',
+        new="",
+        guard="engine-names",
+        expect="这道门挂在统一入口上",
+        note="check_all.py 只按清单转发 —— 清单里没它，这份检查就再也不会被执行",
+    ),
 ]
 
 
@@ -875,6 +950,10 @@ def _failed_names(key: str, out: str) -> set[str]:
       **不打印箭头**（`` `FAIL ${name}${extra ? ` → ${extra}` : ""}` ``），要求带箭头会漏掉那些检查，
       而漏掉表现为"红的不是它"，比误报更难查。
       两个箭头都收（`→` 与 `->`）：仓库的 ASCII/GBK 约定让有的脚本用 `->`。
+      **Python 侧走 `_logging.print_check` 的那几层**（check_hygiene / check_engine_purity /
+      check_pnpm_filter / guard_apm_parser_version）每行都以 `| ` 起头，形态是
+      `| Detail: FAIL <名字>  -> <补充>` 与汇总里的 `|   [FAIL ] <名字>` —— 正则一并认，
+      别把前缀支持删掉（2026-09-24 漏了它，四层 Python 守卫的自证集体失效了）。
       **因此被解析的守卫有一条格式契约**：它的总结行不要写成 `FAIL <名字>`（第一版 check_hygiene
       的 `FAIL 1 项卫生检查未过` 就被当成了检查名，六条变异全报"牵连 1 条"）。写成 `N 项未过` 这种。
     - `prose`（check_engine_pyodide.py）：失败时打印一段人话再 `return 1`，没有统一前缀——
@@ -883,8 +962,18 @@ def _failed_names(key: str, out: str) -> set[str]:
     kind = GUARDS[key][3]
     if kind == "fail-lines":
         names = set()
+        # 三种行形态都要认（2026-09-24 修）：
+        #   `  FAIL  <名字>  -> <补充>`           -- JS 守卫（test-issue-filer.mjs）直接打印
+        #   `| Detail: FAIL <名字>  -> <补充>`    -- Python 守卫走 _logging.print_check
+        #   `|   [FAIL ] <名字>`                  -- _logging.print_summary 的汇总行
+        #
+        # 后两种此前**一条都数不出来**：`_logging.print_check` 的每行都以 `| ` 起头，
+        # 而这里的正则要求 FAIL 紧贴行首（只认第一种形态）。后果不是报错，而是四层
+        # Python 守卫（hygiene / engine / pnpm-filter / apm）的每条变异都报
+        # "red but wrong reason: red=['(unable to count)']" —— 自证集体失效却看着在跑。
+        # `Result:  FAIL` 那一行刻意识别不到：它没有名字，算进来只会变成一条假牵连。
         for line in out.splitlines():
-            m = _re.match(r"\s*FAIL\s+(.*?)(?:\s+(?:->|→)\s+.*)?$", line)
+            m = _re.match(r"\s*(?:\|\s*)?(?:Detail:\s*)?(?:\[FAIL\s*\]|FAIL)\s+(.*?)(?:\s+(?:->|→)\s+.*)?$", line)
             if m:
                 names.add(m.group(1).strip())
         return names

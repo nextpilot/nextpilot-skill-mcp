@@ -24,10 +24,12 @@
    某份文件算不算"编号文档"由它**自己**的标题决定（≥3 个编号标题 + 只有 `.md` / `.mdx` 才算数），
    不维护名单——名单会过期，标题不会。
 2. **产物新鲜度的判据只能是「重跑生成逻辑再逐字节比对」。** 凡**调用生成器并带 `--check`** 的
-   文件（以及生成器自身）都算这道门的当事人，它们不许用 git 判定产物。
+   文件（以及生成器自身、声明这一步的 `checklist.yml`、跑这一步的 `check_all.py`）都算这道门
+   的当事人，它们不许用 git 判定产物。
 3. 同时断言这道门**还在**（收集 `drifted` + 非零退出 + 挂在统一入口上）——否则门被删掉之后，
    第 2 项会因为找不到目标而恒绿。
-4. **失败必须能被调用方看见。** Python 侧：打了 `FAIL` / `ERROR` 的文件，**模块顶层**必须有
+4. **失败必须能被调用方看见。** Python 侧：**会打出失败**的文件（判据是"有没有把以
+   `FAIL` / `ERROR` 起头的字串交给 `print` / `log.*`——不看具体写法），**模块顶层**必须有
    `raise SystemExit(...)` / `sys.exit(...)`——否则 `main()` 的返回值会被丢掉，退出码还是 0
    （这正是那天的原形）。JS 侧：往 stderr 打了 `FAIL` / `ERROR` 的脚本必须设非零
    `process.exitCode` 或 `process.exit(n)`。
@@ -275,6 +277,12 @@ def check_section_refs() -> list[str]:
 
 GENERATOR_SCRIPTS = frozenset({"web/scripts/build-knowledge.mjs"})
 
+# 「这道门的另两个当事人」：**声明**这一步的清单与**跑**这一步的入口。加上它们是因为
+# `GENERATOR_CHECK_RE` 只认得"直接调生成器"的写法，而 CI 入口是转发——转发者拿 git 判产物
+# 一样是那条裂缝，却一个字都抓不到（那条变异因此报"守卫恒绿"，实则是覆盖漏了它）。
+# 就这三个，写死：它们是"入口"，不是会随项目生长的名单。
+CI_ENTRY_FILES = frozenset({"tools/ci/checklist.yml", "tools/ci/check_all.py"})
+
 # 「谁在判产物新鲜度」：光提到生成器名字是不够的——`mutate_guards.py` 的注册表里就写着
 # 生成器路径（那是**测试夹具**，不是门），`check_hygiene.py` 自己也在核那道门还在不在。
 # 第一版把"提到生成器名"当成了判据，于是在这两处各抓了一个假阳性。
@@ -351,7 +359,16 @@ def _js_code_only(src: str) -> str:
 
 def _gate_files() -> list[Path]:
     """可能"既调生成器又用 git 判产物"的文件：CI 门、构建脚本、钩子与 workflow。"""
-    globs = ("tools/**/*.py", "web/scripts/**/*.mjs", "web/package.json", ".githooks/*", ".github/workflows/*.yml")
+    # `tools/ci/*.yml` 是**声明**这一步的清单：它写不下 git 判据，但漏了它就等于
+    # `CI_ENTRY_FILES` 里有个永远扫不到的空头承诺。
+    globs = (
+        "tools/**/*.py",
+        "tools/ci/*.yml",
+        "web/scripts/**/*.mjs",
+        "web/package.json",
+        ".githooks/*",
+        ".github/workflows/*.yml",
+    )
     out: list[Path] = []
     for pattern in globs:
         for path in ROOT.glob(pattern):
@@ -383,7 +400,7 @@ def _freshness_gates() -> list[Path]:
     out: list[Path] = []
     for path in _gate_files():
         rel = _rel(path)
-        if rel in GENERATOR_SCRIPTS or GENERATOR_CHECK_RE.search(_code_only(path)):
+        if rel in GENERATOR_SCRIPTS or rel in CI_ENTRY_FILES or GENERATOR_CHECK_RE.search(_code_only(path)):
             out.append(path)
     return out
 
@@ -422,7 +439,44 @@ def check_freshness_gate_alive() -> list[str]:
 # 退出码仍是 0。
 # ---------------------------------------------------------------------------
 
-PY_FAIL_PRINT_RE = re.compile(r"""(?:print|log\.(?:error|warning))\(\s*f?["']\s*(?:FAIL|ERROR)\b""")
+# 「这个脚本会不会打出失败」：第一版只认 `print(f"FAIL ...")` 这一种写法，漏掉了项目自己的
+# 标准写法 `log.print_check(..., detail=f"FAIL {slug}: ...")` —— `compare_baseline.py` 正是
+# 后者，那条变异因此报"守卫恒绿"，其实是判据没认全。改成判**交给报告函数的那个字符串**
+# （位置参数或关键字参数都算），而不是"打印函数后面紧跟的字面量"：写法会变，
+# "把 FAIL 送到人眼前"这件事不会变。
+_FAIL_MARK_RE = re.compile(r"\s*(?:FAIL|ERROR)\b")
+
+# 会把字串送到人眼前的调用：`print(...)` 与 `log.xxx(...)`。
+_REPORT_ATTRS = frozenset({"print_check", "error", "warning", "critical", "exception", "print"})
+
+
+def _literal_starts_with_fail(node: ast.AST) -> bool:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return bool(_FAIL_MARK_RE.match(node.value))
+    if isinstance(node, ast.JoinedStr) and node.values:  # f-string：只看首个常量段
+        return _literal_starts_with_fail(node.values[0])
+    return False
+
+
+def _is_report_call(func: ast.AST) -> bool:
+    if isinstance(func, ast.Name):
+        return func.id == "print"
+    if isinstance(func, ast.Attribute):
+        return func.attr in _REPORT_ATTRS
+    return False
+
+
+def _py_emits_failure(tree: ast.AST) -> bool:
+    """报告调用里出现了以 FAIL / ERROR 起头的字面量 —— 即"这个文件会打出失败"。"""
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not _is_report_call(node.func):
+            continue
+        for value in (*node.args, *(kw.value for kw in node.keywords)):
+            if _literal_starts_with_fail(value):
+                return True
+    return False
+
+
 JS_FAIL_PRINT_RE = re.compile(r"""console\.(?:error|warn|log)\(\s*[`"']\s*(?:CHECK\s+)?(?:FAIL|ERROR)\b""")
 
 # 取"等号右边/括号里"**再看它是不是常量 0**，而不是把 `(?!0)` 写在 `\s*` 后面：
@@ -465,13 +519,12 @@ def check_failure_visible() -> list[str]:
     problems: list[str] = []
     for path in _scanned_files():
         if path.suffix == ".py":
-            src = _read(path)
-            if not PY_FAIL_PRINT_RE.search(src):
-                continue
             try:
-                tree = ast.parse(src)
+                tree = ast.parse(_read(path))
             except SyntaxError:
                 continue  # 语法错由 ruff 报，这里不重复
+            if not _py_emits_failure(tree):
+                continue
             if not _top_level_exit(tree):
                 problems.append(
                     f"{_rel(path)} 打了 FAIL / ERROR，但模块顶层没有 raise SystemExit / sys.exit"
