@@ -16,7 +16,7 @@
   // rules/*.yaml 的键名补全与拼写检查（需要扩展 redhat.vscode-yaml）。
   //
   // **那份 schema 是构建期生成的**（`cd web && pnpm build:kb` →
-  // knowledge/px4/rules-editor-schema.generated.json），**不要手改**：它的词表
+  // knowledge/rules-editor-schema.generated.json），**不要手改**：它的词表
   // （group / vehicle / severity / 算子名）全部从 facts.yaml 与 knowledge/engine/ 派生。
   // 手抄一份就是第二份真源 —— 改了 facts.yaml 而 schema 没跟上时，IDE 会拿旧词表
   // 去纠正新写法，比完全没有提示更糟。`pnpm build:kb --check` 会比对它与源是否一致。
@@ -24,9 +24,9 @@
   // 它只管"纯形状"（键名 / 枚举 / 类型）。compute 表达式**内部**的语法、算子、
   // 字段存在性它管不了 —— 那部分在字符串里，仍然只有构建期校验能查。
   "yaml.schemas": {
-    "./knowledge/px4/rules-editor-schema.generated.json": [
+    "./knowledge/rules-editor-schema.generated.json": [
       "knowledge/px4/rules/*.yaml",
-      "knowledge/px4/rules-template.yml"
+      "knowledge/rules-template.yml"
     ]
   }
 }

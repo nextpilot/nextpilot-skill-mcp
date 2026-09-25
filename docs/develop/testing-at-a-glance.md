@@ -69,11 +69,11 @@
 
 **生成这 4 份产物（不要手改，改了下次构建就覆盖）：**
 
-| 产物                                               | 是什么                               |
-| -------------------------------------------------- | ------------------------------------ |
-| `web/workers/analysis-engine.generated.ts`         | 引擎的浏览器版（Pyodide 里跑的那份） |
-| `web/workers/fault-kb.generated.json`              | 故障知识库的内联版                   |
-| `knowledge/px4/rules-editor-schema.generated.json` | 规则编辑器的 JSON Schema             |
+| 产物                                           | 是什么                               |
+| ---------------------------------------------- | ------------------------------------ |
+| `web/workers/analysis-engine.generated.ts`     | 引擎的浏览器版（Pyodide 里跑的那份） |
+| `web/workers/fault-kb.generated.json`          | 故障知识库的内联版                   |
+| `knowledge/rules-editor-schema.generated.json` | 规则编辑器的 JSON Schema             |
 
 **之后**：`next build` —— 真编译出生产产物。**144 秒**。
 
@@ -206,7 +206,8 @@ pnpm test:e2e            # 全量 42 条
   运行期读盘，dev 下改完刷新即见。以前那段 `sync-content --watch` 已随真源唯一化退役。
 - **知识真源由 `build-knowledge --watch` 负责重建**（`pnpm dev` 已带上）。同样地，用
   `pnpm dev:no-watch` 时改 `knowledge/px4/` 或 `knowledge/engine/` 后页面不会变，要另开 `pnpm web:kb:watch`。
-- **`build-knowledge` 的产物里有一个落在 `knowledge/px4/` 内部**（`rules-editor-schema.generated.json`）。
+- **`build-knowledge` 的产物里有一个落在 `knowledge/` 根**（`rules-editor-schema.generated.json`，
+  2026-09 从 `knowledge/px4/` 挪出来的）。
   所以 `--watch` 只监听 `rules/`、`plot/`、`meta/`、`knowledge/llm/` 这些真源目录，
   并在监听顶层目录时按文件名滤掉 `*.generated.*` —— 否则写产物会触发自己、无限重建。
 - **`pnpm dev` 会阻止第二个 dev server**：Next 16 按**目录**判重（不是按端口），

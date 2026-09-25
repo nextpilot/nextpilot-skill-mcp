@@ -1777,7 +1777,9 @@ function build() {
     //      真源：改了 facts.yaml 而这里没跟上时，IDE 会拿旧词表去纠正新写法，比没提示更糟。
     //      与别的产物一样走 writeArtifact：`--check` 会比对它与源是否一致。
     writeArtifact(
-        resolve(KN, "rules-editor-schema.generated.json"),
+        // 落在 knowledge/ 根（不是族目录）：它是「规则的形状」，与固件族无关；
+        // 顺带不再污染 px4/ —— 「产物落在源目录里」那条历史尾巴就此了结。
+        resolve(KN_ROOT, "rules-editor-schema.generated.json"),
         JSON.stringify(buildRuleSchema({ signatures, facts, vehicles, builtinVars: BUILTIN_VARS }), null, 2) + "\n",
     );
 
@@ -1815,8 +1817,10 @@ if (!process.argv.includes("--watch")) {
     build();
 } else {
     // 监听**真源**目录。这里只列真源所在的子目录，不监听 ENGINE / KN 的顶层——
-    // `rules-editor-schema.generated.json` 是产物却落在 knowledge/px4/ 里，
-    // 监听顶层会让「写产物」触发「再构建」，自己喂自己、无限重建。
+    // 顶层有真源文件（facts.yaml / fault-kb.yaml）也有产物，监听顶层会让「写产物」
+    // 触发「再构建」，自己喂自己、无限重建（所以回调里还要按名字滤掉 *.generated.*）。
+    // 注：`rules-editor-schema.generated.json` 2026-09 已挪出族目录，现在写在
+    // knowledge/ 根；KN_ROOT 不在监听表里，这一路不会再自触发。
     const WATCH_DIRS = [
         resolve(KN, "rules"),
         resolve(KN, "plot"),

@@ -7,7 +7,8 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const KN = resolve(here, "../../knowledge/px4"); // 本脚本在 web/scripts/ 下：上两级才是仓库根
-const schema = JSON.parse(readFileSync(resolve(KN, "rules-editor-schema.generated.json"), "utf8"));
+const KN_ROOT = resolve(here, "../../knowledge"); // schema 产物 2026-09 起落在 knowledge/ 根
+const schema = JSON.parse(readFileSync(resolve(KN_ROOT, "rules-editor-schema.generated.json"), "utf8"));
 const props = schema.properties;
 
 const problems = [];

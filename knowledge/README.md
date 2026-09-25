@@ -189,7 +189,7 @@ pnpm web:build:kb -- --check    # 只比对不写入：任一产物与 knowledge
 `web/workers/analysis-engine.generated.ts`（内联 knowledge/engine/operators.py + knowledge/engine/engine.py + rules/*.yaml）、
 `web/workers/fault-kb.generated.json`、
 `web/lib/knowledge/prompts.generated.js`、
-`px4/rules-editor-schema.generated.json`（编辑器用，见下节）。
+`rules-editor-schema.generated.json`（编辑器用，见下节；与固件族无关，落在 `knowledge/` 根）。
 
 指南的两页生成物（`rule-catalogue.mdx` / `rule-schema.mdx`）也入库，就在 `web/content/guide/`。
 

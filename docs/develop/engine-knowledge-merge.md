@@ -281,13 +281,13 @@ python tools/ci/check_all.py --with-mutate
 
 `build-knowledge.mjs` 的产物落点（实测，脚本 L14-19 与 L1502-1783）：
 
-| 产物                                                                           | 现在写到哪                                                |
-| ------------------------------------------------------------------------------ | --------------------------------------------------------- |
-| `analysis-engine.generated.ts` / `fault-kb.generated.json`                     | `web/workers/`                                            |
-| `prompts.generated.js` / `plots.generated.ts` / `derived-version.generated.ts` | `web/lib/knowledge/`                                      |
-| `rule-catalogue.mdx` / `rule-schema.mdx`                                       | `web/content/guide/`                                      |
-| `px4-main.json`（参数字典）                                                    | `web/public/params/`                                      |
-| `rules-editor-schema.generated.json`                                           | **`knowledge/px4/`**（产物落在源目录里，脚本 L1821 自认） |
+| 产物                                                                           | 现在写到哪                                             |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| `analysis-engine.generated.ts` / `fault-kb.generated.json`                     | `web/workers/`                                         |
+| `prompts.generated.js` / `plots.generated.ts` / `derived-version.generated.ts` | `web/lib/knowledge/`                                   |
+| `rule-catalogue.mdx` / `rule-schema.mdx`                                       | `web/content/guide/`                                   |
+| `px4-main.json`（参数字典）                                                    | `web/public/params/`                                   |
+| `rules-editor-schema.generated.json`                                           | **`knowledge/`**（2026-09 已挪出族目录；与固件族无关） |
 
 ### 7.5.2 定论：knowledge 自产出，web 在 dev 时调用并拉取
 
@@ -308,7 +308,7 @@ knowledge/
 │   ├── lib/                   prompts.generated.js · plots.generated.ts · derived-version.generated.ts
 │   ├── guide/                 rule-catalogue.mdx · rule-schema.mdx
 │   ├── params/                px4-main.json
-│   └── px4/                   rules-editor-schema.generated.json
+│   └── rules-editor-schema.generated.json   ← 与族无关，放 dist/ 根（不进 px4/）
 ├── package.json               `build` / `build:check`（pnpm）
 └── pyproject.toml             出 wheel（uv）
 ```
@@ -328,7 +328,8 @@ web 侧：
 本来就该由产出方负责；web 侧只剩纯拷贝，不需要它。
 
 ✅ 顺带解决：`rules-editor-schema.generated.json` 落在源目录里的历史问题
-（脚本 L1821 自认）—— 它进 `dist/px4/` 就自然分离了。
+（脚本原注释自认）。**这一步已经提前做掉了**（2026-09）：它先从族目录挪到
+`knowledge/` 根，将来再进 `dist/` 根——因为它描述的是"规则的形状"，与固件族无关。
 
 ⚠️ **唯一要保持的动作**：拉进 `web/` 的产物**仍需入库**。
 因为 EdgeOne 云端只跑 `next build`、不跑构建器（脚本 L20 写明），
@@ -417,8 +418,9 @@ knowledge 的 Node 编译器**在云端不可用**。所以产物必须**入库*
    Ruff 官方文档：忽略没有 `[tool.ruff]` 段的 `pyproject.toml`；
    一旦加了，子配置**完全替换**（不是合并）根配置，
    表现为"`knowledge/engine/` 的 lint 规则突然不报错了"，不报错、CI 全绿。
-4. **边缘情况**：`knowledge/px4/rules-editor-schema.generated.json` 是产物却落在源目录里
-   （`build-knowledge.mjs` L1821 自认此问题）。合并时是顺势挪出，还是维持原样？
+4. ~~**边缘情况**：`knowledge/px4/rules-editor-schema.generated.json` 是产物却落在源目录里~~
+   **已解决（2026-09）**：该产物已挪到 `knowledge/` 根（与固件族无关），合并时进 `dist/` 根即可。
+   注意它**仍在 knowledge 源目录内**（只是不在族目录里），所以 `--watch` 别把 `knowledge/` 根加进监听表。
 5. **monorepo 建到什么程度**：只建 uv workspace（Python 侧）？还是 pnpm + uv 双 workspace
    都建（knowledge 要被 web 用 `pnpm --filter` 调编译器就必须有 pnpm 侧）？见 §7.6。
    ⚠️ Node 侧的旧结论仍然成立：**web 不要依赖 workspace 兄弟包**（部署只上传 `web/`，
