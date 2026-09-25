@@ -118,7 +118,10 @@ class ApmProvider:
 
     def __init__(self, raw, facts_cfg):
         # facts_cfg 是 PX4 的数据配置（构建期只有一份 facts.yaml）——本适配器**不读它**，
-        # 码表都在本文件里（待迁 knowledge/apm/）。参数保留只为与工厂签名一致。
+        # 码表都在本文件里（待迁 knowledge/ardupilot/）。参数保留只为与工厂签名一致。
+        # 迁移未完成的原因不是懒：动这里的任何一条常量都会让
+        # tools/engine/guard_apm_parser_version.py 的 AST 指纹变红，必须同步升
+        # parser_version() 并重冻基线。等接线改动一起做，别单独动。
         self._cfg = facts_cfg or {}
         self.raw = bytes(raw)
         self._parse_errors = 0  # 认不出的字节段数（has_file_corruption 的判据）

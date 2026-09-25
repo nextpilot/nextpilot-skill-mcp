@@ -30,6 +30,12 @@ knowledge/px4/meta/
 knowledge/**/*.yaml
 knowledge/**/*.yml
 
+# ========== 上游引用文本（逐字保留，格式化会改掉表格对齐） ==========
+# knowledge/ardupilot/docs/ 装的是上游 ardupilot-mcp 的 SOURCES.md 审计表。
+# 它是**引用文本**而不是本站文档：prettier 重排表格后内容一个字不丢，但与原文明文
+# 不一致，就失去了"可以拿去和上游对"的意义。本站自己写的 .md 照常格式化。
+knowledge/ardupilot/docs/
+
 # ========== AI 工具自动生成 ==========
 .workbuddy/
 .claude/

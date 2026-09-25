@@ -4,7 +4,7 @@
 Web 站点（浏览器端 Pyodide 引擎、边缘函数 LLM 层）和未来的平台 MCP 服务
 **都只消费这里派生出的产物，不在各自代码里另存一份阈值 / 根因 / 提示词。**
 
-按**飞控固件族**分目录：`px4/`（当前实现），以后新增 ArduPilot 时加 `ardupilot/`，
+按**飞控固件族**分目录：`px4/`（已实现、已接线）、`ardupilot/`（知识已迁、**尚未接线**），
 两边保持同样的结构。每个固件族目录下再按**受众**分文档：
 
 ```text
@@ -25,6 +25,24 @@ px4/
     gjb841-system-prompt.md GJB-841 思考范式
     report-empty.md         无 finding 时的固定结论文案
 ```
+
+`ardupilot/` 的知识源自上游 [ardupilot-mcp](https://github.com/furkanisikay/ardupilot-mcp)
+（MIT），署名与偏差记录在它自己的 `ATTRIBUTION.md`。结构与 `px4/` **刻意不对齐**：
+
+```text
+ardupilot/
+  rules/*.yaml          25 条经验（16 项检查，同构项合并）；13 条可算、12 条占位
+  facts.yaml            码表（飞行模式 / ERR 子系统 / EV 事件 / 机架）与规则元数据
+  ATTRIBUTION.md        上游署名、迁了什么、改了什么
+  PENDING.md            占位总表：缺的算子、FRAME_CLASS 3 号冲突、接线要改哪些
+  CLAUDE.md             给 AI 与维护者
+  docs/SOURCES.md       上游 198 条假设审计（引用文本，逐字保留）
+```
+
+**它缺 `meta/`、`plot/`、`fault-kb.yaml`、`llm/`**，且**暂时不进构建产物**
+（`build-knowledge.mjs` 与 `engine/loader.py` 都硬编码 `knowledge/px4/`），
+所以这批阈值还没有任何一条经过真实 `.bin` 日志验证。
+让 ArduPilot 日志真正出 findings 需要一次独立的接线改动，清单在 `ardupilot/PENDING.md`。
 
 **引擎源码不在这里**：`operators.py`（算子注册表）、`engine.py`（规则框架 + 报告数据层）在 [knowledge/engine/](knowledge/engine/README.md)
 （浏览器与本地工具共用同一份）。这个目录只放**经验与字典**——"算完怎么判定"，不放"怎么算"。
