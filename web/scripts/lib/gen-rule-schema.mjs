@@ -34,9 +34,6 @@ const FW_PATTERN = "^(any|\\s*(>=|<=|==|>|<)?\\s*\\d+(\\.\\d+)?(\\s*,\\s*(>=|<=|
 /** `conditions.message` 的一项：`vehicle_status` ｜ `vehicle_gps_position || sensor_gps` */
 const TOPICS_ITEM_PATTERN = "^[a-z][a-z0-9_]*(\\s*\\|\\|\\s*[a-z][a-z0-9_]*)*$";
 
-/** guard 标签名（与 build-knowledge.mjs 里那处 `/^[a-z0-9_:]+$/i` 同一口径） */
-const TAG_PATTERN = "^[a-zA-Z0-9_:]+$";
-
 /**
  * @param {object} args
  * @param {object} args.signatures  算子签名表（`parseOperatorSignatures` 的产物）

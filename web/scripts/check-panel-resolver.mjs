@@ -198,7 +198,7 @@ check("消费方没有自己再按采样点数筛实例", () => {
 
 let failed = 0;
 for (const [name, fn] of checks) {
-    let why = null;
+    let why;
     try {
         why = fn();
     } catch (err) {

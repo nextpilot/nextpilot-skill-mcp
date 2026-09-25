@@ -438,7 +438,7 @@ function Parser(src, toks) {
     function comparison() {
         let l = bitand();
         for (;;) {
-            let op = null;
+            let op;
             const tok = peek();
             if (
                 at("punct", "<") ||

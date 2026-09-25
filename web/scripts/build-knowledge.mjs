@@ -383,8 +383,6 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
     for (const { file, items } of loaded) {
         for (const raw of items) {
             const where = `rules/${file}` + (items.length > 1 ? `#${(raw && raw.id) || "?"}` : "");
-            // guards use triggers[].severity: guard, same shape as normal rules
-            const hasTriggers = Array.isArray(raw.triggers) && raw.triggers.length > 0;
             const requiredKeys = ["id", "group", "name", "triggers"];
             for (const key of requiredKeys) {
                 if (raw[key] === undefined || raw[key] === null || raw[key] === "") {
@@ -560,23 +558,6 @@ const CATALOGUE_INTRO = `引擎当前内置的 **{n} 条检查经验**，按执�
 判定阈值就写在各自的经验 YAML 里；slot 决定执行顺序（报告里的 F01、F02… 编号按发射顺序生成）。
 所有判定都由确定性引擎在浏览器本地完成——LLM 只把结论翻译成中文报告，不参与任何数值判断。
 本页在构建时从 \`rules/*.yaml\` 自动生成。`;
-
-/** 尽量贴近 Python 的 `%s`，免得清单文本因为换成 Node 生成而整篇 diff */
-function pyRepr(v) {
-    if (Array.isArray(v)) return "[" + v.map(pyRepr).join(", ") + "]";
-    if (v === null || v === undefined) return "None";
-    if (typeof v === "boolean") return v ? "True" : "False";
-    if (typeof v === "object") {
-        return (
-            "{" +
-            Object.entries(v)
-                .map(([k, val]) => `'${k}': ${pyRepr(val)}`)
-                .join(", ") +
-            "}"
-        );
-    }
-    return String(v);
-}
 
 const listOr = (v, fallback) => (Array.isArray(v) ? v.join(",") : v === undefined || v === null ? fallback : String(v));
 
@@ -1183,11 +1164,6 @@ function rejectEngineOnlyConditions(conditions, where, what) {
     }
 }
 
-const escapeMdx = (s) =>
-    String(s ?? "")
-        .replace(/\{/g, "\\{")
-        .replace(/\}/g, "\\}");
-
 function fmtApplicability(raw) {
     const parts = [];
     // conditions 的三个键（不限就整个省掉）：固件 / 机架 / 依赖的 topic
@@ -1737,7 +1713,7 @@ function build() {
         // 曲线**按族**存（APM 没有 plot/ 就是空数组），但**适用性不看族**：
         // 一张图出不出由它自己的 `conditions.topics` 与这份日志的 manifest 决定，
         // 而 topic 名本身就是各格式的命名空间（vehicle_attitude 不会出现在 .bin 里）。
-        plotsByLogType[fam.logType] = plots.map(({ order, ...rest }) => rest);
+        plotsByLogType[fam.logType] = plots.map(({ order: _order, ...rest }) => rest);
     }
 
     if (Object.values(kbByLogType).every((x) => x.length === 0)) throw new Error("故障知识库解析为 0 条，终止");
