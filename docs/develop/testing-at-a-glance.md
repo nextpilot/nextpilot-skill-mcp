@@ -207,7 +207,7 @@ pnpm test:e2e            # 全量 42 条
 - **知识真源由 `build-knowledge --watch` 负责重建**（`pnpm dev` 已带上）。同样地，用
   `pnpm dev:no-watch` 时改 `knowledge/px4/` 或 `knowledge/engine/` 后页面不会变，要另开 `pnpm web:kb:watch`。
 - **`build-knowledge` 的产物里有一个落在 `knowledge/px4/` 内部**（`rules-editor-schema.generated.json`）。
-  所以 `--watch` 只监听 `rules/`、`plot/`、`llm/`、`meta/` 这些真源子目录，
+  所以 `--watch` 只监听 `rules/`、`plot/`、`meta/`、`knowledge/llm/` 这些真源目录，
   并在监听顶层目录时按文件名滤掉 `*.generated.*` —— 否则写产物会触发自己、无限重建。
 - **`pnpm dev` 会阻止第二个 dev server**：Next 16 按**目录**判重（不是按端口），
   同一目录已有 dev server 时会直接报错退出，换 `PORT` 没用。

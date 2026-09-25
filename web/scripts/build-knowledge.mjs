@@ -6,7 +6,7 @@
  *   knowledge/engine/engine.py              引擎本体：规则/guard 框架 + 报告页数据层（Pyodide 执行）
  *   knowledge/px4/rules/*.yaml    检查经验：阈值与判定条件（工程师最常改这里）
  *   knowledge/px4/px4-fault-kb.yaml  第三层故障知识库
- *   knowledge/px4/llm/*.md        第四层 GJB-841 思考范式（LLM 只做组装）
+ *   knowledge/llm/*.md            第四层 GJB-841 思考范式（LLM 只做组装，与固件族无关）
  *   knowledge/px4/meta/*.json     固件字段与参数字典
  *
  * 本脚本生成（产物提交进仓库，EdgeOne 直接 next build 也能跑）：
@@ -49,7 +49,10 @@ import { buildRuleSchema } from "./lib/gen-rule-schema.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
-const KN = resolve(webRoot, "../knowledge/px4");
+// knowledge/ 根目录：放**与固件族无关**的资产（第四层 LLM 提示词、给人工抄的骨架模板）。
+// 它们不属于任何族，所以不放在 KN 下——ards/px4 共用同一份。
+const KN_ROOT = resolve(webRoot, "../knowledge");
+const KN = resolve(KN_ROOT, "px4");
 
 const ENGINE = resolve(webRoot, "../knowledge/engine"); // 确定性引擎源码（浏览器与本地工具共用一份）
 const PY_ENGINE = resolve(ENGINE, "engine.py"); // 引擎本体（框架 + 数据层，与格式无关）
@@ -64,8 +67,9 @@ const YAML_PATH = resolve(KN, "fault-kb.yaml");
 const FACTS_PATH = resolve(KN, "facts.yaml"); // PX4 的数据：码表 / 文案 / 展示口径 / 规则元数据
 const RULES_DIR = resolve(KN, "rules");
 const OPERATORS_PY = resolve(ENGINE, "operators.py");
-const PROMPT_PATH = resolve(KN, "llm/gjb841-system-prompt.md");
-const EMPTY_PATH = resolve(KN, "llm/report-empty.md");
+const LLM_DIR = resolve(KN_ROOT, "llm"); // 第四层：LLM 只做翻译与组装（与固件族无关）
+const PROMPT_PATH = resolve(LLM_DIR, "gjb841-system-prompt.md");
+const EMPTY_PATH = resolve(LLM_DIR, "report-empty.md");
 // 指南页目录：人工编写的 guide 页直接放在 web/content/guide/，本脚本再往里生成规则清单页与参考页。
 // 写在这里而不是仓库根，是因为部署包只有 web/ 一个目录。
 const GUIDES_DIR = resolve(webRoot, "content/guide");
@@ -1463,12 +1467,12 @@ Python \`str.format_map\` 支持的格式：
 
 占位符写法是 \`{name}\`，应用到 \`title\`、tags/\`suggestion\`、brief/detail 模板里。
 
-**狼绕不过去的点**：模版里不要直接写 \`{__builtins__}\`——那是个很大的字典，用得好能切进引擎，用不好就会炸。构建期会直接拒绝模板里有 \`__builtins__\`。
+**绕不过去的点**：模版里不要直接写 \`{__builtins__}\`——那是个很大的字典，用得好能切进引擎，用不好就会炸。构建期会直接拒绝模板里有 \`__builtins__\`。
 
 ### 10.2 图形的实现细节
 
 - 图的 YAML 描述在 \`knowledge/px4/plot/*.yml\`
-- 模板骨架在 \`knowledge/px4/plot/plot-template.yml\`
+- 模板骨架在 \`knowledge/plot-template.yml\`
 - 图的输出单位转换（\`unit=\`）在引擎侧做，前端只画线
 - 图上的换算（\`compute\` 节点、\`unit=\`）一律在引擎侧做，前端只画——"前端不写数学"。
 
@@ -1685,7 +1689,7 @@ function build() {
     mkdirSync(outLib, { recursive: true });
     writeArtifact(
         resolve(outLib, "prompts.generated.js"),
-        "// ⚠️ 自动生成，源：knowledge/px4/llm/。请勿手改。\n" +
+        "// ⚠️ 自动生成，源：knowledge/llm/。请勿手改。\n" +
             "export const GJB841_SYSTEM_PROMPT = " +
             JSON.stringify(prompt) +
             ";\n" +
@@ -1816,7 +1820,7 @@ if (!process.argv.includes("--watch")) {
     const WATCH_DIRS = [
         resolve(KN, "rules"),
         resolve(KN, "plot"),
-        resolve(KN, "llm"),
+        LLM_DIR,
         resolve(KN, "meta"),
         resolve(ENGINE, "providers"),
         resolve(webRoot, "scripts/lib"), // 算子签名校验、规则表达式、schema 生成器

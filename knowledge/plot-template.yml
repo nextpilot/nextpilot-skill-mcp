@@ -1,4 +1,5 @@
-# 一份绘图预设的完整骨架 —— 复制成 plot/<名字>.yml 后逐项填。
+# 一份绘图预设的完整骨架 —— 复制成 knowledge/px4/plot/<名字>.yml 后逐项填。
+# （这份骨架与固件族无关，所以放在 knowledge/ 根下；目前只有 px4 有 plot/ 目录）
 # 字段级权威参考：knowledge/px4/plot/README.md；改完跑：
 #   pnpm web:build:kb                      # 构建 + 校验（写错就构建失败）
 #   python tools/engine/guard_provider_contract.py     # 取数契约（可选，需真日志）

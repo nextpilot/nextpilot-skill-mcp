@@ -15,7 +15,7 @@
 
 ## 骨架
 
-照抄 `plot-template.yml`（`*-template.yml` 不参与加载）。最简的一份：
+照抄 `knowledge/plot-template.yml`（`*-template.yml` 不参与加载）。最简的一份：
 
 ```yaml
 id: power

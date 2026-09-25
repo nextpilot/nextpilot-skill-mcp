@@ -196,12 +196,12 @@ Python `str.format_map` 支持的格式：
 
 占位符写法是 `{name}`，应用到 `title`、tags/`suggestion`、brief/detail 模板里。
 
-**狼绕不过去的点**：模版里不要直接写 `{__builtins__}`——那是个很大的字典，用得好能切进引擎，用不好就会炸。构建期会直接拒绝模板里有 `__builtins__`。
+**绕不过去的点**：模版里不要直接写 `{__builtins__}`——那是个很大的字典，用得好能切进引擎，用不好就会炸。构建期会直接拒绝模板里有 `__builtins__`。
 
 ### 10.2 图形的实现细节
 
 - 图的 YAML 描述在 `knowledge/px4/plot/*.yml`
-- 模板骨架在 `knowledge/px4/plot/plot-template.yml`
+- 模板骨架在 `knowledge/plot-template.yml`
 - 图的输出单位转换（`unit=`）在引擎侧做，前端只画线
 - 图上的换算（`compute` 节点、`unit=`）一律在引擎侧做，前端只画——"前端不写数学"。
 

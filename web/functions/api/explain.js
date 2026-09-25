@@ -21,7 +21,7 @@ import {
 import { getSessionUser } from "../_lib/auth.js";
 import { jsonResponse, readJson } from "../_lib/http.js";
 import { reportIssue } from "../_lib/issue-filer.js";
-// 思考范式与空结论文案的单一事实源在 knowledge/px4/llm/，由 build-knowledge.mjs 生成
+// 思考范式与空结论文案的单一事实源在 knowledge/llm/，由 build-knowledge.mjs 生成
 import {
     GJB841_SYSTEM_PROMPT as SYSTEM_PROMPT,
     EMPTY_FINDINGS_MARKDOWN,

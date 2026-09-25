@@ -8,6 +8,14 @@ Web 站点（浏览器端 Pyodide 引擎、边缘函数 LLM 层）和未来的�
 两边保持同样的结构。每个固件族目录下再按**受众**分文档：
 
 ```text
+knowledge/
+  ── 与固件族无关：各族共用一份（2026-09 从 px4/ 提出）──
+  llm/                  ⓑ 给 AI 看的（第四层：LLM 只做翻译与组装）
+    gjb841-system-prompt.md GJB-841 思考范式
+    report-empty.md         无 finding 时的固定结论文案
+  rules-template.yml    可抄的骨架：一条检查经验（复制成 px4/rules/<名字>.yaml）
+  plot-template.yml     可抄的骨架：一份绘图预设（复制成 px4/plot/<名字>.yml）
+
 px4/
   ── 知识本体（不是文档，是经验与字典）──
   rules/*.yaml          检查经验：一条经验一个 YAML，判定阈值就写在各自经验里
@@ -21,9 +29,6 @@ px4/
   CLAUDE.md             ⓐ 给 AI 与维护者：设计动机、四类经验 → 四种载体、执行链路、
                         实施状态与落地差异
                         （子目录 CLAUDE.md：动 `px4/` 下的经验与文档时会自动进上下文，不发布到网站）
-  llm/                  ⓑ 给 AI 看的（第四层：LLM 只做翻译与组装）
-    gjb841-system-prompt.md GJB-841 思考范式
-    report-empty.md         无 finding 时的固定结论文案
 ```
 
 `ardupilot/` 的知识源自上游 [ardupilot-mcp](https://github.com/furkanisikay/ardupilot-mcp)
@@ -40,7 +45,7 @@ ardupilot/
   docs/SOURCES.md       上游 198 条假设审计（引用文本，逐字保留）
 ```
 
-**它缺 `meta/`、`plot/`、`fault-kb.yaml`、`llm/`**，且**暂时不进构建产物**
+**它缺 `meta/`、`plot/`、`fault-kb.yaml`**（`llm/` 与两个 `*-template.yml` 在 `knowledge/` 根下，各族共用，不算它缺），且**暂时不进构建产物**
 （`build-knowledge.mjs` 与 `engine/loader.py` 都硬编码 `knowledge/px4/`），
 所以这批阈值还没有任何一条经过真实 `.bin` 日志验证。
 让 ArduPilot 日志真正出 findings 需要一次独立的接线改动，清单在 `ardupilot/PENDING.md`。
@@ -154,7 +159,7 @@ pnpm web:check:mcp
 | 改字段绑定 / 码值 / 阶段分组 / slot 执行顺序 / 关键数据的名字与顺序 | `px4/facts.yaml`（引擎不含业务数据，全在这里）                                                |
 | 加一条故障模式（根因 / 排查步骤）                                   | `px4/fault-kb.yaml`（trigger_tags 必须是引擎会产出的标签）                                    |
 | 加一个可复用计算步骤                                                | `knowledge/engine/operators.py`（`@operator` 声明 in/out arity），再在经验的 `compute` 里引用 |
-| 改 AI 报告口径                                                      | `px4/llm/*.md`                                                                                |
+| 改 AI 报告口径                                                      | `llm/*.md`（与固件族无关，在 `knowledge/` 根下）                                              |
 | 同步固件元数据                                                      | `python tools/dev/fetch_px4_uorb_msg.py --tags ...` → 生成物在 `px4/meta/<tag>.json`          |
 
 ## 改完怎么验证
