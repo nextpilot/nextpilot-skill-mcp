@@ -1,0 +1,154 @@
+# ⚠️ 本文件下的 4 条尚未接线进构建产物（见 PENDING.md 第 1 条）。
+#
+# EKF 检验比（XKF4 / NKF4）：归一化新息方差检验比，每个传感器一个。
+#   SV 速度   SP 位置   SH 高度   SM 磁罗盘
+# 比值接近 0 是健康；升到 1.0 以上 EKF 会**主动拒绝**该传感器数据（新息超出模型不确定度），
+# 持续高比值意味着估计器不信这个传感器，是位置/高度漂移、翻机或 EKF 失效的前兆。
+# 阈值 [来源] 上游 ardupilot-mcp 的 checks/ekf.py（CRIT 1.0 / WARN 0.8），依据是
+# AP_NavEKF3/LogStructure.h 里"1.0 = 拒绝边界"的定义。
+#
+# 两个坑，改这个文件前先读：
+#   1. **不要用 SVT**。它在 XKF4（EKF3）里是空速方差、在 NKF4（EKF2）里是倾斜误差收敛
+#      度量，都不是归一化检验比，套 1.0 阈值是错的（上游专门审计过这一条）。
+#   2. **XKF4 优先、NKF4 兜底**。topics 用 `XKF4 || NKF4` 表达"任一存在即可"，
+#      ref 用位置参数候选组 `ref("XKF4.SV", "NKF4.SV")` 取第一个存在的——两处必须成对写，
+#      只写一处会出现"topic 判过但取不到数"或反过来。
+#
+# 降级的那一处没法避免：facts.yaml 的 ekfVarianceMax / ekfVarianceMaxLegacy 两条指标是
+# 各按自己的 topic 现算的，规则用候选组取数**分不清值来自哪个 topic**，所以这里不写
+# outputs.stats——写了就会把 XKF4 的值填进标着 NKF4 的那一项，反而误导。
+
+id: apm-ekf-velocity
+name: EKF 速度检验比
+group: ekf_variance
+order: 1
+
+conditions:
+    topics:
+        - "XKF4 || NKF4"
+
+compute:
+    - sv_max = max(ref("XKF4.SV", "NKF4.SV"))
+
+outputs:
+    tag: ekf_variance_high
+
+triggers:
+    - when: "sv_max > 1.0"
+      severity: critical
+      threshold: 1.0
+      value: f"{sv_max:.2f}"
+      unit: ""
+      field: "XKF4/NKF4.SV(峰值)"
+      title: "EKF 速度检验比超拒绝线，峰值 {sv_max:.2f}"
+      suggestion: "超过 1.0 说明 EKF 在拒绝速度数据。结合振动、GPS 的结论找根因：振动会让加速度计失真，进而污染速度新息。"
+    - when: "sv_max > 0.8"
+      severity: warning
+      threshold: 0.8
+      value: f"{sv_max:.2f}"
+      unit: ""
+      field: "XKF4/NKF4.SV(峰值)"
+      title: "EKF 速度检验比偏高，峰值 {sv_max:.2f}"
+      suggestion: "逼近 1.0 的拒绝边界，估计器已经在勉强信任速度数据。若复现需检查相关传感器。"
+
+---
+id: apm-ekf-position
+name: EKF 位置检验比
+group: ekf_variance
+order: 2
+
+conditions:
+    topics:
+        - "XKF4 || NKF4"
+
+compute:
+    - sp_max = max(ref("XKF4.SP", "NKF4.SP"))
+
+outputs:
+    tag: ekf_variance_high
+
+triggers:
+    - when: "sp_max > 1.0"
+      severity: critical
+      threshold: 1.0
+      value: f"{sp_max:.2f}"
+      unit: ""
+      field: "XKF4/NKF4.SP(峰值)"
+      title: "EKF 位置检验比超拒绝线，峰值 {sp_max:.2f}"
+      suggestion: "超过 1.0 说明 EKF 在拒绝位置数据，是定点漂移的直接前兆。优先查 GPS（搜星/HDOP/跳变）。"
+    - when: "sp_max > 0.8"
+      severity: warning
+      threshold: 0.8
+      value: f"{sp_max:.2f}"
+      unit: ""
+      field: "XKF4/NKF4.SP(峰值)"
+      title: "EKF 位置检验比偏高，峰值 {sp_max:.2f}"
+      suggestion: "逼近 1.0 的拒绝边界。若复现需检查 GPS 与罗盘。"
+
+---
+id: apm-ekf-height
+name: EKF 高度检验比
+group: ekf_variance
+order: 3
+
+conditions:
+    topics:
+        - "XKF4 || NKF4"
+
+compute:
+    - sh_max = max(ref("XKF4.SH", "NKF4.SH"))
+
+outputs:
+    tag: ekf_variance_high
+
+triggers:
+    - when: "sh_max > 1.0"
+      severity: critical
+      threshold: 1.0
+      value: f"{sh_max:.2f}"
+      unit: ""
+      field: "XKF4/NKF4.SH(峰值)"
+      title: "EKF 高度检验比超拒绝线，峰值 {sh_max:.2f}"
+      suggestion: "超过 1.0 说明 EKF 在拒绝高度数据。常见根因：振动（尤其 Z 轴）、气压计受桨流扰动、减震球老化。"
+    - when: "sh_max > 0.8"
+      severity: warning
+      threshold: 0.8
+      value: f"{sh_max:.2f}"
+      unit: ""
+      field: "XKF4/NKF4.SH(峰值)"
+      title: "EKF 高度检验比偏高，峰值 {sh_max:.2f}"
+      suggestion: "逼近 1.0 的拒绝边界。若复现需检查气压计与 Z 轴振动。"
+
+---
+id: apm-ekf-magnetometer
+name: EKF 磁罗盘检验比
+group: ekf_variance
+order: 4
+
+conditions:
+    topics:
+        - "XKF4 || NKF4"
+
+compute:
+    - sm_max = max(ref("XKF4.SM", "NKF4.SM"))
+
+outputs:
+    tag: ekf_variance_high
+
+triggers:
+    - when: "sm_max > 1.0"
+      severity: critical
+      threshold: 1.0
+      value: f"{sm_max:.2f}"
+      unit: ""
+      field: "XKF4/NKF4.SM(峰值)"
+      title: "EKF 磁罗盘检验比超拒绝线，峰值 {sm_max:.2f}"
+      suggestion: "超过 1.0 说明 EKF 在拒绝磁罗盘数据，航向会漂。查罗盘干扰（供电线走线、GPS/罗盘支架高度）与校准。"
+    - when: "sm_max > 0.8"
+      severity: warning
+      threshold: 0.8
+      value: f"{sm_max:.2f}"
+      unit: ""
+      field: "XKF4/NKF4.SM(峰值)"
+      title: "EKF 磁罗盘检验比偏高，峰值 {sm_max:.2f}"
+      suggestion: "逼近 1.0 的拒绝边界。若复现需重新校准罗盘并检查干扰源。"

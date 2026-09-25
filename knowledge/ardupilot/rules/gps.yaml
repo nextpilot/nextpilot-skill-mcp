@@ -1,0 +1,133 @@
+# ⚠️ 本文件下的 3 条尚未接线进构建产物（见 PENDING.md 第 1 条）。
+#
+# GPS（GPS 消息）：定位状态、搜星数、HDOP。上游实现 ardupilot-mcp 的 checks/gps.py。
+#   Status  定位类型 0/1=无定位 2=2D 3=3D 4=DGPS 5=RTK float 6=RTK fixed；3D 是可用下限
+#   NSats   搜星数；ArduPilot 期望 6 颗以上解算稳定，低于 4 颗连 3D 定位都保不住
+#   HDop    水平精度因子；1.5 以下是好，ArduPilot 默认 GPS_HDOP_GOOD 解锁门限是 1.4
+#
+# **一处有意偏离上游**：上游把这三项都限制在 armed 窗口内判（避开起飞前搜星期与落地后
+# 空转）。本仓库的引擎会把 skip 明确显示给用户（"这条为什么没跑"），所以这里的选择是
+# ——拿不到 armed 区间就 **skip**，而不是像上游那样退回全程。理由：退回全程必然把起飞前
+# 的搜星期（NSats=0、HDop=99.99）算成"飞行中 GPS 故障"，那是误报，比漏报更伤信任。
+#   · apm-gps-fix 不加这个 precheck：它的第一条判据本身就是全程语义（"从未达 3D 定位"）。
+#   · apm-gps-sats / apm-gps-hdop 加了 `precheck: not HAS_ARMED`。
+# 代价：不写 ARMED/DISARMED 事件也没有 STAT 的日志（autotest 日志常见）会跳过这两条。
+# 时间戳字段写 `timestamp`：APM 的 TimeUS 由 provider 统一改名（见 providers/ardupilot.py 文件头）。
+
+id: apm-gps-fix
+name: GPS 定位状态
+group: gps_health
+order: 1
+
+conditions:
+    topics:
+        - GPS
+
+compute:
+    - status = ref("GPS.Status")
+    - smax = max(status)
+    # armed 段内的最低定位状态；没有 armed 区间时 interval_mask 返回 None，
+    # 经 apply_mask/min 一路传播成 None，第二条 trigger 自然不命中（不误报）。
+    - status_armed = apply_mask(status, interval_mask(ref("GPS.timestamp"), ARMED_INTERVALS))
+    - smin_armed = min(status_armed)
+
+outputs:
+    tag: gps_no_fix
+
+triggers:
+    - when: "smax < 3.0"
+      severity: warning
+      threshold: 3
+      value: f"{smax:.0f}"
+      unit: ""
+      field: "GPS.Status(最高)"
+      title: "全程未达 3D 定位，最高状态 {smax:.0f}"
+      suggestion: "没有 3D 定位 GPS 就无法给 EKF 提供可用位置。检查天线布置与干扰，起飞前留出更充裕的搜星时间。"
+    - when: "smin_armed < 3.0"
+      severity: critical
+      threshold: 3
+      value: f"{smin_armed:.0f}"
+      unit: ""
+      field: "GPS.Status(armed 段最低)"
+      title: "飞行中丢过 3D 定位，armed 段最低状态 {smin_armed:.0f}"
+      suggestion: "armed 段内出现过低于 3D 的定位，位置辅助会被撤掉，可能触发 EKF 失效或漂移。查天线、供电与干扰源。"
+
+---
+id: apm-gps-sats
+name: GPS 搜星数
+group: gps_health
+order: 2
+
+conditions:
+    topics:
+        - GPS
+    # 没有 armed 区间就不用全程替代（会把起飞前搜星期判成故障），宁可跳过
+    precheck:
+        - "not HAS_ARMED"
+
+compute:
+    - nsats_armed = apply_mask(ref("GPS.NSats"), interval_mask(ref("GPS.timestamp"), ARMED_INTERVALS))
+    - nmin = to_int(min(nsats_armed))
+
+outputs:
+    tag: gps_low_sats
+
+triggers:
+    - when: "nmin < 4"
+      severity: critical
+      threshold: 4
+      value: nmin
+      unit: 颗
+      field: "GPS.NSats(armed 段最少)"
+      title: "飞行中搜星数最低仅 {nmin} 颗"
+      suggestion: "低于 4 颗时接收机无法维持 3D 定位，位置不可信。查天线视野、遮挡与干扰，解决前不要用依赖 GPS 的模式。"
+    - when: "nmin < 6"
+      severity: warning
+      threshold: 6
+      value: nmin
+      unit: 颗
+      field: "GPS.NSats(armed 段最少)"
+      title: "飞行中搜星数偏低，最低 {nmin} 颗"
+      suggestion: "ArduPilot 期望 6 颗以上解算才稳定。改善天线布置与视野，解锁前等搜星数上来。"
+
+---
+# HDOP 只在有定位时才有意义：无定位时接收机会报哨兵值（约 99.99），那属于"没信号"
+# 而不是"几何精度差"，已由 apm-gps-fix / apm-gps-sats 覆盖，这里必须剔除。
+# 剔除方式是与 Status>=3 的掩码做 mask_and（greater 是严格大于，取 2.5 即 >=3）。
+id: apm-gps-hdop
+name: GPS 水平精度因子
+group: gps_health
+order: 3
+
+conditions:
+    topics:
+        - GPS
+    precheck:
+        - "not HAS_ARMED"
+
+compute:
+    - mask_fix = greater(ref("GPS.Status"), 2.5)
+    - mask_armed = interval_mask(ref("GPS.timestamp"), ARMED_INTERVALS)
+    - hdop_valid = apply_mask(ref("GPS.HDop"), mask_and(mask_fix, mask_armed))
+    - hmax = max(hdop_valid)
+
+outputs:
+    tag: gps_high_hdop
+
+triggers:
+    - when: "hmax > 5.0"
+      severity: critical
+      threshold: 5.0
+      value: f"{hmax:.1f}"
+      unit: ""
+      field: "GPS.HDop(armed 段最大)"
+      title: "飞行中 HDOP 峰值 {hmax:.1f}，水平位置不可用"
+      suggestion: "HDOP 超过 5 时水平位置基本不可用。先解决成因（视野、干扰、多径），再飞依赖 GPS 的模式。"
+    - when: "hmax > 2.0"
+      severity: warning
+      threshold: 2.0
+      value: f"{hmax:.1f}"
+      unit: ""
+      field: "GPS.HDop(armed 段最大)"
+      title: "飞行中 HDOP 峰值 {hmax:.1f}，卫星几何偏弱"
+      suggestion: "良好 HDOP 在 1.5 以下。改善天线布置与视野，解锁前争取 HDOP 低于 1.5。"

@@ -329,7 +329,7 @@ vehicle_prefix_map:
 #   · 展示用的单位由规则自己在 triggers[].unit 里写死，照抄本表即可。
 # 等 APM 也有 meta/ 之后，本表应迁过去并启用 unit=。见 PENDING.md。
 field_units:
-    VIBE: { VibeX: m/s², VibeY: m/s², VibeZ: m/s², Clip0: 次, Clip1: 次, Clip2: 次 }
+    VIBE: { VibeX: m/s^2, VibeY: m/s^2, VibeZ: m/s^2, Clip0: 次, Clip1: 次, Clip2: 次 }
     MAG: { MagX: mGauss, MagY: mGauss, MagZ: mGauss, Health: 0/1 }
     ATT:
         { DesRoll: deg, Roll: deg, DesPitch: deg, Pitch: deg, DesYaw: deg, Yaw: deg, ErrRP: deg, ErrYaw: deg }
@@ -385,14 +385,18 @@ doc_urls:
 #   2. 没有跨 topic 的兜底机制（不会 BAT 取不到就自动去 CURR 拿）。所以老固件
 #      兼容只能靠"两条不同 key 并列"，label 必须写清来源，否则概览区出现两个
 #      同名"最低电压"反而误导。
-#   3. 没有标量加法算子，跨 IMU 求和（Clip0+1+2）做不了 → 削波只报 IMU0。
+#   3. 没有标量加法算子，跨 IMU 求和（Clip0+1+2）做不了 → 三个 IMU 各报一条，不汇总。
+#      同理三轴振动也各报一条：振动问题本来就要看是哪一轴冒尖，一个"最大振动"汇总
+#      反而把信息压没了。
 metrics:
-    # ── 只占展示位：取数依赖多列归约，交给规则产出 ──
-    - { key: vibrationMaxMs2, label: 最大振动, unit: m/s² }
-    - { key: accelClipTotal, label: 削波累计, unit: 次 }
-
     # ── 就地现算：单列可算的都放这里 ──
-    - { key: accelClipImu0, label: 削波累计(IMU0), unit: 次, topic: VIBE, field: Clip0, op: range_of, round: 0 }
+    - { key: vibrationMaxX, label: 最大振动(X), unit: m/s^2, topic: VIBE, field: VibeX, op: max, round: 2 }
+    - { key: vibrationMaxY, label: 最大振动(Y), unit: m/s^2, topic: VIBE, field: VibeY, op: max, round: 2 }
+    - { key: vibrationMaxZ, label: 最大振动(Z), unit: m/s^2, topic: VIBE, field: VibeZ, op: max, round: 2 }
+    # Clip 是单调递增的累计计数器，range_of 等价于 last - first，即削波总数
+    - { key: accelClip0, label: 削波累计(IMU0), unit: 次, topic: VIBE, field: Clip0, op: range_of, round: 0 }
+    - { key: accelClip1, label: 削波累计(IMU1), unit: 次, topic: VIBE, field: Clip1, op: range_of, round: 0 }
+    - { key: accelClip2, label: 削波累计(IMU2), unit: 次, topic: VIBE, field: Clip2, op: range_of, round: 0 }
     - { key: batteryVoltageMin, label: 最低电压(BAT), unit: V, topic: BAT, field: Volt, op: min, round: 2 }
     - { key: batteryVoltageMinLegacy, label: 最低电压(CURR), unit: V, topic: CURR, field: Volt, op: min, round: 2 }
     - { key: currentMax, label: 最大电流, unit: A, topic: BAT, field: Curr, op: max, round: 2 }
