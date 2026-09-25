@@ -32,6 +32,8 @@ const PUNCT = [
     ">=",
     "==",
     "!=",
+    "&",
+    "|",
     "(",
     ")",
     "[",
@@ -51,6 +53,68 @@ const PUNCT = [
     ">",
 ];
 const KEYWORDS = new Set(["and", "or", "not", "in", "is", "if", "else", "True", "False", "None"]);
+
+// Python / Numpy 内置函数：不在 operators.py 注册，也不需要签名——直接按返回标量处理
+const KNOWN_BUILTINS = new Set([
+    "abs",
+    "all",
+    "any",
+    "bool",
+    "dict",
+    "enumerate",
+    "float",
+    "int",
+    "len",
+    "list",
+    "map",
+    "max",
+    "min",
+    "round",
+    "set",
+    "sorted",
+    "str",
+    "sum",
+    "tuple",
+    "zip",
+    "np.abs",
+    "np.all",
+    "np.any",
+    "np.arange",
+    "np.argmax",
+    "np.argmin",
+    "np.argsort",
+    "np.array",
+    "np.clip",
+    "np.concatenate",
+    "np.cos",
+    "np.cross",
+    "np.cumsum",
+    "np.deg2rad",
+    "np.diff",
+    "np.dot",
+    "np.exp",
+    "np.hypot",
+    "np.isin",
+    "np.log",
+    "np.log10",
+    "np.max",
+    "np.maximum",
+    "np.mean",
+    "np.median",
+    "np.min",
+    "np.minimum",
+    "np.percentile",
+    "np.ptp",
+    "np.rad2deg",
+    "np.sin",
+    "np.sqrt",
+    "np.std",
+    "np.sum",
+    "np.tan",
+    "np.unique",
+    "np.where",
+    "np.zeros",
+]);
 
 /** 固件约束串：`any` / 空 / 逗号分隔的版本比较（逗号 = 与）。与 provider.match_version 同一套 */
 const FW_ANY = /^\s*any\s*$/;
@@ -80,7 +144,7 @@ export function isVehicleSpec(v) {
  * 抄成两份的后果不是"两边不一致"这么轻——IDE 会拿着旧词表去**纠正**新写法
  * （飘红建议改成已经不合法的值），比完全没有提示更糟。
  */
-export const SEVERITIES = new Set(["critical", "warning", "info"]);
+export const SEVERITIES = new Set(["critical", "warning", "info", "guard"]);
 
 /**
  * 日志 topic / 消息名。**风格的约定属于各个格式**（PX4 的 uORB 是小写 snake_case，
@@ -90,7 +154,7 @@ export const SEVERITIES = new Set(["critical", "warning", "info"]);
 const TOPIC_NAME = /^[A-Za-z][A-Za-z0-9_]*$/;
 
 /**
- * `conditions.topics` 的一项：`vehicle_status` ｜ `vehicle_gps_position || sensor_gps` ｜ `ATT`。
+ * `conditions.message` 的一项：`vehicle_status` ｜ `vehicle_gps_position || sensor_gps` ｜ `ATT`。
  *
  * `||` 表示**其中任意一个在日志里就够**（两个都不在才跳过）；返回候选名列表，
  * 运行期由引擎按这个语义判。这里只拆写法、校验名字，不认识语义。
@@ -200,7 +264,7 @@ const REF_KEYS = new Set(["alias", "unit"]);
  * 两个下标位置不同、含义不同，别混。
  */
 const FIELD_REF =
-    /^[a-z][a-z0-9_]*(\[[-]?\d*(?::-?\d*)?\])?\.(?:[a-z][a-z0-9_]*\.)*[a-z][a-z0-9_]*(\[\d+(?:,\d+)?\])?$/;
+    /^[A-Za-z][A-Za-z0-9_]*(\[[-]?\d*(?::-?\d*)?\])?\.(?:[A-Za-z][A-Za-z0-9_]*\.)*[A-Za-z][A-Za-z0-9_]*(\[\d+(?:,\d+)?\])?$/;
 
 /** 拆开字段引用 → {topic, inst, field}（inst 是 int 或 slice；**不写 = 第 0 个实例**） */
 export function splitFieldRef(s) {
@@ -372,7 +436,7 @@ function Parser(src, toks) {
     }
 
     function comparison() {
-        let l = arith();
+        let l = bitand();
         for (;;) {
             let op = null;
             const tok = peek();
@@ -397,8 +461,18 @@ function Parser(src, toks) {
             } else {
                 return l;
             }
-            l = { k: "cmp", op, l, r: arith(), pos: tok.pos };
+            l = { k: "cmp", op, l, r: bitand(), pos: tok.pos };
         }
+    }
+
+    // & | （Python 语义，比算术低、比比较低）
+    function bitand() {
+        let l = arith();
+        while (at("punct", "&") || at("punct", "|")) {
+            const t = eat("punct");
+            l = { k: "bin", op: t.v, l, r: arith(), pos: t.pos };
+        }
+        return l;
     }
 
     function arith() {
@@ -439,6 +513,29 @@ function Parser(src, toks) {
     }
 
     function primary() {
+        // 辅助：下标 —— name[...] / attr[...] / (...)[...] / [...] 后都可能有
+        function subscript(node) {
+            eat("punct", "[");
+            const items = [];
+            if (!at("punct", "]")) {
+                for (;;) {
+                    // Python slice: `[start:stop]` / `[:stop]` / `[start:]` / `[:]`
+                    if (at("punct", ":") || (at("num") && peek(1)?.t === "punct" && peek(1).v === ":")) {
+                        const start = at("punct", ":") ? null : expr();
+                        eat("punct", ":");
+                        const stop = at("punct", "]") || at("punct", ",") ? null : expr();
+                        items.push({ k: "slice", start, stop });
+                    } else {
+                        items.push(expr());
+                    }
+                    if (!skip("punct", ",")) break;
+                    if (at("punct", "]")) break;
+                }
+            }
+            eat("punct", "]");
+            return { k: "sub", v: node, slice: items, pos: node.pos };
+        }
+
         const t = peek();
         if (t.t === "num") {
             p++;
@@ -459,26 +556,37 @@ function Parser(src, toks) {
                 eat("punct", ".");
                 const f = eat("name");
                 if (at("punct", ".")) fail("字段引用只能有一段点号（topic.field）", src, peek().pos);
-                return { k: "attr", topic: t.v, field: f.v, pos: t.pos };
+                if (at("punct", "(")) {
+                    return call({ v: t.v + "." + f.v, pos: t.pos });
+                }
+                let node = { k: "attr", topic: t.v, field: f.v, pos: t.pos };
+                while (at("punct", "[")) node = subscript(node);
+                return node;
             }
             if (at("punct", "[")) {
-                fail(
-                    '裸写的字段引用不能带实例下标——要指定实例请写成 ref("topic[2].field")（[:] = 所有实例，不写 = 第 0 个）',
-                    src,
-                    peek().pos,
-                );
+                let node = { k: "name", name: t.v, pos: t.pos };
+                while (at("punct", "[")) node = subscript(node);
+                // 下标后面可能还有 .xxx（如 estimator_status[:].filter_fault_flags）
+                while (at("punct", ".")) {
+                    eat("punct", ".");
+                    const f = eat("name");
+                    node = { k: "attr", topic: node, field: f.v, pos: node.pos };
+                    while (at("punct", "[")) node = subscript(node);
+                }
+                return node;
             }
             return { k: "name", name: t.v, pos: t.pos };
         }
         if (at("punct", "(")) {
             eat("punct", "(");
-            const e = expr();
+            let e = expr();
             eat("punct", ")");
+            while (at("punct", "[")) e = subscript(e);
             return e;
         }
         if (at("punct", "[")) {
             eat("punct", "[");
-            const items = [];
+            let items = [];
             if (!at("punct", "]")) {
                 for (;;) {
                     items.push(expr());
@@ -487,7 +595,9 @@ function Parser(src, toks) {
                 }
             }
             eat("punct", "]");
-            return { k: "list", items, pos: t.pos };
+            let node = { k: "list", items, pos: t.pos };
+            while (at("punct", "[")) node = subscript(node);
+            return node;
         }
         if (at("punct", "{")) {
             eat("punct", "{");
@@ -609,10 +719,28 @@ function infer(node, ctx) {
             // **存在性**（这个名字在本固件里到底有没有）不在这里查：那是 check_rules_fields.py 的活，
             // 它按「规则 firmware ∩ 引用级 when_fw」圈定版本范围去比回归日志实测字段与上游字典，
             // 而 requires 管的是 skip 语义、并不列举规则读到的全部 topic（如 imu-bias.yaml 一个都没列）。
-            const full = `${node.topic}.${node.field}`;
-            if (!FIELD_REF.test(full)) {
-                fail(`字段引用 ${full} 的写法不对：必须是 topic.field 两段小写名字`, ctx.src, node.pos);
+            if (typeof node.topic === "string") {
+                const full = `${node.topic}.${node.field}`;
+                if (!FIELD_REF.test(full)) {
+                    fail(`字段引用 ${full} 的写法不对：必须是 topic.field 两段小写名字`, ctx.src, node.pos);
+                }
+            } else {
+                // topic 是子表达式（如 estimator_status[:].field 中的 sub 节点）
+                sub(node.topic, ctx);
             }
+            return T_UNKNOWN;
+        }
+        case "sub": {
+            // 下标：v 是被取对象的表达式，slice 是下标的表达式列表（可为 slice 节点）
+            sub(node.v, ctx);
+            node.slice.forEach((x) => {
+                if (x.k === "slice") {
+                    if (x.start) sub(x.start, ctx);
+                    if (x.stop) sub(x.stop, ctx);
+                } else {
+                    sub(x, ctx);
+                }
+            });
             return T_UNKNOWN;
         }
         case "name":
@@ -684,6 +812,9 @@ function inferCall(node, ctx) {
         infer(args[0], { ...ctx, tryAllowed: false, topCall: args[0] });
         return T_UNKNOWN;
     }
+
+    // Python / Numpy 内置：不是 operators.py 注册的，也不需要签名
+    if (KNOWN_BUILTINS.has(fn)) return T_SCALAR;
 
     const sig = ctx.signatures[fn];
     if (!sig) {
@@ -959,7 +1090,12 @@ export function validateComputeList(list, ctx) {
         // 引用的裸名字必须在本条之前已经赋值（字段引用是 attr 节点，不在其列）
         for (const name of collectNames(r.value)) {
             // ref / _try 是语法层，has_topic / param 是引擎在 env 里注入的函数——都不是变量
-            if (ctx.signatures[name] || ["ref", "_try", "has_topic", "param"].includes(name)) continue;
+            if (
+                ctx.signatures[name] ||
+                ["ref", "_try", "has_topic", "param"].includes(name) ||
+                KNOWN_BUILTINS.has(name)
+            )
+                continue;
             if (!declared.has(name) && !ctx.builtinVars?.has(name)) {
                 throw new Error(
                     `${where}：引用了未声明的名字 ${name}` + `（要么在本条之前用赋值声明，要么是内置变量）`,
@@ -997,7 +1133,7 @@ export function collectRefs(src) {
                 else if (k === "alias") item.alias = v.k === "list" ? v.items.map((x) => x.v) : v.v;
             }
             if (item.fields.length) out.push(item);
-        } else if (n.k === "attr") {
+        } else if (n.k === "attr" && typeof n.topic === "string") {
             out.push({ fields: [`${n.topic}.${n.field}`] });
         }
         for (const [k, v] of Object.entries(n)) {
@@ -1032,7 +1168,7 @@ export function checkFieldItem(src, opts = {}) {
         );
     }
     const node = nodes[0];
-    if (node.k === "attr") {
+    if (node.k === "attr" && typeof node.topic === "string") {
         return { kind: "field", fields: [`${node.topic}.${node.field}`] };
     }
     if (node.k === "call" && node.fn === "ref") {
@@ -1084,6 +1220,11 @@ function collectNames(node, out = new Set()) {
         return out;
     }
     if (node.k === "call") out.add(node.fn);
+    // sub 节点的 v 如果是裸 name，那是 topic 名（如 estimator_status[:]），不收集
+    if (node.k === "sub" && node.v?.k === "name") {
+        node.slice.forEach((x) => collectNames(x, out));
+        return out;
+    }
     for (const [k, v] of Object.entries(node)) {
         if (k === "pos" || k === "k" || k === "fn") continue;
         collectNames(v, out);

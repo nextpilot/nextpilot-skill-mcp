@@ -1,11 +1,14 @@
-# 数据质量 guard：中途重启（同一 topic 时间戳回退）。只打 guard 标签，不产 finding。
-# guards 类经验没有 check 名，也不写 compute/triggers —— 判定全在 outputs.guard_tags 里。
+# 数据质量 guard：中途重启（同一 topic 时间戳回退）。
+# 只打 guard 标签，不产 finding。
 
 id: px4-guard-restart
 name: 数据质量-中途重启
 group: guards
 order: 1
-
-outputs:
-    guard_tags:
-        - { when: "RESTART_DETECTED", tag: restart_detected }
+triggers:
+  - when: RESTART_DETECTED
+    severity: guard
+    label: restart_detected
+    description: "Data quality: restart_detected"
+    evidence:
+      source: ""

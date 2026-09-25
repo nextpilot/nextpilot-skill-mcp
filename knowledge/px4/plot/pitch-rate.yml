@@ -1,9 +1,9 @@
-id: pitch-rate
+﻿id: pitch-rate
 title: Pitch Angular Rate
 description: Pitch 角速度估计值与 setpoint、积分。
 order: 6
 conditions:
-  topics: [vehicle_attitude]
+  message: [vehicle_attitude]
 outputs:
   - container: axes
     title: Pitch Angular Rate

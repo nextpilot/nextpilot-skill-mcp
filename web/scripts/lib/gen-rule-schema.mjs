@@ -18,8 +18,8 @@
  *
  * ⚠ **enum 只给「构建期本来就强制校验」的词表**（group / severity / vehicle）。
  * 反过来——schema 比构建期更严——会在**合法写法**上飘红，而假红比没有提示更糟：
- * 作者会以为自己写错了，去改一个本来对的值。`category` 与 `outputs.check` 就是活例子：
- * 构建期允许它们偏离派生值（px4-cpu-load 的 check 是 `cpu_load` ≠ group `cpu`），
+ * 作者会以为自己写错了，去改一个本来对的值。`category` 就是活例子：
+ * 构建期允许它们偏离派生值。
  * 所以这两处只能给 `examples` 提示，不能给 enum。
  *
  * 不依赖任何第三方包（构建脚本只用 Node 内置 + yaml）。
@@ -31,7 +31,7 @@ const uniqSorted = (xs) => [...new Set(xs)].filter((x) => typeof x === "string" 
 
 const FW_PATTERN = "^(any|\\s*(>=|<=|==|>|<)?\\s*\\d+(\\.\\d+)?(\\s*,\\s*(>=|<=|==|>|<)?\\s*\\d+(\\.\\d+)?\\s*)*)$";
 
-/** `conditions.topics` 的一项：`vehicle_status` ｜ `vehicle_gps_position || sensor_gps` */
+/** `conditions.message` 的一项：`vehicle_status` ｜ `vehicle_gps_position || sensor_gps` */
 const TOPICS_ITEM_PATTERN = "^[a-z][a-z0-9_]*(\\s*\\|\\|\\s*[a-z][a-z0-9_]*)*$";
 
 /** guard 标签名（与 build-knowledge.mjs 里那处 `/^[a-z0-9_:]+$/i` 同一口径） */
@@ -82,10 +82,9 @@ export function buildRuleSchema({ signatures, facts, vehicles, builtinVars }) {
                 description:
                     "执行分组，决定执行顺序与 finding 编号。必须已登记在 facts.yaml 的 group_order 与 rule_meta.by_group",
             },
+            tag: { type: "string", description: "规则级异常标签，trigger 未写 label 时回退到此" },
+            docurl: { type: "string", description: "规则级文档链接，evidence 未写 docurl 时回退到此" },
             order: { type: "integer", description: "同 group 内的次序（缺省 100000，再按 id 兜底）" },
-            // **构建期不强制** category 的取值（它只强制"同 group 派生出来的一致"），
-            // 所以这里也不设 enum —— schema 一旦比构建期更严，就会在合法写法上飘红。
-            // 下面这条判据对所有词表都成立：**enum 只给构建期本身就强制校验的那些**。
             category: {
                 type: "string",
                 examples: categories,
@@ -97,7 +96,6 @@ export function buildRuleSchema({ signatures, facts, vehicles, builtinVars }) {
             status: { type: "string" },
             license: { type: "string" },
             author: { type: "object", additionalProperties: true },
-            doc: { type: "string", description: "官方文档链接 → finding.docUrl。缺省按 group 从 rule_meta 派生" },
             conditions: {
                 type: "object",
                 description: "适用范围，整块可省（省 = 什么都适用）。任一键不满足都会记一条 skipped 并带自动文案",
@@ -151,75 +149,81 @@ export function buildRuleSchema({ signatures, facts, vehicles, builtinVars }) {
             compute: {
                 type: "array",
                 items: { type: "string", description: computeDesc },
-                description: "取值：一串表达式，自上而下求值。guard 类经验不写这一项",
+                description: "取值：一串表达式，自上而下求值",
             },
             outputs: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                    // 同样**不设 enum**：缺省是 group，但允许显式例外（px4-cpu-load 的 check 就是
-                    // `cpu_load` ≠ group `cpu`，构建期只打印一句提示、不拦）。设 enum 会当场假红
-                    check: {
-                        type: "string",
-                        examples: groupOrder,
-                        description: "ran / skipped 用的 check 名；缺省 = group，写别的就是显式例外",
-                    },
-                    tag: {
-                        type: ["string", "null"],
-                        description: "喂故障库匹配的异常标签（trigger 没写 tag 时回退到它）",
-                    },
-                    stats: {
-                        type: "object",
-                        description: "写进报告「关键数据」的统计。键是展示名，var 是 compute 里的变量名",
-                        additionalProperties: {
-                            type: "object",
-                            required: ["var"],
-                            additionalProperties: false,
-                            properties: {
-                                var: { type: "string" },
-                                round: { type: "integer" },
-                            },
-                        },
-                    },
-                    guard_tags: {
-                        type: "array",
-                        description: "条件性数据质量标签：不依赖是否发出 finding，算出来就带上",
-                        items: {
-                            type: "object",
-                            required: ["when", "tag"],
-                            additionalProperties: false,
-                            properties: {
-                                when: { type: "string" },
-                                tag: { type: "string", pattern: TAG_PATTERN },
-                            },
-                        },
+                type: "array",
+                description: "指标输出（纯数据，写入 metrics）。多条 = 多个指标",
+                items: {
+                    type: "object",
+                    required: ["name", "value"],
+                    additionalProperties: false,
+                    properties: {
+                        name: { type: "string", description: "指标名（metrics 的键）" },
+                        value: { type: "string", description: "compute 里的变量名" },
+                        description: { type: "string", description: "指标说明（可用 {变量} 占位）" },
+                        unit: { type: "string", description: "单位" },
                     },
                 },
             },
             triggers: {
                 type: "array",
-                description: "判定：自上而下，命中第一条即发一条 finding",
+                description: "判定：各大组之间**全部执行**，同组内的 when[] 短路（命中第一条即停）",
                 items: {
                     type: "object",
-                    required: ["when", "severity", "title", "field"],
+                    required: ["when", "severity", "description"],
                     additionalProperties: false,
                     properties: {
-                        when: { type: "string", description: "触发条件表达式（与 compute 同一套语法）" },
-                        severity: { type: "string", enum: uniqSorted([...SEVERITIES]) },
-                        title: { type: "string", description: "结论标题，可用 {变量} 占位" },
-                        field: { type: "string", description: "证据字段（evidence.field）" },
-                        value: { type: "string", description: '证据值，表达式（f-string 管格式化），如 f"{n:.3f}"' },
-                        threshold: { type: ["number", "string"], description: "阈值（evidence.threshold）" },
-                        unit: { type: "string", description: "单位（evidence.unit）" },
-                        tag: {
-                            type: ["string", "null"],
-                            description: "本条 finding 的标签（缺省 = outputs.tag；写 null = 不产标签）",
+                        when: {
+                            description: "触发条件（可单值可数组；数组内短路求值）。缺省 = True",
+                            oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
                         },
-                        suggestion: { type: "string", description: "结论建议，也可用 {变量} 占位" },
-                        evidence_extra: {
+                        severity: {
+                            description: "严重等级（可单值可数组，长度 >1 时一一对应 when[]）。guard = 数据质量标签",
+                            oneOf: [
+                                { type: "string", enum: uniqSorted([...SEVERITIES, "guard"]) },
+                                {
+                                    type: "array",
+                                    items: { type: "string", enum: uniqSorted([...SEVERITIES, "guard"]) },
+                                },
+                            ],
+                        },
+                        label: {
+                            description: "本条 finding 的标签（缺省 = 规则级 tag；写 null = 不产标签）",
+                            oneOf: [
+                                { type: "string" },
+                                { type: ["string", "null"] },
+                                { type: "array", items: { type: "string" } },
+                            ],
+                        },
+                        description: {
+                            description: "结论描述，可用 {变量} 占位。可单值可数组",
+                            oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                        },
+                        suggestion: {
+                            description: "建议文本，可用 {变量} 占位。可单值可数组",
+                            oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+                        },
+                        evidence: {
                             type: "object",
-                            description: "额外证据：{evidence 键: 变量名}",
-                            additionalProperties: true,
+                            description: "结构化证据",
+                            additionalProperties: false,
+                            properties: {
+                                source: {
+                                    type: "string",
+                                    description: "证据来源说明（如 topic.field），可用 {变量} 占位",
+                                },
+                                value: { type: "string", description: "证据值表达式（如 vibe_mean 或 f'{x:.2f}'）" },
+                                threshold: {
+                                    description: "阈值（可单值或数组对应 when[]）",
+                                    oneOf: [
+                                        { type: ["number", "string"] },
+                                        { type: "array", items: { type: ["number", "string"] } },
+                                    ],
+                                },
+                                unit: { type: "string", description: "单位" },
+                                docurl: { type: "string", description: "证据级文档链接（覆盖规则级 docurl）" },
+                            },
                         },
                     },
                 },
@@ -244,16 +248,8 @@ export function buildRuleSchema({ signatures, facts, vehicles, builtinVars }) {
                 ],
             },
         },
-        // guard 类经验只打数据质量标签、不发 finding，因此没有 compute / triggers。
-        // 两个分支各说各的形态，比"全可省"更能提示漏写了什么
-        anyOf: [
-            { required: ["compute", "triggers"], title: "普通经验：要取值也要判定" },
-            {
-                required: ["outputs"],
-                title: "guard 类经验：只打数据质量标签，不发 finding",
-                properties: { outputs: { required: ["guard_tags"] } },
-            },
-        ],
+        // guard 类经验通过 triggers.severity: guard 表达，与普通经验同一形态
+        anyOf: [{ required: ["triggers"], title: "所有经验都要有 triggers（guard 用 severity: guard 表达）" }],
         // 机器可读的派生词表（`x-` 前缀是 JSON Schema 允许的自定义字段）。
         // 编辑器不消费，但脚本与其它工具可以查，省得再去解析 knowledge/engine/ 源码
         "x-operators": uniqSorted(Object.keys(signatures ?? {})),

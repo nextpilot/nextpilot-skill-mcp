@@ -1,9 +1,9 @@
-id: visual-odom-pos
+﻿id: visual-odom-pos
 title: Visual Odometry Position
 description: 视觉里程计位置（仅当 topic 存在时显示）。
 order: 13
 conditions:
-  topics: [vehicle_visual_odometry]
+  message: [vehicle_visual_odometry]
 outputs:
   - container: axes
     title: Visual Odometry Position

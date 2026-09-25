@@ -1,9 +1,9 @@
-id: altitude
+﻿id: altitude
 title: Altitude Estimate
 description: GPS / 气压计 / 融合高度估计值与 setpoint。
 order: 2
 conditions:
-  topics:
+  message:
    - vehicle_gps_position || sensor_gps
 # ⚠️ setpoint 那条线暂时缺着，卡在 DSL 上，不是忘了写：
 # 高度设定值只能取 vehicle_local_position_setpoint.z（NED **向下为正**），跟这张图另外

@@ -65,22 +65,23 @@ export interface McpServerMeta {
 }
 
 /** findings 检查结果（日志分析三层架构的层间契约，见 CLAUDE.md 4.2） */ export type Severity =
-    "critical" | "warning" | "info";
+    "critical" | "warning" | "info" | "guard";
 
 export interface Finding {
     id: string;
     severity: Severity;
     ruleId: string;
-    /** 确定性引擎异常标签（喂给故障知识库匹配）；info 级可能为 null */
-    tag?: string | null;
-    title: string;
-    /** 触发依据：字段名、实际值、阈值，LLM 不得更改这些数值 */
+    label: string;
+    description: string;
+    /** 触发依据：字段名、实际值、阈值等结构化证据 */
     evidence: {
-        field: string;
-        value: number | string;
+        source: string;
+        value?: number | string | null;
         threshold?: number | string;
         unit?: string;
+        docurl?: string;
         samples?: { tSec?: number; message?: string }[];
+        [key: string]: unknown;
     };
     docUrl?: string;
     suggestion?: string;
@@ -166,7 +167,7 @@ export interface AnalysisReport {
     /** 数据质量 / 边界 guard 标签（insufficient_data 等） */
     guardTags?: string[];
     checksRun?: string[];
-    checksSkipped?: { check: string; reason: string }[];
+    checksSkipped?: { ruleId: string; reason: string }[];
     /** 规则取数时的实例提示（区间越界被截断等）——不是判定结论，是"这份日志没有你写的那么
      *  多路数据"。与图上的 `SeriesResponse.warnings` 同源，界面上一起进告警栏 */
     instanceNotes?: string[];

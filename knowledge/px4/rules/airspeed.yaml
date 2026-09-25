@@ -11,42 +11,45 @@ order: 1
 # 机型未知过去靠机架轴放行 + 一条 skip 记录留痕，现在 skip 已退役——未知直接被轴挡在门外。
 # 原外层条件还要求存在 vehicle_attitude_setpoint（本经验并不读它），该条件一并去掉。
 conditions:
-    vehicle: fixed_wing
-    topics:
-        - airspeed_validated
+  vehicle: fixed_wing
+  message:
+    - airspeed_validated
 
 compute:
-    # 固定翼巡航段：armed 区间内 nav_state 出现过 3/8；不成立则整条中止（原 require_true 门控）
-    - >-
-        cruise_ok = require_true(masked_any_in(vehicle_status.nav_state,
-        vehicle_status.timestamp, ARMED_INTERVALS, codes=[3, 8]))
-    # 无效样本占比；字段缺失时保持可选（此时只用下面 tas 的统计，与原实现一致）
-    - >-
-        invalid_frac = _try(ratio_equal(
-        ref("airspeed_validated.airspeed_sensor_measurement_valid"), value=0))
-    - has_invalid = invalid_frac is not None
-    - tas_min = _try(min(airspeed_validated.true_airspeed_m_s))
+  # 固定翼巡航段：armed 区间内 nav_state 出现过 3/8；不成立则整条中止（原 require_true 门控）
+  - >-
+    cruise_ok = require_true(masked_any_in(vehicle_status.nav_state, vehicle_status.timestamp, ARMED_INTERVALS, codes=[3, 8]))
+  # 无效样本占比；字段缺失时保持可选（此时只用下面 tas 的统计，与原实现一致）
+  - >-
+    invalid_frac = _try(np.mean( ref("airspeed_validated.airspeed_sensor_measurement_valid") == 0))
+  - has_invalid = invalid_frac is not None
+  - tas_min = _try(min(airspeed_validated.true_airspeed_m_s))
 
 outputs:
-    tag: low_airspeed
-    stats:
-        airspeedInvalidRatio: { var: invalid_frac, round: 3 }
-        airspeedMinM: { var: tas_min, round: 1 }
+  - name: airspeedInvalidRatio
+    value: invalid_frac
+    round: 3
+  - name: airspeedMinM
+    value: tas_min
+    round: 1
 
 triggers:
-    - when: "has_invalid and invalid_frac >= 0.50"
-      severity: critical
-      tag: low_airspeed
-      threshold: 0.50
+  - when: "has_invalid and invalid_frac >= 0.50"
+    severity: critical
+    suggestion: "结合故障库 F009：空速失效极易引发失速，检查空速管堵塞/积水、管路漏气与校准。"
+    description: 空速传感器在固定翼段大部分时间无效（{invalid_frac:.0%} 样本）
+    evidence:
+      source: airspeed_validated.airspeed_sensor_measurement_valid
       value: f"{invalid_frac:.3f}"
-      field: "airspeed_validated.airspeed_sensor_measurement_valid"
-      title: "空速传感器在固定翼段大部分时间无效（{invalid_frac:.0%} 样本）"
-      suggestion: "结合故障库 F009：空速失效极易引发失速，检查空速管堵塞/积水、管路漏气与校准。"
-    - when: "has_invalid and invalid_frac >= 0.10"
-      severity: warning
-      tag: low_airspeed
-      threshold: 0.10
+      threshold: 0.5
+    label: low_airspeed
+  - when: "has_invalid and invalid_frac >= 0.10"
+    severity: warning
+    suggestion: "结合故障库 F009 检查空速管与管路密封。"
+    description: 空速传感器间歇无效（{invalid_frac:.0%} 样本）
+    evidence:
+      source: airspeed_validated.airspeed_sensor_measurement_valid
       value: f"{invalid_frac:.3f}"
-      field: "airspeed_validated.airspeed_sensor_measurement_valid"
-      title: "空速传感器间歇无效（{invalid_frac:.0%} 样本）"
-      suggestion: "结合故障库 F009 检查空速管与管路密封。"
+      threshold: 0.1
+    label: low_airspeed
+tag: low_airspeed

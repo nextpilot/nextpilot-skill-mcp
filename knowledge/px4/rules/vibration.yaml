@@ -8,38 +8,45 @@ group: vibration
 order: 1 # vibration group 内次序：vibration=1, stddev=2, clipping=3
 
 conditions:
-    topics:
-        - vehicle_imu_status
+  message:
+    - vehicle_imu_status
 
 compute:
-    # 每个 IMU 实例一条 accel_vibration_metric 序列；取均值最大的实例，
-    # 同时得到该实例的 p95 与最大值（迁移前 worst 字典的三个统计量同源）。
-    # min_mean=0 复刻迁移前「以 0 为初值、严格更大才替换」的语义：全零视为无有效数据
-    - >-
-        vibe_mean, vibe_p95, vibe_max, imu_idx = worst_mean_stats(
-          ref("vehicle_imu_status[:].accel_vibration_metric"), min_mean=0)
+  # 每个 IMU 实例一条 accel_vibration_metric 序列；取均值最大的实例，
+  # 同时得到该实例的 p95 与最大值（迁移前 worst 字典的三个统计量同源）。
+  # min_mean=0 复刻迁移前「以 0 为初值、严格更大才替换」的语义：全零视为无有效数据
+  - >-
+    vibe_mean, vibe_p95, vibe_max, imu_idx = worst_mean_stats(
+      ref("vehicle_imu_status[:].accel_vibration_metric"), min_mean=0)
 
 outputs:
-    tag: high_vibration
-    stats:
-        imuAccelVibrationMean: { var: vibe_mean, round: 3 }
-        imuAccelVibrationP95: { var: vibe_p95, round: 3 }
-        imuAccelVibrationMax: { var: vibe_max, round: 3 }
+  - name: imuAccelVibrationMean
+    value: vibe_mean
+    round: 3
+  - name: imuAccelVibrationP95
+    value: vibe_p95
+    round: 3
+  - name: imuAccelVibrationMax
+    value: vibe_max
+    round: 3
 
 triggers:
-    - when: "vibe_mean >= 9.81"
-      severity: critical
+  - when: "vibe_mean >= 9.81"
+    severity: critical
+    suggestion: "Flight Review 红色区间（>9.81 m/s^2）。结合故障库条目排查桨叶/电机/机架/减震。"
+    description: "高频振动严重超标（IMU #{imu_idx}）"
+    evidence:
+      source: vehicle_imu_status.accel_vibration_metric(均值)
+      value: f"{vibe_mean:.3f}"
       threshold: 9.81
-      value: f"{vibe_mean:.3f}"
       unit: m/s^2
-      field: "vehicle_imu_status.accel_vibration_metric(均值)"
-      title: "高频振动严重超标（IMU #{imu_idx}）"
-      suggestion: "Flight Review 红色区间（>9.81 m/s^2）。结合故障库条目排查桨叶/电机/机架/减震。"
-    - when: "vibe_mean >= 4.905"
-      severity: warning
+  - when: "vibe_mean >= 4.905"
+    severity: warning
+    suggestion: "Flight Review 橙色区间（4.905~9.81 m/s^2）。结合故障库条目排查桨叶动平衡/电机/IMU 减震。"
+    description: "高频振动偏大（IMU #{imu_idx}）"
+    evidence:
+      source: vehicle_imu_status.accel_vibration_metric(均值)
+      value: f"{vibe_mean:.3f}"
       threshold: 4.905
-      value: f"{vibe_mean:.3f}"
       unit: m/s^2
-      field: "vehicle_imu_status.accel_vibration_metric(均值)"
-      title: "高频振动偏大（IMU #{imu_idx}）"
-      suggestion: "Flight Review 橙色区间（4.905~9.81 m/s^2）。结合故障库条目排查桨叶动平衡/电机/IMU 减震。"
+tag: high_vibration

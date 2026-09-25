@@ -64,7 +64,7 @@ class MetricEntry(BaseModel):
 class SkippedCheck(BaseModel):
     """ "这条没跑"以及原因 —— 报告里要能看出为什么，而不是让读者以为它跑过了。"""
 
-    check: str = Field(description="规则声明的 check 名。")
+    ruleId: str = Field(description="规则 ID。")
     reason: str = Field(description="自动生成的文案：固件不满足 / 机架不适用 / 缺 topic / 数据不足…")
 
 

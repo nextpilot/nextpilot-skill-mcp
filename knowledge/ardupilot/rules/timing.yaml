@@ -13,29 +13,28 @@ group: timing
 order: 1
 
 conditions:
-    topics:
-        - "IMU || ATT || VIBE"
+  message:
+    - "IMU || ATT || VIBE"
 
 compute:
-    # 候选组按上游 GAP_SOURCES 的顺序（IMU > ATT > VIBE）：取日志里第一个存在的
-    - gts = ref("IMU.timestamp", "ATT.timestamp", "VIBE.timestamp")
-    - gaps = gap_events(gts, T0_US)
+  # 候选组按上游 GAP_SOURCES 的顺序（IMU > ATT > VIBE）：取日志里第一个存在的
+  - gts = ref("IMU.timestamp", "ATT.timestamp", "VIBE.timestamp")
+  - gaps = gap_events(gts, T0_US)
 
 # 上游最多报 3 处（`MAX_GAP_FINDINGS`），按间隔降序——截断已在算子内完成
-foreach: { var: gaps, keys: [gap_s, start_s, end_s, nominal_dt_s, threshold_s] }
-
-outputs:
-    tag: apm_logging_gap
+foreach: { var: gaps, keys: [ gap_s, start_s, end_s, nominal_dt_s, threshold_s ] }
 
 triggers:
-    - when: "True"
-      severity: warning
-      threshold: 0.5
+  - when: "True"
+    severity: warning
+    suggestion: "名义间隔 {nominal_dt_s:.3f} s，本次阈值 {threshold_s:.2f} s（绝对下限 0.5 s 与名义间隔 10 倍取大者）。该窗口的数据缺失，会影响所有其它结论；排查 SD 卡写入性能与 CPU 负载。"
+    description: 日志间隙 {gap_s:.2f} s（t={start_s:.2f}s 起，{end_s:.2f}s 恢复）
+    evidence:
+      source: IMU/ATT/VIBE.timestamp(相邻间隔)
       value: f"{gap_s:.2f}"
+      threshold: 0.5
       unit: s
-      field: "IMU/ATT/VIBE.timestamp(相邻间隔)"
-      title: "日志间隙 {gap_s:.2f} s（t={start_s:.2f}s 起，{end_s:.2f}s 恢复）"
-      suggestion: "名义间隔 {nominal_dt_s:.3f} s，本次阈值 {threshold_s:.2f} s（绝对下限 0.5 s 与名义间隔 10 倍取大者）。该窗口的数据缺失，会影响所有其它结论；排查 SD 卡写入性能与 CPU 负载。"
+tag: apm_logging_gap
 
 ---
 # 长循环总数：上游是累加所有 PM 记录的 NLon（NLon 是每条 PM 记录里的增量计数）。
@@ -46,22 +45,20 @@ group: timing
 order: 2
 
 conditions:
-    topics:
-        - PM
+  message:
+    - PM
 
 compute:
-    - nlon = ref("PM.NLon")
-    - long_loops = sum(nlon)
-
-outputs:
-    tag: apm_scheduler_long_loops
+  - long_loops = sum(PM.NLon)
 
 triggers:
-    - when: "long_loops > 0"
-      severity: warning
-      threshold: 0
+  - when: "long_loops > 0"
+    severity: warning
+    suggestion: "主循环曾跑超时间预算，说明飞控一度 CPU 饥饿，会拖慢控制更新并劣化估计与控制。降低负载：调低日志/陷波/EKF 速率、关掉用不到的功能，或检查循环速率是否设得超出板子能力。"
+    description: 调度记录到 {long_loops:.0f} 次长循环
+    evidence:
+      source: PM.NLon(长循环累计数)
       value: f"{long_loops:.0f}"
+      threshold: 0
       unit: 次
-      field: "PM.NLon(长循环累计数)"
-      title: "调度记录到 {long_loops:.0f} 次长循环"
-      suggestion: "主循环曾跑超时间预算，说明飞控一度 CPU 饥饿，会拖慢控制更新并劣化估计与控制。降低负载：调低日志/陷波/EKF 速率、关掉用不到的功能，或检查循环速率是否设得超出板子能力。"
+tag: apm_scheduler_long_loops

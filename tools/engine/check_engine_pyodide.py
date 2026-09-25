@@ -49,7 +49,7 @@ def _declared_track_topics(text: str) -> list:
     这里**不引 pyyaml**：只为一行声明装一个解析器不划算，而且这是"守卫读声明"的窄用途——
     读不出来（格式没见过的写法）时返回空列表，由调用方报错，而不是静默当成"没声明"。
     """
-    m = re.search(r"^\s*topics:\s*(.*)$", text, re.M)
+    m = re.search(r"^\s*message:\s*(.*)$", text, re.M)
     if not m:
         return []
     inline = m.group(1).strip()

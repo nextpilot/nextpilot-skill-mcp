@@ -4,9 +4,7 @@
 # 所以"四个主通道同时偏低"在正常飞行中不会发生，出现即意味着链路出了问题。
 # （这正是经典的"RC 卡在 990us、失效保护没触发"的坠机现场。）
 #
-# 判据实现：四个主通道同时 < 1000 us。
-#   greater 只支持"逐样本 a > b"，所以判 c < 1000 写成 greater(-c, -1000)
-#   （scale_series 取负）。没有取反/取模算子，这是唯一干净的写法。
+# 判据实现：四个主通道同时 < 1000 us（-x > -1000 等价于 x < 1000）。
 #
 # **降级**：上游的 severity 判据是"持续到日志末尾"或"持续 >= 2s"→ critical，否则 warning。
 # 两档都要持续时长，引擎缺 run-length 算子，所以本轮**只出 warning**，并且
@@ -18,31 +16,25 @@ group: rc_input
 order: 1
 
 conditions:
-    topics:
-        - RCIN
+  message:
+    - RCIN
 
 compute:
-    - c1 = ref("RCIN.C1")
-    - c2 = ref("RCIN.C2")
-    - c3 = ref("RCIN.C3")
-    - c4 = ref("RCIN.C4")
-    # 各通道 < 1000 us 的掩码（greater 只认 a > b，故取负后比较）
-    - low1 = greater(scale_series(c1, factor=-1.0), -1000.0)
-    - low2 = greater(scale_series(c2, factor=-1.0), -1000.0)
-    - low3 = greater(scale_series(c3, factor=-1.0), -1000.0)
-    - low4 = greater(scale_series(c4, factor=-1.0), -1000.0)
-    - all_low = mask_and(mask_and(low1, low2), mask_and(low3, low4))
-    - lost_samples = count_true(all_low)
-
-outputs:
-    tag: apm_rc_link_loss
+  - low1 = -RCIN.C1 > -1000
+  - low2 = -RCIN.C2 > -1000
+  - low3 = -RCIN.C3 > -1000
+  - low4 = -RCIN.C4 > -1000
+  - all_low = low1 & low2 & low3 & low4
+  - lost_samples = sum(all_low)
 
 triggers:
-    - when: "lost_samples > 0"
-      severity: warning
-      threshold: 1000.0
+  - when: "lost_samples > 0"
+    severity: warning
+    suggestion: "正常飞行中四杆不会同时处于低位，这通常意味着遥控链路掉线或接收机保持失效值。本条未判持续时长（缺算子）——若同时出现失控、RTL 或坠机，应按 RC 失联处理，并检查接收机供电、天线与失效保护设置。"
+    description: 四个主通道曾同时低于 1000us，共 {lost_samples} 个样本
+    evidence:
+      source: RCIN.C1..C4(同时低于 1000us 的样本数)
       value: lost_samples
+      threshold: 1000
       unit: 样本
-      field: "RCIN.C1..C4(同时低于 1000us 的样本数)"
-      title: "四个主通道曾同时低于 1000us，共 {lost_samples} 个样本"
-      suggestion: "正常飞行中四杆不会同时处于低位，这通常意味着遥控链路掉线或接收机保持失效值。本条未判持续时长（缺算子）——若同时出现失控、RTL 或坠机，应按 RC 失联处理，并检查接收机供电、天线与失效保护设置。"
+tag: apm_rc_link_loss

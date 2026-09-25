@@ -14,38 +14,35 @@ group: events
 order: 1
 
 conditions:
-    topics:
-        - ERR
+  message:
+    - ERR
 
 compute:
-    - subsys = ref("ERR.Subsys")
-    - ecode = ref("ERR.ECode")
-    # ECode == 0 是"清除错误"，先剔掉（greater 只认严格大于，0.5 即 >=1）
-    - err_subsys = apply_mask(subsys, greater(ecode, 0.5))
-    - err_count = length_of(err_subsys)
-    # 这 10 个子系统出错是硬性安全失效（电池/GPS/EKF/崩机/振动等失效保护），直接 critical
-    - crit_count = count_true(values_in(err_subsys, [5, 6, 7, 9, 12, 16, 17, 25, 29, 30]))
-
-outputs:
-    tag: apm_subsystem_error
+  - err_subsys = ERR.Subsys[ERR.ECode > 0.5]
+  - err_count = len(err_subsys)
+  # 这 10 个子系统出错是硬性安全失效（电池/GPS/EKF/崩机/振动等失效保护），直接 critical
+  - crit_count = sum(np.isin(err_subsys, [5, 6, 7, 9, 12, 16, 17, 25, 29, 30]))
 
 triggers:
-    - when: "crit_count > 0"
-      severity: critical
-      threshold: 0
+  - when: "crit_count > 0"
+    severity: critical
+    suggestion: "涉及失效保护类子系统（电池/GPS/EKF/崩机/振动/推力丧失/内部错误），是直接影响飞行安全的硬故障。先查清根因再飞。"
+    description: 发生 {crit_count} 条安全关键子系统错误（ERR）
+    evidence:
+      source: ERR.Subsys(安全关键子系统，ECode!=0)
       value: crit_count
-      unit: 条
-      field: "ERR.Subsys(安全关键子系统，ECode!=0)"
-      title: "发生 {crit_count} 条安全关键子系统错误（ERR）"
-      suggestion: "涉及失效保护类子系统（电池/GPS/EKF/崩机/振动/推力丧失/内部错误），是直接影响飞行安全的硬故障。先查清根因再飞。"
-    - when: "err_count > 0"
-      severity: warning
       threshold: 0
-      value: err_count
       unit: 条
-      field: "ERR.Subsys(ECode!=0)"
-      title: "发生 {err_count} 条子系统错误（ERR）"
-      suggestion: "结合周边遥测定位根因，检查对应子系统（传感器/无线电）为何报错。"
+  - when: "err_count > 0"
+    severity: warning
+    suggestion: "结合周边遥测定位根因，检查对应子系统（传感器/无线电）为何报错。"
+    description: 发生 {err_count} 条子系统错误（ERR）
+    evidence:
+      source: ERR.Subsys(ECode!=0)
+      value: err_count
+      threshold: 0
+      unit: 条
+tag: apm_subsystem_error
 
 ---
 # 上游把 EV 事件统一出 INFO 摘要。**这里有意偏离**：把几个本身就是故障信号的事件
@@ -57,36 +54,36 @@ group: events
 order: 2
 
 conditions:
-    topics:
-        - EV
+  message:
+    - EV
 
 compute:
-    - ev_id = ref("EV.Id")
-    - ev_count = length_of(ev_id)
-    # 19 LOST_GPS / 54 MOTORS_EMERGENCY_STOPPED / 59 ROTOR_SPEED_BELOW_CRITICAL
-    # 60 EKF_ALT_RESET / 62 EKF_YAW_RESET
-    - key_count = count_true(values_in(ev_id, [19, 54, 59, 60, 62]))
-
-outputs:
-    tag: apm_critical_event_logged
+  - ev_id = EV.Id
+  - ev_count = len(ev_id)
+  # 19 LOST_GPS / 54 MOTORS_EMERGENCY_STOPPED / 59 ROTOR_SPEED_BELOW_CRITICAL
+  # 60 EKF_ALT_RESET / 62 EKF_YAW_RESET
+  - key_count = sum(np.isin(ev_id, [19, 54, 59, 60, 62]))
 
 triggers:
-    - when: "key_count > 0"
-      severity: warning
-      threshold: 0
+  - when: "key_count > 0"
+    severity: warning
+    suggestion: "丢 GPS、EKF 高度或航向重置、电机紧急停转、旋翼转速不足都属于明确的异常。按事件类型查对应子系统（GPS/罗盘/动力）。"
+    description: 日志含 {key_count} 条关键异常事件（EV）
+    evidence:
+      source: EV.Id(丢GPS / EKF重置 / 电机急停 / 旋翼转速不足)
       value: key_count
-      unit: 条
-      field: "EV.Id(丢GPS / EKF重置 / 电机急停 / 旋翼转速不足)"
-      title: "日志含 {key_count} 条关键异常事件（EV）"
-      suggestion: "丢 GPS、EKF 高度或航向重置、电机紧急停转、旋翼转速不足都属于明确的异常。按事件类型查对应子系统（GPS/罗盘/动力）。"
-    - when: "ev_count > 0"
-      severity: info
       threshold: 0
-      value: ev_count
       unit: 条
-      field: "EV.Id(全部事件)"
-      title: "日志共记录 {ev_count} 条事件（EV）"
-      suggestion: "事件码对照 facts.yaml 的 ev_ids 查看，用于还原飞行过程。"
+  - when: "ev_count > 0"
+    severity: info
+    suggestion: "事件码对照 facts.yaml 的 ev_ids 查看，用于还原飞行过程。"
+    description: 日志共记录 {ev_count} 条事件（EV）
+    evidence:
+      source: EV.Id(全部事件)
+      value: ev_count
+      threshold: 0
+      unit: 条
+tag: apm_critical_event_logged
 
 ---
 # 占位：MODE 的模式名是**文本列**（MODE.Mode），而本仓库 APM provider 的 get_series()
@@ -97,21 +94,20 @@ id: apm-mode-timeline
 name: 模式时间线（占位）
 group: events
 order: 3
+placeholder: "待补能力：MODE.Mode 是文本列，provider 的 get_series 取不到文本（PENDING 的 C1），暂未实现"
 
 conditions:
-    topics:
-        - MODE
-    placeholder: "待补能力：MODE.Mode 是文本列，provider 的 get_series 取不到文本（PENDING 的 C1），暂未实现"
+  message:
+    - MODE
 
 compute:
-    - mode_num = ref("MODE.ModeNum")
-
-outputs:
-    tag: apm_mode_timeline
+  - mode_num = MODE.ModeNum
 
 triggers:
-    - when: "False"
-      severity: info
-      field: "MODE.Mode(时间线)"
-      title: "模式时间线（占位，未实现）"
-      suggestion: "待 provider 支持文本列后实现：模式切换序列用于还原飞行过程与定位失控时点。"
+  - when: "False"
+    severity: info
+    suggestion: "待 provider 支持文本列后实现：模式切换序列用于还原飞行过程与定位失控时点。"
+    description: 模式时间线（占位，未实现）
+    evidence:
+      source: MODE.Mode(时间线)
+tag: apm_mode_timeline

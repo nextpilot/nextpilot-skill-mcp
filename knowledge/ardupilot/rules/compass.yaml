@@ -18,42 +18,39 @@ group: compass
 order: 1
 
 conditions:
-    topics:
-        - MAG
+  message:
+    - MAG
 
 compute:
-    - mx = ref("MAG.MagX")
-    - my = ref("MAG.MagY")
-    - mz = ref("MAG.MagZ")
-    - mag = hypot(hypot(mx, my), mz)
-    - mean_mag = mean(mag)
-    # 变异系数 std/mean（上游的核心判据）。变量名不取 cv，免得把同名算子遮蔽掉
-    - cv_mag = cv(mag)
-    # 极差比：(max-min)/mean。mean<=0（全零/无场）时 div 返回 None，本条自然不出结论
-    - range_ratio = div(range_of(mag), mean_mag)
-    # 上游的 MIN_SAMPLES=10（样本太少统计量没意义）。**必须在这里算**——trigger 的
-    # when 走 _eval_expr 白名单，只允许 has_topic('...') 这类调用，调不了算子。
-    - n_mag = length_of(mag)
-
-outputs:
-    tag: apm_compass_interference
+  - mag = np.hypot(np.hypot(MAG.MagX, MAG.MagY), MAG.MagZ)
+  - mean_mag = mean(mag)
+  # 变异系数 std/mean（上游的核心判据）。变量名不取 cv，免得把同名算子遮蔽掉
+  - cv_mag = np.std(mag) / np.mean(mag)
+  # 极差比：(max-min)/mean。mean<=0 时除零异常，本条被跳过
+  - range_ratio = np.ptp(mag) / mean_mag
+  # 上游的 MIN_SAMPLES=10（样本太少统计量没意义）。**必须在这里算**——trigger 的
+  # when 走 _eval_expr 白名单，只允许 has_topic('...') 这类调用，调不了算子。
+  - n_mag = len(mag)
 
 triggers:
-    # 上游：CV > 0.60 是"场强极不稳定"，直接 critical
-    - when: "cv_mag > 0.60 and n_mag >= 10"
-      severity: critical
-      threshold: 0.60
+  # 上游：CV > 0.60 是"场强极不稳定"，直接 critical
+  - when: "cv_mag > 0.60 and n_mag >= 10"
+    severity: critical
+    suggestion: "场强波动这么大，几乎必然是电机/电流干扰耦合进了罗盘，会污染 EKF 航向估计（马桶圈、飞丢）。把罗盘挪开供电线与电调、重新校准，开启 COMPASS_MOT 电流补偿，或改用外置罗盘。"
+    description: 罗盘场强极不稳定，变异系数 {cv_mag:.2f}（{mean_mag:.0f} mGauss 均值上摆动）
+    evidence:
+      source: MAG.MagX/Y/Z 合成场强(变异系数)
       value: f"{cv_mag:.2f}"
+      threshold: 0.6
       unit: ""
-      field: "MAG.MagX/Y/Z 合成场强(变异系数)"
-      title: "罗盘场强极不稳定，变异系数 {cv_mag:.2f}（{mean_mag:.0f} mGauss 均值上摆动）"
-      suggestion: "场强波动这么大，几乎必然是电机/电流干扰耦合进了罗盘，会污染 EKF 航向估计（马桶圈、飞丢）。把罗盘挪开供电线与电调、重新校准，开启 COMPASS_MOT 电流补偿，或改用外置罗盘。"
-    # 上游：CV > 0.30 或极差比 > 0.60，任一过线即 warning
-    - when: "(cv_mag > 0.30 or range_ratio > 0.60) and n_mag >= 10"
-      severity: warning
-      threshold: 0.30
+  # 上游：CV > 0.30 或极差比 > 0.60，任一过线即 warning
+  - when: "(cv_mag > 0.30 or range_ratio > 0.60) and n_mag >= 10"
+    severity: warning
+    suggestion: "场强随油门摆动通常意味着电机/电流干扰串进了罗盘。检查罗盘与供电线走线的距离，做 COMPASS_MOT 补偿，或改用外置罗盘。"
+    description: 罗盘场强摆动偏大，变异系数 {cv_mag:.2f}、极差比 {range_ratio:.2f}（均值 {mean_mag:.0f} mGauss）
+    evidence:
+      source: MAG.MagX/Y/Z 合成场强(变异系数 / 极差比)
       value: f"{cv_mag:.2f}"
+      threshold: 0.3
       unit: ""
-      field: "MAG.MagX/Y/Z 合成场强(变异系数 / 极差比)"
-      title: "罗盘场强摆动偏大，变异系数 {cv_mag:.2f}、极差比 {range_ratio:.2f}（均值 {mean_mag:.0f} mGauss）"
-      suggestion: "场强随油门摆动通常意味着电机/电流干扰串进了罗盘。检查罗盘与供电线走线的距离，做 COMPASS_MOT 补偿，或改用外置罗盘。"
+tag: apm_compass_interference

@@ -18,24 +18,23 @@ group: config_safety
 order: 1
 
 conditions:
-    topics:
-        - PARM
+  message:
+    - PARM
 
 compute:
-    - arming_check = param("ARMING_CHECK")
-
-outputs:
-    tag: apm_config_arming_check_disabled
+  - arming_check = param("ARMING_CHECK")
 
 triggers:
-    - when: "arming_check == 0"
-      severity: warning
-      threshold: 0
+  - when: "arming_check == 0"
+    severity: warning
+    suggestion: "ARMING_CHECK=0 会关掉所有预解锁检查：坏传感器、未校准、无 GPS 都不再阻止解锁，地面看一切正常、起飞后才暴露。除非在台架上调试，否则把该开的位重新打开。"
+    description: 预解锁检查被整体禁用（ARMING_CHECK=0）
+    evidence:
+      source: ARMING_CHECK(=0)
       value: arming_check
+      threshold: 0
       unit: ""
-      field: "ARMING_CHECK(=0)"
-      title: "预解锁检查被整体禁用（ARMING_CHECK=0）"
-      suggestion: "ARMING_CHECK=0 会关掉所有预解锁检查：坏传感器、未校准、无 GPS 都不再阻止解锁，地面看一切正常、起飞后才暴露。除非在台架上调试，否则把该开的位重新打开。"
+tag: apm_config_arming_check_disabled
 
 ---
 id: apm-config-batt-monitor
@@ -44,24 +43,23 @@ group: config_safety
 order: 2
 
 conditions:
-    topics:
-        - PARM
+  message:
+    - PARM
 
 compute:
-    - batt_monitor = param("BATT_MONITOR")
-
-outputs:
-    tag: apm_config_no_battery_monitor
+  - batt_monitor = param("BATT_MONITOR")
 
 triggers:
-    - when: "batt_monitor == 0"
-      severity: info
-      threshold: 0
+  - when: "batt_monitor == 0"
+    severity: info
+    suggestion: "BATT_MONITOR=0 意味着没有电压电流采样：低电压/低电量失效保护无从谈起，报告里的电量曲线也是空的。接上电流计或启用模拟电压采样后再飞。"
+    description: 未配置电池监控（BATT_MONITOR=0）
+    evidence:
+      source: BATT_MONITOR(=0)
       value: batt_monitor
+      threshold: 0
       unit: ""
-      field: "BATT_MONITOR(=0)"
-      title: "未配置电池监控（BATT_MONITOR=0）"
-      suggestion: "BATT_MONITOR=0 意味着没有电压电流采样：低电压/低电量失效保护无从谈起，报告里的电量曲线也是空的。接上电流计或启用模拟电压采样后再飞。"
+tag: apm_config_no_battery_monitor
 
 ---
 # FS_THR_ENABLE 是 Copter/Heli 的参数，Plane 对应的是 THR_FAILSAFE。
@@ -73,21 +71,20 @@ group: config_safety
 order: 3
 
 conditions:
-    topics:
-        - PARM
+  message:
+    - PARM
 
 compute:
-    - fs_thr_enable = param("FS_THR_ENABLE")
-
-outputs:
-    tag: apm_config_thr_failsafe_disabled
+  - fs_thr_enable = param("FS_THR_ENABLE")
 
 triggers:
-    - when: "fs_thr_enable == 0"
-      severity: info
-      threshold: 0
+  - when: "fs_thr_enable == 0"
+    severity: info
+    suggestion: "FS_THR_ENABLE=0（Copter/Heli；Plane 对应 THR_FAILSAFE）会让飞控在遥控失联时不动作——不返航、不降落，直到电量耗尽。设成 1（RTL）或 2（降落）再飞。"
+    description: 油门失效保护被禁用（FS_THR_ENABLE=0）
+    evidence:
+      source: FS_THR_ENABLE(=0)
       value: fs_thr_enable
+      threshold: 0
       unit: ""
-      field: "FS_THR_ENABLE(=0)"
-      title: "油门失效保护被禁用（FS_THR_ENABLE=0）"
-      suggestion: "FS_THR_ENABLE=0（Copter/Heli；Plane 对应 THR_FAILSAFE）会让飞控在遥控失联时不动作——不返航、不降落，直到电量耗尽。设成 1（RTL）或 2（降落）再飞。"
+tag: apm_config_thr_failsafe_disabled

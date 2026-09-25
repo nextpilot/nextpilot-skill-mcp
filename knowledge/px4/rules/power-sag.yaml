@@ -8,30 +8,31 @@ group: battery
 order: 2
 
 conditions:
-    topics:
-        - battery_status
+  message:
+    - battery_status
 
 compute:
-    # 每个时刻各电芯最低电压（0 是未接占位 → NaN）。**只看第 0 块电池**（见 power-cell-voltage）
-    - >-
-        cell_min_t = rows_aggregate(ref("battery_status[0].voltage_cell_v"), agg="min", gt=0)
-    # 第一个 armed 区间、跳过前 5s；段长 <=20 或数据不足时算子返回 None（不默认段）
-    - >-
-        drop, tail = head_tail_median_drop(cell_min_t, ref("battery_status[0].timestamp"),
-        ARMED_INTERVALS, skip_first_s=5, min_seg=20)
+  # 每个时刻各电芯最低电压（0 是未接占位 → NaN）。**只看第 0 块电池**（见 power-cell-voltage）
+  - >-
+    cell_min_t = rows_aggregate(battery_status.voltage_cell_v, agg="min", gt=0)
+  # 第一个 armed 区间、跳过前 5s；段长 <=20 或数据不足时算子返回 None（不默认段）
+  - >-
+    drop, tail = head_tail_median_drop(cell_min_t, battery_status.timestamp, ARMED_INTERVALS, skip_first_s=5, min_seg=20)
 
 outputs:
-    tag: battery_voltage_drop
-    stats:
-        batteryCellSagFlight: { var: drop, round: 3 }
+  - name: batteryCellSagFlight
+    value: drop
+    round: 3
 
 # 阈值 [暂定]：drop >= 0.30 V 且尾段中位已低于单电芯告警线 3.70 V
 triggers:
-    - when: "drop >= 0.30 and tail < 3.70"
-      severity: warning
-      threshold: 0.30
+  - when: "drop >= 0.30 and tail < 3.70"
+    severity: warning
+    suggestion: "持续压降区别于大机动瞬时压降：排查电芯老化内阻、插头虚接、线缆线径与负载匹配。"
+    description: 飞行中单电芯持续压降 {drop:.2f} V（尾段中位 {tail:.2f} V）
+    evidence:
+      source: battery_status.voltage_cell_v[] armed 段趋势
       value: f"{drop:.3f}"
+      threshold: 0.3
       unit: V
-      field: "battery_status.voltage_cell_v[] armed 段趋势"
-      title: "飞行中单电芯持续压降 {drop:.2f} V（尾段中位 {tail:.2f} V）"
-      suggestion: "持续压降区别于大机动瞬时压降：排查电芯老化内阻、插头虚接、线缆线径与负载匹配。"
+tag: battery_voltage_drop

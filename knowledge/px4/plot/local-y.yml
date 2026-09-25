@@ -1,9 +1,9 @@
-id: local-y
+﻿id: local-y
 title: Local Position Y
 description: 局部位置 Y 轴估计值与 setpoint。
 order: 10
 conditions:
-  topics: [vehicle_local_position]
+  message: [vehicle_local_position]
 outputs:
   - container: axes
     title: Local Position Y

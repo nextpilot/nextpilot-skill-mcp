@@ -9,39 +9,35 @@ name: CPU 负载
 
 # ── 适用范围：不限就整个省掉；依赖的 topic 缺了记一条 skipped，不误报 ──
 conditions:
-    topics:
-        - cpuload
+  message:
+    - cpuload
 
 # ── 计算：算子节点数据流（输出命名进环境，供表达式引用）──
 compute:
-    # 实测里 cpuload 通常只有一个实例，默认合并后统计（与原 max over instances 等价）
-    - cpu_max = max(cpuload.load)
+  # 实测里 cpuload 通常只有一个实例，默认合并后统计（与原 max over instances 等价）
+  - cpu_max = max(cpuload.load)
 
 # ── 输出：溯源与副作用 ──
 outputs:
-    # ⚠️ 26 条规则里唯一一条 check ≠ group，是刻意的，不是笔误 —— 不要"顺手统一"。
-    #   `group: cpu` 是**执行槽位**（facts.yaml 的 group_order，决定 finding 的 F01/F02 顺序）；
-    #   `check` 是**报告名**（checksRun / checksSkipped），两者本就是两回事，多数规则恰好同名而已。
-    #   `cpu_load` 是历史名，tools/testdata/baseline/ 下 6 份冻结基线的 checksRun 全都冻着它。
-    #   改成 `cpu` 会让 compare_baseline.py 在 6 条日志上全红；而这门校验要真实 .ulg、
-    #   在 CI 里是 SKIP 的 —— 云端抓不到，只有本机 pre-push 兜得住。
-    check: cpu_load # checksRun / checksSkipped 里的名字
-    stats:
-        cpuLoadMax: { var: cpu_max, round: 3 } # 写入 stats 的键
+  - name: cpuLoadMax
+    value: cpu_max
+    round: 3
 
 # ── 触发：自上而下，命中第一条 ──
 triggers:
-    - when: "cpu_max >= 0.95"
-      severity: critical
-      threshold: 0.95 # 写进 evidence.threshold（显式声明，不从表达式猜）
+  - when: "cpu_max >= 0.95"
+    severity: critical
+    suggestion: "CPU 长期接近满载会导致控制环丢步；检查高耗率模块与日志流配置。"
+    description: CPU 负载峰值 {cpu_max:.0%} 超阈值
+    evidence:
+      source: cpuload.load(max)
       value: f"{cpu_max:.3f}"
-      field: "cpuload.load(max)"
-      title: "CPU 负载峰值 {cpu_max:.0%} 超阈值"
-      suggestion: "CPU 长期接近满载会导致控制环丢步；检查高耗率模块与日志流配置。"
-    - when: "cpu_max >= 0.90"
-      severity: warning
-      threshold: 0.90
+      threshold: 0.95
+  - when: "cpu_max >= 0.90"
+    severity: warning
+    suggestion: "关注 CPU 余量，必要时降低消息发布率。"
+    description: CPU 负载峰值 {cpu_max:.0%} 偏高
+    evidence:
+      source: cpuload.load(max)
       value: f"{cpu_max:.3f}"
-      field: "cpuload.load(max)"
-      title: "CPU 负载峰值 {cpu_max:.0%} 偏高"
-      suggestion: "关注 CPU 余量，必要时降低消息发布率。"
+      threshold: 0.9

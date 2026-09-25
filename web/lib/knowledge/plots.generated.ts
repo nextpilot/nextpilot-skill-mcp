@@ -10,7 +10,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_local_position"
           ],
@@ -89,7 +89,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_gps_position",
             "sensor_gps"
@@ -156,7 +156,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_attitude"
           ]
@@ -211,7 +211,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_attitude"
           ]
@@ -295,7 +295,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_attitude"
           ]
@@ -361,7 +361,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_attitude"
           ]
@@ -445,7 +445,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_attitude"
           ]
@@ -528,7 +528,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_attitude"
           ]
@@ -612,7 +612,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_local_position"
           ]
@@ -678,7 +678,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_local_position"
           ]
@@ -744,7 +744,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_local_position"
           ]
@@ -810,7 +810,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_local_position"
           ]
@@ -904,7 +904,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_visual_odometry"
           ]
@@ -967,7 +967,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_visual_odometry"
           ]
@@ -1030,7 +1030,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_visual_odometry"
           ]
@@ -1093,7 +1093,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_visual_odometry"
           ]
@@ -1156,7 +1156,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_visual_odometry"
           ]
@@ -1205,7 +1205,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "airspeed",
             "airspeed_validated",
@@ -1282,7 +1282,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "tecs_status"
           ]
@@ -1338,7 +1338,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "manual_control_setpoint"
           ]
@@ -1448,7 +1448,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_torque_setpoint",
             "actuator_controls_0"
@@ -1515,7 +1515,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_torque_setpoint",
             "actuator_controls_1"
@@ -1599,7 +1599,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "actuator_motors",
             "actuator_servos",
@@ -1942,7 +1942,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "sensor_combined"
           ]
@@ -2005,7 +2005,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_imu_status"
           ]
@@ -2086,7 +2086,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "sensor_combined"
           ]
@@ -2149,7 +2149,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "sensor_accel_fifo"
           ]
@@ -2212,7 +2212,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "sensor_gyro_fifo"
           ]
@@ -2275,7 +2275,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_magnetometer",
             "sensor_combined"
@@ -2342,7 +2342,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "distance_sensor"
           ]
@@ -2422,7 +2422,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_gps_position",
             "sensor_gps"
@@ -2521,7 +2521,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_gps_position",
             "sensor_gps"
@@ -2580,7 +2580,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_magnetometer",
             "sensor_combined"
@@ -2647,7 +2647,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "battery_status"
           ]
@@ -2765,7 +2765,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "sensor_baro"
           ]
@@ -2855,7 +2855,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "estimator_status"
           ]
@@ -2977,7 +2977,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "vehicle_status"
           ]
@@ -3190,7 +3190,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "cpuload"
           ]
@@ -3246,7 +3246,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "sensor_combined"
           ]
@@ -3295,7 +3295,7 @@ export const PLOT_PRESETS = {
       "conditions": {
         "firmware": "any",
         "vehicle": "any",
-        "topics": [
+        "message": [
           [
             "sensor_gps",
             "vehicle_gps_position"

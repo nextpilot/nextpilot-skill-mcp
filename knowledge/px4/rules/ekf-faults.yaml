@@ -8,34 +8,33 @@ group: ekf_faults
 order: 1
 
 conditions:
-    topics:
-        - estimator_status
+  message:
+    - estimator_status
 
 compute:
-    # 位掩码跨实例合并置位；缺失按 0 处理（与原实现一致）
-    - >-
-        fault_raw = _try(bit_or_max(
-        ref("estimator_status[:].filter_fault_flags")))
-    - fault_union = _try(coalesce(fault_raw, 0))
-    - crit_bits = _try(has_bits(fault_union, 63))
-
-outputs:
-    tag: ekf_innovation_failure
+  # 位掩码跨实例合并置位；缺失按 0 处理（与原实现一致）
+  - >-
+    fault_raw = _try(bit_or_max( estimator_status[:].filter_fault_flags))
+  - fault_union = _try(coalesce(fault_raw, 0))
+  - crit_bits = _try(has_bits(fault_union, 63))
 
 triggers:
-    - when: "crit_bits"
-      severity: critical
-      threshold: 0
+  - when: "crit_bits"
+    severity: critical
+    suggestion: "估计器出现硬故障，建议停飞排查传感器与振动后重新标定。"
+    description: EKF 报告核心融合硬故障（filter_fault_flags={fault_union}）
+    evidence:
+      source: estimator_status.filter_fault_flags
       value: f"fault={fault_union}"
-      field: "estimator_status.filter_fault_flags"
-      title: "EKF 报告核心融合硬故障（filter_fault_flags={fault_union}）"
-      suggestion: "估计器出现硬故障，建议停飞排查传感器与振动后重新标定。"
-    # 仅非核心位（如未启用视觉）且无核心故障：给 info 提示，不当作故障
-    - when: "fault_union > 0 and not crit_bits"
-      severity: info
-      tag: null
       threshold: 0
+  # 仅非核心位（如未启用视觉）且无核心故障：给 info 提示，不当作故障
+  - when: "fault_union > 0 and not crit_bits"
+    severity: info
+    suggestion: "若该机确实未启用视觉/光流定位，此位可忽略；否则检查对应传感器。"
+    description: EKF 报告非核心辅助传感器融合拒绝（filter_fault_flags={fault_union}，常见为未使用视觉/光流）
+    evidence:
+      source: estimator_status.filter_fault_flags
       value: fault_union
-      field: "estimator_status.filter_fault_flags"
-      title: "EKF 报告非核心辅助传感器融合拒绝（filter_fault_flags={fault_union}，常见为未使用视觉/光流）"
-      suggestion: "若该机确实未启用视觉/光流定位，此位可忽略；否则检查对应传感器。"
+      threshold: 0
+    label: null
+tag: ekf_innovation_failure

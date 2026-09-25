@@ -7,24 +7,24 @@ group: mode_thrash
 order: 1
 
 conditions:
-    topics:
-        - vehicle_status
+  message:
+    - vehicle_status
 
 compute:
-    - n_changes_raw = edges_count(vehicle_status.nav_state)
-    - n_changes = to_int(n_changes_raw)
+  - n_changes = edges_count(vehicle_status.nav_state)
 
 outputs:
-    stats:
-        navStateChanges: { var: n_changes }
+  - name: navStateChanges
+    value: n_changes
 
 triggers:
-    - when: "n_changes > 12"
-      severity: warning
-      tag: null
-      threshold: 12
+  - when: "n_changes > 12"
+    severity: warning
+    suggestion: "频繁切模式易诱发操纵混乱；检查遥控器开关与失效保护反复触发。"
+    description: 飞行模式切换 {n_changes} 次（>12），可能存在模式抖动
+    evidence:
+      source: vehicle_status.nav_state 变化次数
       value: n_changes
+      threshold: 12
       unit: 次
-      field: "vehicle_status.nav_state 变化次数"
-      title: "飞行模式切换 {n_changes} 次（>12），可能存在模式抖动"
-      suggestion: "频繁切模式易诱发操纵混乱；检查遥控器开关与失效保护反复触发。"
+    label: null

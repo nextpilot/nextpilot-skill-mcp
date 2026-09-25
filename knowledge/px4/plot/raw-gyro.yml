@@ -1,9 +1,9 @@
-id: raw-gyro
+﻿id: raw-gyro
 title: Raw Angular Speed (Gyroscope)
 description: 传感器原始角速度（sensor_combined.gyro_rad）。
 order: 27
 conditions:
-  topics: [sensor_combined]
+  message: [sensor_combined]
 outputs:
   - container: axes
     title: Raw Angular Speed (Gyroscope)

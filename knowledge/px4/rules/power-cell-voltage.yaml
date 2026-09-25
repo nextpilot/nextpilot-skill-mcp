@@ -9,65 +9,70 @@ order: 1 # battery group 内次序：cell-voltage=1, sag=2, remaining=3
 version: 1.1.0
 
 conditions:
-    topics:
-        - battery_status
+  message:
+    - battery_status
 
 compute:
-    # 总压最小值 / 实测单芯最低值 / 回退值 / 芯数 / 两条分支标志 —— 一个算子一次算齐。
-    # **只看第 0 块电池**：不写下标也是第 0 个，但这里写明——"跨电池取最差"是另一件事，
-    # 要显式写 `[:]` 交给会分组的算子，别让人以为漏了；
-    # 要跨电池取最差得让算子吃 `[−1]` 的分组输入（见 CLAUDE.md 的已知缺口）。
-    - >-
-        vmin, cell_min, cells, have_measured, have_fallback, no_cell = _try(cell_voltage_min(
-        ref("battery_status[0].voltage_cell_v"),
-        ref("battery_status[0].voltage_v"),
-        ref("battery_status[0].voltage_filtered_v"),
-        ref("battery_status[0].cell_count")))
+  # 总压最小值 / 实测单芯最低值 / 回退值 / 芯数 / 两条分支标志 —— 一个算子一次算齐。
+  # **只看第 0 块电池**：不写下标也是第 0 个，但这里写明——"跨电池取最差"是另一件事，
+  # 要显式写 `[:]` 交给会分组的算子，别让人以为漏了；
+  # 要跨电池取最差得让算子吃 `[−1]` 的分组输入（见 CLAUDE.md 的已知缺口）。
+  - >-
+    vmin, cell_min, cells, have_measured, have_fallback, no_cell = _try(cell_voltage_min( battery_status.voltage_cell_v, battery_status.voltage_v, battery_status.voltage_filtered_v, battery_status.cell_count))
 
 outputs:
-    tag: battery_voltage_drop
-    stats:
-        batteryVoltageMin: { var: vmin, round: 2 }
-        batteryCellCount: { var: cells } # 只在回退路径有值（与迁移前一致）
-        batteryCellVoltageMin: { var: cell_min, round: 3 }
+  - name: batteryVoltageMin
+    value: vmin
+    round: 2
+  - name: batteryCellCount
+    value: cells
+  - name: batteryCellVoltageMin
+    value: cell_min
+    round: 3
 
 # 阈值 [暂定]：单电芯最低电压 V（crit 3.55 / warn 3.70）
 triggers:
-    - when: "have_measured and cell_min < 3.55"
-      severity: critical
+  - when: "have_measured and cell_min < 3.55"
+    severity: critical
+    suggestion: "存在过放风险，检查电池老化、放电倍率匹配与低压告警阈值。"
+    description: 电芯电压严重过低
+    evidence:
+      source: battery_status.voltage_cell_v[](实测最小值)
+      value: f"{cell_min:.3f}"
       threshold: 3.55
-      value: f"{cell_min:.3f}"
       unit: V/cell
-      field: "battery_status.voltage_cell_v[](实测最小值)"
-      title: "电芯电压严重过低"
-      suggestion: "存在过放风险，检查电池老化、放电倍率匹配与低压告警阈值。"
-    - when: "have_fallback and not have_measured and cell_min < 3.55"
-      severity: critical
+  - when: "have_fallback and not have_measured and cell_min < 3.55"
+    severity: critical
+    suggestion: "存在过放风险，检查电池老化、放电倍率匹配与低压告警阈值。"
+    description: 电芯电压严重过低
+    evidence:
+      source: battery_status.voltage_v(min)/cell_count
+      value: f"{cell_min:.3f}"
       threshold: 3.55
-      value: f"{cell_min:.3f}"
       unit: V/cell
-      field: "battery_status.voltage_v(min)/cell_count"
-      title: "电芯电压严重过低"
-      suggestion: "存在过放风险，检查电池老化、放电倍率匹配与低压告警阈值。"
-    - when: "have_measured and cell_min < 3.70"
-      severity: warning
-      threshold: 3.70
+  - when: "have_measured and cell_min < 3.70"
+    severity: warning
+    suggestion: "建议核对剩余容量估计与返航电压裕度。"
+    description: 电芯电压偏低
+    evidence:
+      source: battery_status.voltage_cell_v[](实测最小值)
       value: f"{cell_min:.3f}"
+      threshold: 3.7
       unit: V/cell
-      field: "battery_status.voltage_cell_v[](实测最小值)"
-      title: "电芯电压偏低"
-      suggestion: "建议核对剩余容量估计与返航电压裕度。"
-    - when: "have_fallback and not have_measured and cell_min < 3.70"
-      severity: warning
-      threshold: 3.70
+  - when: "have_fallback and not have_measured and cell_min < 3.70"
+    severity: warning
+    suggestion: "建议核对剩余容量估计与返航电压裕度。"
+    description: 电芯电压偏低
+    evidence:
+      source: battery_status.voltage_v(min)/cell_count
       value: f"{cell_min:.3f}"
+      threshold: 3.7
       unit: V/cell
-      field: "battery_status.voltage_v(min)/cell_count"
-      title: "电芯电压偏低"
-      suggestion: "建议核对剩余容量估计与返航电压裕度。"
-    - when: "no_cell"
-      severity: info
-      tag: null # 信息提示不进故障标签
+  - when: "no_cell"
+    severity: info
+    description: 日志缺少电芯电压与 cell_count，未做单电芯判断
+    evidence:
+      source: battery_status.voltage_cell_v / cell_count
       value: f"missing"
-      field: "battery_status.voltage_cell_v / cell_count"
-      title: "日志缺少电芯电压与 cell_count，未做单电芯判断"
+    label: null
+tag: battery_voltage_drop

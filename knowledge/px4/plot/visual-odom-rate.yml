@@ -1,9 +1,9 @@
-id: visual-odom-rate
+﻿id: visual-odom-rate
 title: Visual Odometry Attitude Rate
 description: 视觉里程计角速率（仅当 topic 存在时显示）。
 order: 16
 conditions:
-  topics: [vehicle_visual_odometry]
+  message: [vehicle_visual_odometry]
 outputs:
   - container: axes
     title: Visual Odometry Attitude Rate

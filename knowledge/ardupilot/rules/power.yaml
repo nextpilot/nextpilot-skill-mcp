@@ -16,83 +16,77 @@ group: battery
 order: 1
 
 conditions:
-    topics:
-        - "BAT || CURR"
+  message:
+    - "BAT || CURR"
 
 compute:
-    - volts = ref("BAT.Volt", "CURR.Volt")
-    - vmin = min(volts)
-    - vmax = max(volts)
-    # 上游 meta.estimate_cells：cells = round(vmax / 4.2)（LiPo 满电 4.2 V/节），
-    # 再要求折算每节电压落在 3.3~4.4 V，否则认定"没有电池监控 / 量纲异常"、不给结论。
-    # 引擎没有 round 算子：+0.5 后截断即 round half up（与 Python round 的
-    # banker's rounding 只在恰好 .5 处可能差 1，无实质影响）。
-    # vmax 的量程闸门（4~70 V）也在这里一并卡掉，所以 trigger 里不必再判。
-    - cells_raw = to_int(add(div(vmax, 4.2), 0.5))
-    - per_cell = div(vmax, cells_raw)
-    - >-
-        cells = value_if(both(gt(vmax, 4.0), both(gt(70.0, vmax),
-        both(gt(per_cell, 3.3), gt(4.4, per_cell)))), cells_raw)
-    # 上游的 per-cell 阈值：LiPo 约 3.5 V/节告警、3.3 V/节临界
-    # `factor=` 必须写名字：它是**命名选项**不是位置输入（scale 只收 1 个输入），
-    # 写成位置参数构建期就会报错——这正是"构建期校验"在替运行期挡错。
-    - crit_v = scale(cells, factor=3.3)
-    - low_v = scale(cells, factor=3.5)
-
-outputs:
-    tag: apm_battery_low_voltage
+  - volts = ref("BAT.Volt", "CURR.Volt")
+  - vmin = min(volts)
+  - vmax = max(volts)
+  # 上游 meta.estimate_cells：cells = round(vmax / 4.2)（LiPo 满电 4.2 V/节），
+  # 再要求折算每节电压落在 3.3~4.4 V，否则认定"没有电池监控 / 量纲异常"、不给结论。
+  # 引擎没有 round 算子：+0.5 后 int 即 round half up（与 Python round 的
+  # banker's rounding 只在恰好 .5 处可能差 1，无实质影响）。
+  - cells_raw = int(vmax / 4.2 + 0.5)
+  - per_cell = vmax / cells_raw
+  - cells = cells_raw if (vmax > 4.0 and 70.0 > vmax and per_cell > 3.3 and 4.4 > per_cell) else None
+  # 上游的 per-cell 阈值：LiPo 约 3.5 V/节告警、3.3 V/节临界
+  - crit_v = cells * 3.3
+  - low_v = cells * 3.5
 
 triggers:
-    # 闸门已在 cells 里（峰值电压不在 4~70 V、或折算每节电压不在 3.3~4.4 V 时 cells 为 None，
-    # crit_v / low_v 随之缺失、比较抛错被视作未命中）；这里再写一次是给读数的人看的。
-    - when: "vmin <= crit_v and vmax <= 70.0"
-      severity: critical
+  # 闸门已在 cells 里（峰值电压不在 4~70 V、或折算每节电压不在 3.3~4.4 V 时 cells 为 None，
+  # crit_v / low_v 随之缺失、比较抛错被视作未命中）；这里再写一次是给读数的人看的。
+  - when: "vmin <= crit_v and vmax <= 70.0"
+    severity: critical
+    suggestion: "已到临界电压动作点（估算 {cells:.0f}S × 3.3 V = {crit_v:.2f} V）。应就地降落/回收，继续飞有空中断电风险。"
+    description: 电池电压触及临界线，最低 {vmin:.2f} V
+    evidence:
+      source: BAT/CURR.Volt(最低)
+      value: f"{vmin:.2f}"
       threshold: 3.3
-      value: f"{vmin:.2f}"
       unit: V
-      field: "BAT/CURR.Volt(最低)"
-      title: "电池电压触及临界线，最低 {vmin:.2f} V"
-      suggestion: "已到临界电压动作点（估算 {cells:.0f}S × 3.3 V = {crit_v:.2f} V）。应就地降落/回收，继续飞有空中断电风险。"
-    - when: "vmin <= low_v and vmax <= 70.0"
-      severity: warning
+  - when: "vmin <= low_v and vmax <= 70.0"
+    severity: warning
+    suggestion: "已到低电压告警点（估算 {cells:.0f}S × 3.5 V = {low_v:.2f} V）。缩短航时或更早返航，并核对电池健康度。"
+    description: 电池电压触及低电压告警线，最低 {vmin:.2f} V
+    evidence:
+      source: BAT/CURR.Volt(最低)
+      value: f"{vmin:.2f}"
       threshold: 3.5
-      value: f"{vmin:.2f}"
       unit: V
-      field: "BAT/CURR.Volt(最低)"
-      title: "电池电压触及低电压告警线，最低 {vmin:.2f} V"
-      suggestion: "已到低电压告警点（估算 {cells:.0f}S × 3.5 V = {low_v:.2f} V）。缩短航时或更早返航，并核对电池健康度。"
+tag: apm_battery_low_voltage
 
 ---
 # 负载压降：只在高电流（>=20 A）的样本里看电压跨度。
-# 上游用 max-min；引擎没有标量减法算子，但 range_of 就是极差，等价。
+# 上游用 max-min；np.ptp 就是极差，等价。
 id: apm-battery-sag
 name: 电池负载压降
 group: battery
 order: 2
 
 conditions:
-    topics:
-        - "BAT || CURR"
+  message:
+    - "BAT || CURR"
 
 compute:
-    - volts = ref("BAT.Volt", "CURR.Volt")
-    - curr = ref("BAT.Curr", "CURR.Curr")
-    - peak_curr = max(curr)
-    # 只保留电流 >= 20 A 的时刻（greater 是严格大于，与该阈值差一个等号，无实质影响）
-    - sag = range_of(apply_mask(volts, greater(curr, 20.0)))
-
-outputs:
-    tag: apm_battery_sag
+  - volts = ref("BAT.Volt", "CURR.Volt")
+  - curr = ref("BAT.Curr", "CURR.Curr")
+  - peak_curr = max(curr)
+  # 只保留电流 >= 20 A 的时刻
+  - sag = np.ptp(volts[curr > 20.0])
 
 triggers:
-    - when: "sag >= 1.0"
-      severity: info
-      threshold: 1.0
+  - when: "sag >= 1.0"
+    severity: info
+    suggestion: "带载压降一部分是正常的，但跨度偏大通常意味着电池老化、内阻升高，值得关注。"
+    description: 大电流下压降 {sag:.2f} V（峰值电流 {peak_curr:.1f} A）
+    evidence:
+      source: BAT/CURR.Volt(>=20A 段极差)
       value: f"{sag:.2f}"
+      threshold: 1
       unit: V
-      field: "BAT/CURR.Volt(>=20A 段极差)"
-      title: "大电流下压降 {sag:.2f} V（峰值电流 {peak_curr:.1f} A）"
-      suggestion: "带载压降一部分是正常的，但跨度偏大通常意味着电池老化、内阻升高，值得关注。"
+tag: apm_battery_sag
 
 ---
 # 突发跌落：上游 DROP_WARN_V=2.0 / DROP_CRIT_V=4.0 / DROP_MAX_DT_S=0.5，
@@ -104,35 +98,35 @@ group: battery
 order: 3
 
 conditions:
-    topics:
-        - "BAT || CURR"
+  message:
+    - "BAT || CURR"
 
 compute:
-    - volts = ref("BAT.Volt", "CURR.Volt")
-    - vts = ref("BAT.timestamp", "CURR.timestamp")
-    # 上游的量程闸门：电压中位数不在 4~70 V 之间说明没有电池监控或量纲异常，整条不分析
-    - vmed = median(volts)
-    - drops = value_if(both(gt(vmed, 4.0), gt(70.0, vmed)), step_drop_events(volts, vts, T0_US))
+  - volts = ref("BAT.Volt", "CURR.Volt")
+  - vts = ref("BAT.timestamp", "CURR.timestamp")
+  # 上游的量程闸门：电压中位数不在 4~70 V 之间说明没有电池监控或量纲异常，整条不分析
+  - vmed = median(volts)
+  - drops = step_drop_events(volts, vts, T0_US) if (vmed > 4.0 and 70.0 > vmed) else None
 
-foreach: { var: drops, keys: [drop, dt_s, start_s, end_s, recovered] }
-
-outputs:
-    tag: apm_battery_sudden_drop
+foreach: { var: drops, keys: [ drop, dt_s, start_s, end_s, recovered ] }
 
 triggers:
-    - when: "not recovered and drop > 4.0"
-      severity: critical
-      threshold: 4.0
+  - when: "not recovered and drop > 4.0"
+    severity: critical
+    suggestion: "跌完没有回升，指向电池插头虚接、单节失效或瞬时掉电。检查电池插头与线缆、电池健康度；掉电会复位外设甚至飞控。"
+    description: 电池电压在 {dt_s:.3f} s 内跌落 {drop:.2f} V（t={start_s:.2f}s）
+    evidence:
+      source: BAT/CURR.Volt(快速跌落)
       value: f"{drop:.2f}"
+      threshold: 4
       unit: V
-      field: "BAT/CURR.Volt(快速跌落)"
-      title: "电池电压在 {dt_s:.3f} s 内跌落 {drop:.2f} V（t={start_s:.2f}s）"
-      suggestion: "跌完没有回升，指向电池插头虚接、单节失效或瞬时掉电。检查电池插头与线缆、电池健康度；掉电会复位外设甚至飞控。"
-    - when: "not recovered"
-      severity: warning
-      threshold: 2.0
+  - when: "not recovered"
+    severity: warning
+    suggestion: "这么快的跌落不是正常放电（正常放电不会一步掉这么多），指向插头虚接、单节失效或瞬时掉电。检查电池插头与线缆、电池健康度。"
+    description: 电池电压在 {dt_s:.3f} s 内跌落 {drop:.2f} V（t={start_s:.2f}s）
+    evidence:
+      source: BAT/CURR.Volt(快速跌落)
       value: f"{drop:.2f}"
+      threshold: 2
       unit: V
-      field: "BAT/CURR.Volt(快速跌落)"
-      title: "电池电压在 {dt_s:.3f} s 内跌落 {drop:.2f} V（t={start_s:.2f}s）"
-      suggestion: "这么快的跌落不是正常放电（正常放电不会一步掉这么多），指向插头虚接、单节失效或瞬时掉电。检查电池插头与线缆、电池健康度。"
+tag: apm_battery_sudden_drop

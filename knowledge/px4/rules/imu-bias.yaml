@@ -12,62 +12,64 @@ version: 1.1.0
 
 # 没有 armed 段就谈不上"飞行中的零偏"——先决条件直接不跑（原实现外层是 `if armed_intervals:`）。
 conditions:
-    armed: true
+  armed: true
 
 compute:
-    # 取源：**谁有数据用谁**——直读零偏列（更直接）优先，没有就退回状态槽 [10..12]。
-    # 按存在性挑，不按版本号挑：升级换代就是老名字没了、新名字在。
-    # 主数据缺失返回 None；sources 是 evidence.field 里那句"这条结论读的是哪儿"（文案留在经验里）。
-    - >-
-        bx, by, bz, bts, src_text = _try(gyro_bias_series(
-        ref("estimator_sensor_bias[0].gyro_bias"),
-        ref("estimator_sensor_bias[0].timestamp"),
-        ref("estimator_states[0].states"),
-        ref("estimator_states[0].timestamp"),
-        ref("estimator_status[0].states"),
-        ref("estimator_status[0].timestamp"), slot=10,
-        sources=["estimator_sensor_bias.gyro_bias[]",
-                 "estimator_states.states[10..12]",
-                 "estimator_status.states[10..12]"]))
-    # armed 段内逐轴 |最大零偏| 与漂移，各取最差轴。**不包 _try**：整份日志都没有零偏数据时
-    # 算子返回 None，解包即抛异常 → 本条就此中止（不写 stats、不发 finding）。
-    # （"没有 armed 段"那半由上面的 `armed: true` 拦下，不必再依赖异常。）
-    - >-
-        worst_abs, worst_axis, worst_drift, drift_axis = gyro_bias_worst(
-        bx, by, bz, bts, ARMED_INTERVALS, labels=["X", "Y", "Z"], min_count=10)
-    # 温度跨度：两个来源取较大者（样本 < 2 的来源忽略）
-    - >-
-        temp_range = _try(max_temp_range(ref("vehicle_imu_status[0].temperature_gyro"),
-        ref("vehicle_air_data[0].ambient_temperature")))
-    - bias_stat = _try(larger(worst_abs, worst_drift))
+  # 取源：**谁有数据用谁**——直读零偏列（更直接）优先，没有就退回状态槽 [10..12]。
+  # 按存在性挑，不按版本号挑：升级换代就是老名字没了、新名字在。
+  # 主数据缺失返回 None；sources 是 evidence.field 里那句"这条结论读的是哪儿"（文案留在经验里）。
+  - >-
+    bx, by, bz, bts, src_text = _try(gyro_bias_series( estimator_sensor_bias.gyro_bias, estimator_sensor_bias.timestamp, estimator_states.states, estimator_states.timestamp, estimator_status.states, estimator_status.timestamp, slot=10, sources=["estimator_sensor_bias.gyro_bias[]",
+             "estimator_states.states[10..12]",
+             "estimator_status.states[10..12]"]))
+  # armed 段内逐轴 |最大零偏| 与漂移，各取最差轴。**不包 _try**：整份日志都没有零偏数据时
+  # 算子返回 None，解包即抛异常 → 本条就此中止（不写 stats、不发 finding）。
+  # （"没有 armed 段"那半由上面的 `armed: true` 拦下，不必再依赖异常。）
+  - >-
+    worst_abs, worst_axis, worst_drift, drift_axis = gyro_bias_worst( bx, by, bz, bts, ARMED_INTERVALS, labels=["X", "Y", "Z"], min_count=10)
+  # 温度跨度：两个来源取较大者（样本 < 2 的来源忽略）
+  - >-
+    temp_range = _try(max_temp_range(vehicle_imu_status.temperature_gyro, vehicle_air_data.ambient_temperature))
+  - bias_stat = _try(np.maximum(worst_abs, worst_drift))
 
 outputs:
-    tag: imu_bias_drift
-    stats:
-        gyroBiasMaxRadS: { var: worst_abs, round: 4 }
-        gyroBiasDriftRadS: { var: worst_drift, round: 4 }
-        gyroBiasSource: { var: src_text }
-        imuTempRangeC: { var: temp_range, round: 1 }
-    # 温度跨度大：作为背景信息打 guard 标签（与原过程式一致，不依赖是否发 finding）
-    guard_tags:
-        - { when: "temp_range >= 15", tag: temperature_change_large }
+  - name: gyroBiasMaxRadS
+    value: worst_abs
+    round: 4
+  - name: gyroBiasDriftRadS
+    value: worst_drift
+    round: 4
+  - name: gyroBiasSource
+    value: src_text
+  - name: imuTempRangeC
+    value: temp_range
+    round: 1
 
 triggers:
-    - when: "worst_abs >= 0.05 or worst_drift >= 0.05"
-      severity: critical
-      tag: imu_bias_drift
-      threshold: 0.02
+  - when: "worst_abs >= 0.05 or worst_drift >= 0.05"
+    severity: critical
+    suggestion: "结合故障库 F005：检查 IMU 安装紧固、执行陀螺/加计标定；若温度跨度大，优先按温度漂移解释。"
+    description: 陀螺零偏异常（轴 {worst_axis}：绝对值 {worst_abs:.4f} rad/s，漂移 {worst_drift:.4f} rad/s）
+    evidence:
+      source: "{src_text}"
       value: f"{bias_stat:.4f}"
-      unit: rad/s
-      field: "{src_text}"
-      title: "陀螺零偏异常（轴 {worst_axis}：绝对值 {worst_abs:.4f} rad/s，漂移 {worst_drift:.4f} rad/s）"
-      suggestion: "结合故障库 F005：检查 IMU 安装紧固、执行陀螺/加计标定；若温度跨度大，优先按温度漂移解释。"
-    - when: "worst_abs >= 0.02 or worst_drift >= 0.02"
-      severity: warning
-      tag: imu_bias_drift
       threshold: 0.02
-      value: f"{bias_stat:.4f}"
       unit: rad/s
-      field: "{src_text}"
-      title: "陀螺零偏异常（轴 {worst_axis}：绝对值 {worst_abs:.4f} rad/s，漂移 {worst_drift:.4f} rad/s）"
-      suggestion: "结合故障库 F005：检查 IMU 安装紧固、执行陀螺/加计标定；若温度跨度大，优先按温度漂移解释。"
+    label: imu_bias_drift
+  - when: "worst_abs >= 0.02 or worst_drift >= 0.02"
+    severity: warning
+    suggestion: "结合故障库 F005：检查 IMU 安装紧固、执行陀螺/加计标定；若温度跨度大，优先按温度漂移解释。"
+    description: 陀螺零偏异常（轴 {worst_axis}：绝对值 {worst_abs:.4f} rad/s，漂移 {worst_drift:.4f} rad/s）
+    evidence:
+      source: "{src_text}"
+      value: f"{bias_stat:.4f}"
+      threshold: 0.02
+      unit: rad/s
+    label: imu_bias_drift
+  - when: temp_range >= 15
+    severity: guard
+    label: temperature_change_large
+    description: "Data quality: temperature_change_large"
+    evidence:
+      source: ""
+tag: imu_bias_drift

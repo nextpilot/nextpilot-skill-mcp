@@ -2,10 +2,11 @@
   "log": "sample.ulg",
   "slug": "sample",
   "source": "本仓库自带（tools/testdata/logs/，未入库，需自备）",
-  "engine": "engine/rule_engine.py + engine/report_data.py",
+  "engine": "knowledge/engine/engine.py",
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
     "platform": "PX4",
+    "logType": "px4-ulog",
     "parserVersion": "pyulog/1.1.0",
     "facts": {
       "durationSec": 181.5,
@@ -19,7 +20,9 @@
       "dropoutTotalMs": 119,
       "hardware": "AUAV_X21",
       "verSw": "fd483321a5cf50ead91164356d15aa474643aa73",
-      "modes": ["Manual"],
+      "modes": [
+        "Manual"
+      ],
       "mainMode": "Manual",
       "airframeId": 10020
     },
@@ -27,7 +30,7 @@
       {
         "key": "cpuLoadMax",
         "label": "CPU 峰值",
-        "value": 0.833,
+        "value": 0.8331869840621948,
         "unit": "0..1"
       },
       {
@@ -38,44 +41,70 @@
       }
     ],
     "tags": [],
-    "guardTags": ["topic_missing:battery_status"],
-    "checksRun": ["ekf_faults", "cpu_load", "failsafe", "mode_thrash", "logged_messages"],
+    "guardTags": [
+      "topic_missing:battery_status"
+    ],
+    "checksRun": [
+      "px4-guard-short-log",
+      "px4-ekf-fault",
+      "px4-power-cell-voltage",
+      "px4-cpu-load",
+      "px4-gps-sats",
+      "px4-gps-jump",
+      "px4-failsafe-failsafe",
+      "px4-failsafe-rc_signal_lost",
+      "px4-failsafe-data_link_lost",
+      "px4-failsafe-engine_failure",
+      "px4-failsafe-mission_failure",
+      "px4-failsafe-nav",
+      "px4-mode-thrash",
+      "px4-vtol-transition-attitude",
+      "px4-log-errors",
+      "px4-log-warnings",
+      "px4-guard-restart",
+      "px4-guard-topic-missing",
+      "px4-guard-log-dropouts"
+    ],
     "checksSkipped": [
       {
-        "check": "vibration",
-        "reason": "vehicle_imu_status not in log"
-      },
-      {
-        "check": "ekf_innovations",
+        "ruleId": "px4-vibration",
         "reason": "数据不足，本条没算出结论"
       },
       {
-        "check": "battery",
-        "reason": "battery_status not in log"
+        "ruleId": "px4-imu-clipping",
+        "reason": "数据不足，本条没算出结论"
       },
       {
-        "check": "gps_health",
-        "reason": "vehicle_gps_position not in log"
+        "ruleId": "px4-ekf-innovation",
+        "reason": "数据不足，本条没算出结论"
       },
       {
-        "check": "motor_balance",
-        "reason": "actuator_motors not in log"
+        "ruleId": "px4-power-sag",
+        "reason": "数据不足，本条没算出结论"
       },
       {
-        "check": "imu_bias",
-        "reason": "先决条件命中：not HAS_ARMED"
+        "ruleId": "px4-power-remaining",
+        "reason": "数据不足，本条没算出结论"
       },
       {
-        "check": "airspeed",
+        "ruleId": "px4-gps-eph",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "px4-motor-unbalance",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "px4-imu-bias-drift",
+        "reason": "本条只在有解锁段时适用"
+      },
+      {
+        "ruleId": "px4-airspeed-invalid",
         "reason": "机架不适用 fixed_wing"
       },
       {
-        "check": "vtol_transition",
-        "reason": "vtol_vehicle_status not in log"
-      },
-      {
-        "check": "wind_estimate",
-        "reason": "estimator_wind / wind_estimate not in log"
+        "ruleId": "px4-wind-estimate",
+        "reason": "数据不足，本条没算出结论"
       }
     ],
     "matchedFaults": [],
@@ -84,34 +113,27 @@
         "id": "F01",
         "severity": "critical",
         "ruleId": "px4-log-errors",
-        "tag": null,
-        "title": "日志中出现 4 条 ERROR 及以上消息",
+        "label": null,
+        "description": "日志中出现 4 条 ERROR 及以上消息",
         "evidence": {
-          "field": "ulog.logged_messages(log_level<=3)",
+          "source": "ulog.logged_messages(log_level<=3)",
           "value": 4,
           "threshold": 0,
-          "unit": "条",
-          "samples": [
-            {
-              "tSec": 45.72,
-              "message": "[sensors] no barometer found on /dev/baro0 (2)"
-            },
-            {
-              "tSec": 49.57,
-              "message": "[sensors] no barometer found on /dev/baro0 (2)"
-            },
-            {
-              "tSec": 59.12,
-              "message": "[sensors] no barometer found on /dev/baro0 (2)"
-            },
-            {
-              "tSec": 63.91,
-              "message": "[sensors] no barometer found on /dev/baro0 (2)"
-            }
-          ]
+          "unit": "条"
         },
         "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html",
         "suggestion": "按时间顺序核对错误原文，这通常是定位根因最直接的证据。"
+      },
+      {
+        "id": "F02",
+        "severity": "guard",
+        "ruleId": "px4-guard-topic-missing",
+        "label": "topic_missing:battery_status",
+        "description": "Data quality: topic_missing:battery_status",
+        "evidence": {
+          "source": "",
+          "value": null
+        }
       }
     ]
   }

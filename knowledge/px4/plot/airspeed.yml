@@ -1,9 +1,9 @@
-id: airspeed
+﻿id: airspeed
 title: Airspeed
 description: 地速 / 真空速 / 指示空速与 GPS 地速、空速 setpoint。
 order: 18
 conditions:
-  topics: ["airspeed || airspeed_validated || vehicle_global_position"]
+  message: ["airspeed || airspeed_validated || vehicle_global_position"]
 outputs:
   - container: axes
     title: Airspeed

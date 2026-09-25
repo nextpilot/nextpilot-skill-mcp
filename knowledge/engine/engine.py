@@ -22,6 +22,7 @@ import json
 import ast
 import math
 import re
+from types import SimpleNamespace as _SimpleNamespace
 import numpy as np
 
 
@@ -97,53 +98,34 @@ def add_tag(t):
         tags.append(t)
 
 
-def add(
-    severity,
-    rule_id,
-    tag,
-    title,
-    field,
-    value,
-    threshold=None,
-    unit=None,
-    doc=None,
-    suggestion=None,
-    tags_extra=None,
-):
+def add(rule_id, severity, label, description, evidence, suggestion=None, docurl=None):
     _fid[0] += 1
-    ev = {"field": field, "value": value}
-    if threshold is not None:
-        ev["threshold"] = threshold
-    if unit is not None:
-        ev["unit"] = unit
     f = {
         "id": "F%02d" % _fid[0],
         "severity": severity,
         "ruleId": rule_id,
-        "tag": tag,
-        "title": title,
-        "evidence": ev,
+        "label": label,
+        "description": description,
+        "evidence": evidence,
     }
-    if doc:
-        f["docUrl"] = doc
+    if docurl:
+        f["docUrl"] = docurl
     if suggestion:
         f["suggestion"] = suggestion
     findings.append(f)
-    if tag:
-        add_tag(tag)
-    for te in tags_extra or []:
-        add_tag(te)
+    if label:
+        add_tag(label)
 
 
-def skipped(check, reason):
-    item = {"check": check, "reason": reason}
+def skipped(rule_id, reason):
+    item = {"ruleId": rule_id, "reason": reason}
     if item not in checks_skipped:
         checks_skipped.append(item)
 
 
-def ran(check):
-    if check not in checks_run:
-        checks_run.append(check)
+def ran(rule_id):
+    if rule_id not in checks_run:
+        checks_run.append(rule_id)
 
 
 # ---------------- 受限表达式求值 ----------------
@@ -172,6 +154,11 @@ _ALLOWED_NODES = (
     ast.Mult,
     ast.Div,
     ast.Mod,
+    ast.BitAnd,
+    ast.BitOr,
+    # 下标：arr[mask]（布尔索引替换 apply_mask）、arr[0] / arr[-1]（单元素）、arr[:] 等
+    ast.Subscript,
+    ast.Slice,
     ast.Name,
     ast.Load,
     ast.Constant,
@@ -468,7 +455,11 @@ def _scale_series(x, scale):
 #   _try(expr)          容错：内层出错时整条赋值结果为 None
 #   has_topic("name")   这个消息在不在（与 when 里同一个函数，语义一致）
 #   param("NAME")       读飞控参数（**不是算子**，见下面 `_param_fn` 的说明）
-_COMPUTE_CALLABLE = ("ref", "_try", "has_topic", "param")
+_COMPUTE_CALLABLE = ("ref", "_try", "has_topic", "param", "len", "int")
+
+# compute 里允许的**模块名**：裸 Name.attr 碰到这些名字不重写为 ref()，
+# 而是保留为模块.函数 调用（如 np.ptp / np.hypot / np.isin）。
+_COMPUTE_MODULES = {"np"}
 
 # 比 _ALLOWED_NODES 多出：赋值语句、调用、属性（字段引用）、三元、字典（算子选项）
 _ALLOWED_COMPUTE = _ALLOWED_NODES + (
@@ -485,28 +476,111 @@ _ALLOWED_COMPUTE = _ALLOWED_NODES + (
 
 
 class _ComputeRefs(ast.NodeTransformer):
-    """把表达式里裸写的 `topic.field` 重写成 `ref("topic.field")`。
+    """把表达式里裸写的 `topic.field` / `topic[N].field` / `topic[i].field[j]`
+    重写成 `ref("topic.field")` / `ref("topic[N].field")` / `ref("topic[i].field[j]")`。
 
-    只接受 `Name.attr` 形态，且这个 Name **不能是已声明的变量**——否则 `变量.属性` 会去
-    访问对象属性（那是任意能力，白名单不给）。构建期已经拦过一遍，这里是运行期的那道。
+    只接受 `Name.attr` / `Name[N].attr` / `Name[N].attr[M]` 形态，且这个 Name
+    **不能是已声明的变量**——否则 `变量.属性` 会去访问对象属性（那是任意能力，白名单不给）。
     """
 
     def __init__(self, env_keys):
         self.env_keys = env_keys
 
-    def visit_Attribute(self, node):
-        if not isinstance(node.value, ast.Name):
-            raise ValueError("字段引用必须是 topic.field 形式")
-        if node.value.id in self.env_keys:
-            raise ValueError("%s 是变量名，不能当 topic 用" % node.value.id)
+    # ---- helpers ----
+
+    def _is_topic_name(self, name):
+        if name in _COMPUTE_MODULES:
+            return False
+        if name in self.env_keys:
+            raise ValueError("%s 是变量名，不能当 topic 用" % name)
+        return True
+
+    def _format_slice(self, slc):
+        """ast 下标节点 → ref 字符串里的下标片段（如 ``i`` / ``0`` / ``:``）"""
+        if isinstance(slc, ast.Constant):
+            return str(slc.value)
+        if isinstance(slc, ast.Name):
+            return slc.id
+        if isinstance(slc, ast.Slice):
+
+            def _fmt(s):
+                if s is None:
+                    return ""
+                if isinstance(s, ast.Constant):
+                    return str(s.value)
+                if isinstance(s, ast.Name):
+                    return s.id
+                if isinstance(s, ast.UnaryOp) and isinstance(s.op, ast.USub) and isinstance(s.operand, ast.Constant):
+                    return "-" + str(s.operand.value)
+                return "..."
+
+            return "%s:%s" % (_fmt(slc.lower), _fmt(slc.upper))
+        return "..."
+
+    def _build_ref(self, node, prefix):
+        """构造 ref("prefix.attr") 调用节点"""
+        key = "%s.%s" % (prefix, node.attr)
         return ast.copy_location(
             ast.Call(
                 func=ast.Name(id="ref", ctx=ast.Load()),
-                args=[ast.Constant(value="%s.%s" % (node.value.id, node.attr))],
+                args=[ast.Constant(value=key)],
                 keywords=[],
             ),
             node,
         )
+
+    # ---- visitors ----
+
+    def visit_Attribute(self, node):
+        self.generic_visit(node)
+
+        # 情况 1：topic.field（当前支持）
+        if isinstance(node.value, ast.Name):
+            if self._is_topic_name(node.value.id):
+                return self._build_ref(node, node.value.id)
+            return node
+
+        # 情况 2：topic[N].field（新增 —— 下标在属性左边）
+        if isinstance(node.value, ast.Subscript) and isinstance(node.value.value, ast.Name):
+            name = node.value.value.id
+            if self._is_topic_name(name):
+                idx = self._format_slice(node.value.slice)
+                return self._build_ref(node, "%s[%s]" % (name, idx))
+            return node
+
+        return node
+
+    def _is_simple_slice(self, slc):
+        """下标是否为简单索引（常数/变量/切片），可安全并入 ref 字符串。"""
+        return isinstance(slc, (ast.Constant, ast.Name, ast.Slice, ast.Tuple))
+
+    def visit_Subscript(self, node):
+        self.generic_visit(node)
+
+        # 情况 3：ref(...) 被 visit_Attribute 转换后又被下标 —— topic.field[j]
+        # 但只对简单下标合并；布尔掩码等复杂表达式留给 Python 运行时评估
+        if (
+            isinstance(node.value, ast.Call)
+            and isinstance(node.value.func, ast.Name)
+            and node.value.func.id == "ref"
+            and node.value.args
+            and self._is_simple_slice(node.slice)
+        ):
+            if not isinstance(node.value.args[0], ast.Constant) or not isinstance(node.value.args[0].value, str):
+                return node
+            old_key = node.value.args[0].value
+            idx = self._format_slice(node.slice)
+            new_key = "%s[%s]" % (old_key, idx)
+            return ast.copy_location(
+                ast.Call(
+                    func=ast.Name(id="ref", ctx=ast.Load()),
+                    args=[ast.Constant(value=new_key)],
+                    keywords=[],
+                ),
+                node,
+            )
+
+        return node
 
 
 def _compile_compute(stmt, env_keys):
@@ -521,10 +595,14 @@ def _compile_compute(stmt, env_keys):
         if not isinstance(node, _ALLOWED_COMPUTE):
             raise ValueError("compute 表达式含不允许的语法 %s" % type(node).__name__)
         if isinstance(node, ast.Call):
-            if not isinstance(node.func, ast.Name):
-                raise ValueError("compute 只允许直接调用算子")
-            if node.func.id not in OPERATORS and node.func.id not in _COMPUTE_CALLABLE:
-                raise ValueError("compute 调用了未注册的算子 %s" % node.func.id)
+            if isinstance(node.func, ast.Attribute):
+                if not isinstance(node.func.value, ast.Name) or node.func.value.id not in _COMPUTE_MODULES:
+                    raise ValueError("compute 只允许 %s.函数名(...) 或直接调用算子" % "/".join(sorted(_COMPUTE_MODULES)))
+            elif isinstance(node.func, ast.Name):
+                if node.func.id not in OPERATORS and node.func.id not in _COMPUTE_CALLABLE:
+                    raise ValueError("compute 调用了未注册的算子 %s" % node.func.id)
+            else:
+                raise ValueError("compute 只允许直接调用算子或模块方法")
 
     assign = tree.body[0]
     if not isinstance(assign.targets[0], ast.Tuple):
@@ -552,9 +630,55 @@ def _compile_compute(stmt, env_keys):
 
 
 # 表达式求值的名字表：算子按注册名直接可调用，另加 ref（取数）与 has_topic。
-# __builtins__ 置空——表达式里不该有任何 Python 内置能力。
-_COMPUTE_GLOBALS = {"__builtins__": {}, "ref": None}
+# __builtins__ 置空——表达式里不该有任意 Python 内置能力；按需逐类放行。
+_COMPUTE_GLOBALS = {
+    "__builtins__": {},
+    "ref": None,
+    "len": lambda x: None if x is None else len(x),
+    "int": lambda x: None if x is None else int(x),
+}
 _COMPUTE_GLOBALS.update(OPERATORS)
+
+# np 子集：只给纯数学运算，不给 I/O（load/save/savetxt 等）。用 types.SimpleNamespace
+# 是因为 ast.Attribute 会按 obj.attr 查属性，dict 不行。
+_COMPUTE_GLOBALS["np"] = _SimpleNamespace(
+    # ── 基本的 ──
+    abs=np.abs,
+    sum=np.sum,
+    mean=np.mean,
+    std=np.std,
+    median=np.median,
+    min=np.min,
+    max=np.max,
+    ptp=np.ptp,
+    percentile=np.percentile,
+    diff=np.diff,
+    count_nonzero=np.count_nonzero,
+    # ── NaN 安全的 ──
+    nanmean=np.nanmean,
+    nanstd=np.nanstd,
+    nanmedian=np.nanmedian,
+    nanmin=np.nanmin,
+    nanmax=np.nanmax,
+    nansum=np.nansum,
+    # ── 集合 ──
+    isin=np.isin,
+    # ── 三角 ──
+    hypot=np.hypot,
+    degrees=np.degrees,
+    radians=np.radians,
+    arctan2=np.arctan2,
+    # ── 逐元素 ──
+    maximum=np.maximum,
+    minimum=np.minimum,
+    clip=np.clip,
+    sign=np.sign,
+    # ── 数组工具 ──
+    isfinite=np.isfinite,
+    asarray=np.asarray,
+    where=np.where,
+    concatenate=np.concatenate,
+)
 
 
 def _eval_compute(stmt, env, ref_fn=None):
@@ -632,22 +756,8 @@ def _run_rules(group):
         if _rule.get("group") != group:
             continue
         _rid = _rule["id"]
-        _checks = (_rule.get("outputs") or {}).get("check")
-        if _checks is None:
-            _checks = []  # guards 类经验没有 check 名（不记 ran/skipped）
-        elif not isinstance(_checks, list):
-            _checks = [_checks]
         _env = _rule_env()
-        # 适用范围（`conditions`）依次判：占位 / 固件 / 机架 / 依赖的 topic / 模式 / 解锁。
-        # 固件那轴与 provider.match_version 同一套语法（any / ">=1.15" / ">=1.14,<1.15"），
-        # 机架那轴是 `any` / 机架名 / 列表，模式那轴与 `topics` 同形，解锁那轴是
-        # any / true / ">12"（见各自函数的 docstring）。
-        # **不满足一律记一条 skipped 并带上自动文案**：报告里要能看出"这条为什么没跑"，
-        # 而不是让读者以为它跑过了、或者根本没人写过这条经验。
-        # （轴约束写成了解析不了的串时静默退出——那是规则的笔误，构建期本来就会拦。）
         _not_applicable = None
-        # 占位排在最前：它说的是"这条还没写完"，与适用范围无关——所以占位规则
-        # 就算写了 topics / mode，也应当显示"未实现"而不是"topic not in log"。
         _ph = _placeholder_reason(_rule.get("placeholder"))
         if _ph:
             _not_applicable = "未实现：%s" % _ph
@@ -660,45 +770,30 @@ def _run_rules(group):
             except Exception:
                 _not_applicable = None
         if _not_applicable:
-            for _check in _checks:
-                skipped(_check, _not_applicable)
+            skipped(_rid, _not_applicable)
             continue
-        # 依赖的 topic：缺了记一条（文案自动生成，见 _missing_topics）
         _missing = _missing_topics(_rule.get("topics"))
         if _missing:
-            for _check in _checks:
-                skipped(_check, _missing)
+            skipped(_rid, _missing)
             continue
-        # 模式：日志里没出现过要求的模式就跳过（见 _match_mode）
         _mode_miss = _match_mode(_rule.get("mode"), _env)
         if _mode_miss:
-            for _check in _checks:
-                skipped(_check, _mode_miss)
+            skipped(_rid, _mode_miss)
             continue
-        # 解锁：要求有解锁段 / 未解锁 / 解锁时长过门槛（见 _match_armed）
         _armed_miss = _match_armed(_rule.get("armed"), _env)
         if _armed_miss:
-            for _check in _checks:
-                skipped(_check, _armed_miss)
+            skipped(_rid, _armed_miss)
             continue
-        # ── 三步里的第二步：算 ──
-        # 算不出来就记一条 skipped（"数据不足"），所以 ran() 只能放在 compute **成功之后**——
-        # 同一条 check 不能既是 ran 又是 skipped。原先靠 `ran_on_success` 表达的那半边
-        # （原实现把 ran() 放在数据判定之后）现在成了默认，那个字段已删。
         _ok = True
         for _stmt in _rule.get("compute") or []:
-            # compute 是**表达式**，求值出来的名字进 _env，供后面的表达式与 triggers / outputs 引用。
             try:
                 _eval_compute(_stmt, _env)
             except Exception:
                 _ok = False
                 break
         if not _ok:
-            for _check in _checks:
-                skipped(_check, "数据不足，本条没算出结论")
+            skipped(_rid, "数据不足，本条没算出结论")
             continue
-        # ran_when：算出来了、但还不算"跑过"（如姿态那条要有足够的机动段样本）。
-        # 不满足就静默——它跟"数据不足"不是一回事。
         _ran_ok = True
         if _rule.get("ran_when") is not None:
             try:
@@ -706,24 +801,13 @@ def _run_rules(group):
             except Exception:
                 _ran_ok = False
         if _ran_ok:
-            for _check in _checks:
-                ran(_check)
+            ran(_rid)
 
-        _out = _rule["outputs"]
-        # outputs.guard_tags：按条件产生的数据质量标签（等价于原过程式的 guard_tags.append，
-        # 不依赖是否发出 finding——如陀螺零偏的“温度变化大”）
-        for _gspec in _out.get("guard_tags") or []:
-            try:
-                _g_hit = _eval_expr(_gspec["when"], _env)
-            except Exception:
-                _g_hit = False
-            if _g_hit and _gspec.get("tag") and _gspec["tag"] not in guard_tags:
-                guard_tags.append(_gspec["tag"])
-        for _key, _spec in (_out.get("stats") or {}).items():
-            _v = _env.get(_spec["var"])
-            if _v is None:
-                continue
-            metrics[_key] = round(float(_v), int(_spec["round"])) if "round" in _spec else _v
+        # outputs：指标输出（纯数据，数组）
+        for _out_item in _rule.get("outputs") or []:
+            _v = _env.get(_out_item.get("value"))
+            if _v is not None:
+                metrics[_out_item["name"]] = _v
 
         # foreach: 把一条规则算出的「事件列表」展开成多条 finding（如 failsafe 的每次边沿）。
         # 事件 dict 的键会叠加进模板环境，所以文案仍写在经验文件里；
@@ -736,6 +820,10 @@ def _run_rules(group):
             _items = _env.get(_for_key) or []
         else:
             _items = [None]
+
+        _rule_tag = _rule.get("tag")
+        _rule_docurl = _rule.get("docurl")
+
         for _item in _items:
             _tenv = _env
             if _item is not None:
@@ -743,49 +831,109 @@ def _run_rules(group):
                     continue
                 _tenv = dict(_env)
                 _tenv.update(_item)
+
             for _trig in _rule.get("triggers") or []:
-                # 单条触发条件出错（例如表达式把缺失值 None 与数值比较）不应让整份日志
-                # 的分析崩掉：视为未命中，继续下一条。这类错误应当在基线回归里暴露。
-                try:
-                    _hit = _eval_expr(_trig["when"], _tenv)
-                except Exception:
-                    _hit = False
-                if not _hit:
+                # when 缺省 = True；单值/数组归一化成列表
+                _when_raw = _trig.get("when", "True")
+                _when_list = _when_raw if isinstance(_when_raw, list) else [_when_raw]
+
+                _sev_raw = _trig.get("severity")
+                if _sev_raw is None:
                     continue
-                # 证据值就是一个**表达式**：写变量得原值、写 f"{x:.3f}" 得格式化后的串、
-                # 写常量就得到常量。
-                _val = None
-                if _trig.get("value") is not None:
+                _sev_list = _sev_raw if isinstance(_sev_raw, list) else [_sev_raw]
+
+                _n = len(_when_list)
+
+                def _expand(val, n):
+                    if val is None:
+                        return [None] * n
+                    if isinstance(val, list):
+                        return val
+                    return [val] * n
+
+                _desc_list = _expand(_trig.get("description"), _n)
+                _label_list = _expand(_trig.get("label", _rule_tag), _n)
+                _sugg_list = _expand(_trig.get("suggestion"), _n)
+
+                # evidence sub-object
+                _ev_spec = _trig.get("evidence") or {}
+                _ev_thr_raw = _ev_spec.get("threshold")
+                if _ev_thr_raw is None:
+                    _ev_thr_list = [None] * _n
+                elif isinstance(_ev_thr_raw, list):
+                    _ev_thr_list = _ev_thr_raw
+                else:
+                    _ev_thr_list = [_ev_thr_raw] * _n
+
+                # when[] 内部短路：命中第一条即停
+                for _i in range(_n):
                     try:
-                        _val = _eval_expr(str(_trig["value"]), _tenv)
+                        _hit = _eval_expr(_when_list[_i], _tenv)
                     except Exception:
-                        _val = None
-                _field = _trig["field"]
-                if "{" in _field:
-                    _field = _field.format_map(_tenv)
-                # suggestion 同样允许占位符（如 "涉及：{names}。"），与 title 一致
-                _sugg = _trig.get("suggestion")
-                if _sugg and "{" in _sugg:
-                    _sugg = _sugg.format_map(_tenv)
-                add(
-                    _trig["severity"],
-                    _rid,
-                    _trig.get("tag", _out.get("tag")),
-                    _trig["title"].format_map(_tenv),
-                    _field,
-                    _val,
-                    _trig.get("threshold"),
-                    _trig.get("unit"),
-                    _rule.get("doc"),
-                    _sugg,
-                )
-                # evidence_extra: {evidence 键: 变量名}，把额外证据挂到刚发出的 finding 上
-                # （如日志消息的 samples 原文列表）
-                for _ek, _evn in (_trig.get("evidence_extra") or {}).items():
-                    _evv = _tenv.get(_evn)
-                    if _evv is not None:
-                        findings[-1]["evidence"][_ek] = _evv
-                break
+                        _hit = False
+                    if not _hit:
+                        continue
+
+                    _sev = _sev_list[_i] if _i < len(_sev_list) else _sev_list[-1]
+                    _label = _label_list[_i] if _i < len(_label_list) else _label_list[-1]
+                    _desc = _desc_list[_i] if _i < len(_desc_list) else _desc_list[-1]
+                    _sugg = _sugg_list[_i] if _i < len(_sugg_list) else _sugg_list[-1]
+
+                    # construct evidence dict
+                    _ev = {}
+                    _src = _ev_spec.get("source", "")
+                    if _src and "{" in _src:
+                        _src = _src.format_map(_tenv)
+                    _ev["source"] = _src
+
+                    _val_raw = _ev_spec.get("value")
+                    if _val_raw is not None:
+                        try:
+                            _ev["value"] = _eval_expr(str(_val_raw), _tenv)
+                        except Exception:
+                            _ev["value"] = None
+                    else:
+                        _ev["value"] = None
+
+                    _thr = _ev_thr_list[_i] if _i < len(_ev_thr_list) else _ev_thr_list[-1]
+                    if _thr is not None:
+                        _ev["threshold"] = _thr
+
+                    # copy remaining evidence keys (unit, docurl, custom)
+                    for _ek in _ev_spec:
+                        if _ek in ("source", "value", "threshold"):
+                            continue
+                        _ev[_ek] = _ev_spec[_ek]
+
+                    _docurl = _ev.get("docurl") or _rule_docurl
+
+                    # format description/suggestion with template vars
+                    if _desc and "{" in _desc:
+                        _desc = _desc.format_map(_tenv)
+                    if _sugg and "{" in _sugg:
+                        _sugg = _sugg.format_map(_tenv)
+
+                    if _sev == "guard":
+                        # guard: label -> guard_tags[], still emit finding
+                        if _label and _label not in guard_tags:
+                            guard_tags.append(_label)
+                        _fid[0] += 1
+                        _f = {
+                            "id": "F%02d" % _fid[0],
+                            "severity": "guard",
+                            "ruleId": _rid,
+                            "label": _label,
+                            "description": _desc,
+                            "evidence": _ev,
+                        }
+                        if _docurl:
+                            _f["docUrl"] = _docurl
+                        if _sugg:
+                            _f["suggestion"] = _sugg
+                        findings.append(_f)
+                    else:
+                        add(_rid, _sev, _label, _desc, _ev, _sugg, _docurl)
+                    break  # when[] short-circuit
 
 
 # ---------------- 概览指标（knowledge/<格式>/facts.yaml 的 metrics）----------------
@@ -1023,7 +1171,35 @@ def np_report():
         notes = take_notes()
         if notes:
             report["instanceNotes"] = notes
-    __result = json.dumps(report, ensure_ascii=False)
+    __result = json.dumps(report, ensure_ascii=False, default=_json_default)
+
+
+class _NumpyEncoder(json.JSONEncoder):
+    """把 numpy 数值转成 Python 原生类型，使得 json.dumps 不抛 TypeError。
+
+    引擎产出的 _metric_entries 可能含有 np.int64 / np.float64 等类型——一旦规则
+    用 np.sum/max/mean 之类归约，返回值就是 numpy 标量，而标准 json 模块不认识它们。
+    """
+
+    def default(self, o):
+        if isinstance(o, (np.integer,)):
+            return int(o)
+        if isinstance(o, (np.floating,)):
+            return float(o)
+        if isinstance(o, (np.ndarray,)):
+            return o.tolist()
+        return super().default(o)
+
+
+def _json_default(o):
+    """json.dumps 的 default 回调：借用 _NumpyEncoder 的逻辑。"""
+    if isinstance(o, (np.integer,)):
+        return int(o)
+    if isinstance(o, (np.floating,)):
+        return float(o)
+    if isinstance(o, (np.ndarray,)):
+        return o.tolist()
+    raise TypeError("Object of type %s is not JSON serializable" % o.__class__.__name__)
 
 
 # ============ np_manifest：话题清单（驱动前端预设可用性）============

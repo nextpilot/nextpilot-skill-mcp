@@ -180,7 +180,7 @@ def field_refs(expr: str) -> list[list[str]]:
                     names += list(v) if isinstance(v, list) else [v]
             if names:
                 out.append(names)
-        elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+        elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id != "np":
             out.append(["%s.%s" % (node.value.id, node.attr)])
     return out
 
@@ -190,9 +190,13 @@ def rule_refs() -> list[tuple[str, list[str], list]]:
 
     规则来自构建产物（compute 已是表达式）。版本约束**只有规则级的 `firmware`**
     （引用上不再有 when_fw）：一条经验服务哪个版本段，写在 `conditions.firmware` 上。
+
+    只检查 PX4 规则（id 以 px4- 开头）：APM 规则需要 APM 字典，这里不查。
     """
     out = []
     for raw in runner.load_rules():
+        if not raw.get("id", "").startswith("px4-"):
+            continue
         rule_fw = raw.get("firmware")
         for expr in raw.get("compute") or []:
             for names in field_refs(expr):

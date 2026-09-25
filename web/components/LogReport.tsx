@@ -8,6 +8,7 @@ import remarkGfm from "remark-gfm";
 import {
     ShieldAlert,
     AlertTriangle,
+    ShieldCheck,
     Activity,
     Info,
     FileCheck2,
@@ -520,6 +521,11 @@ function FindingCard({ finding }: { finding: Finding }) {
             icon: <Info className="h-4 w-4 text-muted" />,
             label: "提示",
         },
+        guard: {
+            cls: "border-l-muted bg-text/[0.02]",
+            icon: <ShieldCheck className="h-4 w-4 text-muted" />,
+            label: "数据质量",
+        },
     };
     const tone = TONES[finding.severity];
 
@@ -529,11 +535,12 @@ function FindingCard({ finding }: { finding: Finding }) {
                 {tone.icon}
                 <span className="text-xs text-muted">{finding.id}</span>
                 <span className="text-xs text-muted">· {finding.ruleId}</span>
-                <h3 className="text-sm font-medium">{finding.title}</h3>
+                <h3 className="text-sm font-medium">{finding.description}</h3>
             </div>
             <div className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
                 <span className="text-muted">
-                    字段 <span className="ml-1 break-all font-mono text-xs text-primary">{finding.evidence.field}</span>
+                    字段{" "}
+                    <span className="ml-1 break-all font-mono text-xs text-primary">{finding.evidence.source}</span>
                 </span>
                 <span className="text-muted">
                     实测值{" "}

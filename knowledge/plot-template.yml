@@ -15,7 +15,7 @@ order: 5 # 可选，页面里这组图的先后（缺省 999）
 
 # ── 适用范围：整块可省（省 = 总是适用）。**与规则同形**（同一份校验代码）
 conditions:
-  topics: [battery_status] # 项内 `||` = 任意一个存在即可；项间 = 都要有
+  message: [battery_status] # 项内 `||` = 任意一个存在即可；项间 = 都要有
   # firmware / vehicle 同样可用（图上一般只用 topics）。
   # 注意：mode / armed / placeholder 是**规则专用**的，预设写了会在构建期被拦
   # （前端只按 topics 判适用性，拿不到 MODES_PRESENT / ARMED_S）。

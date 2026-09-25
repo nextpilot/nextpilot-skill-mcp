@@ -2,10 +2,11 @@
   "log": "95b077d9-d719-45ea-bf91-5926170cbc52.ulg",
   "slug": "95b077d9",
   "source": "logs.px4.io 公开日志：GET https://logs.px4.io/download?log=95b077d9-d719-45ea-bf91-5926170cbc52（或 python tools/dev/download_px4_logs.py）",
-  "engine": "engine/rule_engine.py + engine/report_data.py",
+  "engine": "knowledge/engine/engine.py",
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
     "platform": "PX4",
+    "logType": "px4-ulog",
     "parserVersion": "pyulog/1.1.0",
     "facts": {
       "durationSec": 73.2,
@@ -15,12 +16,21 @@
       "firmwareDisplay": "v1.17.0",
       "fwReleaseType": 255,
       "armedDurationSec": 42.5,
-      "phases": ["fw_cruise", "hover", "maneuver"],
+      "phases": [
+        "fw_cruise",
+        "hover",
+        "maneuver"
+      ],
       "dropoutTotalMs": 0,
       "hardware": "PX4_FMU_V6X",
       "hardwareSubtype": "V6X001",
       "verSw": "d6f12ad1c4f70ad3230afd7d86e971421e02fef4",
-      "modes": ["Mission", "Hold", "Position", "Manual"],
+      "modes": [
+        "Mission",
+        "Hold",
+        "Position",
+        "Manual"
+      ],
       "mainMode": "Mission",
       "uuid": "0006000000003736333130335109002c003b",
       "vehicleLifeS": 2657.3,
@@ -31,43 +41,43 @@
       {
         "key": "imuAccelVibrationMax",
         "label": "最大振动",
-        "value": 6.558,
+        "value": 6.557805061340332,
         "unit": "m/s²"
       },
       {
         "key": "gpsSatellitesMin",
         "label": "最少搜星",
-        "value": 15,
+        "value": 15.0,
         "unit": "颗"
       },
       {
         "key": "gpsEphMaxM",
         "label": "最大定位误差",
-        "value": 0.0,
+        "value": 0.0003790000081062317,
         "unit": "m"
       },
       {
         "key": "cpuLoadMax",
         "label": "CPU 峰值",
-        "value": 0.375,
+        "value": 0.3745616674423218,
         "unit": "0..1"
       },
       {
         "key": "imuTempRangeC",
         "label": "IMU 温度跨度",
-        "value": 0.2,
+        "value": 0.20803451538085938,
         "unit": "°C"
       },
       {
         "key": "gyroBiasMaxRadS",
         "label": "陀螺零偏最大",
-        "value": 0.001,
+        "value": 0.0010470404522493482,
         "unit": "rad/s"
       },
       {
         "key": "gyroBiasDriftRadS",
         "label": "陀螺零偏漂移",
-        "value": 0.0007,
+        "value": 0.0007255891105160117,
         "unit": "rad/s"
       },
       {
@@ -85,17 +95,17 @@
       {
         "key": "imuAccelVibrationMean",
         "label": "imuAccelVibrationMean",
-        "value": 3.73
+        "value": 3.7295288602756553
       },
       {
         "key": "imuAccelVibrationP95",
         "label": "imuAccelVibrationP95",
-        "value": 5.857
+        "value": 5.8573346614837645
       },
       {
         "key": "gpsEphP95M",
         "label": "gpsEphP95M",
-        "value": 0.0
+        "value": 0.00037700000405311586
       },
       {
         "key": "gyroBiasSource",
@@ -104,48 +114,85 @@
       }
     ],
     "tags": [],
-    "guardTags": ["insufficient_data", "topic_missing:battery_status"],
+    "guardTags": [
+      "insufficient_data",
+      "topic_missing:battery_status"
+    ],
     "checksRun": [
-      "vibration",
-      "ekf_faults",
-      "cpu_load",
-      "gps_health",
-      "failsafe",
-      "mode_thrash",
-      "imu_bias",
-      "logged_messages"
+      "px4-guard-short-log",
+      "px4-vibration",
+      "px4-imu-clipping",
+      "px4-ekf-fault",
+      "px4-power-cell-voltage",
+      "px4-cpu-load",
+      "px4-gps-eph",
+      "px4-gps-sats",
+      "px4-gps-jump",
+      "px4-failsafe-failsafe",
+      "px4-failsafe-rc_signal_lost",
+      "px4-failsafe-data_link_lost",
+      "px4-failsafe-engine_failure",
+      "px4-failsafe-mission_failure",
+      "px4-failsafe-nav",
+      "px4-mode-thrash",
+      "px4-imu-bias-drift",
+      "px4-vtol-transition-attitude",
+      "px4-log-errors",
+      "px4-log-warnings",
+      "px4-guard-restart",
+      "px4-guard-topic-missing",
+      "px4-guard-log-dropouts"
     ],
     "checksSkipped": [
       {
-        "check": "ekf_innovations",
+        "ruleId": "px4-ekf-innovation",
         "reason": "数据不足，本条没算出结论"
       },
       {
-        "check": "battery",
-        "reason": "battery_status not in log"
-      },
-      {
-        "check": "motor_balance",
+        "ruleId": "px4-power-sag",
         "reason": "数据不足，本条没算出结论"
       },
       {
-        "check": "attitude_tracking",
-        "reason": "vehicle_attitude_setpoint not in log"
+        "ruleId": "px4-power-remaining",
+        "reason": "数据不足，本条没算出结论"
       },
       {
-        "check": "airspeed",
+        "ruleId": "px4-motor-unbalance",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "px4-airspeed-invalid",
         "reason": "机架不适用 fixed_wing"
       },
       {
-        "check": "vtol_transition",
-        "reason": "vtol_vehicle_status not in log"
-      },
-      {
-        "check": "wind_estimate",
-        "reason": "estimator_wind / wind_estimate not in log"
+        "ruleId": "px4-wind-estimate",
+        "reason": "数据不足，本条没算出结论"
       }
     ],
     "matchedFaults": [],
-    "findings": []
+    "findings": [
+      {
+        "id": "F01",
+        "severity": "guard",
+        "ruleId": "px4-guard-short-log",
+        "label": "insufficient_data",
+        "description": "Data quality: insufficient_data",
+        "evidence": {
+          "source": "",
+          "value": null
+        }
+      },
+      {
+        "id": "F02",
+        "severity": "guard",
+        "ruleId": "px4-guard-topic-missing",
+        "label": "topic_missing:battery_status",
+        "description": "Data quality: topic_missing:battery_status",
+        "evidence": {
+          "source": "",
+          "value": null
+        }
+      }
+    ]
   }
 }

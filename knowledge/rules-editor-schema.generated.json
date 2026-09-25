@@ -52,6 +52,14 @@
       ],
       "description": "执行分组，决定执行顺序与 finding 编号。必须已登记在 facts.yaml 的 group_order 与 rule_meta.by_group"
     },
+    "tag": {
+      "type": "string",
+      "description": "规则级异常标签，trigger 未写 label 时回退到此"
+    },
+    "docurl": {
+      "type": "string",
+      "description": "规则级文档链接，evidence 未写 docurl 时回退到此"
+    },
     "order": {
       "type": "integer",
       "description": "同 group 内的次序（缺省 100000，再按 id 兜底）"
@@ -74,10 +82,6 @@
     "author": {
       "type": "object",
       "additionalProperties": true
-    },
-    "doc": {
-      "type": "string",
-      "description": "官方文档链接 → finding.docUrl。缺省按 group 从 rule_meta 派生"
     },
     "conditions": {
       "type": "object",
@@ -178,158 +182,180 @@
         "type": "string",
         "description": "取值表达式：自上而下求值，输出的名字供后面与 triggers 引用。\n写法是 Python 的一个真子集（完整语法见 /guide/rule-schema）：\n  a, b = f(x, kw=1) / pct = frac * 100 / x if c else y / a and b / not a\n字段引用：topic.field（裸写）或 ref(\"topic[:].field\", alias=\"x\", unit=\"deg\")；\n  ref(\"新名\", \"旧名\") 是候选组，运行期取第一个存在的。\n⚠ 表达式**内部**（算子名、字段是否存在、单位换算）JSON Schema 查不了，由构建期校验。"
       },
-      "description": "取值：一串表达式，自上而下求值。guard 类经验不写这一项"
+      "description": "取值：一串表达式，自上而下求值"
     },
     "outputs": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "check": {
-          "type": "string",
-          "examples": [
-            "airspeed",
-            "attitude_tracking",
-            "battery",
-            "calibration",
-            "compass",
-            "config_safety",
-            "cpu",
-            "ekf_faults",
-            "ekf_innovations",
-            "ekf_variance",
-            "events",
-            "failsafe",
-            "gps_health",
-            "guards",
-            "guards_early",
-            "imu_bias",
-            "integrity",
-            "logged_messages",
-            "mode_thrash",
-            "motor_balance",
-            "param_audit",
-            "prearm_messages",
-            "rc_input",
-            "sensor_health",
-            "timing",
-            "vibration",
-            "vtol_transition",
-            "wind_estimate"
-          ],
-          "description": "ran / skipped 用的 check 名；缺省 = group，写别的就是显式例外"
-        },
-        "tag": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "description": "喂故障库匹配的异常标签（trigger 没写 tag 时回退到它）"
-        },
-        "stats": {
-          "type": "object",
-          "description": "写进报告「关键数据」的统计。键是展示名，var 是 compute 里的变量名",
-          "additionalProperties": {
-            "type": "object",
-            "required": [
-              "var"
-            ],
-            "additionalProperties": false,
-            "properties": {
-              "var": {
-                "type": "string"
-              },
-              "round": {
-                "type": "integer"
-              }
-            }
-          }
-        },
-        "guard_tags": {
-          "type": "array",
-          "description": "条件性数据质量标签：不依赖是否发出 finding，算出来就带上",
-          "items": {
-            "type": "object",
-            "required": [
-              "when",
-              "tag"
-            ],
-            "additionalProperties": false,
-            "properties": {
-              "when": {
-                "type": "string"
-              },
-              "tag": {
-                "type": "string",
-                "pattern": "^[a-zA-Z0-9_:]+$"
-              }
-            }
+      "type": "array",
+      "description": "指标输出（纯数据，写入 metrics）。多条 = 多个指标",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "指标名（metrics 的键）"
+          },
+          "value": {
+            "type": "string",
+            "description": "compute 里的变量名"
+          },
+          "description": {
+            "type": "string",
+            "description": "指标说明（可用 {变量} 占位）"
+          },
+          "unit": {
+            "type": "string",
+            "description": "单位"
           }
         }
       }
     },
     "triggers": {
       "type": "array",
-      "description": "判定：自上而下，命中第一条即发一条 finding",
+      "description": "判定：各大组之间**全部执行**，同组内的 when[] 短路（命中第一条即停）",
       "items": {
         "type": "object",
         "required": [
           "when",
           "severity",
-          "title",
-          "field"
+          "description"
         ],
         "additionalProperties": false,
         "properties": {
           "when": {
-            "type": "string",
-            "description": "触发条件表达式（与 compute 同一套语法）"
-          },
-          "severity": {
-            "type": "string",
-            "enum": [
-              "critical",
-              "info",
-              "warning"
+            "description": "触发条件（可单值可数组；数组内短路求值）。缺省 = True",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
             ]
           },
-          "title": {
-            "type": "string",
-            "description": "结论标题，可用 {变量} 占位"
+          "severity": {
+            "description": "严重等级（可单值可数组，长度 >1 时一一对应 when[]）。guard = 数据质量标签",
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "critical",
+                  "guard",
+                  "info",
+                  "warning"
+                ]
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "critical",
+                    "guard",
+                    "info",
+                    "warning"
+                  ]
+                }
+              }
+            ]
           },
-          "field": {
-            "type": "string",
-            "description": "证据字段（evidence.field）"
+          "label": {
+            "description": "本条 finding 的标签（缺省 = 规则级 tag；写 null = 不产标签）",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
           },
-          "value": {
-            "type": "string",
-            "description": "证据值，表达式（f-string 管格式化），如 f\"{n:.3f}\""
-          },
-          "threshold": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "description": "阈值（evidence.threshold）"
-          },
-          "unit": {
-            "type": "string",
-            "description": "单位（evidence.unit）"
-          },
-          "tag": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "本条 finding 的标签（缺省 = outputs.tag；写 null = 不产标签）"
+          "description": {
+            "description": "结论描述，可用 {变量} 占位。可单值可数组",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
           },
           "suggestion": {
-            "type": "string",
-            "description": "结论建议，也可用 {变量} 占位"
+            "description": "建议文本，可用 {变量} 占位。可单值可数组",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
           },
-          "evidence_extra": {
+          "evidence": {
             "type": "object",
-            "description": "额外证据：{evidence 键: 变量名}",
-            "additionalProperties": true
+            "description": "结构化证据",
+            "additionalProperties": false,
+            "properties": {
+              "source": {
+                "type": "string",
+                "description": "证据来源说明（如 topic.field），可用 {变量} 占位"
+              },
+              "value": {
+                "type": "string",
+                "description": "证据值表达式（如 vibe_mean 或 f'{x:.2f}'）"
+              },
+              "threshold": {
+                "description": "阈值（可单值或数组对应 when[]）",
+                "oneOf": [
+                  {
+                    "type": [
+                      "number",
+                      "string"
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": [
+                        "number",
+                        "string"
+                      ]
+                    }
+                  }
+                ]
+              },
+              "unit": {
+                "type": "string",
+                "description": "单位"
+              },
+              "docurl": {
+                "type": "string",
+                "description": "证据级文档链接（覆盖规则级 docurl）"
+              }
+            }
           }
         }
       }
@@ -367,23 +393,9 @@
   "anyOf": [
     {
       "required": [
-        "compute",
         "triggers"
       ],
-      "title": "普通经验：要取值也要判定"
-    },
-    {
-      "required": [
-        "outputs"
-      ],
-      "title": "guard 类经验：只打数据质量标签，不发 finding",
-      "properties": {
-        "outputs": {
-          "required": [
-            "guard_tags"
-          ]
-        }
-      }
+      "title": "所有经验都要有 triggers（guard 用 severity: guard 表达）"
     }
   ],
   "x-operators": [

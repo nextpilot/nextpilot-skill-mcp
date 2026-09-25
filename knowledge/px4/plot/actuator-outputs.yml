@@ -1,9 +1,9 @@
-id: actuator-outputs
+﻿id: actuator-outputs
 title: Actuator Outputs
 description: 执行机构输出（Motor/Servo 或 Main/AUX/EXTRA），取决于 dynamic_control_alloc。
 order: 23
 conditions:
-  topics: ["actuator_motors || actuator_servos || actuator_outputs"]
+  message: ["actuator_motors || actuator_servos || actuator_outputs"]
 outputs:
   - container: axes
     title: Motor Outputs

@@ -383,26 +383,15 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
     for (const { file, items } of loaded) {
         for (const raw of items) {
             const where = `rules/${file}` + (items.length > 1 ? `#${(raw && raw.id) || "?"}` : "");
-            // guards 类经验（只产 guard 标签、不发 finding）没有 compute/triggers/check，
-            // 它的“实质”在 outputs.guard_tags 的条件里；其余经验仍要求完整六件套。
-            // 注意：普通经验也可以用 outputs.guard_tags（如陀螺零偏的温度跨度标签），
-            // 所以“是不是 guard 类经验”要看有没有 compute/triggers，而不是有没有 guard_tags。
-            const guardTags = raw.outputs?.guard_tags;
-            const hasCompute = Array.isArray(raw.compute) && raw.compute.length > 0;
+            // guards use triggers[].severity: guard, same shape as normal rules
             const hasTriggers = Array.isArray(raw.triggers) && raw.triggers.length > 0;
-            const isGuardRule = Array.isArray(guardTags) && guardTags.length > 0 && !hasCompute && !hasTriggers;
-            // 必填项：身份 + 规则的“实质”。适用范围（conditions）整块可省——不限就什么都不用写。
-            // 不含 outputs——check / doc 现在都是派生的，没有 tag/stats 的规则确实没什么可声明。
-            const requiredKeys = isGuardRule ? ["id", "group", "name"] : ["id", "group", "name", "compute", "triggers"];
+            const requiredKeys = ["id", "group", "name", "triggers"];
             for (const key of requiredKeys) {
                 if (raw[key] === undefined || raw[key] === null || raw[key] === "") {
                     throw new Error(`${where}: 缺少必填字段 ${key}`);
                 }
             }
-            if (
-                raw.outputs !== undefined &&
-                (typeof raw.outputs !== "object" || raw.outputs === null || Array.isArray(raw.outputs))
-            ) {
+            if (raw.outputs !== undefined && !Array.isArray(raw.outputs)) {
                 throw new Error(`${where}: outputs 必须是对象`);
             }
             // ── 适用范围：一个 conditions 块，六个键都能省（规则与绘图预设共用 normalizeConditions）──
@@ -441,21 +430,11 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
             }
             const gm = byGroup[raw.group];
             if (raw.category === undefined) raw.category = gm.category;
-            // outputs.check 缺省 = group；guard 类经验不填（它本来就不记 ran/skipped）
-            raw.outputs = raw.outputs ?? {};
-            if (raw.outputs.check === undefined && !isGuardRule) raw.outputs.check = raw.group;
-            if (raw.outputs.check !== undefined && raw.outputs.check !== raw.group) {
-                // 允许例外，但要说一声——免得例外悄悄变多
-                console.log(
-                    `  · ${raw.id}: outputs.check「${raw.outputs.check}」与 group「${raw.group}」不同（显式例外）`,
-                );
-            }
-            // doc 是**整条规则**的官方文档链接（不是 outputs 的一部分）：按 group 派生的规则级字段
-            if (raw.doc === undefined && gm.doc !== undefined) raw.doc = gm.doc;
+            if (raw.docurl === undefined && gm.doc !== undefined) raw.docurl = gm.doc;
             // 同 group 的多条规则必须派生出同样的 category/doc
             for (const [field, val] of [
                 ["category", raw.category],
-                ["doc", raw.doc],
+                ["docurl", raw.docurl],
             ]) {
                 const prev = seenMeta.get(`${raw.group} ${field}`);
                 if (prev !== undefined && prev !== val) {
@@ -469,7 +448,7 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
             }
 
             const declared = new Set();
-            if (!isGuardRule && (!Array.isArray(raw.compute) || raw.compute.length === 0)) {
+            if (Array.isArray(raw.compute) && raw.compute.length === 0) {
                 throw new Error(`${where}: compute 必须是非空数组`);
             }
             // compute 是一串**字符串表达式**（与 triggers.when / skip.when 同一套 Python 子集）；
@@ -486,25 +465,7 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
                 for (const name of types.keys()) declared.add(name);
             }
             raw.compute = compute;
-            // outputs.guard_tags：数据质量标签的产生条件（普通经验也会用，如陀螺零偏的温度跨度）。
-            // 条件里的名字必须是内置变量或 compute 输出，避免写错变量名却默默不打标签。
-            if (Array.isArray(guardTags)) {
-                for (const g of guardTags) {
-                    if (typeof g.when !== "string" || !g.tag) {
-                        throw new Error(`${where}: outputs.guard_tags 每项都要有 when 与 tag`);
-                    }
-                    for (const name of stripStrings(g.when).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
-                        if (EXPR_KEYWORDS.has(name)) continue;
-                        if (!declared.has(name) && !BUILTIN_VARS.has(name)) {
-                            throw new Error(`${where}: guard_tags 条件引用了未声明的名字 ${name}`);
-                        }
-                    }
-                    if (!/^[a-z0-9_:]+$/i.test(String(g.tag))) {
-                        throw new Error(`${where}: guard 标签名不合法 ${g.tag}`);
-                    }
-                }
-            }
-            if (!isGuardRule && (!Array.isArray(raw.triggers) || raw.triggers.length === 0)) {
+            if (!Array.isArray(raw.triggers) || raw.triggers.length === 0) {
                 throw new Error(`${where}: triggers 必须是非空数组`);
             }
             // foreach：把「事件列表」展开成多条 finding。事件 dict 的键（如 t_s / name）
@@ -519,53 +480,62 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
                 for (const k of fe.keys || []) eventKeys.add(k);
             }
             for (const t of raw.triggers || []) {
-                if (typeof t.when !== "string") throw new Error(`${where}: trigger 缺 when（须为字符串，注意加引号）`);
+                if (!t.when && t.when !== undefined) throw new Error(`${where}: trigger 缺 when`);
                 // 词表取 rule-expr.mjs 的 SEVERITIES（编辑器 schema 也用这一份，别再抄一份）
-                if (!SEVERITIES.has(t.severity)) {
-                    throw new Error(
-                        `${where}: trigger severity 非法：${t.severity}（可用：${[...SEVERITIES].join(" / ")}）`,
-                    );
+                const sevList = Array.isArray(t.severity) ? t.severity : [t.severity || "info"];
+                for (const s of sevList) {
+                    if (!SEVERITIES.has(s)) {
+                        throw new Error(
+                            `${where}: trigger severity 非法：${s}（可用：${[...SEVERITIES].join(" / ")}）`,
+                        );
+                    }
                 }
-                if (typeof t.title !== "string") throw new Error(`${where}: trigger 缺 title`);
-                if (typeof t.field !== "string") throw new Error(`${where}: trigger 缺 field（evidence.field）`);
+                if (typeof t.description !== "string" && !Array.isArray(t.description))
+                    throw new Error(`${where}: trigger 缺 description`);
+                if (!t.evidence || typeof t.evidence !== "object")
+                    throw new Error(`${where}: trigger 缺 evidence 对象`);
+                if (typeof t.evidence.source !== "string") throw new Error(`${where}: trigger.evidence 缺 source`);
                 // 表达式里的标识符必须已声明（内置变量 / compute 输出 / foreach 事件键）
-                for (const name of stripStrings(t.when).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
-                    if (EXPR_KEYWORDS.has(name)) continue;
-                    if (!declared.has(name) && !BUILTIN_VARS.has(name) && !eventKeys.has(name)) {
-                        throw new Error(`${where}: 表达式引用了未声明的名字 ${name}（when: ${t.when}）`);
-                    }
-                }
-                // 证据值是一个**表达式**（与 when 同一套语法）：写变量得原值、写 f"{x:.3f}" 得
-                // 格式化后的串、写常量就得到常量。名字必须是已声明的。
-                if (t.value !== undefined && typeof t.value !== "string") {
-                    throw new Error(`${where}: trigger 的 value 必须是字符串表达式（如 value: p99_stat）`);
-                }
-                if (typeof t.value === "string") {
-                    for (const name of stripStrings(t.value).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
-                        if (EXPR_KEYWORDS.has(name) || name === "f") continue; // f"..." 的 f 前缀
+                const whenList = Array.isArray(t.when) ? t.when : [t.when || "True"];
+                for (const w of whenList) {
+                    if (typeof w !== "string") continue;
+                    for (const name of stripStrings(w).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
+                        if (EXPR_KEYWORDS.has(name)) continue;
                         if (!declared.has(name) && !BUILTIN_VARS.has(name) && !eventKeys.has(name)) {
-                            throw new Error(`${where}: value 引用了未声明的名字 ${name}（value: ${t.value}）`);
+                            throw new Error(`${where}: 表达式引用了未声明的名字 ${name}（when: ${w}）`);
                         }
                     }
                 }
-                // 标题里的占位符同理
-                for (const m of t.title.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)(:[^}]*)?\}/g)) {
-                    if (!declared.has(m[1]) && !BUILTIN_VARS.has(m[1]) && !eventKeys.has(m[1])) {
-                        throw new Error(`${where}: 标题引用了未声明的名字 ${m[1]}`);
-                    }
+                // evidence.value: expression (variables from compute/env, f-string for formatting)
+                const evVal = t.evidence?.value;
+                if (evVal !== undefined && typeof evVal !== "string") {
+                    throw new Error(`${where}: evidence.value 必须是字符串表达式`);
                 }
-                // 证据文案/建议里的占位符同样校验（value 的 f-string 与 suggestion 都允许模板）
-                for (const txt of [t.value, t.suggestion, t.field]) {
-                    if (typeof txt !== "string") continue;
-                    for (const m of txt.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)(:[^}]*)?\}/g)) {
-                        if (!declared.has(m[1]) && !BUILTIN_VARS.has(m[1]) && !eventKeys.has(m[1])) {
-                            throw new Error(`${where}: 文案引用了未声明的名字 ${m[1]}`);
+                if (typeof evVal === "string") {
+                    for (const name of stripStrings(evVal).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
+                        if (EXPR_KEYWORDS.has(name) || name === "f") continue;
+                        if (!declared.has(name) && !BUILTIN_VARS.has(name) && !eventKeys.has(name)) {
+                            throw new Error(`${where}: evidence.value 引用了未声明的名字 ${name}`);
                         }
                     }
                 }
-            }
-            if (!isGuardRule && !raw.outputs.check) {
-                throw new Error(`${where}: outputs.check 必填（ran/skipped 用）`);
+                // validate template vars in description / evidence.source / suggestion
+                const txtPairs = [
+                    { vec: t.description, label: "description" },
+                    { vec: t.evidence?.source, label: "evidence.source" },
+                    { vec: t.suggestion, label: "suggestion" },
+                ];
+                for (const { vec: txt, label } of txtPairs) {
+                    const arr = Array.isArray(txt) ? txt : txt ? [txt] : [];
+                    for (const tt of arr) {
+                        if (typeof tt !== "string") continue;
+                        for (const m of tt.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)(:[^}]*)?\}/g)) {
+                            if (!declared.has(m[1]) && !BUILTIN_VARS.has(m[1]) && !eventKeys.has(m[1])) {
+                                throw new Error(`${where}: ${label} 引用了未声明的名字 ${m[1]}`);
+                            }
+                        }
+                    }
+                }
             }
             rules.push(raw);
             sources.push(file);
@@ -997,7 +967,7 @@ function withMapConditions(map, conditions, where) {
                 `要按固件 / 机架 / 模式 / 解锁收紧，得先在 get_flight_track 里接上同一个闸门`,
         );
     }
-    return { ...map, conditions: { topics: conditions.topics ?? [] } };
+    return { ...map, conditions: { topics: conditions.message ?? [] } };
 }
 
 /** 一份预设 → `{plot, map, refs}`（plot 进前端产物，map 进 facts.track）。 */
@@ -1100,13 +1070,13 @@ function normalizeConditions(raw, where, vehicles) {
     const cond = raw ?? {};
     if (typeof cond !== "object" || cond === null || Array.isArray(cond)) {
         throw new Error(
-            `${where}: conditions 必须是对象（可用键：firmware / vehicle / topics / mode / armed / placeholder）`,
+            `${where}: conditions 必须是对象（可用键：firmware / vehicle / message / mode / armed / placeholder）`,
         );
     }
     for (const k of Object.keys(cond)) {
-        if (!["firmware", "vehicle", "topics", "mode", "armed", "placeholder"].includes(k)) {
+        if (!["firmware", "vehicle", "message", "mode", "armed", "placeholder"].includes(k)) {
             throw new Error(
-                `${where}: conditions 里有未知键 ${k}（可用：firmware / vehicle / topics / mode / armed / placeholder）`,
+                `${where}: conditions 里有未知键 ${k}（可用：firmware / vehicle / message / mode / armed / placeholder）`,
             );
         }
     }
@@ -1122,13 +1092,13 @@ function normalizeConditions(raw, where, vehicles) {
                 `实际是 ${JSON.stringify(cond.vehicle)}`,
         );
     }
-    if (cond.topics !== undefined && !Array.isArray(cond.topics)) {
-        throw new Error(`${where}: conditions.topics 必须是数组（每项一个 topic，多个候选用 || 分隔）`);
+    if (cond.message !== undefined && !Array.isArray(cond.message)) {
+        throw new Error(`${where}: conditions.message 必须是数组（每项一个 topic，多个候选用 || 分隔）`);
     }
-    if (Array.isArray(cond.topics) && cond.topics.length === 0) {
-        throw new Error(`${where}: conditions.topics 是空数组（没有依赖就整个删掉）`);
+    if (Array.isArray(cond.message) && cond.message.length === 0) {
+        throw new Error(`${where}: conditions.message 是空数组（没有依赖就整个删掉）`);
     }
-    const topics = (cond.topics ?? []).map((t) => {
+    const topics = (cond.message ?? []).map((t) => {
         try {
             return parseTopicReq(t);
         } catch (err) {
@@ -1142,7 +1112,7 @@ function normalizeConditions(raw, where, vehicles) {
         firmware: cond.firmware ?? "any",
         vehicle: normalizeVehicle(cond.vehicle ?? "any", vehicles, where),
     };
-    if (topics.length) out.topics = topics;
+    if (topics.length) out.message = topics;
     if (mode.length) out.mode = mode;
     if (armed !== undefined) out.armed = armed;
     if (placeholder !== undefined) out.placeholder = placeholder;
@@ -1239,32 +1209,29 @@ function fmtCompute(raw) {
 function fmtTriggers(raw) {
     const lines = [];
     for (const t of raw.triggers || []) {
-        const bits = [`**${t.severity}**`, `\`${t.when}\``];
-        if (t.threshold !== undefined && t.threshold !== null) bits.push(`阈值 ${t.threshold}`);
-        if (t.unit) bits.push(`单位 ${t.unit}`);
-        bits.push(`标题「${escapeMdx(t.title)}」`);
-        lines.push("- " + bits.join(" ｜ "));
+        const sevs = Array.isArray(t.severity) ? t.severity.join("/") : t.severity;
+        const whens = Array.isArray(t.when) ? t.when.join(", ") : t.when || "True";
+        const descs = Array.isArray(t.description) ? t.description.join(" / ") : t.description;
+        const thr = t.evidence?.threshold;
+        const thrs = Array.isArray(thr) ? thr.join(" / ") : thr;
+        const bits = [`**${sevs}**`, `\`${whens}\``];
+        if (thrs !== undefined && thrs !== null) bits.push(`threshold ${thrs}`);
+        if (t.evidence?.unit) bits.push(`unit ${t.evidence.unit}`);
+        bits.push(`description "${descs}"`);
+        if (t.label) bits.push(`label=${t.label}`);
+        lines.push("- " + bits.join(" | "));
     }
-    for (const g of raw.outputs?.guard_tags || []) {
-        lines.push(`- guard：当 \`${g.when}\` 时打标签 \`${g.tag}\``);
-    }
-    return lines.join("\n") || "- （只产 guard 标签，不发 finding）";
+    return lines.join("\n") || "-";
 }
 
 function fmtOutputs(raw) {
-    const outputs = raw.outputs || {};
+    const outputs = raw.outputs || [];
     const bits = [];
-    if (outputs.check) bits.push(`check=${outputs.check}`);
-    if (outputs.tag) bits.push(`tag=${outputs.tag}`);
-    if (outputs.stats) {
-        bits.push(
-            "stats=" +
-                Object.entries(outputs.stats)
-                    .map(([k, v]) => `${k}(round ${v?.round ?? "-"})`)
-                    .join(", "),
-        );
+    for (const o of outputs) {
+        if (o.name) bits.push(`${o.name}=${o.value}`);
     }
-    return bits.join("，") || "—";
+    if (raw.tag) bits.push(`tag=${raw.tag}`);
+    return bits.join(", ") || "-";
 }
 
 const SLOT_LABEL = {
@@ -1678,7 +1645,7 @@ function build() {
         };
         for (const v of vehicles.valid) allVehicles.add(String(v));
         const { rules, sources } = loadRules(fam.rulesDir, signatures, facts.rule_meta ?? {}, vehicles);
-        // guards 类经验没有 compute（其判定在 outputs.guard_tags），逐条校验已在 loadRules 里做
+        // guards via triggers[].severity: guard, validated in loadRules already
 
         // 3) 绘图预设（plot/*.yml）—— 曲线与地图**同一套声明**。编译结果两处消费：
         //    · 曲线与布局 → plots.generated.ts（前端）

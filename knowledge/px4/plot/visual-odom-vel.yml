@@ -1,9 +1,9 @@
-id: visual-odom-vel
+﻿id: visual-odom-vel
 title: Visual Odometry Velocity
 description: 视觉里程计速度（仅当 topic 存在时显示）。
 order: 14
 conditions:
-  topics: [vehicle_visual_odometry]
+  message: [vehicle_visual_odometry]
 outputs:
   - container: axes
     title: Visual Odometry Velocity

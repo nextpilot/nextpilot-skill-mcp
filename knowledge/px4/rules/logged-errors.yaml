@@ -13,22 +13,20 @@ order: 1
 version: 1.0.1
 
 compute:
-    - >-
-        n = count_items(MESSAGES, key="level_name",
-        in_list=["EMERGENCY", "ALERT", "CRITICAL", "ERROR"])
-    - >-
-        samples = take_items(MESSAGES, key="level_name",
-        in_list=["EMERGENCY", "ALERT", "CRITICAL", "ERROR"], limit=5,
-        clip={"message": 200}, drop=["level", "level_name"])
+  - >-
+    n = count_items(MESSAGES, key="level_name", in_list=["EMERGENCY", "ALERT", "CRITICAL", "ERROR"])
+  - >-
+    samples = take_items(MESSAGES, key="level_name", in_list=["EMERGENCY", "ALERT", "CRITICAL", "ERROR"], limit=5, clip={"message": 200}, drop=["level", "level_name"])
 
 triggers:
-    - when: "n > 0"
-      severity: critical
-      tag: null
-      threshold: 0
+  - when: "n > 0"
+    severity: critical
+    suggestion: "按时间顺序核对错误原文，这通常是定位根因最直接的证据。"
+    evidence_extra: { samples: samples }
+    description: 日志中出现 {n} 条 ERROR 及以上消息
+    evidence:
+      source: ulog.logged_messages(log_level<=3)
       value: n
+      threshold: 0
       unit: 条
-      field: "ulog.logged_messages(log_level<=3)"
-      title: "日志中出现 {n} 条 ERROR 及以上消息"
-      suggestion: "按时间顺序核对错误原文，这通常是定位根因最直接的证据。"
-      evidence_extra: { samples: samples }
+    label: null

@@ -1,9 +1,9 @@
-id: visual-odom-latency
+﻿id: visual-odom-latency
 title: Visual Odometry Latency
 description: 视觉里程计延迟（仅当 topic 存在时显示）。
 order: 17
 conditions:
-  topics: [vehicle_visual_odometry]
+  message: [vehicle_visual_odometry]
 outputs:
   - container: axes
     title: Visual Odometry Latency

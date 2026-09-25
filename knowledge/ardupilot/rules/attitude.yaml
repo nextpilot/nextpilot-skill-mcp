@@ -20,45 +20,46 @@ group: attitude_tracking
 order: 1
 
 conditions:
-    topics:
-        - ATT
+  message:
+    - ATT
 
 compute:
-    - ats = ref("ATT.timestamp")
-    - err_roll = abs_diff(ref("ATT.DesRoll"), ref("ATT.Roll"))
-    - peak_roll = max(err_roll)
-    - worst_roll = excursion_events(err_roll, ats, T0_US, threshold=15.0, limit=1)
+  - ats = ATT.timestamp
+  - err_roll = abs(ATT.DesRoll - ATT.Roll)
+  - peak_roll = max(err_roll)
+  - worst_roll = excursion_events(err_roll, ats, T0_US, threshold=15.0, limit=1)
 
-foreach: { var: worst_roll, keys: [dur_s, peak, start_s, end_s] }
-
-outputs:
-    tag: apm_attitude_tracking_error
+foreach: { var: worst_roll, keys: [ dur_s, peak, start_s, end_s ] }
 
 triggers:
-    - when: "dur_s >= 1.0 and peak > 25.0"
-      severity: critical
-      threshold: 25.0
+  - when: "dur_s >= 1.0 and peak > 25.0"
+    severity: critical
+    suggestion: "持续超过 1 s 且误差大于 25°，说明机体达不到指令姿态：失控、机械故障（电机/电调/桨、舵面连杆）或动力不足/超重。查机体机械与动力余量，并复核是否超重。"
+    description: 横滚跟踪失败，持续 {dur_s:.1f} s、误差峰值 {peak:.0f}°（t={start_s:.1f}s）
+    evidence:
+      source: ATT.DesRoll - ATT.Roll
       value: f"{peak:.1f}"
+      threshold: 25
       unit: deg
-      field: "ATT.DesRoll - ATT.Roll"
-      title: "横滚跟踪失败，持续 {dur_s:.1f} s、误差峰值 {peak:.0f}°（t={start_s:.1f}s）"
-      suggestion: "持续超过 1 s 且误差大于 25°，说明机体达不到指令姿态：失控、机械故障（电机/电调/桨、舵面连杆）或动力不足/超重。查机体机械与动力余量，并复核是否超重。"
-    - when: "dur_s >= 1.0"
-      severity: warning
-      threshold: 15.0
+  - when: "dur_s >= 1.0"
+    severity: warning
+    suggestion: "误差持续在 15° 以上说明机体明显跟不上指令。复核 PID 整定与控制权限，并确认没有部分机械失效。"
+    description: 横滚持续偏离指令 {dur_s:.1f} s，误差峰值 {peak:.0f}°（t={start_s:.1f}s）
+    evidence:
+      source: ATT.DesRoll - ATT.Roll
       value: f"{peak:.1f}"
+      threshold: 15
       unit: deg
-      field: "ATT.DesRoll - ATT.Roll"
-      title: "横滚持续偏离指令 {dur_s:.1f} s，误差峰值 {peak:.0f}°（t={start_s:.1f}s）"
-      suggestion: "误差持续在 15° 以上说明机体明显跟不上指令。复核 PID 整定与控制权限，并确认没有部分机械失效。"
-    - when: "peak_roll > 30.0"
-      severity: warning
-      threshold: 30.0
+  - when: "peak_roll > 30.0"
+    severity: warning
+    suggestion: "未达 1 s 持续，多为阵风或粗猛打杆造成的瞬时偏差；若多次飞行反复出现再深究。"
+    description: 横滚跟踪误差瞬时尖峰 {peak_roll:.0f}°
+    evidence:
+      source: ATT.DesRoll - ATT.Roll(峰值)
       value: f"{peak_roll:.1f}"
+      threshold: 30
       unit: deg
-      field: "ATT.DesRoll - ATT.Roll(峰值)"
-      title: "横滚跟踪误差瞬时尖峰 {peak_roll:.0f}°"
-      suggestion: "未达 1 s 持续，多为阵风或粗猛打杆造成的瞬时偏差；若多次飞行反复出现再深究。"
+tag: apm_attitude_tracking_error
 
 ---
 id: apm-attitude-pitch
@@ -67,45 +68,46 @@ group: attitude_tracking
 order: 2
 
 conditions:
-    topics:
-        - ATT
+  message:
+    - ATT
 
 compute:
-    - ats = ref("ATT.timestamp")
-    - err_pitch = abs_diff(ref("ATT.DesPitch"), ref("ATT.Pitch"))
-    - peak_pitch = max(err_pitch)
-    - worst_pitch = excursion_events(err_pitch, ats, T0_US, threshold=15.0, limit=1)
+  - ats = ATT.timestamp
+  - err_pitch = abs(ATT.DesPitch - ATT.Pitch)
+  - peak_pitch = max(err_pitch)
+  - worst_pitch = excursion_events(err_pitch, ats, T0_US, threshold=15.0, limit=1)
 
-foreach: { var: worst_pitch, keys: [dur_s, peak, start_s, end_s] }
-
-outputs:
-    tag: apm_attitude_tracking_error
+foreach: { var: worst_pitch, keys: [ dur_s, peak, start_s, end_s ] }
 
 triggers:
-    - when: "dur_s >= 1.0 and peak > 25.0"
-      severity: critical
-      threshold: 25.0
+  - when: "dur_s >= 1.0 and peak > 25.0"
+    severity: critical
+    suggestion: "持续超过 1 s 且误差大于 25°，说明机体达不到指令姿态：失控、舵面/连杆故障或动力不足/超重。查重心、舵面连杆与动力余量。"
+    description: 俯仰跟踪失败，持续 {dur_s:.1f} s、误差峰值 {peak:.0f}°（t={start_s:.1f}s）
+    evidence:
+      source: ATT.DesPitch - ATT.Pitch
       value: f"{peak:.1f}"
+      threshold: 25
       unit: deg
-      field: "ATT.DesPitch - ATT.Pitch"
-      title: "俯仰跟踪失败，持续 {dur_s:.1f} s、误差峰值 {peak:.0f}°（t={start_s:.1f}s）"
-      suggestion: "持续超过 1 s 且误差大于 25°，说明机体达不到指令姿态：失控、舵面/连杆故障或动力不足/超重。查重心、舵面连杆与动力余量。"
-    - when: "dur_s >= 1.0"
-      severity: warning
-      threshold: 15.0
+  - when: "dur_s >= 1.0"
+    severity: warning
+    suggestion: "误差持续在 15° 以上说明机体明显跟不上指令。复核 PID 整定与控制权限，并确认没有部分机械失效。"
+    description: 俯仰持续偏离指令 {dur_s:.1f} s，误差峰值 {peak:.0f}°（t={start_s:.1f}s）
+    evidence:
+      source: ATT.DesPitch - ATT.Pitch
       value: f"{peak:.1f}"
+      threshold: 15
       unit: deg
-      field: "ATT.DesPitch - ATT.Pitch"
-      title: "俯仰持续偏离指令 {dur_s:.1f} s，误差峰值 {peak:.0f}°（t={start_s:.1f}s）"
-      suggestion: "误差持续在 15° 以上说明机体明显跟不上指令。复核 PID 整定与控制权限，并确认没有部分机械失效。"
-    - when: "peak_pitch > 30.0"
-      severity: warning
-      threshold: 30.0
+  - when: "peak_pitch > 30.0"
+    severity: warning
+    suggestion: "未达 1 s 持续，多为阵风或粗猛打杆造成的瞬时偏差；若多次飞行反复出现再深究。"
+    description: 俯仰跟踪误差瞬时尖峰 {peak_pitch:.0f}°
+    evidence:
+      source: ATT.DesPitch - ATT.Pitch(峰值)
       value: f"{peak_pitch:.1f}"
+      threshold: 30
       unit: deg
-      field: "ATT.DesPitch - ATT.Pitch(峰值)"
-      title: "俯仰跟踪误差瞬时尖峰 {peak_pitch:.0f}°"
-      suggestion: "未达 1 s 持续，多为阵风或粗猛打杆造成的瞬时偏差；若多次飞行反复出现再深究。"
+tag: apm_attitude_tracking_error
 
 ---
 # 航向要绕回：误差 = (实测 - 期望) 后 wrap 到 ±180°，否则跨 ±180° 时会给出约 360° 的假误差。
@@ -115,42 +117,43 @@ group: attitude_tracking
 order: 3
 
 conditions:
-    topics:
-        - ATT
+  message:
+    - ATT
 
 compute:
-    - ats = ref("ATT.timestamp")
-    - err_yaw = abs_values(wrap_degrees(sub(ref("ATT.Yaw"), ref("ATT.DesYaw"))))
-    - peak_yaw = max(err_yaw)
-    - worst_yaw = excursion_events(err_yaw, ats, T0_US, threshold=15.0, limit=1)
+  - ats = ATT.timestamp
+  - err_yaw = abs(wrap_degrees(ATT.Yaw - ATT.DesYaw))
+  - peak_yaw = max(err_yaw)
+  - worst_yaw = excursion_events(err_yaw, ats, T0_US, threshold=15.0, limit=1)
 
-foreach: { var: worst_yaw, keys: [dur_s, peak, start_s, end_s] }
-
-outputs:
-    tag: apm_attitude_tracking_error
+foreach: { var: worst_yaw, keys: [ dur_s, peak, start_s, end_s ] }
 
 triggers:
-    - when: "dur_s >= 1.0 and peak > 25.0"
-      severity: critical
-      threshold: 25.0
+  - when: "dur_s >= 1.0 and peak > 25.0"
+    severity: critical
+    suggestion: "持续超过 1 s 且误差大于 25°，说明机体达不到指令航向：罗盘干扰、偏航通道机械问题或电机失衡。查罗盘（见 apm-compass-interference）与偏航方向的一致性。"
+    description: 航向跟踪失败，持续 {dur_s:.1f} s、误差峰值 {peak:.0f}°（t={start_s:.1f}s）
+    evidence:
+      source: ATT.DesYaw - ATT.Yaw(绕回 ±180°)
       value: f"{peak:.1f}"
+      threshold: 25
       unit: deg
-      field: "ATT.DesYaw - ATT.Yaw(绕回 ±180°)"
-      title: "航向跟踪失败，持续 {dur_s:.1f} s、误差峰值 {peak:.0f}°（t={start_s:.1f}s）"
-      suggestion: "持续超过 1 s 且误差大于 25°，说明机体达不到指令航向：罗盘干扰、偏航通道机械问题或电机失衡。查罗盘（见 apm-compass-interference）与偏航方向的一致性。"
-    - when: "dur_s >= 1.0"
-      severity: warning
-      threshold: 15.0
+  - when: "dur_s >= 1.0"
+    severity: warning
+    suggestion: "误差持续在 15° 以上，常见于罗盘干扰、偏航通道机械问题或电机失衡。复核罗盘与偏航控制权限。"
+    description: 航向持续偏离指令 {dur_s:.1f} s，误差峰值 {peak:.0f}°（t={start_s:.1f}s）
+    evidence:
+      source: ATT.DesYaw - ATT.Yaw(绕回 ±180°)
       value: f"{peak:.1f}"
+      threshold: 15
       unit: deg
-      field: "ATT.DesYaw - ATT.Yaw(绕回 ±180°)"
-      title: "航向持续偏离指令 {dur_s:.1f} s，误差峰值 {peak:.0f}°（t={start_s:.1f}s）"
-      suggestion: "误差持续在 15° 以上，常见于罗盘干扰、偏航通道机械问题或电机失衡。复核罗盘与偏航控制权限。"
-    - when: "peak_yaw > 30.0"
-      severity: warning
-      threshold: 30.0
+  - when: "peak_yaw > 30.0"
+    severity: warning
+    suggestion: "未达 1 s 持续，多为阵风或粗猛打杆造成的瞬时偏差；若多次飞行反复出现再深究。"
+    description: 航向跟踪误差瞬时尖峰 {peak_yaw:.0f}°
+    evidence:
+      source: ATT.DesYaw - ATT.Yaw(绕回 ±180°, 峰值)
       value: f"{peak_yaw:.1f}"
+      threshold: 30
       unit: deg
-      field: "ATT.DesYaw - ATT.Yaw(绕回 ±180°, 峰值)"
-      title: "航向跟踪误差瞬时尖峰 {peak_yaw:.0f}°"
-      suggestion: "未达 1 s 持续，多为阵风或粗猛打杆造成的瞬时偏差；若多次飞行反复出现再深究。"
+tag: apm_attitude_tracking_error

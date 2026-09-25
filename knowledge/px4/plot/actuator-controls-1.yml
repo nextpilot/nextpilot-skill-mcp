@@ -1,9 +1,9 @@
-id: actuator-controls-1
+﻿id: actuator-controls-1
 title: Actuator Controls 1 (VTOL in Fixed-Wing mode)
 description: 第二组 Actuator Controls（仅 VTOL/固定翼配置时存在）。
 order: 22
 conditions:
-  topics: ["vehicle_torque_setpoint || actuator_controls_1"]
+  message: ["vehicle_torque_setpoint || actuator_controls_1"]
 outputs:
   - container: axes
     title: Actuator Controls 1 (VTOL in Fixed-Wing mode)

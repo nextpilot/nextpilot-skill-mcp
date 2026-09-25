@@ -17,9 +17,12 @@ group:
   xxx # 执行分组：决定执行顺序与 finding 编号（F01、F02…）。
   # 必须已登记在 facts.yaml 的 group_order 与 rule_meta.by_group
 order: 1 # 同 group 内的次序（缺省 100000，再按 id 兜底）
+# 这条经验**还没实现**时写一句原因——引擎跳过并把这句话原样当作跳过原因显示。
+# 实现了的规则删掉此行（不写或写 false 都行，含义一样：不是占位）。
+# placeholder: "待补能力：xxx 暂未实现"
 # 下面这些可省，缺省按 group 从 facts.yaml 的 rule_meta 派生，只在确实偏离时才写：
-#   category / version / status / license / author / outputs.check / doc
-# doc: https://docs.px4.io/main/en/...   # 整条规则的官方文档链接 → finding.docUrl
+#   category / version / status / license / author / docUrl
+# docUrl: https://docs.px4.io/main/en/...   # 整条规则的官方文档链接 → finding.docUrl
 # version: 1.1.0                         # 经验自身版本
 
 # ── 适用范围：整块可省（省 = 什么都适用、没有数据依赖）。**任一键不满足都会记一条 skipped**
@@ -33,10 +36,10 @@ conditions:
   # （rotary_wing / fixed_wing / rover / airship，另有 unknown）；简写 mc / fw 也认
   # （facts.yaml 的 vehicle_aliases），构建期换成规范名，产物里只留规范名。
   vehicle: any
-  # 数据依赖：日志里得有这些 topic，缺了记一条 skipped（文案自动生成 "X not in log"）。
+  # 数据依赖：日志里得有这些 message，缺了记一条 skipped（文案自动生成 "X not in log"）。
   # 项内 `||` = **其中任意一个在日志里就够**（"改名/另有别名"用它），项间 = 都要有。
-  # 只列"缺了就不该判"的 topic——走过 _try 的可选字段别列进来，那会把能跑的规则变成跳过。
-  topics:
+  # 只列"缺了就不该判"的 message——走过 _try 的可选字段别列进来，那会把能跑的规则变成跳过。
+  message:
     - vehicle_status
     - estimator_wind || wind_estimate
   # 解锁门槛（三个轴里最常用）：不写 = any 不限。
@@ -44,13 +47,11 @@ conditions:
   #   ">12"          解锁**总时长** ARMED_S 的门槛（秒）；也认 >= <= < ==，写数字 12 = ">=12"
   # 判据算不出来（ARMED_S 是 None）当作不满足并跳过——宁可跳过，不在没解锁的日志上误报。
   armed: true
-  # 模式：与 topics **同形**（项内 `||` = 任一出现过即可，项间 = 都要出现过）。
+  # 模式：与 message **同形**（项内 `||` = 任一出现过即可，项间 = 都要出现过）。
   # 比的是"日志里出现过哪些模式"，不是"当前处于"——规则看整段日志，不是一个时刻。
   # 日志没有模式段时会跳过（拿不到模式就套用只适用于某模式的阈值只会误报）。
   # mode:
   #   - AUTO || LOITER
-  # 占位：这条还没实现。引擎跳过并把这句原样显示成 skipped 的原因。**别拿它写判据**。
-  # placeholder: "待补算子：需要 xxx，引擎当前缺 yyy"
 
 # ── 取值：一串表达式，自上而下求值；输出的名字供后面与 triggers 引用 ──
 # 表达式写法（Python 的真子集，与 triggers.when 同一套）：
@@ -61,73 +62,70 @@ conditions:
 #   算不出来（表达式抛异常）→ 整条中止，并**自动**记一条 skipped「数据不足，本条没算出结论」。
 #   要容错就用 _try(...)：内层出错或得 None 时结果为 None，不让整条中止。
 #
-# 字段引用（**完整形态 `topic[N].field[M]`**：第 N 个实例的字段的第 M 个元素。
-# 两个下标各自可省，省掉的含义不同，别混）：
-#   topic[N].field[M]             —— 完整形态（两个下标一起用也合法）
-#   topic[N].field                —— 只取第 N 个实例（N 可为负，按 Python 语义从末尾数）
-#   topic.field[M]                —— 字段的第 M 个元素：数组字段给**整条序列**（q[0] 是第 0
-#                                   个分量随时间变化）；标量序列给**第 M 个采样的标量**
-#                                   （ref_alt[0] 是首值，ref_alt[0] - ref_alt 就是"相对基准"）
-#   topic.field[i,j]              —— 二维下标：i 是行（第几个采样，随时间递进）、j 是列
-#                                   （第几路信号）。数组字段在日志里存成"每列一条序列"
-#                                   （q[0]、q[1]…），所以 q[10,2] = 第 10 个采样、第 2 列
-#   topic.field                    —— **只取第 0 个实例**（与 topic[0].field 同义）
-#   topic[:].field                 —— **所有实例**：多实例给「每实例一组」交给会分组的算子；
-#                                   单实例就是那一条序列
-#   topic[a:b].field               —— 闭区间，实例 a~b（**含 b**），如 [1:3] = 1、2、3
+# 字段引用（**所有形态都用裸写**——引擎自动补 ref()；只有挂 unit / alias / 候选组
+# 时才显式写 ref，因为那不能在裸写语法里表达）：
+#   topic.field                    —— 第 0 个实例（与 topic[0].field 同义）
+#   topic[N].field                 —— 第 N 个实例（N 可为负，按 Python 语义）
+#   topic[:].field                 —— 所有实例：多实例给"每实例一组"交给会分组的算子
+#   topic[a:b].field               —— 闭区间，实例 a~b（**含 b**）
+#   topic.field[M]                 —— 字段的第 M 个元素：数组字段给整条序列（q[0] 是第 0
+#                                    个分量随时间变化）；标量序列给第 M 个采样的标量
+#   topic.field[i,j]               —— 二维下标：i 是行（采样）、j 是列（信号）
+#   topic[i].field[j]              —— 实例 + 元素双重下标
 #
-# 裸写还是包 ref(...)：**不需要修饰就用裸写**——`vehicle_status.nav_state` 与
-# `ref("vehicle_status.nav_state")` 完全等价，包了是白写；要指定实例、或挂 alias /
-# unit / 候选组时才写 ref。两条硬规则：
-#   · ref 的第一个参数必须是**字符串**。写成 ref(battery_status.remaining) 是错的——
-#     那样 Python 会先把字段读出来当参数传，修饰就来不及生效了。
-#   · **裸写不能带实例下标**：`cpuload[0].load` 构建期就报错并提示改写。原因是表达式走
-#     Python `ast` 白名单求值，而裸写的中括号是个 Subscript 节点（等于开了"任意下标"
-#     这个能力），白名单不给；实例信息只能装在字符串里、由 ref 去解析。
+#   · topic.field                 裸写 = ref("topic.field")——完全等价，包了是白写
+#   · topic[0].field              裸写 = ref("topic[0].field")——等价，但更推荐 topic.field
+#   · topic[:].data               裸写 = ref("topic[:].data")——取所有实例
+#   · topic[i].field[j]           裸写 = ref("topic[i].field[j]")——变量下标也支持
 #
-# ref 能挂的三样修饰：
-#   ref("新名", "旧名")                      候选组：按顺序取第一个存在的（改名一律用它）
-#   ref("latitude_deg", "lat", unit="deg")   改名**且**改了单位：取到谁都换算成 deg
+# 以下情况才需要显式 ref(...)：
+#   ref("新名", "旧名")                      候选组：按顺序取第一个存在的
+#   ref("latitude_deg", "lat", unit="deg")   改名 + 改单位：取到谁都换算成 deg
 #   ref("...", alias="clipping")             备用命名，等价于放进候选组
-#   ↑ **没有"这条引用只适用于某版本"这种写法**：升级换代就是老名字没了、新名字在，按存在性
-#     挑就够。要按版本分段的是**语义**差异（比如同一字段换了单位/口径），那种拆成两条规则。
-#   ↑ unit= 只在写了它时才换算：源单位从 meta/<tag>.json 查（经 meta/topic-map.yaml 换
-#     字典键），查不到会**告警**（不是失败），补一行到
-#     knowledge/px4/meta/topic-overrides.yaml 的 units 里即可。
+#   ↑ **没有"这条引用只适用于某版本"**：升级换代就是老名字没了、新名字在，按存在性挑就够
+#
+# 可用内置（Python + numpy 子集，直接用、不用 import）：
+#   int(x)  len(x)  abs(x)  min(x)  max(x)  sum(x)  bool(x)
+#   np.sum  np.mean  np.std  np.ptp  np.abs  np.max  np.min  np.hypot  np.maximum  np.isin  np.percentile
+#   x if cond else y    x and y    x or y    not x    x is None    x in [...]
+#   算术 + - * / % **     比较 < <= == != > >=    位运算 & |
+#   数组下标 arr[mask]  arr[i,j]  arr[:]  （布尔索引等价于 keep_gt / apply_mask）
 compute:
-  - >-
-    vibe_mean, vibe_p95, vibe_max, imu_idx = worst_mean_stats(
-    ref("vehicle_imu_status[:].accel_vibration_metric"))
-  - >-
-    step = _try(adjacent_speed_mps(
-    ref("vehicle_gps_position.latitude_deg", "vehicle_gps_position.lat", unit="deg"),
-    ref("vehicle_gps_position.longitude_deg", "vehicle_gps_position.lon", unit="deg"),
-    ref("vehicle_gps_position.timestamp")))
-  - n = count_above(step, gt=50.0)
+  - vibe_mean, vibe_p95, vibe_max, imu_idx = worst_mean_stats(
+    vehicle_imu_status[:].accel_vibration_metric)
+  - step = _try(adjacent_speed_mps(
+    vehicle_gps_position.latitude_deg,
+    vehicle_gps_position.longitude_deg,
+    vehicle_gps_position.timestamp))
+  - n_jump = int(np.sum(step > 50.0))
 
-# ── 副产品（整块可省）：喂故障库的标签、写进「关键数据」的统计、按条件打的数据质量标签 ──
-outputs:
-  check: xxx # ran/skipped 用的 check 名；缺省 = group
-  tag: xxx # 喂故障库匹配的异常标签（trigger 没写 tag 时回退到它）
-  stats: # → 报告「关键数据」；var 是 compute 里的变量名
-    xxxCount: { var: n, round: 3 }
-  guard_tags: # 条件性数据质量标签：不依赖是否发出 finding，算出来就带上
-    - { when: "n > 0", tag: temperature_change_large }
+# ── 输出（整块可省）：指标统计，写进报告「关键数据」 ──
+outputs: # 数组，每条一项指标
+  - name: xxxCount # 指标名（metrics 的键）
+    value: n_jump # compute 里的变量名
+    round: 3 # 小数位（可选）
+    unit: 次 # 单位（可选）
+    description: "..." # 说明（可选，可用 {变量} 占位）
 
-# ── 判定：自上而下，命中第一条即发一条 finding（guard 类经验可整块省）──
+# ── 判定：自上而下，同一 trigger 的 when[] 短路命中第一条即停 ──
+# guard 类经验可整块省（severity: guard）。
 # 数据缺失要让条件自己为假——表达式里的异常按"未命中"处理
 # （如 airspeed 的 `has_invalid and invalid_frac >= 0.50`）
 triggers:
-  - when: "n >= 3" # 必填
-    severity: warning # 必填：critical | warning | info
-    title: "……{n}……" # 必填；可用 {变量} 占位
-    field: "some_topic.some_field" # 必填：证据字段（evidence.field）
-    value: f"{n:.3f}" # 证据值，表达式（f-string 管格式化）
-    threshold: 3 # 阈值（evidence.threshold）
-    unit: 次 # 单位（evidence.unit）
-    tag: xxx # 本条 finding 的标签（缺省 = outputs.tag；写 null = 不产标签）
-    suggestion: "结合故障库 F0xx：……" # 结论建议（也可用 {变量} 占位）
-    evidence_extra: { samples: samples } # 额外证据：{evidence 键: 变量名}
+  - when: "n_jump >= 3" # 必填（可单值或数组；缺省 = True）
+    severity: warning # 必填：critical | warning | info | guard
+    description: "……{n_jump}……" # 必填；可用 {变量} 占位（可单值或数组）
+    label: xxx # 本条 finding 的标签（缺省 = 顶层 tag；写 null = 不产标签）
+    suggestion: "结合故障库 F0xx：……" # 结论建议（可用 {变量} 占位）
+    evidence: # 结构化触发依据
+      source: "vehicle_gps_position.latitude_deg" # 必填：证据来源
+      value: f"{n_jump:.3f}" # 证据值，表达式（f-string 管格式化）
+      threshold: 3 # 阈值（可选；可单值或数组对应 when[]）
+      unit: 次 # 单位（可选）
+
+# ── 顶层标签（可选）：喂故障库匹配的异常标签 ──
+# tag: xxx    # trigger 没写 label 时回退到它
+# docurl: https://docs.px4.io/main/en/...  # 规则级文档链接
 
 
 # ── 可选：事件类经验（一次事件一条 finding，如每次失效保护边沿）──
@@ -137,8 +135,9 @@ triggers:
 # ── 可选：算出来了、但还不算"跑过"（如机动段样本不足）──
 # ran_when: "seg_ok"
 
-# ── 一个 YAML 装多条经验：顶层写成数组。只有形态完全相同的兄弟经验才合并
-#    （如 failsafe.yaml 的 6 条：5 个布尔事件 + 导航状态）
+# ── 一个 YAML 装多条经验：两种方式 ──
+#
+# 方式一：顶层数组（形态共享时用）
 # - id: px4-xxx-failsafe
 #   name: ...
 #   group: failsafe
@@ -146,12 +145,31 @@ triggers:
 #   compute: [...]
 #   triggers: [...]
 # - id: px4-xxx-rc-lost
+#   name: ...
 #   ...
+#
+# 方式二：YAML 多文档分隔符 ---（主题相关、同文件维护时用）
+# ---
+# id: apm-xxx-first
+# name: ...
+# group: xxx
+# order: 1
+# ...
+# ---
+# id: apm-xxx-second
+# name: ...
+# group: xxx
+# order: 2
+# ...
 
-# ── guard 类经验（只打数据质量标签，不发 finding）：没有 compute / triggers / check ──
+# ── guard 类经验（只打数据质量标签，不发 finding）：没有 compute ──
 # id: px4-guard-xxx
 # name: 数据质量-xxx
-# group: guards                # 或 guards_early（要最早执行、且它的标签排第一时用）
-# outputs:
-#   guard_tags:
-#     - {when: "DROPOUT_MS > 1000", tag: log_dropouts_high}
+# group: guards                # 或 guards_early
+# triggers:
+#   - when: "DROPOUT_MS > 1000"
+#     severity: guard
+#     label: log_dropouts_high
+#     description: "日志丢包超过阈值"
+#     evidence:
+#       source: ""

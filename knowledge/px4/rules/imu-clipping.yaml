@@ -7,47 +7,50 @@ group: vibration
 order: 3
 
 conditions:
-    topics:
-        - vehicle_imu_status
+  message:
+    - vehicle_imu_status
 
 compute:
-    # 每个实例每组 3 列（每轴一条累计计数序列）；逐列 max-min，取全局最大差值。
-    # alias 覆盖旧固件的字段改名；只在 count > 0 时写 imuAccelClippingCountMax
-    # （原实现同样用条件性统计保持等价）
-    - >-
-        clip, clip_idx, clip_axis = worst_column_delta(
-          ref("vehicle_imu_status[:].accel_clipping", alias="clipping"))
-    - clip_stat = clip if clip > 0 else None
+  # 每个实例每组 3 列（每轴一条累计计数序列）；逐列 max-min，取全局最大差值。
+  # alias 覆盖旧固件的字段改名；只在 count > 0 时写 imuAccelClippingCountMax
+  # （原实现同样用条件性统计保持等价）
+  - >-
+    clip, clip_idx, clip_axis = worst_column_delta(
+      ref("vehicle_imu_status[:].accel_clipping", alias="clipping"))
+  - clip_stat = clip if clip > 0 else None
 
 outputs:
-    tag: high_vibration
-    stats:
-        imuAccelClippingCountMax: { var: clip_stat }
+  - name: imuAccelClippingCountMax
+    value: clip_stat
 
 triggers:
-    # 0 次不报（与原实现 worst_clip["count"] > 0 一致）
-    - when: "clip >= 1000"
-      severity: critical
+  # 0 次不报（与原实现 worst_clip["count"] > 0 一致）
+  - when: "clip >= 1000"
+    severity: critical
+    suggestion: "持续削波会破坏 EKF 估计，请优先排除机械振动源。"
+    description: "加速度计削波严重：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）"
+    evidence:
+      source: vehicle_imu_status.accel_clipping[{clip_axis}](末值-首值)
+      value: clip
       threshold: 1000
-      value: clip
       unit: count
-      field: "vehicle_imu_status.accel_clipping[{clip_axis}](末值-首值)"
-      title: "加速度计削波严重：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）"
-      suggestion: "持续削波会破坏 EKF 估计，请优先排除机械振动源。"
-    - when: "clip >= 100"
-      severity: warning
+  - when: "clip >= 100"
+    severity: warning
+    suggestion: "削波表明振动峰值已超出传感器量程，建议排查机械振动源。"
+    description: "检测到明显加速度计削波：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）"
+    evidence:
+      source: vehicle_imu_status.accel_clipping[{clip_axis}](末值-首值)
+      value: clip
       threshold: 100
-      value: clip
       unit: count
-      field: "vehicle_imu_status.accel_clipping[{clip_axis}](末值-首值)"
-      title: "检测到明显加速度计削波：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）"
-      suggestion: "削波表明振动峰值已超出传感器量程，建议排查机械振动源。"
-    - when: "clip > 0"
-      severity: info
-      tag: null
+  - when: "clip > 0"
+    severity: info
+    suggestion: "少量削波可先观察；频次升高或伴随振动告警需排查机械问题。"
+    description: "偶发加速度计削波：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）"
+    evidence:
+      source: vehicle_imu_status.accel_clipping[{clip_axis}](末值-首值)
+      value: clip
       threshold: 0
-      value: clip
       unit: count
-      field: "vehicle_imu_status.accel_clipping[{clip_axis}](末值-首值)"
-      title: "偶发加速度计削波：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）"
-      suggestion: "少量削波可先观察；频次升高或伴随振动告警需排查机械问题。"
+    label: null
+tag: high_vibration

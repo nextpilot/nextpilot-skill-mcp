@@ -1,9 +1,9 @@
-id: gps-noise
+﻿id: gps-noise
 title: GPS Noise & Jamming
 description: GPS 噪声与干扰指示器。
 order: 33
 conditions:
-  topics: ["vehicle_gps_position || sensor_gps"]
+  message: ["vehicle_gps_position || sensor_gps"]
 outputs:
   - container: axes
     title: GPS Noise & Jamming

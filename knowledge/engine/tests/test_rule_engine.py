@@ -72,7 +72,6 @@ def test_eval_expr_rejects_unsafe_nodes():
     env = {"topics": set(), "has_topic": lambda t: False}
     for bad in (
         "vehicle_attitude.q",  # 属性访问
-        "topics[0]",  # 下标
         "[x for x in range(3)]",  # 推导式
         'open("x")',  # 任意函数调用（非白名单）
         '__import__("os")',

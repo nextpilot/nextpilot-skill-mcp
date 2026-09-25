@@ -1,9 +1,9 @@
-id: fifo-gyro
+﻿id: fifo-gyro
 title: Raw Gyro (FIFO)
 description: FIFO 陀螺仪原始数据（每 IMU 一张），仅当 sensor_gyro_fifo 存在时显示。
 order: 29
 conditions:
-  topics: [sensor_gyro_fifo]
+  message: [sensor_gyro_fifo]
 outputs:
   - container: axes
     title: "Raw Gyro (FIFO, IMU{instance})"

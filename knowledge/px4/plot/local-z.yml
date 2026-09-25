@@ -1,9 +1,9 @@
-id: local-z
+﻿id: local-z
 title: Local Position Z
 description: 局部位置 Z 轴估计值与 setpoint（向上为正）。
 order: 11
 conditions:
-  topics: [vehicle_local_position]
+  message: [vehicle_local_position]
 outputs:
   - container: axes
     title: Local Position Z

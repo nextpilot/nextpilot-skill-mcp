@@ -18,44 +18,45 @@ group: vibration
 order: 1
 
 conditions:
-    topics:
-        - VIBE
+  message:
+    - VIBE
 
 compute:
-    - vx = ref("VIBE.VibeX")
-    - vx_max = max(vx)
-    # 超阈值的样本占比：上游用 10% 把"偶尔冒尖"和"持续超标"分开
-    - frac_warn = div(count_above(vx, gt=30.0), length_of(vx))
-    - frac_crit = div(count_above(vx, gt=60.0), length_of(vx))
-
-outputs:
-    tag: apm_high_vibration
+  - vx = VIBE.VibeX
+  - vx_max = max(vx)
+  # 超阈值的样本占比：上游用 10% 把"偶尔冒尖"和"持续超标"分开
+  - frac_warn = np.sum(vx > 30.0) / len(vx)
+  - frac_crit = np.sum(vx > 60.0) / len(vx)
 
 triggers:
-    - when: "vx_max > 60.0 or frac_crit > 0.0"
-      severity: critical
-      threshold: 60.0
+  - when: "vx_max > 60.0 or frac_crit > 0.0"
+    severity: critical
+    suggestion: "超过 60 m/s^2 会让加速度计数据失真并可能触发 EKF 失效。改善飞控减震与桨/电机动平衡后再飞。"
+    description: X 轴振动严重超标，峰值 {vx_max:.0f} m/s^2
+    evidence:
+      source: VIBE.VibeX(峰值)
       value: f"{vx_max:.1f}"
+      threshold: 60
       unit: m/s^2
-      field: "VIBE.VibeX(峰值)"
-      title: "X 轴振动严重超标，峰值 {vx_max:.0f} m/s^2"
-      suggestion: "超过 60 m/s^2 会让加速度计数据失真并可能触发 EKF 失效。改善飞控减震与桨/电机动平衡后再飞。"
-    - when: "frac_warn >= 0.10"
-      severity: warning
-      threshold: 30.0
+  - when: "frac_warn >= 0.10"
+    severity: warning
+    suggestion: "全程有 10% 以上样本超过 30 m/s^2。检查安装与动平衡，考虑启用谐波陷波滤波器。"
+    description: X 轴振动持续偏大，峰值 {vx_max:.0f} m/s^2
+    evidence:
+      source: VIBE.VibeX(峰值)
       value: f"{vx_max:.1f}"
+      threshold: 30
       unit: m/s^2
-      field: "VIBE.VibeX(峰值)"
-      title: "X 轴振动持续偏大，峰值 {vx_max:.0f} m/s^2"
-      suggestion: "全程有 10% 以上样本超过 30 m/s^2。检查安装与动平衡，考虑启用谐波陷波滤波器。"
-    - when: "vx_max > 30.0"
-      severity: info
-      threshold: 30.0
+  - when: "vx_max > 30.0"
+    severity: info
+    suggestion: "仅个别时刻超过 30 m/s^2，整体可接受；若伴随定位漂移再排查。"
+    description: X 轴振动偶有冒尖，峰值 {vx_max:.0f} m/s^2
+    evidence:
+      source: VIBE.VibeX(峰值)
       value: f"{vx_max:.1f}"
+      threshold: 30
       unit: m/s^2
-      field: "VIBE.VibeX(峰值)"
-      title: "X 轴振动偶有冒尖，峰值 {vx_max:.0f} m/s^2"
-      suggestion: "仅个别时刻超过 30 m/s^2，整体可接受；若伴随定位漂移再排查。"
+tag: apm_high_vibration
 
 ---
 id: apm-vibration-y
@@ -64,43 +65,44 @@ group: vibration
 order: 2
 
 conditions:
-    topics:
-        - VIBE
+  message:
+    - VIBE
 
 compute:
-    - vy = ref("VIBE.VibeY")
-    - vy_max = max(vy)
-    - frac_warn = div(count_above(vy, gt=30.0), length_of(vy))
-    - frac_crit = div(count_above(vy, gt=60.0), length_of(vy))
-
-outputs:
-    tag: apm_high_vibration
+  - vy = VIBE.VibeY
+  - vy_max = max(vy)
+  - frac_warn = np.sum(vy > 30.0) / len(vy)
+  - frac_crit = np.sum(vy > 60.0) / len(vy)
 
 triggers:
-    - when: "vy_max > 60.0 or frac_crit > 0.0"
-      severity: critical
-      threshold: 60.0
+  - when: "vy_max > 60.0 or frac_crit > 0.0"
+    severity: critical
+    suggestion: "超过 60 m/s^2 会让加速度计数据失真并可能触发 EKF 失效。改善飞控减震与桨/电机动平衡后再飞。"
+    description: Y 轴振动严重超标，峰值 {vy_max:.0f} m/s^2
+    evidence:
+      source: VIBE.VibeY(峰值)
       value: f"{vy_max:.1f}"
+      threshold: 60
       unit: m/s^2
-      field: "VIBE.VibeY(峰值)"
-      title: "Y 轴振动严重超标，峰值 {vy_max:.0f} m/s^2"
-      suggestion: "超过 60 m/s^2 会让加速度计数据失真并可能触发 EKF 失效。改善飞控减震与桨/电机动平衡后再飞。"
-    - when: "frac_warn >= 0.10"
-      severity: warning
-      threshold: 30.0
+  - when: "frac_warn >= 0.10"
+    severity: warning
+    suggestion: "全程有 10% 以上样本超过 30 m/s^2。检查安装与动平衡，考虑启用谐波陷波滤波器。"
+    description: Y 轴振动持续偏大，峰值 {vy_max:.0f} m/s^2
+    evidence:
+      source: VIBE.VibeY(峰值)
       value: f"{vy_max:.1f}"
+      threshold: 30
       unit: m/s^2
-      field: "VIBE.VibeY(峰值)"
-      title: "Y 轴振动持续偏大，峰值 {vy_max:.0f} m/s^2"
-      suggestion: "全程有 10% 以上样本超过 30 m/s^2。检查安装与动平衡，考虑启用谐波陷波滤波器。"
-    - when: "vy_max > 30.0"
-      severity: info
-      threshold: 30.0
+  - when: "vy_max > 30.0"
+    severity: info
+    suggestion: "仅个别时刻超过 30 m/s^2，整体可接受；若伴随定位漂移再排查。"
+    description: Y 轴振动偶有冒尖，峰值 {vy_max:.0f} m/s^2
+    evidence:
+      source: VIBE.VibeY(峰值)
       value: f"{vy_max:.1f}"
+      threshold: 30
       unit: m/s^2
-      field: "VIBE.VibeY(峰值)"
-      title: "Y 轴振动偶有冒尖，峰值 {vy_max:.0f} m/s^2"
-      suggestion: "仅个别时刻超过 30 m/s^2，整体可接受；若伴随定位漂移再排查。"
+tag: apm_high_vibration
 
 ---
 id: apm-vibration-z
@@ -109,46 +111,47 @@ group: vibration
 order: 3
 
 conditions:
-    topics:
-        - VIBE
+  message:
+    - VIBE
 
 compute:
-    - vz = ref("VIBE.VibeZ")
-    - vz_max = max(vz)
-    - frac_warn = div(count_above(vz, gt=30.0), length_of(vz))
-    - frac_crit = div(count_above(vz, gt=60.0), length_of(vz))
-
-outputs:
-    tag: apm_high_vibration
+  - vz = VIBE.VibeZ
+  - vz_max = max(vz)
+  - frac_warn = np.sum(vz > 30.0) / len(vz)
+  - frac_crit = np.sum(vz > 60.0) / len(vz)
 
 triggers:
-    - when: "vz_max > 60.0 or frac_crit > 0.0"
-      severity: critical
-      threshold: 60.0
+  - when: "vz_max > 60.0 or frac_crit > 0.0"
+    severity: critical
+    suggestion: "Z 轴超标最常来自桨叶/机架共振与减震球老化，会直接影响定高。优先查这一轴。"
+    description: Z 轴振动严重超标，峰值 {vz_max:.0f} m/s^2
+    evidence:
+      source: VIBE.VibeZ(峰值)
       value: f"{vz_max:.1f}"
+      threshold: 60
       unit: m/s^2
-      field: "VIBE.VibeZ(峰值)"
-      title: "Z 轴振动严重超标，峰值 {vz_max:.0f} m/s^2"
-      suggestion: "Z 轴超标最常来自桨叶/机架共振与减震球老化，会直接影响定高。优先查这一轴。"
-    - when: "frac_warn >= 0.10"
-      severity: warning
-      threshold: 30.0
+  - when: "frac_warn >= 0.10"
+    severity: warning
+    suggestion: "全程有 10% 以上样本超过 30 m/s^2。检查安装与动平衡，考虑启用谐波陷波滤波器。"
+    description: Z 轴振动持续偏大，峰值 {vz_max:.0f} m/s^2
+    evidence:
+      source: VIBE.VibeZ(峰值)
       value: f"{vz_max:.1f}"
+      threshold: 30
       unit: m/s^2
-      field: "VIBE.VibeZ(峰值)"
-      title: "Z 轴振动持续偏大，峰值 {vz_max:.0f} m/s^2"
-      suggestion: "全程有 10% 以上样本超过 30 m/s^2。检查安装与动平衡，考虑启用谐波陷波滤波器。"
-    - when: "vz_max > 30.0"
-      severity: info
-      threshold: 30.0
+  - when: "vz_max > 30.0"
+    severity: info
+    suggestion: "仅个别时刻超过 30 m/s^2，整体可接受；若伴随定高漂移再排查。"
+    description: Z 轴振动偶有冒尖，峰值 {vz_max:.0f} m/s^2
+    evidence:
+      source: VIBE.VibeZ(峰值)
       value: f"{vz_max:.1f}"
+      threshold: 30
       unit: m/s^2
-      field: "VIBE.VibeZ(峰值)"
-      title: "Z 轴振动偶有冒尖，峰值 {vz_max:.0f} m/s^2"
-      suggestion: "仅个别时刻超过 30 m/s^2，整体可接受；若伴随定高漂移再排查。"
+tag: apm_high_vibration
 
 ---
-# 削波：Clip0/1/2 是**单调递增的累计计数器**，所以总次数 = 末值 - 初值 = range_of。
+# 削波：Clip0/1/2 是**单调递增的累计计数器**，所以总次数 = 末值 - 初值 = np.ptp。
 # 任何非零都值得报（上游 warns on any clipping），>=100 升 critical。
 id: apm-clip-0
 name: 加速度计削波（IMU0）
@@ -156,32 +159,32 @@ group: vibration
 order: 4
 
 conditions:
-    topics:
-        - VIBE
+  message:
+    - VIBE
 
 compute:
-    - clip0_total = range_of(ref("VIBE.Clip0"))
-
-outputs:
-    tag: apm_accel_clipping
+  - clip0_total = np.ptp(VIBE.Clip0)
 
 triggers:
-    - when: "clip0_total >= 100.0"
-      severity: critical
+  - when: "clip0_total >= 100.0"
+    severity: critical
+    suggestion: "削波期间该 IMU 数据完全不可用。必须从源头降振动：桨动平衡、飞控软安装、检查机架共振。"
+    description: IMU0 削波 {clip0_total:.0f} 次
+    evidence:
+      source: VIBE.Clip0(累计)
+      value: f"{clip0_total:.0f}"
       threshold: 100
-      value: f"{clip0_total:.0f}"
       unit: 次
-      field: "VIBE.Clip0(累计)"
-      title: "IMU0 削波 {clip0_total:.0f} 次"
-      suggestion: "削波期间该 IMU 数据完全不可用。必须从源头降振动：桨动平衡、飞控软安装、检查机架共振。"
-    - when: "clip0_total > 0.0"
-      severity: warning
+  - when: "clip0_total > 0.0"
+    severity: warning
+    suggestion: "少量削波在硬着陆附近常见；若计数持续上升则说明 IMU 在饱和，需降振动。"
+    description: IMU0 削波 {clip0_total:.0f} 次
+    evidence:
+      source: VIBE.Clip0(累计)
+      value: f"{clip0_total:.0f}"
       threshold: 0
-      value: f"{clip0_total:.0f}"
       unit: 次
-      field: "VIBE.Clip0(累计)"
-      title: "IMU0 削波 {clip0_total:.0f} 次"
-      suggestion: "少量削波在硬着陆附近常见；若计数持续上升则说明 IMU 在饱和，需降振动。"
+tag: apm_accel_clipping
 
 ---
 id: apm-clip-1
@@ -190,32 +193,32 @@ group: vibration
 order: 5
 
 conditions:
-    topics:
-        - VIBE
+  message:
+    - VIBE
 
 compute:
-    - clip1_total = range_of(ref("VIBE.Clip1"))
-
-outputs:
-    tag: apm_accel_clipping
+  - clip1_total = np.ptp(VIBE.Clip1)
 
 triggers:
-    - when: "clip1_total >= 100.0"
-      severity: critical
+  - when: "clip1_total >= 100.0"
+    severity: critical
+    suggestion: "削波期间该 IMU 数据完全不可用。必须从源头降振动：桨动平衡、飞控软安装、检查机架共振。"
+    description: IMU1 削波 {clip1_total:.0f} 次
+    evidence:
+      source: VIBE.Clip1(累计)
+      value: f"{clip1_total:.0f}"
       threshold: 100
-      value: f"{clip1_total:.0f}"
       unit: 次
-      field: "VIBE.Clip1(累计)"
-      title: "IMU1 削波 {clip1_total:.0f} 次"
-      suggestion: "削波期间该 IMU 数据完全不可用。必须从源头降振动：桨动平衡、飞控软安装、检查机架共振。"
-    - when: "clip1_total > 0.0"
-      severity: warning
+  - when: "clip1_total > 0.0"
+    severity: warning
+    suggestion: "少量削波在硬着陆附近常见；若计数持续上升则说明 IMU 在饱和，需降振动。"
+    description: IMU1 削波 {clip1_total:.0f} 次
+    evidence:
+      source: VIBE.Clip1(累计)
+      value: f"{clip1_total:.0f}"
       threshold: 0
-      value: f"{clip1_total:.0f}"
       unit: 次
-      field: "VIBE.Clip1(累计)"
-      title: "IMU1 削波 {clip1_total:.0f} 次"
-      suggestion: "少量削波在硬着陆附近常见；若计数持续上升则说明 IMU 在饱和，需降振动。"
+tag: apm_accel_clipping
 
 ---
 id: apm-clip-2
@@ -224,29 +227,29 @@ group: vibration
 order: 6
 
 conditions:
-    topics:
-        - VIBE
+  message:
+    - VIBE
 
 compute:
-    - clip2_total = range_of(ref("VIBE.Clip2"))
-
-outputs:
-    tag: apm_accel_clipping
+  - clip2_total = np.ptp(VIBE.Clip2)
 
 triggers:
-    - when: "clip2_total >= 100.0"
-      severity: critical
+  - when: "clip2_total >= 100.0"
+    severity: critical
+    suggestion: "削波期间该 IMU 数据完全不可用。必须从源头降振动：桨动平衡、飞控软安装、检查机架共振。"
+    description: IMU2 削波 {clip2_total:.0f} 次
+    evidence:
+      source: VIBE.Clip2(累计)
+      value: f"{clip2_total:.0f}"
       threshold: 100
-      value: f"{clip2_total:.0f}"
       unit: 次
-      field: "VIBE.Clip2(累计)"
-      title: "IMU2 削波 {clip2_total:.0f} 次"
-      suggestion: "削波期间该 IMU 数据完全不可用。必须从源头降振动：桨动平衡、飞控软安装、检查机架共振。"
-    - when: "clip2_total > 0.0"
-      severity: warning
+  - when: "clip2_total > 0.0"
+    severity: warning
+    suggestion: "少量削波在硬着陆附近常见；若计数持续上升则说明 IMU 在饱和，需降振动。"
+    description: IMU2 削波 {clip2_total:.0f} 次
+    evidence:
+      source: VIBE.Clip2(累计)
+      value: f"{clip2_total:.0f}"
       threshold: 0
-      value: f"{clip2_total:.0f}"
       unit: 次
-      field: "VIBE.Clip2(累计)"
-      title: "IMU2 削波 {clip2_total:.0f} 次"
-      suggestion: "少量削波在硬着陆附近常见；若计数持续上升则说明 IMU 在饱和，需降振动。"
+tag: apm_accel_clipping

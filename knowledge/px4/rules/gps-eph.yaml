@@ -7,38 +7,43 @@ group: gps_health
 order: 1 # gps_health group 内次序：eph=1, sats=2, jump=3
 
 conditions:
-    topics:
-        - vehicle_gps_position
+  message:
+    - vehicle_gps_position
 
 compute:
-    # 数据缺失/全为 0 时整条规则中止（不写 stats、不发 finding），与原过程式一致
-    - eph_pos = keep_gt(vehicle_gps_position.eph, gt=0)
-    - eph_m = eph_pos * 0.001 # mm → m
-    - e_p95 = percentile(eph_m, p=95)
-    - e_max = max(eph_m)
+  # 数据缺失/全为 0 时整条规则中止（不写 stats、不发 finding），与原过程式一致
+  - eph_pos = vehicle_gps_position.eph[vehicle_gps_position.eph > 0]
+  - eph_m = eph_pos * 0.001 # mm → m
+  - e_p95 = percentile(eph_m, p=95)
+  - e_max = max(eph_m)
 
 outputs:
-    tag: gps_eph_high
-    stats:
-        gpsEphP95M: { var: e_p95, round: 2 }
-        gpsEphMaxM: { var: e_max, round: 2 }
+  - name: gpsEphP95M
+    value: e_p95
+    round: 2
+  - name: gpsEphMaxM
+    value: e_max
+    round: 2
 
 triggers:
-    - when: "e_p95 >= 10.0"
-      severity: warning
-      tag: gps_eph_high
-      threshold: 10.0
+  - when: "e_p95 >= 10.0"
+    severity: warning
+    suggestion: "结合故障库 F002：排查天线电磁干扰/遮挡/馈线虚接/多路径。"
+    description: GPS 水平位置误差持续偏大（p95 {e_p95:.1f} m）
+    evidence:
+      source: vehicle_gps_position.eph(armed p95)
       value: f"{e_p95:.2f}"
+      threshold: 10
       unit: m
-      field: "vehicle_gps_position.eph(armed p95)"
-      title: "GPS 水平位置误差持续偏大（p95 {e_p95:.1f} m）"
-      suggestion: "结合故障库 F002：排查天线电磁干扰/遮挡/馈线虚接/多路径。"
-    - when: "e_p95 >= 5.0"
-      severity: info
-      tag: gps_eph_high
-      threshold: 5.0
+    label: gps_eph_high
+  - when: "e_p95 >= 5.0"
+    severity: info
+    suggestion: "关注天线安装位置与遮挡。"
+    description: GPS 水平位置误差偶发偏大（p95 {e_p95:.1f} m）
+    evidence:
+      source: vehicle_gps_position.eph(armed p95)
       value: f"{e_p95:.2f}"
+      threshold: 5
       unit: m
-      field: "vehicle_gps_position.eph(armed p95)"
-      title: "GPS 水平位置误差偶发偏大（p95 {e_p95:.1f} m）"
-      suggestion: "关注天线安装位置与遮挡。"
+    label: gps_eph_high
+tag: gps_eph_high

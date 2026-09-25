@@ -17,24 +17,23 @@ group: sensor_health
 order: 1
 
 conditions:
-    topics:
-        - PARM
+  message:
+    - PARM
 
 compute:
-    - rng_type = param("RNGFND_TYPE", 0.0)
-    - rng1_type = param("RNGFND1_TYPE", 0.0)
-
-outputs:
-    tag: apm_sensor_configured_but_silent
+  - rng_type = param("RNGFND_TYPE", 0.0)
+  - rng1_type = param("RNGFND1_TYPE", 0.0)
 
 triggers:
-    - when: "(rng_type > 0 or rng1_type > 0) and not has_topic('RFND') and not has_topic('RNGFND')"
-      severity: warning
+  - when: "(rng_type > 0 or rng1_type > 0) and not has_topic('RFND') and not has_topic('RNGFND')"
+    severity: warning
+    suggestion: "参数声明了测距仪（RNGFND_TYPE/RNGFND1_TYPE > 0）却一条数据都没有：通常是接线松动、插错串口，或驱动没探测到设备。先确认日志里有 RFND（新）/ RNGFND（旧）消息。"
+    description: 测距仪已配置但日志无数据
+    evidence:
+      source: RNGFND_TYPE(>0) 但无 RFND/RNGFND 消息
       threshold: 0
       unit: ""
-      field: "RNGFND_TYPE(>0) 但无 RFND/RNGFND 消息"
-      title: "测距仪已配置但日志无数据"
-      suggestion: "参数声明了测距仪（RNGFND_TYPE/RNGFND1_TYPE > 0）却一条数据都没有：通常是接线松动、插错串口，或驱动没探测到设备。先确认日志里有 RFND（新）/ RNGFND（旧）消息。"
+tag: apm_sensor_configured_but_silent
 
 ---
 id: apm-sensor-gps
@@ -43,49 +42,46 @@ group: sensor_health
 order: 2
 
 conditions:
-    topics:
-        - PARM
+  message:
+    - PARM
 
 compute:
-    - gps_type = param("GPS_TYPE", 0.0)
-
-outputs:
-    tag: apm_sensor_configured_but_silent
+  - gps_type = param("GPS_TYPE", 0.0)
 
 triggers:
-    - when: "gps_type > 0 and not has_topic('GPS')"
-      severity: warning
+  - when: "gps_type > 0 and not has_topic('GPS')"
+    severity: warning
+    suggestion: "参数声明了 GPS 接收机（GPS_TYPE > 0）却完全没有 GPS 消息：查接线、串口与驱动探测；没有 GPS 就无法定位与返航。"
+    description: GPS 已配置但日志无数据
+    evidence:
+      source: GPS_TYPE(>0) 但无 GPS 消息
       threshold: 0
       unit: ""
-      field: "GPS_TYPE(>0) 但无 GPS 消息"
-      title: "GPS 已配置但日志无数据"
-      suggestion: "参数声明了 GPS 接收机（GPS_TYPE > 0）却完全没有 GPS 消息：查接线、串口与驱动探测；没有 GPS 就无法定位与返航。"
+tag: apm_sensor_configured_but_silent
 
 ---
 # MAG.Health 是每样本的 0/1 标志，不需要参数，本轮可实现。
-# ratio_equal(values, value) = 取值为 value 的样本占比（分母是全部样本），正是要的量。
+# np.mean(health == 0.0)：值为 0 的样本占比，即"不健康"占比。
 id: apm-sensor-compass-health
 name: 罗盘健康标志
 group: sensor_health
 order: 3
 
 conditions:
-    topics:
-        - MAG
+  message:
+    - MAG
 
 compute:
-    - health = ref("MAG.Health")
-    - unhealthy_ratio = ratio_equal(health, value=0.0)
-
-outputs:
-    tag: apm_compass_unhealthy
+  - unhealthy_ratio = np.mean(MAG.Health == 0.0)
 
 triggers:
-    - when: "unhealthy_ratio > 0.20"
-      severity: warning
-      threshold: 0.20
+  - when: "unhealthy_ratio > 0.20"
+    severity: warning
+    suggestion: "健康罗盘的 Health 标志几乎恒为 1。占比这么高说明磁罗盘在失效或掉线，航向会受影响；查接线、供电与干扰，必要时换罗盘。"
+    description: 罗盘不健康样本占比 {unhealthy_ratio:.0%}
+    evidence:
+      source: MAG.Health(=0 的样本占比)
       value: f"{unhealthy_ratio:.2f}"
+      threshold: 0.2
       unit: ""
-      field: "MAG.Health(=0 的样本占比)"
-      title: "罗盘不健康样本占比 {unhealthy_ratio:.0%}"
-      suggestion: "健康罗盘的 Health 标志几乎恒为 1。占比这么高说明磁罗盘在失效或掉线，航向会受影响；查接线、供电与干扰，必要时换罗盘。"
+tag: apm_compass_unhealthy

@@ -1,9 +1,9 @@
-id: gps-uncertainty
+﻿id: gps-uncertainty
 title: GPS Uncertainty
 description: GPS 不确定度：eph / epv / hdop / vdop / s_variance_m_s / satellites_used / fix_type。
 order: 32
 conditions:
-  topics: ["vehicle_gps_position || sensor_gps"]
+  message: ["vehicle_gps_position || sensor_gps"]
 outputs:
   - container: axes
     title: GPS Uncertainty
