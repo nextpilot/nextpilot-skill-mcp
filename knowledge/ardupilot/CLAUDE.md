@@ -64,6 +64,22 @@ knowledge/ardupilot/
 
 ## 写新规则必须遵守的约定（本轮踩过的坑）
 
+### `outputs.tag` 一律带 `apm_` 前缀
+
+标签是**两族共用**的命名空间：引擎把所有命中标签塞进同一个 `tags` 集合，
+`match_fault_kb()` 也按它匹配故障库。APM 规则原本与 PX4 用同一套裸名
+（`high_vibration`、`accel_clipping`…），其中 `high_vibration` 与
+`motor_output_unbalance` 跟 PX4 **字面重名**——两族一旦同时接线，就分不清
+是哪个固件报的，也没法给两族各配一份故障库。
+
+2026-09-25 起，本目录 34 条规则的 `tag` 全部改成 `apm_` 开头（下划线，
+与标签的 snake_case 一致；规则 `id` 那边是连字符 `apm-`，两套分隔符不同，
+但各自内部一致）。**新写的规则照此办理。**
+
+直接后果：APM **不再能复用** `knowledge/px4/fault-kb.yaml`（它的 `trigger_tags`
+是 PX4 裸标签）。APM 将来要建自己的一份，`trigger_tags` 写 `apm_*`，
+理由与排期见 `PENDING.md` 第六节。
+
 ### `trigger` 的 `when` / `value` 不是随便写的表达式
 
 `knowledge/engine/engine.py` 的 `_eval_expr` 有一份 AST 白名单：

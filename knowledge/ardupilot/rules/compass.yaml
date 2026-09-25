@@ -36,7 +36,7 @@ compute:
     - n_mag = length_of(mag)
 
 outputs:
-    tag: compass_interference
+    tag: apm_compass_interference
 
 triggers:
     # n_mag >= 10 对应上游的 MIN_SAMPLES：样本太少统计量没有意义

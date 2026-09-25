@@ -32,7 +32,7 @@ compute:
     - smin_armed = min(status_armed)
 
 outputs:
-    tag: gps_no_fix
+    tag: apm_gps_no_fix
 
 triggers:
     - when: "smax < 3.0"
@@ -70,7 +70,7 @@ compute:
     - nmin = to_int(min(nsats_armed))
 
 outputs:
-    tag: gps_low_sats
+    tag: apm_gps_low_sats
 
 triggers:
     - when: "nmin < 4"
@@ -112,7 +112,7 @@ compute:
     - hmax = max(hdop_valid)
 
 outputs:
-    tag: gps_high_hdop
+    tag: apm_gps_high_hdop
 
 triggers:
     - when: "hmax > 5.0"

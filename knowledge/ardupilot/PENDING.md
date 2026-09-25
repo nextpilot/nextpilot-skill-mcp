@@ -113,11 +113,13 @@ skipped，原因就是那句话。**注意字符串里不能出现单引号**，
 - **不建 `fault-kb.yaml`**：它的 `trigger_tags` 必须是引擎真产出过的标签，
   而本轮一条都没验证过，写了就是编。等验证过再建。排它前面还有两条前置条件
   （都是 2026-09 实测）：
-  - **标签是两族共用的**：APM 规则与 PX4 规则用**同一套标签名**——
-    `knowledge/ardupilot/rules/vibration.yaml` 里写的是 `tag: high_vibration`、
-    `tag: accel_clipping`，**没有族前缀**。所以语义上可以直接复用
-    `knowledge/px4/fault-kb.yaml`。但**不要**因此把那份挪到 `knowledge/` 根：
-    它的 `flight_phase` 用 PX4 的阶段词汇（`takeoff` / `hover` / `maneuver` /
-    `fw_cruise` / `vtol_transition`），ardupilot 将来仍要写自己的一份。
+  - **APM 标签已全部加 `apm_` 前缀**（2026-09-25，34 条规则、24 个标签）。
+    此前两族共用一个命名空间：APM 写 `tag: high_vibration` / `accel_clipping`，
+    其中 `high_vibration`、`motor_output_unbalance` 与 PX4 **字面重名**——
+    两族同时接线时既分不清来源，也没法各配一份故障库。现在一律是
+    `apm_high_vibration` 这种形式（约定写进 `CLAUDE.md`）。
+  - **加前缀的直接后果**：`knowledge/px4/fault-kb.yaml` 那份**不能再被 APM 复用**
+    ——它的 `trigger_tags` 是 PX4 裸标签，而 APM 现在产出的是 `apm_*`。
+    这也是"别把 px4 那份挪到 `knowledge/` 根"的又一条理由：挪上去 APM 也命中不了。
   - **先补 `phases` 再谈建库**（见第一节第 4 件）：provider 的 `phases` 恒空时，
     故障库 10 条里 7 条永不命中——这时候建 APM 的 fault-kb，建出来就是残的。

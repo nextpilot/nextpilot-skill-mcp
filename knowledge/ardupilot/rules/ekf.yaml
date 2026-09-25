@@ -31,7 +31,7 @@ compute:
     - sv_max = max(ref("XKF4.SV", "NKF4.SV"))
 
 outputs:
-    tag: ekf_variance_high
+    tag: apm_ekf_variance_high
 
 triggers:
     - when: "sv_max > 1.0"
@@ -65,7 +65,7 @@ compute:
     - sp_max = max(ref("XKF4.SP", "NKF4.SP"))
 
 outputs:
-    tag: ekf_variance_high
+    tag: apm_ekf_variance_high
 
 triggers:
     - when: "sp_max > 1.0"
@@ -99,7 +99,7 @@ compute:
     - sh_max = max(ref("XKF4.SH", "NKF4.SH"))
 
 outputs:
-    tag: ekf_variance_high
+    tag: apm_ekf_variance_high
 
 triggers:
     - when: "sh_max > 1.0"
@@ -133,7 +133,7 @@ compute:
     - sm_max = max(ref("XKF4.SM", "NKF4.SM"))
 
 outputs:
-    tag: ekf_variance_high
+    tag: apm_ekf_variance_high
 
 triggers:
     - when: "sm_max > 1.0"

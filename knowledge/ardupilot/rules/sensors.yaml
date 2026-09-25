@@ -25,7 +25,7 @@ compute:
     - placeholder = ref("PARM.Name")
 
 outputs:
-    tag: sensor_configured_but_silent
+    tag: apm_sensor_configured_but_silent
 
 triggers:
     - when: "False"
@@ -50,7 +50,7 @@ compute:
     - placeholder = ref("PARM.Name")
 
 outputs:
-    tag: sensor_configured_but_silent
+    tag: apm_sensor_configured_but_silent
 
 triggers:
     - when: "False"
@@ -78,7 +78,7 @@ compute:
     - unhealthy_ratio = ratio_equal(health, 0.0)
 
 outputs:
-    tag: compass_unhealthy
+    tag: apm_compass_unhealthy
 
 triggers:
     - when: "unhealthy_ratio > 0.20"

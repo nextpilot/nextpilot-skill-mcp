@@ -38,7 +38,7 @@ compute:
     - low_v = scale(cells, 3.5)
 
 outputs:
-    tag: battery_low_voltage
+    tag: apm_battery_low_voltage
 
 triggers:
     # vmax <= 70.0 是上游的量程合理性闸门（超过 70 V 多半是没有电池监控或量纲异常）
@@ -79,7 +79,7 @@ compute:
     - sag = range_of(apply_mask(volts, greater(curr, 20.0)))
 
 outputs:
-    tag: battery_sag
+    tag: apm_battery_sag
 
 triggers:
     - when: "sag >= 1.0"
@@ -112,7 +112,7 @@ compute:
     - volts = ref("BAT.Volt", "CURR.Volt")
 
 outputs:
-    tag: battery_sudden_drop
+    tag: apm_battery_sudden_drop
 
 triggers:
     - when: "False"

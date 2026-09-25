@@ -38,7 +38,7 @@ compute:
     - c1 = ref("RCOU.C1")
 
 outputs:
-    tag: motor_output_unbalance
+    tag: apm_motor_output_unbalance
 
 triggers:
     - when: "False"
@@ -65,7 +65,7 @@ compute:
     - c1 = ref("RCOU.C1")
 
 outputs:
-    tag: motor_output_saturated
+    tag: apm_motor_output_saturated
 
 triggers:
     - when: "False"

@@ -37,7 +37,7 @@ compute:
     - lost_samples = count_true(all_low)
 
 outputs:
-    tag: rc_link_loss
+    tag: apm_rc_link_loss
 
 triggers:
     - when: "lost_samples > 0"

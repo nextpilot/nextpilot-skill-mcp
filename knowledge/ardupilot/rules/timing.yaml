@@ -19,7 +19,7 @@ compute:
     - placeholder = ref("VIBE.VibeX")
 
 outputs:
-    tag: logging_gap
+    tag: apm_logging_gap
 
 triggers:
     - when: "False"
@@ -47,7 +47,7 @@ compute:
     - long_loops = scale(mean(nlon), length_of(nlon))
 
 outputs:
-    tag: scheduler_long_loops
+    tag: apm_scheduler_long_loops
 
 triggers:
     - when: "long_loops > 0"

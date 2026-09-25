@@ -29,7 +29,7 @@ compute:
     - crit_count = count_true(values_in(err_subsys, [5, 6, 7, 9, 12, 16, 17, 25, 29, 30]))
 
 outputs:
-    tag: subsystem_error
+    tag: apm_subsystem_error
 
 triggers:
     - when: "crit_count > 0"
@@ -70,7 +70,7 @@ compute:
     - key_count = count_true(values_in(ev_id, [19, 54, 59, 60, 62]))
 
 outputs:
-    tag: critical_event_logged
+    tag: apm_critical_event_logged
 
 triggers:
     - when: "key_count > 0"
@@ -110,7 +110,7 @@ compute:
     - mode_num = ref("MODE.ModeNum")
 
 outputs:
-    tag: mode_timeline
+    tag: apm_mode_timeline
 
 triggers:
     - when: "False"

@@ -30,7 +30,7 @@ compute:
     - peak_roll = max(err_roll)
 
 outputs:
-    tag: attitude_tracking_error
+    tag: apm_attitude_tracking_error
 
 triggers:
     - when: "peak_roll > 30.0"
@@ -57,7 +57,7 @@ compute:
     - peak_pitch = max(err_pitch)
 
 outputs:
-    tag: attitude_tracking_error
+    tag: apm_attitude_tracking_error
 
 triggers:
     - when: "peak_pitch > 30.0"
@@ -87,7 +87,7 @@ compute:
     - err_yaw = abs_diff(ref("ATT.DesYaw"), ref("ATT.Yaw"))
 
 outputs:
-    tag: attitude_tracking_error
+    tag: apm_attitude_tracking_error
 
 triggers:
     - when: "False"
