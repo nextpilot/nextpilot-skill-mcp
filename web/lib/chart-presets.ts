@@ -80,12 +80,14 @@ export function resolvePlotPanels(manifest: TopicManifest): StoredPlotPanel[] {
     }).filter((x): x is StoredPlotPanel => x !== null);
 }
 
-export const CHART_PRESETS: ChartPreset[] = (PLOT_PRESETS as unknown as CompiledPreset[]).map((data) => ({
-    id: data.id,
-    title: data.title,
-    description: data.description,
-    resolve: (m: TopicManifest) => resolvePreset(data, m),
-}));
+export const CHART_PRESETS: ChartPreset[] = (Object.values(PLOT_PRESETS).flat() as unknown as CompiledPreset[]).map(
+    (data) => ({
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        resolve: (m: TopicManifest) => resolvePreset(data, m),
+    }),
+);
 
 // 分类槽位（dataviz 参考调色板，浅/深两套）
 export const SERIES_COLORS_LIGHT = [
