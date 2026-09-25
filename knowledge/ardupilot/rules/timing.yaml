@@ -1,0 +1,60 @@
+# ⚠️ 本文件下的 2 条尚未接线进构建产物（见 PENDING.md 第 1 条）。
+#
+# 时序（PM / 高码率消息）：上游 ardupilot-mcp 的 checks/timing.py 看两件事——
+#   · 日志间隙：在 IMU / ATT / VIBE 里挑日志里实际有的最高码率那个，看相邻时间戳的间隔。
+#     名义间隔取 **中位数** dt（抗离群），远大于它的跳变要么是丢了一段日志、
+#     要么是主循环卡住。判据是"绝对下限 0.5s"与"名义间隔 10 倍"**两者都超过**才算。
+#   · 调度超时：PM.NLon 是长循环（主循环跑超时间预算）的计数，非零即说明飞控曾 CPU 饥饿。
+
+id: apm-timing-gaps
+name: 日志间隙（占位）
+group: timing
+order: 1
+
+conditions:
+    precheck:
+        - "'待补算子：需相邻时间戳差分与 dt 中位数（引擎缺 diff 与中位数归约算子），暂未实现'"
+
+compute:
+    - placeholder = ref("VIBE.VibeX")
+
+outputs:
+    tag: logging_gap
+
+triggers:
+    - when: "False"
+      severity: warning
+      threshold: 0.5
+      unit: s
+      field: "IMU/ATT/VIBE.timestamp(相邻间隔)"
+      title: "日志间隙 / 主循环卡顿（占位，未实现）"
+      suggestion: "待补算子后实现：间隙意味着那段窗口数据缺失，会影响所有其它结论。排查 SD 卡写入性能与 CPU 负载。"
+
+---
+# 长循环总数：上游是累加所有 PM 记录的 NLon。引擎没有序列求和算子，
+# 用 均值 × 样本数 等价得到总和（NLon 是有效整数计数，无 NaN，等价成立）。
+id: apm-timing-long-loops
+name: 调度长循环
+group: timing
+order: 2
+
+conditions:
+    topics:
+        - PM
+
+compute:
+    - nlon = ref("PM.NLon")
+    - long_loops = scale(mean(nlon), length_of(nlon))
+
+outputs:
+    tag: scheduler_long_loops
+
+triggers:
+    - when: "long_loops > 0"
+      severity: warning
+      threshold: 0
+      value: f"{long_loops:.0f}"
+      unit: 次
+      field: "PM.NLon(长循环累计数)"
+      title: "调度记录到 {long_loops:.0f} 次长循环"
+      suggestion: "主循环曾跑超时间预算，说明飞控一度 CPU 饥饿，会拖慢控制更新并劣化估计与控制。降低负载：调低日志/陷波/EKF 速率、关掉用不到的功能，或检查循环速率是否设得超出板子能力。"
