@@ -23,35 +23,65 @@ MIT 只要求保留版权声明与许可声明，无额外署名条款。收录�
 - **8 张码表**（进 `facts.yaml`）：`COPTER_MODES`(25)、`ERR_SUBSYSTEMS`(31)、
   `CRITICAL_ERR_SUBSYSTEMS`(10)、`EV_IDS`(30)、`_VEHICLE_PREFIX_MAP`(12)、
   `HELI_FRAME_CLASSES`(3)、`FRAME_CLASSES`(14)、`FRAME_TYPES`(14)
-- **派生知识**：`estimate_cells`（4.2 V/格、有效区间 3.3–4.4、包电压合理范围 4–70 V）、
-  `vehicle_kind` 六分类（copter/heli/plane/rover/sub/tracker）
-- **16 项检查的阈值与严重度**（进 `rules/*.yaml`）：振动、EKF、电源、GPS、罗盘、
-  姿态、电机平衡、遥控、时序、事件、配置安全、校准、传感器、预解锁消息、参数审计、日志完整性
+- **一条派生规则**：`estimate_cells`（4.2 V/格、有效区间 3.3–4.4、包电压合理范围 4–70 V），
+  用在 `power.yaml` 的低电压判据上。上游的 `vehicle_kind` 六分类**没迁**——
+  本站的机型判定在 provider 里（`_FRAME_CLASS_MAP`），规则侧只用
+  `rotary_wing / fixed_wing`，两套分类对不上，迁过来只会添乱。
+- **12 组共 34 条规则**（进 `rules/*.yaml`）：振动、EKF、电源、GPS、罗盘、姿态、
+  电机、遥控、时序、事件、配置安全、传感器。其中 23 条能跑、11 条占位。
 - **官方文档链接** 20 条（进 `facts.yaml` 的 `doc_urls` 与 `rule_meta.by_group.doc`）
 - **`docs/SOURCES.md`** 198 条假设审计（confirmed 86 / heuristic 22 /
   design choice 82 / corrected 8），逐字保留
+
+上游共 16 项检查，本轮迁了 12 项。**没迁的 4 项各有原因，不是遗漏**：
+
+| 上游检查      | 为什么不迁                                                                                                                              |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `integrity`   | 它读的是**解析层**产出的 `log.meta.integrity`（日志是否被截断等），不是消息流。本站 provider 没有这个概念，也不在规则能引用的内置变量里 |
+| `calibration` | 100% 依赖参数（`COMPASS_OFS*` 的模长判校准质量）→ 撞 C2                                                                                 |
+| `param_audit` | 同上，依赖参数                                                                                                                          |
+| `prearm`      | 依赖 `MSG.Message` / `STATUSTEXT.Text` 的**文本子串匹配** → 撞 C1，且引擎无文本匹配算子                                                 |
+
+`facts.yaml` 的 `group_order` 里仍然留了 `integrity` / `calibration` /
+`param_audit` / `prearm_messages` 这四个 group（空 group 允许，引擎空跑），
+位置也留着——将来补的时候不用重排。
 
 ## 改了什么（与上游的偏差，逐条如实记）
 
 1. **载体换了。** 上游是 Python 类（`checks/*.py`，命令式、带分支与异常）；
    这里是声明式 YAML（`compute` 表达式 + `triggers`）。判定条件要能写成算子链，
    写不出来的只能占位——见 `PENDING.md` 的算子缺口那张表。
-2. **阈值数值原样保留**，四类标记（`confirmed` / `heuristic` / `design choice` /
-   `corrected`）从 `SOURCES.md` 提到**每条规则的文件头**，与阈值放在一起。
+2. **阈值数值一个都没改，也一个都没新编。** 这是本轮最要紧的一条自我约束：
+   遇到算子缺口时，宁可让判据降级或占位，**也不自己拟一个阈值填进去**
+   （比如"用超阈样本占比近似持续时长"这种看着合理的做法，占比阈值得自己挑，
+   那就是编数）。所以凡本轮出不了结论的档位，都是直接不出，而不是给个编的数。
+   四类标记（`confirmed` / `heuristic` / `design choice` / `corrected`）的出处
+   写在对应规则文件的头注里。
 3. **官方链接从多条改成一条。** 上游 `references_for()` 返回多条链接，本站的
    `docUrl` 是单值，所以 `rule_meta.by_group.doc` 只取**最具体的一条**。
-   完整链接集在 `facts.yaml` 的 `doc_urls` 里。
+   完整链接集在 `facts.yaml` 的 `doc_urls` 里。两处要一起改，目前没有自动校验。
 4. **参数驱动的检查全部降级或占位。** 本站引擎的 `BUILTIN_VARIABLES` 没有参数类
-   内置变量，规则拿不到 `PARM`，所以 `config` / `calibration` / `param_audit`
-   只能占位；`power` 的低电压判据从"读 `BATT_CRT_VOLT`/`BATT_LOW_VOLT`"退回上游的
-   `estimate_cells` 派生路径。
-5. **降级项逐条标注**：罗盘的 CV 判据（无 `std` 算子）、电机饱和的占比判据
-   （无 per-column 占比算子）、遥控与姿态的"持续时长"判据（无 run-length 算子，
-   `rcin` 改用样本占比，**阈值是新拟的、未经校准**）、时序的累加与间隙（无 `diff`
-   与求和算子）。每条的具体偏差写在对应规则文件的注释里。
-6. **`FRAME_CLASS = 3` 的认定与上游不同。** 上游 `FRAME_CLASSES[3] = Octo`（旋翼），
+   内置变量，规则拿不到 `PARM`（C2），所以 `config` 三条与 `sensors` 前两条只能占位；
+   `power` 的低电压判据从"读 `BATT_CRT_VOLT`/`BATT_LOW_VOLT`"退回上游的
+   `estimate_cells` 派生路径（改用了 `coalesce` 链实现 `round`，因为引擎的
+   `to_int` 是截断，会把 6S 估成 5S）。
+5. **逐条降级标注**（每条的具体偏差写在对应规则文件的注释里）：
+   罗盘的 CV 判据缺 `std` 算子（只留极差比，所以本条出不了 critical）；
+   姿态的"持续 1s"判据缺 run-length（只剩峰值档）；航向误差缺取模算子（占位）；
+   电机两条缺矩阵化与标量减法（占位）；时序的日志间隙缺 `diff` 与中位数（占位，
+   PM 长循环那条用 `mean × length_of` 绕开了求和缺口）；MODE 时间线缺文本列（占位）。
+6. **两处有意偏离上游**，都是有理由的，不是抄错：
+   - **GPS 的 armed 窗口**：上游拿不到 armed 窗口就退回全程判，那必然把起飞前
+     搜星期（`NSats=0`、`HDop=99.99`）判成飞行中故障。本站引擎会把 skip 连同原因
+     显示给用户，所以改成 `precheck: not HAS_ARMED` 直接跳过——宁可跳过，不误报。
+   - **EV 事件的严重度**：上游统一出 INFO 摘要；这里把丢 GPS、EKF 高度/航向重置、
+     电机紧急停转、旋翼转速不足提到 warning——它们本身就是故障信号，压在 INFO 会淹没。
+   - 附带一处：上游的 `rcin` 用"持续 >=2s 或持续到日志末尾"判 critical，
+     本站缺持续时长，改成只报**命中样本数**并给 warning（没有新拟阈值）。
+7. **`FRAME_CLASS = 3` 的认定与上游不同。** 上游 `FRAME_CLASSES[3] = Octo`（旋翼），
    本站 `providers/ardupilot.py` 的 `_FRAME_CLASS_MAP[3] = fixed_wing`。
-   本轮不动 provider，规则判定以 provider 实际产出的 `VEHICLE` 为准。
+   本轮不动 provider，规则判定以 provider 实际产出的 `VEHICLE` 为准；
+   权威码表另放在 `facts.yaml` 的 `frame_classes`，两处冲突是有意为之。
 
 ## 没迁什么
 
