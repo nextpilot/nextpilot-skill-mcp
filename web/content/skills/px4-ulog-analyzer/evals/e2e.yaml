@@ -1,6 +1,6 @@
 # 端到端测试 —— 跑真脚本、读真文件
 #
-#   node eval-skills.mjs px4-ulog-diagnostics --e2e
+#   node scripts/run-skill-evals.mjs px4-ulog-analyzer --e2e
 #
 # 与 cases.yaml 的分工：
 #   cases.yaml  测「SKILL.md 作为 prompt 有没有把模型教对」 —— 要调 LLM，慢、花钱、有抖动

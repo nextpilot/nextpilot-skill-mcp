@@ -12,10 +12,10 @@
 
 | 不管 | 归谁 |
 |---|---|
-| 某个参数的**数值**该调到多少 | [`px4-pid-tuning`](../px4-pid-tuning/)（给出的是增益取值逻辑） |
-| 增益整定的阶跃响应判读 | [`px4-pid-tuning`](../px4-pid-tuning/) |
+| 某个参数的**数值**该调到多少 | [`pid-autotune-assistant`](../pid-autotune-assistant/)（给出的是增益取值逻辑） |
+| 增益整定的阶跃响应判读 | [`pid-autotune-assistant`](../pid-autotune-assistant/) |
 | ArduPilot 参数 | 命名完全不同（`ATC_RAT_RLL_P` vs `MC_ROLLRATE_P`），混在一起必然误导 |
-| 参数如何用于故障诊断 | [`px4-ulog-diagnostics`](../px4-ulog-diagnostics/) |
+| 参数如何用于故障诊断 | [`px4-ulog-analyzer`](../px4-ulog-analyzer/) |
 
 **只管 PX4 原生参数。** 这一点写在 SKILL.md 的 `platforms` 里并且再没变过：同样叫"横滚速率环 P"，PX4 是 `MC_ROLLRATE_P`，ArduPilot 是 `ATC_RAT_RLL_P`，单位约定也不同。做一张混表的话，用户按 ArduPilot 的语义去设 PX4 的参数，炸机只是时间问题。
 
@@ -32,7 +32,7 @@ SKILL.md 第一句话就是「`param set` 只在内存生效，必须跟 `param 
 SKILL.md 里的参数名以 **PX4 v1.14** 为准。跨版本要注意：
 
 - v1.13 及更早：部分参数名不同、单位约定有别（尤其 `BAT_*` 系列改过）
-- 涉及时间常数的新形态：`MC_ROLL_TC` 等逐步替代传统的纯增益写法，见 [`px4-pid-tuning`](../px4-pid-tuning/)
+- 涉及时间常数的新形态：`MC_ROLL_TC` 等逐步替代传统的纯增益写法，见 [`pid-autotune-assistant`](../pid-autotune-assistant/)
 
 ## 已知坑
 

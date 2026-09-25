@@ -75,7 +75,7 @@ cases:
     input: |
       怎么判断我这台飞机的振动指标是不是超标了？
     expect_trigger: false
-    route_to: px4-ulog-diagnostics
+    route_to: px4-ulog-analyzer
     judge: |
       本 Skill 只把"gyro_clipping 必须为 0"当作前置条件，
       真正的振动诊断（字段、阈值、判据）属于 ULog 诊断 Skill。

@@ -137,6 +137,6 @@ param set SDLOG_PROFILE 131        # 在原值基础上或上需要的位
 
 **输出**
 
-这不是 uORB 机制问题，是**症状诊断**问题。应该走 [`px4-ulog-diagnostics`](../px4-ulog-diagnostics/) 的症状→字段映射。
+这不是 uORB 机制问题，是**症状诊断**问题。应该走 [`px4-ulog-analyzer`](../px4-ulog-analyzer/) 的症状→字段映射。
 
 > 越界的回答会显得很蠢：用户问的是"偏航为什么漂"，如果开始讲 `update()` 和 `updated()` 的区别，等于没答。

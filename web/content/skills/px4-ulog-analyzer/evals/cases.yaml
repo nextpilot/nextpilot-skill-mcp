@@ -1,7 +1,7 @@
 # 回归测试用例 —— 改 SKILL.md 之后跑一遍，确认没改坏
 #
-#   node eval-skills.mjs px4-ulog-diagnostics              # dry-run，只列出用例
-#   node eval-skills.mjs px4-ulog-diagnostics --run        # 真跑（需要 LLM API）
+#   node scripts/run-skill-evals.mjs px4-ulog-analyzer              # dry-run，只列出用例
+#   node scripts/run-skill-evals.mjs px4-ulog-analyzer --run        # 真跑（需要 LLM API）
 #
 # 为什么用 rubric 而不是"输入→期望输出完全一致"：
 #   模型输出是自然语言，逐字比对必然全红。这里判的是**要素**——
@@ -103,11 +103,11 @@ cases:
       如果模型开始讲 ULog 字段分析，判 0 分。
 
   - id: out-of-scope-pid-tuning
-    desc: 问增益取值该走 px4-pid-tuning
+    desc: 问增益取值该走 pid-autotune-assistant
     input: |
       起飞就抖，MC_ROLLRATE_D 应该调到多少？
     expect_trigger: false
-    route_to: px4-pid-tuning
+    route_to: pid-autotune-assistant
     judge: |
       该由 PID 调参 Skill 接管。本 Skill 最多提供"用哪些字段验证"，
       不应输出具体增益建议。
@@ -116,7 +116,7 @@ cases:
 # 上面这些 case 测的都是「prompt 有没有把模型教对」，输入是纯文本。
 # 「脚本有没有把数取对」是另一回事，放在同级的 e2e.yaml：
 #
-#   node eval-skills.mjs px4-ulog-diagnostics --e2e
+#   node scripts/run-skill-evals.mjs px4-ulog-analyzer --e2e
 #
 # 那边的 fixture 用 scripts/make_fixture.py 合成，不依赖 SITL、不涉及真实飞行数据：
 #   sample_crash_vibration.ulg   振动超标链式失效（根因 gyro_clipping）

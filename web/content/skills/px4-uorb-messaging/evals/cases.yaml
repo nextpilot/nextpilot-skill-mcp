@@ -70,7 +70,7 @@ cases:
     input: |
       悬停时机头慢慢向右偏，我该订阅哪个主题来看？
     expect_trigger: false
-    route_to: px4-ulog-diagnostics
+    route_to: px4-ulog-analyzer
     judge: |
       不应该开始讲 update/updated 的区别。用户问的是偏航漂移的成因，
       应转交 ULog 诊断或参数 Skill。

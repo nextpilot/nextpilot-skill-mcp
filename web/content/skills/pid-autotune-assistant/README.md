@@ -12,7 +12,7 @@
 
 | 不管 | 归谁 |
 |---|---|
-| 怎么判断振动/零偏是否超标 | [`px4-ulog-diagnostics`](../px4-ulog-diagnostics/)（这里只给出"先确认 gyro_clipping 为 0"这个前提） |
+| 怎么判断振动/零偏是否超标 | [`px4-ulog-analyzer`](../px4-ulog-analyzer/)（这里只给出"先确认 gyro_clipping 为 0"这个前提） |
 | 参数名叫什么、怎么持久化 | [`px4-parameter-system`](../px4-parameter-system/) |
 | 固定翼 PID / TECS | 控制结构完全不同 |
 | ArduPilot 调参 | 参数名不同（`ATC_RAT_RLL_*` vs `MC_ROLLRATE_*`），单位约定也不同 |
@@ -61,7 +61,7 @@ vehicle_attitude.rollspeed    ← 飞机实际达到的角速率
 
 这两条曲线的关系是判断的标准：持续滞后 → 加 P；过冲 → 加 D；稳态偏差 → 加 I。
 
-这组字段名依赖 [`px4-ulog-diagnostics`](../px4-ulog-diagnostics/) 的字段知识，两个 Skill 是上下游关系。
+这组字段名依赖 [`px4-ulog-analyzer`](../px4-ulog-analyzer/) 的字段知识，两个 Skill 是上下游关系。
 
 ## 维护
 

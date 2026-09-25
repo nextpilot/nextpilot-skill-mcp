@@ -69,7 +69,8 @@ function readCategories() {
  * 单个 Skill 目录的全部问题。纯函数（不碰文件系统）——反例自检要拿内存里的假目录
  * 走同一套判据，否则自检测的是另一份逻辑，等于没测。
  *
- * @param {{slug: string, files: string[], raw?: string, changelog?: string, categories: string[]}} input
+ * @param {{slug: string, files: string[], raw?: string, changelog?: string, cases?: string,
+ *          knownSlugs?: string[], categories: string[]}} input
  * @returns {{rule: string, msg: string}[]}
  */
 export function collectProblems(input) {
@@ -149,6 +150,21 @@ export function collectProblems(input) {
                 "changelog/parseable",
                 "CHANGELOG.md 里没有 `## <版本>` 条目：version / updatedAt 从这里推导，推不出就是空",
             );
+        }
+    }
+
+    // 交叉引用：cases.yaml 里 route_to 标的是"这个问题该转给哪份 Skill"。
+    // 改名时最容易漏的就是这类引用——目录名改了、别处提它的地方没改，于是
+    // 用例断言指向一份不存在的 Skill，跑出来永远是"没转对"，而没人会想到
+    // 是断言本身过期了。这里把引用表与实际目录对一遍。
+    // 用正则而不是解析 YAML：只要拿到那几行值，不值得为它拉整套结构进来。
+    const cases = input.cases ?? "";
+    const known = input.knownSlugs;
+    if (cases && known && known.length > 0) {
+        for (const m of cases.matchAll(/^\s*route_to:\s*([A-Za-z0-9-]+)\s*$/gm)) {
+            if (!known.includes(m[1])) {
+                fail("refs/unknown-route", `evals/cases.yaml 的 route_to 指向 "${m[1]}"，skills/ 下没有这份`);
+            }
         }
     }
 
@@ -308,6 +324,16 @@ const COUNTEREXAMPLES = [
             changelog: "# 版本历史\n\n还没写过。\n",
         },
     },
+    {
+        rule: "refs/unknown-route",
+        why: "cases.yaml 的 route_to 指向一份不存在的 Skill（改名时目录改了、引用没改）",
+        input: {
+            files: REQUIRED_FILES,
+            raw: `---\nname: demo\ndescription: "做什么。当用户要用时使用。"\nmetadata:\n${GOOD_META}\n---\n# x\n`,
+            cases: "cases:\n  - id: x\n    route_to: px4-not-a-real-skill\n",
+            knownSlugs: ["demo", "px4-uorb-messaging"],
+        },
+    },
 ];
 
 function selfTest(categories) {
@@ -361,7 +387,10 @@ function main() {
         const files = REQUIRED_FILES.filter((f) => existsSync(join(dir, f)));
         const raw = files.includes("SKILL.md") ? readFileSync(join(dir, "SKILL.md"), "utf8") : "";
         const changelog = files.includes("CHANGELOG.md") ? readFileSync(join(dir, "CHANGELOG.md"), "utf8") : undefined;
-        for (const p of collectProblems({ slug, files, raw, changelog, categories })) {
+        const casesPath = join(dir, "evals", "cases.yaml");
+        const cases = existsSync(casesPath) ? readFileSync(casesPath, "utf8") : undefined;
+        // knownSlugs 传全量目录名：route_to 指向的目标必须真的存在
+        for (const p of collectProblems({ slug, files, raw, changelog, cases, knownSlugs: slugs, categories })) {
             problems.push({ slug, ...p });
         }
     }

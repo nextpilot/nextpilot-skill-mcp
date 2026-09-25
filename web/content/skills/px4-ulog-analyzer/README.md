@@ -14,7 +14,7 @@
 |---|---|
 | 画图、拉曲线 | Flight Review / PlotJuggler——专业工具做得更好，不要在这里重复 |
 | 找到根因后该怎么改参数 | [`px4-parameter-system`](../px4-parameter-system/) |
-| 增益该怎么调 | [`px4-pid-tuning`](../px4-pid-tuning/) |
+| 增益该怎么调 | [`pid-autotune-assistant`](../pid-autotune-assistant/) |
 | 日志文件的二进制格式细节 | pyulog /官方文档 |
 
 **这是一张方法卡，不是日志浏览器。** 它教的是"看哪个字段、用什么阈值判断"，最终产出是一组带出处的结论，不是一张图。
@@ -65,7 +65,7 @@ SKILL.md 里那 1→9 的顺序不允许模型自由发挥，理由是它按「*
 ```bash
 python3 scripts/quick_check.py flight.ulg          # 体检一份自己的日志
 python3 scripts/make_fixture.py --outdir assets    # 重新生成素材（需要的话）
-node eval-skills.mjs px4-ulog-diagnostics --e2e    # 端到端回归，不需要 API key
+node scripts/run-skill-evals.mjs px4-ulog-analyzer --e2e    # 端到端回归，不需要 API key
 ```
 
 数值判断交给规则、解释交给模型，这个分工是有意的：**阈值随固件和机架变，改一处比重写 prompt 可靠。**
@@ -73,13 +73,13 @@ node eval-skills.mjs px4-ulog-diagnostics --e2e    # 端到端回归，不需要
 ## 与其他 Skill 的关系
 
 ```
-px4-ulog-diagnostics      ← 你在这里
+px4-ulog-analyzer      ← 你在这里
    ↓ 给出根因
 px4-parameter-system      该改哪个参数
    ↓ 给出取值逻辑
-px4-pid-tuning            PID 增益专项
+pid-autotune-assistant            PID 增益专项
 
-反过来，px4-pid-tuning 的验证环节依赖这里的字段
+反过来，pid-autotune-assistant 的验证环节依赖这里的字段
 （vehicle_rates_setpoint vs vehicle_attitude.rollspeed）。
 ```
 

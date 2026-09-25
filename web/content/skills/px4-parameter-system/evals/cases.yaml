@@ -74,7 +74,7 @@ cases:
     input: |
       起飞抖得厉害，MC_ROLLRATE_D 应该设成多少合适？
     expect_trigger: false
-    route_to: px4-pid-tuning
+    route_to: pid-autotune-assistant
     judge: |
       本 Skill 只回答"参数叫什么、怎么改才生效"，不回答"取值该是多少"。
       应转交 PID 调参 Skill。
