@@ -1,0 +1,405 @@
+# ArduPilot（.bin / DataFlash）的数据文件 —— 码表、展示口径、规则元数据。
+#
+# 与 knowledge/px4/facts.yaml 同构，但**键不全对齐**：照抄 PX4 那 9 个必填键会变成编造
+# （APM 没有 nav_state 数值轴、没有键值信息消息、格式自描述因而没有固定消息码表），
+# 所以下面每一节都写了"为什么它在这、为什么不照抄 PX4"。
+#
+# 判据沿用 px4/facts.yaml 顶部的那条：**同一个节里没有分支/回退/异常 → 留这里；
+# 有 → 进 provider**。从日志的哪儿取、取不到怎么回退，全在
+# knowledge/engine/providers/ardupilot.py（那是本项目唯一认识 APM 的地方）。
+#
+# 数据来源：上游 ardupilot-mcp（MIT）的 ardupilot_meta.py 与 ardupilot_docs.py，
+# 逐条核实过 ArduPilot 官方 LogStructure / apm.pdef.xml。署名与偏差见 ATTRIBUTION.md。
+#
+# ⚠️ 本文件**目前不进构建产物**：build-knowledge.mjs 与 engine/loader.py 都硬编码
+# knowledge/px4/。接线清单见 PENDING.md。在接线之前，下面的值没有任何一条
+# 经过真实 .bin 日志验证。
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 规则执行顺序：引擎按这个列表逐个 group 跑，顺序即报告里 finding 编号（F01、F02…）
+# 的生成顺序。约定与 PX4 一致：**guards_early 必须排第一、guards 排最后**。
+#
+# 本轮 16 项检查 → 16 个 group。两个 guard group 是空占位（本轮不写 APM guard 规则，
+# 空 group 允许，引擎对没有规则的 group 就是空跑）——保留位置是为了将来
+# insufficient_data 能排到第一。
+group_order:
+    [
+        guards_early,
+        integrity,
+        events,
+        ekf_variance,
+        vibration,
+        battery,
+        gps_health,
+        compass,
+        attitude_tracking,
+        motor_balance,
+        rc_input,
+        timing,
+        config_safety,
+        calibration,
+        sensor_health,
+        prearm_messages,
+        param_audit,
+        guards,
+    ]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 规则元数据：避免 25 条经验各自重复写 category / 官方链接 / 许可。
+# 构建期用它给每条规则派生字段，**每个 group 必须在这里登记**，否则构建直接失败。
+# 同一个 group 下的多条规则派生的 category 与 doc 必须一致。
+#
+# status: draft 不是谦虚——本轮这批阈值没有一条经过真实 .bin 日志验证
+# （连"能不能取到数"都还没验，见 PENDING.md）。验完再改 stable。
+# license 是上游的 MIT，**不要**沿用 PX4 那份的 CC-BY-4.0：那是 PX4 侧的身份默认值，
+# 抄过来等于伪造许可。
+rule_meta:
+    defaults:
+        version: "0.1.0"
+        status: draft
+        license: MIT
+        author:
+            name: "NextPilot 内置（源自 ardupilot-mcp，见 ATTRIBUTION.md）"
+    by_group:
+        integrity:
+            category: integrity
+            doc: "https://ardupilot.org/copter/docs/common-diagnosing-problems-using-logs.html"
+        events:
+            category: events
+            doc: "https://ardupilot.org/copter/docs/common-diagnosing-problems-using-logs.html"
+        ekf_variance:
+            category: ekf
+            doc: "https://ardupilot.org/copter/docs/ekf-inav-failsafe.html"
+        vibration:
+            category: vibration
+            doc: "https://ardupilot.org/copter/docs/common-measuring-vibration.html"
+        battery:
+            category: power
+            doc: "https://ardupilot.org/copter/docs/failsafe-battery.html"
+        gps_health:
+            category: gps
+            doc: "https://ardupilot.org/copter/docs/gps-failsafe-glitch-protection.html"
+        compass:
+            category: compass
+            doc: "https://ardupilot.org/copter/docs/common-compass-setup-advanced.html"
+        attitude_tracking:
+            category: attitude
+            doc: "https://ardupilot.org/copter/docs/common-tuning.html"
+        motor_balance:
+            category: motor
+            doc: "https://ardupilot.org/copter/docs/thrust_loss_yaw_imbalance.html"
+        rc_input:
+            category: rc
+            doc: "https://ardupilot.org/copter/docs/radio-failsafe.html"
+        timing:
+            category: system
+            doc: "https://ardupilot.org/copter/docs/common-diagnosing-problems-using-logs.html"
+        config_safety:
+            category: config
+            doc: "https://ardupilot.org/copter/docs/common-prearm-safety-checks.html"
+        calibration:
+            category: calibration
+            doc: "https://ardupilot.org/copter/docs/common-compass-calibration-in-mission-planner.html"
+        sensor_health:
+            category: sensors
+            doc: "https://ardupilot.org/copter/docs/common-prearm-safety-checks.html"
+        prearm_messages:
+            category: config
+            doc: "https://ardupilot.org/copter/docs/common-prearm-safety-checks.html"
+        param_audit:
+            category: config
+            doc: "https://ardupilot.org/copter/docs/parameters.html"
+        guards_early:
+            category: guard
+        guards:
+            category: guard
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 日志级别：APM 与 PX4 共用同一套数字语义（3=ERROR 4=WARNING 6=INFO）。
+# 与 providers/ardupilot.py 的 _LEVEL_NAMES 同源，**本表只是码值文档**：
+# 运行期 MESSAGES 条目已自带 level_name，不走这张表。
+log_levels: { 3: ERROR, 4: WARNING, 6: INFO }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 机型：**规则 conditions.vehicle 的词表**，值域 = 引擎认识的机型名。
+#
+# ⚠️ 这张表按 providers/ardupilot.py 的 _FRAME_CLASS_MAP **实际行为**写，不是 FRAME_CLASS
+# 的权威码表——权威表在下面的 frame_classes（上游逐条核过 apm.pdef.xml）。两表冲突：
+#   · 3 号：本表 fixed_wing（provider 认定的 Plane）；上游 frame_classes[3] = Octo（旋翼）
+#   · 2/6/7 号：provider 的注释写 Tricopter/Octa/Helicopter，上游是 Hexa/Heli/Tri
+# provider 那份自己标了"待真实样本核对"，上游那份是核实过的。但**规则匹配用的是
+# provider 产出的 VEHICLE 字符串**，引擎只做精确比对，所以这里只能照 provider 写，
+# 否则规则永远 skip。冲突的处置见 PENDING.md。
+vehicle_types:
+    {
+        1: rotary_wing,
+        2: rotary_wing,
+        3: fixed_wing,
+        4: rotary_wing,
+        5: rotary_wing,
+        6: rotary_wing,
+        7: rotary_wing,
+        8: rotary_wing,
+    }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 飞行模式：上游 COPTER_MODES（Copter 4.5.7 的 mode.h Number enum）。
+# 缺 8/10/12 —— 那三个号在 ArduCopter 里没有对应模式，不是漏抄。
+#
+# 与 PX4 的 nav_state_names **不是一回事**：APM 的 MODE 消息里模式名本身就是字符串
+# （provider 直接给原文），ModeNum 是可选数值字段。这张表的运行期用途是
+# "当 ModeNum 存在时把码值翻译成名字"。
+flight_modes:
+    {
+        0: STABILIZE,
+        1: ACRO,
+        2: ALT_HOLD,
+        3: AUTO,
+        4: GUIDED,
+        5: LOITER,
+        6: RTL,
+        7: CIRCLE,
+        9: LAND,
+        11: DRIFT,
+        13: SPORT,
+        14: FLIP,
+        15: AUTOTUNE,
+        16: POSHOLD,
+        17: BRAKE,
+        18: THROW,
+        19: AVOID_ADSB,
+        20: GUIDED_NOGPS,
+        21: SMART_RTL,
+        22: FLOWHOLD,
+        23: FOLLOW,
+        24: ZIGZAG,
+        25: SYSTEMID,
+        26: AUTOROTATE,
+        27: AUTO_RTL,
+    }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ERR 子系统（AP_Logger.h 的 LogErrorSubsystem enum）。
+err_subsystems:
+    {
+        1: MAIN,
+        2: RADIO,
+        3: COMPASS,
+        4: OPTFLOW,
+        5: FAILSAFE_RADIO,
+        6: FAILSAFE_BATT,
+        7: FAILSAFE_GPS,
+        8: FAILSAFE_GCS,
+        9: FAILSAFE_FENCE,
+        10: FLIGHT_MODE,
+        11: GPS,
+        12: CRASH_CHECK,
+        13: FLIP,
+        14: AUTOTUNE,
+        15: PARACHUTE,
+        16: EKFCHECK,
+        17: FAILSAFE_EKFINAV,
+        18: BARO,
+        19: CPU,
+        20: FAILSAFE_ADSB,
+        21: TERRAIN,
+        22: NAVIGATION,
+        23: FAILSAFE_TERRAIN,
+        24: EKF_PRIMARY,
+        25: THRUST_LOSS_CHECK,
+        26: FAILSAFE_SENSORS,
+        27: FAILSAFE_LEAK,
+        28: PILOT_INPUT,
+        29: FAILSAFE_VIBE,
+        30: INTERNAL_ERROR,
+        31: FAILSAFE_DEADRECKON,
+    }
+
+# 这些子系统的 ECode != 0 是硬性安全失效，直接判 critical（不是 warning）。
+# 上游标为 confirmed，来源 ArduPilot AP_Logger.h LogErrorSubsystem enum。
+critical_err_subsystems: [5, 6, 7, 9, 12, 16, 17, 25, 29, 30]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EV 事件码（AP_Logger.h 的 LogEvent enum）。
+# 注意上游审计修正过的一处：**没有 TAKEOFF 这个事件 id**，早期版本误把它当事件，
+# 已在 0.1.2 改正。60/62 是 EKF 高度/航向重置，80 是围栏下限启用。
+ev_ids:
+    {
+        10: ARMED,
+        11: DISARMED,
+        15: AUTO_ARMED,
+        17: LAND_COMPLETE_MAYBE,
+        18: LAND_COMPLETE,
+        19: LOST_GPS,
+        21: FLIP_START,
+        22: FLIP_END,
+        25: SET_HOME,
+        26: SET_SIMPLE_ON,
+        27: SET_SIMPLE_OFF,
+        28: NOT_LANDED,
+        29: SET_SUPERSIMPLE_ON,
+        30: AUTOTUNE_INITIALISED,
+        31: AUTOTUNE_OFF,
+        33: AUTOTUNE_SUCCESS,
+        34: AUTOTUNE_FAILED,
+        41: FENCE_ENABLE,
+        42: FENCE_DISABLE,
+        49: PARACHUTE_DISABLED,
+        51: PARACHUTE_RELEASED,
+        54: MOTORS_EMERGENCY_STOPPED,
+        58: ROTOR_RUNUP_COMPLETE,
+        59: ROTOR_SPEED_BELOW_CRITICAL,
+        60: EKF_ALT_RESET,
+        61: LAND_CANCELLED_BY_PILOT,
+        62: EKF_YAW_RESET,
+        67: GPS_PRIMARY_CHANGED,
+        71: ZIGZAG_STORE_A,
+        80: FENCE_FLOOR_ENABLE,
+    }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FRAME_CLASS（Copter，核过 apm.pdef.xml）。name 后面的数是升力电机数，
+# null = 不是简单多旋翼（直升机类）。
+frame_classes:
+    {
+        1: { name: Quad, lift_motors: 4 },
+        2: { name: Hexa, lift_motors: 6 },
+        3: { name: Octo, lift_motors: 8 },
+        4: { name: OctoQuad, lift_motors: 8 },
+        5: { name: Y6, lift_motors: 6 },
+        6: { name: Heli, lift_motors: null },
+        7: { name: Tri, lift_motors: 3 },
+        8: { name: Single, lift_motors: 1 },
+        9: { name: Coax, lift_motors: 2 },
+        10: { name: BiCopter, lift_motors: 2 },
+        11: { name: Heli_Dual, lift_motors: null },
+        12: { name: DodecaHexa, lift_motors: 12 },
+        13: { name: HeliQuad, lift_motors: null },
+        14: { name: Deca, lift_motors: 10 },
+    }
+
+# 传统直升机（单/双/四旋翼直升机）。上游审计修正过：14=Deca 是**多旋翼**不是直升机，
+# 早期版本把 14 也算进来是错的。
+heli_frame_classes: [6, 11, 13]
+
+# FRAME_TYPE：机架几何布局。
+frame_types:
+    {
+        0: Plus,
+        1: X,
+        2: V,
+        3: H,
+        4: V-Tail,
+        5: A-Tail,
+        10: Y6B,
+        11: Y6F,
+        12: BetaFlightX,
+        13: DJIX,
+        14: ClockwiseX,
+        15: I,
+        18: BetaFlightXReversed,
+        19: Y4,
+    }
+
+# 固件横幅前缀 → 规范车型名。覆盖新式（"ArduCopter V4.5.7"）与老式（"APM:Copter V3.4.3"）。
+# 本轮仅作文档，provider 不读它。
+vehicle_prefix_map:
+    {
+        ArduCopter: ArduCopter,
+        "APM:Copter": ArduCopter,
+        ArduPlane: ArduPlane,
+        "APM:Plane": ArduPlane,
+        ArduRover: Rover,
+        "APM:Rover": Rover,
+        Rover: Rover,
+        ArduSub: ArduSub,
+        "APM:Sub": ArduSub,
+        Blimp: Blimp,
+        AntennaTracker: AntennaTracker,
+        "APM:Tracker": AntennaTracker,
+    }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 消息 → 字段 → 单位。**本表是人工维护的**，上游没有集中映射——它的 parser 把
+# FMTU/UNIT/MULT 直接丢了，单位只散落在各 check 的 docstring 里。
+#
+# 用途边界（重要）：当前**不参与运行期换算**。
+#   · 引擎的单位换算走 ref(..., unit=)，源单位从 meta/<tag>.json 查；
+#     APM 侧没有 meta/ 目录，所以规则里**不要写 unit=**（查不到只会告警，不换算）。
+#   · 展示用的单位由规则自己在 triggers[].unit 里写死，照抄本表即可。
+# 等 APM 也有 meta/ 之后，本表应迁过去并启用 unit=。见 PENDING.md。
+field_units:
+    VIBE: { VibeX: m/s², VibeY: m/s², VibeZ: m/s², Clip0: 次, Clip1: 次, Clip2: 次 }
+    MAG: { MagX: mGauss, MagY: mGauss, MagZ: mGauss, Health: 0/1 }
+    ATT:
+        { DesRoll: deg, Roll: deg, DesPitch: deg, Pitch: deg, DesYaw: deg, Yaw: deg, ErrRP: deg, ErrYaw: deg }
+    BAT: { Volt: V, Curr: A, CurrTot: mAh, EnrgTot: Wh, Temp: degC, Res: ohm }
+    CURR: { Volt: V, Curr: A, CurrTot: mAh }
+    GPS: { Status: 枚举, NSats: 颗, HDop: "" }
+    RCOU: { C1: us, C2: us, C3: us, C4: us, C5: us, C6: us, C7: us, C8: us }
+    RCIN: { C1: us, C2: us, C3: us, C4: us }
+    PM: { NLon: 次, NLoop: 次, MaxT: us }
+    # 归一化检验比，无量纲；1.0 是传感器拒绝边界
+    XKF4: { SV: "", SP: "", SH: "", SM: "" }
+    NKF4: { SV: "", SP: "", SH: "", SM: "" }
+    ERR: { Subsys: 枚举, ECode: 枚举 }
+    EV: { Id: 枚举 }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 官方文档链接（上游 ardupilot_docs.py 的 DOC_URLS，20 条，URL 逐个核过 ardupilot.org）。
+# rule_meta.by_group.doc 的取值必须来自这里（引擎的 docUrl 是单值，只取最具体的一条）。
+# 两处要一起改——当前没有自动校验，记在 PENDING.md。
+doc_urls:
+    log_diagnosis_general: "https://ardupilot.org/copter/docs/common-diagnosing-problems-using-logs.html"
+    vibration: "https://ardupilot.org/copter/docs/common-measuring-vibration.html"
+    vibration_damping: "https://ardupilot.org/copter/docs/common-vibration-damping.html"
+    ekf_failsafe: "https://ardupilot.org/copter/docs/ekf-inav-failsafe.html"
+    ekf_overview: "https://ardupilot.org/copter/docs/common-apm-navigation-extended-kalman-filter-overview.html"
+    gps_failsafe: "https://ardupilot.org/copter/docs/gps-failsafe-glitch-protection.html"
+    compass_calibration: "https://ardupilot.org/copter/docs/common-compass-calibration-in-mission-planner.html"
+    compass_interference: "https://ardupilot.org/copter/docs/common-compass-setup-advanced.html"
+    battery_failsafe: "https://ardupilot.org/copter/docs/failsafe-battery.html"
+    power_monitor: "https://ardupilot.org/copter/docs/common-powermodule-landingpage.html"
+    radio_failsafe: "https://ardupilot.org/copter/docs/radio-failsafe.html"
+    tuning: "https://ardupilot.org/copter/docs/common-tuning.html"
+    tuning_process: "https://ardupilot.org/copter/docs/tuning-process-instructions.html"
+    autotune: "https://ardupilot.org/copter/docs/autotune.html"
+    harmonic_notch: "https://ardupilot.org/copter/docs/common-imu-notch-filtering.html"
+    prearm_checks: "https://ardupilot.org/copter/docs/common-prearm-safety-checks.html"
+    esc_calibration: "https://ardupilot.org/copter/docs/esc-calibration.html"
+    thrust_loss: "https://ardupilot.org/copter/docs/thrust_loss_yaw_imbalance.html"
+    motor_order: "https://ardupilot.org/copter/docs/connect-escs-and-motors.html"
+    parameters_reference: "https://ardupilot.org/copter/docs/parameters.html"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 概览指标。两种写法，与 px4/facts.yaml 的约定一致：
+#   · 带 topic/field/op —— 规则没产出时就地现算（兜底）。op 必须是已注册算子。
+#   · 只写 key/label/unit —— 只占展示位，取数交给规则；规则没跑这一项就不显示。
+#
+# APM 日志现在的"关键数据"区是全空的，这张表能让它至少有数。
+#
+# 三个坑，写新条目时照着避开：
+#   1. field: [a, b, c] 的语义是**候选字段名取第一个存在的**（给同一字段在不同固件里
+#      换过名的情况用），不是"多列一起算"。多列归约必须走规则：规则里能用
+#      larger() 逐样本取大、再 max() 收成标量，metrics 这条路径做不到。
+#   2. 没有跨 topic 的兜底机制（不会 BAT 取不到就自动去 CURR 拿）。所以老固件
+#      兼容只能靠"两条不同 key 并列"，label 必须写清来源，否则概览区出现两个
+#      同名"最低电压"反而误导。
+#   3. 没有标量加法算子，跨 IMU 求和（Clip0+1+2）做不了 → 削波只报 IMU0。
+metrics:
+    # ── 只占展示位：取数依赖多列归约，交给规则产出 ──
+    - { key: vibrationMaxMs2, label: 最大振动, unit: m/s² }
+    - { key: accelClipTotal, label: 削波累计, unit: 次 }
+
+    # ── 就地现算：单列可算的都放这里 ──
+    - { key: accelClipImu0, label: 削波累计(IMU0), unit: 次, topic: VIBE, field: Clip0, op: range_of, round: 0 }
+    - { key: batteryVoltageMin, label: 最低电压(BAT), unit: V, topic: BAT, field: Volt, op: min, round: 2 }
+    - { key: batteryVoltageMinLegacy, label: 最低电压(CURR), unit: V, topic: CURR, field: Volt, op: min, round: 2 }
+    - { key: currentMax, label: 最大电流, unit: A, topic: BAT, field: Curr, op: max, round: 2 }
+    - { key: gpsSatellitesMin, label: 最少搜星, unit: 颗, topic: GPS, field: NSats, op: min, round: 0 }
+    - { key: gpsHdopMax, label: 最大 HDOP, unit: "", topic: GPS, field: HDop, op: max, round: 2 }
+    # XKF4 是 Copter 4.x 起的命名，NKF4 是老的（3.x / 部分 Plane）。两条并列，label 区分
+    - { key: ekfVarianceMax, label: EKF 最大检验比(XKF4), unit: "", topic: XKF4, field: SV, op: max, round: 3 }
+    - { key: ekfVarianceMaxLegacy, label: EKF 最大检验比(NKF4), unit: "", topic: NKF4, field: SV, op: max, round: 3 }
+    # PM.NLon 是长循环（>10% 超时）的**累计**计数，max 取到最后值即总数
+    - { key: longLoopCount, label: 长循环数, unit: 次, topic: PM, field: NLon, op: max, round: 0 }
