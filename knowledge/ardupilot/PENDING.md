@@ -21,7 +21,7 @@
 | 3   | `knowledge/engine/engine.py`      | `run_all()` 返回里 `"platform": "PX4"` 是硬编码                                                   | 改成问 provider（如 `provider.platform_label()`） |
 | 4   | `knowledge/engine/engine.py`      | 运行期只有一份 `FACTS` / `RULES`                                                                  | 按 `provider.log_type`（或族标识）挑对应那一套    |
 
-接线时**必须同时**处理的三件事，否则会静默出错：
+接线时**必须同时**处理的四件事，否则会静默出错：
 
 - `field_units` 目前**不参与运行期换算**（APM 没有 `meta/` 目录，写 `unit=` 查不到源单位，
   只会告警不换算）。要让单位真正生效，得先给 APM 补 `meta/`，再把 `field_units` 迁过去。
@@ -29,6 +29,13 @@
   概览区会同时显示两条。接线后先看看是不是能接受，不能接受就得给 metrics 加 fallback 链。
 - 补 `plot/` 目录。`PLOT_DIR` 不存在会直接抛错，所以本轮没建；接线前要么建，
   要么让构建脚本容忍它缺失。
+- **APM provider 不产飞行阶段，会导致故障库残废**（2026-09 实测，详见第六节）：
+  `providers/ardupilot.py` 的 `get_report_facts()` 里 `"phases": []` 是硬编码空数组；
+  引擎 `run_all()` 拿它 `set(...)` 出空集，`match_fault_kb()` 于是对 `flight_phase`
+  不含 `"all"` 的条目**直接跳过**。后果：哪怕直接复用 `knowledge/px4/fault-kb.yaml`，
+  10 条里**只有 3 条**可能命中（`F002` / `F007` / `F010`，它们的 `flight_phase` 是
+  `["all"]`），另外 7 条永远不命中。要修就得从 `MODE` 消息切段推阶段
+  （`takeoff` / `hover` / `cruise` …），或者把匹配改成不依赖阶段。
 
 ## 二、占位总表：11 条，各缺什么
 
@@ -104,4 +111,13 @@ skipped，原因就是那句话。**注意字符串里不能出现单引号**，
 - **`doc_urls` 与 `rule_meta.by_group.doc` 的同步**：引擎的 `docUrl` 是单值，
   只取最具体的一条，所以两处必须一起改，目前没有自动校验。
 - **不建 `fault-kb.yaml`**：它的 `trigger_tags` 必须是引擎真产出过的标签，
-  而本轮一条都没验证过，写了就是编。等验证过再建。
+  而本轮一条都没验证过，写了就是编。等验证过再建。排它前面还有两条前置条件
+  （都是 2026-09 实测）：
+  - **标签是两族共用的**：APM 规则与 PX4 规则用**同一套标签名**——
+    `knowledge/ardupilot/rules/vibration.yaml` 里写的是 `tag: high_vibration`、
+    `tag: accel_clipping`，**没有族前缀**。所以语义上可以直接复用
+    `knowledge/px4/fault-kb.yaml`。但**不要**因此把那份挪到 `knowledge/` 根：
+    它的 `flight_phase` 用 PX4 的阶段词汇（`takeoff` / `hover` / `maneuver` /
+    `fw_cruise` / `vtol_transition`），ardupilot 将来仍要写自己的一份。
+  - **先补 `phases` 再谈建库**（见第一节第 4 件）：provider 的 `phases` 恒空时，
+    故障库 10 条里 7 条永不命中——这时候建 APM 的 fault-kb，建出来就是残的。
