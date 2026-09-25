@@ -1,0 +1,99 @@
+# ⚠️ 本文件下的 3 条尚未接线进构建产物（见 PENDING.md 第 1 条）。
+#
+# 姿态跟踪（ATT）：期望姿态 DesRoll/DesPitch/DesYaw 与实测姿态 Roll/Pitch/Yaw 的差。
+# 上游 ardupilot-mcp 的 checks/attitude.py（自称 crown-jewel check）。
+# 阈值：持续 >=1s 且误差 >25° = critical；持续 >=1s 且在 15~25° = warning；
+#      未达持续但峰值 >30° = warning（阵风/粗猛打杆）。
+#
+# **本轮降级很重，说清楚**：上游真正的判据是"持续 1 秒以上的偏离区间"
+# （intervals_above(min_duration_s=1.0)），引擎缺 run-length / 持续时长算子，做不到。
+# 于是只剩下峰值判据——三条里只有 30° 那条（BRIEF_WARN_DEG，上游真有的阈值）能落地，
+# 15° 与 25° 那两档因为都以"持续"为前提，本轮不出结论。
+# **没有**用"超阈样本占比"去近似持续时长：占比阈值得自己挑，那是编数。
+#
+# yaw 那条直接占位：航向误差要绕回 [-180,180]（上游 `(err+180)%360-180`），
+# 引擎没有取模算子；直接取 |Des-Actual| 会在航向跨 ±180° 时给出约 360° 的假误差。
+# 上游还有一条 RCOU 饱和的附加说明（只在 critical 时加），本轮 critical 不触发，
+# 一并留到补算子后。
+
+id: apm-attitude-roll
+name: 横滚跟踪误差
+group: attitude_tracking
+order: 1
+
+conditions:
+    topics:
+        - ATT
+
+compute:
+    - err_roll = abs_diff(ref("ATT.DesRoll"), ref("ATT.Roll"))
+    - peak_roll = max(err_roll)
+
+outputs:
+    tag: attitude_tracking_error
+
+triggers:
+    - when: "peak_roll > 30.0"
+      severity: warning
+      threshold: 30.0
+      value: f"{peak_roll:.1f}"
+      unit: deg
+      field: "ATT.DesRoll - ATT.Roll(峰值)"
+      title: "横滚跟踪误差峰值 {peak_roll:.0f}°"
+      suggestion: "期望与实测横滚的最大偏差超过 30°。本条未判持续时长（缺算子），阵风或粗猛打杆也会造成瞬时大偏差；若伴随掉高或姿态发散，重点查动力与机械（电机/电调/桨、舵面连杆）与 PID。"
+
+---
+id: apm-attitude-pitch
+name: 俯仰跟踪误差
+group: attitude_tracking
+order: 2
+
+conditions:
+    topics:
+        - ATT
+
+compute:
+    - err_pitch = abs_diff(ref("ATT.DesPitch"), ref("ATT.Pitch"))
+    - peak_pitch = max(err_pitch)
+
+outputs:
+    tag: attitude_tracking_error
+
+triggers:
+    - when: "peak_pitch > 30.0"
+      severity: warning
+      threshold: 30.0
+      value: f"{peak_pitch:.1f}"
+      unit: deg
+      field: "ATT.DesPitch - ATT.Pitch(峰值)"
+      title: "俯仰跟踪误差峰值 {peak_pitch:.0f}°"
+      suggestion: "期望与实测俯仰的最大偏差超过 30°。本条未判持续时长（缺算子）；若伴随掉高或姿态发散，重点查重心、动力余量与 PID。"
+
+---
+# 占位：航向误差必须先绕回 [-180, 180]，引擎缺取模算子，直接取差会给出约 360° 的假误差。
+# 另：上游的持续时长判据（1s）本轮整体缺算子，见文件头。
+id: apm-attitude-yaw
+name: 航向跟踪误差（占位）
+group: attitude_tracking
+order: 3
+
+conditions:
+    topics:
+        - ATT
+    precheck:
+        - "'待补算子：航向误差需绕回 ±180 度（缺取模算子），且持续时长判据缺 run-length 算子，暂未实现'"
+
+compute:
+    - err_yaw = abs_diff(ref("ATT.DesYaw"), ref("ATT.Yaw"))
+
+outputs:
+    tag: attitude_tracking_error
+
+triggers:
+    - when: "False"
+      severity: warning
+      threshold: 30.0
+      unit: deg
+      field: "ATT.DesYaw - ATT.Yaw(绕回后峰值)"
+      title: "航向跟踪误差（占位，未实现）"
+      suggestion: "待补算子后实现：航向持续偏离常见于罗盘干扰、偏航通道机械问题或电机失衡。"

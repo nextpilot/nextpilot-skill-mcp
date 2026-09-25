@@ -1,0 +1,120 @@
+# ⚠️ 本文件下的 3 条尚未接线进构建产物（见 PENDING.md 第 1 条）。
+#
+# 事件与错误（ERR / EV / MODE）：上游 ardupilot-mcp 的 checks/events.py。
+#   ERR   子系统错误，Subsys + ECode；ECode 0 表示**清除**之前报的错误，不算问题
+#   EV    事件码（见 facts.yaml 的 ev_ids）
+#   MODE  模式时间线，上游出一条 INFO 摘要
+#
+# 上游这两类都是"每个 onset 一条 finding"，本仓库的引擎一条规则最多出一条 finding
+# （triggers 自上而下首条命中即中止；要展开成多条得用 foreach + 事件列表算子）。
+# 所以这里改成**按严重度分档的汇总**：先数出安全关键错误有几条、错误总共几条，
+# 再由 triggers 分档。代价是看不出每次发生的时间与具体子系统——记在 PENDING.md。
+
+id: apm-err-subsystem
+name: 子系统错误（ERR）
+group: events
+order: 1
+
+conditions:
+    topics:
+        - ERR
+
+compute:
+    - subsys = ref("ERR.Subsys")
+    - ecode = ref("ERR.ECode")
+    # ECode == 0 是"清除错误"，先剔掉（greater 只认严格大于，0.5 即 >=1）
+    - err_subsys = apply_mask(subsys, greater(ecode, 0.5))
+    - err_count = length_of(err_subsys)
+    # 这 10 个子系统出错是硬性安全失效（电池/GPS/EKF/崩机/振动等失效保护），直接 critical
+    - crit_count = count_true(values_in(err_subsys, [5, 6, 7, 9, 12, 16, 17, 25, 29, 30]))
+
+outputs:
+    tag: subsystem_error
+
+triggers:
+    - when: "crit_count > 0"
+      severity: critical
+      threshold: 0
+      value: crit_count
+      unit: 条
+      field: "ERR.Subsys(安全关键子系统，ECode!=0)"
+      title: "发生 {crit_count} 条安全关键子系统错误（ERR）"
+      suggestion: "涉及失效保护类子系统（电池/GPS/EKF/崩机/振动/推力丧失/内部错误），是直接影响飞行安全的硬故障。先查清根因再飞。"
+    - when: "err_count > 0"
+      severity: warning
+      threshold: 0
+      value: err_count
+      unit: 条
+      field: "ERR.Subsys(ECode!=0)"
+      title: "发生 {err_count} 条子系统错误（ERR）"
+      suggestion: "结合周边遥测定位根因，检查对应子系统（传感器/无线电）为何报错。"
+
+---
+# 上游把 EV 事件统一出 INFO 摘要。**这里有意偏离**：把几个本身就是故障信号的事件
+# 提到 warning——丢 GPS、EKF 高度/航向重置、电机紧急停转、旋翼转速不足。
+# 它们压在 INFO 里会被淹没，而这几条几乎不可能是"正常现象"。
+id: apm-ev-events
+name: 关键事件（EV）
+group: events
+order: 2
+
+conditions:
+    topics:
+        - EV
+
+compute:
+    - ev_id = ref("EV.Id")
+    - ev_count = length_of(ev_id)
+    # 19 LOST_GPS / 54 MOTORS_EMERGENCY_STOPPED / 59 ROTOR_SPEED_BELOW_CRITICAL
+    # 60 EKF_ALT_RESET / 62 EKF_YAW_RESET
+    - key_count = count_true(values_in(ev_id, [19, 54, 59, 60, 62]))
+
+outputs:
+    tag: critical_event_logged
+
+triggers:
+    - when: "key_count > 0"
+      severity: warning
+      threshold: 0
+      value: key_count
+      unit: 条
+      field: "EV.Id(丢GPS / EKF重置 / 电机急停 / 旋翼转速不足)"
+      title: "日志含 {key_count} 条关键异常事件（EV）"
+      suggestion: "丢 GPS、EKF 高度或航向重置、电机紧急停转、旋翼转速不足都属于明确的异常。按事件类型查对应子系统（GPS/罗盘/动力）。"
+    - when: "ev_count > 0"
+      severity: info
+      threshold: 0
+      value: ev_count
+      unit: 条
+      field: "EV.Id(全部事件)"
+      title: "日志共记录 {ev_count} 条事件（EV）"
+      suggestion: "事件码对照 facts.yaml 的 ev_ids 查看，用于还原飞行过程。"
+
+---
+# 占位：MODE 的模式名是**文本列**（MODE.Mode），而本仓库 APM provider 的 get_series()
+# 会把文本列的 float 转换失败吞成 None（PENDING.md 的 C1），取不到。
+# 数值的 ModeNum 理论可取，但上游这条的产出是"模式时间线摘要"，
+# 只靠 ModeNum 复现不出原文，价值有限；等 provider 支持文本列再做。
+id: apm-mode-timeline
+name: 模式时间线（占位）
+group: events
+order: 3
+
+conditions:
+    topics:
+        - MODE
+    precheck:
+        - "'待补能力：MODE.Mode 是文本列，provider 的 get_series 取不到文本（PENDING 的 C1），暂未实现'"
+
+compute:
+    - mode_num = ref("MODE.ModeNum")
+
+outputs:
+    tag: mode_timeline
+
+triggers:
+    - when: "False"
+      severity: info
+      field: "MODE.Mode(时间线)"
+      title: "模式时间线（占位，未实现）"
+      suggestion: "待 provider 支持文本列后实现：模式切换序列用于还原飞行过程与定位失控时点。"

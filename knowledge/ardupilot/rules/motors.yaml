@@ -1,0 +1,77 @@
+# ⚠️ 本文件下的 2 条都尚未接线进构建产物（见 PENDING.md 第 1 条），且**都是占位**。
+#
+# 电机输出（RCOU）：上游 ardupilot-mcp 的 checks/motors.py 查两类问题——
+#   · 不平衡：活跃通道的**每通道均值**极差（150 us 警告 / 300 us 严重）
+#   · 饱和：单通道接近满舵（>=1950 us）的样本占比（20% 警告 / 50% 严重）
+#
+# 原计划这两条是"能跑"的，写的时候发现跑不了，三条硬约束叠在一起：
+#   1. RCOU 的 C1..C8 在 DataFlash 里是**八个独立字段**，不是数组字段。引擎的
+#      column_spread_stats（PX4 电机平衡用的那个算子）吃的是数组字段——PX4 那边是
+#      actuator_motors.control（float32[8]，provider 摊平成 8 列）。ref() 只能逐字段取，
+#      也没有"把多个独立字段拼成矩阵"的语法，矩阵类算子全部用不上。
+#   2. 跨通道极差 = 最热通道均值 - 最冷通道均值，两个标量相减。引擎**没有标量减法**：
+#      abs_diff / sum_abs 对标量输入会 IndexError（它们的实现是 x[:n] - y[:n]，
+#      标量进 np.asarray 是 0-d 数组，切不了）。
+#   3. 饱和占比要先逐通道算 fraction_above 再取最大，需要"对矩阵逐列套算子"，
+#      引擎没有 map 类算子。
+# 所以：不动 operators.py 就做不了，而动它要重跑 build:kb 并牵动 PX4 的冻结基线——
+# 按本轮"不改算子"的边界，留占位。
+#
+# 另有一处**上游已声明、本轮不修**的风险：上游把这条限制在 copter（多旋翼），
+# 因为 heli 的 RCOU C1-C4 是斜盘舵机、plane 是舵面，"电机平衡"没有意义。
+# 本仓库的 conditions.vehicle 只能填 provider 真产出的 rotary_wing / fixed_wing，
+# 而 heli 在 provider 里也归 rotary_wing（见 facts.yaml 的 C3 冲突），
+# 所以将来接线后这条在直升机上会误报——接线时必须处理，记在 PENDING.md。
+
+id: apm-motor-imbalance
+name: 电机输出不平衡（占位）
+group: motor_balance
+order: 1
+
+conditions:
+    topics:
+        - RCOU
+    precheck:
+        - "'待补能力：需把 RCOU 的 C1 至 C8 独立字段组成矩阵，并用标量减法算通道均值极差（引擎缺矩阵拼装与标量减法），暂未实现'"
+
+compute:
+    - c1 = ref("RCOU.C1")
+
+outputs:
+    tag: motor_output_unbalance
+
+triggers:
+    - when: "False"
+      severity: warning
+      threshold: 150.0
+      unit: us
+      field: "RCOU.C1..C8(活跃通道均值极差)"
+      title: "电机输出不平衡（占位，未实现）"
+      suggestion: "待补能力后实现：通道均值极差大意味着飞控在对抗不对称（重心偏移、机架扭转、电机/桨不一致）。"
+
+---
+id: apm-motor-saturation
+name: 电机输出饱和（占位）
+group: motor_balance
+order: 2
+
+conditions:
+    topics:
+        - RCOU
+    precheck:
+        - "'待补能力：需逐通道统计接近满舵的样本占比并跨通道取最大（引擎缺矩阵逐列归约），暂未实现'"
+
+compute:
+    - c1 = ref("RCOU.C1")
+
+outputs:
+    tag: motor_output_saturated
+
+triggers:
+    - when: "False"
+      severity: warning
+      threshold: 0.20
+      unit: ""
+      field: "RCOU.C1..C8(>=1950us 样本占比)"
+      title: "电机输出饱和（占位，未实现）"
+      suggestion: "待补能力后实现：长时间接近满舵说明动力余量不足（超重或动力偏弱），会失去姿态控制权。"
