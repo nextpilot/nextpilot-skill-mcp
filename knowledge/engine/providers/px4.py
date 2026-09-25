@@ -107,6 +107,10 @@ class Px4Provider:
         """解析这份日志用的解析器版本（见 `_read_versions`）。"""
         return self.parser_version_str
 
+    def platform_label(self):
+        """报告头里的固件族名（人读的名字，与 `log_type` 那个机器标识不是一个东西）。"""
+        return "PX4"
+
     def get_topic_meta(self):
         """[{name, instance, n, fields:[{name, dtype}]}]（驱动 np_manifest 与曲线可用性）"""
         out = []
@@ -428,6 +432,8 @@ class Px4Provider:
             "DROPOUT_MS": self.dropout_total_ms,
             # 日志消息：供「日志消息聚合」类经验按级别筛选
             "MESSAGES": self.get_logged_events(),
+            # 初始参数表（ULog 的 'Q' 消息）。规则里用 param('NAME') 取单个值
+            "PARAMS": dict(self.get_initial_parameters()),
             # ---- 知识引擎内置变量（api.py 的 BUILTIN_VARIABLES；缺的给 None/空串，不编值）----
             "SYS_UUID": self.uuid,
             "AIRFRAME_ID": self.airframe_id,
@@ -1431,4 +1437,4 @@ def _make_px4(raw, facts_cfg):
     return Px4Provider(raw, facts_cfg)
 
 
-FORMATS.append((_is_ulog, _make_px4, "PX4 ULog（.ulg）"))
+FORMATS.append((_is_ulog, _make_px4, "PX4 ULog（.ulg）", Px4Provider.log_type))

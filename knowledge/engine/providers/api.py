@@ -231,6 +231,11 @@ OPTIONAL = {
         "sig": "(name=None) -> dict|None",
         "doc": "参数说明 {param: {min, max, desc}}。**v1 无数据源（参数字典是前端按需拉的静态 JSON）→ 返回 None**",
     },
+    "platform_label": {
+        "sig": "() -> str",
+        "doc": "报告头里的固件族名（如 PX4 / ArduPilot）——给读者看的名字，不是 `log_type` 那种机器标识。"
+        "**没有这个方法就退回 log_type**：引擎不替任何格式猜它该叫什么",
+    },
 }
 
 # ---------------- builtin_variables() 必须给的键（= 规则与 plot 能引用的内置变量）----------------
@@ -262,6 +267,12 @@ BUILTIN_VARIABLES = {
     "RESTART_DETECTED": {"type": "bool", "doc": "是否有 topic 时间戳回退（疑似中途重启）"},
     "DROPOUT_MS": {"type": "int", "doc": "全日志丢包累计（毫秒）"},
     "MESSAGES": {"type": "list[dict]", "doc": "日志消息条目（供消息类经验按级别筛选）"},
+    "PARAMS": {
+        "type": "dict",
+        "doc": "飞控参数表 {参数名: 值}。**规则里不直接引用它**——表达式没有下标能力，"
+        "取单个参数用框架的 `param('NAME')`（见 engine.py 的 `_rule_env`）。"
+        "这份日志没录参数就给空 dict（APM 是 PARM 消息的最后一次值，PX4 是初始参数表）",
+    },
     # ---- 知识引擎内置变量（docs/develop/engine-api-rework.md 并入）----
     # 缺什么给 None / ""（类型里写明 |None 或直接给空串），**不许编值**。
     "SYS_UUID": {"type": "str", "doc": "系统唯一 ID。这份日志没写就给空串"},
@@ -284,11 +295,17 @@ BUILTIN_VARIABLES = {
 
 
 # ---------------- 格式注册表 ----------------
-# 各 providers/<格式>.py 在文件末尾把 (探测器, 工厂, 说明) 追加进来。探测靠文件头 magic，
-# 不靠扩展名（用户上传的文件名不可信）。
+# 各 providers/<格式>.py 在文件末尾把 (探测器, 工厂, 说明, log_type) 追加进来。探测靠文件头
+# magic，不靠扩展名（用户上传的文件名不可信）。
 #   探测器  detect(raw) -> bool
 #   工厂    make(raw, facts_cfg) -> provider（facts_cfg 是那一份数据 YAML，由引擎传进来；
 #           之所以显式传而不是读全局，是为了让"这个 provider 用哪份数据"一目了然）
+#   log_type  格式标识（如 px4-ulog），**与适配器类上的 `log_type` 是同一个串**。
+#
+# 为什么把它塞进注册表而不是"引擎从 provider 实例上读"：引擎同时装着好几套知识
+# （knowledge/px4 与 knowledge/ardupilot 各自的规则 / 数据 / 故障库），而**挑知识必须先
+# 知道格式、挑格式又发生在打开日志之前**——探测器是唯一能在"还没构造 provider"时就回答
+# 这一步的东西。有了它 `open_log()` 一行都不用改。
 FORMATS = []
 
 _VALUE_TYPES = {
@@ -333,12 +350,28 @@ def match_version_spec(cur, spec):
     return True
 
 
+def detect_log_type(raw):
+    """按文件头认出这是哪种日志，**不构造 provider**（只跑探测器）。
+
+    引擎拿它当"该用哪一套知识"的开关：规则 / 数据 / 故障库 / 单位表在产物里都是
+    `{log_type: ...}` 的形状，先认格式才能取出对应那一套。认不出来返回 None。
+    """
+    for detect, _make, _label, log_type in FORMATS:
+        if detect(raw):
+            return log_type
+    return None
+
+
 def open_log(raw, facts_cfg=None):
-    """按文件头挑一个适配器打开日志，并立刻做一次契约自检；挑不出来就报人话错误。"""
-    for detect, make, label in FORMATS:
+    """按文件头挑一个适配器打开日志，并立刻做一次契约自检；挑不出来就报人话错误。
+
+    facts_cfg 是**已经挑好的那一份**数据（多格式时代由引擎按 `detect_log_type()` 挑，
+    见 engine.py）——这里不做挑选，因为挑知识要先知道格式，而格式是探测器说了算。
+    """
+    for detect, make, label, _log_type in FORMATS:
         if detect(raw):
             return check_provider(make(raw, facts_cfg), label)
-    known = "、".join(label for _, _, label in FORMATS) or "（无）"
+    known = "、".join(label for _, _, label, _ in FORMATS) or "（无）"
     raise ValueError("不认识的日志格式：本站目前只支持 %s。扩展名不作数，判据是文件头 magic" % known)
 
 

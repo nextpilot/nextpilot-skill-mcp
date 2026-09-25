@@ -29,24 +29,42 @@ import numpy as np
 # 第一部分：规则框架
 # ============================================================================
 
+# ---------------- 这一份日志该用哪一套知识 ----------------
+# 知识是**按固件族分开**的：knowledge/px4/ 与 knowledge/ardupilot/ 各有自己的规则、
+# 数据文件、故障库与单位表，构建期把它们内联成 `{log_type: ...}` 的形状。
+# 而"用哪一套"取决于这份日志是什么格式——所以先看文件头（detect_log_type），再取下标。
+# 顺序不能倒：open_log() 要拿 FACTS 去构造 provider，而 FACTS 又得先知道格式。
+_LOG_TYPE = detect_log_type(bytes(ulog_bytes))
+if _LOG_TYPE is None:
+    raise ValueError("不认识的日志格式（连探测器都没认出来）——见 providers/api.py 的 FORMATS")
+
+_LOG_TYPE_KNOWLEDGE = {
+    "fault_kb": __FAULT_KB__,
+    "rules": json.loads(r"""__RULES__"""),
+    "facts": json.loads(r"""__FACTS__"""),
+    "field_units": __FIELD_UNITS__,
+}
+
 # 故障知识库（构建期内联，第三层检索用）
-FAULT_KB = __FAULT_KB__
+FAULT_KB = _LOG_TYPE_KNOWLEDGE["fault_kb"].get(_LOG_TYPE, [])
 
 # ---------------- 经验规则（rules/*.yaml 编译而来）----------------
-RULES = json.loads(r"""__RULES__""")
+RULES = _LOG_TYPE_KNOWLEDGE["rules"].get(_LOG_TYPE, [])
 
 # ---------------- 那一份数据文件（knowledge/<格式>/facts.yaml 编译而来）----------------
 # 码表、文案、展示口径、规则元数据、执行顺序都在里面；引擎只提供机制。
 # 它同时也是 provider 的数据源（随 open_log 一起传进去）。
 # **按 JSON 解析**（与 RULES 同款）：它里面可能有 true / false / null（绘图预设的开关），
 # 那些不是合法的 Python 字面量——当字面量注入会直接 NameError。
-FACTS = json.loads(r"""__FACTS__""")
+FACTS = _LOG_TYPE_KNOWLEDGE["facts"].get(_LOG_TYPE, {})
 
 # ---------------- 字段单位表（构建期查好的，只含写了 unit= 的引用涉及的字段）----------------
 # 源单位从 meta/<tag>.json 查（经 meta/topic-map.yaml 换字典键）、meta/topic-overrides.yaml
 # 可补/纠。查不到的构建期会告警并在产物里留空——这里拿不到就**不换算**。
 # 键是 `topic.field`（日志里的名字，不是字典键），值是规范化后的单位名（见 _UNIT_FACTORS）。
-FIELD_UNITS = __FIELD_UNITS__
+# **换算是"声明了才做"**：APM 那份是空的（它的单位声明在 FMTU 里、没核对过），
+# 于是 APM 规则取到什么就是什么——不换算比换算错好。
+FIELD_UNITS = _LOG_TYPE_KNOWLEDGE["field_units"].get(_LOG_TYPE, {})
 
 # 同一 group 内多条规则按 order 字段排序（缺省 100000，再按 id 兜底）。
 # **跨 group 的顺序不在这里决定**：由 facts.yaml 的 group_order 决定（见文件末尾的执行循环），
@@ -445,6 +463,13 @@ def _scale_series(x, scale):
 # 算子名/入参/变量声明校验过一遍，这里再查一遍是为了防"构建期放行、运行期能执行任意代码"
 # 这类缝——两道关卡的判据不同，不能只留一道。
 
+# compute 里放行的**直接调用**：注册过的算子 + 这四个框架函数。
+#   ref("topic.field")  取一列
+#   _try(expr)          容错：内层出错时整条赋值结果为 None
+#   has_topic("name")   这个消息在不在（与 when 里同一个函数，语义一致）
+#   param("NAME")       读飞控参数（**不是算子**，见下面 `_param_fn` 的说明）
+_COMPUTE_CALLABLE = ("ref", "_try", "has_topic", "param")
+
 # 比 _ALLOWED_NODES 多出：赋值语句、调用、属性（字段引用）、三元、字典（算子选项）
 _ALLOWED_COMPUTE = _ALLOWED_NODES + (
     ast.Module,
@@ -498,7 +523,7 @@ def _compile_compute(stmt, env_keys):
         if isinstance(node, ast.Call):
             if not isinstance(node.func, ast.Name):
                 raise ValueError("compute 只允许直接调用算子")
-            if node.func.id not in OPERATORS and node.func.id not in ("ref", "_try", "has_topic"):
+            if node.func.id not in OPERATORS and node.func.id not in _COMPUTE_CALLABLE:
                 raise ValueError("compute 调用了未注册的算子 %s" % node.func.id)
 
     assign = tree.body[0]
@@ -564,14 +589,36 @@ _COMPUTE_GLOBALS["ref"] = _ref
 _COMPUTE_GLOBALS["has_topic"] = provider.has_topic
 
 
+def _param_fn(env):
+    """`param('NAME')`：读飞控参数。compute 里放行的第四个调用（与 ref / has_topic 同级）。
+
+    为什么不把它做成算子：算子只收数据、看不见 provider 与内置变量表，而参数是
+    **一份日志一个值的离散事实**（不是从列里算出来的）。它属于 `builtin_variables()`
+    给的 PARAMS 字典，取单个值本来就只是"查表"这件事本身——做成算子反而要开一个
+    "算子能读環境"的口子。
+
+    参数缺失（这份日志没录 / 名字写错）返回 `default`（默认 None）而**不抛异常**：
+    "没这个参数"与"参数等于 0"是两件事，挑哪个由规则自己说——要兜底就把 default 写上
+    （`param('RNGFND_TYPE', 0.0)` 的语义是"没声明就等于没配"，正是这类检查想要的）。
+    """
+
+    def param(name, default=None):
+        val = (env.get("PARAMS") or {}).get(str(name))
+        return default if val is None else val
+
+    return param
+
+
 def _rule_env():
-    """一条规则求值时的名字空间：内置变量（provider 给）+ 框架补的一个。
+    """一条规则求值时的名字空间：内置变量（provider 给）+ 框架补的这几个。
 
     每次都要新的一份：compute 的输出直接写进这个 dict。
-      has_topic() —— 表达式里唯一放行的函数调用，指向 provider.has_topic
+      has_topic() —— 这个消息在不在
+      param()     —— 读飞控参数（按本 env 的 PARAMS 查表）
     """
     env = provider.builtin_variables()
     env["has_topic"] = provider.has_topic
+    env["param"] = _param_fn(env)
     return env
 
 
@@ -878,7 +925,11 @@ def run_all():
     findings.sort(key=lambda f: order.get(f["severity"], 9))
 
     return {
-        "platform": "PX4",
+        # 固件族名**问 provider**：引擎不认识任何一种固件，写死一个就是把"本站只支持 PX4"
+        # 这个结论钉进了格式无关层（ArduPilot 日志会顶着 PX4 的名义出报告）。
+        # 没有 platform_label() 的格式退回 log_type——至少那是真的、只是不好读。
+        "platform": provider.platform_label() if hasattr(provider, "platform_label") else provider.log_type,
+        "logType": provider.log_type,
         "parserVersion": provider.parser_version(),
         # 事实层产出：facts=日志是什么（离散，驱动判定）；metrics=关键数字（有序，带中文名与单位）
         "facts": provider.get_report_facts(),

@@ -7,7 +7,7 @@ group: 开发指南
 groupEn: For Developers
 order: 12
 ---
-引擎当前内置的 **31 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
+引擎当前内置的 **65 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
 每条给出：**适用**（固件 / 机架 / 依赖）、**取值**（读哪些字段、过哪个算子）、**判定**（自上而下
 命中第一条即发射）、**产出**（写进报告的 check 名、喂故障库匹配的标签、UI 用的统计）。
 
@@ -21,7 +21,7 @@ order: 12
 
 ### px4-airspeed-invalid — 空速健康
 
-- 文件：`rules/airspeed.yaml` ｜ 位置：group `airspeed` #1
+- 文件：`rules/undefined` ｜ 位置：group `airspeed` #1
 - 适用：机架 fixed_wing ｜ 需要 airspeed_validated
 - 取值：
 - `cruise_ok = require_true(masked_any_in(vehicle_status.nav_state, vehicle_status.timestamp, ARMED_INTERVALS, codes=[3, 8]))`
@@ -36,9 +36,24 @@ order: 12
 
 ## attitude_tracking（group: `attitude_tracking`）
 
+### apm-attitude-roll — 横滚跟踪误差
+
+- 文件：`rules/airspeed.yaml` ｜ 位置：group `attitude_tracking` #1
+- 适用：需要 ATT
+- 取值：
+- `ats = ref("ATT.timestamp")`
+- `err_roll = abs_diff(ref("ATT.DesRoll"), ref("ATT.Roll"))`
+- `peak_roll = max(err_roll)`
+- `worst_roll = excursion_events(err_roll, ats, T0_US, threshold=15.0, limit=1)`
+- 判定：
+- **critical** ｜ `dur_s >= 1.0 and peak > 25.0` ｜ 阈值 25 ｜ 单位 deg ｜ 标题「横滚跟踪失败，持续 \{dur_s:.1f\} s、误差峰值 \{peak:.0f\}°（t=\{start_s:.1f\}s）」
+- **warning** ｜ `dur_s >= 1.0` ｜ 阈值 15 ｜ 单位 deg ｜ 标题「横滚持续偏离指令 \{dur_s:.1f\} s，误差峰值 \{peak:.0f\}°（t=\{start_s:.1f\}s）」
+- **warning** ｜ `peak_roll > 30.0` ｜ 阈值 30 ｜ 单位 deg ｜ 标题「横滚跟踪误差瞬时尖峰 \{peak_roll:.0f\}°」
+- 产出：check=attitude_tracking，tag=apm_attitude_tracking_error
+
 ### px4-attitude-overshoot — 姿态跟踪超调
 
-- 文件：`rules/attitude-overshoot.yaml` ｜ 位置：group `attitude_tracking` #1
+- 文件：`rules/undefined` ｜ 位置：group `attitude_tracking` #1
 - 适用：需要 vehicle_attitude ｜ 需要 vehicle_attitude_setpoint
 - 取值：
 - `p99, osc_hz, seg_n = _try(att_tracking_stats(
@@ -62,9 +77,24 @@ order: 12
 - **warning** ｜ `p99_stat >= 15.0 and not IS_FIXED_WING` ｜ 阈值 15 ｜ 单位 ° ｜ 标题「姿态跟踪误差偏大（p99 \{p99_stat:.1f\}°）」
 - 产出：check=attitude_tracking，tag=attitude_overshoot，stats=attitudeErrDegP99(round 1), attitudeOscHz(round 2)
 
-### px4-attitude-oscillation — 姿态误差高频振荡
+### apm-attitude-pitch — 俯仰跟踪误差
 
 - 文件：`rules/attitude-oscillation.yaml` ｜ 位置：group `attitude_tracking` #2
+- 适用：需要 ATT
+- 取值：
+- `ats = ref("ATT.timestamp")`
+- `err_pitch = abs_diff(ref("ATT.DesPitch"), ref("ATT.Pitch"))`
+- `peak_pitch = max(err_pitch)`
+- `worst_pitch = excursion_events(err_pitch, ats, T0_US, threshold=15.0, limit=1)`
+- 判定：
+- **critical** ｜ `dur_s >= 1.0 and peak > 25.0` ｜ 阈值 25 ｜ 单位 deg ｜ 标题「俯仰跟踪失败，持续 \{dur_s:.1f\} s、误差峰值 \{peak:.0f\}°（t=\{start_s:.1f\}s）」
+- **warning** ｜ `dur_s >= 1.0` ｜ 阈值 15 ｜ 单位 deg ｜ 标题「俯仰持续偏离指令 \{dur_s:.1f\} s，误差峰值 \{peak:.0f\}°（t=\{start_s:.1f\}s）」
+- **warning** ｜ `peak_pitch > 30.0` ｜ 阈值 30 ｜ 单位 deg ｜ 标题「俯仰跟踪误差瞬时尖峰 \{peak_pitch:.0f\}°」
+- 产出：check=attitude_tracking，tag=apm_attitude_tracking_error
+
+### px4-attitude-oscillation — 姿态误差高频振荡
+
+- 文件：`rules/undefined` ｜ 位置：group `attitude_tracking` #2
 - 适用：需要 vehicle_attitude ｜ 需要 vehicle_attitude_setpoint
 - 取值：
 - `p99, osc_hz, seg_n = _try(att_tracking_stats(
@@ -86,12 +116,45 @@ order: 12
 - **warning** ｜ `osc_stat >= 4.0 and p99_stat >= 15.0 and not IS_FIXED_WING` ｜ 阈值 4 ｜ 单位 Hz ｜ 标题「姿态误差高频振荡（约 \{osc_stat:.1f\} Hz）」
 - 产出：check=attitude_tracking，tag=attitude_overshoot，stats=attitudeErrDegP99(round 1), attitudeOscHz(round 2)
 
+### apm-attitude-yaw — 航向跟踪误差
+
+- 文件：`rules/attitude-overshoot.yaml` ｜ 位置：group `attitude_tracking` #3
+- 适用：需要 ATT
+- 取值：
+- `ats = ref("ATT.timestamp")`
+- `err_yaw = abs_values(wrap_degrees(sub(ref("ATT.Yaw"), ref("ATT.DesYaw"))))`
+- `peak_yaw = max(err_yaw)`
+- `worst_yaw = excursion_events(err_yaw, ats, T0_US, threshold=15.0, limit=1)`
+- 判定：
+- **critical** ｜ `dur_s >= 1.0 and peak > 25.0` ｜ 阈值 25 ｜ 单位 deg ｜ 标题「航向跟踪失败，持续 \{dur_s:.1f\} s、误差峰值 \{peak:.0f\}°（t=\{start_s:.1f\}s）」
+- **warning** ｜ `dur_s >= 1.0` ｜ 阈值 15 ｜ 单位 deg ｜ 标题「航向持续偏离指令 \{dur_s:.1f\} s，误差峰值 \{peak:.0f\}°（t=\{start_s:.1f\}s）」
+- **warning** ｜ `peak_yaw > 30.0` ｜ 阈值 30 ｜ 单位 deg ｜ 标题「航向跟踪误差瞬时尖峰 \{peak_yaw:.0f\}°」
+- 产出：check=attitude_tracking，tag=apm_attitude_tracking_error
+
 
 ## battery（group: `battery`）
 
+### apm-battery-low — 电池最低电压
+
+- 文件：`rules/imu-bias.yaml` ｜ 位置：group `battery` #1
+- 适用：需要 BAT 或 CURR
+- 取值：
+- `volts = ref("BAT.Volt", "CURR.Volt")`
+- `vmin = min(volts)`
+- `vmax = max(volts)`
+- `cells_raw = to_int(add(div(vmax, 4.2), 0.5))`
+- `per_cell = div(vmax, cells_raw)`
+- `cells = value_if(both(gt(vmax, 4.0), both(gt(70.0, vmax), both(gt(per_cell, 3.3), gt(4.4, per_cell)))), cells_raw)`
+- `crit_v = scale(cells, factor=3.3)`
+- `low_v = scale(cells, factor=3.5)`
+- 判定：
+- **critical** ｜ `vmin <= crit_v and vmax <= 70.0` ｜ 阈值 3.3 ｜ 单位 V ｜ 标题「电池电压触及临界线，最低 \{vmin:.2f\} V」
+- **warning** ｜ `vmin <= low_v and vmax <= 70.0` ｜ 阈值 3.5 ｜ 单位 V ｜ 标题「电池电压触及低电压告警线，最低 \{vmin:.2f\} V」
+- 产出：check=battery，tag=apm_battery_low_voltage
+
 ### px4-power-cell-voltage — 单电芯电压
 
-- 文件：`rules/power-cell-voltage.yaml` ｜ 位置：group `battery` #1
+- 文件：`rules/undefined` ｜ 位置：group `battery` #1
 - 适用：需要 battery_status
 - 取值：
 - `vmin, cell_min, cells, have_measured, have_fallback, no_cell = _try(cell_voltage_min( ref("battery_status[0].voltage_cell_v"), ref("battery_status[0].voltage_v"), ref("battery_status[0].voltage_filtered_v"), ref("battery_status[0].cell_count")))`
@@ -103,9 +166,22 @@ order: 12
 - **info** ｜ `no_cell` ｜ 标题「日志缺少电芯电压与 cell_count，未做单电芯判断」
 - 产出：check=battery，tag=battery_voltage_drop，stats=batteryVoltageMin(round 2), batteryCellCount(round -), batteryCellVoltageMin(round 3)
 
+### apm-battery-sag — 电池负载压降
+
+- 文件：`rules/imu-clipping.yaml` ｜ 位置：group `battery` #2
+- 适用：需要 BAT 或 CURR
+- 取值：
+- `volts = ref("BAT.Volt", "CURR.Volt")`
+- `curr = ref("BAT.Curr", "CURR.Curr")`
+- `peak_curr = max(curr)`
+- `sag = range_of(apply_mask(volts, greater(curr, 20.0)))`
+- 判定：
+- **info** ｜ `sag >= 1.0` ｜ 阈值 1 ｜ 单位 V ｜ 标题「大电流下压降 \{sag:.2f\} V（峰值电流 \{peak_curr:.1f\} A）」
+- 产出：check=battery，tag=apm_battery_sag
+
 ### px4-power-sag — 飞行中持续压降
 
-- 文件：`rules/power-sag.yaml` ｜ 位置：group `battery` #2
+- 文件：`rules/undefined` ｜ 位置：group `battery` #2
 - 适用：需要 battery_status
 - 取值：
 - `cell_min_t = rows_aggregate(ref("battery_status[0].voltage_cell_v"), agg="min", gt=0)`
@@ -114,9 +190,23 @@ order: 12
 - **warning** ｜ `drop >= 0.30 and tail < 3.70` ｜ 阈值 0.3 ｜ 单位 V ｜ 标题「飞行中单电芯持续压降 \{drop:.2f\} V（尾段中位 \{tail:.2f\} V）」
 - 产出：check=battery，tag=battery_voltage_drop，stats=batteryCellSagFlight(round 3)
 
+### apm-battery-sudden-drop — 电池电压突降
+
+- 文件：`rules/logged-errors.yaml` ｜ 位置：group `battery` #3
+- 适用：需要 BAT 或 CURR
+- 取值：
+- `volts = ref("BAT.Volt", "CURR.Volt")`
+- `vts = ref("BAT.timestamp", "CURR.timestamp")`
+- `vmed = median(volts)`
+- `drops = value_if(both(gt(vmed, 4.0), gt(70.0, vmed)), step_drop_events(volts, vts, T0_US))`
+- 判定：
+- **critical** ｜ `not recovered and drop > 4.0` ｜ 阈值 4 ｜ 单位 V ｜ 标题「电池电压在 \{dt_s:.3f\} s 内跌落 \{drop:.2f\} V（t=\{start_s:.2f\}s）」
+- **warning** ｜ `not recovered` ｜ 阈值 2 ｜ 单位 V ｜ 标题「电池电压在 \{dt_s:.3f\} s 内跌落 \{drop:.2f\} V（t=\{start_s:.2f\}s）」
+- 产出：check=battery，tag=apm_battery_sudden_drop
+
 ### px4-power-remaining — 电池剩余电量
 
-- 文件：`rules/power-remaining.yaml` ｜ 位置：group `battery` #3
+- 文件：`rules/undefined` ｜ 位置：group `battery` #3
 - 适用：需要 battery_status
 - 取值：
 - `rem = min_ge(ref("battery_status[0].remaining"), ge=0)`
@@ -127,11 +217,65 @@ order: 12
 - 产出：check=battery，tag=battery_voltage_drop，stats=batteryRemainingMin(round 3)
 
 
+## compass（group: `compass`）
+
+### apm-compass-interference — 罗盘场强稳定性
+
+- 文件：`rules/cpu-load.yaml` ｜ 位置：group `compass` #1
+- 适用：需要 MAG
+- 取值：
+- `mx = ref("MAG.MagX")`
+- `my = ref("MAG.MagY")`
+- `mz = ref("MAG.MagZ")`
+- `mag = hypot(hypot(mx, my), mz)`
+- `mean_mag = mean(mag)`
+- `cv_mag = cv(mag)`
+- `range_ratio = div(range_of(mag), mean_mag)`
+- `n_mag = length_of(mag)`
+- 判定：
+- **critical** ｜ `cv_mag > 0.60 and n_mag >= 10` ｜ 阈值 0.6 ｜ 标题「罗盘场强极不稳定，变异系数 \{cv_mag:.2f\}（\{mean_mag:.0f\} mGauss 均值上摆动）」
+- **warning** ｜ `(cv_mag > 0.30 or range_ratio > 0.60) and n_mag >= 10` ｜ 阈值 0.3 ｜ 标题「罗盘场强摆动偏大，变异系数 \{cv_mag:.2f\}、极差比 \{range_ratio:.2f\}（均值 \{mean_mag:.0f\} mGauss）」
+- 产出：check=compass，tag=apm_compass_interference
+
+
+## config_safety（group: `config_safety`）
+
+### apm-config-arming-check — 预解锁检查被禁用
+
+- 文件：`rules/ekf-faults.yaml` ｜ 位置：group `config_safety` #1
+- 适用：需要 PARM
+- 取值：
+- `arming_check = param("ARMING_CHECK")`
+- 判定：
+- **warning** ｜ `arming_check == 0` ｜ 阈值 0 ｜ 标题「预解锁检查被整体禁用（ARMING_CHECK=0）」
+- 产出：check=config_safety，tag=apm_config_arming_check_disabled
+
+### apm-config-batt-monitor — 未配置电池监控
+
+- 文件：`rules/ekf-innovation.yaml` ｜ 位置：group `config_safety` #2
+- 适用：需要 PARM
+- 取值：
+- `batt_monitor = param("BATT_MONITOR")`
+- 判定：
+- **info** ｜ `batt_monitor == 0` ｜ 阈值 0 ｜ 标题「未配置电池监控（BATT_MONITOR=0）」
+- 产出：check=config_safety，tag=apm_config_no_battery_monitor
+
+### apm-config-fs-thr — 油门失效保护被禁用
+
+- 文件：`rules/failsafe.yaml` ｜ 位置：group `config_safety` #3
+- 适用：需要 PARM
+- 取值：
+- `fs_thr_enable = param("FS_THR_ENABLE")`
+- 判定：
+- **info** ｜ `fs_thr_enable == 0` ｜ 阈值 0 ｜ 标题「油门失效保护被禁用（FS_THR_ENABLE=0）」
+- 产出：check=config_safety，tag=apm_config_thr_failsafe_disabled
+
+
 ## cpu（group: `cpu`）
 
 ### px4-cpu-load — CPU 负载
 
-- 文件：`rules/cpu-load.yaml` ｜ 位置：group `cpu` #—
+- 文件：`rules/undefined` ｜ 位置：group `cpu` #—
 - 适用：需要 cpuload
 - 取值：
 - `cpu_max = max(cpuload.load)`
@@ -145,7 +289,7 @@ order: 12
 
 ### px4-ekf-fault — EKF 融合硬故障
 
-- 文件：`rules/ekf-faults.yaml` ｜ 位置：group `ekf_faults` #1
+- 文件：`rules/undefined` ｜ 位置：group `ekf_faults` #1
 - 适用：需要 estimator_status
 - 取值：
 - `fault_raw = _try(bit_or_max( ref("estimator_status[:].filter_fault_flags")))`
@@ -161,7 +305,7 @@ order: 12
 
 ### px4-ekf-innovation — EKF 创新检验
 
-- 文件：`rules/ekf-innovation.yaml` ｜ 位置：group `ekf_innovations` #1
+- 文件：`rules/undefined` ｜ 位置：group `ekf_innovations` #1
 - 适用：需要 estimator_status
 - 取值：
 - `frac, names, inst = worst_reject_ratio(
@@ -188,11 +332,99 @@ order: 12
 - 产出：check=ekf_innovations，tag=ekf_innovation_failure，stats=ekfRejectRatioPct(round 2)
 
 
+## ekf_variance（group: `ekf_variance`）
+
+### apm-ekf-velocity — EKF 速度检验比
+
+- 文件：`rules/failsafe.yaml` ｜ 位置：group `ekf_variance` #1
+- 适用：需要 XKF4 或 NKF4
+- 取值：
+- `sv_max = max(ref("XKF4.SV", "NKF4.SV"))`
+- 判定：
+- **critical** ｜ `sv_max > 1.0` ｜ 阈值 1 ｜ 标题「EKF 速度检验比超拒绝线，峰值 \{sv_max:.2f\}」
+- **warning** ｜ `sv_max > 0.8` ｜ 阈值 0.8 ｜ 标题「EKF 速度检验比偏高，峰值 \{sv_max:.2f\}」
+- 产出：check=ekf_variance，tag=apm_ekf_variance_high
+
+### apm-ekf-position — EKF 位置检验比
+
+- 文件：`rules/failsafe.yaml` ｜ 位置：group `ekf_variance` #2
+- 适用：需要 XKF4 或 NKF4
+- 取值：
+- `sp_max = max(ref("XKF4.SP", "NKF4.SP"))`
+- 判定：
+- **critical** ｜ `sp_max > 1.0` ｜ 阈值 1 ｜ 标题「EKF 位置检验比超拒绝线，峰值 \{sp_max:.2f\}」
+- **warning** ｜ `sp_max > 0.8` ｜ 阈值 0.8 ｜ 标题「EKF 位置检验比偏高，峰值 \{sp_max:.2f\}」
+- 产出：check=ekf_variance，tag=apm_ekf_variance_high
+
+### apm-ekf-height — EKF 高度检验比
+
+- 文件：`rules/failsafe.yaml` ｜ 位置：group `ekf_variance` #3
+- 适用：需要 XKF4 或 NKF4
+- 取值：
+- `sh_max = max(ref("XKF4.SH", "NKF4.SH"))`
+- 判定：
+- **critical** ｜ `sh_max > 1.0` ｜ 阈值 1 ｜ 标题「EKF 高度检验比超拒绝线，峰值 \{sh_max:.2f\}」
+- **warning** ｜ `sh_max > 0.8` ｜ 阈值 0.8 ｜ 标题「EKF 高度检验比偏高，峰值 \{sh_max:.2f\}」
+- 产出：check=ekf_variance，tag=apm_ekf_variance_high
+
+### apm-ekf-magnetometer — EKF 磁罗盘检验比
+
+- 文件：`rules/failsafe.yaml` ｜ 位置：group `ekf_variance` #4
+- 适用：需要 XKF4 或 NKF4
+- 取值：
+- `sm_max = max(ref("XKF4.SM", "NKF4.SM"))`
+- 判定：
+- **critical** ｜ `sm_max > 1.0` ｜ 阈值 1 ｜ 标题「EKF 磁罗盘检验比超拒绝线，峰值 \{sm_max:.2f\}」
+- **warning** ｜ `sm_max > 0.8` ｜ 阈值 0.8 ｜ 标题「EKF 磁罗盘检验比偏高，峰值 \{sm_max:.2f\}」
+- 产出：check=ekf_variance，tag=apm_ekf_variance_high
+
+
+## events（group: `events`）
+
+### apm-err-subsystem — 子系统错误（ERR）
+
+- 文件：`rules/failsafe.yaml` ｜ 位置：group `events` #1
+- 适用：需要 ERR
+- 取值：
+- `subsys = ref("ERR.Subsys")`
+- `ecode = ref("ERR.ECode")`
+- `err_subsys = apply_mask(subsys, greater(ecode, 0.5))`
+- `err_count = length_of(err_subsys)`
+- `crit_count = count_true(values_in(err_subsys, [5, 6, 7, 9, 12, 16, 17, 25, 29, 30]))`
+- 判定：
+- **critical** ｜ `crit_count > 0` ｜ 阈值 0 ｜ 单位 条 ｜ 标题「发生 \{crit_count\} 条安全关键子系统错误（ERR）」
+- **warning** ｜ `err_count > 0` ｜ 阈值 0 ｜ 单位 条 ｜ 标题「发生 \{err_count\} 条子系统错误（ERR）」
+- 产出：check=events，tag=apm_subsystem_error
+
+### apm-ev-events — 关键事件（EV）
+
+- 文件：`rules/gps-eph.yaml` ｜ 位置：group `events` #2
+- 适用：需要 EV
+- 取值：
+- `ev_id = ref("EV.Id")`
+- `ev_count = length_of(ev_id)`
+- `key_count = count_true(values_in(ev_id, [19, 54, 59, 60, 62]))`
+- 判定：
+- **warning** ｜ `key_count > 0` ｜ 阈值 0 ｜ 单位 条 ｜ 标题「日志含 \{key_count\} 条关键异常事件（EV）」
+- **info** ｜ `ev_count > 0` ｜ 阈值 0 ｜ 单位 条 ｜ 标题「日志共记录 \{ev_count\} 条事件（EV）」
+- 产出：check=events，tag=apm_critical_event_logged
+
+### apm-mode-timeline — 模式时间线（占位）
+
+- 文件：`rules/gps-jump.yaml` ｜ 位置：group `events` #3
+- 适用：需要 MODE
+- 取值：
+- `mode_num = ref("MODE.ModeNum")`
+- 判定：
+- **info** ｜ `False` ｜ 标题「模式时间线（占位，未实现）」
+- 产出：check=events，tag=apm_mode_timeline
+
+
 ## failsafe（group: `failsafe`）
 
 ### px4-failsafe-failsafe — 失效保护触发
 
-- 文件：`rules/failsafe.yaml` ｜ 位置：group `failsafe` #1
+- 文件：`rules/undefined` ｜ 位置：group `failsafe` #1
 - 适用：总是适用
 - 取值：
 - `events = rising_edge_events(vehicle_status.failsafe, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)`
@@ -202,7 +434,7 @@ order: 12
 
 ### px4-failsafe-rc_signal_lost — 遥控信号丢失
 
-- 文件：`rules/failsafe.yaml` ｜ 位置：group `failsafe` #2
+- 文件：`rules/undefined` ｜ 位置：group `failsafe` #2
 - 适用：总是适用
 - 取值：
 - `events = rising_edge_events(vehicle_status.rc_signal_lost, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)`
@@ -212,7 +444,7 @@ order: 12
 
 ### px4-failsafe-data_link_lost — 数据链路丢失
 
-- 文件：`rules/failsafe.yaml` ｜ 位置：group `failsafe` #3
+- 文件：`rules/undefined` ｜ 位置：group `failsafe` #3
 - 适用：总是适用
 - 取值：
 - `events = rising_edge_events(vehicle_status.data_link_lost, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)`
@@ -222,7 +454,7 @@ order: 12
 
 ### px4-failsafe-engine_failure — 动力故障保护
 
-- 文件：`rules/failsafe.yaml` ｜ 位置：group `failsafe` #4
+- 文件：`rules/undefined` ｜ 位置：group `failsafe` #4
 - 适用：总是适用
 - 取值：
 - `events = rising_edge_events(vehicle_status.engine_failure, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)`
@@ -232,7 +464,7 @@ order: 12
 
 ### px4-failsafe-mission_failure — 任务失效保护
 
-- 文件：`rules/failsafe.yaml` ｜ 位置：group `failsafe` #5
+- 文件：`rules/undefined` ｜ 位置：group `failsafe` #5
 - 适用：总是适用
 - 取值：
 - `events = rising_edge_events(vehicle_status.mission_failure, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)`
@@ -242,7 +474,7 @@ order: 12
 
 ### px4-failsafe-nav — 失效保护导航状态
 
-- 文件：`rules/failsafe.yaml` ｜ 位置：group `failsafe` #6
+- 文件：`rules/undefined` ｜ 位置：group `failsafe` #6
 - 适用：需要 vehicle_status
 - 取值：
 - `events = step_into_events(vehicle_status.nav_state, vehicle_status.timestamp, ARMED_INTERVALS, T0_US, codes={5: "AUTO_RTL", 12: "DESCEND", 13: "TERMINATION", 18: "LAND"})`
@@ -253,9 +485,23 @@ order: 12
 
 ## gps_health（group: `gps_health`）
 
+### apm-gps-fix — GPS 定位状态
+
+- 文件：`rules/gps-sats.yaml` ｜ 位置：group `gps_health` #1
+- 适用：需要 GPS
+- 取值：
+- `status = ref("GPS.Status")`
+- `smax = max(status)`
+- `status_armed = apply_mask(status, interval_mask(ref("GPS.timestamp"), ARMED_INTERVALS))`
+- `smin_armed = min(status_armed)`
+- 判定：
+- **warning** ｜ `smax < 3.0` ｜ 阈值 3 ｜ 标题「全程未达 3D 定位，最高状态 \{smax:.0f\}」
+- **critical** ｜ `smin_armed < 3.0` ｜ 阈值 3 ｜ 标题「飞行中丢过 3D 定位，armed 段最低状态 \{smin_armed:.0f\}」
+- 产出：check=gps_health，tag=apm_gps_no_fix
+
 ### px4-gps-eph — GPS 水平位置误差
 
-- 文件：`rules/gps-eph.yaml` ｜ 位置：group `gps_health` #1
+- 文件：`rules/undefined` ｜ 位置：group `gps_health` #1
 - 适用：需要 vehicle_gps_position
 - 取值：
 - `eph_pos = keep_gt(vehicle_gps_position.eph, gt=0)`
@@ -267,9 +513,21 @@ order: 12
 - **info** ｜ `e_p95 >= 5.0` ｜ 阈值 5 ｜ 单位 m ｜ 标题「GPS 水平位置误差偶发偏大（p95 \{e_p95:.1f\} m）」
 - 产出：check=gps_health，tag=gps_eph_high，stats=gpsEphP95M(round 2), gpsEphMaxM(round 2)
 
+### apm-gps-sats — GPS 搜星数
+
+- 文件：`rules/guard-log-dropouts.yaml` ｜ 位置：group `gps_health` #2
+- 适用：需要 GPS
+- 取值：
+- `nsats_armed = apply_mask(ref("GPS.NSats"), interval_mask(ref("GPS.timestamp"), ARMED_INTERVALS))`
+- `nmin = to_int(min(nsats_armed))`
+- 判定：
+- **critical** ｜ `nmin < 4` ｜ 阈值 4 ｜ 单位 颗 ｜ 标题「飞行中搜星数最低仅 \{nmin\} 颗」
+- **warning** ｜ `nmin < 6` ｜ 阈值 6 ｜ 单位 颗 ｜ 标题「飞行中搜星数偏低，最低 \{nmin\} 颗」
+- 产出：check=gps_health，tag=apm_gps_low_sats
+
 ### px4-gps-sats — GPS 卫星数
 
-- 文件：`rules/gps-sats.yaml` ｜ 位置：group `gps_health` #2
+- 文件：`rules/undefined` ｜ 位置：group `gps_health` #2
 - 适用：需要 vehicle_gps_position
 - 取值：
 - `s_min_raw = min(vehicle_gps_position.satellites_used)`
@@ -278,9 +536,23 @@ order: 12
 - **warning** ｜ `s_min <= 6` ｜ 阈值 8 ｜ 单位 颗 ｜ 标题「GPS 卫星数最少仅 \{s_min\} 颗」
 - 产出：check=gps_health，tag=gps_eph_high，stats=gpsSatellitesMin(round -)
 
+### apm-gps-hdop — GPS 水平精度因子
+
+- 文件：`rules/guard-restart.yaml` ｜ 位置：group `gps_health` #3
+- 适用：需要 GPS
+- 取值：
+- `mask_fix = greater(ref("GPS.Status"), 2.5)`
+- `mask_armed = interval_mask(ref("GPS.timestamp"), ARMED_INTERVALS)`
+- `hdop_valid = apply_mask(ref("GPS.HDop"), mask_and(mask_fix, mask_armed))`
+- `hmax = max(hdop_valid)`
+- 判定：
+- **critical** ｜ `hmax > 5.0` ｜ 阈值 5 ｜ 标题「飞行中 HDOP 峰值 \{hmax:.1f\}，水平位置不可用」
+- **warning** ｜ `hmax > 2.0` ｜ 阈值 2 ｜ 标题「飞行中 HDOP 峰值 \{hmax:.1f\}，卫星几何偏弱」
+- 产出：check=gps_health，tag=apm_gps_high_hdop
+
 ### px4-gps-jump — GPS 位置跳变
 
-- 文件：`rules/gps-jump.yaml` ｜ 位置：group `gps_health` #3
+- 文件：`rules/undefined` ｜ 位置：group `gps_health` #3
 - 适用：需要 vehicle_gps_position
 - 取值：
 - `step = _try(adjacent_speed_mps( ref("vehicle_gps_position.latitude_deg", "vehicle_gps_position.lat", unit="deg"), ref("vehicle_gps_position.longitude_deg", "vehicle_gps_position.lon", unit="deg"), ref("vehicle_gps_position.timestamp")))`
@@ -294,7 +566,7 @@ order: 12
 
 ### px4-guard-restart — 数据质量-中途重启
 
-- 文件：`rules/guard-restart.yaml` ｜ 位置：group `guards` #1
+- 文件：`rules/undefined` ｜ 位置：group `guards` #1
 - 适用：总是适用
 - 取值：
 - （无 compute）
@@ -304,7 +576,7 @@ order: 12
 
 ### px4-guard-topic-missing — 数据质量-关键 topic 缺失
 
-- 文件：`rules/guard-topic-missing.yaml` ｜ 位置：group `guards` #2
+- 文件：`rules/undefined` ｜ 位置：group `guards` #2
 - 适用：总是适用
 - 取值：
 - （无 compute）
@@ -316,7 +588,7 @@ order: 12
 
 ### px4-guard-log-dropouts — 数据质量-日志丢包
 
-- 文件：`rules/guard-log-dropouts.yaml` ｜ 位置：group `guards` #3
+- 文件：`rules/undefined` ｜ 位置：group `guards` #3
 - 适用：总是适用
 - 取值：
 - （无 compute）
@@ -329,7 +601,7 @@ order: 12
 
 ### px4-guard-short-log — 数据质量-短日志
 
-- 文件：`rules/guard-short-log.yaml` ｜ 位置：group `guards_early` #1
+- 文件：`rules/undefined` ｜ 位置：group `guards_early` #1
 - 适用：总是适用
 - 取值：
 - （无 compute）
@@ -343,7 +615,7 @@ order: 12
 
 ### px4-imu-bias-drift — 陀螺零偏漂移
 
-- 文件：`rules/imu-bias.yaml` ｜ 位置：group `imu_bias` #1
+- 文件：`rules/undefined` ｜ 位置：group `imu_bias` #1
 - 适用：总是适用
 - 取值：
 - `bx, by, bz, bts, src_text = _try(gyro_bias_series( ref("estimator_sensor_bias[0].gyro_bias"), ref("estimator_sensor_bias[0].timestamp"), ref("estimator_states[0].states"), ref("estimator_states[0].timestamp"), ref("estimator_status[0].states"), ref("estimator_status[0].timestamp"), slot=10, sources=["estimator_sensor_bias.gyro_bias[]",
@@ -363,7 +635,7 @@ order: 12
 
 ### px4-log-errors — 日志错误消息
 
-- 文件：`rules/logged-errors.yaml` ｜ 位置：group `logged_messages` #1
+- 文件：`rules/undefined` ｜ 位置：group `logged_messages` #1
 - 适用：总是适用
 - 取值：
 - `n = count_items(MESSAGES, key="level_name", in_list=["EMERGENCY", "ALERT", "CRITICAL", "ERROR"])`
@@ -374,7 +646,7 @@ order: 12
 
 ### px4-log-warnings — 日志警告消息
 
-- 文件：`rules/logged-warnings.yaml` ｜ 位置：group `logged_messages` #2
+- 文件：`rules/undefined` ｜ 位置：group `logged_messages` #2
 - 适用：总是适用
 - 取值：
 - `n = count_items(MESSAGES, key="level_name", eq="WARNING")`
@@ -388,7 +660,7 @@ order: 12
 
 ### px4-mode-thrash — 飞行模式抖动
 
-- 文件：`rules/mode-thrash.yaml` ｜ 位置：group `mode_thrash` #1
+- 文件：`rules/undefined` ｜ 位置：group `mode_thrash` #1
 - 适用：需要 vehicle_status
 - 取值：
 - `n_changes_raw = edges_count(vehicle_status.nav_state)`
@@ -400,9 +672,31 @@ order: 12
 
 ## motor_balance（group: `motor_balance`）
 
+### apm-motor-imbalance — 电机输出不平衡
+
+- 文件：`rules/guard-short-log.yaml` ｜ 位置：group `motor_balance` #1
+- 适用：需要 RCOU
+- 取值：
+- `c1 = ref("RCOU.C1")`
+- `c2 = ref("RCOU.C2")`
+- `c3 = ref("RCOU.C3")`
+- `c4 = ref("RCOU.C4")`
+- `c5 = ref("RCOU.C5")`
+- `c6 = ref("RCOU.C6")`
+- `c7 = ref("RCOU.C7")`
+- `c8 = ref("RCOU.C8")`
+- `cols = stack_columns(c1, c2, c3, c4, c5, c6, c7, c8)`
+- `spread, hot, cold, n_active = column_spread_stats(cols, None, min_mean=1100.0, min_channels=2)`
+- `hot_ch = add(hot, 1)`
+- `cold_ch = add(cold, 1)`
+- 判定：
+- **critical** ｜ `spread > 300.0` ｜ 阈值 300 ｜ 单位 us ｜ 标题「电机输出严重不平衡，极差 \{spread:.0f\} us（\{n_active\} 个活跃通道）」
+- **warning** ｜ `spread > 150.0` ｜ 阈值 150 ｜ 单位 us ｜ 标题「电机输出不平衡，极差 \{spread:.0f\} us（\{n_active\} 个活跃通道）」
+- 产出：check=motor_balance，tag=apm_motor_output_unbalance
+
 ### px4-motor-unbalance — 电机输出不平衡
 
-- 文件：`rules/motor-balance.yaml` ｜ 位置：group `motor_balance` #1
+- 文件：`rules/undefined` ｜ 位置：group `motor_balance` #1
 - 适用：需要 actuator_motors
 - 取值：
 - `mts = actuator_motors.timestamp`
@@ -414,12 +708,129 @@ order: 12
 - **warning** ｜ `spread >= 0.08` ｜ 阈值 0.08 ｜ 标题「电机输出差异偏大（通道 \{busiest\} 与 \{idlest\} 差 \{spread:.3f\}）」
 - 产出：check=motor_balance，tag=motor_output_unbalance，stats=motorControlSpread(round 3), motorCountActive(round -)
 
+### apm-motor-saturation — 电机输出饱和
+
+- 文件：`rules/guard-topic-missing.yaml` ｜ 位置：group `motor_balance` #2
+- 适用：需要 RCOU
+- 取值：
+- `c1 = ref("RCOU.C1")`
+- `c2 = ref("RCOU.C2")`
+- `c3 = ref("RCOU.C3")`
+- `c4 = ref("RCOU.C4")`
+- `c5 = ref("RCOU.C5")`
+- `c6 = ref("RCOU.C6")`
+- `c7 = ref("RCOU.C7")`
+- `c8 = ref("RCOU.C8")`
+- `cols = stack_columns(c1, c2, c3, c4, c5, c6, c7, c8)`
+- `sats = column_ratio_events(cols, 1950.0, min_frac=0.20, min_mean=1100.0)`
+- 判定：
+- **critical** ｜ `frac > 0.50` ｜ 阈值 0.5 ｜ 单位 % ｜ 标题「电机 \{channel\} 号通道长时间满舵（均值 \{mean:.0f\} us）」
+- **warning** ｜ `True` ｜ 阈值 0.2 ｜ 单位 % ｜ 标题「电机 \{channel\} 号通道接近满舵（均值 \{mean:.0f\} us）」
+- 产出：check=motor_balance，tag=apm_motor_output_saturated
+
+
+## rc_input（group: `rc_input`）
+
+### apm-rcin-link-loss — 遥控输入链路
+
+- 文件：`rules/logged-warnings.yaml` ｜ 位置：group `rc_input` #1
+- 适用：需要 RCIN
+- 取值：
+- `c1 = ref("RCIN.C1")`
+- `c2 = ref("RCIN.C2")`
+- `c3 = ref("RCIN.C3")`
+- `c4 = ref("RCIN.C4")`
+- `low1 = greater(scale_series(c1, factor=-1.0), -1000.0)`
+- `low2 = greater(scale_series(c2, factor=-1.0), -1000.0)`
+- `low3 = greater(scale_series(c3, factor=-1.0), -1000.0)`
+- `low4 = greater(scale_series(c4, factor=-1.0), -1000.0)`
+- `all_low = mask_and(mask_and(low1, low2), mask_and(low3, low4))`
+- `lost_samples = count_true(all_low)`
+- 判定：
+- **warning** ｜ `lost_samples > 0` ｜ 阈值 1000 ｜ 单位 样本 ｜ 标题「四个主通道曾同时低于 1000us，共 \{lost_samples\} 个样本」
+- 产出：check=rc_input，tag=apm_rc_link_loss
+
+
+## sensor_health（group: `sensor_health`）
+
+### apm-sensor-rangefinder — 测距仪配置但无数据
+
+- 文件：`rules/mode-thrash.yaml` ｜ 位置：group `sensor_health` #1
+- 适用：需要 PARM
+- 取值：
+- `rng_type = param("RNGFND_TYPE", 0.0)`
+- `rng1_type = param("RNGFND1_TYPE", 0.0)`
+- 判定：
+- **warning** ｜ `(rng_type > 0 or rng1_type > 0) and not has_topic('RFND') and not has_topic('RNGFND')` ｜ 阈值 0 ｜ 标题「测距仪已配置但日志无数据」
+- 产出：check=sensor_health，tag=apm_sensor_configured_but_silent
+
+### apm-sensor-gps — GPS 配置但无数据
+
+- 文件：`rules/motor-balance.yaml` ｜ 位置：group `sensor_health` #2
+- 适用：需要 PARM
+- 取值：
+- `gps_type = param("GPS_TYPE", 0.0)`
+- 判定：
+- **warning** ｜ `gps_type > 0 and not has_topic('GPS')` ｜ 阈值 0 ｜ 标题「GPS 已配置但日志无数据」
+- 产出：check=sensor_health，tag=apm_sensor_configured_but_silent
+
+### apm-sensor-compass-health — 罗盘健康标志
+
+- 文件：`rules/power-cell-voltage.yaml` ｜ 位置：group `sensor_health` #3
+- 适用：需要 MAG
+- 取值：
+- `health = ref("MAG.Health")`
+- `unhealthy_ratio = ratio_equal(health, value=0.0)`
+- 判定：
+- **warning** ｜ `unhealthy_ratio > 0.20` ｜ 阈值 0.2 ｜ 标题「罗盘不健康样本占比 \{unhealthy_ratio:.0%\}」
+- 产出：check=sensor_health，tag=apm_compass_unhealthy
+
+
+## timing（group: `timing`）
+
+### apm-timing-gaps — 日志间隙
+
+- 文件：`rules/power-remaining.yaml` ｜ 位置：group `timing` #1
+- 适用：需要 IMU 或 ATT 或 VIBE
+- 取值：
+- `gts = ref("IMU.timestamp", "ATT.timestamp", "VIBE.timestamp")`
+- `gaps = gap_events(gts, T0_US)`
+- 判定：
+- **warning** ｜ `True` ｜ 阈值 0.5 ｜ 单位 s ｜ 标题「日志间隙 \{gap_s:.2f\} s（t=\{start_s:.2f\}s 起，\{end_s:.2f\}s 恢复）」
+- 产出：check=timing，tag=apm_logging_gap
+
+### apm-timing-long-loops — 调度长循环
+
+- 文件：`rules/power-sag.yaml` ｜ 位置：group `timing` #2
+- 适用：需要 PM
+- 取值：
+- `nlon = ref("PM.NLon")`
+- `long_loops = sum(nlon)`
+- 判定：
+- **warning** ｜ `long_loops > 0` ｜ 阈值 0 ｜ 单位 次 ｜ 标题「调度记录到 \{long_loops:.0f\} 次长循环」
+- 产出：check=timing，tag=apm_scheduler_long_loops
+
 
 ## vibration（group: `vibration`）
 
-### px4-vibration — 高频振动
+### apm-vibration-x — X 轴振动
 
 - 文件：`rules/vibration.yaml` ｜ 位置：group `vibration` #1
+- 适用：需要 VIBE
+- 取值：
+- `vx = ref("VIBE.VibeX")`
+- `vx_max = max(vx)`
+- `frac_warn = div(count_above(vx, gt=30.0), length_of(vx))`
+- `frac_crit = div(count_above(vx, gt=60.0), length_of(vx))`
+- 判定：
+- **critical** ｜ `vx_max > 60.0 or frac_crit > 0.0` ｜ 阈值 60 ｜ 单位 m/s^2 ｜ 标题「X 轴振动严重超标，峰值 \{vx_max:.0f\} m/s^2」
+- **warning** ｜ `frac_warn >= 0.10` ｜ 阈值 30 ｜ 单位 m/s^2 ｜ 标题「X 轴振动持续偏大，峰值 \{vx_max:.0f\} m/s^2」
+- **info** ｜ `vx_max > 30.0` ｜ 阈值 30 ｜ 单位 m/s^2 ｜ 标题「X 轴振动偶有冒尖，峰值 \{vx_max:.0f\} m/s^2」
+- 产出：check=vibration，tag=apm_high_vibration
+
+### px4-vibration — 高频振动
+
+- 文件：`rules/undefined` ｜ 位置：group `vibration` #1
 - 适用：需要 vehicle_imu_status
 - 取值：
 - `vibe_mean, vibe_p95, vibe_max, imu_idx = worst_mean_stats(
@@ -429,9 +840,39 @@ order: 12
 - **warning** ｜ `vibe_mean >= 4.905` ｜ 阈值 4.905 ｜ 单位 m/s^2 ｜ 标题「高频振动偏大（IMU #\{imu_idx\}）」
 - 产出：check=vibration，tag=high_vibration，stats=imuAccelVibrationMean(round 3), imuAccelVibrationP95(round 3), imuAccelVibrationMax(round 3)
 
+### apm-vibration-y — Y 轴振动
+
+- 文件：`rules/vtol-transition.yaml` ｜ 位置：group `vibration` #2
+- 适用：需要 VIBE
+- 取值：
+- `vy = ref("VIBE.VibeY")`
+- `vy_max = max(vy)`
+- `frac_warn = div(count_above(vy, gt=30.0), length_of(vy))`
+- `frac_crit = div(count_above(vy, gt=60.0), length_of(vy))`
+- 判定：
+- **critical** ｜ `vy_max > 60.0 or frac_crit > 0.0` ｜ 阈值 60 ｜ 单位 m/s^2 ｜ 标题「Y 轴振动严重超标，峰值 \{vy_max:.0f\} m/s^2」
+- **warning** ｜ `frac_warn >= 0.10` ｜ 阈值 30 ｜ 单位 m/s^2 ｜ 标题「Y 轴振动持续偏大，峰值 \{vy_max:.0f\} m/s^2」
+- **info** ｜ `vy_max > 30.0` ｜ 阈值 30 ｜ 单位 m/s^2 ｜ 标题「Y 轴振动偶有冒尖，峰值 \{vy_max:.0f\} m/s^2」
+- 产出：check=vibration，tag=apm_high_vibration
+
+### apm-vibration-z — Z 轴振动
+
+- 文件：`rules/wind-estimate.yaml` ｜ 位置：group `vibration` #3
+- 适用：需要 VIBE
+- 取值：
+- `vz = ref("VIBE.VibeZ")`
+- `vz_max = max(vz)`
+- `frac_warn = div(count_above(vz, gt=30.0), length_of(vz))`
+- `frac_crit = div(count_above(vz, gt=60.0), length_of(vz))`
+- 判定：
+- **critical** ｜ `vz_max > 60.0 or frac_crit > 0.0` ｜ 阈值 60 ｜ 单位 m/s^2 ｜ 标题「Z 轴振动严重超标，峰值 \{vz_max:.0f\} m/s^2」
+- **warning** ｜ `frac_warn >= 0.10` ｜ 阈值 30 ｜ 单位 m/s^2 ｜ 标题「Z 轴振动持续偏大，峰值 \{vz_max:.0f\} m/s^2」
+- **info** ｜ `vz_max > 30.0` ｜ 阈值 30 ｜ 单位 m/s^2 ｜ 标题「Z 轴振动偶有冒尖，峰值 \{vz_max:.0f\} m/s^2」
+- 产出：check=vibration，tag=apm_high_vibration
+
 ### px4-imu-clipping — 加速度计削波
 
-- 文件：`rules/imu-clipping.yaml` ｜ 位置：group `vibration` #3
+- 文件：`rules/undefined` ｜ 位置：group `vibration` #3
 - 适用：需要 vehicle_imu_status
 - 取值：
 - `clip, clip_idx, clip_axis = worst_column_delta(
@@ -443,12 +884,45 @@ order: 12
 - **info** ｜ `clip > 0` ｜ 阈值 0 ｜ 单位 count ｜ 标题「偶发加速度计削波：IMU #\{clip_idx\} 轴 \{clip_axis\} 全日志累计削波 \{clip\} 次（理想值为 0）」
 - 产出：check=vibration，tag=high_vibration，stats=imuAccelClippingCountMax(round -)
 
+### apm-clip-0 — 加速度计削波（IMU0）
+
+- 文件：`rules/vibration.yaml` ｜ 位置：group `vibration` #4
+- 适用：需要 VIBE
+- 取值：
+- `clip0_total = range_of(ref("VIBE.Clip0"))`
+- 判定：
+- **critical** ｜ `clip0_total >= 100.0` ｜ 阈值 100 ｜ 单位 次 ｜ 标题「IMU0 削波 \{clip0_total:.0f\} 次」
+- **warning** ｜ `clip0_total > 0.0` ｜ 阈值 0 ｜ 单位 次 ｜ 标题「IMU0 削波 \{clip0_total:.0f\} 次」
+- 产出：check=vibration，tag=apm_accel_clipping
+
+### apm-clip-1 — 加速度计削波（IMU1）
+
+- 文件：`rules/vibration.yaml` ｜ 位置：group `vibration` #5
+- 适用：需要 VIBE
+- 取值：
+- `clip1_total = range_of(ref("VIBE.Clip1"))`
+- 判定：
+- **critical** ｜ `clip1_total >= 100.0` ｜ 阈值 100 ｜ 单位 次 ｜ 标题「IMU1 削波 \{clip1_total:.0f\} 次」
+- **warning** ｜ `clip1_total > 0.0` ｜ 阈值 0 ｜ 单位 次 ｜ 标题「IMU1 削波 \{clip1_total:.0f\} 次」
+- 产出：check=vibration，tag=apm_accel_clipping
+
+### apm-clip-2 — 加速度计削波（IMU2）
+
+- 文件：`rules/vibration.yaml` ｜ 位置：group `vibration` #6
+- 适用：需要 VIBE
+- 取值：
+- `clip2_total = range_of(ref("VIBE.Clip2"))`
+- 判定：
+- **critical** ｜ `clip2_total >= 100.0` ｜ 阈值 100 ｜ 单位 次 ｜ 标题「IMU2 削波 \{clip2_total:.0f\} 次」
+- **warning** ｜ `clip2_total > 0.0` ｜ 阈值 0 ｜ 单位 次 ｜ 标题「IMU2 削波 \{clip2_total:.0f\} 次」
+- 产出：check=vibration，tag=apm_accel_clipping
+
 
 ## vtol_transition（group: `vtol_transition`）
 
 ### px4-vtol-transition-attitude — VTOL 转换姿态越限
 
-- 文件：`rules/vtol-transition.yaml` ｜ 位置：group `vtol_transition` #1
+- 文件：`rules/undefined` ｜ 位置：group `vtol_transition` #1
 - 适用：需要 vtol_vehicle_status
 - 取值：
 - `trans_n = _try(count_above(vtol_vehicle_status.vtol_in_trans_mode, gt=0))`
@@ -469,7 +943,7 @@ order: 12
 
 ### px4-wind-estimate — 风扰估计
 
-- 文件：`rules/wind-estimate.yaml` ｜ 位置：group `wind_estimate` #1
+- 文件：`rules/undefined` ｜ 位置：group `wind_estimate` #1
 - 适用：需要 estimator_wind 或 wind_estimate
 - 取值：
 - `w_p95 = percentile(

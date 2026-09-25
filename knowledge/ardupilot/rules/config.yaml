@@ -1,87 +1,93 @@
-# ⚠️ 本文件下的 3 条都是占位，尚未接线进构建产物（见 PENDING.md 第 1 条）。
-#
 # 配置安全（参数快照）：上游 ardupilot-mcp 的 checks/config.py 看三个参数——
 #   ARMING_CHECK == 0  禁用**全部**预解锁检查（坏传感器/未校准/无 GPS 都挡不住解锁）→ WARN
 #   BATT_MONITOR == 0  根本没有电池监控（无电压电流采样，也就没有低电压失效保护）→ INFO
 #   FS_THR_ENABLE == 0 禁用油门失效保护（Copter/Heli；Plane 用的是 THR_FAILSAFE）→ INFO
 # 注意是**精确等于 0** 才报：非零值（包括 -9 这类负位掩码）表示检查是开着的，不能报。
 #
-# **为什么全是占位**：这三条 100% 依赖参数，而本仓库的 APM provider 取不到任何参数
-# （PENDING.md 的 C2 —— provider 契约里的 BUILTIN_VARIABLES 没有任何参数类变量，
-# 参数也不在规则能引用的内置变量里）。上游读的是 log.params（DataFlash 里的 PARM 快照），
-# 本仓库那份数据在 PARM 消息的 **Name/Value 文本列**里，而 provider 的 get_series()
-# 会把文本列的 float 转换失败吞成 None（C1）。两个约束叠在一起，本轮无解。
+# 参数怎么读：provider 把 PARM 消息的最后一次值放进内置变量 PARAMS，规则里用
+# `param('NAME')` 取（engine.py 的 `_param_fn`；不是算子——参数是一份日志一个值的
+# 离散事实，不是从列里算出来的）。**参数缺失返回 None**，于是 `x == 0` 不成立 → 不发射，
+# 这正是"没有这条参数就不该下结论"要的效果。
 #
-# 计划里写的是 5 条，实际上游只有 3 项参数检查，按实际写——不为了凑数编两个参数进去。
-# 将来 provider 支持参数后，这三条的阈值与文案都是现成的，直接照抄上游即可。
+# `conditions.topics: [PARM]` 是有意的：日志没录参数表时，这三条要在报告里显示成
+# **skipped（缺 PARM）**，而不是"跑了、没发现问题"——后者会让读者以为检查过了。
 
 id: apm-config-arming-check
-name: 预解锁检查被禁用（占位）
+name: 预解锁检查被禁用
 group: config_safety
 order: 1
 
 conditions:
-    placeholder: "待补能力：ARMING_CHECK 是参数，provider 取不到参数（PENDING 的 C2），暂未实现"
+    topics:
+        - PARM
 
 compute:
-    - placeholder = ref("PARM.Name")
+    - arming_check = param("ARMING_CHECK")
 
 outputs:
     tag: apm_config_arming_check_disabled
 
 triggers:
-    - when: "False"
+    - when: "arming_check == 0"
       severity: warning
       threshold: 0
+      value: arming_check
       unit: ""
       field: "ARMING_CHECK(=0)"
-      title: "预解锁检查被整体禁用（占位，未实现）"
-      suggestion: "待补能力后实现：ARMING_CHECK=0 会关掉所有预解锁检查，坏传感器与未校准都不再阻止解锁。"
+      title: "预解锁检查被整体禁用（ARMING_CHECK=0）"
+      suggestion: "ARMING_CHECK=0 会关掉所有预解锁检查：坏传感器、未校准、无 GPS 都不再阻止解锁，地面看一切正常、起飞后才暴露。除非在台架上调试，否则把该开的位重新打开。"
 
 ---
 id: apm-config-batt-monitor
-name: 未配置电池监控（占位）
+name: 未配置电池监控
 group: config_safety
 order: 2
 
 conditions:
-    placeholder: "待补能力：BATT_MONITOR 是参数，provider 取不到参数（PENDING 的 C2），暂未实现"
+    topics:
+        - PARM
 
 compute:
-    - placeholder = ref("PARM.Name")
+    - batt_monitor = param("BATT_MONITOR")
 
 outputs:
     tag: apm_config_no_battery_monitor
 
 triggers:
-    - when: "False"
+    - when: "batt_monitor == 0"
       severity: info
       threshold: 0
+      value: batt_monitor
       unit: ""
       field: "BATT_MONITOR(=0)"
-      title: "未配置电池监控（占位，未实现）"
-      suggestion: "待补能力后实现：BATT_MONITOR=0 意味着没有电压电流采样，低电压失效保护无从谈起。"
+      title: "未配置电池监控（BATT_MONITOR=0）"
+      suggestion: "BATT_MONITOR=0 意味着没有电压电流采样：低电压/低电量失效保护无从谈起，报告里的电量曲线也是空的。接上电流计或启用模拟电压采样后再飞。"
 
 ---
+# FS_THR_ENABLE 是 Copter/Heli 的参数，Plane 对应的是 THR_FAILSAFE。
+# 这里**不加 vehicle 约束**：上游没加，而本仓库的 FRAME_CLASS→机型映射与上游有冲突
+# （PENDING.md 的 C3），加了反而可能把该跑的日志 skip 掉。机型归属写在文案里说明。
 id: apm-config-fs-thr
-name: 油门失效保护被禁用（占位）
+name: 油门失效保护被禁用
 group: config_safety
 order: 3
 
 conditions:
-    placeholder: "待补能力：FS_THR_ENABLE 是参数，provider 取不到参数（PENDING 的 C2），暂未实现"
+    topics:
+        - PARM
 
 compute:
-    - placeholder = ref("PARM.Name")
+    - fs_thr_enable = param("FS_THR_ENABLE")
 
 outputs:
     tag: apm_config_thr_failsafe_disabled
 
 triggers:
-    - when: "False"
+    - when: "fs_thr_enable == 0"
       severity: info
       threshold: 0
+      value: fs_thr_enable
       unit: ""
       field: "FS_THR_ENABLE(=0)"
-      title: "油门失效保护被禁用（占位，未实现）"
-      suggestion: "待补能力后实现：FS_THR_ENABLE=0（Copter/Heli）会让飞控在遥控失联时不动作；Plane 对应的是 THR_FAILSAFE。"
+      title: "油门失效保护被禁用（FS_THR_ENABLE=0）"
+      suggestion: "FS_THR_ENABLE=0（Copter/Heli；Plane 对应 THR_FAILSAFE）会让飞控在遥控失联时不动作——不返航、不降落，直到电量耗尽。设成 1（RTL）或 2（降落）再飞。"

@@ -1,5 +1,3 @@
-# ⚠️ 本文件下的 2 条尚未接线进构建产物（见 PENDING.md 第 1 条）。
-#
 # 时序（PM / 高码率消息）：上游 ardupilot-mcp 的 checks/timing.py 看两件事——
 #   · 日志间隙：在 IMU / ATT / VIBE 里挑日志里实际有的最高码率那个，看相邻时间戳的间隔。
 #     名义间隔取 **中位数** dt（抗离群），远大于它的跳变要么是丢了一段日志、
@@ -40,8 +38,8 @@ triggers:
       suggestion: "名义间隔 {nominal_dt_s:.3f} s，本次阈值 {threshold_s:.2f} s（绝对下限 0.5 s 与名义间隔 10 倍取大者）。该窗口的数据缺失，会影响所有其它结论；排查 SD 卡写入性能与 CPU 负载。"
 
 ---
-# 长循环总数：上游是累加所有 PM 记录的 NLon。引擎没有序列求和算子，
-# 用 均值 × 样本数 等价得到总和（NLon 是有效整数计数，无 NaN，等价成立）。
+# 长循环总数：上游是累加所有 PM 记录的 NLon（NLon 是每条 PM 记录里的增量计数）。
+# 直接 `sum`——早先写成"均值 × 样本数"是因为那时引擎没有求和算子，现在有了就不必绕。
 id: apm-timing-long-loops
 name: 调度长循环
 group: timing
@@ -53,7 +51,7 @@ conditions:
 
 compute:
     - nlon = ref("PM.NLon")
-    - long_loops = scale(mean(nlon), length_of(nlon))
+    - long_loops = sum(nlon)
 
 outputs:
     tag: apm_scheduler_long_loops

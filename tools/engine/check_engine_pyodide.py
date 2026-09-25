@@ -149,7 +149,9 @@ def main() -> int:
     step += 1
     rule_name = "产物是合法 Python（ast.parse）"
 
-    rules = extract_json_const(src, "rules")
+    # 产物里的规则**按 log_type 分组**（PX4 与 ArduPilot 各一套），逐条遍历要扁平的那一份
+    rules_by_type = extract_json_const(src, "rules")
+    rules = [r for fam in rules_by_type.values() for r in fam]
     syntax_err = ""
     try:
         ast.parse(final)
@@ -169,7 +171,9 @@ def main() -> int:
     rule_name = "conditions.topics 从 track.yml 搬进 facts.track"
 
     declared_topics = _declared_track_topics(TRACK_YML.read_text(encoding="utf-8"))
-    got_topics = (runner.load_facts_payload().get("track") or {}).get("conditions", {}).get("topics")
+    # 数据配置同样按 log_type 分组：轨迹声明在 PX4 那一套里
+    px4_facts = runner.load_facts_payload().get("px4-ulog") or {}
+    got_topics = (px4_facts.get("track") or {}).get("conditions", {}).get("topics")
     topics_ok = bool(declared_topics) and got_topics == declared_topics
 
     detail = f"declared={declared_topics}\nproduced={got_topics}"

@@ -28,19 +28,20 @@ MIT 只要求保留版权声明与许可声明，无额外署名条款。收录�
   本站的机型判定在 provider 里（`_FRAME_CLASS_MAP`），规则侧只用
   `rotary_wing / fixed_wing`，两套分类对不上，迁过来只会添乱。
 - **12 组共 34 条规则**（进 `rules/*.yaml`）：振动、EKF、电源、GPS、罗盘、姿态、
-  电机、遥控、时序、事件、配置安全、传感器。其中 28 条能跑、6 条占位（都卡在读参数）。
+  电机、遥控、时序、事件、配置安全、传感器。其中 33 条能算、1 条占位
+  （`apm-mode-timeline` 卡在 `MODE.Mode` 是文本列）。
 - **官方文档链接** 20 条（进 `facts.yaml` 的 `doc_urls` 与 `rule_meta.by_group.doc`）
 - **`docs/SOURCES.md`** 198 条假设审计（confirmed 86 / heuristic 22 /
   design choice 82 / corrected 8），逐字保留
 
 上游共 16 项检查，本轮迁了 12 项。**没迁的 4 项各有原因，不是遗漏**：
 
-| 上游检查      | 为什么不迁                                                                                                                              |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `integrity`   | 它读的是**解析层**产出的 `log.meta.integrity`（日志是否被截断等），不是消息流。本站 provider 没有这个概念，也不在规则能引用的内置变量里 |
-| `calibration` | 100% 依赖参数（`COMPASS_OFS*` 的模长判校准质量）→ 撞 C2                                                                                 |
-| `param_audit` | 同上，依赖参数                                                                                                                          |
-| `prearm`      | 依赖 `MSG.Message` / `STATUSTEXT.Text` 的**文本子串匹配** → 撞 C1，且引擎无文本匹配算子                                                 |
+| 上游检查      | 为什么不迁                                                                                                                               |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `integrity`   | 它读的是**解析层**产出的 `log.meta.integrity`（日志是否被截断等），不是消息流。本站 provider 没有这个概念，也不在规则能引用的内置变量里  |
+| `prearm`      | 依赖 `MSG.Message` / `STATUSTEXT.Text` 的**文本子串匹配** → 撞 C1（`count_items` 的 `contains=` 有了，但文本列仍然取不到）               |
+| `calibration` | 100% 依赖参数（`COMPASS_OFS*` 的模长判校准质量）。**原卡 C2，2026-09 已解除**（有 `param()` 了），但还没迁——要迁得先补向量模长一类的算子 |
+| `param_audit` | 同上，依赖参数。C2 解除后这条基本没障碍了，还没迁只是没排期                                                                              |
 
 `facts.yaml` 的 `group_order` 里仍然留了 `integrity` / `calibration` /
 `param_audit` / `prearm_messages` 这四个 group（空 group 允许，引擎空跑），
@@ -60,16 +61,19 @@ MIT 只要求保留版权声明与许可声明，无额外署名条款。收录�
 3. **官方链接从多条改成一条。** 上游 `references_for()` 返回多条链接，本站的
    `docUrl` 是单值，所以 `rule_meta.by_group.doc` 只取**最具体的一条**。
    完整链接集在 `facts.yaml` 的 `doc_urls` 里。两处要一起改，目前没有自动校验。
-4. **参数驱动的检查全部降级或占位。** 本站引擎的 `BUILTIN_VARIABLES` 没有参数类
-   内置变量，规则拿不到 `PARM`（C2），所以 `config` 三条与 `sensors` 前两条只能占位；
-   `power` 的低电压判据从"读 `BATT_CRT_VOLT`/`BATT_LOW_VOLT`"退回上游的
-   `estimate_cells` 派生路径（改用了 `coalesce` 链实现 `round`，因为引擎的
-   `to_int` 是截断，会把 6S 估成 5S）。
+4. **参数驱动的检查曾全部降级或占位**，2026-09 已解除：`BUILTIN_VARIABLES` 新增
+   `PARAMS`，规则用 `param('NAME', default=None)` 读，`config` 三条与 `sensors`
+   前两条随之从占位转真。仍保留的一处降级：`power` 的低电压判据没有改成
+   "读 `BATT_CRT_VOLT`/`BATT_LOW_VOLT`"，仍是上游的 `estimate_cells` 派生路径
+   （改用了 `coalesce` 链实现 `round`，因为引擎的 `to_int` 是截断，会把 6S 估成 5S）——
+   现在能读了，改不改是阈值验证那一步的事（见 `PENDING.md` 第五节第 5、6 条）。
 5. **逐条降级标注**（每条的具体偏差写在对应规则文件的注释里）：
    罗盘的 CV 判据缺 `std` 算子（只留极差比，所以本条出不了 critical）；
    姿态的"持续 1s"判据缺 run-length（只剩峰值档）；航向误差缺取模算子（占位）；
    电机两条缺矩阵化与标量减法（占位）；时序的日志间隙缺 `diff` 与中位数（占位，
    PM 长循环那条用 `mean × length_of` 绕开了求和缺口）；MODE 时间线缺文本列（占位）。
+   —— 除 MODE 时间线外，上面这些 2026-09 补算子后**都已解除**（`wrap_degrees` /
+   `stack_columns` / `diff` / `median` / `sum`），只剩文本列那一条（C1）。
 6. **两处有意偏离上游**，都是有理由的，不是抄错：
    - **GPS 的 armed 窗口**：上游拿不到 armed 窗口就退回全程判，那必然把起飞前
      搜星期（`NSats=0`、`HDop=99.99`）判成飞行中故障。本站引擎会把 skip 连同原因
@@ -94,11 +98,12 @@ MIT 只要求保留版权声明与许可声明，无额外署名条款。收录�
 
 ## 本轮状态（重要）
 
-**这批规则尚未接线进构建产物，不会被执行。**
+**2026-09 已接线**：构建脚本按固件族扫描（`knowledge/ardupilot/` 配 `providers/ardupilot.py`），
+这批规则进产物、会被执行；引擎按 `log_type = ardupilot-bin` 取这一套知识。
 
-`web/scripts/build-knowledge.mjs` 与 `knowledge/engine/loader.py` 目前都硬编码
-`knowledge/px4/`，`knowledge/ardupilot/` 不在它们的扫描范围内。所以本目录现在是
-**知识源**，不是可执行规则——没有任何一条阈值经过真实 `.bin` 日志验证。
+**但阈值仍然全部是待验证的草稿**：仓库里还没有真实 `.bin` 样本，端到端证据只有两处——
+`tools/dev/apm_make_sample.py` 的合成日志与挂进 push 门禁的 `tools/engine/check_apm_e2e.py`。
+合成样本自证"链路通、参数读得到、该报的报了"，**不代表这些阈值对真实飞行成立**。
+拿不到真实样本之前，请把 `rules/*.yaml` 里的每条阈值都当作草稿看待。
 
-要让 APM 日志真正出 findings，需要一次独立的"接线"改动，清单在 `PENDING.md` 第一段。
-在那之前，请把 `rules/*.yaml` 里的每条都当作**待验证的草稿**看待。
+剩余待办（占位那一条、FRAME_CLASS 3 号冲突、曲线预设、找真样本）在 `PENDING.md`。

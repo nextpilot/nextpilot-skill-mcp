@@ -19,6 +19,8 @@
  *   ref("topic[:].field", alias="x", unit="deg")
  *   ref("新名", "旧名")               候选组：取第一个存在的（同义改名用它）
  *   _try(expr)                        容错：内层出错或得 None 时结果为 None
+ *   param("NAME")                     读飞控参数（provider 的 PARAMS 表；缺失返回 None）
+ *   param("NAME", 0.0)                同上但缺失时兜底为 0.0
  *   worst_mean_stats(...)             算子调用
  *
  * 不依赖任何第三方包（构建脚本只用 Node 内置 + yaml）。
@@ -80,11 +82,15 @@ export function isVehicleSpec(v) {
  */
 export const SEVERITIES = new Set(["critical", "warning", "info"]);
 
-/** 日志 topic 名（uORB 风格的小写 snake_case） */
-const TOPIC_NAME = /^[a-z][a-z0-9_]*$/;
+/**
+ * 日志 topic / 消息名。**风格的约定属于各个格式**（PX4 的 uORB 是小写 snake_case，
+ * ArduPilot 的 DataFlash 是大写短名如 ATT / GPS / PARM），构建期只挡明显的出格字符——
+ * 拿某一族的风格去卡另一族，结果是那一族的规则一条都进不了产物。
+ */
+const TOPIC_NAME = /^[A-Za-z][A-Za-z0-9_]*$/;
 
 /**
- * `conditions.topics` 的一项：`vehicle_status` ｜ `vehicle_gps_position || sensor_gps`。
+ * `conditions.topics` 的一项：`vehicle_status` ｜ `vehicle_gps_position || sensor_gps` ｜ `ATT`。
  *
  * `||` 表示**其中任意一个在日志里就够**（两个都不在才跳过）；返回候选名列表，
  * 运行期由引擎按这个语义判。这里只拆写法、校验名字，不认识语义。
@@ -99,7 +105,7 @@ export function parseTopicReq(v) {
     for (const n of names) {
         if (!TOPIC_NAME.test(n)) {
             throw new Error(
-                `topics 项「${v}」写法不对：每一段都要是 topic 名（小写 snake_case，如 vehicle_gps_position），多个用 || 分隔`,
+                `topics 项「${v}」写法不对：每一段都要是消息名（字母开头，如 vehicle_gps_position 或 ATT），多个用 || 分隔`,
             );
         }
     }
@@ -198,10 +204,12 @@ const FIELD_REF =
 
 /** 拆开字段引用 → {topic, inst, field}（inst 是 int 或 slice；**不写 = 第 0 个实例**） */
 export function splitFieldRef(s) {
-    const m =
-        /^([a-z][a-z0-9_]*)(?:\[([-]?\d*(?::-?\d*)?)\])?\.((?:[a-z][a-z0-9_]*\.)*[a-z][a-z0-9_]*)(?:\[(\d+(?:,\d+)?)\])?$/.exec(
-            String(s).trim(),
-        );
+    // 大小写都收（与 TOPIC_NAME 同理）：`ATT.timestamp`（APM）与
+    // `vehicle_attitude.timestamp`（PX4）是同一件事在不同格式里的写法。
+    const NAME = "[A-Za-z][A-Za-z0-9_]*";
+    const m = new RegExp(
+        `^(${NAME})(?:\\[([-]?\\d*(?::-?\\d*)?)\\])?\\.((?:${NAME}\\.)*${NAME})(?:\\[(\\d+(?:,\\d+)?)\\])?$`,
+    ).exec(String(s).trim());
     if (!m) return null;
     return {
         topic: m[1],
@@ -655,6 +663,19 @@ function inferCall(node, ctx) {
         return T_SCALAR;
     }
 
+    if (fn === "param") {
+        // 读飞控参数：与 ref / has_topic 一样是引擎内置（provider 的 PARAMS 表），不查算子表。
+        // 第一个实参是参数名（必须是字符串字面量），第二个可选是缺失时的兜底值（字面量）。
+        if (args.length < 1 || args.length > 2 || args[0].k !== "str") {
+            fail("param() 的第一个参数必须是参数名字面量，如 param('ARMING_CHECK')", ctx.src, node.pos);
+        }
+        if (args.length === 2 && !["num", "str", "bool"].includes(args[1].k)) {
+            fail("param() 的兜底值必须是字面量，如 param('RNGFND_TYPE', 0.0)", ctx.src, node.pos);
+        }
+        if (Object.keys(kwargs).length) fail("param() 不接受关键字参数", ctx.src, node.pos);
+        return T_SCALAR;
+    }
+
     if (fn === "_try") {
         if (!ctx.tryAllowed) fail("_try() 只能出现在赋值右侧的最外层（它的语义是求值器层面的）", ctx.src, node.pos);
         if (args.length !== 1 || Object.keys(kwargs).length) fail("_try() 只接受一个参数", ctx.src, node.pos);
@@ -701,7 +722,10 @@ function inferCall(node, ctx) {
                 v.pos,
             );
         }
-        if (!["num", "str", "const", "list", "dict"].includes(v.k)) {
+        // 一元正负号作用在数字字面量上仍是字面量（`-1.0` 在 Python 里也是）——
+        // 不放行的话"取负"这种最朴素的写法只能在规则里绕道实现（见 rcin.yaml 的注记）
+        const bare = v.k === "un" && (v.op === "-" || v.op === "+") ? v.x : v;
+        if (!["num", "str", "const", "list", "dict"].includes(bare.k)) {
             fail(`算子 ${fn} 的选项 ${k}= 只能是字面量（数字/字符串/布尔/None/列表/字典）`, ctx.src, v.pos);
         }
     }
@@ -934,7 +958,8 @@ export function validateComputeList(list, ctx) {
         }
         // 引用的裸名字必须在本条之前已经赋值（字段引用是 attr 节点，不在其列）
         for (const name of collectNames(r.value)) {
-            if (ctx.signatures[name] || name === "ref" || name === "_try") continue;
+            // ref / _try 是语法层，has_topic / param 是引擎在 env 里注入的函数——都不是变量
+            if (ctx.signatures[name] || ["ref", "_try", "has_topic", "param"].includes(name)) continue;
             if (!declared.has(name) && !ctx.builtinVars?.has(name)) {
                 throw new Error(
                     `${where}：引用了未声明的名字 ${name}` + `（要么在本条之前用赋值声明，要么是内置变量）`,

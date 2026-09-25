@@ -1,5 +1,3 @@
-# ⚠️ 本文件下的 3 条尚未接线进构建产物（见 PENDING.md 第 1 条）。
-#
 # 电池（BAT / CURR）：最低电压 vs 失效保护阈值、负载压降、突发跌落。
 # 上游实现：ardupilot-mcp 的 checks/power.py。
 #
@@ -36,8 +34,10 @@ compute:
         cells = value_if(both(gt(vmax, 4.0), both(gt(70.0, vmax),
         both(gt(per_cell, 3.3), gt(4.4, per_cell)))), cells_raw)
     # 上游的 per-cell 阈值：LiPo 约 3.5 V/节告警、3.3 V/节临界
-    - crit_v = scale(cells, 3.3)
-    - low_v = scale(cells, 3.5)
+    # `factor=` 必须写名字：它是**命名选项**不是位置输入（scale 只收 1 个输入），
+    # 写成位置参数构建期就会报错——这正是"构建期校验"在替运行期挡错。
+    - crit_v = scale(cells, factor=3.3)
+    - low_v = scale(cells, factor=3.5)
 
 outputs:
     tag: apm_battery_low_voltage

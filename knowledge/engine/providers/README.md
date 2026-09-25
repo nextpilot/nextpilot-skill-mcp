@@ -3,11 +3,20 @@
 **这里唯一认识"某一种日志"的地方。** 引擎本体（`../engine.py`：规则框架 + 报告数据层）与算子
 （`../operators.py`）都不认识 topic 名、字段名、info 键名、码值——它们只认 `api.py` 那份契约。
 
+一个适配器 + 一个同名知识目录 = **一个固件族**：
+
 ```text
-日志字节 ──→ providers/<格式>.py ──→ 契约（名字 + 类型 + 失败语义） ──→ facts / rule / plot
+providers/px4.py       ←→  knowledge/px4/        （log_type = px4-ulog）
+providers/ardupilot.py ←→  knowledge/ardupilot/  （log_type = ardupilot-bin）
+
+日志字节 ──→ providers/<族名>.py ──→ 契约（名字 + 类型 + 失败语义） ──→ facts / rule / plot
                     ↑
-        knowledge/<格式>/facts.yaml（它那一份纯数据：码表 / 文案 / 展示口径）
+        knowledge/<族名>/facts.yaml（它那一份纯数据：码表 / 文案 / 展示口径）
 ```
+
+**目录名必须与适配器文件名同名**——构建脚本（`web/scripts/build-knowledge.mjs`）按这条扫描
+`knowledge/` 下的族目录，引擎按 `log_type` 挑自己那一套知识。加一种日志格式 = 加这两样，
+**构建脚本零改动**。
 
 ## 文件
 
@@ -21,9 +30,12 @@
 
 1. 写一个类，实现 `api.py` 的 `REQUIRED` 全部能力（`OPTIONAL` 按这份日志能给的东西实现，
    缺席是合法的——报告页对应 tab 会自动隐藏）；
-2. 写它那一份数据文件 `knowledge/<格式>/facts.yaml`（码表 / 文案 / 展示口径；**不放取数逻辑**）；
-3. 文件末尾把 `(探测器, 工厂, 说明)` 追加进 `FORMATS`。探测按**文件头 magic**，
-   不看扩展名（用户上传的文件名不可信）；
+2. 建同名目录 `knowledge/<族名>/`，里面放 `facts.yaml`（码表 / 文案 / 展示口径；
+   **不放取数逻辑**）与 `rules/*.yaml`。`meta/` / `plot/` / `fault-kb.yaml` 都是可选的，
+   缺哪一様就少哪样功能，不报错；
+3. 文件末尾把 `(探测器, 工厂, 说明, log_type)` 追加进 `FORMATS`。探测按**文件头 magic**，
+   不看扩展名（用户上传的文件名不可信）。`log_type` 就是知识分组的键，
+   也是 `detect_log_type()` 的返回值——引擎靠它在打开日志之前先挑好知识；
 4. 跑 `python tools/engine/guard_provider_contract.py <该格式的日志...>`，把契约测试跑绿。
 
 ## 契约怎么被确认（三道，缺一不可）
@@ -43,8 +55,10 @@ Python（只当文本搬运，见 `../README.md`），Pyodide 里也没有 mypy�
 - **取不到一律返回 `None`，不抛异常**。引擎把 `None` 当"数据不足"（那条规则静默不出结论）；
   抛异常会顺着 `_eval_compute` 的兜底变成同一种静默，但更难查。这条是契约测试第一个查的。
 - **`builtin_variables()` 每次返回新 dict**：引擎会把 compute 的输出直接写进它。
-- **`has_topic` 不在这里**：它是框架给 `provider.has_topic` 起的别名（表达式里唯一放行的
-  函数调用）——规则里判"某个 topic 在不在日志里"用它。
+- **`has_topic` / `param` 不在这里**：它们是框架放行的调用（`has_topic` 是
+  `provider.has_topic` 的别名；`param('NAME', default=None)` 查 `builtin_variables()`
+  里的 `PARAMS`）。规则里判"某个 topic 在不在日志里"用前者，读飞控参数用后者——
+  参数是一份日志一个值的离散事实，算子只收数据、看不见 provider，所以做不成算子。
 - **别把取数逻辑搬回 YAML**：候选字段、异常回退、位解码、按版本挑分支——这些是逻辑，
   用 YAML 表达只能再造一门小语言（本项目已经删掉两门了）。
 - **这里会整份进浏览器**：`api.py` 与各适配器都被内联进 `web/workers/analysis-engine.generated.ts`，

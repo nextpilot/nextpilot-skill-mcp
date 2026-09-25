@@ -19,21 +19,26 @@ ENGINE = Path(__file__).resolve().parents[1]
 def _load_engine() -> dict:
     operators_src = (ENGINE / "operators.py").read_text(encoding="utf-8")
     rule_src = (ENGINE / "engine.py").read_text(encoding="utf-8")
-    # 占位符替换（与 build-knowledge.mjs 的 .replace 链等价）：
-    #   RULES 必须是 list（模块级 RULES.sort 会执行），FACTS/FIELD_UNITS 是 dict
+    # 占位符替换（与 build-knowledge.mjs 的 .replace 链等价）。
+    # 四样知识在产物里都是 **{log_type: ...}**（引擎按文件头挑一套），所以桩也要给这个形状，
+    # 下标用 `stub` —— 与下面 `detect_log_type` 桩的返回值对上。
     rule_src = (
-        rule_src.replace("__FAULT_KB__", "[]")
-        .replace('r"""__RULES__"""', '"[]"')
-        .replace('r"""__FACTS__"""', '"{}"')
+        rule_src.replace("__FAULT_KB__", "{}")
+        .replace('r"""__RULES__"""', "'{\"stub\": []}'")
+        .replace('r"""__FACTS__"""', "'{\"stub\": {}}'")
         .replace("__FIELD_UNITS__", "{}")
     )
     # 拼接顺序即执行顺序：算子注册表在前，引擎本体在后（与产物一致）
     combined = operators_src + "\n" + rule_src
-    # 桩 provider：open_log 返回带 has_topic 的对象；本测试不触发 ref/_ref
+    # 桩 provider：open_log 返回带 has_topic 的对象；本测试不触发 ref/_ref。
+    # detect_log_type 同样要桩：引擎靠它决定"用哪一套知识"，而这里没有真实文件头。
     stub = (
         "class _StubProvider:\n"
+        "    log_type = 'stub'\n"
         "    def has_topic(self, t):\n"
         "        return False\n"
+        "def detect_log_type(b):\n"
+        "    return 'stub'\n"
         "def open_log(b, facts):\n"
         "    return _StubProvider()\n"
         "ulog_bytes = b''\n"

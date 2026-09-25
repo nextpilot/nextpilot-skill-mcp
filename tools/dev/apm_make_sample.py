@@ -81,10 +81,25 @@ def build_sample_bytes() -> bytes:
     for name, (fmt, columns) in STRUCTS.items():
         out += _fmt_row(IDS[name], _fmt_len(fmt), name, fmt, columns)
 
-    # 参数：版本 + 机架
-    out += _msg(IDS["PARM"], "QNf", (50_000, "FORMAT_VERSION", 4.5), scaled=set())
-    out += _msg(IDS["PARM"], "QNf", (51_000, "FRAME_CLASS", 1), scaled=set())
-    out += _msg(IDS["PARM"], "QNf", (52_000, "DISARMED_PARAM_KEEP", 1), scaled=set())
+    # 参数：版本 + 机架 + 一批"会被规则读"的配置项。
+    # 后四个是**故意挑的值**：前三个取 0（禁用）让 config_safety 那三条真的发射一次
+    # ——参数类规则在 2026-09 之前一直是"provider 读不到参数"而占位，没有这份夹具它们
+    # 没有端到端证据；RNGFND1_TYPE=1 而日志里没有 RFND/RNGFND 消息，是"配置与数据对不上"
+    # 那条的正例；GPS_TYPE=1 且下面真有 GPS 消息，是同一条的**反例**（不该报）。
+    for i, (name, value) in enumerate(
+        [
+            ("FORMAT_VERSION", 4.5),
+            ("FRAME_CLASS", 1),
+            ("DISARMED_PARAM_KEEP", 1),
+            ("ARMING_CHECK", 0),
+            ("BATT_MONITOR", 0),
+            ("FS_THR_ENABLE", 0),
+            ("RNGFND_TYPE", 0),
+            ("RNGFND1_TYPE", 1),
+            ("GPS_TYPE", 1),
+        ]
+    ):
+        out += _msg(IDS["PARM"], "QNf", (50_000 + i * 1_000, name, value), scaled=set())
 
     # 文本消息：版本串（解析器从这行取固件版本与 git 哈希）
     out += _msg(IDS["MSG"], "QZ", (100_000, "ArduPilot Version 4.5.7 (abcd1234)"), scaled=set())

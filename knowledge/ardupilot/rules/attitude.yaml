@@ -1,5 +1,3 @@
-# ⚠️ 本文件下的 3 条尚未接线进构建产物（见 PENDING.md 第 1 条）。
-#
 # 姿态跟踪（ATT）：期望姿态 DesRoll/DesPitch/DesYaw 与实测姿态 Roll/Pitch/Yaw 的差。
 # 上游 ardupilot-mcp 的 checks/attitude.py（自称 crown-jewel check）。
 # 阈值：持续 >=1s 且误差 >25° = critical；持续 >=1s 且在 15~25° = warning；

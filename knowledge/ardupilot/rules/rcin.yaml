@@ -1,5 +1,3 @@
-# ⚠️ 本条尚未接线进构建产物（见 PENDING.md 第 1 条）。
-#
 # 遥控输入（RCIN）：上游 ardupilot-mcp 的 checks/rcin.py。
 # 最清晰的失效特征是**丢链路**：接收机掉线或把所有通道同时保持在异常低值（~900-1000 us）。
 # 正常飞行时各杆量是独立的——横滚/俯仰/航向在中位（~1500）附近，只有油门偏低——
@@ -29,10 +27,10 @@ compute:
     - c3 = ref("RCIN.C3")
     - c4 = ref("RCIN.C4")
     # 各通道 < 1000 us 的掩码（greater 只认 a > b，故取负后比较）
-    - low1 = greater(scale_series(c1, -1.0), -1000.0)
-    - low2 = greater(scale_series(c2, -1.0), -1000.0)
-    - low3 = greater(scale_series(c3, -1.0), -1000.0)
-    - low4 = greater(scale_series(c4, -1.0), -1000.0)
+    - low1 = greater(scale_series(c1, factor=-1.0), -1000.0)
+    - low2 = greater(scale_series(c2, factor=-1.0), -1000.0)
+    - low3 = greater(scale_series(c3, factor=-1.0), -1000.0)
+    - low4 = greater(scale_series(c4, factor=-1.0), -1000.0)
     - all_low = mask_and(mask_and(low1, low2), mask_and(low3, low4))
     - lost_samples = count_true(all_low)
 

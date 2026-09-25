@@ -4,8 +4,15 @@
 Web 站点（浏览器端 Pyodide 引擎、边缘函数 LLM 层）和未来的平台 MCP 服务
 **都只消费这里派生出的产物，不在各自代码里另存一份阈值 / 根因 / 提示词。**
 
-按**飞控固件族**分目录：`px4/`（已实现、已接线）、`ardupilot/`（知识已迁、**尚未接线**），
-两边保持同样的结构。每个固件族目录下再按**受众**分文档：
+按**飞控固件族**分目录：`px4/` 与 `ardupilot/` **都已接线进构建产物**，两边保持同样的结构。
+
+> **族是怎么配对的**：`knowledge/<族名>/` 配 `knowledge/engine/providers/<族名>.py`——两边
+> **同名**即一族，构建脚本按这条规则扫描（`web/scripts/build-knowledge.mjs` 的 `FAMILIES`），
+> 引擎按 provider 的 `log_type` 取自己那一套规则 / 数据 / 故障库。加一种日志格式 =
+> 加一个目录 + 一个同名适配器，构建脚本零改动（2026-09 之前这些路径硬编码成
+> `knowledge/px4/`，于是 `ardupilot/` 那批规则写了却没人跑）。
+
+每个固件族目录下再按**受众**分文档：
 
 ```text
 knowledge/
@@ -37,18 +44,21 @@ px4/
 ```text
 ardupilot/
   rules/*.yaml          12 个文件共 34 条经验（上游 16 项检查里迁了 12 项，同构项合并）；
-                        28 条能算、6 条占位（全部卡在读参数，逐条记在 PENDING.md）
+                        33 条能算、1 条占位（卡在 MODE.Mode 文本列，记在 PENDING.md）
   facts.yaml            码表（飞行模式 / ERR 子系统 / EV 事件 / 机架）与规则元数据
   ATTRIBUTION.md        上游署名、迁了什么、改了什么
-  PENDING.md            占位总表：缺的算子、FRAME_CLASS 3 号冲突、接线要改哪些
+  PENDING.md            剩余待办：占位那一条、FRAME_CLASS 3 号冲突、曲线预设、真实样本
   CLAUDE.md             给 AI 与维护者
   docs/SOURCES.md       上游 198 条假设审计（引用文本，逐字保留）
 ```
 
-**它缺 `meta/`、`plot/`、`fault-kb.yaml`**（`llm/` 与两个 `*-template.yml` 在 `knowledge/` 根下，各族共用，不算它缺），且**暂时不进构建产物**
-（`build-knowledge.mjs` 与 `engine/loader.py` 都硬编码 `knowledge/px4/`），
-所以这批阈值还没有任何一条经过真实 `.bin` 日志验证。
-让 ArduPilot 日志真正出 findings 需要一次独立的接线改动，清单在 `ardupilot/PENDING.md`。
+**它缺 `meta/`、`plot/`、`fault-kb.yaml`**（`llm/` 与两个 `*-template.yml` 在 `knowledge/` 根下，
+各族共用，不算它缺）——这三样都是**可选**的：没有 `meta/` 就不做单位换算、没有 `plot/` 就没有
+曲线预设、没有 `fault-kb.yaml` 就不参与第三层故障检索，构建期都不会报错。
+
+这批阈值**仍然没有任何一条经过真实 `.bin` 日志验证**：仓库里还没有真实样本，端到端证据
+来自 `tools/dev/apm_make_sample.py` 的合成日志与 `tools/engine/check_apm_e2e.py`（push 门禁）。
+剩下的待办在 `ardupilot/PENDING.md`。
 
 **引擎源码不在这里**：`operators.py`（算子注册表）、`engine.py`（规则框架 + 报告数据层）在 [knowledge/engine/](knowledge/engine/README.md)
 （浏览器与本地工具共用同一份）。这个目录只放**经验与字典**——"算完怎么判定"，不放"怎么算"。

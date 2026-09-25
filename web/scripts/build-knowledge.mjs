@@ -30,7 +30,7 @@ import { createHash } from "node:crypto";
 import { dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readdirSync } from "node:fs";
-import { parse as parseYaml } from "yaml";
+import { parse as parseYaml, parseAllDocuments } from "yaml";
 import {
     normalizeCompute,
     validateComputeList,
@@ -52,6 +52,8 @@ const webRoot = resolve(here, "..");
 // knowledge/ 根目录：放**与固件族无关**的资产（第四层 LLM 提示词、给人工抄的骨架模板）。
 // 它们不属于任何族，所以不放在 KN 下——ards/px4 共用同一份。
 const KN_ROOT = resolve(webRoot, "../knowledge");
+// ⚠️ `KN` 现在只剩一个用途：PX4 的参数元数据（产物文件名就是 px4-main.json，而 APM 没有
+// `meta/main.json` 这种参数快照）。**别再往它下面挂新东西**——其余一切按族走 FAMILIES。
 const KN = resolve(KN_ROOT, "px4");
 
 const ENGINE = resolve(webRoot, "../knowledge/engine"); // 确定性引擎源码（浏览器与本地工具共用一份）
@@ -59,13 +61,46 @@ const PY_ENGINE = resolve(ENGINE, "engine.py"); // 引擎本体（框架 + 数�
 const PY_PROVIDER_API = resolve(ENGINE, "providers/api.py"); // provider 契约（常量表 + 自检）
 // 日志格式适配器：每个文件都实现同一份契约，引擎不认识它们内部
 const PROVIDER_DIR = resolve(ENGINE, "providers");
+// `read` 提到这里：下面的 FAMILIES 要读适配器源码（ESM 的 const 不提升，晚定义就是 TDZ 报错）
+const read = (p) => readFileSync(p, "utf8");
 const providerFiles = readdirSync(PROVIDER_DIR)
     .filter((f) => f.endsWith(".py") && f !== "api.py")
     .sort();
 if (providerFiles.length === 0) throw new Error("knowledge/engine/providers/ 下没有任何适配器");
-const YAML_PATH = resolve(KN, "fault-kb.yaml");
-const FACTS_PATH = resolve(KN, "facts.yaml"); // PX4 的数据：码表 / 文案 / 展示口径 / 规则元数据
-const RULES_DIR = resolve(KN, "rules");
+
+// ---------------- 固件族（family）----------------
+// 一族 = knowledge/<族名>/ 下的一整套知识（facts.yaml / rules/ / fault-kb.yaml / plot/）
+//      + knowledge/engine/providers/<族名>.py 里那个**同名**适配器。
+// **两边同名就是唯一的配对规则**：加一种日志格式 = 加一个目录 + 一个同名适配器，本脚本零改动。
+//
+// 为什么要有这一层：2026-09 之前这些路径是硬编码的 `knowledge/px4/`，于是
+// knowledge/ardupilot/ 那批规则一条都进不了产物——写了、校验了、但永远不会被任何人跑。
+// 知识是**按格式分开**的（码表、阈值、group 都是各自那一套），引擎侧同理按 `log_type` 取用
+// （见 engine.py 的 `_LOG_TYPE_KNOWLEDGE`）。
+const FAMILIES = readdirSync(KN_ROOT, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    // 没有同名适配器 = 不是一族日志的知识（knowledge/engine、knowledge/llm 都在这儿被滤掉）
+    .filter((d) => providerFiles.includes(`${d.name}.py`))
+    .filter((d) => existsSync(resolve(KN_ROOT, d.name, "facts.yaml")))
+    .map((d) => {
+        const dir = resolve(KN_ROOT, d.name);
+        // log_type 是这一族在产物里的下标：引擎按它从 `{log_type: ...}` 里挑出该用的那一套
+        const m = read(resolve(PROVIDER_DIR, `${d.name}.py`)).match(/^\s+log_type\s*=\s*"([^"]+)"/m);
+        if (!m) throw new Error(`knowledge/engine/providers/${d.name}.py 里读不到 log_type（族 ${d.name} 配对失败）`);
+        return {
+            key: d.name,
+            logType: m[1],
+            dir,
+            factsPath: resolve(dir, "facts.yaml"),
+            rulesDir: resolve(dir, "rules"),
+            plotDir: resolve(dir, "plot"),
+            metaDir: resolve(dir, "meta"),
+            faultKbPath: resolve(dir, "fault-kb.yaml"),
+        };
+    })
+    .sort((a, b) => a.key.localeCompare(b.key));
+if (FAMILIES.length === 0) throw new Error("knowledge/ 下没有配好对的固件族（要有 facts.yaml 且同名适配器存在）");
+
 const OPERATORS_PY = resolve(ENGINE, "operators.py");
 const LLM_DIR = resolve(KN_ROOT, "llm"); // 第四层：LLM 只做翻译与组装（与固件族无关）
 const PROMPT_PATH = resolve(LLM_DIR, "gjb841-system-prompt.md");
@@ -73,9 +108,7 @@ const EMPTY_PATH = resolve(LLM_DIR, "report-empty.md");
 // 指南页目录：人工编写的 guide 页直接放在 web/content/guide/，本脚本再往里生成规则清单页与参考页。
 // 写在这里而不是仓库根，是因为部署包只有 web/ 一个目录。
 const GUIDES_DIR = resolve(webRoot, "content/guide");
-const PLOT_DIR = resolve(KN, "plot"); // 结果页曲线预设（纯前端，不经 Pyodide）
-
-const read = (p) => readFileSync(p, "utf8");
+// （曲线预设目录按族给：见 FAMILIES 里的 `plotDir`，没有 plot/ 的族就是没有曲线声明）
 
 /**
  * 产物落盘。`--check` 时只比对不写入：产物是提交进仓库的，所以"改了 knowledge/ 却没重新
@@ -276,11 +309,42 @@ function parseProviderApi(py) {
         if (keys.length === 0) throw new Error(`knowledge/engine/providers/api.py 的 ${name} 是空的`);
         return keys;
     };
+    const varsBlock = new RegExp(`^BUILTIN_VARIABLES = \\{([\\s\\S]*?)^\\}`, "m").exec(py);
     return {
         required: block("REQUIRED"),
         optional: block("OPTIONAL"),
         builtinVariables: block("BUILTIN_VARIABLES"),
+        builtinVarDocs: parseBuiltinVarDocs(varsBlock[1]),
     };
+}
+
+/**
+ * 解析 `BUILTIN_VARIABLES` 每个条目的 `type` 与 `doc`（指南页 §6.1 要用）。
+ *
+ * `doc` 允许**隐式字符串拼接**（一句太长折成几行相邻字面量），所以是把条目体内所有
+ * 字符串字面量收集起来再拼——不要求 `"doc":` 后面只有一个字面量。
+ * 只取 `doc` 之后的字面量：`type` 写在它前面，按出现顺序切一刀即可。
+ */
+function parseBuiltinVarDocs(body) {
+    // 条目有两种写法：一行写完（`"X": {"type": ..., "doc": ...},`）与拆成多行。
+    // 所以不能靠"匹配到 `^    },`"来切——那样会把后面的一行式条目整段吞进来。
+    // 按**下一个顶层键的起点**切才是稳的：条目边界就是 `/^ {4}"NAME":/m`。
+    const heads = [...body.matchAll(/^ {4}"([A-Za-z_0-9]+)":/gm)];
+    const out = {};
+    heads.forEach((head, i) => {
+        const inner = body.slice(head.index, i + 1 < heads.length ? heads[i + 1].index : body.length);
+        const name = head[1];
+        const type = /"type":\s*"([^"]*)"/.exec(inner)?.[1] ?? "—";
+        const docAt = inner.indexOf('"doc":');
+        // 只收集引号里的内容：正文带转义引号的情况本表不追求精确，指南页够读就行
+        // 第一个字面量是 `"doc"` 这个键名本身，丢掉；后面那些才是正文（可能折成多行拼接）
+        const lits = [...inner.slice(docAt).matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((x) => x[1]);
+        const doc = docAt === -1 ? "" : lits.slice(1).join("");
+        out[name] = { type, doc };
+    });
+    if (Object.keys(out).length === 0)
+        throw new Error("knowledge/engine/providers/api.py 的 BUILTIN_VARIABLES 解析不出条目");
+    return out;
 }
 
 /** 校验并加载 rules/*.yaml；任何不完整都构建失败（杜绝"空洞经验"） */
@@ -298,10 +362,22 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
     // 而不是静默取第一个（否则"改了派生表、却只有一条规则跟着变"没人会发现）。
     const seenMeta = new Map();
 
-    // 先整读一遍：一个 YAML 可以装多条经验（顶层写成数组），一般情况下仍是一条经验一个文件
+    // 先整读一遍：一个 YAML 可以装多条经验——**顶层数组**与**多个 YAML 文档**（`---` 分隔）
+    // 两种写法都收。PX4 多数文件一条；APM 那一批全用多文档。
+    // （以前只认单文档：APM 规则一进构建就报 MULTIPLE_DOCS，这也是它们迟迟没接线的副作用之一）
     const loaded = files.map((file) => {
-        const p = parseYaml(readFileSync(resolve(dir, file), "utf8"));
-        return { file, items: Array.isArray(p) ? p : [p] };
+        const docs = parseAllDocuments(readFileSync(resolve(dir, file), "utf8"));
+        const items = [];
+        for (const doc of docs) {
+            if (doc.errors.length > 0) {
+                throw new Error(`rules/${file}: YAML 解析失败：${doc.errors[0].message}`);
+            }
+            const v = doc.toJS();
+            if (v === null || v === undefined) continue; // `---` 分隔线留下的空文档
+            if (Array.isArray(v)) items.push(...v);
+            else items.push(v);
+        }
+        return { file, items };
     });
 
     for (const { file, items } of loaded) {
@@ -1314,15 +1390,14 @@ function operatorCatalog(py, sigs) {
 }
 
 function builtinTable(api) {
-    const vars = api?.builtin_variables ?? {};
+    const vars = api?.builtinVarDocs ?? {};
     const keys = Object.keys(vars);
     if (keys.length === 0) return "";
+    // 单元格里出现 `|` 会撑破表格（`int|None` 这种类型就带一个），一律转义
+    const cell = (s) => String(s).replace(/\|/g, "\\|");
     const lines = ["| 变量 | 类型 | 说明 |", "|------|------|------|"];
     for (const k of keys) {
-        const v = vars[k];
-        const type = v?.type ?? "—";
-        const desc = v?.desc ?? "";
-        lines.push(`| \`${k}\` | ${type} | ${desc} |`);
+        lines.push(`| \`${k}\` | ${cell(vars[k].type)} | ${cell(vars[k].doc)} |`);
     }
     return lines.join("\n") + "\n";
 }
@@ -1340,12 +1415,12 @@ function renderSchemaPage(catalogueCount, providerApi) {
             order: 11,
         }) +
         `写一条经验的权威参考：字段级定义、数据流（\`compute\`）语义、触发与输出、内置变量、
-算子目录，以及构建期会直接拒绝的写法。内部设计（动机、实施状态与已知缺口）见仓库里的
-\`knowledge/px4/CLAUDE.md\`；现有规则清单：[规则目录](/guide/rule-catalogue)。
+算子目录，以及构建期会直接拒绝的写法。内部设计（动机、实施状态与已知缺口）见仓库里各族的
+\`CLAUDE.md\`（\`knowledge/px4/\` 与 \`knowledge/ardupilot/\`）；现有规则清单：[规则目录](/guide/rule-catalogue)。
 
 > **本页由构建期 \`build-knowledge.mjs\` 自动生成**：正文是模板（随代码规范变动时更新此处），
 > 算子目录与内置变量表从 ${CAT} 动态派生。
-> 单一事实源是 \`knowledge/px4/rules/*.yaml\`；改完算子或内置变量后重跑 \`pnpm build:kb\`（dev/build 自动执行）。
+> 单一事实源是各固件族的 \`knowledge/<族>/rules/*.yaml\`；改完算子或内置变量后重跑 \`pnpm build:kb\`（dev/build 自动执行）。
 
 ## 0. 一条经验怎么跑起来
 
@@ -1465,6 +1540,16 @@ compute:
 ` +
         builtinTable(providerApi) +
         `
+框架另外往求值环境里注入**两个调用**，它们不是变量、也不在算子表里：
+
+| 调用                            | 能写在哪             | 作用                                                                     |
+| ------------------------------- | -------------------- | ------------------------------------------------------------------------ |
+| \`has_topic('TOPIC')\`          | \`compute\` / \`when\` | 这个 topic 在不在日志里                                                  |
+| \`param('NAME', default=None)\` | **只有** \`compute\`  | 读飞控参数（查上面的 \`PARAMS\`）。缺这个参数就返回 \`default\`，不抛异常 |
+
+\`param\` 只能在 \`compute\` 里取成变量再拿去 \`when\` 比——直接写
+\`when: "param('ARMING_CHECK') == 0"\` 是**非法**的（\`when\` 的白名单只放行 \`has_topic\`）。
+"没这个参数"与"参数等于 0"是两件事：前者要写 \`default\`，如 \`param('RNGFND_TYPE', 0.0)\`。
 
 ### 6.2 模板占位符
 
@@ -1546,7 +1631,7 @@ Python \`str.format_map\` 支持的格式：
     );
 }
 
-const banner = `// ⚠️ 自动生成，请勿手改。源文件在 knowledge/engine/ 与 knowledge/px4/，改完跑 \`pnpm build:kb\`（dev/build 自动执行）。\n`;
+const banner = `// ⚠️ 自动生成，请勿手改。源文件在 knowledge/（按固件族分目录）与 knowledge/engine/，改完跑 \`pnpm build:kb\`（dev/build 自动执行）。\n`;
 
 // 整份构建按顺序写在一个函数里（`--watch` 要复用它重建）。下面这两个是**唯一**被深层函数读到的值：
 // `signatures` 被 compileFieldOne / compilePreset 读，`operatorsPy` 被 renderSchemaPage 读。
@@ -1560,45 +1645,144 @@ let operatorsPy;
  * 不能靠重新 import 本模块来重建——那样每改一次就多一层模块状态。
  */
 function build() {
-    // 1) 故障库 JSON
-    const kb = parseFaultKb(read(YAML_PATH));
-    if (kb.length === 0) throw new Error("故障知识库解析为 0 条，终止");
+    operatorsPy = read(OPERATORS_PY);
+    signatures = parseOperatorSignatures(operatorsPy);
+    if (Object.keys(signatures).length === 0) throw new Error("operators.py 里没解析到任何算子签名");
+    const enginePy = read(PY_ENGINE);
 
+    // ---- 每一族各自编译一遍：规则 / 数据 / 故障库 / 单位表 ----
+    // 四样东西都是**按 log_type 分开**的（见 FAMILIES 的注释）。产物里它们长成
+    // `{log_type: ...}`，引擎按文件头认出格式后取下标（engine.py 的 _LOG_TYPE_KNOWLEDGE）。
+    const rulesByLogType = {};
+    const factsByLogType = {};
+    const fieldUnitsByLogType = {};
+    const kbByLogType = {};
+    // 合并视图只给**跨族**的产物用（规则清单页、编辑器 schema、总数打印）
+    const allRules = [];
+    const allSources = {};
+    const allVehicles = new Set(["unknown"]);
+    const allGroups = new Set();
+    const plotFilesByFamily = {};
+    const plotsByLogType = {};
+
+    for (const fam of FAMILIES) {
+        // 1) 故障库：族里没有 fault-kb.yaml 就是**空库**（第三层检索可选），不是错误
+        kbByLogType[fam.logType] = existsSync(fam.faultKbPath) ? parseFaultKb(read(fam.faultKbPath)) : [];
+
+        // 2) facts.yaml 要在规则校验**之前**读：规则的 category / doc / 身份块默认值都在 rule_meta 里
+        const facts = parseYaml(read(fam.factsPath));
+        const vehicles = {
+            // 简写 → 规范名（facts.yaml 里的人工数据）；合法名 = vehicle_types 的值 + unknown
+            aliases: facts.vehicle_aliases ?? {},
+            valid: new Set([...Object.values(facts.vehicle_types ?? {}).map(String), "unknown"]),
+        };
+        for (const v of vehicles.valid) allVehicles.add(String(v));
+        const { rules, sources } = loadRules(fam.rulesDir, signatures, facts.rule_meta ?? {}, vehicles);
+        // guards 类经验没有 compute（其判定在 outputs.guard_tags），逐条校验已在 loadRules 里做
+
+        // 3) 绘图预设（plot/*.yml）—— 曲线与地图**同一套声明**。编译结果两处消费：
+        //    · 曲线与布局 → plots.generated.ts（前端）
+        //    · `container: map` 那一份 → facts.track（provider 在引擎侧取数、换算、抽稀）
+        //    族里没有 plot/ 就是没有曲线声明（APM 目前如此）：**不报错**，产一份空的。
+        const hasPlots = existsSync(fam.plotDir);
+        const {
+            plots,
+            mapSpec,
+            refs: plotRefs,
+        } = hasPlots ? loadPresets(fam.plotDir, vehicles) : { plots: [], mapSpec: null, refs: [] };
+        plotFilesByFamily[fam.key] = hasPlots
+            ? readdirSync(fam.plotDir)
+                  .filter((f) => f.endsWith(".yml"))
+                  .sort()
+            : [];
+        facts.track = mapSpec ?? {};
+        // 单位表：规则与预设里所有写了 `unit=` 的引用一起查（源单位在 meta/<tag>.json，见
+        // resolveFieldUnits）。**没有 meta/ 目录的族不换算**（APM：单位声明在 FMTU 里、没核对过）
+        const ruleRefs = rules.flatMap((r) =>
+            (r.compute ?? []).flatMap((expr) => collectRefs(expr).map((x) => ({ where: r.id, ...x }))),
+        );
+        const fieldUnits = existsSync(fam.metaDir) ? resolveFieldUnits([...ruleRefs, ...plotRefs], fam.metaDir) : {};
+
+        rulesByLogType[fam.logType] = rules;
+        factsByLogType[fam.logType] = facts;
+        fieldUnitsByLogType[fam.logType] = fieldUnits;
+        allRules.push(...rules);
+        Object.assign(allSources, sources);
+        for (const g of facts.group_order ?? []) allGroups.add(g);
+
+        // ---------------- facts.yaml 的形状校验（按族）----------------
+        // 必填键分两类，这不是偷懒而是**各族的知识本来就不一样全**：
+        //   · 通用（每族都要）：group_order / vehicle_types / rule_meta —— 引擎机制直接靠它们
+        //     （group_order 决定执行顺序、rule_meta 给规则派生身份、vehicle_types 校验机架约束）
+        //   · 格式专有（**给了才查形状**）：nav_state_* / ulog_msg_types / info_key_docs /
+        //     sys_info_keys / log_levels 全是 PX4 的 ULog 码表，APM 一份都没有。
+        //     一刀切必填的后果是"要么照抄一遍假码表、要么进不了产物"，两条路都是编造。
+        for (const key of ["group_order", "vehicle_types", "rule_meta"]) {
+            if (facts[key] === undefined) throw new Error(`knowledge/${fam.key}/facts.yaml 缺少 ${key}`);
+        }
+        if (facts.info_key_docs !== undefined) {
+            for (const [k, v] of Object.entries(facts.info_key_docs)) {
+                if (typeof v?.name !== "string" || typeof v?.desc !== "string") {
+                    throw new Error(`knowledge/${fam.key}/facts.yaml 的 info_key_docs.${k} 必须是 {name, desc}`);
+                }
+            }
+        }
+        if (facts.ulog_msg_types !== undefined) {
+            for (const t of facts.ulog_msg_types) {
+                // 一条消息类型的单字母码是引擎按字节流统计出来的键，缺了就会静默少一行
+                if (typeof t?.code !== "string" || t.code.length !== 1) {
+                    throw new Error(
+                        `knowledge/${fam.key}/facts.yaml 的 ulog_msg_types 每项都要有单字母 code：${JSON.stringify(t)}`,
+                    );
+                }
+            }
+        }
+        // metrics：概览指标的展示清单（key/label/unit + 可选的兜底取数）
+        const metricKeys = new Set();
+        for (const m of facts.metrics ?? []) {
+            if (!m?.key) throw new Error(`knowledge/${fam.key}/facts.yaml 的 metrics 每项都要有 key`);
+            if (metricKeys.has(m.key)) throw new Error(`knowledge/${fam.key}/facts.yaml 的 metrics 键重复：${m.key}`);
+            metricKeys.add(m.key);
+            if (m.op !== undefined) {
+                if (!signatures[m.op]) throw new Error(`metrics ${m.key} 引用了未注册的算子 ${m.op}`);
+                if (!m.topic) throw new Error(`metrics ${m.key} 有 op 就必须给 topic`);
+                if (m.field === undefined && m.fields === undefined) {
+                    throw new Error(`metrics ${m.key} 有 op 就必须给 field/fields`);
+                }
+                if (m.pick !== undefined && !(signatures[m.op].out_names ?? []).includes(m.pick)) {
+                    throw new Error(`metrics ${m.key} 的 pick=${m.pick} 不在 ${m.op} 的输出里`);
+                }
+            }
+        }
+        if (!Array.isArray(facts.group_order) || facts.group_order.length === 0) {
+            throw new Error(`knowledge/${fam.key}/facts.yaml 的 group_order 不能为空`);
+        }
+        // 经验声明的 group 必须已登记在本族的 group_order 里——否则那条经验**永远不会被执行**
+        // （引擎按 group_order 逐个 group 跑），且失败是静默的。宁可构建失败。
+        const knownGroups = new Set(facts.group_order);
+        for (const r of rules) {
+            if (!knownGroups.has(r.group)) {
+                throw new Error(
+                    `规则 ${r.id} 的 group「${r.group}」未登记在 knowledge/${fam.key}/facts.yaml 的 group_order`,
+                );
+            }
+        }
+        // 曲线**按族**存（APM 没有 plot/ 就是空数组），但**适用性不看族**：
+        // 一张图出不出由它自己的 `conditions.topics` 与这份日志的 manifest 决定，
+        // 而 topic 名本身就是各格式的命名空间（vehicle_attitude 不会出现在 .bin 里）。
+        plotsByLogType[fam.logType] = plots.map(({ order, ...rest }) => rest);
+    }
+
+    if (Object.values(kbByLogType).every((x) => x.length === 0)) throw new Error("故障知识库解析为 0 条，终止");
     const outWorkers = resolve(webRoot, "workers");
     mkdirSync(outWorkers, { recursive: true });
     writeArtifact(
         resolve(outWorkers, "fault-kb.generated.json"),
         // 不写 generatedAt：时间戳会让产物每次构建都产生 diff（而它没有任何消费者），
         // 产物应当可复现 —— 同样的 knowledge/ 输入必须得到逐字节相同的输出。
-        JSON.stringify({ entries: kb }, null, 2) + "\n",
+        // entries 按 log_type 分组：引擎只取这一份日志那一族的条目。
+        JSON.stringify({ entries: kbByLogType }, null, 2) + "\n",
     );
-
-    // 2) 检查脚本 .ts：内联 KB 与阈值，替换两个占位符
-    operatorsPy = read(OPERATORS_PY);
-    signatures = parseOperatorSignatures(operatorsPy);
-    if (Object.keys(signatures).length === 0) throw new Error("operators.py 里没解析到任何算子签名");
-    // facts.yaml 要在规则校验**之前**读：规则的 category / doc / 身份块默认值都在 rule_meta 里
-    const facts = parseYaml(read(FACTS_PATH));
-    const vehicles = {
-        // 简写 → 规范名（facts.yaml 里的人工数据）；合法名 = vehicle_types 的值 + unknown
-        aliases: facts.vehicle_aliases ?? {},
-        valid: new Set([...Object.values(facts.vehicle_types ?? {}).map(String), "unknown"]),
-    };
-    const { rules, sources } = loadRules(RULES_DIR, signatures, facts.rule_meta ?? {}, vehicles);
-    // guards 类经验没有 compute（其判定在 outputs.guard_tags），逐条校验已在 loadRules 里做
-
-    // 3) 绘图预设（plot/*.yml）—— 曲线与地图**同一套声明**。编译结果两处消费：
-    //    · 曲线与布局 → plots.generated.ts（前端）
-    //    · `container: map` 那一份 → facts.track（provider 在引擎侧取数、换算、抽稀）
-    const { plots, mapSpec, refs: plotRefs } = loadPresets(PLOT_DIR, vehicles);
-    facts.track = mapSpec ?? {};
-    // 单位表：规则与预设里所有写了 `unit=` 的引用一起查（源单位在 meta/<tag>.json，见 resolveFieldUnits）
-    const ruleRefs = rules.flatMap((r) =>
-        (r.compute ?? []).flatMap((expr) => collectRefs(expr).map((x) => ({ where: r.id, ...x }))),
-    );
-    const fieldUnits = resolveFieldUnits([...ruleRefs, ...plotRefs], resolve(KN, "meta"));
-
-    const enginePy = read(PY_ENGINE);
     // 单位词表在两边各有一份（构建期管"别名 → 规范名"，运行期管"规范名 → 换算因子"），
     // 规范名必须一模一样。各改各的会静默换算出错数，所以在这里比一次。
     {
@@ -1614,62 +1798,7 @@ function build() {
             );
         }
     }
-    // facts.yaml：那一种格式的数据（码表 / 文案 / 展示口径 / 规则元数据）。
-    // 键名是引擎与 provider 约定的，缺一个就构建失败（宁可构建失败，也不要在浏览器里
-    // 跑到某个码表是空的才发现）。取数逻辑不在这里——它在 knowledge/engine/providers/<格式>.py。
-    for (const key of [
-        "group_order",
-        "log_levels",
-        "vehicle_types",
-        "nav_state_names",
-        "nav_state_groups",
-        "sys_info_keys",
-        "ulog_msg_types",
-        "info_key_docs",
-        "rule_meta",
-    ]) {
-        if (facts[key] === undefined) throw new Error(`facts.yaml 缺少 ${key}`);
-    }
-    for (const [k, v] of Object.entries(facts.info_key_docs)) {
-        if (typeof v?.name !== "string" || typeof v?.desc !== "string") {
-            throw new Error(`facts.yaml 的 info_key_docs.${k} 必须是 {name, desc} 两个字符串`);
-        }
-    }
-    for (const t of facts.ulog_msg_types) {
-        // 一条消息类型的单字母码是引擎按字节流统计出来的键，缺了就会静默少一行
-        if (typeof t?.code !== "string" || t.code.length !== 1) {
-            throw new Error(`facts.yaml 的 ulog_msg_types 每项都要有单字母 code：${JSON.stringify(t)}`);
-        }
-    }
-    // metrics：概览指标的展示清单（key/label/unit + 可选的兜底取数）
-    const metricKeys = new Set();
-    for (const m of facts.metrics ?? []) {
-        if (!m?.key) throw new Error("facts.yaml 的 metrics 每项都要有 key");
-        if (metricKeys.has(m.key)) throw new Error(`facts.yaml 的 metrics 键重复：${m.key}`);
-        metricKeys.add(m.key);
-        if (m.op !== undefined) {
-            if (!signatures[m.op]) throw new Error(`facts.yaml 的 metric ${m.key} 引用了未注册的算子 ${m.op}`);
-            if (!m.topic) throw new Error(`facts.yaml 的 metric ${m.key} 有 op 就必须给 topic`);
-            if (m.field === undefined && m.fields === undefined) {
-                throw new Error(`facts.yaml 的 metric ${m.key} 有 op 就必须给 field/fields`);
-            }
-            if (m.pick !== undefined && !(signatures[m.op].out_names ?? []).includes(m.pick)) {
-                throw new Error(`facts.yaml 的 metric ${m.key} 的 pick=${m.pick} 不在 ${m.op} 的输出里`);
-            }
-        }
-    }
-    if (!Array.isArray(facts.group_order) || facts.group_order.length === 0) {
-        throw new Error("facts.yaml 的 group_order 不能为空");
-    }
-
-    // 经验声明的 group 必须已登记在 facts.yaml 的 group_order 里——否则那条经验**永远不会被执行**
-    // （引擎按 group_order 逐个 group 跑），且失败是静默的。宁可构建失败。
-    const knownGroups = new Set(facts.group_order);
-    for (const r of rules) {
-        if (!knownGroups.has(r.group)) {
-            throw new Error(`规则 ${r.id} 的 group「${r.group}」未登记在 knowledge/px4/facts.yaml 的 group_order`);
-        }
-    }
+    // （各族 facts.yaml 的形状校验与 group 登记检查在族循环里做完了——它们是按族的）
     // ---------------- provider 契约：构建期查"漏写" ----------------
     // 契约的事实源是 knowledge/engine/providers/api.py 的两张常量表。这里查每个适配器是否**定义了**
     // 契约要求的能力、builtin_variables() 的字典字面量键是否齐全。
@@ -1727,16 +1856,18 @@ function build() {
         resolve(outWorkers, "analysis-engine.generated.ts"),
         banner +
             'import faultKbJson from "./fault-kb.generated.json";\n\n' +
+            // 四样知识**都按 log_type 分组**：引擎按文件头认出格式后取自己那一套
+            // （见 engine.py 的 _LOG_TYPE_KNOWLEDGE）。名字不换，形状从"一份"变成"按族一份"。
             "const rules = " +
-            JSON.stringify(rules) +
+            JSON.stringify(rulesByLogType) +
             ";\n" +
             // facts 也必须在此声明：下面的 .replace 链在模块加载时求值，缺声明就是 ReferenceError
             "const facts = " +
-            JSON.stringify(facts) +
+            JSON.stringify(factsByLogType) +
             ";\n\n" +
             // 字段单位表：只含写了 unit= 的引用涉及的字段；本地回归脚本也从这一行取（与 rules 同款）
             "const fieldUnits = " +
-            JSON.stringify(fieldUnits) +
+            JSON.stringify(fieldUnitsByLogType) +
             ";\n\n" +
             "export const PY_ULG_ENGINE = String.raw`" +
             toRawTemplate(pyWithOperators) +
@@ -1766,19 +1897,14 @@ function build() {
     // 4.5) 绘图预设 → web/lib/knowledge/plots.generated.ts
     // 与引擎产物不同，这一份是**纯前端**渲染用（不进 Pyodide），所以单独生成一个 ESM 文件。
     // 内容已在上面编译并校验过（loadPresets）：这里只负责写出来。
-    const plotFiles = readdirSync(PLOT_DIR)
-        .filter((f) => f.endsWith(".yml"))
-        .sort();
+    // **按 log_type 分组**（与 rules / facts 同款）：没有 plot/ 的族给空数组，
+    // 而不是拿别人的图来凑——那会在 APM 日志上画出 PX4 的曲线。
     writeArtifact(
         resolve(webRoot, "lib/knowledge/plots.generated.ts"),
         banner +
-            "// 源：knowledge/px4/plot/*.yml（改图请改那边）\n" +
+            "// 源：knowledge/<族>/plot/*.yml（改图请改那边）\n" +
             "export const PLOT_PRESETS = " +
-            JSON.stringify(
-                plots.map(({ order, ...rest }) => rest),
-                null,
-                2,
-            ) +
+            JSON.stringify(plotsByLogType, null, 2) +
             " as const;\n",
     );
 
@@ -1792,8 +1918,11 @@ function build() {
         ["knowledge/engine/engine.py", PY_ENGINE],
         ["knowledge/engine/providers/api.py", PY_PROVIDER_API],
         ...providerFiles.map((f) => [`knowledge/engine/providers/${f}`, resolve(PROVIDER_DIR, f)]),
-        ["knowledge/px4/facts.yaml", FACTS_PATH],
-        ...plotFiles.map((f) => [`knowledge/px4/plot/${f}`, resolve(PLOT_DIR, f)]),
+        // **每一族**的 facts.yaml 与曲线预设都在内：派生数据的形状是各族各一份的
+        ...FAMILIES.flatMap((fam) => [
+            [`knowledge/${fam.key}/facts.yaml`, fam.factsPath],
+            ...plotFilesByFamily[fam.key].map((f) => [`knowledge/${fam.key}/plot/${f}`, resolve(fam.plotDir, f)]),
+        ]),
     ];
     const derivedVersion = createHash("sha256");
     for (const [label, file] of versionSources) {
@@ -1804,7 +1933,7 @@ function build() {
         resolve(webRoot, "lib/knowledge/derived-version.generated.ts"),
         banner +
             "// 源：knowledge/engine/engine.py + knowledge/engine/providers/*.py + " +
-            "knowledge/px4/{facts.yaml,plot/*.yml} 的内容哈希\n" +
+            "knowledge/<族>/{facts.yaml,plot/*.yml} 的内容哈希\n" +
             "// 用途：存档里的派生数据（info / 曲线 / 轨迹）带的版本，与这里不一致就重新解析一次。\n" +
             "export const DERIVED_DATA_VERSION = " +
             JSON.stringify(derivedVersionHex) +
@@ -1844,15 +1973,28 @@ function build() {
     writeArtifact(
         // 落在 knowledge/ 根（不是族目录）：它是「规则的形状」，与固件族无关；
         // 顺带不再污染 px4/ —— 「产物落在源目录里」那条历史尾巴就此了结。
+        // 词表取**各族的并集**（group / 机型名各族不同）：schema 只做提示，漏提示无所谓、
+        // 错提示会让人改错，所以宁宽。真正拦人的判据在各族 facts.yaml 的构建期校验里。
         resolve(KN_ROOT, "rules-editor-schema.generated.json"),
-        JSON.stringify(buildRuleSchema({ signatures, facts, vehicles, builtinVars: BUILTIN_VARS }), null, 2) + "\n",
+        JSON.stringify(
+            buildRuleSchema({
+                signatures,
+                // 排序只为产物可复现（Set 的迭代顺序取决于插入顺序，各族顺序一变就 diff）
+                facts: { group_order: [...allGroups].sort(), vehicle_types: {} },
+                vehicles: { aliases: {}, valid: allVehicles },
+                builtinVars: BUILTIN_VARS,
+            }),
+            null,
+            2,
+        ) + "\n",
     );
 
     // 5) 指南的「开发指南」分组：规则清单 + 规则编写参考（改规则/算子/内置变量后自动跟上，不用谁记得手动同步）
     if (!CHECK) {
         mkdirSync(GUIDES_DIR, { recursive: true });
-        writeFileSync(resolve(GUIDES_DIR, "rule-catalogue.mdx"), renderCataloguePage(rules, sources), "utf8");
-        writeFileSync(resolve(GUIDES_DIR, "rule-schema.mdx"), renderSchemaPage(rules.length, providerApi), "utf8");
+        // 规则清单是**跨族**的（各族规则混在一起按 group 展示），所以传合并后的那一份
+        writeFileSync(resolve(GUIDES_DIR, "rule-catalogue.mdx"), renderCataloguePage(allRules, allSources), "utf8");
+        writeFileSync(resolve(GUIDES_DIR, "rule-schema.mdx"), renderSchemaPage(allRules.length, providerApi), "utf8");
     }
 
     if (CHECK) {
@@ -1864,8 +2006,10 @@ function build() {
             console.log("OK 全部产物与 knowledge/ 一致");
         }
     } else {
+        const kbTotal = Object.values(kbByLogType).reduce((n, x) => n + x.length, 0);
+        const perFamily = FAMILIES.map((f) => `${f.key} ${rulesByLogType[f.logType].length}`).join(" + ");
         console.log(
-            `knowledge built: ${kb.length} fault entries, ${rules.length} rules, ` +
+            `knowledge built: ${kbTotal} fault entries, ${allRules.length} rules（${perFamily}）, ` +
                 `${Object.keys(signatures).length} operators; ` +
                 "ulog-check-script.ts, prompts.generated.js",
         );
@@ -1886,17 +2030,16 @@ if (!process.argv.includes("--watch")) {
     // 触发「再构建」，自己喂自己、无限重建（所以回调里还要按名字滤掉 *.generated.*）。
     // 注：`rules-editor-schema.generated.json` 2026-09 已挪出族目录，现在写在
     // knowledge/ 根；KN_ROOT 不在监听表里，这一路不会再自触发。
+    // **每一族**的规则 / 曲线 / 元数据目录都要监听（APM 改规则也得触发重建）
     const WATCH_DIRS = [
-        resolve(KN, "rules"),
-        resolve(KN, "plot"),
+        ...FAMILIES.flatMap((f) => [f.rulesDir, f.plotDir, f.metaDir]).filter((d) => existsSync(d)),
         LLM_DIR,
-        resolve(KN, "meta"),
         resolve(ENGINE, "providers"),
         resolve(webRoot, "scripts/lib"), // 算子签名校验、规则表达式、schema 生成器
     ];
     // 真源是"文件"而不是"目录"的那几个（facts.yaml / fault-kb.yaml / *.py 顶层）
     // 只能靠监听父目录拿到事件，所以在回调里按名字过滤掉产物。
-    const WATCH_DIR_LOOSE = [KN, ENGINE];
+    const WATCH_DIR_LOOSE = [...FAMILIES.map((f) => f.dir), ENGINE];
     const GENERATED_IN_SOURCE = /\.generated\.(json|ts|js)$/;
 
     let timer = null;

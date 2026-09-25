@@ -16,8 +16,8 @@ README「拼接顺序与桥接名字」：
 
 **规则与数据只从构建产物读**：compute 的老节点写法要在构建期编译成表达式，而那个编译器
 只有 JS 一份（`web/scripts/lib/rule-expr.mjs`）——Python 侧再实现一份必然漂移，所以不重复
-实现。代价是改了 `knowledge/px4/rules/` 必须先 `pnpm web:build:kb`；本模块会检查产物
-是否陈旧并当场报错。
+实现。代价是改了 `knowledge/<族>/rules/` 必须先 `pnpm web:build:kb`；本模块会检查产物
+是否陈旧并当场报错（每一族的规则都查）。
 
 **接口签名是兼容契约**：`build_namespace(path)` / `call(ns, code)` / `run_one(path)` /
 `load_facts_payload()` 被 `tools/` 下多处脚本依赖，改名或换参等于同时改多个调用点。
@@ -32,7 +32,7 @@ from pathlib import Path
 # 路径一律从本文件推导，使调用方在哪都能拿到同一套源
 ENGINE = Path(__file__).resolve().parent
 REPO_ROOT = ENGINE.parents[1]
-KN_PX4 = REPO_ROOT / "knowledge" / "px4"  # 规则与阈值（知识）
+KN_ROOT = REPO_ROOT / "knowledge"
 
 OPERATORS_PY = ENGINE / "operators.py"
 PROVIDER_API_PY = ENGINE / "providers" / "api.py"  # provider 契约（常量表 + 自检）
@@ -42,7 +42,12 @@ PROVIDER_DIR = ENGINE / "providers"
 PROVIDER_FILES = sorted(p for p in PROVIDER_DIR.glob("*.py") if p.name != "api.py")
 ENGINE_PY = ENGINE / "engine.py"  # 引擎本体（规则框架 + 报告数据层，原 rule_engine/report_data）
 
-RULES_DIR = KN_PX4 / "rules"
+# 固件族：knowledge/<族名>/ 下的一套知识，与 providers/<族名>.py 那个**同名**适配器配对。
+# 配对规则与 web/scripts/build-knowledge.mjs 的 FAMILIES 完全一致（同一条约定，两处实现）——
+# 引擎侧用它判断"产物是不是比规则旧"。
+FAMILY_DIRS = sorted(
+    d for d in KN_ROOT.iterdir() if d.is_dir() and (d / "rules").is_dir() and (PROVIDER_DIR / (d.name + ".py")).exists()
+)
 FAULT_KB_JSON = REPO_ROOT / "web" / "workers" / "fault-kb.generated.json"
 CHECK_SCRIPT = REPO_ROOT / "web" / "workers" / "analysis-engine.generated.ts"
 
@@ -55,7 +60,13 @@ def _product_text() -> str:
     """
     if not CHECK_SCRIPT.exists():
         raise RuntimeError("还没有构建产物，先 pnpm web:build:kb")
-    stale = [f.name for f in RULES_DIR.glob("*.yaml") if f.stat().st_mtime > CHECK_SCRIPT.stat().st_mtime]
+    # **每一族**的规则都要查（以前只查 px4：改了 APM 规则会一直用旧产物，且没人报错）
+    stale = [
+        f"{d.name}/{f.name}"
+        for d in FAMILY_DIRS
+        for f in (d / "rules").glob("*.yaml")
+        if f.stat().st_mtime > CHECK_SCRIPT.stat().st_mtime
+    ]
     if stale:
         raise RuntimeError("构建产物比规则陈旧（%s 改过），先 pnpm web:build:kb 再跑" % "、".join(sorted(stale)[:5]))
     return CHECK_SCRIPT.read_text(encoding="utf-8")
@@ -70,21 +81,17 @@ def _product_const(name: str) -> object:
 
 
 def load_rules() -> list:
-    """规则清单（compute 已是表达式形态，老节点写法在构建期被编译掉了）。"""
-    return _product_const("rules")  # type: ignore[return-value]
+    """规则清单（compute 已是表达式形态，老节点写法在构建期被编译掉了）。
 
-
-def load_field_units() -> dict:
-    """字段单位表（`ref(..., unit=)` 的源单位）。
-
-    它是构建期按 `meta/<tag>.json` + `meta/topic-overrides.yaml` 查好的；本地不重算
-    （那要再实现一遍查表逻辑），直接读产物，保证与浏览器一致。
+    **各族合并**：产物里是 `{log_type: [...]}`（引擎按格式取自己那一套），而字段校验、
+    工作台这类"遍历全部规则"的调用方要的是扁平一份——这里按族顺序拼起来。
     """
-    return _product_const("fieldUnits")  # type: ignore[return-value]
+    by_type: dict = _product_const("rules")  # type: ignore[assignment]
+    return [r for fam in by_type.values() for r in fam]
 
 
 def load_facts_payload() -> dict:
-    """provider 拿到的那份数据配置（`const facts = {...}`）。
+    """provider 拿到的那份数据配置（`const facts = {...}`）——**按 log_type 分组**。
 
     必须从产物取、不能本地重新装配：`facts.yaml` 与 `plot/` 下的地图声明是**构建期**合流的
     （预设编译成候选组、单位查表）。本地再装配一遍就是"同一份规则两处实现"，一旦不一致，
@@ -94,13 +101,27 @@ def load_facts_payload() -> dict:
     return _product_const("facts")  # type: ignore[return-value]
 
 
+def load_field_units() -> dict:
+    """字段单位表（`ref(..., unit=)` 的源单位），**按 log_type 分组**。
+
+    它是构建期按 `meta/<tag>.json` + `meta/topic-overrides.yaml` 查好的；本地不重算
+    （那要再实现一遍查表逻辑），直接读产物，保证与浏览器一致。
+    没有 `meta/` 的族（APM）那份是空的——不换算，取到什么就是什么。
+    """
+    return _product_const("fieldUnits")  # type: ignore[return-value]
+
+
 def _engine_body() -> str:
-    """`engine.py` 的正文，四个占位符已替换为与构建期同款的数据。"""
+    """`engine.py` 的正文，四个占位符已替换为与构建期同款的数据。
+
+    四样知识都是 `{log_type: ...}` 的形状：一次装进引擎，由 `detect_log_type()` 挑出
+    这份日志该用的那一套（见 engine.py 的 `_LOG_TYPE_KNOWLEDGE`）。
+    """
     body = ENGINE_PY.read_text(encoding="utf-8")
     entries = json.loads(FAULT_KB_JSON.read_text(encoding="utf-8"))["entries"]
     body = body.replace("__FAULT_KB__", repr(entries))
     # 阈值已随经验内联（px4-thresholds.toml 退场），无需再注入
-    body = body.replace("__RULES__", json.dumps(load_rules(), ensure_ascii=False))
+    body = body.replace("__RULES__", json.dumps(_product_const("rules"), ensure_ascii=False))
     body = body.replace("__FACTS__", json.dumps(load_facts_payload(), ensure_ascii=False))
     body = body.replace("__FIELD_UNITS__", json.dumps(load_field_units(), ensure_ascii=False))
     return body

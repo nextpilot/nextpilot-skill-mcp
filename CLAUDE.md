@@ -261,7 +261,7 @@
 
 5. 6 条真实日志冻结基线回归，逐字段比对通过；构建期校验（字段名 / 算子名 / 表达式）保证错误不进浏览器。
 
-6. ArduPilot `.bin` 支持：**已落地**，`knowledge/engine/providers/ardupilot.py` 是本项目唯一认识 ArduPilot 的地方（按 `providers/api.py` 契约自注册，引擎一行未改）。解析是**自研**的（只依赖 `struct` + `numpy`，不引 pymavlink —— `.bin` 开头自带 FMT 声明，按表通解即可；pymavlink 带整套 mavlink 协议表，进 Pyodide 代价大而这里用不上）。ardupilot-mcp 那 16 项检查套件仍待排期。
+6. ArduPilot `.bin` 支持：**已端到端打通**（2026-09）。解析侧 `knowledge/engine/providers/ardupilot.py` 是本项目唯一认识 ArduPilot 的地方（按 `providers/api.py` 契约自注册，引擎一行未改），**自研**（只依赖 `struct` + `numpy`，不引 pymavlink —— `.bin` 开头自带 FMT 声明，按表通解即可；pymavlink 带整套 mavlink 协议表，进 Pyodide 代价大而这里用不上）。知识侧 `knowledge/ardupilot/`（ardupilot-mcp 的 16 项检查迁了 12 项、34 条规则）已接线进构建产物：构建脚本按固件族扫描（`knowledge/<族>/` + 同名 provider），引擎按 `log_type` 挑知识。**阈值全部仍是 draft**——仓库里还没有真实 `.bin`，唯一证据是合成样本与 push 门禁 `check-apm-e2e`。
 
 ### 4.4 参考实现与研究项目
 

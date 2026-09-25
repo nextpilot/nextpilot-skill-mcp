@@ -5,10 +5,10 @@
 >
 > **最重要的两件事，先说：**
 >
-> 1. **本目录下的规则目前一条都不会执行。** 构建管线只认 `knowledge/px4/`：
->    `web/scripts/build-knowledge.mjs` 里的 `KN` 与 `knowledge/engine/loader.py` 里的
->    `KN_PX4` 都写死了。这里是**知识源**，不是可执行规则。接线要改那 4 处，清单在
->    `PENDING.md` 的第一节。
+> 1. **本目录已接线（2026-09），34 条规则进构建产物、跑 `.bin` 时会真的执行。**
+>    构建脚本按固件族扫描：`knowledge/<族名>/` 配
+>    `knowledge/engine/providers/<族名>.py`，**两边同名即一族**。产物按 `log_type`
+>    分组，引擎按 `provider.log_type` 挑自己那一套知识。别把任何族名写回脚本里。
 > 2. **全部 34 条的 `status` 是 `draft`，没有一条经过真实 `.bin` 验证。**
 >    不要因为"文件里写了阈值"就以为它验证过。验证清单在 `PENDING.md` 的第五节。
 >
@@ -31,8 +31,8 @@ knowledge/ardupilot/
 
 | 缺什么          | 为什么                                                                  |
 | --------------- | ----------------------------------------------------------------------- |
-| `meta/`         | 没有抓取脚本；目录不存在会让 `resolveFieldUnits` 报警                   |
-| `plot/`         | `PLOT_DIR` 不存在会直接抛错。接线时要么建，要么让构建脚本容忍缺失       |
+| `meta/`         | 没有抓取脚本。缺它 = `field_units` 空、不换算，只告警，不影响跑         |
+| `plot/`         | 缺它 = 空曲线数组。构建脚本容忍缺失，不抛错                             |
 | `fault-kb.yaml` | `trigger_tags` 必须是引擎真产出过的标签，本轮一条都没验证过，写了就是编 |
 
 不在本表：`llm/`、两个 `*-template.yml` 已提到 `knowledge/` 根下（与固件族无关，
@@ -89,7 +89,11 @@ knowledge/ardupilot/
 - 不允许属性访问、下标、推导式；
 - 允许 `and` / `or` / 比较 / 四则 / `in [..]` 列表 / f-string。
 
-而 `compute` 走的是 `_eval_compute`（`exec`），算子随便调。**两者的规则完全不同。**
+而 `compute` 走的是 `_eval_compute`（`exec`），算子随便调，**另有两个 when 里没有的放行调用**：
+`has_topic()` 与 `param('NAME', default=None)`——后者读飞控参数（见 `PENDING.md` 第四节）。
+**所以参数只能在 compute 里取成变量，再拿去 when 比**，直接写
+`when: "param('ARMING_CHECK') == 0"` 是**非法**的。
+**两者的规则完全不同。**
 踩过的实例：compass 里写 `when: "range_ratio > 0.60 and length_of(mag) >= 10"` 是**非法的**，
 必须把 `length_of(mag)` 挪进 `compute` 存成变量。
 
@@ -145,11 +149,11 @@ APM 没有 `meta/` 目录，所以规则里**不要写 `unit=`**（查不到源�
 
 ## 三条既有事实约束
 
-| 编号 | 事实                                                                                   | 后果                                                                                                                                |
-| ---- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| C1   | provider 的 `get_series()` 把文本列的 float 转换失败吞成 `None`                        | `MSG.Message` / `MODE.Mode` / `STATUSTEXT.Text` / `PARM.Name` 一律取不到                                                            |
-| C2   | `providers/api.py` 的 `BUILTIN_VARIABLES` 里没有任何参数类变量                         | 依赖参数的检查只能占位                                                                                                              |
-| C3   | 上游 `FRAME_CLASSES[3]=Octo`（旋翼）与本仓库 `_FRAME_CLASS_MAP[3]=fixed_wing` **冲突** | `conditions.vehicle` 只能填 `rotary_wing / fixed_wing / unknown`，**不能写 copter/heli/plane**（引擎只做精确比对，写错就静默 skip） |
+| 编号   | 事实                                                                                                                                          | 后果                                                                                                                                |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| C1     | provider 的 `get_series()` 把文本列的 float 转换失败吞成 `None`                                                                               | `MSG.Message` / `MODE.Mode` / `STATUSTEXT.Text` / `PARM.Name` 一律取不到                                                            |
+| ~~C2~~ | ~~`BUILTIN_VARIABLES` 里没有任何参数类变量~~ 2026-09 已解除：新增 `PARAMS` 内置变量与 `param('NAME', default=None)`，详见 `PENDING.md` 第四节 | 依赖参数的检查已全部转真                                                                                                            |
+| C3     | 上游 `FRAME_CLASSES[3]=Octo`（旋翼）与本仓库 `_FRAME_CLASS_MAP[3]=fixed_wing` **冲突**                                                        | `conditions.vehicle` 只能填 `rotary_wing / fixed_wing / unknown`，**不能写 copter/heli/plane**（引擎只做精确比对，写错就静默 skip） |
 
 `facts.yaml` 的 `vehicle_types` 是**按 provider 的实际行为**写的（`3: fixed_wing`），
 权威码表放在 `frame_classes`（`3: Octo`）。两表冲突是有意为之，别去"修正"其中一份。
@@ -158,8 +162,9 @@ C3 还有个必须在接线时处理的后果：provider 把 heli 也归到 `rot
 
 ## 改动后的自检
 
-本目录下的规则**不进构建**，所以 `pnpm web:build:kb` 不会替你校验它们。
-可用的手段：
+本目录下的规则**已进构建**，所以 `pnpm web:build:kb` 会替你校验它们（YAML、必填字段、
+group 登记、算子名与签名、`when`/`value` 的白名单、`param()` 的写法）。
+它**不校验**的、需要手动过的：
 
 1. YAML 能解析（多文档 `---` 分隔）、必填字段齐全、`group` 已在 `facts.yaml`
    的 `group_order` 与 `rule_meta.by_group` 里登记；
@@ -173,5 +178,7 @@ C3 还有个必须在接线时处理的后果：provider 把 heli 也归到 `rot
 `title` / `suggestion` / `field` 走的是 `str.format_map`，**占位符里不能写表达式**
 （`{dt_s*1000:.0f}` 会 KeyError）；要算就挪进 `value`（那里是真正的表达式求值）。
 
-`PENDING.md` 第六节记着"把这份静态检查固化进 CI"这条待办——在它落地之前，
-改完规则请手动过一遍这几项。
+另外跑 `tools/engine/check_apm_e2e.py`（已挂在 push 门禁 `check-apm-e2e` 上）：
+它用合成 `.bin` 端到端验一遍"认得格式、装对规则、`param()` 取得数、参数规则真发射"。
+`PENDING.md` 第六节还留着"把静态规则校验脚本也固化进 CI"这条待办——在它落地之前，
+改完规则请手动过一遍上面几项。

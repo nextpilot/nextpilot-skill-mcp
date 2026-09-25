@@ -169,6 +169,16 @@ jobs:
         command: ["{PYTHON}", "tools/engine/guard_apm_parser_version.py"]
         hint: "The ArduPilot parser changed but parser_version() did not. Bump the version string in knowledge/engine/providers/ardupilot.py, then re-freeze with `python tools/engine/guard_apm_parser_version.py --update`."
 
+      # APM 那条链路的端到端冒烟：合成 .bin 走完「认格式 → 取这一族的知识 → 读参数 → 跑规则」。
+      # 为什么必须有：knowledge/ardupilot/ 那批规则曾经"写了但没人跑"（构建脚本硬编码
+      # knowledge/px4/），而这件事**没有任何运行时信号**——改回硬编码照样全绿、只是规则
+      # 又变成装饰品。参数那一半同理：少挂一次 PARAMS 的表现是规则静默不发射。
+      - id: "check-apm-e2e"
+        name: "APM pipeline end-to-end smoke (check_apm_e2e)"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "tools/engine/check_apm_e2e.py"]
+        hint: "The ArduPilot pipeline regressed: either the APM rules are no longer in the artifact (knowledge/ is scanned by family — do not hard-code knowledge/px4/), or param() no longer reaches them. Run `python tools/engine/check_apm_e2e.py` for details."
+
       # knowledge/engine/ 下的片段被拼成**一份**脚本（同一命名空间）：两个片段顶层同名 = 后者静默
       # 覆盖前者，不报错不告警。`_MAGIC` 就这么被踩过一次。provider 靠扫目录纳入，
       # 加第三个格式时这条会自动覆盖到它。

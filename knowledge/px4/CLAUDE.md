@@ -41,7 +41,8 @@ guard 条件写错名字都会构建失败，而不是进浏览器才炸）。
   **运行期**（`check_provider()` 自检类型与缺席）、**测试**（`tools/engine/guard_provider_contract.py`）
   三处的输入 —— 一处定义、三处使用。**不写 `typing.Protocol`**：两端都没有类型检查器
   （构建期不执行 Python、Pyodide 里没有 mypy），写了只是"看着有约束、实际没人管"。
-- 内置变量从 23 个收敛到 **11 个 + `has_topic()`**（实测 10 个零引用：
+- 内置变量从 23 个收敛到 **11 个 + `has_topic()`**（2026-09 起再加 `PARAMS` → 12 个，
+  供 `param('NAME')` 读参数；实测 10 个零引用：
   `firmware` `fw_major` `fw_profile` `is_rotary_wing` `is_vtol` `is_rover` `phases` `tags`
   `guard_tags` `topics`）。其中 `topics` 删掉之后，"同一个事实两种写法"（`'x' in topics`
   vs `has_topic('x')`）只剩一种。

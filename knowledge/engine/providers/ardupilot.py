@@ -436,9 +436,13 @@ class ApmProvider:
 
     # ================= 数据访问层 =================
 
+    def platform_label(self):
+        """报告头里的固件族名（人读的名字，与 `log_type` 那个机器标识不是一个东西）。"""
+        return "ArduPilot"
+
     def parser_version(self):
         """自研解析器（不依赖 pymavlink）：版本号在这里维护，进报告头的 parserVersion。"""
-        return "apm-bin-parser/1.1.0"  # 1.1.0：新增内置变量 MODES_PRESENT（conditions.mode 按它匹配）
+        return "apm-bin-parser/1.2.0"  # 1.2.0：新增内置变量 PARAMS（规则用 param('NAME') 读飞控参数）
 
     def get_topic_meta(self):
         out = []
@@ -568,6 +572,9 @@ class ApmProvider:
             "RESTART_DETECTED": self.restart_topics > 0,
             "DROPOUT_MS": 0,  # .bin 没有丢包记录的概念：给 0，不装作查过
             "MESSAGES": self.get_logged_events(),
+            # 参数表：PARM 消息的**最后一次值**（首现值 = 初始参数，运行中的变更另在
+            # _changed 里，见 get_changed_parameters()）。规则里用 param('NAME') 取单个值
+            "PARAMS": dict(self._params),
             # ---- 知识引擎内置变量 ----
             "SYS_UUID": "",  # v1 无来源（APM 的 UID 在 INFO 多值消息里，解析待真实样本）
             "AIRFRAME_ID": self.airframe_id,
@@ -851,4 +858,4 @@ def _make_apm(raw, facts_cfg):
     return ApmProvider(raw, facts_cfg)
 
 
-FORMATS.append((_is_apm, _make_apm, "ArduPilot .bin（AP_Logger）"))
+FORMATS.append((_is_apm, _make_apm, "ArduPilot .bin（AP_Logger）", ApmProvider.log_type))

@@ -11,9 +11,10 @@
 # 数据来源：上游 ardupilot-mcp（MIT）的 ardupilot_meta.py 与 ardupilot_docs.py，
 # 逐条核实过 ArduPilot 官方 LogStructure / apm.pdef.xml。署名与偏差见 ATTRIBUTION.md。
 #
-# ⚠️ 本文件**目前不进构建产物**：build-knowledge.mjs 与 engine/loader.py 都硬编码
-# knowledge/px4/。接线清单见 PENDING.md。在接线之前，下面的值没有任何一条
-# 经过真实 .bin 日志验证。
+# ✅ 2026-09 已接线：构建脚本按固件族扫描（`knowledge/<族>/` 配 `providers/<族>.py`），
+# 本文件与 rules/ 一起进产物，引擎按 `log_type` 取这一套。
+# 仍然成立的一条：下面的值**没有一条经过真实 .bin 日志验证**（仓库里还没有真实样本，
+# 端到端证据来自 tools/dev/apm_make_sample.py 的合成日志）——见 PENDING.md。
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 规则执行顺序：引擎按这个列表逐个 group 跑，顺序即报告里 finding 编号（F01、F02…）
