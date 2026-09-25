@@ -187,22 +187,28 @@ conditions: # 整块可省
   vehicle: any # any / 机架名 / 机架名列表；省 = any
   topics: # 项内 `||` = 其中任意一个在日志里就够，项间 = 都要有
     - vehicle_gps_position || sensor_gps
-  precheck: # 先决条件：命中即不跑（文案就是命中的那句）
-    - "not HAS_ARMED"
+  armed: true # 解锁门槛：any（省）/ true / false / ">12"（ARMED_S 的门槛，秒）
+  mode: # 与 topics 同形：项内 `||` = 任一出现过即可，项间 = 都要出现过
+    - AUTO || LOITER
+  # placeholder: "待补算子：xxx" ← 这条还没实现，引擎跳过并把这句当原因显示
 ```
 
-四个键的分工：`firmware` / `vehicle` 判"这台机器是不是本来就无关"，`topics` 判"日志里
-有没有这份数据"，`precheck` 放"不用算就知道跟我无关"的场合（如 `not HAS_ARMED` 就谈不上
-飞行中的零偏判定）。`precheck` 在 compute **之前**求值，所以只认内置变量与 `has_topic()`——
-**没有 `no_data`**："数据不足"由 compute 抛异常自己表达。
+六个键的分工：`firmware` / `vehicle` 判"这台机器是不是本来就无关"，`topics` 判"日志里
+有没有这份数据"，`armed` / `mode` 判"这段飞行够不够格"（没有解锁段就谈不上飞行中的
+零偏判定；没进过某模式就套不上只适用于该模式的阈值），`placeholder` 是"这条还没写完"。
 
-**四个键不满足一律记一条 skipped**（2026-09-18 追加第五段改的，原先静默）：报告里要能看出
+**2026-09-25：`precheck` 退役**，它原先承担的活拆成了这三个——解锁门槛 → `armed`，
+模式 → `mode`，未实现 → `placeholder`。剩下的"任意布尔先决条件"请在 `compute` 里算出来、
+交给 `triggers[].when` 判。好处是这三个都不再是表达式：构建期能校验形状，报告里的
+skipped 文案也是引擎生成的固定说法，而不是作者随手写的一句判据。
+
+**六个键不满足一律记一条 skipped**（2026-09-18 追加第五段改的，原先静默）：报告里要能看出
 "这条为什么没跑"。自动文案分别是 `固件不满足 >=1.15` / `机架不适用 fixed_wing` /
-`先决条件命中：not HAS_ARMED` / `X not in log`。
+`X not in log` / `AUTO / LOITER 未在日志中出现` / `本条只在有解锁段时适用` / `未实现：…`。
 
-- **`skip` 整个字段没了**，三类条件各有去向：缺 topic 写进 `conditions.topics`；"有没有数据"
-  这类改成 `conditions.precheck`（命中即不跑）；`no_data` 由 compute 抛异常自己表达。
-  三者**都会留痕**，文案由引擎生成（`X not in log` / `先决条件命中：…` / `数据不足，本条没算出结论`）。
+- **`skip` 整个字段没了**，三类条件各有去向：缺 topic 写进 `conditions.topics`；"有没有解锁段"
+  这类改成 `conditions.armed`（`true` / `false` / `">12"`）；`no_data` 由 compute 抛异常自己表达。
+  三者**都会留痕**，文案由引擎生成（`X not in log` / `本条只在有解锁段时适用` / `数据不足，本条没算出结论`）。
 - 引擎侧 `_rule_skipped()` 与 `no_data`（`_rule_env` 里那个）**已删除**，换成 `_missing_topics(spec)`
   原生判 `topics`。`skip` 在 YAML / 产物 / 引擎里都不存在；`has_topic()` 保留（guard 与将来的
   表达式仍可用）。
@@ -222,7 +228,8 @@ conditions: # 整块可省
   `abs_gate`）。于是去掉 `not has_armed` 后这条规则会在没有 armed 段的日志上"跑成功"、
   多吐一个 `gyroBiasSource` 指标。**现在"没有 armed 段"写进 `conditions.precheck`
   （`not HAS_ARMED`）显式拦下**，那层 `_try` 仍去掉——它现在只负责"整份日志都没有零偏数据"
-  这一种中止。顺带一提：`require_true` 的"门控"语义只有在**下游真的引用了那个变量**时才成立，
+  这一种中止（2026-09-25 起写成 `conditions.armed: true`，`precheck` 退役后换个字段名，
+  语义没变）。顺带一提：`require_true` 的"门控"语义只有在**下游真的引用了那个变量**时才成立，
   这是个容易踩的坑（airspeed 的 `cruise_ok` 同样没人引用）。
 - **内置变量一律大写**（`FW_MINOR` / `VEHICLE` / `IS_FIXED_WING` / `DURATION_S` / `ARMED_S` /
   `ARMED_INTERVALS` / `T0_US` / `HAS_ARMED` / `RESTART_DETECTED` / `DROPOUT_MS` / `MESSAGES`）：
@@ -240,11 +247,13 @@ conditions: # 整块可省
 目标流程写死为 **conditions 拦 → compute 算 → 判定**，前两步的失败一律**自动留痕**、
 不用作者写文案：
 
-| 步骤                                           | 不满足时                                                   |
-| ---------------------------------------------- | ---------------------------------------------------------- |
-| `conditions.firmware` / `vehicle` / `precheck` | **记一条 skipped + 自动文案**（原先静默，2026-09-18 起改） |
-| `conditions.topics`                            | 记一条 skipped，文案自动生成（`X not in log`）             |
-| **compute 抛异常**                             | **记一条 skipped：`数据不足，本条没算出结论`**             |
+| 步骤                              | 不满足时                                                                      |
+| --------------------------------- | ----------------------------------------------------------------------------- |
+| `conditions.placeholder`          | **记一条 skipped：`未实现：<那句文案>`**（2026-09-25 新增）                   |
+| `conditions.firmware` / `vehicle` | **记一条 skipped + 自动文案**（原先静默，2026-09-18 起改）                    |
+| `conditions.topics` / `mode`      | 记一条 skipped，文案自动生成（`X not in log` / `X 未在日志中出现`）           |
+| `conditions.armed`                | 记一条 skipped（`本条只在有解锁段时适用` / `解锁时长不满足 >12（实际 x s）`） |
+| **compute 抛异常**                | **记一条 skipped：`数据不足，本条没算出结论`**                                |
 
 - 因此 **`ran()` 统一挪到 compute 成功之后**——同一条 check 不能既 ran 又 skipped。
   `ran_on_success` 字段**已删**（它想要的就是这个行为，现在成了默认）；`ran_when` 保留

@@ -31,8 +31,7 @@ order: 1
 conditions:
     topics:
         - RCOU
-    precheck:
-        - "'待补能力：需把 RCOU 的 C1 至 C8 独立字段组成矩阵，并用标量减法算通道均值极差（引擎缺矩阵拼装与标量减法），暂未实现'"
+    placeholder: "待补能力：需把 RCOU 的 C1 至 C8 独立字段组成矩阵，并用标量减法算通道均值极差（引擎缺矩阵拼装与标量减法），暂未实现"
 
 compute:
     - c1 = ref("RCOU.C1")
@@ -58,8 +57,7 @@ order: 2
 conditions:
     topics:
         - RCOU
-    precheck:
-        - "'待补能力：需逐通道统计接近满舵的样本占比并跨通道取最大（引擎缺矩阵逐列归约），暂未实现'"
+    placeholder: "待补能力：需逐通道统计接近满舵的样本占比并跨通道取最大（引擎缺矩阵逐列归约），暂未实现"
 
 compute:
     - c1 = ref("RCOU.C1")

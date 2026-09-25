@@ -255,6 +255,10 @@ BUILTIN_VARIABLES = {
     },
     "T0_US": {"type": "int", "doc": "日志起点时间戳（us），事件类算子算相对时刻的基准"},
     "HAS_ARMED": {"type": "bool", "doc": "是否存在 armed 段"},
+    "MODES_PRESENT": {
+        "type": "list[str]",
+        "doc": "日志里出现过的飞行模式名（去重排序）。`conditions.mode` 按它匹配；没有模式段就给空列表——**空列表不是「模式不限」**，写 mode 约束时会因此跳过",
+    },
     "RESTART_DETECTED": {"type": "bool", "doc": "是否有 topic 时间戳回退（疑似中途重启）"},
     "DROPOUT_MS": {"type": "int", "doc": "全日志丢包累计（毫秒）"},
     "MESSAGES": {"type": "list[dict]", "doc": "日志消息条目（供消息类经验按级别筛选）"},

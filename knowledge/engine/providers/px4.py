@@ -421,6 +421,8 @@ class Px4Provider:
             # 事件类算子的相对时间（t=xx.x s）基准
             "T0_US": self.t0_us,
             "HAS_ARMED": bool(self.armed_intervals),
+            # 出现过的模式名（conditions.mode 按它匹配）；没有模式段就是空列表
+            "MODES_PRESENT": sorted({str(s["mode"]) for s in self.get_mode_changed() if s.get("mode")}),
             # 数据质量事实（guards 类经验用）
             "RESTART_DETECTED": self.restart_topics > 0,
             "DROPOUT_MS": self.dropout_total_ms,

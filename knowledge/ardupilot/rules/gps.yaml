@@ -9,8 +9,8 @@
 # 空转）。本仓库的引擎会把 skip 明确显示给用户（"这条为什么没跑"），所以这里的选择是
 # ——拿不到 armed 区间就 **skip**，而不是像上游那样退回全程。理由：退回全程必然把起飞前
 # 的搜星期（NSats=0、HDop=99.99）算成"飞行中 GPS 故障"，那是误报，比漏报更伤信任。
-#   · apm-gps-fix 不加这个 precheck：它的第一条判据本身就是全程语义（"从未达 3D 定位"）。
-#   · apm-gps-sats / apm-gps-hdop 加了 `precheck: not HAS_ARMED`。
+#   · apm-gps-fix 不加这个约束：它的第一条判据本身就是全程语义（"从未达 3D 定位"）。
+#   · apm-gps-sats / apm-gps-hdop 加了 `armed: true`。
 # 代价：不写 ARMED/DISARMED 事件也没有 STAT 的日志（autotest 日志常见）会跳过这两条。
 # 时间戳字段写 `timestamp`：APM 的 TimeUS 由 provider 统一改名（见 providers/ardupilot.py 文件头）。
 
@@ -62,8 +62,7 @@ conditions:
     topics:
         - GPS
     # 没有 armed 区间就不用全程替代（会把起飞前搜星期判成故障），宁可跳过
-    precheck:
-        - "not HAS_ARMED"
+    armed: true
 
 compute:
     - nsats_armed = apply_mask(ref("GPS.NSats"), interval_mask(ref("GPS.timestamp"), ARMED_INTERVALS))
@@ -102,8 +101,7 @@ order: 3
 conditions:
     topics:
         - GPS
-    precheck:
-        - "not HAS_ARMED"
+    armed: true
 
 compute:
     - mask_fix = greater(ref("GPS.Status"), 2.5)

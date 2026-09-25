@@ -344,7 +344,7 @@ order: 12
 ### px4-imu-bias-drift — 陀螺零偏漂移
 
 - 文件：`rules/imu-bias.yaml` ｜ 位置：group `imu_bias` #1
-- 适用：不跑当 not HAS_ARMED
+- 适用：总是适用
 - 取值：
 - `bx, by, bz, bts, src_text = _try(gyro_bias_series( ref("estimator_sensor_bias[0].gyro_bias"), ref("estimator_sensor_bias[0].timestamp"), ref("estimator_states[0].states"), ref("estimator_states[0].timestamp"), ref("estimator_status[0].states"), ref("estimator_status[0].timestamp"), slot=10, sources=["estimator_sensor_bias.gyro_bias[]",
          "estimator_states.states[10..12]",

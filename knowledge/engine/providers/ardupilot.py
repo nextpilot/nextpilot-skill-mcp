@@ -438,7 +438,7 @@ class ApmProvider:
 
     def parser_version(self):
         """自研解析器（不依赖 pymavlink）：版本号在这里维护，进报告头的 parserVersion。"""
-        return "apm-bin-parser/1.0.0"
+        return "apm-bin-parser/1.1.0"  # 1.1.0：新增内置变量 MODES_PRESENT（conditions.mode 按它匹配）
 
     def get_topic_meta(self):
         out = []
@@ -563,6 +563,8 @@ class ApmProvider:
             "ARMED_INTERVALS": list(self.armed_intervals),
             "T0_US": self.t0_us,
             "HAS_ARMED": bool(self.armed_intervals),
+            # 出现过的模式名（conditions.mode 按它匹配）；MODE 消息缺失就是空列表
+            "MODES_PRESENT": sorted({str(s["mode"]) for s in self.get_mode_changed() if s.get("mode")}),
             "RESTART_DETECTED": self.restart_topics > 0,
             "DROPOUT_MS": 0,  # .bin 没有丢包记录的概念：给 0，不装作查过
             "MESSAGES": self.get_logged_events(),

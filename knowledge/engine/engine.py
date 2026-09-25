@@ -191,26 +191,79 @@ def _eval_expr(expr, env):
     return eval(compile(tree, "<rule>", "eval"), {"__builtins__": {}}, env)
 
 
-def _precheck_hit(spec, env):
-    """`conditions.precheck`：一串先决条件，命中任意一条就不跑本条。
+def _placeholder_reason(spec):
+    """`conditions.placeholder`：这条经验**还没实现**，引擎别跑它。
 
-    与 `topics` 的分工：`topics` 只回答"日志里有没有这个 topic"，这里放**要算一遍才知道的
-    适用范围**——如 `not HAS_ARMED`（没有 armed 段就谈不上零偏判定、机动段统计）。
-    在 compute **之前**求值，所以只认内置变量与 `has_topic()`，拿不到 compute 的输出。
+    为什么要有这个一等字段：2026-09 之前占位是把一句字符串字面量塞进 `precheck`
+    （构建期剥引号放行、运行期恒真）——能工作，但把"未实现"伪装成"先决条件命中"，
+    报告里那句原因看着像判据，其实是施工告示。`precheck` 退役后占位单独成字段，
+    语义和文案都对得上了。
 
-    **返回命中的那条表达式原文**（没命中返回 None）——它就是 skipped 的原因文案：作者写的
-    本来就是一句可读的判据，不必再翻译一遍。表达式本身出错（名字写错、取值缺失）当作
-    **未命中**：宁可多跑一条，也别把整条误杀。
-
-    注意这里**没有**"数据不足"这条：compute 算不出来本来就会留痕，见 `_run_rules`。
+    写法就是一个字符串（原因文案），`true` 给一句缺省文案。没写 → None。
     """
-    for when in spec or []:
-        try:
-            if _eval_expr(when, env):
-                return when
-        except Exception:
-            continue
+    if isinstance(spec, str) and spec.strip():
+        return spec.strip()
+    if spec is True:
+        return "本条尚未实现"
     return None
+
+
+def _match_mode(spec, env):
+    """`conditions.mode`：与 `topics` **同形**——每项是「候选模式」，项间是「都要出现」。
+
+    一项里写 `AUTO || LOITER` 表示任一出现过即满足；写成两项就要求都出现过。
+    匹配的是"日志里出现过"（`MODES_PRESENT`），不是"当前处于"——规则看的是
+    整段日志，不是一个时刻。
+
+    返回缺失项的原因文案（`"AUTO / LOITER 未在日志中出现"`），满足则返回 None。
+    ⚠ 日志没有模式段时 `MODES_PRESENT` 是空列表，写了 mode 约束就会跳过——
+    这是**故意**的：拿不到模式就去跑只适用于某模式的阈值，只会误报。
+    """
+    present = set(env.get("MODES_PRESENT") or [])
+    for candidates in spec or []:
+        if isinstance(candidates, str):
+            candidates = [t.strip() for t in candidates.split("||")]
+        if not any(m in present for m in candidates):
+            return " / ".join(str(c) for c in candidates) + " 未在日志中出现"
+    return None
+
+
+def _match_armed(spec, env):
+    """`conditions.armed`：解锁条件（取代原先写在 `precheck` 里的 `HAS_ARMED` 那半）。
+
+    - 不写 / `any`：不限（缺省）
+    - `true`：必须有 armed 段；`false`：必须全程未解锁
+    - `">12"` / `">=12"` 这类带比较符的串：对 `ARMED_S`（解锁**总时长**，秒）求值
+    - 写数字 `12`：等价 `>= 12`
+
+    判据算不出来（语法写错、`ARMED_S` 是 None）当作**不满足**并跳过——这里与当初
+    `precheck` 的取向相反（那边是"宁可多跑一条"）：门槛是作者明确写的，拿不到数还跑，
+    等于在没解锁的日志上套用只适用于飞行段的阈值，会误报。
+
+    返回原因文案，满足则返回 None。
+    """
+    if spec is None:
+        return None
+    # 布尔与字符串 "true"/"false" 同义（YAML 里两种写法都会出现，别让作者猜）
+    want = None
+    if isinstance(spec, bool):
+        want = spec
+    elif isinstance(spec, str) and spec.strip().lower() in ("true", "false"):
+        want = spec.strip().lower() == "true"
+    if want is not None:
+        if want == bool(env.get("HAS_ARMED")):
+            return None
+        return "本条只在有解锁段时适用" if want else "本条只在全程未解锁时适用"
+    txt = str(spec).strip()
+    if txt == "" or txt.lower() == "any":
+        return None
+    expr = "ARMED_S %s" % txt if txt[0] in "<>=!" else "ARMED_S >= %s" % txt
+    try:
+        if _eval_expr(expr, env):
+            return None
+    except Exception:
+        return "解锁时长判据算不出来：%s" % txt
+    return "解锁时长不满足 %s（实际 %s s）" % (txt, env.get("ARMED_S"))
 
 
 def _vehicle_label(spec):
@@ -538,20 +591,27 @@ def _run_rules(group):
         elif not isinstance(_checks, list):
             _checks = [_checks]
         _env = _rule_env()
-        # 适用范围（`conditions`）依次判：固件 / 机架 / 先决条件 / 依赖的 topic。
+        # 适用范围（`conditions`）依次判：占位 / 固件 / 机架 / 依赖的 topic / 模式 / 解锁。
         # 固件那轴与 provider.match_version 同一套语法（any / ">=1.15" / ">=1.14,<1.15"），
-        # 机架那轴是 `any` / 机架名 / 列表。
+        # 机架那轴是 `any` / 机架名 / 列表，模式那轴与 `topics` 同形，解锁那轴是
+        # any / true / ">12"（见各自函数的 docstring）。
         # **不满足一律记一条 skipped 并带上自动文案**：报告里要能看出"这条为什么没跑"，
         # 而不是让读者以为它跑过了、或者根本没人写过这条经验。
         # （轴约束写成了解析不了的串时静默退出——那是规则的笔误，构建期本来就会拦。）
         _not_applicable = None
-        try:
-            if not provider.match_version(_rule["firmware"]):
-                _not_applicable = "固件不满足 %s" % _rule["firmware"]
-            elif not _match_vehicle(_rule["vehicle"], _env):
-                _not_applicable = "机架不适用 %s" % _vehicle_label(_rule["vehicle"])
-        except Exception:
-            _not_applicable = None
+        # 占位排在最前：它说的是"这条还没写完"，与适用范围无关——所以占位规则
+        # 就算写了 topics / mode，也应当显示"未实现"而不是"topic not in log"。
+        _ph = _placeholder_reason(_rule.get("placeholder"))
+        if _ph:
+            _not_applicable = "未实现：%s" % _ph
+        else:
+            try:
+                if not provider.match_version(_rule["firmware"]):
+                    _not_applicable = "固件不满足 %s" % _rule["firmware"]
+                elif not _match_vehicle(_rule["vehicle"], _env):
+                    _not_applicable = "机架不适用 %s" % _vehicle_label(_rule["vehicle"])
+            except Exception:
+                _not_applicable = None
         if _not_applicable:
             for _check in _checks:
                 skipped(_check, _not_applicable)
@@ -562,11 +622,17 @@ def _run_rules(group):
             for _check in _checks:
                 skipped(_check, _missing)
             continue
-        # 先决条件：命中的那条条件原文就是原因（它本来就是作者写的一句判据）
-        _pre = _precheck_hit(_rule.get("precheck"), _env)
-        if _pre:
+        # 模式：日志里没出现过要求的模式就跳过（见 _match_mode）
+        _mode_miss = _match_mode(_rule.get("mode"), _env)
+        if _mode_miss:
             for _check in _checks:
-                skipped(_check, "先决条件命中：%s" % _pre)
+                skipped(_check, _mode_miss)
+            continue
+        # 解锁：要求有解锁段 / 未解锁 / 解锁时长过门槛（见 _match_armed）
+        _armed_miss = _match_armed(_rule.get("armed"), _env)
+        if _armed_miss:
+            for _check in _checks:
+                skipped(_check, _armed_miss)
             continue
         # ── 三步里的第二步：算 ──
         # 算不出来就记一条 skipped（"数据不足"），所以 ran() 只能放在 compute **成功之后**——

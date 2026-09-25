@@ -103,8 +103,7 @@ order: 3
 conditions:
     topics:
         - MODE
-    precheck:
-        - "'待补能力：MODE.Mode 是文本列，provider 的 get_series 取不到文本（PENDING 的 C1），暂未实现'"
+    placeholder: "待补能力：MODE.Mode 是文本列，provider 的 get_series 取不到文本（PENDING 的 C1），暂未实现"
 
 compute:
     - mode_num = ref("MODE.ModeNum")

@@ -21,8 +21,7 @@ group: config_safety
 order: 1
 
 conditions:
-    precheck:
-        - "'待补能力：ARMING_CHECK 是参数，provider 取不到参数（PENDING 的 C2），暂未实现'"
+    placeholder: "待补能力：ARMING_CHECK 是参数，provider 取不到参数（PENDING 的 C2），暂未实现"
 
 compute:
     - placeholder = ref("PARM.Name")
@@ -46,8 +45,7 @@ group: config_safety
 order: 2
 
 conditions:
-    precheck:
-        - "'待补能力：BATT_MONITOR 是参数，provider 取不到参数（PENDING 的 C2），暂未实现'"
+    placeholder: "待补能力：BATT_MONITOR 是参数，provider 取不到参数（PENDING 的 C2），暂未实现"
 
 compute:
     - placeholder = ref("PARM.Name")
@@ -71,8 +69,7 @@ group: config_safety
 order: 3
 
 conditions:
-    precheck:
-        - "'待补能力：FS_THR_ENABLE 是参数，provider 取不到参数（PENDING 的 C2），暂未实现'"
+    placeholder: "待补能力：FS_THR_ENABLE 是参数，provider 取不到参数（PENDING 的 C2），暂未实现"
 
 compute:
     - placeholder = ref("PARM.Name")

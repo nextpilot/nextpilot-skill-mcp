@@ -122,11 +122,28 @@ export function buildRuleSchema({ signatures, facts, vehicles, builtinVars }) {
                         description:
                             "数据依赖：日志里得有这些 topic，缺了记一条 skipped。项内 `||` = 任意一个在就够，项间 = 都要有",
                     },
-                    precheck: {
+                    mode: {
                         type: "array",
                         items: { type: "string" },
                         description:
-                            "先决条件：命中任意一条就不跑本条。在 compute **之前**求值 → 只认内置变量与 has_topic()",
+                            "模式：与 `topics` **同形**——项内 `||` = 任一出现过即可，项间 = 都要出现过。匹配的是「日志里出现过」（MODES_PRESENT），不是「当前处于」",
+                    },
+                    armed: {
+                        description:
+                            '解锁：any（缺省，不限）/ true（必须有解锁段）/ false（必须全程未解锁）/ ">12"（解锁总时长 ARMED_S 的门槛，秒）。判据算不出来就跳过',
+                        oneOf: [
+                            {
+                                type: "string",
+                                pattern: "^(any|true|false|[<>=!]=?\\s*\\d+(\\.\\d+)?|\\d+(\\.\\d+)?)$",
+                            },
+                            { type: "boolean" },
+                            { type: "number" },
+                        ],
+                    },
+                    placeholder: {
+                        description:
+                            "这条经验**还没实现**：引擎跳过并把这句原样当作原因显示。占位专用，别拿它写判据（2026-09 取代原先塞进 precheck 的字符串 hack）",
+                        oneOf: [{ type: "string" }, { type: "boolean" }],
                     },
                 },
             },

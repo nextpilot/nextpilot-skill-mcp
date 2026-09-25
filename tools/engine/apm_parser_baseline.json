@@ -1,6 +1,6 @@
 {
-  "version": "apm-bin-parser/1.0.0",
-  "fingerprint": "9c7e2f9bc49454b1cc72501bac664add825468b74f0c3bdbfbbe4381169d91c1",
+  "version": "apm-bin-parser/1.1.0",
+  "fingerprint": "b12d351c04e2cf64952edb00f2032e57518a8b59a8ed2db626490de124088fe6",
   "consts": 10,
   "funcs": 46
 }

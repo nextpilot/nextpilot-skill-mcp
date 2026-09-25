@@ -12,8 +12,7 @@ version: 1.1.0
 
 # 没有 armed 段就谈不上"飞行中的零偏"——先决条件直接不跑（原实现外层是 `if armed_intervals:`）。
 conditions:
-    precheck:
-        - "not HAS_ARMED"
+    armed: true
 
 compute:
     # 取源：**谁有数据用谁**——直读零偏列（更直接）优先，没有就退回状态槽 [10..12]。
@@ -32,7 +31,7 @@ compute:
                  "estimator_status.states[10..12]"]))
     # armed 段内逐轴 |最大零偏| 与漂移，各取最差轴。**不包 _try**：整份日志都没有零偏数据时
     # 算子返回 None，解包即抛异常 → 本条就此中止（不写 stats、不发 finding）。
-    # （"没有 armed 段"那半由上面的 precheck 拦下，不必再依赖异常。）
+    # （"没有 armed 段"那半由上面的 `armed: true` 拦下，不必再依赖异常。）
     - >-
         worst_abs, worst_axis, worst_drift, drift_axis = gyro_bias_worst(
         bx, by, bz, bts, ARMED_INTERVALS, labels=["X", "Y", "Z"], min_count=10)

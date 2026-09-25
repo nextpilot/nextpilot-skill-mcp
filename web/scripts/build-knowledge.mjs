@@ -208,16 +208,6 @@ const stripStrings = (s) =>
         .replace(/'[^']*'/g, " ")
         .replace(/"[^"]*"/g, " ");
 
-/** 这条表达式只能引用内置变量（用于 compute 之前求值的场合：适用范围轴、skip 条件） */
-function checkBuiltinOnly(expr, where, what) {
-    for (const name of stripStrings(expr).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
-        if (EXPR_KEYWORDS.has(name)) continue;
-        if (!BUILTIN_VARS.has(name)) {
-            throw new Error(`${where}: ${what} 引用了非内置变量 ${name}——它在 compute 之前求值，拿不到 compute 的输出`);
-        }
-    }
-}
-
 /** 从 operators.py 解析算子签名（本文件由我们维护，格式固定；解析不到即构建失败） */
 function parseOperatorSignatures(py) {
     const sigs = {};
@@ -339,12 +329,19 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
             ) {
                 throw new Error(`${where}: outputs 必须是对象`);
             }
-            // ── 适用范围：一个 conditions 块，四个键都能省（规则与绘图预设共用 normalizeConditions）──
+            // ── 适用范围：一个 conditions 块，六个键都能省（规则与绘图预设共用 normalizeConditions）──
             // 下面归一化成运行期的形态：两个平铺的轴 + 嵌套的 topics。**没有 skip 这个键**
             // （原来那坨 no_data / not has_armed 的判定已退役，理由见 knowledge/px4/CLAUDE.md）。
             // 退役的顶层键：不静默忽略，写错了要当场知道
             for (const [key, hint] of [
-                ["skip", "缺 topic 改写进 conditions.topics；no_data / not has_armed 这类按需改成 precheck，或直接删"],
+                [
+                    "skip",
+                    '缺 topic 改写进 conditions.topics；no_data / not has_armed 这类改成 conditions.armed（true / false / ">12"），或直接删',
+                ],
+                [
+                    "precheck",
+                    "已拆成三块：解锁门槛 → conditions.armed；模式 → conditions.mode；未实现 → conditions.placeholder。其余先决条件请在 compute 里算出来、交给 triggers[].when 判",
+                ],
                 ["ran_on_success", "ran() 现在统一在 compute 成功之后记（算不出来会记一条「数据不足」），这个字段已删"],
                 ["known_legacy", '字段的跨版本差异改用候选组表达：ref("新名", "旧名") 取第一个存在的'],
             ]) {
@@ -917,11 +914,11 @@ function compileMap(out, where, declaredVars, refs) {
  */
 function withMapConditions(map, conditions, where) {
     const unsupported = ["firmware", "vehicle"].filter((k) => conditions[k] && conditions[k] !== "any");
-    if (conditions.precheck) unsupported.push("precheck");
+    unsupported.push(...["mode", "armed", "placeholder"].filter((k) => conditions[k] !== undefined));
     if (unsupported.length) {
         throw new Error(
             `${where}: 地图预设的 conditions 只支持 topics（引擎侧的地图路径没接 ${unsupported.join(" / ")}）——` +
-                `要按固件 / 机架 / 先决条件收紧，得先在 get_flight_track 里接上同一个闸门`,
+                `要按固件 / 机架 / 模式 / 解锁收紧，得先在 get_flight_track 里接上同一个闸门`,
         );
     }
     return { ...map, conditions: { topics: conditions.topics ?? [] } };
@@ -938,6 +935,7 @@ function compilePreset(spec, where, vehicles) {
         throw new Error(`${where}: order 必须是数字`);
     }
     const conditions = normalizeConditions(spec.conditions, where, vehicles);
+    rejectEngineOnlyConditions(conditions, where, "绘图预设");
     const compute = (spec.compute ?? []).map((s) => String(s).trim());
     let declaredVars = new Set();
     if (compute.length) {
@@ -1012,7 +1010,12 @@ function loadPresets(dir, vehicles) {
  *   firmware  固件约束串（any / ">=1.15" / ">=1.14,<1.15"），由 provider.match_version 解释
  *   vehicle  any / 机架名 / 机架名列表；简写（mc / fw）在这里换成规范名
  *   topics    日志里得有这些 topic，缺了记一条 skipped；项内 `||` = 任意一个存在即可
- *   precheck  compute **之前**求值的先决条件（命中即不跑，只认内置变量与 has_topic()）
+ *   mode      与 topics **同形**，但比的是「日志里出现过哪些飞行模式」（MODES_PRESENT）
+ *   armed     解锁：any（缺省）/ true / false / ">12"（对 ARMED_S 求值的门槛，秒）
+ *   placeholder  这条经验还没实现，引擎跳过并把这句当原因显示（占位专用）
+ *
+ * 后三个**只有规则这边用得上**：绘图预设的 conditions 由前端按 topics 判适用性，
+ * 拿不到 MODES_PRESENT / ARMED_S，写了会在运行期悄悄不生效——所以预设侧直接拦掉。
  *
  * 没写的键**省略掉**——产物里不留空壳。退役的顶层键（skip / ran_on_success / known_legacy）
  * 由调用方各自拦（规则那边有历史包袱，预设那边写了直接报错）。
@@ -1020,11 +1023,15 @@ function loadPresets(dir, vehicles) {
 function normalizeConditions(raw, where, vehicles) {
     const cond = raw ?? {};
     if (typeof cond !== "object" || cond === null || Array.isArray(cond)) {
-        throw new Error(`${where}: conditions 必须是对象（可用键：firmware / vehicle / topics / precheck）`);
+        throw new Error(
+            `${where}: conditions 必须是对象（可用键：firmware / vehicle / topics / mode / armed / placeholder）`,
+        );
     }
     for (const k of Object.keys(cond)) {
-        if (!["firmware", "vehicle", "topics", "precheck"].includes(k)) {
-            throw new Error(`${where}: conditions 里有未知键 ${k}（可用：firmware / vehicle / topics / precheck）`);
+        if (!["firmware", "vehicle", "topics", "mode", "armed", "placeholder"].includes(k)) {
+            throw new Error(
+                `${where}: conditions 里有未知键 ${k}（可用：firmware / vehicle / topics / mode / armed / placeholder）`,
+            );
         }
     }
     if (cond.firmware !== undefined && !isFirmwareSpec(cond.firmware)) {
@@ -1052,24 +1059,82 @@ function normalizeConditions(raw, where, vehicles) {
             throw new Error(`${where}: ${err.message}`);
         }
     });
-    if (cond.precheck !== undefined) {
-        if (!Array.isArray(cond.precheck) || cond.precheck.length === 0) {
-            throw new Error(`${where}: conditions.precheck 必须是非空数组（每项一条表达式，没有就整个删掉）`);
-        }
-        for (const w of cond.precheck) {
-            if (typeof w !== "string" || !w.trim()) {
-                throw new Error(`${where}: conditions.precheck 的每一项都要是非空表达式字符串`);
-            }
-            checkBuiltinOnly(w, where, `precheck 条件「${w}」`);
-        }
-    }
+    const mode = parseModeSpec(cond.mode, where);
+    const armed = parseArmedSpec(cond.armed, where);
+    const placeholder = parsePlaceholderSpec(cond.placeholder, where);
     const out = {
         firmware: cond.firmware ?? "any",
         vehicle: normalizeVehicle(cond.vehicle ?? "any", vehicles, where),
     };
     if (topics.length) out.topics = topics;
-    if (cond.precheck !== undefined) out.precheck = cond.precheck.map((s) => s.trim());
+    if (mode.length) out.mode = mode;
+    if (armed !== undefined) out.armed = armed;
+    if (placeholder !== undefined) out.placeholder = placeholder;
     return out;
+}
+
+/**
+ * `conditions.mode` → 候选组的数组，与 `topics` 同形（项内 `||` = 任一，项间 = 都要）。
+ * 校验只做形状：模式名是日志原文（APM 的 `AUTO` / `LOITER`，PX4 也是字符串），
+ * 不做码表比对——码表是 facts 的事，且老固件总有表外的模式名。
+ */
+function parseModeSpec(spec, where) {
+    if (spec === undefined) return [];
+    if (!Array.isArray(spec) || spec.length === 0) {
+        throw new Error(`${where}: conditions.mode 必须是非空数组（每项一个模式，多个候选用 || 分隔）`);
+    }
+    return spec.map((m) => {
+        if (typeof m !== "string" || !m.trim()) {
+            throw new Error(`${where}: conditions.mode 的每一项都要是非空字符串`);
+        }
+        const parts = m.split("||").map((s) => s.trim());
+        if (parts.length !== parts.filter(Boolean).length) {
+            throw new Error(`${where}: conditions.mode 项「${m}」的 || 两边不能为空`);
+        }
+        for (const p of parts) {
+            if (!/^[A-Za-z0-9_]+$/.test(p)) {
+                throw new Error(
+                    `${where}: conditions.mode 项「${m}」里的「${p}」不是合法模式名（只允许字母数字下划线）`,
+                );
+            }
+        }
+        return parts;
+    });
+}
+
+/** `conditions.armed` → any / 布尔 / 数字 / 带比较符的门槛串。原值透传，运行期解释。 */
+function parseArmedSpec(spec, where) {
+    if (spec === undefined) return undefined;
+    const ok =
+        spec === true ||
+        spec === false ||
+        (typeof spec === "number" && Number.isFinite(spec)) ||
+        (typeof spec === "string" && /^(any|true|false|[<>=!]=?\s*\d+(\.\d+)?|\d+(\.\d+)?)$/.test(spec.trim()));
+    if (!ok) {
+        throw new Error(
+            `${where}: conditions.armed 只能是 any / true / false / 数字 / 带比较符的门槛（如 ">12"），实际是 ${JSON.stringify(spec)}`,
+        );
+    }
+    return typeof spec === "string" ? spec.trim() : spec;
+}
+
+/** `conditions.placeholder` → 非空字符串或 true。 */
+function parsePlaceholderSpec(spec, where) {
+    if (spec === undefined) return undefined;
+    if (spec === true) return true;
+    if (typeof spec === "string" && spec.trim()) return spec.trim();
+    throw new Error(`${where}: conditions.placeholder 只能是一句原因文案（字符串）或 true`);
+}
+
+/** 绘图预设用不了的那几个轴（引擎侧才有的闸门），写了要在构建期拦住而不是运行期静默。 */
+function rejectEngineOnlyConditions(conditions, where, what) {
+    const bad = ["mode", "armed", "placeholder"].filter((k) => conditions[k] !== undefined);
+    if (bad.length) {
+        throw new Error(
+            `${where}: ${what} 的 conditions 用不了 ${bad.join(" / ")}（前端只按 topics 判适用性，` +
+                `拿不到 MODES_PRESENT / ARMED_S；这三个轴是规则专用的）`,
+        );
+    }
 }
 
 const escapeMdx = (s) =>

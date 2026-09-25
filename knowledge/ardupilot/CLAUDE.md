@@ -60,7 +60,8 @@ knowledge/ardupilot/
 | `rcin.yaml`      | 1    | 四主通道同时低于 1000us                                           |
 
 占位那 11 条各自缺什么、`PENDING.md` 第二节有逐条的表。要认出一条占位规则：
-它的 `conditions.precheck` 里是一个**单引号包裹的字符串字面量**。
+它有 `conditions.placeholder`，值就是一句"缺什么"的原因文案——引擎跳过本条并原样
+显示这句话。2026-09 之前这个机制靠往 `precheck` 里塞字符串字面量实现，现在是一等字段。
 
 ## 写新规则必须遵守的约定（本轮踩过的坑）
 
@@ -109,10 +110,12 @@ knowledge/ardupilot/
 改名的场合一律用它，没有"这个引用只适用于某版本"这种写法。
 `topics` 的 `||` 与 `ref` 的候选组**必须成对写**，只写一处会出现"判过 topic 却取不到数"。
 
-### 引擎先判 `topics` 再判 `precheck`
+### `conditions` 的判定顺序：占位 → 固件 → 机架 → topics → mode → armed
 
-所以**占位规则不要写 `conditions.topics`**——写了会在取不到数时报
-`"topic not in log"`，把占位说明里那句"缺什么能力"盖掉。
+**占位排在最前**（它说的是"这条还没写完"，与适用范围无关），所以占位规则
+**可以**写 `topics` 了——2026-09 之前占位靠 `precheck` 实现，而 precheck 排在
+topics **之后**，写了 topics 就会被 `"topic not in log"` 盖掉那句"缺什么能力"。
+现在不会了。
 
 ### 标量加减不可用，矩阵类算子只吃数组字段
 
@@ -155,7 +158,8 @@ C3 还有个必须在接线时处理的后果：provider 把 heli 也归到 `rot
 1. YAML 能解析（多文档 `---` 分隔）、必填字段齐全、`group` 已在 `facts.yaml`
    的 `group_order` 与 `rule_meta.by_group` 里登记；
 2. 表达式里的算子名确实在 `knowledge/engine/operators.py` 的 `OPERATORS` 里；
-3. `when` / `value` / `precheck` 符合上面说的 `_eval_expr` 白名单；
+3. `when` / `value` 符合上面说的 `_eval_expr` 白名单（`precheck` 已于 2026-09 退役，
+   它的活由 `armed` / `mode` / `placeholder` 三个一等字段接走，都不走 `_eval_expr`）；
 4. 文案里的 `{占位符}` 都能在 `compute` 产出的变量里找到。
 
 `PENDING.md` 第六节记着"把这份静态检查固化进 CI"这条待办——在它落地之前，

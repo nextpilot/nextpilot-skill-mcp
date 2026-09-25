@@ -12,8 +12,7 @@ group: timing
 order: 1
 
 conditions:
-    precheck:
-        - "'待补算子：需相邻时间戳差分与 dt 中位数（引擎缺 diff 与中位数归约算子），暂未实现'"
+    placeholder: "待补算子：需相邻时间戳差分与 dt 中位数（引擎缺 diff 与中位数归约算子），暂未实现"
 
 compute:
     - placeholder = ref("VIBE.VibeX")

@@ -80,8 +80,7 @@ order: 3
 conditions:
     topics:
         - ATT
-    precheck:
-        - "'待补算子：航向误差需绕回 ±180 度（缺取模算子），且持续时长判据缺 run-length 算子，暂未实现'"
+    placeholder: "待补算子：航向误差需绕回 ±180 度（缺取模算子），且持续时长判据缺 run-length 算子，暂未实现"
 
 compute:
     - err_yaw = abs_diff(ref("ATT.DesYaw"), ref("ATT.Yaw"))
