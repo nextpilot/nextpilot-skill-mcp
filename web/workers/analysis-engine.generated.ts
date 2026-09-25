@@ -89,6 +89,41 @@ def op_mean(values, **kw):
     return float(a.mean()) if a.size else None
 
 
+@operator("std", doc="有限值的标准差（忽略 NaN；ddof 与 numpy 同义，默认 0 即总体标准差）")
+def op_std(values, ddof=0, **kw):
+    if values is None:
+        return None
+    a = _finite(values)
+    d = int(ddof)
+    if a.size <= d:
+        return None
+    return float(a.std(ddof=d))
+
+
+@operator("cv", doc="变异系数 std / mean：衡量序列的相对波动（如罗盘场强稳定性）；均值非正时 None")
+def op_cv(values, ddof=0, **kw):
+    import numpy as np
+
+    m = op_mean(values)
+    if m is None or not np.isfinite(m) or float(m) <= 0:
+        return None
+    s = op_std(values, ddof=ddof)
+    return None if s is None else float(s) / float(m)
+
+
+@operator("median", doc="中位数（第 50 百分位，省掉每次写 p=50）")
+def op_median(values, **kw):
+    return op_percentile(values, p=50)
+
+
+@operator("sum", doc="有限值求和（忽略 NaN；无有效值则 None）")
+def op_sum(values, **kw):
+    if values is None:
+        return None
+    a = _finite(values)
+    return float(a.sum()) if a.size else None
+
+
 # ─────────────────────────── 空值 / 逻辑 / 算术（通用积木）───────────────────────────
 
 
@@ -133,6 +168,72 @@ def op_div(a, b, require_positive=False, **kw):
     return float(a) / float(b)
 
 
+def _align_pair(a, b):
+    """两个输入对齐成等长序列（标量先升维再截断），缺失返回 None。
+
+    有了它，加减取模这类运算不必区分“标量还是序列”两套写法：两个标量进、两个标量出，
+    否则按较短长度逐样本。"""
+    import numpy as np
+
+    if a is None or b is None:
+        return None
+    x = np.atleast_1d(np.asarray(a, dtype=float))
+    y = np.atleast_1d(np.asarray(b, dtype=float))
+    n = min(x.size, y.size)
+    if n == 0:
+        return None
+    return x[:n], y[:n]
+
+
+@operator("add", in_arity=2, doc="a + b：两个标量相加得标量，否则按较短长度逐样本相加")
+def op_add(a, b, **kw):
+    import numpy as np
+
+    if a is None or b is None:
+        return None
+    if np.asarray(a).ndim == 0 and np.asarray(b).ndim == 0:
+        return float(a) + float(b)
+    p = _align_pair(a, b)
+    return None if p is None else p[0] + p[1]
+
+
+@operator("sub", in_arity=2, doc="a - b：两个标量相减得标量，否则按较短长度逐样本相减（如实测减期望）")
+def op_sub(a, b, **kw):
+    import numpy as np
+
+    if a is None or b is None:
+        return None
+    if np.asarray(a).ndim == 0 and np.asarray(b).ndim == 0:
+        return float(a) - float(b)
+    p = _align_pair(a, b)
+    return None if p is None else p[0] - p[1]
+
+
+@operator("abs", doc="绝对值：标量进标量出，序列则逐样本（与只吃序列的 abs_values 互补）")
+def op_abs(x, **kw):
+    import numpy as np
+
+    if x is None:
+        return None
+    a = np.asarray(x, dtype=float)
+    return float(np.abs(a)) if a.ndim == 0 else np.abs(a)
+
+
+@operator("mod", in_arity=2, doc="取模 a % b：标量或逐样本；b 里出现 0 则 None")
+def op_mod(a, b, **kw):
+    import numpy as np
+
+    if a is None or b is None:
+        return None
+    yb = np.asarray(b, dtype=float)
+    if np.any(yb == 0):
+        return None
+    if np.asarray(a).ndim == 0 and yb.ndim == 0:
+        return float(a) % float(yb)
+    p = _align_pair(a, b)
+    return None if p is None else p[0] % p[1]
+
+
 # ─────────────────────────── 定长数组字段（任意 float32[n] 时间序列列集合）───────────────────────────
 
 
@@ -146,6 +247,19 @@ def _as_columns(matrix):
     if not isinstance(matrix, (list, tuple)):
         matrix = [matrix]
     return [np.asarray(c, dtype=float) for c in matrix if c is not None]
+
+
+@operator(
+    "stack_columns",
+    in_arity=[2, 3, 4, 5, 6, 7, 8],
+    doc="把 2 到 8 个**独立字段**拼成矩阵（每字段一列，缺失的列跳过），供 column_spread_stats 等"
+    "矩阵算子使用。DataFlash 里 RCOU 的 C1 至 C8 就是八个独立字段而非数组字段，靠它才能进矩阵算子",
+)
+def op_stack_columns(c1, c2, c3=None, c4=None, c5=None, c6=None, c7=None, c8=None, **kw):
+    import numpy as np
+
+    cols = [np.asarray(c, dtype=float) for c in (c1, c2, c3, c4, c5, c6, c7, c8) if c is not None]
+    return cols or None
 
 
 @operator(
@@ -429,6 +543,35 @@ def op_worst_reject_ratio(
 # ─────────────────────────── 序列统计 / 边沿 / 地理（通用）───────────────────────────
 
 
+@operator("diff", doc="相邻后向差分，返回 n-1 个样本（电压逐样本变化量、时间戳间隔等）；n=2 时是二阶差分")
+def op_diff(values, n=1, **kw):
+    import numpy as np
+
+    if values is None:
+        return None
+    a = np.asarray(values, dtype=float)
+    k = int(n)
+    if k < 1 or a.size <= k:
+        return None
+    return np.diff(a, n=k)
+
+
+@operator(
+    "wrap_degrees",
+    doc="角度绕回到 -period/2 到 period/2（默认 ±180 度）：航向误差跨 ±180 度时不会给出约 360 度的假误差",
+)
+def op_wrap_degrees(values, period=360.0, **kw):
+    import numpy as np
+
+    if values is None:
+        return None
+    p = float(period) if period else 360.0
+    if p <= 0:
+        return None
+    a = np.asarray(values, dtype=float)
+    return ((a + p / 2.0) % p) - p / 2.0
+
+
 @operator("percentile", doc="有限值的第 p 百分位（如 p=95）；无有效值则 None")
 def op_percentile(values, p=95, **kw):
     import numpy as np
@@ -661,27 +804,234 @@ def op_step_into_events(values, ts_us, intervals, t0_us, codes=None, **kw):
     return events
 
 
+def _runs(mask):
+    """布尔掩码里连续为真的段：返回 [(i0, i1), ...]，索引含两端。"""
+    import numpy as np
+
+    idx = np.nonzero(np.asarray(mask, dtype=bool))[0]
+    if idx.size == 0:
+        return []
+    out = []
+    start = prev = int(idx[0])
+    for i in idx[1:]:
+        i = int(i)
+        if i != prev + 1:
+            out.append((start, prev))
+            start = i
+        prev = i
+    out.append((start, prev))
+    return out
+
+
+@operator(
+    "excursion_events",
+    in_arity=3,
+    doc="超出阈值的持续段事件（run-length）：mode 取 above / below / abs_above，"
+    "min_duration_s 丢掉短于该时长的段；返回 [{start_s, end_s, dur_s, peak, t_peak_s}, ...] 按超出幅度降序，"
+    "最多 limit 条（0 表示不限）。ts_us 与 t0_us 同 rising_edge_events：微秒",
+)
+def op_excursion_events(values, ts_us, t0_us, threshold=0.0, mode="above", min_duration_s=0.0, limit=0, **kw):
+    import numpy as np
+
+    if values is None or ts_us is None:
+        return None
+    v = np.asarray(values, dtype=float)
+    ts = np.asarray(ts_us, dtype=np.int64)
+    n = min(v.size, ts.size)
+    if n < 2:
+        return None
+    v, ts = v[:n], ts[:n]
+    thr = float(threshold or 0.0)
+    how = str(mode or "above")
+    dev = np.abs(v) if how == "abs_above" else (-v if how == "below" else v)
+    cut = -thr if how == "below" else thr
+    ok = np.isfinite(dev) & (dev > cut)
+    t0 = int(t0_us or 0)
+    out = []
+    for i0, i1 in _runs(ok):
+        dur_s = float(int(ts[i1]) - int(ts[i0])) / 1e6
+        if dur_s < float(min_duration_s):
+            continue
+        seg = v[i0 : i1 + 1]
+        if how == "below":
+            peak, rel = float(seg.min()), float(seg.min())
+        elif how == "abs_above":
+            peak, rel = float(np.abs(seg).max()), float(np.abs(seg).max())
+        else:
+            peak, rel = float(seg.max()), float(seg.max())
+        j = i0 + int(np.argmax(np.abs(seg))) if how == "abs_above" else i0 + int(np.argmax(seg))
+        if how == "below":
+            j = i0 + int(np.argmin(seg))
+        out.append(
+            {
+                "start_s": (int(ts[i0]) - t0) / 1e6,
+                "end_s": (int(ts[i1]) - t0) / 1e6,
+                "dur_s": dur_s,
+                "peak": peak,
+                "over": abs(float(rel) - thr),
+                "t_peak_s": (int(ts[j]) - t0) / 1e6,
+            }
+        )
+    if not out:
+        return None
+    out.sort(key=lambda e: (e["over"], e["dur_s"]), reverse=True)
+    return out[: int(limit)] if int(limit) > 0 else out
+
+
+@operator(
+    "longest_true_run",
+    in_arity=2,
+    doc="布尔掩码里连续为真的最长时长（秒）：把「持续了多久」变成一个标量判据。"
+    "掩码全假返回 0——那是有结论（从未满足），不是数据缺失",
+)
+def op_longest_true_run(mask, ts_us, **kw):
+    import numpy as np
+
+    if mask is None or ts_us is None:
+        return None
+    m = np.asarray(mask, dtype=bool)
+    ts = np.asarray(ts_us, dtype=np.int64)
+    n = min(m.size, ts.size)
+    if n < 2:
+        return None
+    ts = ts[:n]
+    best = 0.0
+    for i0, i1 in _runs(m[:n]):
+        best = max(best, float(int(ts[i1]) - int(ts[i0])) / 1e6)
+    return best
+
+
+@operator(
+    "gap_events",
+    in_arity=2,
+    doc="时间序列的间隙事件：相邻间隔超过阈值即算一处，阈值取 abs_floor_s 与"
+    "「名义间隔（正间隔的中位数）× rel_factor」里的较大者；"
+    "返回 [{gap_s, start_s, end_s, nominal_dt_s, threshold_s}, ...] 按间隔降序，最多 limit 条",
+)
+def op_gap_events(ts_us, t0_us, abs_floor_s=0.5, rel_factor=10.0, limit=3, **kw):
+    import numpy as np
+
+    if ts_us is None:
+        return None
+    ts = np.asarray(ts_us, dtype=np.int64)
+    if ts.size < 3:
+        return None
+    dt = np.diff(ts).astype(float) / 1e6
+    pos = dt[dt > 0.0]
+    if pos.size == 0:
+        return None
+    nominal = float(np.median(pos))
+    if nominal <= 0.0:
+        return None
+    thr = max(float(abs_floor_s), float(rel_factor) * nominal)
+    t0 = int(t0_us or 0)
+    out = []
+    for i, d in enumerate(dt):
+        if d <= thr:
+            continue
+        out.append(
+            {
+                "gap_s": float(d),
+                "start_s": (int(ts[i]) - t0) / 1e6,
+                "end_s": (int(ts[i + 1]) - t0) / 1e6,
+                "nominal_dt_s": nominal,
+                "threshold_s": thr,
+            }
+        )
+    if not out:
+        return None
+    out.sort(key=lambda e: e["gap_s"], reverse=True)
+    return out[: max(int(limit), 1)]
+
+
+@operator(
+    "step_drop_events",
+    in_arity=3,
+    doc="相邻样本之间的快速跌落事件：间隔在 0 到 max_dt_s 之间、且跌幅超过 min_drop 才算一处；"
+    "每处再判恢复——跌后 recovery_s 秒内若回升到「跌前值 - 跌幅 × recovery_frac」以上，recovered 为真"
+    "（瞬时毛刺会自己弹回，真掉电不会）。返回 [{drop, dt_s, start_s, end_s, recovered}, ...] 按跌幅降序，"
+    "最多 limit 条（默认 1，只报最严重那处）",
+)
+def op_step_drop_events(
+    values,
+    ts_us,
+    t0_us,
+    min_drop=2.0,
+    max_dt_s=0.5,
+    recovery_s=1.0,
+    recovery_frac=0.5,
+    limit=1,
+    **kw,
+):
+    import numpy as np
+
+    if values is None or ts_us is None:
+        return None
+    v = np.asarray(values, dtype=float)
+    ts = np.asarray(ts_us, dtype=np.int64)
+    n = min(v.size, ts.size)
+    if n < 2:
+        return None
+    v, ts = v[:n], ts[:n]
+    t0 = int(t0_us or 0)
+    out = []
+    for i in range(1, n):
+        dt_s = float(int(ts[i]) - int(ts[i - 1])) / 1e6
+        if dt_s <= 0.0 or dt_s >= float(max_dt_s):
+            continue
+        drop = float(v[i - 1] - v[i])
+        if drop <= float(min_drop):
+            continue
+        end_t = int(ts[i])
+        post = (ts > end_t) & (ts <= end_t + float(recovery_s) * 1e6)
+        recovered = False
+        if bool(np.any(post)):
+            seg = v[post]
+            seg = seg[np.isfinite(seg)]
+            if seg.size and float(seg.max()) >= float(v[i - 1]) - drop * float(recovery_frac):
+                recovered = True
+        out.append(
+            {
+                "drop": drop,
+                "dt_s": dt_s,
+                "start_s": (int(ts[i - 1]) - t0) / 1e6,
+                "end_s": (end_t - t0) / 1e6,
+                "recovered": recovered,
+            }
+        )
+    if not out:
+        return None
+    out.sort(key=lambda e: e["drop"], reverse=True)
+    return out[: max(int(limit), 1)]
+
+
 # ─────────────────────────── 结构化条目列表（日志消息等）───────────────────────────
 
 
-def _item_hit(it, key, eq, lte, gte, in_list):
+def _item_hit(it, key, eq, lte, gte, in_list, contains=None):
     if not isinstance(it, dict):
         return False
-    if eq is None and lte is None and gte is None and in_list is None:
+    if eq is None and lte is None and gte is None and in_list is None and contains is None:
         return True  # 无条件 = 全选（可当计数器用）
     v = it.get(key)
     if v is None:
         return False
     if in_list is not None:
         return v in list(in_list)
+    if contains is not None:
+        # 文本子串匹配：日志消息/参数名没有统一的拼写，故大小写不敏感
+        return str(contains).lower() in str(v).lower()
     return (eq is not None and v == eq) or (lte is not None and v <= lte) or (gte is not None and v >= gte)
 
 
-@operator("count_items", doc="条目列表里满足条件的条数：按 key 字段判定，in_list / eq / lte / gte")
-def op_count_items(items, key="level", eq=None, lte=None, gte=None, in_list=None, **kw):
+@operator(
+    "count_items",
+    doc="条目列表里满足条件的条数：按 key 字段判定，in_list / eq / lte / gte / contains（文本子串，大小写不敏感）",
+)
+def op_count_items(items, key="level", eq=None, lte=None, gte=None, in_list=None, contains=None, **kw):
     if not items:
         return 0
-    return sum(1 for it in items if _item_hit(it, key, eq, lte, gte, in_list))
+    return sum(1 for it in items if _item_hit(it, key, eq, lte, gte, in_list, contains))
 
 
 @operator("take_items", doc="条目列表里满足条件的前 limit 条（drop 可去掉辅助键；clip 可按字段截断文本）")
@@ -692,6 +1042,7 @@ def op_take_items(
     lte=None,
     gte=None,
     in_list=None,
+    contains=None,
     limit=5,
     drop=None,
     clip=None,
@@ -700,7 +1051,7 @@ def op_take_items(
     out = []
     clips = {str(k): int(v) for k, v in dict(clip or {}).items()}
     for it in items or []:
-        if not _item_hit(it, key, eq, lte, gte, in_list):
+        if not _item_hit(it, key, eq, lte, gte, in_list, contains):
             continue
         item = dict(it)
         for k in drop if isinstance(drop, (list, tuple)) else [drop] if drop else []:
@@ -847,24 +1198,26 @@ def op_count_columns(matrix, **kw):
     "active_column_means",
     in_arity=2,
     doc="掩码内逐通道均值，只保留均值 > min_mean 的通道（未接/未用通道均值≈0，排除）；"
-    "返回 [{index, mean}, ...]；列长与掩码不一致时退化为前 N 个样本",
+    "返回 [{index, mean}, ...]；列长与掩码不一致时退化为前 N 个样本。"
+    "mask 传 None 表示**不筛时段**（整条序列都算，如电机平衡看的是全程均值）",
 )
 def op_active_column_means(matrix, mask, min_mean=0.01, **kw):
     import numpy as np
 
-    if matrix is None or mask is None:
+    if matrix is None:
         return None
-    m = np.asarray(mask, dtype=bool)
-    n_on = int(np.count_nonzero(m))
+    m = None if mask is None else np.asarray(mask, dtype=bool)
+    n_on = 0 if m is None else int(np.count_nonzero(m))
     out = []
     for i, col in enumerate(matrix if isinstance(matrix, (list, tuple)) else [matrix]):
         if col is None:
             continue
         v = np.asarray(col, dtype=float)
-        if v.size == m.size:
-            v = v[m]
-        else:
-            v = v[:n_on]  # 与原实现一致：长度不匹配时取前 N 个
+        if m is not None:
+            if v.size == m.size:
+                v = v[m]
+            else:
+                v = v[:n_on]  # 与原实现一致：长度不匹配时取前 N 个
         v = v[np.isfinite(v)]
         if v.size and float(np.mean(v)) > float(min_mean):
             out.append({"index": i, "mean": float(np.mean(v))})
@@ -963,26 +1316,28 @@ def op_either(a, b, **kw):
     return bool(a) or bool(b)
 
 
-@operator("abs_diff", in_arity=2, doc="逐样本 |a - b|（长度取较短者）")
+@operator("abs_diff", in_arity=2, doc="逐样本 |a - b|（长度取较短者）；两个标量则得标量")
 def op_abs_diff(a, b, **kw):
     import numpy as np
 
     if a is None or b is None:
         return None
-    x, y = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
-    n = min(x.size, y.size)
-    return np.abs(x[:n] - y[:n])
+    if np.asarray(a).ndim == 0 and np.asarray(b).ndim == 0:
+        return abs(float(a) - float(b))
+    p = _align_pair(a, b)
+    return None if p is None else np.abs(p[0] - p[1])
 
 
-@operator("sum_abs", in_arity=2, doc="逐样本 |a| + |b|")
+@operator("sum_abs", in_arity=2, doc="逐样本 |a| + |b|（长度取较短者）；两个标量则得标量")
 def op_sum_abs(a, b, **kw):
     import numpy as np
 
     if a is None or b is None:
         return None
-    x, y = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
-    n = min(x.size, y.size)
-    return np.abs(x[:n]) + np.abs(y[:n])
+    if np.asarray(a).ndim == 0 and np.asarray(b).ndim == 0:
+        return abs(float(a)) + abs(float(b))
+    p = _align_pair(a, b)
+    return None if p is None else np.abs(p[0]) + np.abs(p[1])
 
 
 @operator("greater", in_arity=2, doc="逐样本 a > b，返回布尔掩码")
@@ -1312,6 +1667,43 @@ def op_column_spread_stats(matrix, mask, min_mean=0.01, min_channels=4, **kw):
         if it["mean"] < worst["mean"]:
             worst = it
     return (float(best["mean"] - worst["mean"]), best["index"], worst["index"], len(means))
+
+
+@operator(
+    "column_ratio_events",
+    in_arity=[2, 3],
+    doc="逐通道统计 大于 threshold 的样本占比，只回传占比不低于 min_frac 的通道："
+    "返回 [{channel, frac, mean}, ...] 按占比降序，最多 limit 条，channel 从 1 起算。"
+    "可选第三个输入 mask 把统计限制在某段时间；min_mean 可先过滤掉未接/未用的通道",
+)
+def op_column_ratio_events(matrix, threshold, mask=None, min_frac=0.0, min_mean=0.0, limit=8, **kw):
+    import numpy as np
+
+    if threshold is None:
+        return None
+    cols = _as_columns(matrix)
+    if not cols:
+        return None
+    m = None if mask is None else np.asarray(mask, dtype=bool)
+    out = []
+    for i, col in enumerate(cols):
+        v = np.asarray(col, dtype=float)
+        if m is not None:
+            v = v[m] if v.size == m.size else v[: int(np.count_nonzero(m))]
+        v = v[np.isfinite(v)]
+        if not v.size:
+            continue
+        col_mean = float(np.mean(v))
+        if col_mean <= float(min_mean):
+            continue
+        frac = float(np.count_nonzero(v > float(threshold))) / float(v.size)
+        if frac < float(min_frac):
+            continue
+        out.append({"channel": i + 1, "frac": frac, "mean": float(np.mean(v))})
+    if not out:
+        return None
+    out.sort(key=lambda d: d["frac"], reverse=True)
+    return out[: max(int(limit), 1)]
 
 
 @operator(

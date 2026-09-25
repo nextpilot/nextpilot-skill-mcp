@@ -37,7 +37,7 @@
   `["all"]`），另外 7 条永远不命中。要修就得从 `MODE` 消息切段推阶段
   （`takeoff` / `hover` / `cruise` …），或者把匹配改成不依赖阶段。
 
-## 二、占位总表：11 条，各缺什么
+## 二、占位总表：6 条，各缺什么
 
 占位规则用 `conditions.placeholder` 写：值就是一句"缺什么"的原因文案，引擎跳过本条并
 原样显示它（2026-09-25 起）。
@@ -47,38 +47,45 @@
 > "未实现"伪装成"先决条件命中"，而且字符串里不能出现单引号。`precheck` 退役后换成了
 > 一等字段，这两个毛病都没了。
 
-| 规则 id                   | 缺什么能力                                 | 补上之后阈值是否现成    |
-| ------------------------- | ------------------------------------------ | ----------------------- |
-| `apm-battery-sudden-drop` | 相邻差分 + 跌后 1s 是否恢复（持续时长）    | 现成（2.0/4.0 V、0.5s） |
-| `apm-attitude-yaw`        | 取模（航向误差绕回 ±180°）+ 持续时长       | 现成（30°）             |
-| `apm-motor-imbalance`     | 把 RCOU 的 8 个独立字段组成矩阵 + 标量相减 | 现成（150/300 us）      |
-| `apm-motor-saturation`    | 对矩阵逐列算占比再取最大                   | 现成（20%/50%）         |
-| `apm-mode-timeline`       | provider 支持文本列（MODE.Mode 是字符串）  | 无阈值，摘要性质        |
-| `apm-config-arming-check` | 读参数 `ARMING_CHECK`                      | 现成（==0）             |
-| `apm-config-batt-monitor` | 读参数 `BATT_MONITOR`                      | 现成（==0）             |
-| `apm-config-fs-thr`       | 读参数 `FS_THR_ENABLE`                     | 现成（==0）             |
-| `apm-timing-gaps`         | 相邻时间戳差分 + dt 中位数                 | 现成（0.5s / 10 倍）    |
-| `apm-sensor-rangefinder`  | 读参数 `RNGFND_TYPE` / `RNGFND1_TYPE`      | 现成（>0 但无数据）     |
-| `apm-sensor-gps`          | 读参数 `GPS_TYPE`                          | 现成（>0 但无数据）     |
+| 规则 id                   | 缺什么能力                                | 补上之后阈值是否现成 |
+| ------------------------- | ----------------------------------------- | -------------------- |
+| `apm-mode-timeline`       | provider 支持文本列（MODE.Mode 是字符串） | 无阈值，摘要性质     |
+| `apm-config-arming-check` | 读参数 `ARMING_CHECK`                     | 现成（==0）          |
+| `apm-config-batt-monitor` | 读参数 `BATT_MONITOR`                     | 现成（==0）          |
+| `apm-config-fs-thr`       | 读参数 `FS_THR_ENABLE`                    | 现成（==0）          |
+| `apm-sensor-rangefinder`  | 读参数 `RNGFND_TYPE` / `RNGFND1_TYPE`     | 现成（>0 但无数据）  |
+| `apm-sensor-gps`          | 读参数 `GPS_TYPE`                         | 现成（>0 但无数据）  |
 
-一句话概括：11 条里 **6 条卡在读参数**、**2 条卡在矩阵化**、**3 条卡在算子**。
+**6 条全部卡在读参数**（C2），没有一条是"引擎算不出来"——算子那批缺口 2026-09 已补齐：
+`apm-battery-sudden-drop`、`apm-attitude-yaw`、`apm-motor-imbalance`、
+`apm-motor-saturation`、`apm-timing-gaps` 这 5 条随之从占位转成了真规则。
+要解锁剩下的 6 条，得让 provider 能提供参数（PARAM/PARM 消息）。
 
-## 三、算子缺口
+## 三、算子缺口（2026-09 已补齐）
 
-下表是本轮写规则时**实测**撞到的（不是推测）。补算子要动 `knowledge/engine/operators.py`，
-并**必须重跑 `pnpm web:build:kb`**，还会牵动 PX4 那 6 份冻结基线的比对——所以本轮一个都没补。
+下表是当初写规则时**实测**撞到的缺口（不是推测），现已全部补上 `knowledge/engine/operators.py`，
+算子表 73 → 89 个。补算子必须**重跑 `pnpm web:build:kb`**（算子表与签名会进产物），
+并留意 PX4 那 6 份冻结基线的比对——新增算子不改既有算子的行为，那批基线应当不变。
 
-| 缺口                       | 实测表现                                                                                                      | 卡住了谁                                                 |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `std` / `cv`               | 算子表里没有                                                                                                  | compass 的 CV 判据（0.30/0.60），于是它也出不了 critical |
-| 相邻差分                   | 只有逐样本的 `abs_diff`，没有 `diff`                                                                          | 电压突降、日志间隙                                       |
-| 中位数归约                 | 有 `percentile` 但要指定分位，没有直接的 median                                                               | 日志间隙的名义 dt                                        |
-| 序列求和                   | 没有；本轮用 `mean × length_of` 绕开了 PM 长循环那一处                                                        | 别的累加场合（如削波跨 IMU 求和）                        |
-| run-length / 持续时长      | `intervals_above(min_duration_s=...)` 那类能力没有                                                            | 姿态持续偏离、RC 失联时长、电压跌后是否恢复              |
-| 文本子串匹配               | 无                                                                                                            | STATUSTEXT 预解锁消息、PARM 参数解析                     |
-| **标量加减**（补充）       | `abs_diff` / `sum_abs` 对标量输入直接 `IndexError`（实现是 `x[:n]`，标量进 `np.asarray` 是 0 维数组，切不了） | 电机通道均值极差、电芯数估算的 `x+0.5`                   |
-| **取模**（补充）           | 无                                                                                                            | 航向误差绕回                                             |
-| **独立字段组矩阵**（补充） | `ref()` 只能逐字段取，没有"拼成矩阵"的语法                                                                    | `column_spread_stats` 用不上（它吃数组字段）             |
+| 缺口                  | 现在用哪个算子                                                           | 解锁了谁                                                 |
+| --------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------- |
+| `std` / `cv`          | `std` / `cv`（`std` 带 `ddof`；`cv` 在均值非正时返回 None）              | compass 的 CV 判据（0.30/0.60），critical 档才出得来     |
+| 相邻差分              | `diff`（可 `n=2` 求二阶）                                                | 通用积木；电压突降与日志间隙另用事件型算子               |
+| 中位数归约            | `median`                                                                 | 电压量程闸门；日志间隙的名义 dt 在 `gap_events` 内       |
+| 序列求和              | `sum`                                                                    | 通用积木（`mean × length_of` 那个绕法可以退休了）        |
+| run-length / 持续时长 | `excursion_events`（事件列表）/ `longest_true_run`（标量秒数）           | 姿态持续偏离、任意"持续多久"类判据                       |
+| 文本子串匹配          | `count_items` / `take_items` 新增 `contains=`（大小写不敏感）            | STATUSTEXT 预解锁消息、PARM 参数解析（仍要先过 C1 那关） |
+| **标量加减**          | `add` / `sub` / `abs` / `mod`；`abs_diff` / `sum_abs` 顺手修好了标量输入 | 通道号换算、电芯数估算的 `x+0.5`                         |
+| **取模**              | `wrap_degrees`（绕回 ±period/2）/ `mod`                                  | 航向误差绕回                                             |
+| **独立字段组矩阵**    | `stack_columns`（2~8 列，缺失列跳过）；`column_ratio_events` 做逐列占比  | `column_spread_stats` 用得上 RCOU 的 C1..C8 了           |
+
+另外 3 个**事件型**算子是把上游 check 里那段手写的循环搬进算子（文案仍留在经验文件）：
+
+| 算子               | 复刻的上游逻辑                                                             | 用在哪                    |
+| ------------------ | -------------------------------------------------------------------------- | ------------------------- |
+| `gap_events`       | 阈值 = max(0.5 s, 10 × 名义间隔中位数)；按间隔降序，最多 3 条              | `apm-timing-gaps`         |
+| `step_drop_events` | 间隔 < 0.5 s 且跌幅 > 2 V 才算；跌后 1 s 内回升过半即视为毛刺（recovered） | `apm-battery-sudden-drop` |
+| `excursion_events` | 超阈持续段，可选 `min_duration_s` 过滤，`limit` 只留最严重那一段           | 姿态三轴                  |
 
 ## 四、三条既有事实约束（改规则前必读）
 

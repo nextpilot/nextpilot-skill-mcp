@@ -3,18 +3,18 @@
 # 姿态跟踪（ATT）：期望姿态 DesRoll/DesPitch/DesYaw 与实测姿态 Roll/Pitch/Yaw 的差。
 # 上游 ardupilot-mcp 的 checks/attitude.py（自称 crown-jewel check）。
 # 阈值：持续 >=1s 且误差 >25° = critical；持续 >=1s 且在 15~25° = warning；
-#      未达持续但峰值 >30° = warning（阵风/粗猛打杆）。
+#      未达持续但峰值 >30° = warning（阵风/粗猛打杆）。峰值 <=15° 不出结论。
 #
-# **本轮降级很重，说清楚**：上游真正的判据是"持续 1 秒以上的偏离区间"
-# （intervals_above(min_duration_s=1.0)），引擎缺 run-length / 持续时长算子，做不到。
-# 于是只剩下峰值判据——三条里只有 30° 那条（BRIEF_WARN_DEG，上游真有的阈值）能落地，
-# 15° 与 25° 那两档因为都以"持续"为前提，本轮不出结论。
-# **没有**用"超阈样本占比"去近似持续时长：占比阈值得自己挑，那是编数。
+# 判定"持续"用的是 excursion_events：找出误差超过阈值的连续段，min_duration_s 丢掉
+# 短于该时长的段，limit=1 只留最严重的那一段（峰值最大的），与上游"在持续段里取 worst"
+# 一致。三条原先只有峰值判据（上游 30° 那一档），2026-09 补上 run-length 算子后补齐三档。
 #
-# yaw 那条直接占位：航向误差要绕回 [-180,180]（上游 `(err+180)%360-180`），
-# 引擎没有取模算子；直接取 |Des-Actual| 会在航向跨 ±180° 时给出约 360° 的假误差。
-# 上游还有一条 RCOU 饱和的附加说明（只在 critical 时加），本轮 critical 不触发，
-# 一并留到补算子后。
+# 已知的一处边界差异：本条取的是"峰值最大那一段"，上游取的是"持续段里峰值最大的那一段"。
+# 只有当峰值最大的那一段不足 1 s、而另有一段持续超过 1 s 但峰值更小（15~25°）时，
+# 上游会多报一条 warning——这个空档里的情形极少，且第三档（峰值 >30°）会兜住更严重的那些。
+#
+# 上游还有一条 RCOU 饱和的附加说明（只在 critical 时追加），需要在文案里引用另一条
+# 规则的中间量，引擎做不到跨规则取值，故不迁（饱和本身由 apm-motor-saturation 单独报）。
 
 id: apm-attitude-roll
 name: 横滚跟踪误差
@@ -26,21 +26,41 @@ conditions:
         - ATT
 
 compute:
+    - ats = ref("ATT.timestamp")
     - err_roll = abs_diff(ref("ATT.DesRoll"), ref("ATT.Roll"))
     - peak_roll = max(err_roll)
+    - worst_roll = excursion_events(err_roll, ats, T0_US, threshold=15.0, limit=1)
+
+foreach: { var: worst_roll, keys: [dur_s, peak, start_s, end_s] }
 
 outputs:
     tag: apm_attitude_tracking_error
 
 triggers:
+    - when: "dur_s >= 1.0 and peak > 25.0"
+      severity: critical
+      threshold: 25.0
+      value: f"{peak:.1f}"
+      unit: deg
+      field: "ATT.DesRoll - ATT.Roll"
+      title: "横滚跟踪失败，持续 {dur_s:.1f} s、误差峰值 {peak:.0f}°（t={start_s:.1f}s）"
+      suggestion: "持续超过 1 s 且误差大于 25°，说明机体达不到指令姿态：失控、机械故障（电机/电调/桨、舵面连杆）或动力不足/超重。查机体机械与动力余量，并复核是否超重。"
+    - when: "dur_s >= 1.0"
+      severity: warning
+      threshold: 15.0
+      value: f"{peak:.1f}"
+      unit: deg
+      field: "ATT.DesRoll - ATT.Roll"
+      title: "横滚持续偏离指令 {dur_s:.1f} s，误差峰值 {peak:.0f}°（t={start_s:.1f}s）"
+      suggestion: "误差持续在 15° 以上说明机体明显跟不上指令。复核 PID 整定与控制权限，并确认没有部分机械失效。"
     - when: "peak_roll > 30.0"
       severity: warning
       threshold: 30.0
       value: f"{peak_roll:.1f}"
       unit: deg
       field: "ATT.DesRoll - ATT.Roll(峰值)"
-      title: "横滚跟踪误差峰值 {peak_roll:.0f}°"
-      suggestion: "期望与实测横滚的最大偏差超过 30°。本条未判持续时长（缺算子），阵风或粗猛打杆也会造成瞬时大偏差；若伴随掉高或姿态发散，重点查动力与机械（电机/电调/桨、舵面连杆）与 PID。"
+      title: "横滚跟踪误差瞬时尖峰 {peak_roll:.0f}°"
+      suggestion: "未达 1 s 持续，多为阵风或粗猛打杆造成的瞬时偏差；若多次飞行反复出现再深究。"
 
 ---
 id: apm-attitude-pitch
@@ -53,46 +73,86 @@ conditions:
         - ATT
 
 compute:
+    - ats = ref("ATT.timestamp")
     - err_pitch = abs_diff(ref("ATT.DesPitch"), ref("ATT.Pitch"))
     - peak_pitch = max(err_pitch)
+    - worst_pitch = excursion_events(err_pitch, ats, T0_US, threshold=15.0, limit=1)
+
+foreach: { var: worst_pitch, keys: [dur_s, peak, start_s, end_s] }
 
 outputs:
     tag: apm_attitude_tracking_error
 
 triggers:
+    - when: "dur_s >= 1.0 and peak > 25.0"
+      severity: critical
+      threshold: 25.0
+      value: f"{peak:.1f}"
+      unit: deg
+      field: "ATT.DesPitch - ATT.Pitch"
+      title: "俯仰跟踪失败，持续 {dur_s:.1f} s、误差峰值 {peak:.0f}°（t={start_s:.1f}s）"
+      suggestion: "持续超过 1 s 且误差大于 25°，说明机体达不到指令姿态：失控、舵面/连杆故障或动力不足/超重。查重心、舵面连杆与动力余量。"
+    - when: "dur_s >= 1.0"
+      severity: warning
+      threshold: 15.0
+      value: f"{peak:.1f}"
+      unit: deg
+      field: "ATT.DesPitch - ATT.Pitch"
+      title: "俯仰持续偏离指令 {dur_s:.1f} s，误差峰值 {peak:.0f}°（t={start_s:.1f}s）"
+      suggestion: "误差持续在 15° 以上说明机体明显跟不上指令。复核 PID 整定与控制权限，并确认没有部分机械失效。"
     - when: "peak_pitch > 30.0"
       severity: warning
       threshold: 30.0
       value: f"{peak_pitch:.1f}"
       unit: deg
       field: "ATT.DesPitch - ATT.Pitch(峰值)"
-      title: "俯仰跟踪误差峰值 {peak_pitch:.0f}°"
-      suggestion: "期望与实测俯仰的最大偏差超过 30°。本条未判持续时长（缺算子）；若伴随掉高或姿态发散，重点查重心、动力余量与 PID。"
+      title: "俯仰跟踪误差瞬时尖峰 {peak_pitch:.0f}°"
+      suggestion: "未达 1 s 持续，多为阵风或粗猛打杆造成的瞬时偏差；若多次飞行反复出现再深究。"
 
 ---
-# 占位：航向误差必须先绕回 [-180, 180]，引擎缺取模算子，直接取差会给出约 360° 的假误差。
-# 另：上游的持续时长判据（1s）本轮整体缺算子，见文件头。
+# 航向要绕回：误差 = (实测 - 期望) 后 wrap 到 ±180°，否则跨 ±180° 时会给出约 360° 的假误差。
 id: apm-attitude-yaw
-name: 航向跟踪误差（占位）
+name: 航向跟踪误差
 group: attitude_tracking
 order: 3
 
 conditions:
     topics:
         - ATT
-    placeholder: "待补算子：航向误差需绕回 ±180 度（缺取模算子），且持续时长判据缺 run-length 算子，暂未实现"
 
 compute:
-    - err_yaw = abs_diff(ref("ATT.DesYaw"), ref("ATT.Yaw"))
+    - ats = ref("ATT.timestamp")
+    - err_yaw = abs_values(wrap_degrees(sub(ref("ATT.Yaw"), ref("ATT.DesYaw"))))
+    - peak_yaw = max(err_yaw)
+    - worst_yaw = excursion_events(err_yaw, ats, T0_US, threshold=15.0, limit=1)
+
+foreach: { var: worst_yaw, keys: [dur_s, peak, start_s, end_s] }
 
 outputs:
     tag: apm_attitude_tracking_error
 
 triggers:
-    - when: "False"
+    - when: "dur_s >= 1.0 and peak > 25.0"
+      severity: critical
+      threshold: 25.0
+      value: f"{peak:.1f}"
+      unit: deg
+      field: "ATT.DesYaw - ATT.Yaw(绕回 ±180°)"
+      title: "航向跟踪失败，持续 {dur_s:.1f} s、误差峰值 {peak:.0f}°（t={start_s:.1f}s）"
+      suggestion: "持续超过 1 s 且误差大于 25°，说明机体达不到指令航向：罗盘干扰、偏航通道机械问题或电机失衡。查罗盘（见 apm-compass-interference）与偏航方向的一致性。"
+    - when: "dur_s >= 1.0"
+      severity: warning
+      threshold: 15.0
+      value: f"{peak:.1f}"
+      unit: deg
+      field: "ATT.DesYaw - ATT.Yaw(绕回 ±180°)"
+      title: "航向持续偏离指令 {dur_s:.1f} s，误差峰值 {peak:.0f}°（t={start_s:.1f}s）"
+      suggestion: "误差持续在 15° 以上，常见于罗盘干扰、偏航通道机械问题或电机失衡。复核罗盘与偏航控制权限。"
+    - when: "peak_yaw > 30.0"
       severity: warning
       threshold: 30.0
+      value: f"{peak_yaw:.1f}"
       unit: deg
-      field: "ATT.DesYaw - ATT.Yaw(绕回后峰值)"
-      title: "航向跟踪误差（占位，未实现）"
-      suggestion: "待补算子后实现：航向持续偏离常见于罗盘干扰、偏航通道机械问题或电机失衡。"
+      field: "ATT.DesYaw - ATT.Yaw(绕回 ±180°, 峰值)"
+      title: "航向跟踪误差瞬时尖峰 {peak_yaw:.0f}°"
+      suggestion: "未达 1 s 持续，多为阵风或粗猛打杆造成的瞬时偏差；若多次飞行反复出现再深究。"

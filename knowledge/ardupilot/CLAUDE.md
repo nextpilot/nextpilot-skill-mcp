@@ -117,15 +117,21 @@ knowledge/ardupilot/
 topics **之后**，写了 topics 就会被 `"topic not in log"` 盖掉那句"缺什么能力"。
 现在不会了。
 
-### 标量加减不可用，矩阵类算子只吃数组字段
+### 独立字段要先 `stack_columns` 拼成矩阵
 
-- `abs_diff` / `sum_abs` 对**标量**输入直接 `IndexError`（实现是 `x[:n]`，标量进
-  `np.asarray` 是 0 维数组，切不了）。`motors.yaml` 的两条就卡在这里。
-- `column_spread_stats` / `columns_aggregate` 这类矩阵算子吃的是**数组字段**
-  （如 PX4 的 `actuator_motors.control`，provider 摊平成多列）。APM 的 `RCOU.C1..C8`
-  是八个**独立字段**，`ref()` 只能逐字段取，没有"拼成矩阵"的语法，喂不进去。
-- 绕开标量减法的现成办法：极差用 `range_of`，比例用 `div`，取大取小用 `larger` / `smaller`
-  （这两个对标量可以用）。
+`column_spread_stats` / `column_ratio_events` 这类矩阵算子吃的是"每元素一列"的矩阵。
+APM 的 `RCOU.C1..C8` 是八个**独立字段**（不像 PX4 的 `actuator_motors.control` 那样
+是数组字段、被 provider 摊平成多列），所以得先 `stack_columns(c1, ..., c8)` 再喂进去；
+四轴只有 C1..C4 时其余传 `None`，缺失的列会被跳过而不是占位。
+矩阵算子的 `mask` 传 `None` 表示**不筛时段**（上游判"活跃通道"用的是全程均值）。
+
+### 标量加减 / 取模（2026-09 补齐）
+
+- `add` / `sub` / `abs` / `mod`：两个标量进 → 标量出，否则按较短长度逐样本。
+  `column_spread_stats` 回的是 **0 起算的列号**，通道号要用 `add(hot, 1)` 换算
+  （语言里没有下标，取不了元素）。
+- `abs_diff` / `sum_abs` 以前对**标量**输入直接 `IndexError`（实现是 `x[:n]`，标量进
+  `np.asarray` 是 0 维数组，切不了），现在两个标量进也能用。
 
 ### `field_units` 目前不参与运行期换算
 
@@ -160,7 +166,12 @@ C3 还有个必须在接线时处理的后果：provider 把 heli 也归到 `rot
 2. 表达式里的算子名确实在 `knowledge/engine/operators.py` 的 `OPERATORS` 里；
 3. `when` / `value` 符合上面说的 `_eval_expr` 白名单（`precheck` 已于 2026-09 退役，
    它的活由 `armed` / `mode` / `placeholder` 三个一等字段接走，都不走 `_eval_expr`）；
-4. 文案里的 `{占位符}` 都能在 `compute` 产出的变量里找到。
+4. 文案里的 `{占位符}` 都能在 `compute` 产出的变量里找到；
+5. 用了 `foreach` 的规则：事件键要写在 `foreach.keys` 里（构建期靠它校验占位符），
+   运行期事件字典的键会叠加进文案环境。
+
+`title` / `suggestion` / `field` 走的是 `str.format_map`，**占位符里不能写表达式**
+（`{dt_s*1000:.0f}` 会 KeyError）；要算就挪进 `value`（那里是真正的表达式求值）。
 
 `PENDING.md` 第六节记着"把这份静态检查固化进 CI"这条待办——在它落地之前，
 改完规则请手动过一遍这几项。

@@ -37,7 +37,7 @@ px4/
 ```text
 ardupilot/
   rules/*.yaml          12 个文件共 34 条经验（上游 16 项检查里迁了 12 项，同构项合并）；
-                        23 条能算、11 条占位（缺算子/缺参数/缺矩阵，逐条记在 PENDING.md）
+                        28 条能算、6 条占位（全部卡在读参数，逐条记在 PENDING.md）
   facts.yaml            码表（飞行模式 / ERR 子系统 / EV 事件 / 机架）与规则元数据
   ATTRIBUTION.md        上游署名、迁了什么、改了什么
   PENDING.md            占位总表：缺的算子、FRAME_CLASS 3 号冲突、接线要改哪些

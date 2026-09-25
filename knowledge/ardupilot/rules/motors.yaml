@@ -1,21 +1,16 @@
-# ⚠️ 本文件下的 2 条都尚未接线进构建产物（见 PENDING.md 第 1 条），且**都是占位**。
+# ⚠️ 本文件下的 2 条尚未接线进构建产物（见 PENDING.md 第 1 条）。
 #
 # 电机输出（RCOU）：上游 ardupilot-mcp 的 checks/motors.py 查两类问题——
 #   · 不平衡：活跃通道的**每通道均值**极差（150 us 警告 / 300 us 严重）
 #   · 饱和：单通道接近满舵（>=1950 us）的样本占比（20% 警告 / 50% 严重）
 #
-# 原计划这两条是"能跑"的，写的时候发现跑不了，三条硬约束叠在一起：
-#   1. RCOU 的 C1..C8 在 DataFlash 里是**八个独立字段**，不是数组字段。引擎的
-#      column_spread_stats（PX4 电机平衡用的那个算子）吃的是数组字段——PX4 那边是
-#      actuator_motors.control（float32[8]，provider 摊平成 8 列）。ref() 只能逐字段取，
-#      也没有"把多个独立字段拼成矩阵"的语法，矩阵类算子全部用不上。
-#   2. 跨通道极差 = 最热通道均值 - 最冷通道均值，两个标量相减。引擎**没有标量减法**：
-#      abs_diff / sum_abs 对标量输入会 IndexError（它们的实现是 x[:n] - y[:n]，
-#      标量进 np.asarray 是 0-d 数组，切不了）。
-#   3. 饱和占比要先逐通道算 fraction_above 再取最大，需要"对矩阵逐列套算子"，
-#      引擎没有 map 类算子。
-# 所以：不动 operators.py 就做不了，而动它要重跑 build:kb 并牵动 PX4 的冻结基线——
-# 按本轮"不改算子"的边界，留占位。
+# 两条原先都是占位，卡在"RCOU 的 C1..C8 是八个**独立字段**、引擎的矩阵算子吃不下"。
+# 2026-09 补上 stack_columns（把独立字段拼成矩阵）后落地：
+#   · 不平衡：stack_columns → column_spread_stats。min_mean=1100 对应上游 ACTIVE_MIN_PWM
+#     （未接/未出力的通道均值≈1000，会被排除），min_channels=2 对应上游"至少两个活跃通道"。
+#   · 饱和：stack_columns → column_ratio_events（逐通道算占比再按占比降序），配合 foreach
+#     每个超标通道各出一条 finding，与上游一致。
+# 上游判定"活跃"用的是**全程均值**（不限制在 armed 段），所以矩阵算子的 mask 传 None。
 #
 # 另有一处**上游已声明、本轮不修**的风险：上游把这条限制在 copter（多旋翼），
 # 因为 heli 的 RCOU C1-C4 是斜盘舵机、plane 是舵面，"电机平衡"没有意义。
@@ -24,52 +19,94 @@
 # 所以将来接线后这条在直升机上会误报——接线时必须处理，记在 PENDING.md。
 
 id: apm-motor-imbalance
-name: 电机输出不平衡（占位）
+name: 电机输出不平衡
 group: motor_balance
 order: 1
 
 conditions:
     topics:
         - RCOU
-    placeholder: "待补能力：需把 RCOU 的 C1 至 C8 独立字段组成矩阵，并用标量减法算通道均值极差（引擎缺矩阵拼装与标量减法），暂未实现"
 
 compute:
     - c1 = ref("RCOU.C1")
+    - c2 = ref("RCOU.C2")
+    - c3 = ref("RCOU.C3")
+    - c4 = ref("RCOU.C4")
+    - c5 = ref("RCOU.C5")
+    - c6 = ref("RCOU.C6")
+    - c7 = ref("RCOU.C7")
+    - c8 = ref("RCOU.C8")
+    # 四轴只有 C1..C4：缺失的列（None）会被 stack_columns 跳过，不占位
+    - cols = stack_columns(c1, c2, c3, c4, c5, c6, c7, c8)
+    - spread, hot, cold, n_active = column_spread_stats(cols, None, min_mean=1100.0, min_channels=2)
+    # 算子回的是 0 起算的列号，而通道号从 1 起算（语言里没有下标，用标量加法换算）
+    - hot_ch = add(hot, 1)
+    - cold_ch = add(cold, 1)
 
 outputs:
     tag: apm_motor_output_unbalance
 
 triggers:
-    - when: "False"
-      severity: warning
-      threshold: 150.0
+    - when: "spread > 300.0"
+      severity: critical
+      threshold: 300.0
+      value: f"{spread:.0f}"
       unit: us
       field: "RCOU.C1..C8(活跃通道均值极差)"
-      title: "电机输出不平衡（占位，未实现）"
-      suggestion: "待补能力后实现：通道均值极差大意味着飞控在对抗不对称（重心偏移、机架扭转、电机/桨不一致）。"
+      title: "电机输出严重不平衡，极差 {spread:.0f} us（{n_active} 个活跃通道）"
+      suggestion: "最热的是 {hot_ch} 号通道、最冷的是 {cold_ch} 号通道。飞控在持续对抗某个不对称（重心偏移、机架扭转、电机/桨不一致或某个电机偏弱），重点查这几项与电调校准。"
+    - when: "spread > 150.0"
+      severity: warning
+      threshold: 150.0
+      value: f"{spread:.0f}"
+      unit: us
+      field: "RCOU.C1..C8(活跃通道均值极差)"
+      title: "电机输出不平衡，极差 {spread:.0f} us（{n_active} 个活跃通道）"
+      suggestion: "最热的是 {hot_ch} 号通道、最冷的是 {cold_ch} 号通道。通道均值极差大意味着飞控在对抗不对称（重心偏移、机架扭转、电机/桨不一致）。"
 
 ---
 id: apm-motor-saturation
-name: 电机输出饱和（占位）
+name: 电机输出饱和
 group: motor_balance
 order: 2
 
 conditions:
     topics:
         - RCOU
-    placeholder: "待补能力：需逐通道统计接近满舵的样本占比并跨通道取最大（引擎缺矩阵逐列归约），暂未实现"
 
 compute:
     - c1 = ref("RCOU.C1")
+    - c2 = ref("RCOU.C2")
+    - c3 = ref("RCOU.C3")
+    - c4 = ref("RCOU.C4")
+    - c5 = ref("RCOU.C5")
+    - c6 = ref("RCOU.C6")
+    - c7 = ref("RCOU.C7")
+    - c8 = ref("RCOU.C8")
+    - cols = stack_columns(c1, c2, c3, c4, c5, c6, c7, c8)
+    # min_frac=0.20 即上游"占比不超过 20% 就不报"；边界差一个等号，无实质影响
+    - sats = column_ratio_events(cols, 1950.0, min_frac=0.20, min_mean=1100.0)
+
+# 上游对每个超标通道各出一条 finding，这里靠 foreach 展开（占比最高的排在前）
+foreach: { var: sats, keys: [channel, frac, mean] }
 
 outputs:
     tag: apm_motor_output_saturated
 
 triggers:
-    - when: "False"
+    - when: "frac > 0.50"
+      severity: critical
+      threshold: 0.50
+      value: f"{frac*100:.0f}"
+      unit: "%"
+      field: "RCOU.C{channel}(>=1950us 样本占比)"
+      title: "电机 {channel} 号通道长时间满舵（均值 {mean:.0f} us）"
+      suggestion: "超过一半时间贴着满舵，说明动力余量严重不足（超重或动力偏弱），已接近失去姿态控制权。减轻起飞重量或换更大推力的电机/桨。"
+    - when: "True"
       severity: warning
       threshold: 0.20
-      unit: ""
-      field: "RCOU.C1..C8(>=1950us 样本占比)"
-      title: "电机输出饱和（占位，未实现）"
-      suggestion: "待补能力后实现：长时间接近满舵说明动力余量不足（超重或动力偏弱），会失去姿态控制权。"
+      value: f"{frac*100:.0f}"
+      unit: "%"
+      field: "RCOU.C{channel}(>=1950us 样本占比)"
+      title: "电机 {channel} 号通道接近满舵（均值 {mean:.0f} us）"
+      suggestion: "长时间接近满舵说明动力余量不足（超重或动力偏弱），会失去姿态控制权。减轻起飞重量或换更大推力的电机/桨。"

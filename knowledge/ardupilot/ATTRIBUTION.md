@@ -28,7 +28,7 @@ MIT 只要求保留版权声明与许可声明，无额外署名条款。收录�
   本站的机型判定在 provider 里（`_FRAME_CLASS_MAP`），规则侧只用
   `rotary_wing / fixed_wing`，两套分类对不上，迁过来只会添乱。
 - **12 组共 34 条规则**（进 `rules/*.yaml`）：振动、EKF、电源、GPS、罗盘、姿态、
-  电机、遥控、时序、事件、配置安全、传感器。其中 23 条能跑、11 条占位。
+  电机、遥控、时序、事件、配置安全、传感器。其中 28 条能跑、6 条占位（都卡在读参数）。
 - **官方文档链接** 20 条（进 `facts.yaml` 的 `doc_urls` 与 `rule_meta.by_group.doc`）
 - **`docs/SOURCES.md`** 198 条假设审计（confirmed 86 / heuristic 22 /
   design choice 82 / corrected 8），逐字保留

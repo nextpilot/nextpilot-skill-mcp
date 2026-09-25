@@ -5,29 +5,39 @@
 #     名义间隔取 **中位数** dt（抗离群），远大于它的跳变要么是丢了一段日志、
 #     要么是主循环卡住。判据是"绝对下限 0.5s"与"名义间隔 10 倍"**两者都超过**才算。
 #   · 调度超时：PM.NLon 是长循环（主循环跑超时间预算）的计数，非零即说明飞控曾 CPU 饥饿。
+#
+# 间隙那条原先是占位，2026-09 补上 `gap_events` 算子后落地：中位数与阈值比较都封在
+# 算子内（阈值 = max(0.5 s, 10 × 名义间隔)），经验文件里只写"超过阈值的才算间隙"。
 
 id: apm-timing-gaps
-name: 日志间隙（占位）
+name: 日志间隙
 group: timing
 order: 1
 
 conditions:
-    placeholder: "待补算子：需相邻时间戳差分与 dt 中位数（引擎缺 diff 与中位数归约算子），暂未实现"
+    topics:
+        - "IMU || ATT || VIBE"
 
 compute:
-    - placeholder = ref("VIBE.VibeX")
+    # 候选组按上游 GAP_SOURCES 的顺序（IMU > ATT > VIBE）：取日志里第一个存在的
+    - gts = ref("IMU.timestamp", "ATT.timestamp", "VIBE.timestamp")
+    - gaps = gap_events(gts, T0_US)
+
+# 上游最多报 3 处（`MAX_GAP_FINDINGS`），按间隔降序——截断已在算子内完成
+foreach: { var: gaps, keys: [gap_s, start_s, end_s, nominal_dt_s, threshold_s] }
 
 outputs:
     tag: apm_logging_gap
 
 triggers:
-    - when: "False"
+    - when: "True"
       severity: warning
       threshold: 0.5
+      value: f"{gap_s:.2f}"
       unit: s
       field: "IMU/ATT/VIBE.timestamp(相邻间隔)"
-      title: "日志间隙 / 主循环卡顿（占位，未实现）"
-      suggestion: "待补算子后实现：间隙意味着那段窗口数据缺失，会影响所有其它结论。排查 SD 卡写入性能与 CPU 负载。"
+      title: "日志间隙 {gap_s:.2f} s（t={start_s:.2f}s 起，{end_s:.2f}s 恢复）"
+      suggestion: "名义间隔 {nominal_dt_s:.3f} s，本次阈值 {threshold_s:.2f} s（绝对下限 0.5 s 与名义间隔 10 倍取大者）。该窗口的数据缺失，会影响所有其它结论；排查 SD 卡写入性能与 CPU 负载。"
 
 ---
 # 长循环总数：上游是累加所有 PM 记录的 NLon。引擎没有序列求和算子，
