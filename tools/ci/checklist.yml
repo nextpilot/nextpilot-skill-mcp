@@ -213,6 +213,19 @@ jobs:
         command: ["{NODE}", "scripts/build-knowledge.mjs", "--check"]
         hint: "The built knowledge base differs from the committed artifact. Run `node scripts/build-knowledge.mjs` locally and commit the updated artifact."
 
+      # build-kb-parity 的盲区补丁：它比的是「重算 vs 磁盘」，而本机磁盘常被 dev/build
+      # 刷成重算值，比对永远自洽 —— 「HEAD 里提交的产物 vs knowledge/ 真源」脱节它测不出
+      # （2026-09-26 derived-version 实际发生过）。这里真跑一次 build（写模式）再和 HEAD
+      # 比产物区：工作区里未提交的 knowledge/ 改动也会被算进重算，diff 非零就拦 ——
+      # push 出去的 HEAD 必须「源 + 产物」一起自洽。hook 只拦截不代改：让 pre-push 自动
+      # amend / 补提交等于改写历史，危险得多。产物区用 pathspec 模式，与 .prettierignore
+      # 的自动生成清单同源，新增产物沿用命名惯例即自动覆盖。
+      - id: "build-kb-fresh"
+        name: "Artifact freshness vs HEAD (build:kb + git diff)"
+        workdir: "{ROOT}"
+        command: ["{PYTHON}", "tools/common/check_kb_fresh.py"]
+        hint: "Rebuilt artifacts differ from HEAD — the committed artifacts lag behind knowledge/. Commit the artifact changes together with the knowledge/ source changes, then push again."
+
       # 内容规范。两个脚本各自带反例自检。
       - id: "check-skill-spec"
         name: "Skill directory spec (check-skill-spec)"
