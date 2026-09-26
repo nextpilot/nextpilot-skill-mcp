@@ -1,7 +1,9 @@
 # ========== 依赖 ==========
 node_modules/
-# 仓库根的 pnpm-lock.yaml 是零依赖空壳，不入库（web/pnpm-lock.yaml 照常跟踪）
-/pnpm-lock.yaml
+# pnpm workspace 的 lockfile 在仓库根（pnpm-workspace.yaml 在哪，lockfile 就在哪）——
+# 它必须入库：CI / EdgeOne 部署都靠它做 frozen install。web/ 下那份是 workspace 化
+# 之前的残留，已于 2026-09-26 删除（当时根 lockfile 被误标为「零依赖空壳」而漏提交，
+# CI 的 --frozen-lockfile 找不到 lockfile 秒挂，Deploy 因此全 skipped，线上修不上去）。
 
 # ========== 构建产物 ==========
 .next/
