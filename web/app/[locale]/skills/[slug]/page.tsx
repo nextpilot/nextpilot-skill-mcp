@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { makePageMeta, softwareAppJsonLd, SITE_URL } from "@/lib/seo";
-import { Sparkles } from "lucide-react";
+import { Eye, Sparkles, Zap } from "lucide-react";
 import { getAllSkills, getSkillBySlug } from "@/lib/skills";
 import { JsonLd } from "@/components/JsonLd";
 import { CATEGORY_GLYPH, CATEGORY_LABEL, skillEditUrls } from "@/lib/constants";
@@ -52,8 +52,10 @@ export default async function SkillDetailPage({ params }: { params: Promise<{ sl
         <div className="page-shell pt-4 pb-10 sm:pt-5">
             <Breadcrumbs items={[{ label: "Skill 技能库", href: "/skills" }, { label: skill.slug }]} />
 
-            {/* 两栏：左栏 = 标题 + 内容（纵向堆叠），右栏 = 粘性侧栏（对应 SkillHub 的 390px 侧栏） */}
-            <div className="flex flex-col gap-4 lg:grid lg:gap-x-6 lg:[grid-template-columns:minmax(0,1fr)_320px]">
+            {/* 两栏：左栏 = 标题 + 内容（纵向堆叠），右栏 = 390px 侧栏（与 EntrySidebar
+                的说明、/mcp/[slug] 一致；gap 收到 12px——左右卡各自有 20px+ 内边距，
+                再叠 24px 的 gap，中缝看着有一掌宽，用户点过名「空白可以减少一些」） */}
+            <div className="flex flex-col gap-4 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">
                 <div className="card min-w-0 p-5 sm:p-6">
                     {/* 标题区：图标 + 标题 + slug，其后按组展示头部信息（见 EntryHeaderMeta） */}
                     <header className="mb-8">
@@ -70,6 +72,27 @@ export default async function SkillDetailPage({ params }: { params: Promise<{ sl
                                     <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                                         {CATEGORY_LABEL[skill.category]}
                                     </span>
+                                    {skill.capability && (
+                                        <span
+                                            className={
+                                                skill.capability === "read-only"
+                                                    ? "inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-xs text-muted"
+                                                    : "inline-flex items-center gap-1 rounded-md border border-warning/40 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning"
+                                            }
+                                        >
+                                            {skill.capability === "read-only" ? (
+                                                <>
+                                                    <Eye className="h-3 w-3" />
+                                                    只读
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Zap className="h-3 w-3" />
+                                                    可调参
+                                                </>
+                                            )}
+                                        </span>
+                                    )}
                                     {skill.featured && (
                                         <span className="inline-flex items-center gap-1 rounded-md border border-warning/40 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
                                             <Sparkles className="h-3 w-3" />

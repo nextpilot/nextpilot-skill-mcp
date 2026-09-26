@@ -23,6 +23,8 @@ export interface SkillMeta {
     version?: string;
     /** 版本历史（可选，作者在 frontmatter 维护；缺省时按 version+updatedAt 兜底生成一条） */
     changelog?: ChangelogEntry[];
+    /** 致动能力：read-only 表示仅分析不写参数，config 表示可修改配置/参数 */
+    capability?: "read-only" | "config";
     updatedAt: string;
 }
 

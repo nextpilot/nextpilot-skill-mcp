@@ -66,6 +66,7 @@ function parseSkillDir(dirName: string): Skill {
         paperUrl: meta.paper_url,
         license: data.license ? String(data.license) : undefined,
         icon: meta.icon,
+        capability: meta.capability as SkillMeta["capability"],
         version: latest?.version,
         changelog,
         updatedAt: latest?.date ?? "",
