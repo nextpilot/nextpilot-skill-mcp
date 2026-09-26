@@ -72,8 +72,6 @@
 | `web/scripts/build-knowledge.mjs`           | —     | ⚙️ 生成器（96KB，构建期）                                                | dev / build | —            |
 | `web/scripts/dev.mjs`                       | —     | ⚙️ dev 启动器                                                            | dev         | —            |
 | `web/scripts/fix-node-links.mjs`            | —     | 🗄 一次性                                                                 | 手动        | —            |
-| `web/scripts/migrate-skills-to-spec.mjs`    | —     | 🗄 一次性（已跑过）                                                       | 手动        | —            |
-| `web/scripts/_verify-schema.mjs`            | —     | 🗄 一次性（已跑过）                                                       | 手动        | —            |
 | `web/e2e/pages.spec.ts` + `analyze.spec.ts` | —     | ✅ **真 E2E**（实测 **42 条**：`@smoke` 16 + 日志分析流程 11 + 其余 15） | ci          | `--with-e2e` |
 
 ### 1.3 已经存在的漂移（整改的证据，不是假设）
@@ -294,7 +292,7 @@ tools/
 web/
   scripts/                只剩构建期脚本 + 一次性脚本
     build-knowledge.mjs / dev.mjs
-    one-off/  fix-node-links.mjs / migrate-skills-to-spec.mjs / _verify-schema.mjs
+    one-off/  fix-node-links.mjs
   guards/                 前端侧守卫集
     guard-web-invariants.mjs    ← web/scripts/test-issue-filer.mjs
     guard-skill-dir-spec.mjs    ← web/scripts/check-skill-spec.mjs
@@ -456,7 +454,7 @@ run: python tools/ci/check_all.py --with-mutate # ← 没有 --stage
 | **`check-px4log-data-shape.py` 是一次拆分**  | `px4log_engine_runner.py` 一身两职（探查 + `--probe-data` 测试），拆完要保证 `guard-meta-self-honest` 的探针指向新文件                         | 先只搬不改逻辑，跑通再调                                                                                             |
 | **`web/guards/` 会不会被打进部署包**         | EdgeOne 从 `web/` 源码目录构建，未被 import 的 `.mjs` 不会被打包，但**可能仍被上传**。现状它们也在 `web/scripts/` 下，风险**没有新增**         | 若在意可移到仓库根 `tools/web-guards/`，但那样跨了部署边界，读取 `web/` 源码要靠相对路径——**不建议**                 |
 | **`test-issue-filer` 改名要连带改的东西**    | 段 [10]/[12]/[16] 里有些断言**已经在核"归一函数还被导出"这类自身代码**，改文件名不影响；但 `mutate_guards` 注册表里 27 条打它的变异要改 `path` | 单独提交，改完必须跑完整 `mutate_guards`                                                                             |
-| **`one-off/` 还是 `_once/`**                 | 一次性脚本的目录名                                                                                                                             | 倾向 `one-off/`（望文生义；`_` 前缀在本仓库已有"内部"含义，如 `_verify-schema.mjs`）                                 |
+| **`one-off/` 还是 `_once/`**                 | 一次性脚本的目录名                                                                                                                             | 倾向 `one-off/`（望文生义）                                                                                          |
 | **`engine/test_pyulog.py`**                  | 是 demo 不是测试，且**实测收集不到**（不在 `testpaths` 里）                                                                                    | 建议改名 `demo-pyulog-read.py`，明确它不是测试。**待你定**                                                           |
 | **`web/scripts/browser/check-*.mjs` 改不改** | 两段式，且不进任何门禁                                                                                                                         | 建议改 `probe-site-*.mjs`，或按"不进清单就不强求"原样保留。**待你定**                                                |
 | **`build` 阶段的默认语义变更**               | 现状省略 `--stage` 会跑 build；改后不跑。有人（含脚本）可能依赖现状                                                                            | 改的时候在 `check_all.py` 的 docstring 与输出头里**明说**"build 需显式点名"                                          |

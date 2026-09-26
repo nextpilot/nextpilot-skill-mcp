@@ -11,11 +11,38 @@ const SOURCE_URL = "https://gitee.com/nextpilot/nextpilot-skill-mcp";
 type FooterLink = { href: string; label: string; external?: boolean };
 type FooterGroup = { title: string; links: FooterLink[] };
 
+/** 单条链接：站内走 <Link> 客户端路由，外站走 <a> 新标签页（两者行为不同，别混） */
+function FooterLinkItem({ link }: { link: FooterLink }) {
+    if (link.external) {
+        return (
+            <a
+                href={link.href}
+                target="_blank"
+                rel="noreferrer"
+                className="group inline-flex items-center gap-1 text-sm text-muted transition-colors hover:text-primary"
+            >
+                {link.label}
+                <ExternalLink className="h-3 w-3 text-faint transition-colors group-hover:text-primary" />
+            </a>
+        );
+    }
+    return (
+        <Link href={link.href} className="text-sm text-muted transition-colors hover:text-primary">
+            {link.label}
+        </Link>
+    );
+}
+
 /**
  * 站点页脚：分组导航 + 版本徽标。
  *
  * 版本号与日期只从 `lib/site-version.ts` 取（构建期注入），这里不写死任何字面量——
  * 写死的版本号不会报错，只会安静地过期。取不到时按那边的话说"版本未知"，不编一个。
+ *
+ * 布局有两份 DOM，用断点切换而不是用 JS 测屏宽：桌面是「品牌 + 4 栏」，
+ * 手机是「品牌 + 分组 2×2 平铺」（参考阿木实验室移动端页脚：标题加粗亮色、
+ * 链接灰色宽行距、全部展开不折叠——就 11 条链接，折叠反而多一步点击）。
+ * display:none 的那份不进无障碍树，两份 DOM 不会读两遍。
  */
 export function SiteFooter() {
     const { t } = useLanguage();
@@ -66,27 +93,34 @@ export function SiteFooter() {
     const versionLabel = hasSiteVersion() ? siteVersionLabel() : t("版本未知", "Version unknown");
     const year = versionLabel.match(/\d{4}/)?.[0] ?? "";
 
+    // 品牌区两份布局共用：手机放平铺网格上方，桌面是网格第一栏。
+    // 不设 max-w-*：描述语要在窄屏水平铺满（框住会折成三行窄条，用户点过名），
+    // 桌面栏宽由网格决定，本来就不到 xs，去掉了也不变。
+    const brand = (
+        <div>
+            <Link href="/" className="flex items-center gap-2 text-[15px] font-semibold">
+                <Radar className="h-5 w-5 text-primary" />
+                <span>
+                    NextPilot <span className="text-primary">Skill</span>
+                </span>
+            </Link>
+            <p className="mt-3 text-sm leading-6 text-muted">
+                {t(
+                    "围绕感知 → 决策 → 控制 → 工具链的飞控 AI Skill 与 MCP 社区，内置 PX4 / ArduPilot 确定性日志分析。",
+                    "A flight-control AI Skill & MCP hub across perception, decision, control and toolchain, with deterministic PX4 / ArduPilot log analysis built in.",
+                )}
+            </p>
+            {/* 隐私承诺那句原来也写在这里，2026-09-21 挪去了上传卡（用户交日志的地方才是
+                它该在的位置），页脚不再重复——措辞见 lib/log-analysis-notes.ts。 */}
+        </div>
+    );
+
     return (
         <footer className="border-t border-border bg-surface-2">
             <div className="page-shell py-10">
-                <div className="grid gap-8 md:grid-cols-[1.5fr_repeat(4,1fr)] md:gap-6">
-                    {/* 品牌区 */}
-                    <div className="max-w-xs">
-                        <Link href="/" className="flex items-center gap-2 text-[15px] font-semibold">
-                            <Radar className="h-5 w-5 text-primary" />
-                            <span>
-                                NextPilot <span className="text-primary">Skill</span>
-                            </span>
-                        </Link>
-                        <p className="mt-3 text-sm leading-6 text-muted">
-                            {t(
-                                "围绕感知 → 决策 → 控制 → 工具链的飞控 AI Skill 与 MCP 社区，内置 PX4 / ArduPilot 确定性日志分析。",
-                                "A flight-control AI Skill & MCP hub across perception, decision, control and toolchain, with deterministic PX4 / ArduPilot log analysis built in.",
-                            )}
-                        </p>
-                        {/* 隐私承诺那句原来也写在这里，2026-09-21 挪去了上传卡（用户交日志的地方才是
-                它该在的位置），页脚不再重复——措辞见 lib/log-analysis-notes.ts。 */}
-                    </div>
+                {/* 桌面（≥md）：品牌 + 4 栏平铺 */}
+                <div className="hidden gap-8 md:grid md:grid-cols-[1.5fr_repeat(4,1fr)] md:gap-6">
+                    {brand}
 
                     {/* 导航分组 */}
                     {groups.map((group) => (
@@ -95,24 +129,7 @@ export function SiteFooter() {
                             <ul className="mt-3 space-y-2.5">
                                 {group.links.map((l) => (
                                     <li key={l.href}>
-                                        {l.external ? (
-                                            <a
-                                                href={l.href}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="group inline-flex items-center gap-1 text-sm text-muted transition-colors hover:text-primary"
-                                            >
-                                                {l.label}
-                                                <ExternalLink className="h-3 w-3 text-faint transition-colors group-hover:text-primary" />
-                                            </a>
-                                        ) : (
-                                            <Link
-                                                href={l.href}
-                                                className="text-sm text-muted transition-colors hover:text-primary"
-                                            >
-                                                {l.label}
-                                            </Link>
-                                        )}
+                                        <FooterLinkItem link={l} />
                                     </li>
                                 ))}
                             </ul>
@@ -120,8 +137,28 @@ export function SiteFooter() {
                     ))}
                 </div>
 
-                {/* 底栏：版权 + 版本（免责那句在分析页上传卡上，见 lib/log-analysis-notes.ts） */}
-                <div className="mt-9 flex flex-col gap-4 border-t border-border pt-5 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+                {/* 手机（<md）：品牌区 + 分组 2×2 平铺，标题比链接醒目一档 */}
+                <div className="md:hidden">
+                    {brand}
+                    <div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-8">
+                        {groups.map((group) => (
+                            <nav key={group.title} aria-label={group.title}>
+                                <h2 className="text-sm font-semibold text-text">{group.title}</h2>
+                                <ul className="mt-3.5 space-y-3">
+                                    {group.links.map((l) => (
+                                        <li key={l.href}>
+                                            <FooterLinkItem link={l} />
+                                        </li>
+                                    ))}
+                                </ul>
+                            </nav>
+                        ))}
+                    </div>
+                </div>
+
+                {/* 底栏：版权 + 版本（免责那句在分析页上传卡上，见 lib/log-analysis-notes.ts）。
+                    手机上整条居中（左对齐的堆叠块看着歪，用户点过名）；sm 起恢复两端对齐。 */}
+                <div className="mt-9 flex flex-col items-center gap-4 border-t border-border pt-5 text-center text-xs text-muted sm:flex-row sm:justify-between sm:text-left">
                     <p>
                         {year ? `© ${year} ` : "© "}NextPilot Skill · {t("让无人机更智能", "Making aircraft smarter")}
                     </p>

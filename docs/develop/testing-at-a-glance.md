@@ -164,18 +164,16 @@ FULL_PUSH=1 git push    # 和 CI 一样全（+144s 的 next build）
 
 ## 附 · 其余脚本什么时候手动跑
 
-| 文件                                     | 什么时候用                                                      |
-| ---------------------------------------- | --------------------------------------------------------------- |
-| `tools/ci/check_all.py`                  | 手动跑任意阶段：`--stage push`；`--list-stages` 看全貌          |
-| `tools/ci/check_all.ps1`                 | 同上，PowerShell 包装（**Git hook 不会调它**，`.ps1` 只手动用） |
-| `tools/common/check_prereq.py`           | 首次配环境时查工具链齐不齐（CI 装依赖就顶替了，不重复跑）       |
-| `tools/engine/dump_baseline.py`          | **确认改规则是有意的**之后，重新打基线                          |
-| `tools/dev/dump_px4log_fields.py`        | 查某份日志里有哪些字段（写规则时用）                            |
-| `tools/engine/check_rules_compute.py`    | 调单条规则，看它为什么命中/没命中                               |
-| `tools/dev/dump_px4log_stats.py`         | 探某字段的统计分布（定阈值时用）                                |
-| `web/scripts/fix-node-links.mjs`         | 批量修网站里的内部链接                                          |
-| `web/scripts/migrate-skills-to-spec.mjs` | 一次性迁移脚本（已跑过）                                        |
-| `web/scripts/_verify-schema.mjs`         | 一次性验证脚本（已跑过）                                        |
+| 文件                                  | 什么时候用                                                      |
+| ------------------------------------- | --------------------------------------------------------------- |
+| `tools/ci/check_all.py`               | 手动跑任意阶段：`--stage push`；`--list-stages` 看全貌          |
+| `tools/ci/check_all.ps1`              | 同上，PowerShell 包装（**Git hook 不会调它**，`.ps1` 只手动用） |
+| `tools/common/check_prereq.py`        | 首次配环境时查工具链齐不齐（CI 装依赖就顶替了，不重复跑）       |
+| `tools/engine/dump_baseline.py`       | **确认改规则是有意的**之后，重新打基线                          |
+| `tools/dev/dump_px4log_fields.py`     | 查某份日志里有哪些字段（写规则时用）                            |
+| `tools/engine/check_rules_compute.py` | 调单条规则，看它为什么命中/没命中                               |
+| `tools/dev/dump_px4log_stats.py`      | 探某字段的统计分布（定阈值时用）                                |
+| `web/scripts/fix-node-links.mjs`      | 批量修网站里的内部链接                                          |
 
 **跑 E2E 的三个命令：**
 

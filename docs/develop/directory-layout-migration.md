@@ -193,21 +193,19 @@ function findDir(dir, name) {
 
 ### 4.1 构建脚本（`src/scripts/`，5 处文件）
 
-| 文件                             | 现状                                                               | 改成                                                     |
-| -------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------- |
-| `build-knowledge.mjs`            | `webRoot = resolve(here,"..")`                                     | 新增 `repoRoot = resolve(here,"../..")`                  |
-| 同上 L54                         | `KN = resolve(webRoot,"../knowledge/px4")`                         | `resolve(repoRoot,"knowledge/px4")`                      |
-| 同上 L56                         | `ENGINE = resolve(webRoot,"../engine")`                            | `resolve(repoRoot,"engine")`                             |
-| 同上 L74                         | `GUIDES_DIR = resolve(webRoot,"content/guide")`                    | `resolve(repoRoot,"src/content/guide")`                  |
-| 同上 L1499                       | `outWorkers = resolve(webRoot,"workers")`                          | `resolve(repoRoot,"src/workers")`                        |
-| 同上 L1690/L1710/L1742           | `resolve(webRoot,"lib/knowledge/…")`                               | `resolve(repoRoot,"src/lib/knowledge/…")`                |
-| 同上 L1768/L1770                 | `resolve(webRoot,"public/params/…")`                               | `resolve(repoRoot,"public/params/…")` ← **根，不是 src** |
-| 同上 L1829                       | `resolve(webRoot,"scripts/lib")`                                   | `resolve(repoRoot,"src/scripts/lib")`                    |
-| `sync-content.mjs` L20-21        | `repoRoot=resolve(webRoot,"..")`、`OUT=resolve(webRoot,"content")` | `repoRoot=resolve(here,"../..")`、OUT → `src/content`    |
-| `check-skill-spec.mjs` L43       | `repoRoot = resolve(webRoot,"..")`                                 | `resolve(here,"../..")`                                  |
-| `check-mcp-spec.mjs` L39         | 同上                                                               | 同上                                                     |
-| `migrate-skills-to-spec.mjs` L30 | `repoRoot = resolve(here,"..","..")`                               | 再上一級 → `resolve(here,"..","..","..")`                |
-| `_verify-schema.mjs` L9          | `KN = resolve(here,"../../knowledge/px4")`                         | `resolve(here,"../../../knowledge/px4")`                 |
+| 文件                       | 现状                                                               | 改成                                                     |
+| -------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------- |
+| `build-knowledge.mjs`      | `webRoot = resolve(here,"..")`                                     | 新增 `repoRoot = resolve(here,"../..")`                  |
+| 同上 L54                   | `KN = resolve(webRoot,"../knowledge/px4")`                         | `resolve(repoRoot,"knowledge/px4")`                      |
+| 同上 L56                   | `ENGINE = resolve(webRoot,"../engine")`                            | `resolve(repoRoot,"engine")`                             |
+| 同上 L74                   | `GUIDES_DIR = resolve(webRoot,"content/guide")`                    | `resolve(repoRoot,"src/content/guide")`                  |
+| 同上 L1499                 | `outWorkers = resolve(webRoot,"workers")`                          | `resolve(repoRoot,"src/workers")`                        |
+| 同上 L1690/L1710/L1742     | `resolve(webRoot,"lib/knowledge/…")`                               | `resolve(repoRoot,"src/lib/knowledge/…")`                |
+| 同上 L1768/L1770           | `resolve(webRoot,"public/params/…")`                               | `resolve(repoRoot,"public/params/…")` ← **根，不是 src** |
+| 同上 L1829                 | `resolve(webRoot,"scripts/lib")`                                   | `resolve(repoRoot,"src/scripts/lib")`                    |
+| `sync-content.mjs` L20-21  | `repoRoot=resolve(webRoot,"..")`、`OUT=resolve(webRoot,"content")` | `repoRoot=resolve(here,"../..")`、OUT → `src/content`    |
+| `check-skill-spec.mjs` L43 | `repoRoot = resolve(webRoot,"..")`                                 | `resolve(here,"../..")`                                  |
+| `check-mcp-spec.mjs` L39   | 同上                                                               | 同上                                                     |
 
 ### 4.2 运行期路径（最容易静默失效）
 

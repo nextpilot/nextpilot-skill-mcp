@@ -25,7 +25,7 @@ export interface Skill extends SkillMeta {
  *                         的唯一真源（frontmatter 里不再存，避免两份分叉）。
  *
  * 以前是 `knowledge/skills/*.mdx` 平铺、给人看与给 AI 看混在一份正文里；
- * 2026-09-20 改成上面的结构，规范依据记在 `scripts/migrate-skills-to-spec.mjs` 文件头。
+ * 2026-09-20 改成上面的结构。
  */
 function readFileOrThrow(dir: string, name: string): string {
     const full = path.join(dir, name);

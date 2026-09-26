@@ -109,7 +109,7 @@ knowledge/                  ← 独立项目根（一级目录）
 ### 4.3 不需要改（这是方案 C 的收益）
 
 `web/lib/constants.ts:59` 的 `contentRoot: "knowledge"`、
-`web/scripts/sync-content.mjs:25-26`、`_verify-schema.mjs:9`、`check_rules_fields.py:10`、
+`web/scripts/sync-content.mjs:25-26`、`check_rules_fields.py:10`、
 `.prettierignore`、`.markdownlintignore`、`.vscode/settings.json` —— **全部保持不变**。
 
 > ⚠️ 2026-09-24 后本节过时：skills/mcp 真源搬进 `web/content/` 后，`contentRoot` 已改为
