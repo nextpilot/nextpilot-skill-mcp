@@ -105,9 +105,9 @@ my_module_max_velocity_tuning:
 
 ```yaml
 # 改成
-my_mod_max_vel:     # 13 字符，安全
-    num:
-      default: 5.0
+my_mod_max_vel: # 13 字符，安全
+  num:
+    default: 5.0
 ```
 
 > 命名建议：`<模块缩写>_<含义>`，控制在 12 字符以内留余量。截断不会有任何报错——这是这个坑最隐蔽的地方。

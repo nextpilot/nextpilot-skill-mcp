@@ -3,90 +3,90 @@
 version: 1
 judge_model: claude-opus-4
 target_models:
-  - claude-haiku-4
-  - deepseek-v3
+    - claude-haiku-4
+    - deepseek-v3
 
 cases:
-  - id: command-not-found-is-cmake
-    desc: start 报命令不存在，八成是没被编进去，不是代码错
-    input: |
-      代码写完了编译也过了，但 nsh 里敲 my_module start 提示 command not found。
-    must_mention:
-      - CMakeLists|px4_add_module
-      - MAIN
-    judge: |
-      必须按「CMake 未加入构建 → MAIN 名字对不上 → 固件没烧进去」的顺序给排查路径。
-      关键 caveat：这不是编译错误，是"没把这个东西编进去"，
-      所以编译通过毫无安慰作用。没说这句最多给一半分。
-    weight: 2
+    - id: command-not-found-is-cmake
+      desc: start 报命令不存在，八成是没被编进去，不是代码错
+      input: |
+          代码写完了编译也过了，但 nsh 里敲 my_module start 提示 command not found。
+      must_mention:
+          - CMakeLists|px4_add_module
+          - MAIN
+      judge: |
+          必须按「CMake 未加入构建 → MAIN 名字对不上 → 固件没烧进去」的顺序给排查路径。
+          关键 caveat：这不是编译错误，是"没把这个东西编进去"，
+          所以编译通过毫无安慰作用。没说这句最多给一半分。
+      weight: 2
 
-  - id: silent-failure-no-schedule
-    desc: 忘了 ScheduleOnInterval，Run() 一次都不执行，且不报错
-    input: |
-      模块能起来，top 里看得到进程，但什么都不输出。
-    must_mention:
-      - ScheduleOnInterval|ScheduleNow
-    judge: |
-      必须把"忘了调度"列为第一嫌疑，并说明它的隐蔽性：
-      start 返回成功、进程在跑、就是不干活——完全沉默。
-      还应覆盖另外两个沉默失败：忘了 publish、忘填 timestamp，
-      以及退出时漏 exit_and_cleanup 导致二次 start 失败。
-    weight: 2
+    - id: silent-failure-no-schedule
+      desc: 忘了 ScheduleOnInterval，Run() 一次都不执行，且不报错
+      input: |
+          模块能起来，top 里看得到进程，但什么都不输出。
+      must_mention:
+          - ScheduleOnInterval|ScheduleNow
+      judge: |
+          必须把"忘了调度"列为第一嫌疑，并说明它的隐蔽性：
+          start 返回成功、进程在跑、就是不干活——完全沉默。
+          还应覆盖另外两个沉默失败：忘了 publish、忘填 timestamp，
+          以及退出时漏 exit_and_cleanup 导致二次 start 失败。
+      weight: 2
 
-  - id: blocking-forbids-work-queue
-    desc: 工作队列里不许阻塞，要等 I/O 就用独立任务
-    input: |
-      我的模块需要读串口数据，用工作队列可以吗？
-    must_mention:
-      - px4::Task|独立任务
-    judge: |
-      必须明确说不可以，并解释原因：工作队列是所有注册模块共用的，
-      在回调里阻塞一次，队列上其它所有模块一起延迟。
-      还应说明那类故障的表现是"某些模块莫名周期性掉帧"，很难联想到源头。
-    weight: 2
+    - id: blocking-forbids-work-queue
+      desc: 工作队列里不许阻塞，要等 I/O 就用独立任务
+      input: |
+          我的模块需要读串口数据，用工作队列可以吗？
+      must_mention:
+          - px4::Task|独立任务
+      judge: |
+          必须明确说不可以，并解释原因：工作队列是所有注册模块共用的，
+          在回调里阻塞一次，队列上其它所有模块一起延迟。
+          还应说明那类故障的表现是"某些模块莫名周期性掉帧"，很难联想到源头。
+      weight: 2
 
-  - id: queue-selection-by-hardware
-    desc: 有硬件总线走 INS*/SPI*，不要占高优先级通用队列
-    input: |
-      要写一个 SPI 接口的传感器驱动，1000Hz 采样，该挂哪个队列？
-    must_mention:
-      - SPI0|SPI\*|INS0
-    judge: |
-      必须指出有硬件总线的驱动走 INS*/SPI* 专用队列，
-      不要塞进 nav_and_controllers——会拖慢整架飞机的控制回路。
+    - id: queue-selection-by-hardware
+      desc: 有硬件总线走 INS*/SPI*，不要占高优先级通用队列
+      input: |
+          要写一个 SPI 接口的传感器驱动，1000Hz 采样，该挂哪个队列？
+      must_mention:
+          - SPI0|SPI\*|INS0
+      judge: |
+          必须指出有硬件总线的驱动走 INS*/SPI* 专用队列，
+          不要塞进 nav_and_controllers——会拖慢整架飞机的控制回路。
 
-  - id: nextpilot-is-different-build-system
-    desc: NextPilot 完全不适用 PX4 的 CMake 教程
-    input: |
-      我在用 NextPilot（RT-Thread），照 PX4 教程建模块，
-      CMakeLists 写好了，接下来怎么编译？
-    must_mention:
-      - scons|SConscript
-      - menuconfig|Kconfig
-    judge: |
-      必须说明 NextPilot 不用 CMake，照搬会直接扑空。
-      给出差异对照：scons+SConscript、Kconfig+menuconfig、
-      RT-Thread 自动初始化宏、apps/ 下按类别分目录。
-      主动承认不适用，比硬凑一套"大概可以这样"有用。
-    weight: 3
+    - id: nextpilot-is-different-build-system
+      desc: NextPilot 完全不适用 PX4 的 CMake 教程
+      input: |
+          我在用 NextPilot（RT-Thread），照 PX4 教程建模块，
+          CMakeLists 写好了，接下来怎么编译？
+      must_mention:
+          - scons|SConscript
+          - menuconfig|Kconfig
+      judge: |
+          必须说明 NextPilot 不用 CMake，照搬会直接扑空。
+          给出差异对照：scons+SConscript、Kconfig+menuconfig、
+          RT-Thread 自动初始化宏、apps/ 下按类别分目录。
+          主动承认不适用，比硬凑一套"大概可以这样"有用。
+      weight: 3
 
-  # ---------- 负例 ----------
+    # ---------- 负例 ----------
 
-  - id: out-of-scope-uorb-mechanics
-    desc: 模块内部怎么收发数据是 uORB Skill 的活
-    input: |
-      我模块里想订阅 vehicle_attitude，Subscription 和 copy 该怎么配合？
-    expect_trigger: false
-    route_to: px4-uorb-messaging
-    judge: |
-      这是 uORB 机制问题，不是模块脚手架问题。
+    - id: out-of-scope-uorb-mechanics
+      desc: 模块内部怎么收发数据是 uORB Skill 的活
+      input: |
+          我模块里想订阅 vehicle_attitude，Subscription 和 copy 该怎么配合？
+      expect_trigger: false
+      route_to: px4-uorb-messaging
+      judge: |
+          这是 uORB 机制问题，不是模块脚手架问题。
 
-  - id: out-of-scope-param-declaration
-    desc: 参数怎么声明和刷新归 parameter-system
-    input: |
-      模块里的 params.yaml 该怎么写，运行时怎么拿到参数更新？
-    expect_trigger: false
-    route_to: px4-parameter-system
-    judge: |
-      这是参数系统问题。本 Skill 只在介绍 init/Run 骨架时顺带出现 updateParams()，
-      不负责展开参数声明语法。
+    - id: out-of-scope-param-declaration
+      desc: 参数怎么声明和刷新归 parameter-system
+      input: |
+          模块里的 params.yaml 该怎么写，运行时怎么拿到参数更新？
+      expect_trigger: false
+      route_to: px4-parameter-system
+      judge: |
+          这是参数系统问题。本 Skill 只在介绍 init/Run 骨架时顺带出现 updateParams()，
+          不负责展开参数声明语法。

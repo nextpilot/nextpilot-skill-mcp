@@ -5,19 +5,9 @@
       {
         "fault_id": "F001",
         "fault_tag": "high_vibration",
-        "trigger_tags": [
-          "high_vibration"
-        ],
-        "flight_phase": [
-          "takeoff",
-          "hover",
-          "maneuver",
-          "fw_cruise",
-          "cruise"
-        ],
-        "exclude_tags": [
-          "collision_detected"
-        ],
+        "trigger_tags": ["high_vibration"],
+        "flight_phase": ["takeoff", "hover", "maneuver", "fw_cruise", "cruise"],
+        "exclude_tags": ["collision_detected"],
         "possible_root_cause": [
           "螺旋桨破损、变形、动平衡失衡",
           "电机轴承磨损、电机转轴松动",
@@ -36,13 +26,8 @@
       {
         "fault_id": "F002",
         "fault_tag": "gps_jump",
-        "trigger_tags": [
-          "gps_jump",
-          "gps_eph_high"
-        ],
-        "flight_phase": [
-          "all"
-        ],
+        "trigger_tags": ["gps_jump", "gps_eph_high"],
+        "flight_phase": ["all"],
         "exclude_tags": [],
         "possible_root_cause": [
           "GPS天线安装位置受电源/电机电磁干扰",
@@ -62,15 +47,9 @@
       {
         "fault_id": "F003",
         "fault_tag": "vtol_convert_attitude_over",
-        "trigger_tags": [
-          "vtol_convert_attitude_over"
-        ],
-        "flight_phase": [
-          "vtol_transition"
-        ],
-        "exclude_tags": [
-          "wind_strong"
-        ],
+        "trigger_tags": ["vtol_convert_attitude_over"],
+        "flight_phase": ["vtol_transition"],
+        "exclude_tags": ["wind_strong"],
         "possible_root_cause": [
           "VTOL转换时间、油门过渡参数不合理",
           "旋翼推力与固定翼升力匹配失调",
@@ -87,14 +66,8 @@
       {
         "fault_id": "F004",
         "fault_tag": "battery_voltage_drop",
-        "trigger_tags": [
-          "battery_voltage_drop"
-        ],
-        "flight_phase": [
-          "takeoff",
-          "hover",
-          "maneuver"
-        ],
+        "trigger_tags": ["battery_voltage_drop"],
+        "flight_phase": ["takeoff", "hover", "maneuver"],
         "exclude_tags": [],
         "possible_root_cause": [
           "电池电芯老化、内阻增大",
@@ -113,16 +86,9 @@
       {
         "fault_id": "F005",
         "fault_tag": "imu_bias_drift",
-        "trigger_tags": [
-          "imu_bias_drift"
-        ],
-        "flight_phase": [
-          "hover",
-          "cruise"
-        ],
-        "exclude_tags": [
-          "temperature_change_large"
-        ],
+        "trigger_tags": ["imu_bias_drift"],
+        "flight_phase": ["hover", "cruise"],
+        "exclude_tags": ["temperature_change_large"],
         "possible_root_cause": [
           "IMU温度漂移，温度补偿参数不足",
           "IMU安装松动，存在微小机械位移",
@@ -139,36 +105,19 @@
       {
         "fault_id": "F006",
         "fault_tag": "attitude_overshoot",
-        "trigger_tags": [
-          "attitude_overshoot"
-        ],
-        "flight_phase": [
-          "maneuver",
-          "hover"
-        ],
-        "exclude_tags": [
-          "wind_strong"
-        ],
-        "possible_root_cause": [
-          "姿态环PID增益过高，系统阻尼不足",
-          "机架共振，激励控制环震荡"
-        ],
-        "troubleshooting_steps": [
-          "适当降低姿态环P增益，优先调阻尼D项",
-          "排查整机共振点，避开控制带宽"
-        ],
+        "trigger_tags": ["attitude_overshoot"],
+        "flight_phase": ["maneuver", "hover"],
+        "exclude_tags": ["wind_strong"],
+        "possible_root_cause": ["姿态环PID增益过高，系统阻尼不足", "机架共振，激励控制环震荡"],
+        "troubleshooting_steps": ["适当降低姿态环P增益，优先调阻尼D项", "排查整机共振点，避开控制带宽"],
         "risk_level": "中",
         "note": "大风环境下超调优先归为环境扰动，禁止直接大幅度下调PID"
       },
       {
         "fault_id": "F007",
         "fault_tag": "rc_lost",
-        "trigger_tags": [
-          "rc_lost"
-        ],
-        "flight_phase": [
-          "all"
-        ],
+        "trigger_tags": ["rc_lost"],
+        "flight_phase": ["all"],
         "exclude_tags": [],
         "possible_root_cause": [
           "遥控器距离过远，信号衰减",
@@ -187,15 +136,9 @@
       {
         "fault_id": "F008",
         "fault_tag": "motor_output_unbalance",
-        "trigger_tags": [
-          "motor_output_unbalance"
-        ],
-        "flight_phase": [
-          "hover"
-        ],
-        "exclude_tags": [
-          "collision_detected"
-        ],
+        "trigger_tags": ["motor_output_unbalance"],
+        "flight_phase": ["hover"],
+        "exclude_tags": ["collision_detected"],
         "possible_root_cause": [
           "单台电机效率衰减，动力不一致",
           "螺旋桨型号不一致、桨尺寸不匹配",
@@ -211,42 +154,22 @@
       {
         "fault_id": "F009",
         "fault_tag": "low_airspeed",
-        "trigger_tags": [
-          "low_airspeed"
-        ],
-        "flight_phase": [
-          "fw_cruise"
-        ],
+        "trigger_tags": ["low_airspeed"],
+        "flight_phase": ["fw_cruise"],
         "exclude_tags": [],
-        "possible_root_cause": [
-          "空速管堵塞、积水",
-          "空速校准未完成",
-          "总压/静压管路漏气"
-        ],
-        "troubleshooting_steps": [
-          "检查空速管有无异物堵塞",
-          "检查管路接头，确认无漏气",
-          "重新执行空速校准"
-        ],
+        "possible_root_cause": ["空速管堵塞、积水", "空速校准未完成", "总压/静压管路漏气"],
+        "troubleshooting_steps": ["检查空速管有无异物堵塞", "检查管路接头，确认无漏气", "重新执行空速校准"],
         "risk_level": "高",
         "note": "VTOL固定翼阶段空速失效极易引发失速"
       },
       {
         "fault_id": "F010",
         "fault_tag": "wind_disturb",
-        "trigger_tags": [
-          "wind_strong"
-        ],
-        "flight_phase": [
-          "all"
-        ],
+        "trigger_tags": ["wind_strong"],
+        "flight_phase": ["all"],
         "exclude_tags": [],
-        "possible_root_cause": [
-          "外部大风环境扰动，非机载故障"
-        ],
-        "troubleshooting_steps": [
-          "记录本场气象数据，大风条件建议缩减任务或停飞"
-        ],
+        "possible_root_cause": ["外部大风环境扰动，非机载故障"],
+        "troubleshooting_steps": ["记录本场气象数据，大风条件建议缩减任务或停飞"],
         "risk_level": "低",
         "note": "本条目为环境因素，不做硬件/参数故障判定"
       }

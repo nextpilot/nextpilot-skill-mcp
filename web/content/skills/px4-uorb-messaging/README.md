@@ -8,12 +8,12 @@
 
 ## 不做什么
 
-| 不管 | 归谁 |
-|---|---|
-| 某个字段代表什么物理含义 | [`px4-ulog-analyzer`](../px4-ulog-analyzer/) |
-| 怎么建一个完整模块 | [`px4-module-development`](../px4-module-development/) |
-| MAVLink 与外部通信 | 不在范围内 |
-| ArduPilot 的消息总线 | 机制不同，另写一份 |
+| 不管                     | 归谁                                                   |
+| ------------------------ | ------------------------------------------------------ |
+| 某个字段代表什么物理含义 | [`px4-ulog-analyzer`](../px4-ulog-analyzer/)           |
+| 怎么建一个完整模块       | [`px4-module-development`](../px4-module-development/) |
+| MAVLink 与外部通信       | 不在范围内                                             |
+| ArduPilot 的消息总线     | 机制不同，另写一份                                     |
 
 **只讲机制，不讲语义。** 不回答"该订阅哪个主题"（那是任务相关），只回答"订阅了为什么拿不到"。
 

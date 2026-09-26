@@ -10,12 +10,12 @@
 
 ## 不做什么
 
-| 不管 | 归谁 |
-|---|---|
+| 不管                         | 归谁                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------ |
 | 某个参数的**数值**该调到多少 | [`pid-autotune-assistant`](../pid-autotune-assistant/)（给出的是增益取值逻辑） |
-| 增益整定的阶跃响应判读 | [`pid-autotune-assistant`](../pid-autotune-assistant/) |
-| ArduPilot 参数 | 命名完全不同（`ATC_RAT_RLL_P` vs `MC_ROLLRATE_P`），混在一起必然误导 |
-| 参数如何用于故障诊断 | [`px4-ulog-analyzer`](../px4-ulog-analyzer/) |
+| 增益整定的阶跃响应判读       | [`pid-autotune-assistant`](../pid-autotune-assistant/)                         |
+| ArduPilot 参数               | 命名完全不同（`ATC_RAT_RLL_P` vs `MC_ROLLRATE_P`），混在一起必然误导           |
+| 参数如何用于故障诊断         | [`px4-ulog-analyzer`](../px4-ulog-analyzer/)                                   |
 
 **只管 PX4 原生参数。** 这一点写在 SKILL.md 的 `platforms` 里并且再没变过：同样叫"横滚速率环 P"，PX4 是 `MC_ROLLRATE_P`，ArduPilot 是 `ATC_RAT_RLL_P`，单位约定也不同。做一张混表的话，用户按 ArduPilot 的语义去设 PX4 的参数，炸机只是时间问题。
 

@@ -44,17 +44,17 @@ param diff        复飞前再核对一次
 
 ## 关键参数速查
 
-| 用途 | 参数 |
-|---|---|
-| 机型 | `SYS_AUTOSTART`（决定启动哪些模块）、`SYS_AUTOCONFIG` |
-| 姿态 / 速率环 | `MC_ROLL_P`、`MC_ROLLRATE_P/I/D`、`MC_PITCHRATE_*`、`MC_YAWRATE_*` |
-| 位置 / 速度环 | `MPC_XY_P`、`MPC_Z_P`、`MPC_ACC_HOR`、`MPC_TILTMAX_AIR` |
-| 估计器 | `EKF2_*`、`EKF2_MAG_TYPE`、`EKF2_GPS_*` |
-| 失效保护 | `COM_RCL_ACT`、`COM_LOW_BAT_ACT`、`NAV_DLL_ACT`、`GF_*`、`RTL_*` |
-| 电池 | `BAT_*`、`BAT_LOW_THR`、`BAT_CRIT_THR`、`BAT_N_CELLS` |
-| 传感器校准 | `CAL_GYRO0_ID`、`CAL_ACC0_ID`、`CAL_MAG0_ID`（多实例按 ID 区分，不是按序号） |
-| 日志 | `SDLOG_MODE`、`SDLOG_PROFILE`（自定义主题不进日志查这里） |
-| 输出 | `PWM_MAIN_*`、`DSHOT_*` |
+| 用途          | 参数                                                                         |
+| ------------- | ---------------------------------------------------------------------------- |
+| 机型          | `SYS_AUTOSTART`（决定启动哪些模块）、`SYS_AUTOCONFIG`                        |
+| 姿态 / 速率环 | `MC_ROLL_P`、`MC_ROLLRATE_P/I/D`、`MC_PITCHRATE_*`、`MC_YAWRATE_*`           |
+| 位置 / 速度环 | `MPC_XY_P`、`MPC_Z_P`、`MPC_ACC_HOR`、`MPC_TILTMAX_AIR`                      |
+| 估计器        | `EKF2_*`、`EKF2_MAG_TYPE`、`EKF2_GPS_*`                                      |
+| 失效保护      | `COM_RCL_ACT`、`COM_LOW_BAT_ACT`、`NAV_DLL_ACT`、`GF_*`、`RTL_*`             |
+| 电池          | `BAT_*`、`BAT_LOW_THR`、`BAT_CRIT_THR`、`BAT_N_CELLS`                        |
+| 传感器校准    | `CAL_GYRO0_ID`、`CAL_ACC0_ID`、`CAL_MAG0_ID`（多实例按 ID 区分，不是按序号） |
+| 日志          | `SDLOG_MODE`、`SDLOG_PROFILE`（自定义主题不进日志查这里）                    |
+| 输出          | `PWM_MAIN_*`、`DSHOT_*`                                                      |
 
 ## 输入示例
 

@@ -10,12 +10,12 @@
 
 ## 不做什么
 
-| 不管 | 归谁 |
-|---|---|
-| 画图、拉曲线 | Flight Review / PlotJuggler——专业工具做得更好，不要在这里重复 |
-| 找到根因后该怎么改参数 | [`px4-parameter-system`](../px4-parameter-system/) |
-| 增益该怎么调 | [`pid-autotune-assistant`](../pid-autotune-assistant/) |
-| 日志文件的二进制格式细节 | pyulog /官方文档 |
+| 不管                     | 归谁                                                          |
+| ------------------------ | ------------------------------------------------------------- |
+| 画图、拉曲线             | Flight Review / PlotJuggler——专业工具做得更好，不要在这里重复 |
+| 找到根因后该怎么改参数   | [`px4-parameter-system`](../px4-parameter-system/)            |
+| 增益该怎么调             | [`pid-autotune-assistant`](../pid-autotune-assistant/)        |
+| 日志文件的二进制格式细节 | pyulog /官方文档                                              |
 
 **这是一张方法卡，不是日志浏览器。** 它教的是"看哪个字段、用什么阈值判断"，最终产出是一组带出处的结论，不是一张图。
 
@@ -56,11 +56,11 @@ SKILL.md 里那 1→9 的顺序不允许模型自由发挥，理由是它按「*
 
 ## 自带的脚本与素材
 
-| 文件 | 作用 |
-|---|---|
-| `scripts/quick_check.py` | 把关键字段按固定顺序拉出来，输出 JSON。**只给数，不给结论**——判断交给 SKILL.md 描述的规则 |
-| `scripts/make_fixture.py` | 合成三份测试用 `.ulg`，地面真值已知、字节可复现 |
-| `assets/*.ulg` | 上面那个脚本的产物，同时也是回归测试的输入 |
+| 文件                      | 作用                                                                                      |
+| ------------------------- | ----------------------------------------------------------------------------------------- |
+| `scripts/quick_check.py`  | 把关键字段按固定顺序拉出来，输出 JSON。**只给数，不给结论**——判断交给 SKILL.md 描述的规则 |
+| `scripts/make_fixture.py` | 合成三份测试用 `.ulg`，地面真值已知、字节可复现                                           |
+| `assets/*.ulg`            | 上面那个脚本的产物，同时也是回归测试的输入                                                |
 
 ```bash
 python3 scripts/quick_check.py flight.ulg          # 体检一份自己的日志

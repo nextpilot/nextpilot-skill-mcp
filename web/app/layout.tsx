@@ -13,9 +13,11 @@ const defaultTitle = `${SITE_NAME} · 专为飞行控制优化的 AI Skill 与 M
 
 function buildVerification(): Metadata["verification"] {
     const v: Metadata["verification"] = {};
+    const other: Record<string, string> = {};
     if (GOOGLE_VERIFICATION) v.google = GOOGLE_VERIFICATION;
-    if (BING_VERIFICATION) v.bing = BING_VERIFICATION;
-    if (BAIDU_VERIFICATION) v.baidu = BAIDU_VERIFICATION;
+    if (BING_VERIFICATION) other["msvalidate.01"] = BING_VERIFICATION;
+    if (BAIDU_VERIFICATION) other["baidu-site-verification"] = BAIDU_VERIFICATION;
+    if (Object.keys(other).length > 0) v.other = other;
     return Object.keys(v).length > 0 ? v : undefined;
 }
 

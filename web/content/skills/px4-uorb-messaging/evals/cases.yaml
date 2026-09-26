@@ -3,85 +3,85 @@
 version: 1
 judge_model: claude-opus-4
 target_models:
-  - claude-haiku-4
-  - deepseek-v3
+    - claude-haiku-4
+    - deepseek-v3
 
 cases:
-  - id: updated-vs-copy
-    desc: updated() 只清标志不取数据，这是最常见的数据丢失
-    input: |
-      uORB::Subscription _att_sub{ORB_ID(vehicle_attitude)};
-      if (_att_sub.updated()) {
-        vehicle_attitude_s att{};
-        _att_sub.copy(&att);
-        use(att.timestamp);
-      }
-      数据偶尔丢，为什么？
-    must_mention:
-      - update\(&
-      - 覆盖|丢
-    judge: |
-      必须指出 updated() 只把标志清掉、不取数据，下一次 update 会覆盖，
-      并给出改用 _att_sub.update(&att) 的写法。
-      如果只说"试试加个延时"之类，判 0 分。
-    weight: 2
+    - id: updated-vs-copy
+      desc: updated() 只清标志不取数据，这是最常见的数据丢失
+      input: |
+          uORB::Subscription _att_sub{ORB_ID(vehicle_attitude)};
+          if (_att_sub.updated()) {
+            vehicle_attitude_s att{};
+            _att_sub.copy(&att);
+            use(att.timestamp);
+          }
+          数据偶尔丢，为什么？
+      must_mention:
+          - update\(&
+          - 覆盖|丢
+      judge: |
+          必须指出 updated() 只把标志清掉、不取数据，下一次 update 会覆盖，
+          并给出改用 _att_sub.update(&att) 的写法。
+          如果只说"试试加个延时"之类，判 0 分。
+      weight: 2
 
-  - id: zero-frequency-check-publisher-first
-    desc: 频率为 0 必须从发布端查起，不能上来就翻订阅代码
-    input: |
-      新写的模块注册了 motor_temp 主题，uorb top 里频率一直是 0，
-      listener motor_temp 也没输出。模块 start 成功了。
-    must_mention:
-      - publish
-      - hrt_absolute_time|timestamp
-    judge: |
-      必须指出首要怀疑对象是发布端（主题节点在首次 publish 时才创建），
-      给出 advertise/publish/timestamp 的检查清单。
-      如果建议改 UORB 缓冲区大小之类的无关配置，判 0 分。
-    weight: 2
+    - id: zero-frequency-check-publisher-first
+      desc: 频率为 0 必须从发布端查起，不能上来就翻订阅代码
+      input: |
+          新写的模块注册了 motor_temp 主题，uorb top 里频率一直是 0，
+          listener motor_temp 也没输出。模块 start 成功了。
+      must_mention:
+          - publish
+          - hrt_absolute_time|timestamp
+      judge: |
+          必须指出首要怀疑对象是发布端（主题节点在首次 publish 时才创建），
+          给出 advertise/publish/timestamp 的检查清单。
+          如果建议改 UORB 缓冲区大小之类的无关配置，判 0 分。
+      weight: 2
 
-  - id: multi-instance-by-device-id
-    desc: 多传感器实例按 device_id 区分，不是按数组下标
-    input: |
-      板子上有两个 IMU，读出来的加速度值时而对时错，
-      像是随机串到了另一个传感器。用的 Subscription{ORB_ID(sensor_accel), 1}。
-    must_mention:
-      - device_id
-    must_not_mention:
-      - 下标 1 就是第二个
-    judge: |
-      必须说明实例下标不稳定（插拔顺序、初始化时序都会影响），
-      device_id 才是身份，并给出按 CAL_*_ID 过滤的写法。
+    - id: multi-instance-by-device-id
+      desc: 多传感器实例按 device_id 区分，不是按数组下标
+      input: |
+          板子上有两个 IMU，读出来的加速度值时而对时错，
+          像是随机串到了另一个传感器。用的 Subscription{ORB_ID(sensor_accel), 1}。
+      must_mention:
+          - device_id
+      must_not_mention:
+          - 下标 1 就是第二个
+      judge: |
+          必须说明实例下标不稳定（插拔顺序、初始化时序都会影响），
+          device_id 才是身份，并给出按 CAL_*_ID 过滤的写法。
 
-  - id: custom-topic-not-in-log
-    desc: 主题本身通了但不进日志，是 SDLOG_PROFILE 没覆盖
-    input: |
-      motor_temp 在 uorb top 里有频率，listener 也能看到值，
-      但 ulog 里抓不到这个主题。
-    must_mention:
-      - SDLOG_PROFILE
-    judge: |
-      必须指向 SDLOG_PROFILE（bitmask），并提示老固件用 SDLOG_PRIO_* 系列。
+    - id: custom-topic-not-in-log
+      desc: 主题本身通了但不进日志，是 SDLOG_PROFILE 没覆盖
+      input: |
+          motor_temp 在 uorb top 里有频率，listener 也能看到值，
+          但 ulog 里抓不到这个主题。
+      must_mention:
+          - SDLOG_PROFILE
+      judge: |
+          必须指向 SDLOG_PROFILE（bitmask），并提示老固件用 SDLOG_PRIO_* 系列。
 
-  # ---------- 负例 ----------
+    # ---------- 负例 ----------
 
-  - id: out-of-scope-symptom-diagnosis
-    desc: 问"该订阅哪个主题"是症状诊断，不是 uORB 机制问题
-    input: |
-      悬停时机头慢慢向右偏，我该订阅哪个主题来看？
-    expect_trigger: false
-    route_to: px4-ulog-analyzer
-    judge: |
-      不应该开始讲 update/updated 的区别。用户问的是偏航漂移的成因，
-      应转交 ULog 诊断或参数 Skill。
-      如果模型输出了大段 uORB API 说明，判 0 分。
-    weight: 2
+    - id: out-of-scope-symptom-diagnosis
+      desc: 问"该订阅哪个主题"是症状诊断，不是 uORB 机制问题
+      input: |
+          悬停时机头慢慢向右偏，我该订阅哪个主题来看？
+      expect_trigger: false
+      route_to: px4-ulog-analyzer
+      judge: |
+          不应该开始讲 update/updated 的区别。用户问的是偏航漂移的成因，
+          应转交 ULog 诊断或参数 Skill。
+          如果模型输出了大段 uORB API 说明，判 0 分。
+      weight: 2
 
-  - id: out-of-scope-module-scaffold
-    desc: 问怎么建完整模块该走 module-development
-    input: |
-      我想新建一个模块，CMakeLists 该怎么写？
-    expect_trigger: false
-    route_to: px4-module-development
-    judge: |
-      这是模块脚手架问题，不是消息总线问题。
+    - id: out-of-scope-module-scaffold
+      desc: 问怎么建完整模块该走 module-development
+      input: |
+          我想新建一个模块，CMakeLists 该怎么写？
+      expect_trigger: false
+      route_to: px4-module-development
+      judge: |
+          这是模块脚手架问题，不是消息总线问题。

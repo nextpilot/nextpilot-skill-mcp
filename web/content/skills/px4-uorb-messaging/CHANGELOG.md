@@ -7,10 +7,12 @@
 ## 1.0.0 — 2026-09-19
 
 ### Added
+
 - 初版：定义 / 发布 / 订阅 / 多实例四环节的排查逻辑
 - 「症状 → 原因」对照与 `uorb top` → `listener` 的命令链
 - 多实例按 `device_id` 区分的原则
 - 与 v1.13 老 C API 的兼容性说明
 
 ### Changed
+
 - 文件形态从扁平 `.mdx` 改为目录形态 `SKILL.md` + `README.md` + `EXAMPLE.md` + `CHANGELOG.md`

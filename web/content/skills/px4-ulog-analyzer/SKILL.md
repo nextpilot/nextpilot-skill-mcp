@@ -48,18 +48,18 @@ metadata:
 
 ## 字段速查（按症状）
 
-| 症状 | 主题.字段 |
-|---|---|
+| 症状        | 主题.字段                                                                                         |
+| ----------- | ------------------------------------------------------------------------------------------------- |
 | 振动 / 削波 | `vehicle_imu_status.accel_vibration_metric`、`gyro_clipping[]`（>0 即量程打满，比振动指标更严重） |
-| EKF 创新 | `estimator_status.innovation_check_flags`（按位解析）、`health_flags`、`timeout_flags` |
-| 电源跌落 | `battery_status.cell_voltage[]`（找最差电芯）、`voltage_v`、`system_power.voltage5v_v` |
-| GPS 健康 | `vehicle_gps_position.fix_type`（<3 不可用）、`satellites_used`、`eph`、`jamming_indicator` |
-| 电机平衡 | `actuator_outputs.output[]` / `actuator_motors.control[]`（按固件版本选） |
-| 零偏漂移 | `estimator_sensor_bias.gyro_bias[3]`、`accel_bias[3]` |
-| 姿态振荡 | `vehicle_attitude.q[4]` vs `vehicle_attitude_setpoint.q_d[]`、`vehicle_rates_setpoint` |
-| 失效保护 | `vehicle_status.nav_state`（频繁跳变即模式抖动）、`failsafe`、`rc_signal_lost` |
-| 空速 / VTOL | `airspeed_validated.true_airspeed_m_s`、`vtol_vehicle_status.vtol_in_trans_mode` |
-| 机载消息 | `logged_message.severity`（0 emergency → 7 debug）、`message` |
+| EKF 创新    | `estimator_status.innovation_check_flags`（按位解析）、`health_flags`、`timeout_flags`            |
+| 电源跌落    | `battery_status.cell_voltage[]`（找最差电芯）、`voltage_v`、`system_power.voltage5v_v`            |
+| GPS 健康    | `vehicle_gps_position.fix_type`（<3 不可用）、`satellites_used`、`eph`、`jamming_indicator`       |
+| 电机平衡    | `actuator_outputs.output[]` / `actuator_motors.control[]`（按固件版本选）                         |
+| 零偏漂移    | `estimator_sensor_bias.gyro_bias[3]`、`accel_bias[3]`                                             |
+| 姿态振荡    | `vehicle_attitude.q[4]` vs `vehicle_attitude_setpoint.q_d[]`、`vehicle_rates_setpoint`            |
+| 失效保护    | `vehicle_status.nav_state`（频繁跳变即模式抖动）、`failsafe`、`rc_signal_lost`                    |
+| 空速 / VTOL | `airspeed_validated.true_airspeed_m_s`、`vtol_vehicle_status.vtol_in_trans_mode`                  |
+| 机载消息    | `logged_message.severity`（0 emergency → 7 debug）、`message`                                     |
 
 **版本差异**：较新固件把零偏从 `estimator_status.states[]` 拆到独立的 `estimator_sensor_bias`；解析时按固件版本切换字段绑定，否则老日志读不到。
 
