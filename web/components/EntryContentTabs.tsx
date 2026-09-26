@@ -110,7 +110,12 @@ export function EntryContentTabs({
                 {/* 移动端：tab 等宽铺满一行、藏图标、active 用居中短下划线（参考 skillhub.cn
           的详情页）—— 390px 下四个 tab 一屏全见，不用滑动，点按面积也大。
           桌面端（sm+）：回到「图标 + 自然宽度 + 放不下横向滑」，编辑入口同行右端。 */}
-                <div className="grid grid-cols-4 border-b border-border sm:flex sm:gap-1 sm:overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div
+                    className="grid border-b border-border sm:flex sm:gap-1 sm:overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    // 列数跟 tab 数走：Skill 4 个、MCP 3 个（无 SKILL.md），写死 grid-cols-4
+                    // 会让 MCP 的 tab 挤在左边、空一列。桌面端 sm:flex 后该属性自然失效。
+                    style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
+                >
                     {tabs.map((t) => (
                         <button
                             key={t.key}
