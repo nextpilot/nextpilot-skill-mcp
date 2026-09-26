@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 export const alt = "NextPilot Skill — 飞控 AI Skill 与 MCP 平台";
 export const size = { width: 1200, height: 630 };

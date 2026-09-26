@@ -1,5 +1,6 @@
 import type { ChangelogEntry } from "@/lib/types";
 import { formatDate } from "@/lib/format";
+import ReactMarkdown from "react-markdown";
 
 /** 版本历史（对齐 SkillHub 的版本列表：版本号 / 日期 / 变更条目） */
 export function ChangelogList({ entries, currentVersion }: { entries: ChangelogEntry[]; currentVersion?: string }) {
@@ -33,7 +34,22 @@ export function ChangelogList({ entries, currentVersion }: { entries: ChangelogE
                                 {e.notes.map((n) => (
                                     <li key={n} className="flex gap-2">
                                         <span className="text-border">·</span>
-                                        <span>{n}</span>
+                                        <span className="min-w-0">
+                                            <ReactMarkdown
+                                                allowedElements={["a", "code", "em", "strong", "del"]}
+                                                unwrapDisallowed
+                                                components={{
+                                                    p: ({ children }) => <>{children}</>,
+                                                    code: ({ children }) => (
+                                                        <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-[13px] text-primary/90">
+                                                            {children}
+                                                        </code>
+                                                    ),
+                                                }}
+                                            >
+                                                {n}
+                                            </ReactMarkdown>
+                                        </span>
                                     </li>
                                 ))}
                             </ul>
