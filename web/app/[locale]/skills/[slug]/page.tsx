@@ -53,7 +53,7 @@ export default async function SkillDetailPage({ params }: { params: Promise<{ sl
             <Breadcrumbs items={[{ label: "Skill 技能库", href: "/skills" }, { label: skill.slug }]} />
 
             {/* 两栏：左栏 = 标题 + 内容（纵向堆叠），右栏 = 粘性侧栏（对应 SkillHub 的 390px 侧栏） */}
-            <div className="flex flex-col gap-4 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">
+            <div className="flex flex-col gap-4 lg:grid lg:gap-x-6 lg:[grid-template-columns:minmax(0,1fr)_320px]">
                 <div className="card min-w-0 p-5 sm:p-6">
                     {/* 标题区：图标 + 标题 + slug，其后按组展示头部信息（见 EntryHeaderMeta） */}
                     <header className="mb-8">
