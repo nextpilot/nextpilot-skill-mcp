@@ -293,6 +293,34 @@ body {
 .prose-skill a {
     @apply text-primary underline-offset-2 hover:underline;
 }
+.prose-skill h1 {
+    @apply mt-8 mb-4 text-xl font-semibold text-text;
+}
+.prose-skill h4 {
+    @apply mt-4 mb-2 text-sm font-semibold text-text;
+}
+.prose-skill blockquote {
+    @apply my-4 rounded-r-lg border-l-2 border-primary/40 bg-surface-2 py-2 pl-4 text-sm text-muted;
+}
+.prose-skill table {
+    @apply my-5 w-full border-collapse text-sm;
+}
+.prose-skill th,
+.prose-skill td {
+    @apply border-b border-border px-3 py-2 text-left align-top;
+}
+.prose-skill th {
+    @apply font-semibold text-text;
+}
+.prose-skill td {
+    @apply text-muted;
+}
+.prose-skill hr {
+    @apply my-6 border-border;
+}
+.prose-skill img {
+    @apply my-4 max-w-full rounded-lg;
+}
 
 /* 使用指南正文（MD 文件渲染）。比 prose-skill 更接近文档站：标题带锚点偏移，
    段落行高放宽，代码块落在 surface-2（正文卡片内部，属「凹陷块」）。 */
