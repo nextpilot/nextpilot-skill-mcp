@@ -67,13 +67,14 @@ jobs:
         working-directory: web
         run: pnpm exec playwright install --with-deps chromium
 
-      # --stage build 必须显式列出：`--stage ci` 不含 build，否则每次 CI 会少跑真编译。
+      # --stage 可重复传（不支持逗号多值）；build 必须显式列出：--stage ci 不含 build，
+      # 否则每次 CI 会少跑真编译。
       # --with-e2e 是步骤级开关而非阶段开关——它同时控制两条 E2E：
       #   playwright-smoke（@smoke，约 1~2 分钟）与 playwright-analyze（日志分析全流程，约 5~7 分钟）。
       # 后者上传的是入库的 web/e2e/fixtures/sample.ulg，不依赖本机日志，云端能真跑。
       # 不传这个 flag 两步都会静默跳过（--list-stages 里标 [off] 就是这个意思）。
       - name: 仓库校验（含 E2E 冒烟 + 日志分析全流程）
-        run: python tools/ci/check_all.py --stage build,ci --with-e2e
+        run: python tools/ci/check_all.py --stage build --stage ci --with-e2e
 
       # 日志类那组在 CI 里必然 SKIP，把这句话顶到汇总最上面，免得"全绿"被误读成回归通过
       - name: 提醒：日志类回归未跑

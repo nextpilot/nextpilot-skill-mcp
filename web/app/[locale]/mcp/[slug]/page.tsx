@@ -170,9 +170,9 @@ export default async function McpDetailPage({ params }: { params: Promise<{ slug
                     />
                 </div>
 
-                {/* 右栏：sticky 配方与 skills/[slug] 一致（top-20 = 64px 头部 + 16px 呼吸，
-                    GuideSidebar/GuideOutline 同款；max-h + 内部滚动兜住超长侧栏） */}
-                <aside className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto lg:pb-10">
+                {/* 右栏：不做 sticky——与 skills/[slug] 同一结论（2026-09-26 试过又撤，
+                    用户实测「跟随滚动不好用」）。self-start 保持顶对齐。 */}
+                <aside className="lg:self-start">
                     <EntrySidebar
                         kind="mcp"
                         slug={server.slug}

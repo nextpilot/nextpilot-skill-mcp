@@ -155,10 +155,9 @@ export default async function SkillDetailPage({ params }: { params: Promise<{ sl
                     />
                 </div>
 
-                {/* 右栏：lg 下 sticky 跟随视口。top-20 = 64px 头部 + 16px 呼吸，与
-                    GuideSidebar/GuideOutline 同一配方；max-h + 内部滚动兜住超长侧栏，
-                    self-start 是前提——grid item 默认 stretch 拉满列高，sticky 无滑动空间 */}
-                <aside className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto lg:pb-10">
+                {/* 右栏：不做 sticky——2026-09-26 试过（top-20 + 内部滚动那套），用户实测
+                    否决「跟随滚动不好用」，撤回。self-start 保持右栏与左栏顶对齐。 */}
+                <aside className="lg:self-start">
                     <EntrySidebar
                         kind="skill"
                         slug={skill.slug}
