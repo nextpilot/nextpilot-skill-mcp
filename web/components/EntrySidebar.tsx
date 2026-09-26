@@ -27,8 +27,8 @@ export function EntrySidebar({
     installTitle = "把这个 Skill 交给你的 AI，即可使用",
     /**
      * 内容在仓库里的编辑入口。只有 Skill 传（指向 `SKILL.md`）；
-     * MCP 的编辑入口放在 `EntryContentTabs` 的每个 Tab 上（它有三份文件，侧栏一个入口
-     * 指不清是哪份），所以这里不传就不渲染。
+     * MCP 的编辑入口放在 `EntryContentTabs` 的每个 Tab 上（三份文件各指各的，
+     * 侧栏一个入口指不清是哪份），所以这里不传就不渲染。
      */
     editUrl,
     related,

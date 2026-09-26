@@ -1,10 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, Eye, FileText, History, MessageSquare, Pencil } from "lucide-react";
+import {
+    Check,
+    ChevronLeft,
+    ChevronRight,
+    Copy,
+    Eye,
+    FileText,
+    Folder,
+    FolderOpen,
+    History,
+    MessageSquare,
+    Pencil,
+} from "lucide-react";
 import { contentHostLabel } from "@/lib/constants";
+import type { SkillFile } from "@/lib/types";
 
-type TabKey = "overview" | "skill" | "changelog" | "comments";
+type TabKey = "overview" | "files" | "changelog" | "comments";
 
 /**
  * 详情页内容区 Tab。**Skill 与 MCP 两类条目共用**（`/skills/[slug]` 与 `/mcp/[slug]`）。
@@ -15,26 +28,196 @@ type TabKey = "overview" | "skill" | "changelog" | "comments";
  * `McpContentTabs`（那样就长出一对只差前缀的孪生组件，改一边漏一边）。
  * 家族名取的是两类共有的上位词"收录条目"，见 CLAUDE.md 的命名约定。
  *
- * Skill 的三个内容 Tab 各对应 `web/content/skills/<slug>/` 下的一份文件，所以每个 Tab
- * 都能给出**那一份文件**的仓库编辑入口——改哪份就跳哪份，不让人在仓库里自己找
- * （三份文件用途不同，一律指向"编辑本 Skill"是没法下手的）。
- * 概述 / 版本历史给人看，SKILL.md 给 AI 看（原文展示 + 一键复制，复制的就是
- * 能直接放进 `.claude/skills/` 的那份文件内容）。
+ * Skill 的内容 Tab 各对应 `web/content/skills/<slug>/` 下的文件，所以每个 Tab
+ * 都能给出**那一份文件**的仓库编辑入口——改哪份就跳哪份，不让人在仓库里自己找。
+ * 概述 / 版本历史给人看；「文件」Tab 是整个 Skill 目录的文件浏览器（树形列表 +
+ * 点击打开原文），给 AI 用的 SKILL.md 打开后带一段「这是什么」的说明和一键复制
+ * （复制的就是能直接放进 `.claude/skills/` 的那份文件内容）。
  *
- * MCP 条目虽已拆成目录，但走的是另一份规范（server.json，不是 SKILL.md），
- * 所以它只给 readme / changelog 两个编辑入口，SKILL.md 那个 Tab 不会出现。
+ * MCP 条目走的是另一份规范（server.json，不是 SKILL.md），没有文件浏览这层，
+ * 只给 readme / changelog 两个编辑入口——不传 `files` 就没有「文件」Tab。
  */
+
+/* ---------- 「文件」Tab：目录树 + 点击打开（参考 skillhub.cn 的文件浏览器） ---------- */
+
+function fmtSize(n: number): string {
+    if (n < 1024) return `${n} B`;
+    return `${(n / 1024).toFixed(1)} KB`;
+}
+
+interface TreeNode {
+    name: string;
+    /** 相对 skill 目录的路径；目录不含尾部斜杠 */
+    path: string;
+    isDir: boolean;
+    file?: SkillFile;
+    children: TreeNode[];
+}
+
+function buildTree(files: SkillFile[]): TreeNode[] {
+    const root: TreeNode = { name: "", path: "", isDir: true, children: [] };
+    for (const f of files) {
+        const parts = f.path.split("/");
+        let cur = root;
+        for (let i = 0; i < parts.length - 1; i++) {
+            const p = parts.slice(0, i + 1).join("/");
+            let next = cur.children.find((c) => c.isDir && c.path === p);
+            if (!next) {
+                next = { name: parts[i], path: p, isDir: true, children: [] };
+                cur.children.push(next);
+            }
+            cur = next;
+        }
+        cur.children.push({
+            name: parts[parts.length - 1],
+            path: f.path,
+            isDir: false,
+            file: f,
+            children: [],
+        });
+    }
+    const sort = (nodes: TreeNode[]) => {
+        nodes.sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name) : a.isDir ? -1 : 1));
+        for (const n of nodes) sort(n.children);
+    };
+    sort(root.children);
+    return root.children;
+}
+
+function FileBrowser({ files }: { files: SkillFile[] }) {
+    // 默认停在列表态；点了哪个文件就整个面板换成那份原文，返回按钮回去
+    const [openPath, setOpenPath] = useState<string | null>(null);
+    const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+    const [copied, setCopied] = useState(false);
+
+    const open = openPath ? files.find((f) => f.path === openPath) : undefined;
+
+    async function copyOpen() {
+        if (!open) return;
+        try {
+            await navigator.clipboard.writeText(open.content);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1600);
+        } catch {
+            /* 剪贴板不可用 */
+        }
+    }
+
+    function toggleDir(p: string) {
+        setCollapsed((s) => {
+            const next = new Set(s);
+            if (next.has(p)) next.delete(p);
+            else next.add(p);
+            return next;
+        });
+    }
+
+    const tree = buildTree(files);
+
+    function renderNodes(nodes: TreeNode[], depth: number): React.ReactNode {
+        return nodes.map((n) => {
+            const indent = { paddingLeft: `${8 + depth * 14}px` };
+            if (n.isDir) {
+                const isCollapsed = collapsed.has(n.path);
+                return (
+                    <div key={n.path}>
+                        <button
+                            type="button"
+                            onClick={() => toggleDir(n.path)}
+                            aria-expanded={!isCollapsed}
+                            className="flex w-full items-center gap-1.5 rounded-lg py-1.5 pr-2 text-sm text-text transition-colors hover:bg-surface-2"
+                            style={indent}
+                        >
+                            <ChevronRight
+                                className={`h-3.5 w-3.5 shrink-0 text-muted transition-transform ${isCollapsed ? "" : "rotate-90"}`}
+                            />
+                            {isCollapsed ? (
+                                <Folder className="h-4 w-4 shrink-0 text-muted" />
+                            ) : (
+                                <FolderOpen className="h-4 w-4 shrink-0 text-muted" />
+                            )}
+                            <span className="truncate font-medium">{n.name}/</span>
+                        </button>
+                        {!isCollapsed && renderNodes(n.children, depth + 1)}
+                    </div>
+                );
+            }
+            const active = openPath === n.path;
+            return (
+                <button
+                    key={n.path}
+                    type="button"
+                    onClick={() => setOpenPath(n.path)}
+                    className={`flex w-full items-center gap-1.5 rounded-lg py-1.5 pr-2 text-sm transition-colors ${
+                        active ? "bg-primary/10 font-medium text-primary" : "text-text hover:bg-surface-2"
+                    }`}
+                    style={indent}
+                >
+                    <FileText className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{n.name}</span>
+                    <span className="ml-auto shrink-0 pl-2 text-xs text-muted">{fmtSize(n.file!.size)}</span>
+                </button>
+            );
+        });
+    }
+
+    if (open) {
+        return (
+            <div>
+                <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    <button
+                        type="button"
+                        onClick={() => setOpenPath(null)}
+                        className="btn-ghost shrink-0 px-2.5 py-1.5 text-xs"
+                    >
+                        <ChevronLeft className="h-3.5 w-3.5" />
+                        文件列表
+                    </button>
+                    <span className="min-w-0 truncate font-mono text-[13px] text-muted">{open.path}</span>
+                    <span className="shrink-0 text-xs text-muted">{fmtSize(open.size)}</span>
+                    <button
+                        type="button"
+                        onClick={() => void copyOpen()}
+                        className="btn-ghost ml-auto shrink-0 px-3 py-1.5 text-xs"
+                    >
+                        {copied ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}
+                        {copied ? "已复制" : "复制"}
+                    </button>
+                </div>
+                {open.path === "SKILL.md" && (
+                    <p className="mb-3 text-xs text-muted">
+                        这是 AI 实际读到的指令原文。整个目录拷进 <code className="font-mono">.claude/skills/</code>{" "}
+                        即可作为 Skill 加载。
+                    </p>
+                )}
+                <pre className="max-h-[32rem] overflow-auto rounded-xl border border-border bg-surface-2 p-4 font-mono text-xs leading-6">
+                    {open.content}
+                </pre>
+            </div>
+        );
+    }
+
+    return (
+        <div>
+            <p className="mb-2 text-xs text-muted">共 {files.length} 个文件，点击文件名查看原文</p>
+            <div className="rounded-xl border border-border p-1.5">{renderNodes(tree, 0)}</div>
+        </div>
+    );
+}
+
+/* ---------- Tab 骨架 ---------- */
+
 export function EntryContentTabs({
     overview,
-    skillMdRaw,
+    files,
     changelog,
     comments,
     changelogCount,
     editUrls,
 }: {
     overview: React.ReactNode;
-    /** SKILL.md 全文；不给则不显示该 Tab */
-    skillMdRaw?: string;
+    /** Skill 目录下的文本文件（SKILL.md / README / evals / scripts…）；不给则不显示「文件」Tab */
+    files?: SkillFile[];
     changelog: React.ReactNode;
     comments: React.ReactNode;
     changelogCount: number;
@@ -42,18 +225,6 @@ export function EntryContentTabs({
     editUrls?: { readme?: string; skillMd?: string; changelog?: string };
 }) {
     const [tab, setTab] = useState<TabKey>("overview");
-    const [copied, setCopied] = useState(false);
-
-    async function copySkill() {
-        if (!skillMdRaw) return;
-        try {
-            await navigator.clipboard.writeText(skillMdRaw);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1600);
-        } catch {
-            /* 剪贴板不可用 */
-        }
-    }
 
     const tabs: {
         key: TabKey;
@@ -77,11 +248,12 @@ export function EntryContentTabs({
         },
         { key: "comments", label: "评论", icon: <MessageSquare className="h-3.5 w-3.5" /> },
     ];
-    // SKILL.md 这一层只有 Skill 有，插在「概述」后面，与左栏的阅读顺序一致
-    if (skillMdRaw) {
+    // 「文件」这层只有 Skill 有（整个目录的文件浏览器），插在「概述」后面，与阅读顺序一致；
+    // 编辑入口指向 SKILL.md——目录里最常改的主文件
+    if (files?.length) {
         tabs.splice(1, 0, {
-            key: "skill",
-            label: "SKILL.md",
+            key: "files",
+            label: "文件",
             icon: <FileText className="h-3.5 w-3.5" />,
             editUrl: editUrls?.skillMd,
         });
@@ -89,15 +261,14 @@ export function EntryContentTabs({
 
     const active = tabs.find((t) => t.key === tab);
 
-    // 编辑入口渲染成两份：桌面端与 tab 同行（-mb-px 对齐底线），移动端挪到 tab 行下方
-    // 单独一行右对齐 —— 390px 下 4 个 tab 加一条编辑链接塞一行，每个按钮都会被压到
-    // 文字竖排断行（概/述、版/本/历/史），底线随之参差不齐。
-    const editLink = active?.editUrl ? (
+    // 编辑入口：桌面端与 tab 同行（-mb-px 对齐底线）。移动端**不渲染**——tab 行下方
+    // 再挂一行链接在手机上显得杂，且手机上也没有"顺手去仓库改文件"的场景。
+    const desktopEditLink = active?.editUrl ? (
         <a
             href={active.editUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 pb-2 text-xs text-muted transition-colors hover:text-primary"
+            className="hidden items-center gap-1 pb-2 text-xs text-muted transition-colors hover:text-primary sm:inline-flex"
         >
             <Pencil className="h-3 w-3" />
             {`在 ${contentHostLabel()} 上编辑本页`}
@@ -112,7 +283,7 @@ export function EntryContentTabs({
           桌面端（sm+）：回到「图标 + 自然宽度 + 放不下横向滑」，编辑入口同行右端。 */}
                 <div
                     className="grid border-b border-border sm:flex sm:gap-1 sm:overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                    // 列数跟 tab 数走：Skill 4 个、MCP 3 个（无 SKILL.md），写死 grid-cols-4
+                    // 列数跟 tab 数走：Skill 4 个、MCP 3 个（无「文件」），写死 grid-cols-4
                     // 会让 MCP 的 tab 挤在左边、空一列。桌面端 sm:flex 后该属性自然失效。
                     style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
                 >
@@ -138,38 +309,16 @@ export function EntryContentTabs({
                             )}
                         </button>
                     ))}
-                    {/* 桌面端编辑入口与 tab 同行右端；移动端走下面那行（grid 下 hidden 不占格） */}
-                    {editLink && (
-                        <div className="hidden -mb-px sm:ml-auto sm:block sm:shrink-0 sm:pl-3">{editLink}</div>
+                    {/* 桌面端编辑入口与 tab 同行右端；移动端不出编辑入口 */}
+                    {desktopEditLink && (
+                        <div className="hidden -mb-px sm:ml-auto sm:block sm:shrink-0 sm:pl-3">{desktopEditLink}</div>
                     )}
                 </div>
-                {/* 移动端编辑入口：tab 行下方右对齐，不与 tab 抢宽度 */}
-                {editLink && <div className="flex justify-end pt-1.5 sm:hidden">{editLink}</div>}
             </div>
 
             <div className="pt-6">
                 {tab === "overview" && overview}
-                {tab === "skill" && (
-                    <div>
-                        <div className="mb-3 flex items-center justify-between gap-3">
-                            <p className="text-xs text-muted">
-                                这是 AI 实际读到的指令原文。整个目录拷进{" "}
-                                <code className="font-mono">.claude/skills/</code> 即可作为 Skill 加载。
-                            </p>
-                            <button
-                                type="button"
-                                onClick={() => void copySkill()}
-                                className="btn-ghost shrink-0 px-3 py-1.5 text-xs"
-                            >
-                                {copied ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}
-                                {copied ? "已复制" : "复制 SKILL.md"}
-                            </button>
-                        </div>
-                        <pre className="max-h-[32rem] overflow-auto rounded-xl border border-border bg-surface-2 p-4 font-mono text-xs leading-6">
-                            {skillMdRaw}
-                        </pre>
-                    </div>
-                )}
+                {tab === "files" && files && <FileBrowser files={files} />}
                 {tab === "changelog" && changelog}
                 {tab === "comments" && comments}
             </div>

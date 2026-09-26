@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
-import type { SkillMeta } from "./types";
+import type { SkillFile, SkillMeta } from "./types";
 import { parseChangelogFromMarkdown } from "./changelog";
 import { SKILLS_DIR } from "./content-dir";
 
@@ -97,6 +97,41 @@ export function getSkillBySlug(slug: string): Skill | undefined {
     const dir = path.join(SKILLS_DIR, slug);
     if (!fs.existsSync(path.join(dir, "SKILL.md"))) return undefined;
     return parseSkillDir(slug);
+}
+
+/** 站点当文本展示的扩展名白名单——不在名单里（.ulg 等）就不进「文件」Tab */
+const TEXT_EXTS = new Set([".md", ".markdown", ".yaml", ".yml", ".json", ".py", ".txt", ".toml", ".sh", ".js", ".ts"]);
+
+/**
+ * 列出一个 Skill 目录下的全部文本文件（含内容），供详情页「文件」Tab 展示——
+ * 一个 Skill = 一个可整体拷进 `.claude/skills/` 的目录，目录里有什么这里就列什么，
+ * 参考 skillhub.cn 的文件浏览器：树形列表 + 点击打开。
+ *
+ * 只在详情页调用；`getAllSkills()` 不带文件内容，列表页/索引保持轻量。
+ */
+export function getSkillFiles(slug: string): SkillFile[] {
+    const dir = path.join(SKILLS_DIR, slug);
+    if (!fs.existsSync(dir)) return [];
+    const out: SkillFile[] = [];
+    const walk = (rel: string) => {
+        for (const e of fs.readdirSync(path.join(dir, rel), { withFileTypes: true })) {
+            const relPath = rel ? `${rel}/${e.name}` : e.name;
+            if (e.isDirectory()) walk(relPath);
+            else if (e.isFile() && TEXT_EXTS.has(path.extname(e.name).toLowerCase())) {
+                const full = path.join(dir, relPath);
+                out.push({ path: relPath, size: fs.statSync(full).size, content: fs.readFileSync(full, "utf8") });
+            }
+        }
+    };
+    walk("");
+    // 子目录在前、根目录文件在后，各自按路径字母序——与常见文件浏览器的「目录优先」一致
+    out.sort((a, b) => {
+        const da = a.path.includes("/");
+        const db = b.path.includes("/");
+        if (da !== db) return da ? -1 : 1;
+        return a.path.localeCompare(b.path);
+    });
+    return out;
 }
 
 /** 提供给客户端 Fuse.js 的轻量索引（不含正文） */

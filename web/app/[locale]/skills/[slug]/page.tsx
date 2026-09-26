@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { makePageMeta, softwareAppJsonLd, SITE_URL } from "@/lib/seo";
 import { Eye, Sparkles, Zap } from "lucide-react";
-import { getAllSkills, getSkillBySlug } from "@/lib/skills";
+import { getAllSkills, getSkillBySlug, getSkillFiles } from "@/lib/skills";
 import { JsonLd } from "@/components/JsonLd";
 import { CATEGORY_GLYPH, CATEGORY_LABEL, skillEditUrls } from "@/lib/constants";
 import { GuideBody } from "@/components/GuideBody";
@@ -139,15 +139,15 @@ export default async function SkillDetailPage({ params }: { params: Promise<{ sl
                         />
                     </header>
 
-                    {/* 内容区：概述 / SKILL.md / 版本历史 / 评论
-              三个内容 Tab 各对应 skills/<slug>/ 下的一份文件，各自带一个仓库编辑入口 */}
+                    {/* 内容区：概述 / 文件 / 版本历史 / 评论
+              各内容 Tab 对应 skills/<slug>/ 下的文件，各自带一个仓库编辑入口（移动端不出） */}
                     <EntryContentTabs
                         overview={
                             <article className="prose-skill">
                                 <GuideBody renderer="md" source={skill.readme} />
                             </article>
                         }
-                        skillMdRaw={skill.skillMd}
+                        files={getSkillFiles(skill.slug)}
                         changelog={<ChangelogList entries={skill.changelog ?? []} currentVersion={skill.version} />}
                         comments={<EntryComments kind="skill" slug={skill.slug} />}
                         changelogCount={skill.changelog?.length ?? 0}

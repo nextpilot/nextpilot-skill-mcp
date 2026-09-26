@@ -35,6 +35,19 @@ export interface ChangelogEntry {
 }
 
 /**
+ * Skill 详情页「文件」Tab 里可打开的一个文件（参考 skillhub.cn 的文件浏览器）。
+ * 只收文本文件——`.ulg` 等二进制不该被站点当文本展示，也不会进这个列表。
+ */
+export interface SkillFile {
+    /** 相对 skill 目录的路径，如 `evals/cases.yaml`、`SKILL.md` */
+    path: string;
+    /** 字节数（列表里展示大小用） */
+    size: number;
+    /** 文件全文（UTF-8） */
+    content: string;
+}
+
+/**
  * MCP 服务元数据。
  * 与 Skill 并列而非其子类：Skill 是模型读到的提示词与约定，MCP 服务是客户端
  * 能真正调用的工具集，两者的字段、评估方式和安全要求都不同。
