@@ -57,9 +57,9 @@ export default async function McpDetailPage({ params }: { params: Promise<{ slug
         <div className="page-shell pt-4 pb-10 sm:pt-5">
             <Breadcrumbs items={[{ label: "MCP 服务", href: "/mcp" }, { label: server.slug }]} />
 
-            {/* 与 /skills/[slug] 同构：390px 侧栏 + 12px 列距（EntrySidebar 宽度交给轨道，
+            {/* 与 /skills/[slug] 同构：320px 侧栏 + 12px 列距（EntrySidebar 宽度交给轨道，
                 gap 收窄理由见那边注释） */}
-            <div className="flex flex-col gap-4 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">
+            <div className="flex flex-col gap-4 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_320px]">
                 <div className="card min-w-0 p-5 sm:p-6">
                     <header className="mb-8">
                         <div className="flex items-start gap-4">
@@ -170,7 +170,9 @@ export default async function McpDetailPage({ params }: { params: Promise<{ slug
                     />
                 </div>
 
-                <aside className="lg:self-start">
+                {/* 右栏：sticky 配方与 skills/[slug] 一致（top-20 = 64px 头部 + 16px 呼吸，
+                    GuideSidebar/GuideOutline 同款；max-h + 内部滚动兜住超长侧栏） */}
+                <aside className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto lg:pb-10">
                     <EntrySidebar
                         kind="mcp"
                         slug={server.slug}

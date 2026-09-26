@@ -52,10 +52,10 @@ export default async function SkillDetailPage({ params }: { params: Promise<{ sl
         <div className="page-shell pt-4 pb-10 sm:pt-5">
             <Breadcrumbs items={[{ label: "Skill 技能库", href: "/skills" }, { label: skill.slug }]} />
 
-            {/* 两栏：左栏 = 标题 + 内容（纵向堆叠），右栏 = 390px 侧栏（与 EntrySidebar
+            {/* 两栏：左栏 = 标题 + 内容（纵向堆叠），右栏 = 320px 侧栏（与 EntrySidebar
                 的说明、/mcp/[slug] 一致；gap 收到 12px——左右卡各自有 20px+ 内边距，
                 再叠 24px 的 gap，中缝看着有一掌宽，用户点过名「空白可以减少一些」） */}
-            <div className="flex flex-col gap-4 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_390px]">
+            <div className="flex flex-col gap-4 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_320px]">
                 <div className="card min-w-0 p-5 sm:p-6">
                     {/* 标题区：图标 + 标题 + slug，其后按组展示头部信息（见 EntryHeaderMeta） */}
                     <header className="mb-8">
@@ -155,8 +155,10 @@ export default async function SkillDetailPage({ params }: { params: Promise<{ sl
                     />
                 </div>
 
-                {/* 右栏 */}
-                <aside className="lg:self-start">
+                {/* 右栏：lg 下 sticky 跟随视口。top-20 = 64px 头部 + 16px 呼吸，与
+                    GuideSidebar/GuideOutline 同一配方；max-h + 内部滚动兜住超长侧栏，
+                    self-start 是前提——grid item 默认 stretch 拉满列高，sticky 无滑动空间 */}
+                <aside className="lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto lg:pb-10">
                     <EntrySidebar
                         kind="skill"
                         slug={skill.slug}
