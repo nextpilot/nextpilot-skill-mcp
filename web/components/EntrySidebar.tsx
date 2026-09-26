@@ -51,6 +51,9 @@ export function EntrySidebar({
     // 相关推荐的路径段跟 kind 走：mcp 页的相关推荐是其他 MCP 条目，写死 /skills/
     // 会把它们链到不存在的 skill 页
     const relatedBase = kind === "mcp" ? "mcp" : "skills";
+    // 复制按钮文案跟 kind 走：Skill 复制的是给 AI 的提示词原文（SKILL.md），
+    // MCP 复制的是接入配置（JSON 配置块）——后者叫「Skill 内容」是撒谎
+    const copyLabel = kind === "mcp" ? "复制接入配置" : "复制 SKILL 提示词";
 
     useEffect(() => {
         void getFavorite(kind, slug).then((f) => f && setFav(f));
@@ -76,15 +79,13 @@ export function EntrySidebar({
     }
 
     function download() {
-        // 文件名必须是 SKILL.md：这是 Agent Skills 规范定的名字，落到 .claude/skills/<slug>/
-        // 才能被加载。写成 <slug>.md 就只是"一份格式像 Skill 的文档"，加载不了。
-        const blob = new Blob([copyText], { type: "text/markdown;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
+        // 安装包走 /api/skills/<slug>/download：整个 Skill 目录打成 zip（含 assets
+        // 里的示例 .ulg、evals、scripts），解压出来就是一个能直接拷进 .claude/skills/
+        // 的目录。只下载 SKILL.md 单文件的话，这些伴生文件就丢了。
         const a = document.createElement("a");
-        a.href = url;
-        a.download = "SKILL.md";
+        a.href = `/api/skills/${slug}/download`;
+        a.download = `${slug}.zip`;
         a.click();
-        URL.revokeObjectURL(url);
         setDownloaded(true);
         if (delta === 0) {
             void trackDownload(kind, slug);
@@ -101,12 +102,17 @@ export function EntrySidebar({
 
                 <button type="button" onClick={() => void copy()} className="btn-primary mt-4 w-full py-2.5">
                     {copied ? <Check className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-                    {copied ? "已复制，粘贴给 AI 即可" : "复制 Skill 内容"}
+                    {copied ? "已复制，粘贴给 AI 即可" : copyLabel}
                 </button>
-                <button type="button" onClick={download} className="btn-ghost mt-2 w-full py-2.5 text-muted">
-                    {downloaded ? <Check className="h-4 w-4 text-ok" /> : <Download className="h-4 w-4" />}
-                    {downloaded ? "已下载" : "下载 SKILL.md"}
-                </button>
+                {/* 安装包下载只有 Skill 有：MCP 的「安装」就是复制配置接进客户端，
+                    没有可下载的包；旧版给 MCP 也挂「下载 SKILL.md」，实际下载的是
+                    接入配置文本存成 SKILL.md，是个坏按钮，撤掉。 */}
+                {kind === "skill" && (
+                    <button type="button" onClick={download} className="btn-ghost mt-2 w-full py-2.5 text-muted">
+                        {downloaded ? <Check className="h-4 w-4 text-ok" /> : <Download className="h-4 w-4" />}
+                        {downloaded ? "已下载" : "下载 SKILL 安装包"}
+                    </button>
+                )}
 
                 <button
                     type="button"

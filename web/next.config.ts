@@ -81,12 +81,18 @@ const nextConfig: NextConfig = {
     },
     // 仅开发环境：Next 路由未命中的 /api、/internal 转给边缘函数垫片（app/edge-dev）。
     // afterFiles 保证 /api/auth/*（NextAuth）等真实路由优先，生产构建不注册这些 rewrite。
+    //
+    // 负向排除清单 = 需要真实 Next route 的前缀（auth 之外新增了 skills/）：
+    // 实测 afterFiles 在 dev 下会**抢在真实 route 之前** rewrite，所以凡是有真实
+    // route 的前缀必须在这里放行，否则本地被转进垫片白名单、静默 404。
+    // skills/ = Skill 安装包下载（app/api/skills/[slug]/download）：zip 打包要
+    // node:fs + jszip，边缘函数运行时没有文件系统，只能在 Node 侧做。
     async rewrites() {
         if (!isDev) return [];
         return {
             afterFiles: [
                 // 负向匹配必须放行 /api/auth/*（NextAuth 是真实 Next 路由；afterFiles 在 dev 下也会优先 rewrite）
-                { source: "/api/:path((?!auth/).*)", destination: "/edge-dev/api/:path*" },
+                { source: "/api/:path((?!auth/|skills/).*)", destination: "/edge-dev/api/:path*" },
                 { source: "/internal/:path*", destination: "/edge-dev/internal/:path*" },
                 // 根级自检探针：`functions/foo.js` 的 URL 就是 `/foo`（不挂 /api 前缀）。
                 // 不加这三条它们在本地永远 404 —— 而这三个恰恰是"部署前手工验一遍"的工具，

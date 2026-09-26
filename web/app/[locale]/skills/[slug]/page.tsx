@@ -165,7 +165,7 @@ export default async function SkillDetailPage({ params }: { params: Promise<{ sl
                         baseDownloads={skill.downloads}
                         copyText={skill.skillMd}
                         editUrl={editUrls.skillMd}
-                        installHint="复制下方全部内容，粘贴到 Claude / ChatGPT / Cursor 等对话里，或作为 System Prompt 使用；也可把整个目录放进 .claude/skills/ 直接作为 Skill 加载。原始 .ulg 等数据始终留在你自己的设备上。"
+                        installHint="复制下方全部内容，粘贴到 Claude / ChatGPT / Cursor 等对话里，或作为 System Prompt 使用；也可下载安装包（整个目录的 zip），解压进 .claude/skills/ 直接作为 Skill 加载。原始 .ulg 等数据始终留在你自己的设备上。"
                         related={related}
                     />
                 </aside>
