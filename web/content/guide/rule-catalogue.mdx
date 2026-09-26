@@ -29,8 +29,8 @@ order: 12
 - `has_invalid = invalid_frac is not None`
 - `tas_min = _try(min(airspeed_validated.true_airspeed_m_s))`
 - 判定：
-- **critical** | `has_invalid and invalid_frac >= 0.50` | threshold 0.5 | description "空速传感器在固定翼段大部分时间无效（{invalid_frac:.0%} 样本）" | label=low_airspeed
-- **warning** | `has_invalid and invalid_frac >= 0.10` | threshold 0.1 | description "空速传感器间歇无效（{invalid_frac:.0%} 样本）" | label=low_airspeed
+- **critical** | `has_invalid and invalid_frac >= 0.50` | threshold 0.5 | description "空速传感器在固定翼段大部分时间无效（\{invalid_frac:.0%\} 样本）" | label=low_airspeed
+- **warning** | `has_invalid and invalid_frac >= 0.10` | threshold 0.1 | description "空速传感器间歇无效（\{invalid_frac:.0%\} 样本）" | label=low_airspeed
 - 产出：airspeedInvalidRatio=invalid_frac, airspeedMinM=tas_min, tag=low_airspeed
 
 
@@ -46,9 +46,9 @@ order: 12
 - `peak_roll = max(err_roll)`
 - `worst_roll = excursion_events(err_roll, ats, T0_US, threshold=15.0, limit=1)`
 - 判定：
-- **critical** | `dur_s >= 1.0 and peak > 25.0` | threshold 25 | unit deg | description "横滚跟踪失败，持续 {dur_s:.1f} s、误差峰值 {peak:.0f}°（t={start_s:.1f}s）"
-- **warning** | `dur_s >= 1.0` | threshold 15 | unit deg | description "横滚持续偏离指令 {dur_s:.1f} s，误差峰值 {peak:.0f}°（t={start_s:.1f}s）"
-- **warning** | `peak_roll > 30.0` | threshold 30 | unit deg | description "横滚跟踪误差瞬时尖峰 {peak_roll:.0f}°"
+- **critical** | `dur_s >= 1.0 and peak > 25.0` | threshold 25 | unit deg | description "横滚跟踪失败，持续 \{dur_s:.1f\} s、误差峰值 \{peak:.0f\}°（t=\{start_s:.1f\}s）"
+- **warning** | `dur_s >= 1.0` | threshold 15 | unit deg | description "横滚持续偏离指令 \{dur_s:.1f\} s，误差峰值 \{peak:.0f\}°（t=\{start_s:.1f\}s）"
+- **warning** | `peak_roll > 30.0` | threshold 30 | unit deg | description "横滚跟踪误差瞬时尖峰 \{peak_roll:.0f\}°"
 - 产出：tag=apm_attitude_tracking_error
 
 ### px4-attitude-overshoot — 姿态跟踪超调
@@ -71,10 +71,10 @@ order: 12
 - `p99_stat = p99 if seg_ok else None`
 - `osc_stat = osc_hz if seg_ok else None`
 - 判定：
-- **critical** | `p99_stat >= 40.0 and IS_FIXED_WING` | threshold 25 | unit ° | description "姿态跟踪误差过大（p99 {p99_stat:.1f}°）" | label=attitude_overshoot
-- **warning** | `p99_stat >= 25.0 and IS_FIXED_WING` | threshold 25 | unit ° | description "姿态跟踪误差偏大（p99 {p99_stat:.1f}°）" | label=attitude_overshoot
-- **critical** | `p99_stat >= 30.0 and not IS_FIXED_WING` | threshold 15 | unit ° | description "姿态跟踪误差过大（p99 {p99_stat:.1f}°）" | label=attitude_overshoot
-- **warning** | `p99_stat >= 15.0 and not IS_FIXED_WING` | threshold 15 | unit ° | description "姿态跟踪误差偏大（p99 {p99_stat:.1f}°）" | label=attitude_overshoot
+- **critical** | `p99_stat >= 40.0 and IS_FIXED_WING` | threshold 25 | unit ° | description "姿态跟踪误差过大（p99 \{p99_stat:.1f\}°）" | label=attitude_overshoot
+- **warning** | `p99_stat >= 25.0 and IS_FIXED_WING` | threshold 25 | unit ° | description "姿态跟踪误差偏大（p99 \{p99_stat:.1f\}°）" | label=attitude_overshoot
+- **critical** | `p99_stat >= 30.0 and not IS_FIXED_WING` | threshold 15 | unit ° | description "姿态跟踪误差过大（p99 \{p99_stat:.1f\}°）" | label=attitude_overshoot
+- **warning** | `p99_stat >= 15.0 and not IS_FIXED_WING` | threshold 15 | unit ° | description "姿态跟踪误差偏大（p99 \{p99_stat:.1f\}°）" | label=attitude_overshoot
 - 产出：attitudeErrDegP99=p99_stat, attitudeOscHz=osc_stat, tag=attitude_overshoot
 
 ### apm-attitude-pitch — 俯仰跟踪误差
@@ -87,9 +87,9 @@ order: 12
 - `peak_pitch = max(err_pitch)`
 - `worst_pitch = excursion_events(err_pitch, ats, T0_US, threshold=15.0, limit=1)`
 - 判定：
-- **critical** | `dur_s >= 1.0 and peak > 25.0` | threshold 25 | unit deg | description "俯仰跟踪失败，持续 {dur_s:.1f} s、误差峰值 {peak:.0f}°（t={start_s:.1f}s）"
-- **warning** | `dur_s >= 1.0` | threshold 15 | unit deg | description "俯仰持续偏离指令 {dur_s:.1f} s，误差峰值 {peak:.0f}°（t={start_s:.1f}s）"
-- **warning** | `peak_pitch > 30.0` | threshold 30 | unit deg | description "俯仰跟踪误差瞬时尖峰 {peak_pitch:.0f}°"
+- **critical** | `dur_s >= 1.0 and peak > 25.0` | threshold 25 | unit deg | description "俯仰跟踪失败，持续 \{dur_s:.1f\} s、误差峰值 \{peak:.0f\}°（t=\{start_s:.1f\}s）"
+- **warning** | `dur_s >= 1.0` | threshold 15 | unit deg | description "俯仰持续偏离指令 \{dur_s:.1f\} s，误差峰值 \{peak:.0f\}°（t=\{start_s:.1f\}s）"
+- **warning** | `peak_pitch > 30.0` | threshold 30 | unit deg | description "俯仰跟踪误差瞬时尖峰 \{peak_pitch:.0f\}°"
 - 产出：tag=apm_attitude_tracking_error
 
 ### px4-attitude-oscillation — 姿态误差高频振荡
@@ -112,8 +112,8 @@ order: 12
 - `p99_stat = p99 if seg_ok else None`
 - `osc_stat = osc_hz if seg_ok else None`
 - 判定：
-- **warning** | `osc_stat >= 4.0 and p99_stat >= 25.0 and IS_FIXED_WING` | threshold 4 | unit Hz | description "姿态误差高频振荡（约 {osc_stat:.1f} Hz）" | label=attitude_overshoot
-- **warning** | `osc_stat >= 4.0 and p99_stat >= 15.0 and not IS_FIXED_WING` | threshold 4 | unit Hz | description "姿态误差高频振荡（约 {osc_stat:.1f} Hz）" | label=attitude_overshoot
+- **warning** | `osc_stat >= 4.0 and p99_stat >= 25.0 and IS_FIXED_WING` | threshold 4 | unit Hz | description "姿态误差高频振荡（约 \{osc_stat:.1f\} Hz）" | label=attitude_overshoot
+- **warning** | `osc_stat >= 4.0 and p99_stat >= 15.0 and not IS_FIXED_WING` | threshold 4 | unit Hz | description "姿态误差高频振荡（约 \{osc_stat:.1f\} Hz）" | label=attitude_overshoot
 - 产出：attitudeErrDegP99=p99_stat, attitudeOscHz=osc_stat, tag=attitude_overshoot
 
 ### apm-attitude-yaw — 航向跟踪误差
@@ -126,9 +126,9 @@ order: 12
 - `peak_yaw = max(err_yaw)`
 - `worst_yaw = excursion_events(err_yaw, ats, T0_US, threshold=15.0, limit=1)`
 - 判定：
-- **critical** | `dur_s >= 1.0 and peak > 25.0` | threshold 25 | unit deg | description "航向跟踪失败，持续 {dur_s:.1f} s、误差峰值 {peak:.0f}°（t={start_s:.1f}s）"
-- **warning** | `dur_s >= 1.0` | threshold 15 | unit deg | description "航向持续偏离指令 {dur_s:.1f} s，误差峰值 {peak:.0f}°（t={start_s:.1f}s）"
-- **warning** | `peak_yaw > 30.0` | threshold 30 | unit deg | description "航向跟踪误差瞬时尖峰 {peak_yaw:.0f}°"
+- **critical** | `dur_s >= 1.0 and peak > 25.0` | threshold 25 | unit deg | description "航向跟踪失败，持续 \{dur_s:.1f\} s、误差峰值 \{peak:.0f\}°（t=\{start_s:.1f\}s）"
+- **warning** | `dur_s >= 1.0` | threshold 15 | unit deg | description "航向持续偏离指令 \{dur_s:.1f\} s，误差峰值 \{peak:.0f\}°（t=\{start_s:.1f\}s）"
+- **warning** | `peak_yaw > 30.0` | threshold 30 | unit deg | description "航向跟踪误差瞬时尖峰 \{peak_yaw:.0f\}°"
 - 产出：tag=apm_attitude_tracking_error
 
 
@@ -148,8 +148,8 @@ order: 12
 - `crit_v = cells * 3.3`
 - `low_v = cells * 3.5`
 - 判定：
-- **critical** | `vmin <= crit_v and vmax <= 70.0` | threshold 3.3 | unit V | description "电池电压触及临界线，最低 {vmin:.2f} V"
-- **warning** | `vmin <= low_v and vmax <= 70.0` | threshold 3.5 | unit V | description "电池电压触及低电压告警线，最低 {vmin:.2f} V"
+- **critical** | `vmin <= crit_v and vmax <= 70.0` | threshold 3.3 | unit V | description "电池电压触及临界线，最低 \{vmin:.2f\} V"
+- **warning** | `vmin <= low_v and vmax <= 70.0` | threshold 3.5 | unit V | description "电池电压触及低电压告警线，最低 \{vmin:.2f\} V"
 - 产出：tag=apm_battery_low_voltage
 
 ### px4-power-cell-voltage — 单电芯电压
@@ -176,7 +176,7 @@ order: 12
 - `peak_curr = max(curr)`
 - `sag = np.ptp(volts[curr > 20.0])`
 - 判定：
-- **info** | `sag >= 1.0` | threshold 1 | unit V | description "大电流下压降 {sag:.2f} V（峰值电流 {peak_curr:.1f} A）"
+- **info** | `sag >= 1.0` | threshold 1 | unit V | description "大电流下压降 \{sag:.2f\} V（峰值电流 \{peak_curr:.1f\} A）"
 - 产出：tag=apm_battery_sag
 
 ### px4-power-sag — 飞行中持续压降
@@ -187,7 +187,7 @@ order: 12
 - `cell_min_t = rows_aggregate(battery_status.voltage_cell_v, agg="min", gt=0)`
 - `drop, tail = head_tail_median_drop(cell_min_t, battery_status.timestamp, ARMED_INTERVALS, skip_first_s=5, min_seg=20)`
 - 判定：
-- **warning** | `drop >= 0.30 and tail < 3.70` | threshold 0.3 | unit V | description "飞行中单电芯持续压降 {drop:.2f} V（尾段中位 {tail:.2f} V）"
+- **warning** | `drop >= 0.30 and tail < 3.70` | threshold 0.3 | unit V | description "飞行中单电芯持续压降 \{drop:.2f\} V（尾段中位 \{tail:.2f\} V）"
 - 产出：batteryCellSagFlight=drop, tag=battery_voltage_drop
 
 ### apm-battery-sudden-drop — 电池电压突降
@@ -200,8 +200,8 @@ order: 12
 - `vmed = median(volts)`
 - `drops = step_drop_events(volts, vts, T0_US) if (vmed > 4.0 and 70.0 > vmed) else None`
 - 判定：
-- **critical** | `not recovered and drop > 4.0` | threshold 4 | unit V | description "电池电压在 {dt_s:.3f} s 内跌落 {drop:.2f} V（t={start_s:.2f}s）"
-- **warning** | `not recovered` | threshold 2 | unit V | description "电池电压在 {dt_s:.3f} s 内跌落 {drop:.2f} V（t={start_s:.2f}s）"
+- **critical** | `not recovered and drop > 4.0` | threshold 4 | unit V | description "电池电压在 \{dt_s:.3f\} s 内跌落 \{drop:.2f\} V（t=\{start_s:.2f\}s）"
+- **warning** | `not recovered` | threshold 2 | unit V | description "电池电压在 \{dt_s:.3f\} s 内跌落 \{drop:.2f\} V（t=\{start_s:.2f\}s）"
 - 产出：tag=apm_battery_sudden_drop
 
 ### px4-power-remaining — 电池剩余电量
@@ -212,8 +212,8 @@ order: 12
 - `rem = min_ge(battery_status.remaining, ge=0)`
 - `rem_pct = rem * 100`
 - 判定：
-- **critical** | `rem <= 0.10` | threshold 0.1 | description "电池剩余电量极低（{rem_pct:.0f}%）"
-- **warning** | `rem <= 0.20` | threshold 0.2 | description "电池剩余电量偏低（{rem_pct:.0f}%）"
+- **critical** | `rem <= 0.10` | threshold 0.1 | description "电池剩余电量极低（\{rem_pct:.0f\}%）"
+- **warning** | `rem <= 0.20` | threshold 0.2 | description "电池剩余电量偏低（\{rem_pct:.0f\}%）"
 - 产出：batteryRemainingMin=rem, tag=battery_voltage_drop
 
 
@@ -230,8 +230,8 @@ order: 12
 - `range_ratio = np.ptp(mag) / mean_mag`
 - `n_mag = len(mag)`
 - 判定：
-- **critical** | `cv_mag > 0.60 and n_mag >= 10` | threshold 0.6 | description "罗盘场强极不稳定，变异系数 {cv_mag:.2f}（{mean_mag:.0f} mGauss 均值上摆动）"
-- **warning** | `(cv_mag > 0.30 or range_ratio > 0.60) and n_mag >= 10` | threshold 0.3 | description "罗盘场强摆动偏大，变异系数 {cv_mag:.2f}、极差比 {range_ratio:.2f}（均值 {mean_mag:.0f} mGauss）"
+- **critical** | `cv_mag > 0.60 and n_mag >= 10` | threshold 0.6 | description "罗盘场强极不稳定，变异系数 \{cv_mag:.2f\}（\{mean_mag:.0f\} mGauss 均值上摆动）"
+- **warning** | `(cv_mag > 0.30 or range_ratio > 0.60) and n_mag >= 10` | threshold 0.3 | description "罗盘场强摆动偏大，变异系数 \{cv_mag:.2f\}、极差比 \{range_ratio:.2f\}（均值 \{mean_mag:.0f\} mGauss）"
 - 产出：tag=apm_compass_interference
 
 
@@ -277,8 +277,8 @@ order: 12
 - 取值：
 - `cpu_max = max(cpuload.load)`
 - 判定：
-- **critical** | `cpu_max >= 0.95` | threshold 0.95 | description "CPU 负载峰值 {cpu_max:.0%} 超阈值"
-- **warning** | `cpu_max >= 0.90` | threshold 0.9 | description "CPU 负载峰值 {cpu_max:.0%} 偏高"
+- **critical** | `cpu_max >= 0.95` | threshold 0.95 | description "CPU 负载峰值 \{cpu_max:.0%\} 超阈值"
+- **warning** | `cpu_max >= 0.90` | threshold 0.9 | description "CPU 负载峰值 \{cpu_max:.0%\} 偏高"
 - 产出：cpuLoadMax=cpu_max
 
 
@@ -293,8 +293,8 @@ order: 12
 - `fault_union = _try(coalesce(fault_raw, 0))`
 - `crit_bits = _try(has_bits(fault_union, 63))`
 - 判定：
-- **critical** | `crit_bits` | threshold 0 | description "EKF 报告核心融合硬故障（filter_fault_flags={fault_union}）"
-- **info** | `fault_union > 0 and not crit_bits` | threshold 0 | description "EKF 报告非核心辅助传感器融合拒绝（filter_fault_flags={fault_union}，常见为未使用视觉/光流）"
+- **critical** | `crit_bits` | threshold 0 | description "EKF 报告核心融合硬故障（filter_fault_flags=\{fault_union\}）"
+- **info** | `fault_union > 0 and not crit_bits` | threshold 0 | description "EKF 报告非核心辅助传感器融合拒绝（filter_fault_flags=\{fault_union\}，常见为未使用视觉/光流）"
 - 产出：tag=ekf_innovation_failure
 
 
@@ -324,8 +324,8 @@ order: 12
   fallback_label="未知通道")`
 - `pct = frac * 100`
 - 判定：
-- **critical** | `pct >= 5.0` | threshold 5 | unit % | description "EKF 创新检验持续失败（estimator #{inst}：{names}）"
-- **warning** | `pct >= 1.0` | threshold 1 | unit % | description "EKF 创新检验偶发失败（estimator #{inst}：{names}）"
+- **critical** | `pct >= 5.0` | threshold 5 | unit % | description "EKF 创新检验持续失败（estimator #\{inst\}：\{names\}）"
+- **warning** | `pct >= 1.0` | threshold 1 | unit % | description "EKF 创新检验偶发失败（estimator #\{inst\}：\{names\}）"
 - 产出：ekfRejectRatioPct=pct, tag=ekf_innovation_failure
 
 
@@ -338,8 +338,8 @@ order: 12
 - 取值：
 - `sv_max = max(ref("XKF4.SV", "NKF4.SV"))`
 - 判定：
-- **critical** | `sv_max > 1.0` | threshold 1 | description "EKF 速度检验比超拒绝线，峰值 {sv_max:.2f}"
-- **warning** | `sv_max > 0.8` | threshold 0.8 | description "EKF 速度检验比偏高，峰值 {sv_max:.2f}"
+- **critical** | `sv_max > 1.0` | threshold 1 | description "EKF 速度检验比超拒绝线，峰值 \{sv_max:.2f\}"
+- **warning** | `sv_max > 0.8` | threshold 0.8 | description "EKF 速度检验比偏高，峰值 \{sv_max:.2f\}"
 - 产出：tag=apm_ekf_variance_high
 
 ### apm-ekf-position — EKF 位置检验比
@@ -349,8 +349,8 @@ order: 12
 - 取值：
 - `sp_max = max(ref("XKF4.SP", "NKF4.SP"))`
 - 判定：
-- **critical** | `sp_max > 1.0` | threshold 1 | description "EKF 位置检验比超拒绝线，峰值 {sp_max:.2f}"
-- **warning** | `sp_max > 0.8` | threshold 0.8 | description "EKF 位置检验比偏高，峰值 {sp_max:.2f}"
+- **critical** | `sp_max > 1.0` | threshold 1 | description "EKF 位置检验比超拒绝线，峰值 \{sp_max:.2f\}"
+- **warning** | `sp_max > 0.8` | threshold 0.8 | description "EKF 位置检验比偏高，峰值 \{sp_max:.2f\}"
 - 产出：tag=apm_ekf_variance_high
 
 ### apm-ekf-height — EKF 高度检验比
@@ -360,8 +360,8 @@ order: 12
 - 取值：
 - `sh_max = max(ref("XKF4.SH", "NKF4.SH"))`
 - 判定：
-- **critical** | `sh_max > 1.0` | threshold 1 | description "EKF 高度检验比超拒绝线，峰值 {sh_max:.2f}"
-- **warning** | `sh_max > 0.8` | threshold 0.8 | description "EKF 高度检验比偏高，峰值 {sh_max:.2f}"
+- **critical** | `sh_max > 1.0` | threshold 1 | description "EKF 高度检验比超拒绝线，峰值 \{sh_max:.2f\}"
+- **warning** | `sh_max > 0.8` | threshold 0.8 | description "EKF 高度检验比偏高，峰值 \{sh_max:.2f\}"
 - 产出：tag=apm_ekf_variance_high
 
 ### apm-ekf-magnetometer — EKF 磁罗盘检验比
@@ -371,8 +371,8 @@ order: 12
 - 取值：
 - `sm_max = max(ref("XKF4.SM", "NKF4.SM"))`
 - 判定：
-- **critical** | `sm_max > 1.0` | threshold 1 | description "EKF 磁罗盘检验比超拒绝线，峰值 {sm_max:.2f}"
-- **warning** | `sm_max > 0.8` | threshold 0.8 | description "EKF 磁罗盘检验比偏高，峰值 {sm_max:.2f}"
+- **critical** | `sm_max > 1.0` | threshold 1 | description "EKF 磁罗盘检验比超拒绝线，峰值 \{sm_max:.2f\}"
+- **warning** | `sm_max > 0.8` | threshold 0.8 | description "EKF 磁罗盘检验比偏高，峰值 \{sm_max:.2f\}"
 - 产出：tag=apm_ekf_variance_high
 
 
@@ -387,8 +387,8 @@ order: 12
 - `err_count = len(err_subsys)`
 - `crit_count = sum(np.isin(err_subsys, [5, 6, 7, 9, 12, 16, 17, 25, 29, 30]))`
 - 判定：
-- **critical** | `crit_count > 0` | threshold 0 | unit 条 | description "发生 {crit_count} 条安全关键子系统错误（ERR）"
-- **warning** | `err_count > 0` | threshold 0 | unit 条 | description "发生 {err_count} 条子系统错误（ERR）"
+- **critical** | `crit_count > 0` | threshold 0 | unit 条 | description "发生 \{crit_count\} 条安全关键子系统错误（ERR）"
+- **warning** | `err_count > 0` | threshold 0 | unit 条 | description "发生 \{err_count\} 条子系统错误（ERR）"
 - 产出：tag=apm_subsystem_error
 
 ### apm-ev-events — 关键事件（EV）
@@ -400,8 +400,8 @@ order: 12
 - `ev_count = len(ev_id)`
 - `key_count = sum(np.isin(ev_id, [19, 54, 59, 60, 62]))`
 - 判定：
-- **warning** | `key_count > 0` | threshold 0 | unit 条 | description "日志含 {key_count} 条关键异常事件（EV）"
-- **info** | `ev_count > 0` | threshold 0 | unit 条 | description "日志共记录 {ev_count} 条事件（EV）"
+- **warning** | `key_count > 0` | threshold 0 | unit 条 | description "日志含 \{key_count\} 条关键异常事件（EV）"
+- **info** | `ev_count > 0` | threshold 0 | unit 条 | description "日志共记录 \{ev_count\} 条事件（EV）"
 - 产出：tag=apm_critical_event_logged
 
 ### apm-mode-timeline — 模式时间线（占位）
@@ -424,7 +424,7 @@ order: 12
 - 取值：
 - `events = rising_edge_events(vehicle_status.failsafe, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)`
 - 判定：
-- **critical** | `True` | description "触发失效保护（飞行中，t={t_s:.1f}s）" | label=failsafe
+- **critical** | `True` | description "触发失效保护（飞行中，t=\{t_s:.1f\}s）" | label=failsafe
 - 产出：-
 
 ### px4-failsafe-rc_signal_lost — 遥控信号丢失
@@ -434,7 +434,7 @@ order: 12
 - 取值：
 - `events = rising_edge_events(vehicle_status.rc_signal_lost, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)`
 - 判定：
-- **warning** | `True` | description "遥控信号丢失（飞行中，t={t_s:.1f}s）" | label=rc_lost
+- **warning** | `True` | description "遥控信号丢失（飞行中，t=\{t_s:.1f\}s）" | label=rc_lost
 - 产出：-
 
 ### px4-failsafe-data_link_lost — 数据链路丢失
@@ -444,7 +444,7 @@ order: 12
 - 取值：
 - `events = rising_edge_events(vehicle_status.data_link_lost, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)`
 - 判定：
-- **warning** | `True` | description "数据链路丢失（飞行中，t={t_s:.1f}s）"
+- **warning** | `True` | description "数据链路丢失（飞行中，t=\{t_s:.1f\}s）"
 - 产出：-
 
 ### px4-failsafe-engine_failure — 动力故障保护
@@ -454,7 +454,7 @@ order: 12
 - 取值：
 - `events = rising_edge_events(vehicle_status.engine_failure, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)`
 - 判定：
-- **critical** | `True` | description "发动机/动力故障保护（飞行中，t={t_s:.1f}s）"
+- **critical** | `True` | description "发动机/动力故障保护（飞行中，t=\{t_s:.1f\}s）"
 - 产出：-
 
 ### px4-failsafe-mission_failure — 任务失效保护
@@ -464,7 +464,7 @@ order: 12
 - 取值：
 - `events = rising_edge_events(vehicle_status.mission_failure, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)`
 - 判定：
-- **critical** | `True` | description "任务失效保护（飞行中，t={t_s:.1f}s）"
+- **critical** | `True` | description "任务失效保护（飞行中，t=\{t_s:.1f\}s）"
 - 产出：-
 
 ### px4-failsafe-nav — 失效保护导航状态
@@ -474,7 +474,7 @@ order: 12
 - 取值：
 - `events = step_into_events(vehicle_status.nav_state, vehicle_status.timestamp, ARMED_INTERVALS, T0_US, codes={5: "AUTO_RTL", 12: "DESCEND", 13: "TERMINATION", 18: "LAND"})`
 - 判定：
-- **critical** | `True` | description "飞行中导航状态切换为 {name}（t={t_s:.1f}s）" | label=failsafe
+- **critical** | `True` | description "飞行中导航状态切换为 \{name\}（t=\{t_s:.1f\}s）" | label=failsafe
 - 产出：-
 
 
@@ -490,8 +490,8 @@ order: 12
 - `status_armed = status[interval_mask(GPS.timestamp, ARMED_INTERVALS)]`
 - `smin_armed = min(status_armed)`
 - 判定：
-- **warning** | `smax < 3.0` | threshold 3 | description "全程未达 3D 定位，最高状态 {smax:.0f}"
-- **critical** | `smin_armed < 3.0` | threshold 3 | description "飞行中丢过 3D 定位，armed 段最低状态 {smin_armed:.0f}"
+- **warning** | `smax < 3.0` | threshold 3 | description "全程未达 3D 定位，最高状态 \{smax:.0f\}"
+- **critical** | `smin_armed < 3.0` | threshold 3 | description "飞行中丢过 3D 定位，armed 段最低状态 \{smin_armed:.0f\}"
 - 产出：tag=apm_gps_no_fix
 
 ### px4-gps-eph — GPS 水平位置误差
@@ -504,8 +504,8 @@ order: 12
 - `e_p95 = percentile(eph_m, p=95)`
 - `e_max = max(eph_m)`
 - 判定：
-- **warning** | `e_p95 >= 10.0` | threshold 10 | unit m | description "GPS 水平位置误差持续偏大（p95 {e_p95:.1f} m）" | label=gps_eph_high
-- **info** | `e_p95 >= 5.0` | threshold 5 | unit m | description "GPS 水平位置误差偶发偏大（p95 {e_p95:.1f} m）" | label=gps_eph_high
+- **warning** | `e_p95 >= 10.0` | threshold 10 | unit m | description "GPS 水平位置误差持续偏大（p95 \{e_p95:.1f\} m）" | label=gps_eph_high
+- **info** | `e_p95 >= 5.0` | threshold 5 | unit m | description "GPS 水平位置误差偶发偏大（p95 \{e_p95:.1f\} m）" | label=gps_eph_high
 - 产出：gpsEphP95M=e_p95, gpsEphMaxM=e_max, tag=gps_eph_high
 
 ### apm-gps-sats — GPS 搜星数
@@ -515,8 +515,8 @@ order: 12
 - 取值：
 - `nmin = min(GPS.NSats[interval_mask(GPS.timestamp, ARMED_INTERVALS)])`
 - 判定：
-- **critical** | `nmin < 4` | threshold 4 | unit 颗 | description "飞行中搜星数最低仅 {nmin} 颗"
-- **warning** | `nmin < 6` | threshold 6 | unit 颗 | description "飞行中搜星数偏低，最低 {nmin} 颗"
+- **critical** | `nmin < 4` | threshold 4 | unit 颗 | description "飞行中搜星数最低仅 \{nmin\} 颗"
+- **warning** | `nmin < 6` | threshold 6 | unit 颗 | description "飞行中搜星数偏低，最低 \{nmin\} 颗"
 - 产出：tag=apm_gps_low_sats
 
 ### px4-gps-sats — GPS 卫星数
@@ -526,7 +526,7 @@ order: 12
 - 取值：
 - `s_min = min(vehicle_gps_position.satellites_used)`
 - 判定：
-- **warning** | `s_min <= 6` | threshold 8 | unit 颗 | description "GPS 卫星数最少仅 {s_min} 颗" | label=gps_eph_high
+- **warning** | `s_min <= 6` | threshold 8 | unit 颗 | description "GPS 卫星数最少仅 \{s_min\} 颗" | label=gps_eph_high
 - 产出：gpsSatellitesMin=s_min, tag=gps_eph_high
 
 ### apm-gps-hdop — GPS 水平精度因子
@@ -536,8 +536,8 @@ order: 12
 - 取值：
 - `hmax = max(GPS.HDop[interval_mask(GPS.timestamp, ARMED_INTERVALS) & (GPS.Status > 2.5)])`
 - 判定：
-- **critical** | `hmax > 5.0` | threshold 5 | description "飞行中 HDOP 峰值 {hmax:.1f}，水平位置不可用"
-- **warning** | `hmax > 2.0` | threshold 2 | description "飞行中 HDOP 峰值 {hmax:.1f}，卫星几何偏弱"
+- **critical** | `hmax > 5.0` | threshold 5 | description "飞行中 HDOP 峰值 \{hmax:.1f\}，水平位置不可用"
+- **warning** | `hmax > 2.0` | threshold 2 | description "飞行中 HDOP 峰值 \{hmax:.1f\}，卫星几何偏弱"
 - 产出：tag=apm_gps_high_hdop
 
 ### px4-gps-jump — GPS 位置跳变
@@ -548,7 +548,7 @@ order: 12
 - `step = _try(adjacent_speed_mps( ref("vehicle_gps_position.latitude_deg", "vehicle_gps_position.lat", unit="deg"), ref("vehicle_gps_position.longitude_deg", "vehicle_gps_position.lon", unit="deg"), ref("vehicle_gps_position.timestamp")))`
 - `njump = _try(np.sum(step > 50.0))`
 - 判定：
-- **warning** | `njump >= 3` | threshold 3 | unit 次 | description "GPS 位置出现 {njump} 次异常跳变（>50 m/s）" | label=gps_jump
+- **warning** | `njump >= 3` | threshold 3 | unit 次 | description "GPS 位置出现 \{njump\} 次异常跳变（>50 m/s）" | label=gps_jump
 - 产出：gpsJumpCount=njump, tag=gps_jump
 
 
@@ -615,8 +615,8 @@ order: 12
 - `temp_range = _try(max_temp_range(vehicle_imu_status.temperature_gyro, vehicle_air_data.ambient_temperature))`
 - `bias_stat = _try(np.maximum(worst_abs, worst_drift))`
 - 判定：
-- **critical** | `worst_abs >= 0.05 or worst_drift >= 0.05` | threshold 0.02 | unit rad/s | description "陀螺零偏异常（轴 {worst_axis}：绝对值 {worst_abs:.4f} rad/s，漂移 {worst_drift:.4f} rad/s）" | label=imu_bias_drift
-- **warning** | `worst_abs >= 0.02 or worst_drift >= 0.02` | threshold 0.02 | unit rad/s | description "陀螺零偏异常（轴 {worst_axis}：绝对值 {worst_abs:.4f} rad/s，漂移 {worst_drift:.4f} rad/s）" | label=imu_bias_drift
+- **critical** | `worst_abs >= 0.05 or worst_drift >= 0.05` | threshold 0.02 | unit rad/s | description "陀螺零偏异常（轴 \{worst_axis\}：绝对值 \{worst_abs:.4f\} rad/s，漂移 \{worst_drift:.4f\} rad/s）" | label=imu_bias_drift
+- **warning** | `worst_abs >= 0.02 or worst_drift >= 0.02` | threshold 0.02 | unit rad/s | description "陀螺零偏异常（轴 \{worst_axis\}：绝对值 \{worst_abs:.4f\} rad/s，漂移 \{worst_drift:.4f\} rad/s）" | label=imu_bias_drift
 - **guard** | `temp_range >= 15` | description "Data quality: temperature_change_large" | label=temperature_change_large
 - 产出：gyroBiasMaxRadS=worst_abs, gyroBiasDriftRadS=worst_drift, gyroBiasSource=src_text, imuTempRangeC=temp_range, tag=imu_bias_drift
 
@@ -631,7 +631,7 @@ order: 12
 - `n = count_items(MESSAGES, key="level_name", in_list=["EMERGENCY", "ALERT", "CRITICAL", "ERROR"])`
 - `samples = take_items(MESSAGES, key="level_name", in_list=["EMERGENCY", "ALERT", "CRITICAL", "ERROR"], limit=5, clip={"message": 200}, drop=["level", "level_name"])`
 - 判定：
-- **critical** | `n > 0` | threshold 0 | unit 条 | description "日志中出现 {n} 条 ERROR 及以上消息"
+- **critical** | `n > 0` | threshold 0 | unit 条 | description "日志中出现 \{n\} 条 ERROR 及以上消息"
 - 产出：-
 
 ### px4-log-warnings — 日志警告消息
@@ -642,7 +642,7 @@ order: 12
 - `n = count_items(MESSAGES, key="level_name", eq="WARNING")`
 - `samples = take_items(MESSAGES, key="level_name", eq="WARNING", limit=5, clip={"message": 200}, drop=["level", "level_name"])`
 - 判定：
-- **warning** | `n > 0` | threshold 0 | unit 条 | description "日志中出现 {n} 条 WARNING 消息"
+- **warning** | `n > 0` | threshold 0 | unit 条 | description "日志中出现 \{n\} 条 WARNING 消息"
 - 产出：-
 
 
@@ -655,7 +655,7 @@ order: 12
 - 取值：
 - `n_changes = edges_count(vehicle_status.nav_state)`
 - 判定：
-- **warning** | `n_changes > 12` | threshold 12 | unit 次 | description "飞行模式切换 {n_changes} 次（>12），可能存在模式抖动"
+- **warning** | `n_changes > 12` | threshold 12 | unit 次 | description "飞行模式切换 \{n_changes\} 次（>12），可能存在模式抖动"
 - 产出：navStateChanges=n_changes
 
 
@@ -671,8 +671,8 @@ order: 12
 - `hot_ch = hot + 1`
 - `cold_ch = cold + 1`
 - 判定：
-- **critical** | `spread > 300.0` | threshold 300 | unit us | description "电机输出严重不平衡，极差 {spread:.0f} us（{n_active} 个活跃通道）"
-- **warning** | `spread > 150.0` | threshold 150 | unit us | description "电机输出不平衡，极差 {spread:.0f} us（{n_active} 个活跃通道）"
+- **critical** | `spread > 300.0` | threshold 300 | unit us | description "电机输出严重不平衡，极差 \{spread:.0f\} us（\{n_active\} 个活跃通道）"
+- **warning** | `spread > 150.0` | threshold 150 | unit us | description "电机输出不平衡，极差 \{spread:.0f\} us（\{n_active\} 个活跃通道）"
 - 产出：tag=apm_motor_output_unbalance
 
 ### px4-motor-unbalance — 电机输出不平衡
@@ -685,8 +685,8 @@ order: 12
 - `seg = active_window_mask(mts, ARMED_INTERVALS, vehicle_status.nav_state, vehicle_status.timestamp, codes=[2, 4, 6, 14, 21], min_active=20)`
 - `spread, busiest, idlest, n_active = column_spread_stats( cols, seg, min_mean=0.01, min_channels=4)`
 - 判定：
-- **critical** | `spread >= 0.15` | threshold 0.15 | description "电机输出不平衡（悬停段通道 {busiest} 与 {idlest} 差 {spread:.3f}）" | label=motor_output_unbalance
-- **warning** | `spread >= 0.08` | threshold 0.08 | description "电机输出差异偏大（通道 {busiest} 与 {idlest} 差 {spread:.3f}）" | label=motor_output_unbalance
+- **critical** | `spread >= 0.15` | threshold 0.15 | description "电机输出不平衡（悬停段通道 \{busiest\} 与 \{idlest\} 差 \{spread:.3f\}）" | label=motor_output_unbalance
+- **warning** | `spread >= 0.08` | threshold 0.08 | description "电机输出差异偏大（通道 \{busiest\} 与 \{idlest\} 差 \{spread:.3f\}）" | label=motor_output_unbalance
 - 产出：motorControlSpread=spread, motorCountActive=n_active, tag=motor_output_unbalance
 
 ### apm-motor-saturation — 电机输出饱和
@@ -697,8 +697,8 @@ order: 12
 - `cols = [RCOU.C1, RCOU.C2, RCOU.C3, RCOU.C4, RCOU.C5, RCOU.C6, RCOU.C7, RCOU.C8]`
 - `sats = column_ratio_events(cols, 1950.0, min_frac=0.20, min_mean=1100.0)`
 - 判定：
-- **critical** | `frac > 0.50` | threshold 0.5 | unit % | description "电机 {channel} 号通道长时间满舵（均值 {mean:.0f} us）"
-- **warning** | `True` | threshold 0.2 | unit % | description "电机 {channel} 号通道接近满舵（均值 {mean:.0f} us）"
+- **critical** | `frac > 0.50` | threshold 0.5 | unit % | description "电机 \{channel\} 号通道长时间满舵（均值 \{mean:.0f\} us）"
+- **warning** | `True` | threshold 0.2 | unit % | description "电机 \{channel\} 号通道接近满舵（均值 \{mean:.0f\} us）"
 - 产出：tag=apm_motor_output_saturated
 
 
@@ -716,7 +716,7 @@ order: 12
 - `all_low = low1 & low2 & low3 & low4`
 - `lost_samples = sum(all_low)`
 - 判定：
-- **warning** | `lost_samples > 0` | threshold 1000 | unit 样本 | description "四个主通道曾同时低于 1000us，共 {lost_samples} 个样本"
+- **warning** | `lost_samples > 0` | threshold 1000 | unit 样本 | description "四个主通道曾同时低于 1000us，共 \{lost_samples\} 个样本"
 - 产出：tag=apm_rc_link_loss
 
 
@@ -750,7 +750,7 @@ order: 12
 - 取值：
 - `unhealthy_ratio = np.mean(MAG.Health == 0.0)`
 - 判定：
-- **warning** | `unhealthy_ratio > 0.20` | threshold 0.2 | description "罗盘不健康样本占比 {unhealthy_ratio:.0%}"
+- **warning** | `unhealthy_ratio > 0.20` | threshold 0.2 | description "罗盘不健康样本占比 \{unhealthy_ratio:.0%\}"
 - 产出：tag=apm_compass_unhealthy
 
 
@@ -764,7 +764,7 @@ order: 12
 - `gts = ref("IMU.timestamp", "ATT.timestamp", "VIBE.timestamp")`
 - `gaps = gap_events(gts, T0_US)`
 - 判定：
-- **warning** | `True` | threshold 0.5 | unit s | description "日志间隙 {gap_s:.2f} s（t={start_s:.2f}s 起，{end_s:.2f}s 恢复）"
+- **warning** | `True` | threshold 0.5 | unit s | description "日志间隙 \{gap_s:.2f\} s（t=\{start_s:.2f\}s 起，\{end_s:.2f\}s 恢复）"
 - 产出：tag=apm_logging_gap
 
 ### apm-timing-long-loops — 调度长循环
@@ -774,7 +774,7 @@ order: 12
 - 取值：
 - `long_loops = sum(PM.NLon)`
 - 判定：
-- **warning** | `long_loops > 0` | threshold 0 | unit 次 | description "调度记录到 {long_loops:.0f} 次长循环"
+- **warning** | `long_loops > 0` | threshold 0 | unit 次 | description "调度记录到 \{long_loops:.0f\} 次长循环"
 - 产出：tag=apm_scheduler_long_loops
 
 
@@ -790,9 +790,9 @@ order: 12
 - `frac_warn = np.sum(vx > 30.0) / len(vx)`
 - `frac_crit = np.sum(vx > 60.0) / len(vx)`
 - 判定：
-- **critical** | `vx_max > 60.0 or frac_crit > 0.0` | threshold 60 | unit m/s^2 | description "X 轴振动严重超标，峰值 {vx_max:.0f} m/s^2"
-- **warning** | `frac_warn >= 0.10` | threshold 30 | unit m/s^2 | description "X 轴振动持续偏大，峰值 {vx_max:.0f} m/s^2"
-- **info** | `vx_max > 30.0` | threshold 30 | unit m/s^2 | description "X 轴振动偶有冒尖，峰值 {vx_max:.0f} m/s^2"
+- **critical** | `vx_max > 60.0 or frac_crit > 0.0` | threshold 60 | unit m/s^2 | description "X 轴振动严重超标，峰值 \{vx_max:.0f\} m/s^2"
+- **warning** | `frac_warn >= 0.10` | threshold 30 | unit m/s^2 | description "X 轴振动持续偏大，峰值 \{vx_max:.0f\} m/s^2"
+- **info** | `vx_max > 30.0` | threshold 30 | unit m/s^2 | description "X 轴振动偶有冒尖，峰值 \{vx_max:.0f\} m/s^2"
 - 产出：tag=apm_high_vibration
 
 ### px4-vibration — 高频振动
@@ -803,8 +803,8 @@ order: 12
 - `vibe_mean, vibe_p95, vibe_max, imu_idx = worst_mean_stats(
   ref("vehicle_imu_status[:].accel_vibration_metric"), min_mean=0)`
 - 判定：
-- **critical** | `vibe_mean >= 9.81` | threshold 9.81 | unit m/s^2 | description "高频振动严重超标（IMU #{imu_idx}）"
-- **warning** | `vibe_mean >= 4.905` | threshold 4.905 | unit m/s^2 | description "高频振动偏大（IMU #{imu_idx}）"
+- **critical** | `vibe_mean >= 9.81` | threshold 9.81 | unit m/s^2 | description "高频振动严重超标（IMU #\{imu_idx\}）"
+- **warning** | `vibe_mean >= 4.905` | threshold 4.905 | unit m/s^2 | description "高频振动偏大（IMU #\{imu_idx\}）"
 - 产出：imuAccelVibrationMean=vibe_mean, imuAccelVibrationP95=vibe_p95, imuAccelVibrationMax=vibe_max, tag=high_vibration
 
 ### apm-vibration-y — Y 轴振动
@@ -817,9 +817,9 @@ order: 12
 - `frac_warn = np.sum(vy > 30.0) / len(vy)`
 - `frac_crit = np.sum(vy > 60.0) / len(vy)`
 - 判定：
-- **critical** | `vy_max > 60.0 or frac_crit > 0.0` | threshold 60 | unit m/s^2 | description "Y 轴振动严重超标，峰值 {vy_max:.0f} m/s^2"
-- **warning** | `frac_warn >= 0.10` | threshold 30 | unit m/s^2 | description "Y 轴振动持续偏大，峰值 {vy_max:.0f} m/s^2"
-- **info** | `vy_max > 30.0` | threshold 30 | unit m/s^2 | description "Y 轴振动偶有冒尖，峰值 {vy_max:.0f} m/s^2"
+- **critical** | `vy_max > 60.0 or frac_crit > 0.0` | threshold 60 | unit m/s^2 | description "Y 轴振动严重超标，峰值 \{vy_max:.0f\} m/s^2"
+- **warning** | `frac_warn >= 0.10` | threshold 30 | unit m/s^2 | description "Y 轴振动持续偏大，峰值 \{vy_max:.0f\} m/s^2"
+- **info** | `vy_max > 30.0` | threshold 30 | unit m/s^2 | description "Y 轴振动偶有冒尖，峰值 \{vy_max:.0f\} m/s^2"
 - 产出：tag=apm_high_vibration
 
 ### apm-vibration-z — Z 轴振动
@@ -832,9 +832,9 @@ order: 12
 - `frac_warn = np.sum(vz > 30.0) / len(vz)`
 - `frac_crit = np.sum(vz > 60.0) / len(vz)`
 - 判定：
-- **critical** | `vz_max > 60.0 or frac_crit > 0.0` | threshold 60 | unit m/s^2 | description "Z 轴振动严重超标，峰值 {vz_max:.0f} m/s^2"
-- **warning** | `frac_warn >= 0.10` | threshold 30 | unit m/s^2 | description "Z 轴振动持续偏大，峰值 {vz_max:.0f} m/s^2"
-- **info** | `vz_max > 30.0` | threshold 30 | unit m/s^2 | description "Z 轴振动偶有冒尖，峰值 {vz_max:.0f} m/s^2"
+- **critical** | `vz_max > 60.0 or frac_crit > 0.0` | threshold 60 | unit m/s^2 | description "Z 轴振动严重超标，峰值 \{vz_max:.0f\} m/s^2"
+- **warning** | `frac_warn >= 0.10` | threshold 30 | unit m/s^2 | description "Z 轴振动持续偏大，峰值 \{vz_max:.0f\} m/s^2"
+- **info** | `vz_max > 30.0` | threshold 30 | unit m/s^2 | description "Z 轴振动偶有冒尖，峰值 \{vz_max:.0f\} m/s^2"
 - 产出：tag=apm_high_vibration
 
 ### px4-imu-clipping — 加速度计削波
@@ -846,9 +846,9 @@ order: 12
   ref("vehicle_imu_status[:].accel_clipping", alias="clipping"))`
 - `clip_stat = clip if clip > 0 else None`
 - 判定：
-- **critical** | `clip >= 1000` | threshold 1000 | unit count | description "加速度计削波严重：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）"
-- **warning** | `clip >= 100` | threshold 100 | unit count | description "检测到明显加速度计削波：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）"
-- **info** | `clip > 0` | threshold 0 | unit count | description "偶发加速度计削波：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）"
+- **critical** | `clip >= 1000` | threshold 1000 | unit count | description "加速度计削波严重：IMU #\{clip_idx\} 轴 \{clip_axis\} 全日志累计削波 \{clip\} 次（理想值为 0）"
+- **warning** | `clip >= 100` | threshold 100 | unit count | description "检测到明显加速度计削波：IMU #\{clip_idx\} 轴 \{clip_axis\} 全日志累计削波 \{clip\} 次（理想值为 0）"
+- **info** | `clip > 0` | threshold 0 | unit count | description "偶发加速度计削波：IMU #\{clip_idx\} 轴 \{clip_axis\} 全日志累计削波 \{clip\} 次（理想值为 0）"
 - 产出：imuAccelClippingCountMax=clip_stat, tag=high_vibration
 
 ### apm-clip-0 — 加速度计削波（IMU0）
@@ -858,8 +858,8 @@ order: 12
 - 取值：
 - `clip0_total = np.ptp(VIBE.Clip0)`
 - 判定：
-- **critical** | `clip0_total >= 100.0` | threshold 100 | unit 次 | description "IMU0 削波 {clip0_total:.0f} 次"
-- **warning** | `clip0_total > 0.0` | threshold 0 | unit 次 | description "IMU0 削波 {clip0_total:.0f} 次"
+- **critical** | `clip0_total >= 100.0` | threshold 100 | unit 次 | description "IMU0 削波 \{clip0_total:.0f\} 次"
+- **warning** | `clip0_total > 0.0` | threshold 0 | unit 次 | description "IMU0 削波 \{clip0_total:.0f\} 次"
 - 产出：tag=apm_accel_clipping
 
 ### apm-clip-1 — 加速度计削波（IMU1）
@@ -869,8 +869,8 @@ order: 12
 - 取值：
 - `clip1_total = np.ptp(VIBE.Clip1)`
 - 判定：
-- **critical** | `clip1_total >= 100.0` | threshold 100 | unit 次 | description "IMU1 削波 {clip1_total:.0f} 次"
-- **warning** | `clip1_total > 0.0` | threshold 0 | unit 次 | description "IMU1 削波 {clip1_total:.0f} 次"
+- **critical** | `clip1_total >= 100.0` | threshold 100 | unit 次 | description "IMU1 削波 \{clip1_total:.0f\} 次"
+- **warning** | `clip1_total > 0.0` | threshold 0 | unit 次 | description "IMU1 削波 \{clip1_total:.0f\} 次"
 - 产出：tag=apm_accel_clipping
 
 ### apm-clip-2 — 加速度计削波（IMU2）
@@ -880,8 +880,8 @@ order: 12
 - 取值：
 - `clip2_total = np.ptp(VIBE.Clip2)`
 - 判定：
-- **critical** | `clip2_total >= 100.0` | threshold 100 | unit 次 | description "IMU2 削波 {clip2_total:.0f} 次"
-- **warning** | `clip2_total > 0.0` | threshold 0 | unit 次 | description "IMU2 削波 {clip2_total:.0f} 次"
+- **critical** | `clip2_total >= 100.0` | threshold 100 | unit 次 | description "IMU2 削波 \{clip2_total:.0f\} 次"
+- **warning** | `clip2_total > 0.0` | threshold 0 | unit 次 | description "IMU2 削波 \{clip2_total:.0f\} 次"
 - 产出：tag=apm_accel_clipping
 
 
@@ -901,7 +901,7 @@ order: 12
 - `has_tilt = tilt_max is not None`
 - `tilt_stat = _try(tilt_max if enough else None)`
 - 判定：
-- **warning** | `has_tilt and enough and tilt_max > 8.0` | threshold 8 | unit ° | description "VTOL 转换阶段姿态越限（最大 {tilt_max:.1f}°，限值 8°）" | label=vtol_convert_attitude_over
+- **warning** | `has_tilt and enough and tilt_max > 8.0` | threshold 8 | unit ° | description "VTOL 转换阶段姿态越限（最大 \{tilt_max:.1f\}°，限值 8°）" | label=vtol_convert_attitude_over
 - 产出：vtolTransitionSamples=trans_n, vtolTransitionMaxTiltDeg=tilt_stat, tag=vtol_convert_attitude_over
 
 
@@ -919,7 +919,7 @@ order: 12
                  wind_estimate.windspeed_east)),
   p=95)`
 - 判定：
-- **warning** | `w_p95 >= 12.0` | threshold 8 | unit m/s | description "估计风速较大（p95 {w_p95:.1f} m/s）" | label=wind_disturb
-- **info** | `w_p95 >= 8.0` | threshold 8 | unit m/s | description "估计风速偏大（p95 {w_p95:.1f} m/s）" | label=wind_disturb
+- **warning** | `w_p95 >= 12.0` | threshold 8 | unit m/s | description "估计风速较大（p95 \{w_p95:.1f\} m/s）" | label=wind_disturb
+- **info** | `w_p95 >= 8.0` | threshold 8 | unit m/s | description "估计风速偏大（p95 \{w_p95:.1f\} m/s）" | label=wind_disturb
 - **guard** | `w_p95 >= 8.0` | description "Data quality: wind_strong" | label=wind_strong
 - 产出：windSpeedP95M=w_p95, tag=wind_disturb

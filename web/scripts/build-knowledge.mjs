@@ -1164,13 +1164,20 @@ function rejectEngineOnlyConditions(conditions, where, what) {
     }
 }
 
+/** 知识源自由文本进生成页正文前的转义：`{`/`}` 会被 MDX 当成 JSX 表达式开头
+ *  （acorn 直接报 "Could not parse expression with acorn"，如描述里的 `{invalid_frac:.0%}`），
+ *  `|` 在表格单元格会撑破列。反斜杠转义在正文与表格里都还原成原字符。 */
+function escMdxText(s) {
+    return String(s).replace(/[|{}]/g, (c) => `\\${c}`);
+}
+
 function fmtApplicability(raw) {
     const parts = [];
     // conditions 的三个键（不限就整个省掉）：固件 / 机架 / 依赖的 topic
     if (raw.firmware !== "any") parts.push("固件 " + raw.firmware);
     if (raw.vehicle !== "any") parts.push("机架 " + listOr(raw.vehicle, ""));
     for (const cand of raw.topics ?? []) parts.push("需要 " + cand.join(" 或 "));
-    for (const w of raw.precheck ?? []) parts.push("不跑当 " + w);
+    for (const w of raw.precheck ?? []) parts.push("不跑当 " + escMdxText(w));
     return parts.join(" ｜ ") || "总是适用";
 }
 
@@ -1193,7 +1200,7 @@ function fmtTriggers(raw) {
         const bits = [`**${sevs}**`, `\`${whens}\``];
         if (thrs !== undefined && thrs !== null) bits.push(`threshold ${thrs}`);
         if (t.evidence?.unit) bits.push(`unit ${t.evidence.unit}`);
-        bits.push(`description "${descs}"`);
+        bits.push(`description "${escMdxText(descs)}"`);
         if (t.label) bits.push(`label=${t.label}`);
         lines.push("- " + bits.join(" | "));
     }
@@ -1235,7 +1242,7 @@ function renderCatalogue(rules, sources) {
             current = slot;
             body.push(`\n## ${SLOT_LABEL[slot] ?? slot}（group: \`${slot}\`）\n`);
         }
-        body.push(`### ${raw.id} — ${raw.name ?? ""}\n`);
+        body.push(`### ${raw.id} — ${escMdxText(raw.name ?? "")}\n`);
         body.push(`- 文件：\`rules/${file}\` ｜ 位置：group \`${slot}\` #${raw.order ?? "—"}`);
         body.push(`- 适用：${fmtApplicability(raw)}`);
         body.push(`- 取值：\n${fmtCompute(raw)}`);
@@ -1324,7 +1331,7 @@ function operatorCatalog(py, sigs) {
         for (const { name, sig } of grouped[sec]) {
             const ins = (sig.in_names ?? sig.in_display ?? []).map((n) => `\`${n}\``).join(" / ");
             const outs = (sig.out_names ?? sig.out_display ?? []).map((n) => `\`${n}\``).join(" / ");
-            const desc = sig.desc ?? "";
+            const desc = escMdxText(sig.desc ?? "");
             lines.push(`| \`${name}\` | ${ins || "—"} | ${outs || "—"} | ${desc} |`);
         }
         lines.push("");
@@ -1336,8 +1343,9 @@ function builtinTable(api) {
     const vars = api?.builtinVarDocs ?? {};
     const keys = Object.keys(vars);
     if (keys.length === 0) return "";
-    // 单元格里出现 `|` 会撑破表格（`int|None` 这种类型就带一个），一律转义
-    const cell = (s) => String(s).replace(/\|/g, "\\|");
+    // 单元格转义交 escMdxText：`|` 撑破表格（`int|None` 这种类型就带一个），
+    // `{`/`}` 会被当 JSX 表达式（api.py 的 doc 里就有 `{参数名: 值}`）
+    const cell = escMdxText;
     const lines = ["| 变量 | 类型 | 说明 |", "|------|------|------|"];
     for (const k of keys) {
         lines.push(`| \`${k}\` | ${cell(vars[k].type)} | ${cell(vars[k].doc)} |`);

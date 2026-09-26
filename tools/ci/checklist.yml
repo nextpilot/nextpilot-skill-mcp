@@ -226,6 +226,15 @@ jobs:
         command: ["{NODE}", "scripts/check-mcp-spec.mjs"]
         hint: "web/content/mcp/ 下有目录不合 server.json（MCP Registry）规范。按上面的输出补齐；upstream_status: pending 的条目是 SKIP 不是放行，核实后要补 server.json 并删掉该字段。"
 
+      # guide 页正文由 next-mdx-remote 在请求期才编译：next build 不碰它、markdownlint 只管
+      # 写法风格、build:kb --check 只比对生成产物——正文混进裸 `{` 会一路绿到用户打开页面
+      # 才 500（2026-09-26 实际发生）。这一条在本地真编译一遍，手写页与生成页都受检。
+      - id: "check-guide-mdx"
+        name: "Guide MDX compiles (check-guide-mdx)"
+        workdir: "{WEB}"
+        command: ["{NODE}", "scripts/check-guide-mdx.mjs"]
+        hint: "content/guide/ 下有 mdx 编译不过（多半是裸 { 未转义）。生成页改 build-knowledge.mjs 的 escMdxText 注入点后重新 build:kb；手写页用反斜杠转义或挪进反引号。"
+
       # 需要真实日志的回归。日志不入仓库（CLAUDE.md 第 9 节：原始日志不上传服务器），
       # 所以 CI 上这四项必然 SKIP —— 这就是它们归 push 而不是 ci 的原因。
       - id: "compare-baseline"

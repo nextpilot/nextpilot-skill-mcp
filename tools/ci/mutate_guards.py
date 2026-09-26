@@ -121,6 +121,12 @@ GUARDS = {
         "fail-lines",
     ),
     # APM 解析器版本：解析逻辑的 AST 指纹 vs 手维护的 parserVersion —— 快、无依赖、不需要日志
+    "apm": (
+        [PY, "tools/engine/guard_apm_parser_version.py"],
+        ROOT,
+        "APM 解析器版本（guard_apm_parser_version）",
+        "fail-lines",
+    ),
     # 拼接命名：knowledge/engine/ 的片段顶层名字撞车 —— 只做 AST 遍历，快、无依赖
     "engine-names": (
         [PY, "tools/engine/guard_engine_names.py"],
@@ -128,6 +134,9 @@ GUARDS = {
         "拼接命名（guard_engine_names）",
         "fail-lines",
     ),
+    # 指南 MDX 可编译：guide 页正文请求期才编译，next build / markdownlint / build:kb
+    # --check 三道门都看不见它 —— 快、无依赖、不需要日志
+    "guide-mdx": ([NODE, "scripts/check-guide-mdx.mjs"], WEB, "指南 MDX 可编译（check-guide-mdx）", "fail-lines"),
 }
 
 
@@ -832,6 +841,30 @@ MUTATIONS: list[Mutation] = [
         new="",
         guard="engine-names",
         expect="这道门挂在统一入口上",
+        note="check_all.py 只按清单转发 —— 清单里没它，这份检查就再也不会被执行",
+    ),
+    # ---- 内容侧：guide 页正文必须能过 MDX 编译（2026-09-26） ----
+    #
+    # 正文由 next-mdx-remote 在**请求期**编译：next build 不碰它、markdownlint 只管风格、
+    # build:kb --check 只比对生成产物。知识源描述里的格式占位符（{invalid_frac:.0%}）
+    # 一旦没转义就混进正文，会一路绿到用户打开页面才 500 —— 2026-09-26 实际发生。
+    # 反例打在手写的 index.mdx 上：生成文件的一致性另有 build:kb --check 管，两层各管各的。
+    Mutation(
+        name="指南正文混进裸花括号（生成器转义被绕过的原形）",
+        path="web/content/guide/index.mdx",
+        old="下面用三步走通平台的三个入口。",
+        new="下面用三步走通平台的三个入口。\n\n知识源描述反例：{invalid_frac:.0%} 样本。",
+        guard="guide-mdx",
+        expect="mdx-compile",
+        note="airspeed.yaml 描述带 {invalid_frac:.0%}，rule-catalogue.mdx 一打开就 500",
+    ),
+    Mutation(
+        name="指南 MDX 这道门从 checklist.yml 里被摘掉（没人再跑它）",
+        path="tools/ci/checklist.yml",
+        old='      - id: "check-guide-mdx"',
+        new="",
+        guard="guide-mdx",
+        expect="mdx-wiring",
         note="check_all.py 只按清单转发 —— 清单里没它，这份检查就再也不会被执行",
     ),
 ]
