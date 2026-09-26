@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { Link } from "@/i18n/routing";
-import { Bookmark, BookmarkCheck, Check, Download, Pencil, Sparkles } from "lucide-react";
+import { ArrowRight, Bookmark, BookmarkCheck, Check, Download, Pencil, Sparkles } from "lucide-react";
 import { getFavorite, toggleFavorite, trackDownload, type FavoriteStats, type Kind } from "@/lib/community-stats";
 import { contentHostLabel } from "@/lib/constants";
 
 /**
- * 详情页右栏（版式参照腾讯 SkillHub 的 390px 侧栏；宽度由页面的 grid 轨道给，
+ * 详情页右栏（版式参照腾讯 SkillHub 的侧栏收窄到 320px；宽度由页面的 grid 轨道给，
  * 这里不写死——skill / mcp 两个详情页共用本组件，轨道各改各的就会像当年那样
  * 一边 320px 一边 390px，卡比轨道宽的 70px 会向右溢出、贴出内容区）：
  * 安装卡（复制/下载/收藏）→ 相关推荐；元信息在左栏分组表内。
@@ -48,6 +48,9 @@ export function EntrySidebar({
     const [copied, setCopied] = useState(false);
     const [downloaded, setDownloaded] = useState(false);
     const [delta, setDelta] = useState(0);
+    // 相关推荐的路径段跟 kind 走：mcp 页的相关推荐是其他 MCP 条目，写死 /skills/
+    // 会把它们链到不存在的 skill 页
+    const relatedBase = kind === "mcp" ? "mcp" : "skills";
 
     useEffect(() => {
         void getFavorite(kind, slug).then((f) => f && setFav(f));
@@ -137,24 +140,34 @@ export function EntrySidebar({
                     <h3 className="mb-3 text-sm font-semibold">相关推荐</h3>
                     <ul className="divide-y divide-border/60">
                         {related.map((r) => (
-                            <li key={r.slug} className="py-2.5 first:pt-0 last:pb-0">
-                                <Link href={`/skills/${r.slug}`} className="group flex items-start gap-2.5">
+                            <li key={r.slug} className="py-1 first:pt-0 last:pb-0">
+                                {/* 悬停反馈三件套（习语取自 SkillHub 的卡片）：整条浮起（负 margin
+                                    让高亮块比文字宽、文字仍与标题对齐）→ 标题变主色 → 箭头从左滑入；
+                                    箭头常驻占位（只动透明度/位移），悬停时文字不回流。 */}
+                                <Link
+                                    href={`/${relatedBase}/${r.slug}`}
+                                    className="group -mx-2 flex items-start gap-2.5 rounded-lg px-2 py-1.5 transition-colors duration-200 hover:bg-surface-2"
+                                >
                                     {r.icon && (
                                         <span
-                                            className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface-2 text-sm"
+                                            className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-surface-2 text-sm transition-all duration-200 group-hover:scale-110 group-hover:bg-surface"
                                             aria-hidden
                                         >
                                             {r.icon}
                                         </span>
                                     )}
                                     <span className="min-w-0">
-                                        <span className="block truncate text-sm font-medium text-text group-hover:text-primary">
+                                        <span className="block truncate text-sm font-medium text-text transition-colors duration-200 group-hover:text-primary">
                                             {r.name}
                                         </span>
                                         <span className="mt-1 line-clamp-2 block text-xs leading-5 text-muted">
                                             {r.description}
                                         </span>
                                     </span>
+                                    <ArrowRight
+                                        className="mt-1.5 h-3.5 w-3.5 shrink-0 -translate-x-1 text-primary opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100"
+                                        aria-hidden
+                                    />
                                 </Link>
                             </li>
                         ))}

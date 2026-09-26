@@ -262,20 +262,25 @@ body {
     }
 }
 
+/* 标题-正文阶梯必须拉得开：正文 15px 下，h2 20px+下边线、h3 17px、h1 24px。
+   曾经 h2=18 / h3=16 而正文继承 16px，2px 差和 0 差让人分不清标题还是正文（用户点过名）。 */
+.prose-skill h1 {
+    @apply mt-8 mb-4 text-2xl font-semibold text-text first:mt-0;
+}
 .prose-skill h2 {
-    @apply mt-8 mb-3 text-lg font-semibold text-text;
+    @apply mt-8 mb-3 border-b border-border pb-2 text-xl font-semibold text-text first:mt-0;
 }
 .prose-skill h3 {
-    @apply mt-6 mb-2 text-base font-semibold text-text;
+    @apply mt-6 mb-2 text-[17px] font-semibold text-text;
 }
 .prose-skill p {
-    @apply my-3 leading-7 text-muted;
+    @apply my-3 text-[15px] leading-7 text-muted;
 }
 .prose-skill ul {
-    @apply my-3 list-disc space-y-1.5 pl-5 text-muted;
+    @apply my-3 list-disc space-y-1.5 pl-5 text-[15px] text-muted;
 }
 .prose-skill ol {
-    @apply my-3 list-decimal space-y-1.5 pl-5 text-muted;
+    @apply my-3 list-decimal space-y-1.5 pl-5 text-[15px] text-muted;
 }
 /* 正文直接落在页面底色上，故代码块用 surface（浮起）而非 surface-2（面板内凹陷） */
 .prose-skill code {
@@ -293,11 +298,8 @@ body {
 .prose-skill a {
     @apply text-primary underline-offset-2 hover:underline;
 }
-.prose-skill h1 {
-    @apply mt-8 mb-4 text-xl font-semibold text-text;
-}
 .prose-skill h4 {
-    @apply mt-4 mb-2 text-sm font-semibold text-text;
+    @apply mt-4 mb-2 text-[15px] font-semibold text-text;
 }
 .prose-skill blockquote {
     @apply my-4 rounded-r-lg border-l-2 border-primary/40 bg-surface-2 py-2 pl-4 text-sm text-muted;
