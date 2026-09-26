@@ -7,6 +7,7 @@ export default function robots(): MetadataRoute.Robots {
             userAgent: "*",
             allow: "/",
             disallow: ["/api/", "/internal/", "/edge-dev/", "/zh/me", "/en/me"],
+            crawlDelay: 5,
         },
         sitemap: `${SITE_URL}/sitemap.xml`,
         host: SITE_URL,

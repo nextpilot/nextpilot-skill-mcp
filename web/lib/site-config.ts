@@ -26,6 +26,20 @@ export const GOOGLE_VERIFICATION = process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION |
 export const BING_VERIFICATION = process.env.NEXT_PUBLIC_BING_VERIFICATION || "";
 export const BAIDU_VERIFICATION = process.env.NEXT_PUBLIC_BAIDU_VERIFICATION || "";
 
+/** 站点关键词（逗号分隔） */
+export const SITE_KEYWORDS =
+    process.env.NEXT_PUBLIC_SITE_KEYWORDS ||
+    "飞控,flight control,AI skill,MCP,PX4,ArduPilot,日志分析,log analysis,无人机,UAV,NextPilot";
+
+/** 站点作者 / 发布者 */
+export const SITE_AUTHOR = process.env.NEXT_PUBLIC_SITE_AUTHOR || "NextPilot";
+
+/** Twitter/X 账号（不含 @，用于 twitter:site / twitter:creator） */
+export const TWITTER_HANDLE = process.env.NEXT_PUBLIC_TWITTER_HANDLE || "";
+
+/** 百度统计 ID */
+export const BAIDU_STAT_ID = process.env.NEXT_PUBLIC_BAIDU_STAT_ID || "";
+
 export const SOCIAL_GITHUB =
     process.env.NEXT_PUBLIC_SOCIAL_GITHUB || "https://github.com/nextpilot/nextpilot-skill-mcp";
 export const SOCIAL_GITEE = process.env.NEXT_PUBLIC_SOCIAL_GITEE || "https://gitee.com/nextpilot/nextpilot-skill-mcp";

@@ -5,13 +5,16 @@ import {
     SITE_SHORT,
     SITE_DESCRIPTION,
     OG_IMAGE,
+    SITE_KEYWORDS,
+    SITE_AUTHOR,
+    TWITTER_HANDLE,
     SOCIAL_GITHUB,
     SOCIAL_GITEE,
     SOCIAL_TWITTER,
 } from "@/lib/site-config";
 
 // 为兼容旧引用保留导出（其他文件 `import { SITE_URL } from "@/lib/seo"` 仍可用）
-export { SITE_URL, SITE_NAME, SITE_SHORT, SITE_DESCRIPTION, OG_IMAGE };
+export { SITE_URL, SITE_NAME, SITE_SHORT, SITE_DESCRIPTION, OG_IMAGE, SITE_KEYWORDS, SITE_AUTHOR, TWITTER_HANDLE };
 
 /** @deprecated 请使用 `SITE_DESCRIPTION`（来自 @/lib/site-config） */
 export const DEFAULT_DESCRIPTION = SITE_DESCRIPTION;
@@ -26,6 +29,8 @@ export interface PageMeta {
     title: string;
     /** 页面描述（OG / Twitter / 搜索摘要共用） */
     description: string;
+    /** 页面关键词（逗号分隔；undefined 时使用站点默认） */
+    keywords?: string;
     /** 当前页面路径部分（不含 locale 前缀，不含域名） */
     path?: string;
     /** 当前 locale（用于构建 canonical URL），未传则 canonical 指向站点根 */
@@ -40,6 +45,12 @@ export interface PageMeta {
     publishedTime?: string;
     /** 修改时间（article 类型用） */
     modifiedTime?: string;
+    /** 文章分类 / 标签（article 类型用） */
+    articleSection?: string;
+    /** 文章标签（article 类型用） */
+    articleTags?: string[];
+    /** 页面作者（覆盖站点默认 SITE_AUTHOR） */
+    author?: string;
 }
 
 /**
@@ -53,6 +64,7 @@ export interface PageMeta {
 export function makePageMeta({
     title,
     description,
+    keywords,
     path = "",
     locale,
     ogImage,
@@ -60,6 +72,9 @@ export function makePageMeta({
     ogType = "website",
     publishedTime,
     modifiedTime,
+    articleSection,
+    articleTags,
+    author,
 }: PageMeta): Metadata {
     const canonicalPath = locale ? `/${locale}${path}` : path || "/";
     const canonicalUrl = `${SITE_URL}${canonicalPath}`;
@@ -69,10 +84,13 @@ export function makePageMeta({
             ? ogImage
             : `${SITE_URL}${ogImage}`
         : `${SITE_URL}${DEFAULT_OG_IMAGE}`;
+    const pageAuthor = author || SITE_AUTHOR;
 
-    return {
+    const meta: Metadata = {
         title,
         description,
+        keywords: keywords || SITE_KEYWORDS,
+        authors: [{ name: pageAuthor }],
         alternates: {
             canonical: canonicalUrl,
             ...(locale
@@ -89,20 +107,33 @@ export function makePageMeta({
             description,
             url: ogUrl,
             siteName: SITE_NAME,
-            images: [{ url: image, width: 1200, height: 630, alt: title }],
+            images: [
+                {
+                    url: image,
+                    width: 1200,
+                    height: 630,
+                    alt: title,
+                    type: "image/png",
+                },
+            ],
             type: ogType,
+            locale: locale === "en" ? "en_US" : "zh_CN",
             ...(publishedTime ? { publishedTime } : {}),
             ...(modifiedTime ? { modifiedTime } : {}),
-            locale: "zh_CN",
+            ...(articleSection ? { section: articleSection } : {}),
+            ...(articleTags?.length ? { tag: articleTags } : {}),
         },
         twitter: {
             card: "summary_large_image",
             title: `${title} · ${SITE_SHORT}`,
             description,
-            images: [image],
+            images: [{ url: image, alt: title }],
+            ...(TWITTER_HANDLE ? { site: `@${TWITTER_HANDLE}`, creator: `@${TWITTER_HANDLE}` } : {}),
         },
         robots: noIndex ? { index: false, follow: false } : undefined,
     };
+
+    return meta;
 }
 
 /* ========== JSON-LD 结构化数据 ========== */
@@ -238,3 +269,38 @@ export function faqPageJsonLd(items: FaqItem[]): object {
         })),
     };
 }
+
+/** Product 结构化数据（一个统一的 JSON-LD，不需每页单独发） */
+export function productJsonLd(): object {
+    return {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        name: SITE_NAME,
+        description: SITE_DESCRIPTION,
+        url: SITE_URL,
+        category: "AIApplication",
+        manufacturer: { "@type": "Organization", name: SITE_AUTHOR },
+    };
+}
+
+/* ========== Speakable 语音搜索标记 ========== */
+
+/**
+ * 生成 Speakable 结构化数据（Google Assistant / Siri 语音搜索用）。
+ * 指定页面中哪些文本适合朗读。每页限定 2-3 段。
+ */
+export function speakableJsonLd(xpathSections: string[]): object {
+    return {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        speakable: {
+            "@type": "SpeakableSpecification",
+            xpath: xpathSections.map((p) => `/html/head/title`).slice(0, 3),
+        },
+    };
+}
+
+/* ========== 资源提示（DNS prefetch / preconnect） ========== */
+
+/** 需要 dns-prefetch / preconnect 的第三方域名 */
+export const THIRD_PARTY_DOMAINS = ["https://hm.baidu.com", "https://api.nextpilot.org"].filter(Boolean);

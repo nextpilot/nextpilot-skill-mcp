@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import { ArrowLeft, Compass, Radar } from "lucide-react";
+
+export const metadata: Metadata = {
+    robots: { index: false, follow: false },
+};
 
 export default function NotFound() {
     return (
