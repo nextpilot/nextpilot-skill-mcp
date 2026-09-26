@@ -1,20 +1,31 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { makePageMeta, articleJsonLd, extractFaqItems, faqPageJsonLd, SITE_URL } from "@/lib/seo";
 import { GuideArticle } from "@/components/GuideArticle";
 import { getAllGuideDocs, getGuideDoc } from "@/lib/guide";
+import { JsonLd } from "@/components/JsonLd";
 
 export function generateStaticParams() {
-    // 空 slug 由 app/guide/page.tsx 提供，这里只出子页面，避免两条路由抢同一个地址
     return getAllGuideDocs()
         .filter((doc) => doc.slug !== "")
         .map((doc) => ({ slug: doc.slug }));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-    const { slug } = await params;
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ slug: string; locale: string }>;
+}): Promise<Metadata> {
+    const { slug, locale } = await params;
     const doc = getGuideDoc(slug);
     if (!doc) return {};
-    return { title: `${doc.title} · 使用指南`, description: doc.description };
+    return makePageMeta({
+        title: `${doc.title} · 使用指南`,
+        description: doc.description,
+        path: `/guide/${slug}`,
+        locale,
+        ogType: "article",
+    });
 }
 
 export default async function GuideDocPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -22,5 +33,17 @@ export default async function GuideDocPage({ params }: { params: Promise<{ slug:
     const doc = getGuideDoc(slug);
     if (!doc) notFound();
 
-    return <GuideArticle doc={doc} />;
+    return (
+        <>
+            <GuideArticle doc={doc} />
+            <JsonLd
+                data={articleJsonLd({
+                    url: `${SITE_URL}/guide/${slug}`,
+                    title: `${doc.title} · 使用指南`,
+                    description: doc.description,
+                })}
+            />
+            {slug === "faq" && <JsonLd data={faqPageJsonLd(extractFaqItems(doc.body))} />}
+        </>
+    );
 }

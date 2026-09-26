@@ -12,6 +12,8 @@ export function generateStaticParams() {
     return routing.locales.map((locale) => ({ locale }));
 }
 
+export const dynamicParams = false;
+
 export default async function LocaleLayout({
     children,
     params,
@@ -20,6 +22,7 @@ export default async function LocaleLayout({
     params: Promise<{ locale: string }>;
 }) {
     const { locale } = await params;
+
     const messages = await getMessages();
 
     return (

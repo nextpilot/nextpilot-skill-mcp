@@ -1,13 +1,20 @@
 import type { Metadata } from "next";
+import { makePageMeta } from "@/lib/seo";
 import { getSkillIndex } from "@/lib/skills";
 import { SkillExplorer } from "@/components/SkillExplorer";
 import { LocalizedText } from "@/components/LocalizedText";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 
-export const metadata: Metadata = {
-    title: "Skill 技能库 · NextPilot Skill",
-    description: "飞控 AI Skill 浏览与搜索：感知、决策、控制与工具链",
-};
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+    const { locale } = await params;
+    return makePageMeta({
+        title: "Skill 技能库",
+        description:
+            "飞控 AI Skill 浏览与搜索：感知、决策、控制与工具链，覆盖目标检测、自主导航、视觉伺服、PX4 集成等场景。",
+        path: "/skills",
+        locale,
+    });
+}
 
 /**
  * ⚠️ 这一页**必须保持静态**（不要接 `searchParams` / `headers` 这类动态 API）。

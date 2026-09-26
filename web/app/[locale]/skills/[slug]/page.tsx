@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { makePageMeta, softwareAppJsonLd, SITE_URL } from "@/lib/seo";
 import { Sparkles } from "lucide-react";
 import { getAllSkills, getSkillBySlug } from "@/lib/skills";
+import { JsonLd } from "@/components/JsonLd";
 import { CATEGORY_GLYPH, CATEGORY_LABEL, skillEditUrls } from "@/lib/constants";
 import { GuideBody } from "@/components/GuideBody";
 import { CommunityStatLine, EntryMetaGroups } from "@/components/EntryHeaderMeta";
@@ -16,11 +18,21 @@ export function generateStaticParams() {
     return getAllSkills().map((s) => ({ slug: s.slug }));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-    const { slug } = await params;
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ slug: string; locale: string }>;
+}): Promise<Metadata> {
+    const { slug, locale } = await params;
     const skill = getSkillBySlug(slug);
     if (!skill) return {};
-    return { title: `${skill.name} · NextPilot Skill`, description: skill.description };
+    return makePageMeta({
+        title: skill.name,
+        description: skill.description,
+        path: `/skills/${slug}`,
+        locale,
+        ...(skill.updatedAt ? { modifiedTime: skill.updatedAt } : {}),
+    });
 }
 
 export default async function SkillDetailPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -133,6 +145,16 @@ export default async function SkillDetailPage({ params }: { params: Promise<{ sl
                         related={related}
                     />
                 </aside>
+
+                <JsonLd
+                    data={softwareAppJsonLd({
+                        url: `${SITE_URL}/skills/${slug}`,
+                        name: skill.name,
+                        description: skill.description,
+                        version: skill.version,
+                        dateModified: skill.updatedAt,
+                    })}
+                />
             </div>
         </div>
     );

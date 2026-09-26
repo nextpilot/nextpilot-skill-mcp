@@ -1,5 +1,6 @@
 import "server-only";
 import { headers } from "next/headers";
+import { SITE_URL } from "@/lib/site-config";
 import { asRecord } from "./json-boundary";
 
 /**
@@ -13,9 +14,10 @@ const INTERNAL_PATHS = {
     usersUpsert: "/internal/users/upsert",
 } as const;
 
-/** 从当前请求的转发头推导公网源站（EdgeOne 注入 x-forwarded-*） */
+/** 从当前请求的转发头推导公网源站（EdgeOne 注入 x-forwarded-*）。
+ *  优先使用环境变量 SITE_URL，未配置时从请求头推导。 */
 async function publicOrigin(): Promise<string> {
-    if (process.env.SITE_URL) return process.env.SITE_URL.replace(/\/$/, "");
+    if (SITE_URL && SITE_URL !== "http://localhost:3000") return SITE_URL;
     const h = await headers();
     const proto = h.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
     const host = h.get("x-forwarded-host")?.split(",")[0]?.trim() || h.get("host");

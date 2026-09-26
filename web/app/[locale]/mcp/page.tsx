@@ -1,14 +1,21 @@
 import type { Metadata } from "next";
+import { makePageMeta } from "@/lib/seo";
 import { Plug, ShieldCheck } from "lucide-react";
 import { getMcpIndex } from "@/lib/mcp";
 import { McpGrid } from "@/components/McpGrid";
 import { LocalizedText } from "@/components/LocalizedText";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 
-export const metadata: Metadata = {
-    title: "MCP 服务 · NextPilot Skill",
-    description: "飞控方向的 MCP 服务目录：可被 Claude / Cursor 等客户端直接调用的工具集。",
-};
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+    const { locale } = await params;
+    return makePageMeta({
+        title: "MCP 服务",
+        description:
+            "飞控方向的 MCP 服务目录：可被 Claude / Cursor 等客户端直接调用的工具集，涵盖 ArduPilot 日志查询、模拟飞行数据等。",
+        path: "/mcp",
+        locale,
+    });
+}
 
 export default function McpPage() {
     const servers = getMcpIndex();

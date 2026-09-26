@@ -1,10 +1,17 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { makePageMeta } from "@/lib/seo";
 import { LoginForm } from "@/components/LoginForm";
 
-export const metadata: Metadata = {
-    title: "登录 · NextPilot Skill",
-};
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+    const { locale } = await params;
+    return makePageMeta({
+        title: "登录",
+        description: "登录 NextPilot Skill 平台，管理你的飞控日志分析记录。",
+        path: "/login",
+        locale,
+    });
+}
 
 export default async function LoginPage({
     searchParams,

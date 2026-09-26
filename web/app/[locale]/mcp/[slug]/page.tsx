@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-// MCP 正文与 Skill 一样走 `renderer="md"`（react-markdown + GFM），不走 MDX：
-// README 里可以有 HTML 注释（维护者说明，remarkDropComments 会丢掉），花括号也不会被当 JSX。
+import { makePageMeta, softwareAppJsonLd, SITE_URL } from "@/lib/seo";
 import { GuideBody } from "@/components/GuideBody";
 import { Eye, Sparkles, Zap } from "lucide-react";
 import { getAllMcpServers, getMcpServerBySlug } from "@/lib/mcp";
@@ -13,16 +12,27 @@ import { EntryComments } from "@/components/EntryComments";
 import { ChangelogList } from "@/components/ChangelogList";
 import { CopyChip } from "@/components/CopyChip";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { JsonLd } from "@/components/JsonLd";
 
 export function generateStaticParams() {
     return getAllMcpServers().map((s) => ({ slug: s.slug }));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-    const { slug } = await params;
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ slug: string; locale: string }>;
+}): Promise<Metadata> {
+    const { slug, locale } = await params;
     const server = getMcpServerBySlug(slug);
     if (!server) return {};
-    return { title: `${server.name} · MCP 服务`, description: server.description };
+    return makePageMeta({
+        title: server.name,
+        description: server.description,
+        path: `/mcp/${slug}`,
+        locale,
+        ...(server.updatedAt ? { modifiedTime: server.updatedAt } : {}),
+    });
 }
 
 export default async function McpDetailPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -170,6 +180,16 @@ export default async function McpDetailPage({ params }: { params: Promise<{ slug
                         related={related}
                     />
                 </aside>
+
+                <JsonLd
+                    data={softwareAppJsonLd({
+                        url: `${SITE_URL}/mcp/${slug}`,
+                        name: server.name,
+                        description: server.description,
+                        version: server.version,
+                        dateModified: server.updatedAt,
+                    })}
+                />
             </div>
         </div>
     );

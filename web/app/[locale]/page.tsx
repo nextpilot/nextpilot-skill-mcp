@@ -19,6 +19,8 @@ import { SkillCard } from "@/components/SkillCard";
 import { McpCard } from "@/components/McpCard";
 import { LocalizedText } from "@/components/LocalizedText";
 import { HeroIllustration } from "@/components/HeroIllustration";
+import { JsonLd } from "@/components/JsonLd";
+import { siteJsonLd } from "@/lib/seo";
 
 const CHECKS: { name: string; en: string; field: string }[] = [
     { name: "振动与 IMU 削波", en: "Vibration & clipping", field: "vehicle_imu_status.accel_vibration_metric" },
@@ -456,6 +458,7 @@ export default function HomePage() {
                     </div>
                 </div>
             </section>
+            <JsonLd data={siteJsonLd()} />
         </div>
     );
 }
