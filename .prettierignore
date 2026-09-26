@@ -11,7 +11,7 @@
 **/content/skills/
 **/content/mcp/
 **/.generated/
-**/params/px4-main.json
+**/public/params/
 
 # ========== build:kb 生成物 ==========
 # analysis-engine.generated.ts 已被下面 **/*.generated.* 覆盖
@@ -71,7 +71,7 @@ __pycache__/
 
 # ========== 锁文件 ==========
 
-pnpm-lock.yaml
+**/pnpm-lock.yaml
 
 # ========== IDE ==========
 
