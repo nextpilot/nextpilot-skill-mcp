@@ -30,39 +30,39 @@
 
 ### 第一块：站点信息（现在写死在代码里，改一次要重新构建一次）
 
-| 配置项 | 现在写死在哪 | 改了之后哪里会变 |
-|---|---|---|
-| 网站标题（全称） | `web/lib/seo.ts:7` | 浏览器标签页标题、搜索引擎标题、分享卡片标题 |
-| 网站短名 | `web/lib/seo.ts:10` | 标题后缀（`xxx · NextPilot Skill`）、PWA 应用名 |
-| 网站描述 | `web/app/layout.tsx:10`、`web/lib/seo.ts:16` | 搜索引擎摘要、分享卡片描述 |
-| 网站域名 | `web/app/layout.tsx:5`、`web/lib/seo.ts:4` | 分享链接、sitemap、robots、JSON-LD |
-| 页脚版权行 | `web/components/SiteFooter.tsx`（版权行） | 每页底部 © 行 |
-| 页脚品牌介绍 | `web/components/SiteFooter.tsx`（品牌区描述） | 页脚左侧介绍语 |
-| 源代码链接 | `web/components/SiteFooter.tsx:8`（`SOURCE_URL`） | 页脚"源代码"链接 |
-| 备案号 | **现在全站没有** | 页脚版权行下新增一行 |
+| 配置项           | 现在写死在哪                                      | 改了之后哪里会变                                |
+| ---------------- | ------------------------------------------------- | ----------------------------------------------- |
+| 网站标题（全称） | `web/lib/seo.ts:7`                                | 浏览器标签页标题、搜索引擎标题、分享卡片标题    |
+| 网站短名         | `web/lib/seo.ts:10`                               | 标题后缀（`xxx · NextPilot Skill`）、PWA 应用名 |
+| 网站描述         | `web/app/layout.tsx:10`、`web/lib/seo.ts:16`      | 搜索引擎摘要、分享卡片描述                      |
+| 网站域名         | `web/app/layout.tsx:5`、`web/lib/seo.ts:4`        | 分享链接、sitemap、robots、JSON-LD              |
+| 页脚版权行       | `web/components/SiteFooter.tsx`（版权行）         | 每页底部 © 行                                   |
+| 页脚品牌介绍     | `web/components/SiteFooter.tsx`（品牌区描述）     | 页脚左侧介绍语                                  |
+| 源代码链接       | `web/components/SiteFooter.tsx:8`（`SOURCE_URL`） | 页脚"源代码"链接                                |
+| 备案号           | **现在全站没有**                                  | 页脚版权行下新增一行                            |
 
 顺手收敛一个现存不一致：`.env.example:10` 与运维文档写 `skill.nextpilot.org`，
 代码里是 `skill.nextpilot.ai`——这次统一成一个来源。
 
 ### 第二块：服务密钥（现在在 EdgeOne 控制台环境变量里，改一次要进控制台）
 
-| 密钥 | 现在的用途 | 消费位置 |
-|---|---|---|
-| `DEEPSEEK_API_KEY` | 分析报告的 AI 解读 | `web/functions/api/explain.js:50` |
-| `SMTP_PASS`（及 SMTP 其他项） | 登录验证码邮件 | `web/lib/mailer.ts:14-29` |
-| `ISSUE_TOKEN` | 用户反馈自动建 issue | `web/functions/_lib/issue-filer.js:111` |
+| 密钥                          | 现在的用途           | 消费位置                                |
+| ----------------------------- | -------------------- | --------------------------------------- |
+| `DEEPSEEK_API_KEY`            | 分析报告的 AI 解读   | `web/functions/api/explain.js:50`       |
+| `SMTP_PASS`（及 SMTP 其他项） | 登录验证码邮件       | `web/lib/mailer.ts:14-29`               |
+| `ISSUE_TOKEN`                 | 用户反馈自动建 issue | `web/functions/_lib/issue-filer.js:111` |
 
 后台里的展示规则：**只显示尾 4 位**；"替换"= 写入新值立即生效；"清除"= 删掉
 KV 覆盖、回落到环境变量。完整值永不回显（防截图泄露）。
 
 ## 3. 故意不给改的（安全边界，不是没做完）
 
-| 密钥 | 为什么不进后台 |
-|---|---|
-| `AUTH_SECRET` | 改了所有登录会话立即失效（全员掉线），且边缘函数与 Node 必须一致（运维文档已警示） |
-| `AUTH_INTERNAL_SECRET` | 改了 Node↔Edge 内部通道锁死，后台自己也调不通 KV |
-| GitHub OAuth 密钥 | 改了登录坏，且极少轮换 |
-| `EDGEONE_API_TOKEN` | 部署通道密钥，在 GitHub Secrets 层，与站点运行时无关 |
+| 密钥                   | 为什么不进后台                                                                     |
+| ---------------------- | ---------------------------------------------------------------------------------- |
+| `AUTH_SECRET`          | 改了所有登录会话立即失效（全员掉线），且边缘函数与 Node 必须一致（运维文档已警示） |
+| `AUTH_INTERNAL_SECRET` | 改了 Node↔Edge 内部通道锁死，后台自己也调不通 KV                                   |
+| GitHub OAuth 密钥      | 改了登录坏，且极少轮换                                                             |
+| `EDGEONE_API_TOKEN`    | 部署通道密钥，在 GitHub Secrets 层，与站点运行时无关                               |
 
 这些留在 EdgeOne 控制台环境变量。**改它们等于换锁芯，必须在控制台走变更。**
 
@@ -90,13 +90,13 @@ KV 覆盖、回落到环境变量。完整值永不回显（防截图泄露）�
 
 ## 6. 分几步做、每步交付什么
 
-| 步骤 | 内容 | 交付物 | 约计 |
-|---|---|---|---|
-| 1 | 配置读写层 + 管理员判断 | `web/lib/site-config.ts`（缓存 + 兜底）、auth 侧 isAdmin | 半天 |
-| 2 | 后台页面 + 保存接口 | `/admin/config` 表单 + `functions/api/admin/config` GET/PUT + 写入校验（域名/URL 格式，缺啥报啥）+ 审计；edge-dev 白名单同步登记（否则本地静默 404） | 半天 |
-| 3 | 八处写死的地方改读配置 | 第一块清单逐个替换；改后台即全站生效，**这步做完可直观验收** | 半天 |
-| 4 | 三个密钥进后台 | `functions/_lib/settings.js`（KV 覆盖 > env）；替换 explain.js / mailer.ts / issue-filer.js 三处消费点 | 半天 |
-| 5 | 守卫 + 文档 | 两条自动检查：①品牌文字不许写回 Header/Footer/seo.ts；②密钥类配置 key 名不得出现在客户端代码。进 `tools/ci/checklist.yml` 三处同步（yml + checks-by-stage.md + testing-at-a-glance.md），每条跑 `mutate_guards` 看各自变红；`.env.example` 补 `ADMIN_EMAILS` 并收敛域名不一致 | 2 小时 |
+| 步骤 | 内容                    | 交付物                                                                                                                                                                                                                                                                        | 约计   |
+| ---- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 1    | 配置读写层 + 管理员判断 | `web/lib/site-config.ts`（缓存 + 兜底）、auth 侧 isAdmin                                                                                                                                                                                                                      | 半天   |
+| 2    | 后台页面 + 保存接口     | `/admin/config` 表单 + `functions/api/admin/config` GET/PUT + 写入校验（域名/URL 格式，缺啥报啥）+ 审计；edge-dev 白名单同步登记（否则本地静默 404）                                                                                                                          | 半天   |
+| 3    | 八处写死的地方改读配置  | 第一块清单逐个替换；改后台即全站生效，**这步做完可直观验收**                                                                                                                                                                                                                  | 半天   |
+| 4    | 三个密钥进后台          | `functions/_lib/settings.js`（KV 覆盖 > env）；替换 explain.js / mailer.ts / issue-filer.js 三处消费点                                                                                                                                                                        | 半天   |
+| 5    | 守卫 + 文档             | 两条自动检查：①品牌文字不许写回 Header/Footer/seo.ts；②密钥类配置 key 名不得出现在客户端代码。进 `tools/ci/checklist.yml` 三处同步（yml + checks-by-stage.md + testing-at-a-glance.md），每条跑 `mutate_guards` 看各自变红；`.env.example` 补 `ADMIN_EMAILS` 并收敛域名不一致 | 2 小时 |
 
 **总计约两天。每步独立可验收，做完一步看一步。**
 
