@@ -107,31 +107,36 @@ export function EntryContentTabs({
     return (
         <section>
             <div className="border-b border-border">
-                <div className="flex items-center justify-between gap-3">
-                    {/* tab 行：窄屏放不下时横向滑动，按钮 nowrap + shrink-0 禁止被压缩断行。
-              min-w-0 让滑动区在 flex 里可收缩；-mb-px 会溢出 1px 竖向空间，
-              滚动条直接隐藏（滑动本身不受影响），避免 Windows 桌面窄窗口出一条丑滚动条 */}
-                    <div className="-mb-px flex min-w-0 gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                        {tabs.map((t) => (
-                            <button
-                                key={t.key}
-                                type="button"
-                                onClick={() => setTab(t.key)}
-                                className={`-mb-px inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-colors ${
-                                    tab === t.key
-                                        ? "border-primary font-medium text-text"
-                                        : "border-transparent text-muted hover:text-text"
-                                }`}
-                            >
-                                {t.icon}
-                                {t.label}
-                                {typeof t.count === "number" && t.count > 0 && (
-                                    <span className="text-xs text-muted">{t.count}</span>
-                                )}
-                            </button>
-                        ))}
-                    </div>
-                    {editLink && <div className="-mb-px hidden shrink-0 sm:block">{editLink}</div>}
+                {/* 移动端：tab 等宽铺满一行、藏图标、active 用居中短下划线（参考 skillhub.cn
+          的详情页）—— 390px 下四个 tab 一屏全见，不用滑动，点按面积也大。
+          桌面端（sm+）：回到「图标 + 自然宽度 + 放不下横向滑」，编辑入口同行右端。 */}
+                <div className="grid grid-cols-4 border-b border-border sm:flex sm:gap-1 sm:overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {tabs.map((t) => (
+                        <button
+                            key={t.key}
+                            type="button"
+                            onClick={() => setTab(t.key)}
+                            className={`relative flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap px-1 py-2.5 text-sm transition-colors sm:mb-[-1px] sm:inline-flex sm:shrink-0 sm:justify-start sm:border-b-2 sm:px-3 ${
+                                tab === t.key
+                                    ? "font-medium text-text sm:border-primary"
+                                    : "text-muted hover:text-text sm:border-transparent"
+                            }`}
+                        >
+                            <span className="hidden sm:inline">{t.icon}</span>
+                            <span className="truncate">{t.label}</span>
+                            {typeof t.count === "number" && t.count > 0 && (
+                                <span className="text-xs text-muted">{t.count}</span>
+                            )}
+                            {/* 移动端 active 短条：略窄于格子、居中，压在容器 border 上 */}
+                            {tab === t.key && (
+                                <span className="absolute inset-x-5 bottom-0 hidden h-0.5 rounded-full bg-primary max-sm:block" />
+                            )}
+                        </button>
+                    ))}
+                    {/* 桌面端编辑入口与 tab 同行右端；移动端走下面那行（grid 下 hidden 不占格） */}
+                    {editLink && (
+                        <div className="hidden -mb-px sm:ml-auto sm:block sm:shrink-0 sm:pl-3">{editLink}</div>
+                    )}
                 </div>
                 {/* 移动端编辑入口：tab 行下方右对齐，不与 tab 抢宽度 */}
                 {editLink && <div className="flex justify-end pt-1.5 sm:hidden">{editLink}</div>}
