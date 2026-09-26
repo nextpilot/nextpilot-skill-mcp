@@ -89,40 +89,52 @@ export function EntryContentTabs({
 
     const active = tabs.find((t) => t.key === tab);
 
+    // 编辑入口渲染成两份：桌面端与 tab 同行（-mb-px 对齐底线），移动端挪到 tab 行下方
+    // 单独一行右对齐 —— 390px 下 4 个 tab 加一条编辑链接塞一行，每个按钮都会被压到
+    // 文字竖排断行（概/述、版/本/历/史），底线随之参差不齐。
+    const editLink = active?.editUrl ? (
+        <a
+            href={active.editUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 pb-2 text-xs text-muted transition-colors hover:text-primary"
+        >
+            <Pencil className="h-3 w-3" />
+            {`在 ${contentHostLabel()} 上编辑本页`}
+        </a>
+    ) : null;
+
     return (
         <section>
-            <div className="flex items-center gap-1 border-b border-border">
-                <div className="flex gap-1">
-                    {tabs.map((t) => (
-                        <button
-                            key={t.key}
-                            type="button"
-                            onClick={() => setTab(t.key)}
-                            className={`-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors ${
-                                tab === t.key
-                                    ? "border-primary font-medium text-text"
-                                    : "border-transparent text-muted hover:text-text"
-                            }`}
-                        >
-                            {t.icon}
-                            {t.label}
-                            {typeof t.count === "number" && t.count > 0 && (
-                                <span className="text-xs text-muted">{t.count}</span>
-                            )}
-                        </button>
-                    ))}
+            <div className="border-b border-border">
+                <div className="flex items-center justify-between gap-3">
+                    {/* tab 行：窄屏放不下时横向滑动，按钮 nowrap + shrink-0 禁止被压缩断行。
+              min-w-0 让滑动区在 flex 里可收缩；-mb-px 会溢出 1px 竖向空间，
+              滚动条直接隐藏（滑动本身不受影响），避免 Windows 桌面窄窗口出一条丑滚动条 */}
+                    <div className="-mb-px flex min-w-0 gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        {tabs.map((t) => (
+                            <button
+                                key={t.key}
+                                type="button"
+                                onClick={() => setTab(t.key)}
+                                className={`-mb-px inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-colors ${
+                                    tab === t.key
+                                        ? "border-primary font-medium text-text"
+                                        : "border-transparent text-muted hover:text-text"
+                                }`}
+                            >
+                                {t.icon}
+                                {t.label}
+                                {typeof t.count === "number" && t.count > 0 && (
+                                    <span className="text-xs text-muted">{t.count}</span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                    {editLink && <div className="-mb-px hidden shrink-0 sm:block">{editLink}</div>}
                 </div>
-                {active?.editUrl && (
-                    <a
-                        href={active.editUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="ml-auto -mb-px inline-flex items-center gap-1 pb-2 text-xs text-muted transition-colors hover:text-primary"
-                    >
-                        <Pencil className="h-3 w-3" />
-                        {`在 ${contentHostLabel()} 上编辑本页`}
-                    </a>
-                )}
+                {/* 移动端编辑入口：tab 行下方右对齐，不与 tab 抢宽度 */}
+                {editLink && <div className="flex justify-end pt-1.5 sm:hidden">{editLink}</div>}
             </div>
 
             <div className="pt-6">
