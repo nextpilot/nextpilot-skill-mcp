@@ -139,7 +139,7 @@ export default async function SkillDetailPage({ params }: { params: Promise<{ sl
                         />
                     </header>
 
-                    {/* 内容区：概述 / 文件 / 版本历史 / 评论
+                    {/* 内容区：概述 / 文件 / 版本 / 评论
               各内容 Tab 对应 skills/<slug>/ 下的文件，各自带一个仓库编辑入口（移动端不出） */}
                     <EntryContentTabs
                         overview={

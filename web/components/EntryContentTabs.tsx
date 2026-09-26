@@ -30,7 +30,7 @@ type TabKey = "overview" | "files" | "changelog" | "comments";
  *
  * Skill 的内容 Tab 各对应 `web/content/skills/<slug>/` 下的文件，所以每个 Tab
  * 都能给出**那一份文件**的仓库编辑入口——改哪份就跳哪份，不让人在仓库里自己找。
- * 概述 / 版本历史给人看；「文件」Tab 是整个 Skill 目录的文件浏览器（树形列表 +
+ * 概述 / 版本给人看；「文件」Tab 是整个 Skill 目录的文件浏览器（树形列表 +
  * 点击打开原文），给 AI 用的 SKILL.md 打开后带一段「这是什么」的说明和一键复制
  * （复制的就是能直接放进 `.claude/skills/` 的那份文件内容）。
  *
@@ -241,7 +241,7 @@ export function EntryContentTabs({
         },
         {
             key: "changelog",
-            label: "版本历史",
+            label: "版本",
             icon: <History className="h-3.5 w-3.5" />,
             count: changelogCount,
             editUrl: editUrls?.changelog,
