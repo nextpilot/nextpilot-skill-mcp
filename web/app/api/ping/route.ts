@@ -1,5 +1,4 @@
-// GET /api/ping —— EdgeOne Pages 线上冒烟探针。
-// 边缘函数版本见 functions/api/ping.js（/api/ping 也命中它，两个入口等效）。
+// GET /api/ping —— EdgeOne Pages 冒烟探针（Next.js API Route 实现）。
 import { NextResponse } from "next/server";
 
 export function GET() {
