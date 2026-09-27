@@ -87,7 +87,7 @@ def _http_err(resp: requests.Response) -> str:
     except Exception:
         err = resp.text[:300]
     if resp.status_code == 404 and "<!DOCTYPE" in str(resp.text[:100]):
-        err = "端点未找到。请先部署 web/functions/blob.js + app/api/blob/route.ts 到 EdgeOne。"
+        err = "端点未找到。请先部署 web/functions/api/blob.js 到 EdgeOne。"
     return str(err)
 
 

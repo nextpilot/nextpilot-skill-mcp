@@ -137,7 +137,7 @@
 | `web/lib/error-policy.js`                       | 新增。**两侧共用的政策**：脱敏规则与顺序、`clip()` 头尾保留截断、`normalize()` 指纹归一化、长度上限、级别白名单。浏览器与边缘都引它——见 §6.2      |
 | `web/functions/_lib/issue-filer.js`             | 新增。指纹（归一化后 sha256 前 16 位）、KV 去重、内存限流、Gitee/GitHub 适配、失败留痕、`probeConfig()`                                           |
 | `web/functions/api/issues.js`                   | 新增。浏览器入口，公开端点：按 IP 日限流 20 条、body ≤ 64KB、立即 202 由 `waitUntil` 处理；`ISSUE_DEBUG=1` 时同步回显结果                         |
-| `web/functions/issue-probe.js`                  | 新增。自检探针，只显示配置与状态码，**从不回显 token**                                                                                            |
+| `web/functions/api/issue-probe.js`              | 新增。自检探针，只显示配置与状态码，**从不回显 token**                                                                                            |
 | `web/functions/api/explain.js`                  | 三处 LLM 失败（上游非 2xx / 返回空 / fetch 抛错）上报为 **recoverable**，只带状态码，**不带**上游响应体（`detail` 里可能夹带本次请求的 findings） |
 | `web/lib/issue-bridge.ts`                       | 新增。`window.onerror` + `unhandledrejection` + `reportError()` / `reportManual()`；内存去抖 5 分钟；脱敏/截断/归一化引 `error-policy.js`         |
 | `web/components/IssueBridgeMount.tsx`           | 新增。挂进 RootLayout，同步登录态                                                                                                                 |

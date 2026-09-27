@@ -254,7 +254,7 @@ check_engine_pyodide.py     →  check · analysis-engine.generated（产物全�
 - ~~`engine/test_pyulog.py`~~ —— 是 demo 不是测试（已排除在 `testpaths` 外）。原建议改名 `demo-pyulog-read.py`；**2026-09-24 已直接删除**（它连"验证 pyulog 能跑"这唯一用途也已被 `engine/tests/` 覆盖），改名提议作废。
 - `web/scripts/browser/check-upload.mjs` / `check-restore.mjs` —— 手动 CDP 自检，不进任何门禁。建议改 `probe-site-*.mjs`，或原样保留，**待你定**。
 
-**同词异义一处**：`web/functions/issue-probe.js` / `kv-probe.js` 是**边缘函数路由**（`/api/issue-probe`），
+**同词异义一处**：`web/functions/api/issue-probe.js` / `api/kv-probe.js` 是**边缘函数路由**（`/api/issue-probe`），
 里面的 `probe` 意思是"诊断接口"，与本规则的"手动探查工具"撞词。建议**不动**（运行时由目录表达），
 只在 taxonomy 文档里点明。
 

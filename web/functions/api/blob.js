@@ -1,4 +1,4 @@
-// GET/POST/DELETE /internal/blob —— EdgeOne Blob 存储管理（本地工具通过此端点操作）。
+// GET/POST/DELETE /api/blob —— EdgeOne Blob 存储管理（本地工具通过此端点操作）。
 //
 // 鉴权：必须携带 `x-internal-secret`，值与 AUTH_EDGE_SECRET 一致。
 //
@@ -18,7 +18,7 @@
 // 依赖：@edgeone/pages-blob（EdgeOne Pages 边缘运行时内置）
 
 import { getStore, listStores } from "@edgeone/pages-blob";
-import { assertInternal } from "./_lib/http.js";
+import { assertInternal } from "../_lib/http.js";
 
 async function handleRequest({ request, env }) {
     if (!assertInternal(request, env)) {
@@ -34,7 +34,6 @@ async function handleRequest({ request, env }) {
     const method = request.method.toUpperCase();
     const consistency = url.searchParams.get("consistency") === "strong" ? "strong" : "eventual";
 
-    // ---- 列出命名空间 ----
     if (method === "GET" && url.searchParams.has("stores")) {
         try {
             const result = await listStores({ consistency });
@@ -59,7 +58,6 @@ async function handleRequest({ request, env }) {
     const store = getStore(storeName);
 
     try {
-        // ---- 下载 ----
         if (method === "GET" && key) {
             const readType = url.searchParams.get("type") || "arrayBuffer";
             const value = await store.get(key, { type: readType, consistency });
@@ -69,13 +67,11 @@ async function handleRequest({ request, env }) {
                     headers: { "content-type": "application/json; charset=utf-8" },
                 });
             }
-            // JSON 类型直接返回
             if (readType === "json") {
                 return new Response(JSON.stringify(value), {
                     headers: { "content-type": "application/json; charset=utf-8" },
                 });
             }
-            // 字节流返回原始二进制
             const body = typeof value === "string" ? new TextEncoder().encode(value) : value;
             const contentType = key.endsWith(".wasm")
                 ? "application/wasm"
@@ -94,7 +90,6 @@ async function handleRequest({ request, env }) {
             });
         }
 
-        // ---- 列举（按前缀） ----
         if (method === "GET" && (url.searchParams.has("prefix") || url.searchParams.has("list"))) {
             const prefix = url.searchParams.get("prefix") || undefined;
             const result = await store.list({ prefix, directories: true, consistency });
@@ -103,7 +98,6 @@ async function handleRequest({ request, env }) {
             });
         }
 
-        // ---- 上传 ----
         if (method === "POST") {
             if (!key) {
                 return new Response(JSON.stringify({ error: "missing key" }), {
@@ -117,7 +111,6 @@ async function handleRequest({ request, env }) {
                 setOptions.onlyIfNew = true;
             }
 
-            // JSON 模式
             if (url.searchParams.get("json") === "1") {
                 const data = await request.json();
                 await store.setJSON(key, data, setOptions);
@@ -126,7 +119,6 @@ async function handleRequest({ request, env }) {
                 });
             }
 
-            // 二进制模式
             const buf = await request.arrayBuffer();
             await store.set(key, buf, setOptions);
             return new Response(JSON.stringify({ ok: true, key, size: buf.byteLength }), {
@@ -134,7 +126,6 @@ async function handleRequest({ request, env }) {
             });
         }
 
-        // ---- 删除 ----
         if (method === "DELETE") {
             if (!key) {
                 return new Response(JSON.stringify({ error: "missing key" }), {

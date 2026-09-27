@@ -1,7 +1,6 @@
-// 冲刺 2 阶段 0 Spike：验证 KV 绑定读写 + 边缘函数外网 fetch（DeepSeek 连通性）。
+// GET /api/kv-probe —— 验证 KV 绑定读写 + 边缘函数外网 fetch（DeepSeek 连通性）。
 // 控制台需先开通 KV、创建 namespace（nextpilot_skill_mcp）并绑定到本项目，变量名 NEXTPILOT_KV。
-// 访问 GET /kv-probe 每次计数 +1，并探测 DeepSeek API 的可达性（无 key 时对方返回 401 也算通）。
-import { getKv, listAll } from "./_lib/kv.js";
+import { getKv, listAll } from "../_lib/kv.js";
 
 const COUNTER_KEY = "kvprobe_count";
 const SHAPE_KEY = "kvprobe_shape";
@@ -14,8 +13,6 @@ export async function onRequestGet({ request, env }) {
     const result = { ok: false, kv: null, deepseek: null };
     const kv = getBinding(env);
 
-    // 前缀可用 `?prefix=` 覆盖：探针的用途就是"KV 里到底存了什么"，写死成自己的前缀就
-    // 只能看到自己。排查线上问题时靠它看别的前缀（如 `settings_log_`）有没有落记录。
     const prefix = new URL(request.url).searchParams.get("prefix") ?? "kvprobe_";
 
     if (!kv) {
@@ -34,8 +31,6 @@ export async function onRequestGet({ request, env }) {
         result.kv = { error: String(err && err.message ? err.message : err) };
     }
 
-    // KV 接口自查：list / get({type:"json"}) 的实际形状。
-    // 平台若与官方文档有出入，这里能直接看出（/api/me 的配额计数依赖 list）。
     try {
         await kv.put(SHAPE_KEY, JSON.stringify({ t: "probe" }));
         const plain = await kv.get(SHAPE_KEY);
@@ -50,13 +45,11 @@ export async function onRequestGet({ request, env }) {
         result.kvApi = { error: String(err && err.message ? err.message : err) };
     }
 
-    // 复现配额计数实际走的调用：listAll 的翻页参数
     try {
         result.listAll = { count: (await listAll(kv, prefix)).length };
     } catch (err) {
         result.listAll = { error: String(err && err.message ? err.message : err) };
     }
-    // 匿名配额的前缀在新设备上是空结果——dump 空结果时 list 的原始返回
     try {
         result.emptyList = await kv.list({ prefix: `anuse_nonexistent_${Date.now()}_`, limit: 256 });
     } catch (err) {

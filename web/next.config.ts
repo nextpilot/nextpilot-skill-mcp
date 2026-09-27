@@ -101,12 +101,7 @@ const nextConfig: NextConfig = {
             rules.afterFiles.push(
                 { source: "/api/:path((?!auth/|skills/).*)", destination: "/edge-dev/api/:path*" },
                 { source: "/internal/:path*", destination: "/edge-dev/internal/:path*" },
-                // 根级自检探针：`functions/foo.js` 的 URL 就是 `/foo`（不挂 /api 前缀）。
-                // 不加这三条它们在本地永远 404 —— 而这三个恰恰是"部署前手工验一遍"的工具，
-                // 本地用不了就只能等发布后再发现问题（见 app/edge-dev/[[...path]]/route.ts 的说明）
-                { source: "/ping", destination: "/edge-dev/ping" },
-                { source: "/kv-probe", destination: "/edge-dev/kv-probe" },
-                { source: "/issue-probe", destination: "/edge-dev/issue-probe" },
+                // 探针已统一迁移到 /api 前缀下（functions/api/），根级路径不再可用。
             );
         }
         return rules;

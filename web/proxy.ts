@@ -55,9 +55,8 @@ export default function middleware(req: NextRequest) {
 //   internal   = 边缘函数中转（Node 侧 SSR 读 KV 的唯一通道）。漏它时拿到的是 **HTML 404**
 //                （Next 的 404 页面），和"垫片白名单没登记"那种纯文本 404 长得不一样，
 //                足以把排查方向带偏到"函数没写对"上去
-//   ping / kv-probe / issue-probe = 根级自检探针，靠 next.config 的 rewrite 转到垫片，
-//                同样没有 locale 概念（生产环境由平台路由层直接接管，不走这里）
+//   ping / kv-probe / issue-probe / blob = 探针已统一迁移到 /api/ 前缀，根级路径不再可用
 //   edge-dev   = 开发环境垫片自身，rewrite 进来后再被加一次前缀就永远命中不了
 export const config = {
-    matcher: ["/((?!api|internal|ping|kv-probe|issue-probe|_next|_vercel|edge-dev).*)"],
+    matcher: ["/((?!api|internal|ping|kv-probe|issue-probe|blob|_next|_vercel|edge-dev).*)"],
 };
