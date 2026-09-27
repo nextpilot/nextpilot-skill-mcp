@@ -88,10 +88,17 @@ const nextConfig: NextConfig = {
     // skills/ = Skill 安装包下载（app/api/skills/[slug]/download）：zip 打包要
     // node:fs + jszip，边缘函数运行时没有文件系统，只能在 Node 侧做。
     async rewrites() {
-        if (!isDev) return [];
-        return {
-            afterFiles: [
-                // 负向匹配必须放行 /api/auth/*（NextAuth 是真实 Next 路由；afterFiles 在 dev 下也会优先 rewrite）
+        const rules = {
+            beforeFiles: [
+                // /.well-known/security.txt 在部分部署平台中路由层的处理与 Next.js 不一致，
+                // 可能导致 500 内部错误。显式 rewrite 到 /security.txt 兜底。
+                { source: "/.well-known/security.txt", destination: "/security.txt" },
+            ],
+            afterFiles: [] as { source: string; destination: string }[],
+        };
+
+        if (isDev) {
+            rules.afterFiles.push(
                 { source: "/api/:path((?!auth/|skills/).*)", destination: "/edge-dev/api/:path*" },
                 { source: "/internal/:path*", destination: "/edge-dev/internal/:path*" },
                 // 根级自检探针：`functions/foo.js` 的 URL 就是 `/foo`（不挂 /api 前缀）。
@@ -100,8 +107,9 @@ const nextConfig: NextConfig = {
                 { source: "/ping", destination: "/edge-dev/ping" },
                 { source: "/kv-probe", destination: "/edge-dev/kv-probe" },
                 { source: "/issue-probe", destination: "/edge-dev/issue-probe" },
-            ],
-        };
+            );
+        }
+        return rules;
     },
 };
 
