@@ -36,9 +36,12 @@ export async function getSessionUser(request, env) {
                 keyManagementAlgorithms: ["dir"],
                 contentEncryptionAlgorithms: ["A256CBC-HS512"],
             });
-            if (!payload.uid) return null;
+            // uid 可选：GitHub 登录时 upsertGithubUser 可能因内部 API 不通而失败，
+            // JWT 里不会有 uid；但 isAdmin / email / sub 总是有的，不影响鉴权。
+            const uid = payload.uid ? String(payload.uid) : payload.sub ? String(payload.sub) : "";
+            if (!uid && !payload.email) return null;
             return {
-                uid: String(payload.uid),
+                uid,
                 email: payload.email ? String(payload.email) : null,
                 name: payload.name ? String(payload.name) : null,
                 plan: typeof payload.plan === "string" ? payload.plan : "free",
