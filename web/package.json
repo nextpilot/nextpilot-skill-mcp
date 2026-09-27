@@ -40,6 +40,7 @@
     "next-intl": "^4.14.7",
     "next-mdx-remote": "^6.0.0",
     "nodemailer": "^10.0.10",
+    "pinyin-pro": "^3.29.4",
     "plotly.js-basic-dist-min": "^4.1.1",
     "postcss": "^8.5.28",
     "react": "^19.3.0",
