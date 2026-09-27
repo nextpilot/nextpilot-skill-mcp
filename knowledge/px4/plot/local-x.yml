@@ -1,4 +1,4 @@
-﻿id: local-x
+id: local-x
 title: Local Position X
 description: 局部位置 X 轴估计值与 setpoint。
 order: 9
@@ -11,9 +11,9 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_local_position[0].x")
+          - vehicle_local_position.x
         label: ["X Estimated"]
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_local_position_setpoint[0].x")
+          - vehicle_local_position_setpoint.x
         label: ["X Setpoint"]

@@ -1,4 +1,4 @@
-﻿id: thrust-mag
+id: thrust-mag
 title: Thrust and Magnetic Field
 description: 推力与磁场强度范数对比。
 order: 34
@@ -11,7 +11,7 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_magnetometer[0].magnetometer_ga[0]", "sensor_combined[0].magnetometer_ga[0]")
-          - ref("vehicle_magnetometer[0].magnetometer_ga[1]", "sensor_combined[0].magnetometer_ga[1]")
-          - ref("vehicle_magnetometer[0].magnetometer_ga[2]", "sensor_combined[0].magnetometer_ga[2]")
+          - _ref("vehicle_magnetometer.magnetometer_ga[0]", "sensor_combined.magnetometer_ga[0]")
+          - _ref("vehicle_magnetometer.magnetometer_ga[1]", "sensor_combined.magnetometer_ga[1]")
+          - _ref("vehicle_magnetometer.magnetometer_ga[2]", "sensor_combined.magnetometer_ga[2]")
         label: ["Mag X", "Mag Y", "Mag Z"]

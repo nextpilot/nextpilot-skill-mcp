@@ -181,7 +181,7 @@
 
 - MSFS MCP 模拟飞行工具（工具链 / 仿真类）
 
-- PX4 ULog Analyzer、ardupilot-mcp 作为**工具链入口**收录；日志分析服务本体保持平台内置，不作为 Skill 分发。其中 **PX4 ULog Analyzer 是首发 fork 底座**
+- PX4 ULog Analyzer、ardupilot-mcp 作为**工具链入口**收录；日志分析服务本体保持平台内置，不作为 Skill 分发。其中 **PX4 ULog Analyzer 是首发 fork 底座**，该作者后续将 ULog 分析器重构为 **AI Drone Toolkit**（monorepo：`robotto-drone-core` 共享解析层 + `px4-ulog-mcp` / `px4-sitl-mcp` 独立工具）
 
 ---
 
@@ -268,6 +268,7 @@
 | 项目                             | 作者 / 来源       | 借鉴点                                                                                                                                                                                                                                                                           |
 | -------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **PX4 ULog Analyzer** ⭐首发底座 | robotto-xyz       | PX4 `.ulg` 日志分析，"确定性工具解析 + LLM 只做解释" 架构（pyulog 解析 + 检查器骨架）                                                                                                                                                                                            |
+| **AI Drone Toolkit**             | robotto-xyz，MIT  | PX4 ULog Analyzer 的演进版：`uv` workspace monorepo，`robotto-drone-core`（共享解析/安全检查/坐标系工具）+ `px4-ulog-mcp`（ULog 检查 MCP）+ `px4-sitl-mcp`（仿真 SITL 指令 MCP）。模块化分层架构（core + 薄工具层）可作为本项目 `knowledge/engine/` 拆分与 MCP 对接的参照        |
 | **ardupilot-mcp**                | furkanisikay，MIT | ArduPilot `.bin` 诊断 MCP 服务，16 项检查（振动、EKF、电源、GPS、电机平衡、参数审计等），每条发现附带阈值来源（docs/SOURCES.md）与官方文档链接；40 个真实炸机日志验证；贡献指南开放。检查套件设计（analyze_log 返回严重度排序的 findings）是规则层的直接模板，接入 `.bin` 时复用 |
 | **ArduPilot 实时连接 MCP**       | rmeadomavic，MIT  | 通过 MAVLink 实时读状态、改参数、切模式、诊断无法解锁原因；**默认只读**，致动功能需显式传参启用，对真实载具有额外安全门禁 —— 平台安全设计的参照                                                                                                                                  |
 | **PX4 SITL MCP**                 | —                 | 仅仿真环境，向 PX4 SITL 发送指令并带安全门禁                                                                                                                                                                                                                                     |
@@ -1516,6 +1517,74 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 ### 6.9.1 `mutate_guards.py` Windows 兼容说明
 
 `mutate_guards.py` 的「某一节丢了编号」守卫在 Windows 控制台（GBK）下会因打印 `\ufffd` 字符触发 `UnicodeEncodeError` 而失败。这是已知的**既存问题**，不影响守卫本身的逻辑正确性（仅在打印报错信息时编码失败），修复方案见该文件注释。在 Windows 上运行 `check_all.py` 时可暂时接受此项失败，其余检查的通过 / 失败判定不变。
+
+### 6.9.2 AI Agent 提交与推送规则
+
+AI（Claude / 任何自动化 agent）在执行 `git commit` 和 `git push` 时，**必须**遵守以下流程，不得跳过任何一步：
+
+**第一步：运行 pre-commit 钩子**
+
+```bash
+.git/hooks/pre-commit
+# 或等效触发（git commit 会自动跑，但 agent 应主动验证）
+```
+
+pre-commit 不绿（退出码非 0）→ **禁止 commit**，先修复它报出的问题。
+
+**第二步：运行 pre-push 钩子**
+
+```bash
+.git/hooks/pre-push
+# 或等效触发（git push 会自动跑，但 agent 应在 push 前主动验证）
+```
+
+pre-push 不绿 → **禁止 push**，先修复它报出的问题。
+
+> 注意：钩子实际路径在 `.githooks/`，本地开发需执行 `git config core.hooksPath .githooks` 使其生效。
+
+**第三步：检查远程是否有新提交**
+
+在 push 之前，**必须**同时检查 Gitee（`origin`）和 GitHub（`github`）两个远程：
+
+```bash
+git fetch origin
+git fetch github
+```
+
+然后对比本地分支与远程分支：
+
+```bash
+# 假设当前在 master 分支
+git log HEAD..origin/master --oneline   # Gitee 上领先于本地的提交
+git log HEAD..github/master --oneline   # GitHub 上领先于本地的提交
+```
+
+**第四步：如果远程有新提交，用 rebase 方式集成**
+
+```bash
+# 如果 origin/master（Gitee）有新提交
+git pull --rebase origin master
+
+# 如果 github/master（GitHub）有新提交
+git pull --rebase github master
+```
+
+rebase 过程中出现冲突 → **暂停 push**，修复冲突后 `git rebase --continue`，然后**重新从第一步开始**（pre-commit → pre-push → 远程比对）。
+
+**第五步：全部通过后才允许 push**
+
+```bash
+git push origin master   # 推送 Gitee
+git push github master   # 推送 GitHub
+```
+
+**完整流程总结**：
+
+```
+pre-commit 全绿 → pre-push 全绿 → fetch 所有远程 → 无超前提交或有超前已在本地 rebase → git push
+```
+
+任何一步不通过，都必须停下来修复，不得强行跳过。
 
 ---
 

@@ -7,7 +7,7 @@
   "result": {
     "platform": "PX4",
     "logType": "px4-ulog",
-    "parserVersion": "pyulog/1.1.0",
+    "parserVersion": "pyulog/1.2.4",
     "facts": {
       "durationSec": 203.4,
       "vehicleType": "fixed_wing",
@@ -66,12 +66,6 @@
         "unit": "次"
       },
       {
-        "key": "imuTempRangeC",
-        "label": "IMU 温度跨度",
-        "value": 0.0,
-        "unit": "°C"
-      },
-      {
         "key": "ekfRejectRatioPct",
         "label": "EKF 拒绝占比",
         "value": 0.4830917874396135,
@@ -88,18 +82,6 @@
         "label": "姿态振荡频率",
         "value": 1.5216230646022424,
         "unit": "Hz"
-      },
-      {
-        "key": "gyroBiasMaxRadS",
-        "label": "陀螺零偏最大",
-        "value": 0.00442630285397172,
-        "unit": "rad/s"
-      },
-      {
-        "key": "gyroBiasDriftRadS",
-        "label": "陀螺零偏漂移",
-        "value": 0.0030104208271950483,
-        "unit": "rad/s"
       },
       {
         "key": "windSpeedP95M",
@@ -139,11 +121,6 @@
         "key": "gpsEphP95M",
         "label": "gpsEphP95M",
         "value": 0.0003095500081777572
-      },
-      {
-        "key": "gyroBiasSource",
-        "label": "gyroBiasSource",
-        "value": "estimator_sensor_bias.gyro_bias[]"
       }
     ],
     "tags": [
@@ -172,7 +149,6 @@
       "px4-failsafe-mission_failure",
       "px4-failsafe-nav",
       "px4-mode-thrash",
-      "px4-imu-bias-drift",
       "px4-attitude-overshoot",
       "px4-attitude-oscillation",
       "px4-airspeed-invalid",
@@ -196,6 +172,10 @@
       {
         "ruleId": "px4-motor-unbalance",
         "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "px4-imu-bias-drift",
+        "reason": "本条只在有解锁段时适用"
       }
     ],
     "matchedFaults": [
@@ -274,21 +254,6 @@
         "suggestion": "结合故障库 F009：空速失效极易引发失速，检查空速管堵塞/积水、管路漏气与校准。"
       },
       {
-        "id": "F07",
-        "severity": "critical",
-        "ruleId": "px4-log-errors",
-        "label": null,
-        "description": "日志中出现 8 条 ERROR 及以上消息",
-        "evidence": {
-          "source": "ulog.logged_messages(log_level<=3)",
-          "value": 8,
-          "threshold": 0,
-          "unit": "条"
-        },
-        "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html",
-        "suggestion": "按时间顺序核对错误原文，这通常是定位根因最直接的证据。"
-      },
-      {
         "id": "F01",
         "severity": "warning",
         "ruleId": "px4-vibration",
@@ -348,20 +313,6 @@
         "suggestion": "结合故障库 F009 检查空速管与管路密封。"
       },
       {
-        "id": "F08",
-        "severity": "warning",
-        "ruleId": "px4-log-warnings",
-        "label": null,
-        "description": "日志中出现 13 条 WARNING 消息",
-        "evidence": {
-          "source": "ulog.logged_messages(log_level=4)",
-          "value": 13,
-          "threshold": 0,
-          "unit": "条"
-        },
-        "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html"
-      },
-      {
         "id": "F03",
         "severity": "info",
         "ruleId": "px4-imu-clipping",
@@ -377,7 +328,7 @@
         "suggestion": "少量削波可先观察；频次升高或伴随振动告警需排查机械问题。"
       },
       {
-        "id": "F09",
+        "id": "F07",
         "severity": "guard",
         "ruleId": "px4-guard-topic-missing",
         "label": "topic_missing:battery_status",

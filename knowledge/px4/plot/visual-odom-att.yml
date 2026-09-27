@@ -1,4 +1,4 @@
-﻿id: visual-odom-att
+id: visual-odom-att
 title: Visual Odometry Attitude
 description: 视觉里程计姿态角（仅当 topic 存在时显示）。
 order: 15
@@ -11,7 +11,7 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_visual_odometry[0].roll")
-          - ref("vehicle_visual_odometry[0].pitch")
-          - ref("vehicle_visual_odometry[0].yaw")
+          - vehicle_visual_odometry.roll
+          - vehicle_visual_odometry.pitch
+          - vehicle_visual_odometry.yaw
         label: ["Roll", "Pitch", "Yaw"]

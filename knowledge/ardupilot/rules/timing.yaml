@@ -18,7 +18,7 @@ conditions:
 
 compute:
   # 候选组按上游 GAP_SOURCES 的顺序（IMU > ATT > VIBE）：取日志里第一个存在的
-  - gts = ref("IMU.timestamp", "ATT.timestamp", "VIBE.timestamp")
+  - gts = _ref("IMU.timestamp", "ATT.timestamp", "VIBE.timestamp")
   - gaps = gap_events(gts, T0_US)
 
 # 上游最多报 3 处（`MAX_GAP_FINDINGS`），按间隔降序——截断已在算子内完成

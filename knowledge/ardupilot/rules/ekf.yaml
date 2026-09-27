@@ -9,7 +9,7 @@
 #   1. **不要用 SVT**。它在 XKF4（EKF3）里是空速方差、在 NKF4（EKF2）里是倾斜误差收敛
 #      度量，都不是归一化检验比，套 1.0 阈值是错的（上游专门审计过这一条）。
 #   2. **XKF4 优先、NKF4 兜底**。topics 用 `XKF4 || NKF4` 表达"任一存在即可"，
-#      ref 用位置参数候选组 `ref("XKF4.SV", "NKF4.SV")` 取第一个存在的——两处必须成对写，
+#      _ref 用位置参数候选组 `_ref("XKF4.SV", "NKF4.SV")` 取第一个存在的——两处必须成对写，
 #      只写一处会出现"topic 判过但取不到数"或反过来。
 #
 # 降级的那一处没法避免：facts.yaml 的 ekfVarianceMax / ekfVarianceMaxLegacy 两条指标是
@@ -26,7 +26,7 @@ conditions:
     - "XKF4 || NKF4"
 
 compute:
-  - sv_max = max(ref("XKF4.SV", "NKF4.SV"))
+  - sv_max = max(_ref("XKF4.SV", "NKF4.SV"))
 
 triggers:
   - when: "sv_max > 1.0"
@@ -60,7 +60,7 @@ conditions:
     - "XKF4 || NKF4"
 
 compute:
-  - sp_max = max(ref("XKF4.SP", "NKF4.SP"))
+  - sp_max = max(_ref("XKF4.SP", "NKF4.SP"))
 
 triggers:
   - when: "sp_max > 1.0"
@@ -94,7 +94,7 @@ conditions:
     - "XKF4 || NKF4"
 
 compute:
-  - sh_max = max(ref("XKF4.SH", "NKF4.SH"))
+  - sh_max = max(_ref("XKF4.SH", "NKF4.SH"))
 
 triggers:
   - when: "sh_max > 1.0"
@@ -128,7 +128,7 @@ conditions:
     - "XKF4 || NKF4"
 
 compute:
-  - sm_max = max(ref("XKF4.SM", "NKF4.SM"))
+  - sm_max = max(_ref("XKF4.SM", "NKF4.SM"))
 
 triggers:
   - when: "sm_max > 1.0"

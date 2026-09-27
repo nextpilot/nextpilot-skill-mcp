@@ -1,4 +1,4 @@
-﻿id: gps-uncertainty
+id: gps-uncertainty
 title: GPS Uncertainty
 description: GPS 不确定度：eph / epv / hdop / vdop / s_variance_m_s / satellites_used / fix_type。
 order: 32
@@ -11,13 +11,13 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_gps_position[0].eph", "sensor_gps[0].eph")
-          - ref("vehicle_gps_position[0].epv", "sensor_gps[0].epv")
-          - ref("vehicle_gps_position[0].hdop", "sensor_gps[0].hdop")
-          - ref("vehicle_gps_position[0].vdop", "sensor_gps[0].vdop")
-          - ref("vehicle_gps_position[0].s_variance_m_s", "sensor_gps[0].s_variance_m_s")
-          - ref("vehicle_gps_position[0].satellites_used", "sensor_gps[0].satellites_used")
-          - ref("vehicle_gps_position[0].fix_type", "sensor_gps[0].fix_type")
+          - _ref("vehicle_gps_position.eph", "sensor_gps.eph")
+          - _ref("vehicle_gps_position.epv", "sensor_gps.epv")
+          - _ref("vehicle_gps_position.hdop", "sensor_gps.hdop")
+          - _ref("vehicle_gps_position.vdop", "sensor_gps.vdop")
+          - _ref("vehicle_gps_position.s_variance_m_s", "sensor_gps.s_variance_m_s")
+          - _ref("vehicle_gps_position.satellites_used", "sensor_gps.satellites_used")
+          - _ref("vehicle_gps_position.fix_type", "sensor_gps.fix_type")
         label:
           ["Horizontal position accuracy [m]", "Vertical position accuracy [m]",
            "Horizontal dilution of precision [m]", "Vertical dilution of precision [m]",

@@ -1,4 +1,4 @@
-﻿id: fifo-gyro
+id: fifo-gyro
 title: Raw Gyro (FIFO)
 description: FIFO 陀螺仪原始数据（每 IMU 一张），仅当 sensor_gyro_fifo 存在时显示。
 order: 29
@@ -12,7 +12,7 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("sensor_gyro_fifo[:].x")
-          - ref("sensor_gyro_fifo[:].y")
-          - ref("sensor_gyro_fifo[:].z")
+          - sensor_gyro_fifo[:].x
+          - sensor_gyro_fifo[:].y
+          - sensor_gyro_fifo[:].z
         label: ["X", "Y", "Z"]

@@ -27,25 +27,24 @@ MIT 只要求保留版权声明与许可声明，无额外署名条款。收录�
   用在 `power.yaml` 的低电压判据上。上游的 `vehicle_kind` 六分类**没迁**——
   本站的机型判定在 provider 里（`_FRAME_CLASS_MAP`），规则侧只用
   `rotary_wing / fixed_wing`，两套分类对不上，迁过来只会添乱。
-- **12 组共 34 条规则**（进 `rules/*.yaml`）：振动、EKF、电源、GPS、罗盘、姿态、
-  电机、遥控、时序、事件、配置安全、传感器。其中 33 条能算、1 条占位
-  （`apm-mode-timeline` 卡在 `MODE.Mode` 是文本列）。
+- **16 组共 43 条规则**（进 `rules/*.yaml`）：振动、EKF、电源、GPS、罗盘、姿态、
+  电机、遥控、时序、事件、配置安全、传感器、校准、日志完整性、预解锁、参数审计。
+  全部 43 条均为真规则，0 条占位。
 - **官方文档链接** 20 条（进 `facts.yaml` 的 `doc_urls` 与 `rule_meta.by_group.doc`）
 - **`docs/SOURCES.md`** 198 条假设审计（confirmed 86 / heuristic 22 /
   design choice 82 / corrected 8），逐字保留
 
-上游共 16 项检查，本轮迁了 12 项。**没迁的 4 项各有原因，不是遗漏**：
+上游共 16 项检查，2026-09 全部迁移完毕。最后 4 项的原障碍与解除方式：
 
-| 上游检查      | 为什么不迁                                                                                                                               |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `integrity`   | 它读的是**解析层**产出的 `log.meta.integrity`（日志是否被截断等），不是消息流。本站 provider 没有这个概念，也不在规则能引用的内置变量里  |
-| `prearm`      | 依赖 `MSG.Message` / `STATUSTEXT.Text` 的**文本子串匹配** → 撞 C1（`count_items` 的 `contains=` 有了，但文本列仍然取不到）               |
-| `calibration` | 100% 依赖参数（`COMPASS_OFS*` 的模长判校准质量）。**原卡 C2，2026-09 已解除**（有 `param()` 了），但还没迁——要迁得先补向量模长一类的算子 |
-| `param_audit` | 同上，依赖参数。C2 解除后这条基本没障碍了，还没迁只是没排期                                                                              |
+| 上游检查      | 原卡什么 / 如何解除                                                                                                                                            |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `integrity`   | 它读的是**解析层**产出的 `log.meta.integrity`（日志是否被截断等），不是消息流。本站 provider 2026-09 已补 `is_log_ok()` 与 `get_log_integrity()`，规则随之补齐 |
+| `prearm`      | 依赖 `MSG.Message` / `STATUSTEXT.Text` 的**文本子串匹配** → ~~原卡 C1~~ 2026-09 C1 已解除，`get_series()` 可返回文本列                                         |
+| `calibration` | 100% 依赖参数（`COMPASS_OFS*` 的模长判校准质量）。**原卡 C2，2026-09 已解除**（有 `_cfg()` 了），2026-09 已迁，用 `np.hypot` 求三轴偏移模长                    |
+| `param_audit` | 同上，依赖参数。C2 解除后 2026-09 已迁                                                                                                                         |
 
-`facts.yaml` 的 `group_order` 里仍然留了 `integrity` / `calibration` /
-`param_audit` / `prearm_messages` 这四个 group（空 group 允许，引擎空跑），
-位置也留着——将来补的时候不用重排。
+以上 4 项 2026-09 已全部补齐（`integrity.yaml` / `prearm.yaml` / `calibration.yaml` /
+`param_audit.yaml`），上游 16 项检查迁移完毕。
 
 ## 改了什么（与上游的偏差，逐条如实记）
 
@@ -62,7 +61,7 @@ MIT 只要求保留版权声明与许可声明，无额外署名条款。收录�
    `docUrl` 是单值，所以 `rule_meta.by_group.doc` 只取**最具体的一条**。
    完整链接集在 `facts.yaml` 的 `doc_urls` 里。两处要一起改，目前没有自动校验。
 4. **参数驱动的检查曾全部降级或占位**，2026-09 已解除：`BUILTIN_VARIABLES` 新增
-   `PARAMS`，规则用 `param('NAME', default=None)` 读，`config` 三条与 `sensors`
+   `PARAMS`，规则用 `_cfg('NAME', default=None)` 读，`config` 三条与 `sensors`
    前两条随之从占位转真。仍保留的一处降级：`power` 的低电压判据没有改成
    "读 `BATT_CRT_VOLT`/`BATT_LOW_VOLT`"，仍是上游的 `estimate_cells` 派生路径
    （改用了 `coalesce` 链实现 `round`，因为引擎的 `to_int` 是截断，会把 6S 估成 5S）——
@@ -73,15 +72,15 @@ MIT 只要求保留版权声明与许可声明，无额外署名条款。收录�
    电机两条缺矩阵化与标量减法（占位）；时序的日志间隙缺 `diff` 与中位数（占位，
    PM 长循环那条用 `mean × length_of` 绕开了求和缺口）；MODE 时间线缺文本列（占位）。
    —— 除 MODE 时间线外，上面这些 2026-09 补算子后**都已解除**（`wrap_degrees` /
-   `stack_columns` / `diff` / `median` / `sum`），只剩文本列那一条（C1）。
+   `stack_columns` / `diff` / `median` / `sum`）；MODE 时间线则随 C1 2026-09 解除而解锁。
 6. **两处有意偏离上游**，都是有理由的，不是抄错：
    - **GPS 的 armed 窗口**：上游拿不到 armed 窗口就退回全程判，那必然把起飞前
      搜星期（`NSats=0`、`HDop=99.99`）判成飞行中故障。本站引擎会把 skip 连同原因
      显示给用户，所以改成 `armed: true` 直接跳过——宁可跳过，不误报。
    - **EV 事件的严重度**：上游统一出 INFO 摘要；这里把丢 GPS、EKF 高度/航向重置、
      电机紧急停转、旋翼转速不足提到 warning——它们本身就是故障信号，压在 INFO 会淹没。
-   - 附带一处：上游的 `rcin` 用"持续 >=2s 或持续到日志末尾"判 critical，
-     本站缺持续时长，改成只报**命中样本数**并给 warning（没有新拟阈值）。
+   - 附带一处：上游的 `rcin` 用"持续 >=2s 或持续到日志末尾"判 critical。
+     2026-09 补齐 `excursion_events` 算子后已与上游对齐（>=2.0s→critical，否则 warning）。
 7. **`FRAME_CLASS = 3` 的认定与上游不同。** 上游 `FRAME_CLASSES[3] = Octo`（旋翼），
    本站 `providers/ardupilot.py` 的 `_FRAME_CLASS_MAP[3] = fixed_wing`。
    本轮不动 provider，规则判定以 provider 实际产出的 `VEHICLE` 为准；
@@ -106,4 +105,4 @@ MIT 只要求保留版权声明与许可声明，无额外署名条款。收录�
 合成样本自证"链路通、参数读得到、该报的报了"，**不代表这些阈值对真实飞行成立**。
 拿不到真实样本之前，请把 `rules/*.yaml` 里的每条阈值都当作草稿看待。
 
-剩余待办（占位那一条、FRAME_CLASS 3 号冲突、曲线预设、找真样本）在 `PENDING.md`。
+剩余待办（FRAME_CLASS 3 号冲突、曲线预设、找真样本）在 `PENDING.md`。

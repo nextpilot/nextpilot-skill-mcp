@@ -1,4 +1,4 @@
-﻿id: visual-odom-vel
+id: visual-odom-vel
 title: Visual Odometry Velocity
 description: 视觉里程计速度（仅当 topic 存在时显示）。
 order: 14
@@ -11,7 +11,7 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_visual_odometry[0].vx")
-          - ref("vehicle_visual_odometry[0].vy")
-          - ref("vehicle_visual_odometry[0].vz")
+          - vehicle_visual_odometry.vx
+          - vehicle_visual_odometry.vy
+          - vehicle_visual_odometry.vz
         label: ["X", "Y", "Z"]

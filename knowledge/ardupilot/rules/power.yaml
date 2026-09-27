@@ -2,10 +2,10 @@
 # 上游实现：ardupilot-mcp 的 checks/power.py。
 #
 # 降级的地方只有一处，先摆在这里：
-# 上游的最低电压判据优先用参数 BATT_LOW_VOLT / BATT_CRT_VOLT，而本仓库的 APM provider
-# 取不到任何参数（见 PENDING.md 的 C2）。上游有一条回退路径——按峰值电压估电芯数
-# （4.2 V/节满电）再乘 3.5/3.3 V/节——本文件走的就是这条回退路径。
-# 拿到参数后应当优先用参数（阈值回填见 PENDING.md 第五节第 5 条）。
+# 上游的最低电压判据优先用参数 BATT_LOW_VOLT / BATT_CRT_VOLT（C2 2026-09 已解除，
+# `_cfg()` 可读），但阈值尚未经过真实日志验证，所以**暂不切换**，继续走回退路径——
+# 按峰值电压估电芯数（4.2 V/节满电）再乘 3.5/3.3 V/节。拿到验证后的阈值再切
+# （阈值回填见 PENDING.md 第五节第 5 条）。
 #
 # BAT / CURR 两个 topic 名是固件代际差异（Copter 4.x 用 BAT，3.x 用 CURR，字段同名），
 # 一律用 `BAT || CURR` + ref 候选组成对处理。
@@ -20,7 +20,7 @@ conditions:
     - "BAT || CURR"
 
 compute:
-  - volts = ref("BAT.Volt", "CURR.Volt")
+  - volts = _ref("BAT.Volt", "CURR.Volt")
   - vmin = min(volts)
   - vmax = max(volts)
   # 上游 meta.estimate_cells：cells = round(vmax / 4.2)（LiPo 满电 4.2 V/节），
@@ -70,8 +70,8 @@ conditions:
     - "BAT || CURR"
 
 compute:
-  - volts = ref("BAT.Volt", "CURR.Volt")
-  - curr = ref("BAT.Curr", "CURR.Curr")
+  - volts = _ref("BAT.Volt", "CURR.Volt")
+  - curr = _ref("BAT.Curr", "CURR.Curr")
   - peak_curr = max(curr)
   # 只保留电流 >= 20 A 的时刻
   - sag = np.ptp(volts[curr > 20.0])
@@ -102,8 +102,8 @@ conditions:
     - "BAT || CURR"
 
 compute:
-  - volts = ref("BAT.Volt", "CURR.Volt")
-  - vts = ref("BAT.timestamp", "CURR.timestamp")
+  - volts = _ref("BAT.Volt", "CURR.Volt")
+  - vts = _ref("BAT.timestamp", "CURR.timestamp")
   # 上游的量程闸门：电压中位数不在 4~70 V 之间说明没有电池监控或量纲异常，整条不分析
   - vmed = median(volts)
   - drops = step_drop_events(volts, vts, T0_US) if (vmed > 4.0 and 70.0 > vmed) else None

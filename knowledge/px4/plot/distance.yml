@@ -1,4 +1,4 @@
-﻿id: distance
+id: distance
 title: Distance Sensor
 description: 距离传感器读数（current_distance / variance / dist_bottom）。
 order: 31
@@ -11,11 +11,11 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("distance_sensor[0].current_distance")
-          - ref("distance_sensor[0].variance")
+          - distance_sensor.current_distance
+          - distance_sensor.variance
         label: ["Distance", "Variance"]
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_local_position[0].dist_bottom")
-          - ref("vehicle_local_position[0].dist_bottom_valid")
+          - vehicle_local_position.dist_bottom
+          - vehicle_local_position.dist_bottom_valid
         label: ["Estimated Distance Bottom [m]", "Dist Bottom Valid"]

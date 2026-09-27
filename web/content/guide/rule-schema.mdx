@@ -130,19 +130,11 @@ compute:
 
 | 变量 | 类型 | 说明 |
 |------|------|------|
-| `FW_MINOR` | int\|None | 固件次版本号。**版本分支唯一常用的量**；None = 这份日志没写版本号 |
 | `VEHICLE` | str | 机型：rotary_wing / fixed_wing / rover / airship / unknown |
-| `IS_FIXED_WING` | bool | 机型别名（比 VEHICLE == 'fixed_wing' 好读） |
 | `DURATION_S` | float | 日志总时长（秒） |
 | `ARMED_S` | float | armed 总时长（秒） |
-| `ARMED_INTERVALS` | list[(us,us)] | armed 区间，升序不重叠；end=None 表示持续到日志结束。时序算子按它切窗 |
 | `T0_US` | int | 日志起点时间戳（us），事件类算子算相对时刻的基准 |
-| `HAS_ARMED` | bool | 是否存在 armed 段 |
-| `MODES_PRESENT` | list[str] | 日志里出现过的飞行模式名（去重排序）。`conditions.mode` 按它匹配；没有模式段就给空列表——**空列表不是「模式不限」**，写 mode 约束时会因此跳过 |
-| `RESTART_DETECTED` | bool | 是否有 topic 时间戳回退（疑似中途重启） |
 | `DROPOUT_MS` | int | 全日志丢包累计（毫秒） |
-| `MESSAGES` | list[dict] | 日志消息条目（供消息类经验按级别筛选） |
-| `PARAMS` | dict | 飞控参数表 \{参数名: 值\}。**规则里不直接引用它**——表达式没有下标能力，取单个参数用框架的 `param('NAME')`（见 engine.py 的 `_rule_env`）。这份日志没录参数就给空 dict（APM 是 PARM 消息的最后一次值，PX4 是初始参数表） |
 | `SYS_UUID` | str | 系统唯一 ID。这份日志没写就给空串 |
 | `AIRFRAME_ID` | int\|None | 机架编号（PX4: SYS_AUTOSTART；APM: FRAME_CLASS）。没有就 None——与 AIRFRAME（机型字符串）是两个东西 |
 | `HOME_LAT` | float\|None | Home 点纬度（度）。给不出定位就 None |

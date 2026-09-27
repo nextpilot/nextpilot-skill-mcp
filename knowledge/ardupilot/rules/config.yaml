@@ -4,9 +4,8 @@
 #   FS_THR_ENABLE == 0 禁用油门失效保护（Copter/Heli；Plane 用的是 THR_FAILSAFE）→ INFO
 # 注意是**精确等于 0** 才报：非零值（包括 -9 这类负位掩码）表示检查是开着的，不能报。
 #
-# 参数怎么读：provider 把 PARM 消息的最后一次值放进内置变量 PARAMS，规则里用
-# `param('NAME')` 取（engine.py 的 `_param_fn`；不是算子——参数是一份日志一个值的
-# 离散事实，不是从列里算出来的）。**参数缺失返回 None**，于是 `x == 0` 不成立 → 不发射，
+# 参数怎么读：provider 把 PARM 消息的最后一次值放进内置变量 CFG，规则里全大写裸名
+# 自动走 `_cfg()` 取单个值。**参数缺失返回 None**，于是 `x == 0` 不成立 → 不发射，
 # 这正是"没有这条参数就不该下结论"要的效果。
 #
 # `conditions.topics: [PARM]` 是有意的：日志没录参数表时，这三条要在报告里显示成
@@ -22,7 +21,7 @@ conditions:
     - PARM
 
 compute:
-  - arming_check = param("ARMING_CHECK")
+  - arming_check = ARMING_CHECK
 
 triggers:
   - when: "arming_check == 0"
@@ -47,7 +46,7 @@ conditions:
     - PARM
 
 compute:
-  - batt_monitor = param("BATT_MONITOR")
+  - batt_monitor = BATT_MONITOR
 
 triggers:
   - when: "batt_monitor == 0"
@@ -75,7 +74,7 @@ conditions:
     - PARM
 
 compute:
-  - fs_thr_enable = param("FS_THR_ENABLE")
+  - fs_thr_enable = FS_THR_ENABLE
 
 triggers:
   - when: "fs_thr_enable == 0"

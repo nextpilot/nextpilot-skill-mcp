@@ -124,24 +124,10 @@ log_levels: { 3: ERROR, 4: WARNING, 6: INFO }
 # ─────────────────────────────────────────────────────────────────────────────
 # 机型：**规则 conditions.vehicle 的词表**，值域 = 引擎认识的机型名。
 #
-# ⚠️ 这张表按 providers/ardupilot.py 的 _FRAME_CLASS_MAP **实际行为**写，不是 FRAME_CLASS
-# 的权威码表——权威表在下面的 frame_classes（上游逐条核过 apm.pdef.xml）。两表冲突：
-#   · 3 号：本表 fixed_wing（provider 认定的 Plane）；上游 frame_classes[3] = Octo（旋翼）
-#   · 2/6/7 号：provider 的注释写 Tricopter/Octa/Helicopter，上游是 Hexa/Heli/Tri
-# provider 那份自己标了"待真实样本核对"，上游那份是核实过的。但**规则匹配用的是
-# provider 产出的 VEHICLE 字符串**，引擎只做精确比对，所以这里只能照 provider 写，
-# 否则规则永远 skip。冲突的处置见 PENDING.md。
-vehicle_types:
-    {
-        1: rotary_wing,
-        2: rotary_wing,
-        3: fixed_wing,
-        4: rotary_wing,
-        5: rotary_wing,
-        6: rotary_wing,
-        7: rotary_wing,
-        8: rotary_wing,
-    }
+# FRAME_CLASS → 精确机型按上游权威源码（AP_Motors/AP_Parameters）。
+# Plane / Rover 没有 FRAME_CLASS，由 provider 按固件名（ArduPlane / ArduRover）识别。
+# 规则可写精确名，也可写类别简写（copter / plane / rover），引擎 _match_vehicle 展开。
+vehicle_types: [copter, plane, rover, quad, hexa, octa, tri, coax, y6, heli, heli_dual, octa_quad, single, dodeca, deca, undefined, unknown]
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 飞行模式：上游 COPTER_MODES（Copter 4.5.7 的 mode.h Number enum）。
@@ -325,7 +311,7 @@ vehicle_prefix_map:
 # FMTU/UNIT/MULT 直接丢了，单位只散落在各 check 的 docstring 里。
 #
 # 用途边界（重要）：当前**不参与运行期换算**。
-#   · 引擎的单位换算走 ref(..., unit=)，源单位从 meta/<tag>.json 查；
+#   · 引擎的单位换算走 _ref(..., unit=)，源单位从 meta/<tag>.json 查；
 #     APM 侧没有 meta/ 目录，所以规则里**不要写 unit=**（查不到只会告警，不换算）。
 #   · 展示用的单位由规则自己在 triggers[].unit 里写死，照抄本表即可。
 # 等 APM 也有 meta/ 之后，本表应迁过去并启用 unit=。见 PENDING.md。

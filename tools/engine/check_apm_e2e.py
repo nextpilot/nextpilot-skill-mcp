@@ -91,15 +91,14 @@ def main() -> int:
     if not ok:
         return log.print_summary(results, skipped)
 
-    # ── Check 2: param() 取数与兜底 ─────────────────────────────────
+    # ── Check 2: _cfg() 取数与兜底 ─────────────────────────────────
     step += 1
-    rule_name = "param('NAME') 读得到参数，读不到按 default 兜底"
+    rule_name = "_cfg('NAME') 读得到参数，读不到按 default 兜底"
     env = ns["_rule_env"]()
-    params = env.get("PARAMS") or {}
     got_class, got_missing = None, "<未执行>"
     try:
-        ns["_eval_compute"]('x = param("FRAME_CLASS")', env)
-        ns["_eval_compute"]('y = param("NO_SUCH_PARAM", 0.0)', env)
+        ns["_eval_compute"]('x = _cfg("FRAME_CLASS")', env)
+        ns["_eval_compute"]('y = _cfg("NO_SUCH_PARAM", 0.0)', env)
         got_class, got_missing = env.get("x"), env.get("y")
     except Exception as exc:  # noqa: BLE001
         err = f"{type(exc).__name__}: {exc}"
@@ -107,9 +106,9 @@ def main() -> int:
         results.append((rule_name, "fail"))
         return log.print_summary(results, skipped)
 
-    ok = "FRAME_CLASS" in params and got_class is not None and got_missing == 0.0
-    detail = f"PARAMS 有 {len(params)} 项；param('FRAME_CLASS')={got_class}，缺失兜底={got_missing}"
-    err = "" if ok else "参数没进内置变量表，或兜底没生效（规则会静默不发射）"
+    ok = got_class is not None and got_missing == 0.0
+    detail = f"_cfg('FRAME_CLASS')={got_class}，缺失兜底={got_missing}"
+    err = "" if ok else "参数没读到，或兜底没生效（规则会静默不发射）"
     log.print_check(step, total, rule_name, ok, detail, err)
     results.append((rule_name, "ok" if ok else "fail"))
     if not ok:

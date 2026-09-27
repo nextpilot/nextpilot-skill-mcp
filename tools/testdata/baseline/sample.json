@@ -7,7 +7,7 @@
   "result": {
     "platform": "PX4",
     "logType": "px4-ulog",
-    "parserVersion": "pyulog/1.1.0",
+    "parserVersion": "pyulog/1.2.4",
     "facts": {
       "durationSec": 181.5,
       "vehicleType": "rotary_wing",
@@ -111,21 +111,6 @@
     "findings": [
       {
         "id": "F01",
-        "severity": "critical",
-        "ruleId": "px4-log-errors",
-        "label": null,
-        "description": "日志中出现 4 条 ERROR 及以上消息",
-        "evidence": {
-          "source": "ulog.logged_messages(log_level<=3)",
-          "value": 4,
-          "threshold": 0,
-          "unit": "条"
-        },
-        "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html",
-        "suggestion": "按时间顺序核对错误原文，这通常是定位根因最直接的证据。"
-      },
-      {
-        "id": "F02",
         "severity": "guard",
         "ruleId": "px4-guard-topic-missing",
         "label": "topic_missing:battery_status",

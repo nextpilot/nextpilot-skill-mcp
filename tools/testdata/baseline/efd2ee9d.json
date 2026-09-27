@@ -7,7 +7,7 @@
   "result": {
     "platform": "PX4",
     "logType": "px4-ulog",
-    "parserVersion": "pyulog/1.1.0",
+    "parserVersion": "pyulog/1.2.4",
     "facts": {
       "durationSec": 213.0,
       "vehicleType": "rotary_wing",
@@ -94,18 +94,6 @@
         "unit": "个"
       },
       {
-        "key": "gyroBiasMaxRadS",
-        "label": "陀螺零偏最大",
-        "value": 0.005085999146103859,
-        "unit": "rad/s"
-      },
-      {
-        "key": "gyroBiasDriftRadS",
-        "label": "陀螺零偏漂移",
-        "value": 0.00030912505462765694,
-        "unit": "rad/s"
-      },
-      {
         "key": "navStateChanges",
         "label": "模式切换次数",
         "value": 2,
@@ -126,11 +114,6 @@
         "key": "imuAccelVibrationP95",
         "label": "imuAccelVibrationP95",
         "value": 3.621377778053284
-      },
-      {
-        "key": "gyroBiasSource",
-        "label": "gyroBiasSource",
-        "value": "estimator_sensor_bias.gyro_bias[]"
       }
     ],
     "tags": [
@@ -155,7 +138,6 @@
       "px4-failsafe-nav",
       "px4-mode-thrash",
       "px4-motor-unbalance",
-      "px4-imu-bias-drift",
       "px4-attitude-overshoot",
       "px4-attitude-oscillation",
       "px4-vtol-transition-attitude",
@@ -177,6 +159,10 @@
       {
         "ruleId": "px4-gps-eph",
         "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "px4-imu-bias-drift",
+        "reason": "本条只在有解锁段时适用"
       },
       {
         "ruleId": "px4-airspeed-invalid",
@@ -225,21 +211,6 @@
         "suggestion": "剩余电量低于 10%，应立即返航；检查电量估算与电池健康。"
       },
       {
-        "id": "F04",
-        "severity": "critical",
-        "ruleId": "px4-log-errors",
-        "label": null,
-        "description": "日志中出现 2 条 ERROR 及以上消息",
-        "evidence": {
-          "source": "ulog.logged_messages(log_level<=3)",
-          "value": 2,
-          "threshold": 0,
-          "unit": "条"
-        },
-        "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html",
-        "suggestion": "按时间顺序核对错误原文，这通常是定位根因最直接的证据。"
-      },
-      {
         "id": "F01",
         "severity": "warning",
         "ruleId": "px4-power-cell-voltage",
@@ -267,20 +238,6 @@
         },
         "docUrl": "https://docs.px4.io/main/en/config/battery.html",
         "suggestion": "剩余电量低于 20%，注意返航裕度。"
-      },
-      {
-        "id": "F05",
-        "severity": "warning",
-        "ruleId": "px4-log-warnings",
-        "label": null,
-        "description": "日志中出现 3 条 WARNING 消息",
-        "evidence": {
-          "source": "ulog.logged_messages(log_level=4)",
-          "value": 3,
-          "threshold": 0,
-          "unit": "条"
-        },
-        "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html"
       }
     ]
   }

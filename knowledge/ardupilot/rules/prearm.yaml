@@ -1,0 +1,61 @@
+# 预解锁消息（MSG / STATUSTEXT）：上游 ardupilot-mcp 的 checks/prearm.py。
+# 扫描启动阶段的消息文本，匹配预解锁/安全相关的关键字。
+#
+# 上游在初次解锁前（first arm 事件）的消息中扫描并过滤掉例行启动杂讯
+# （initialis/initializ/alignment complete/ready/detected as/rcout/rcin/frame:/
+# param space/u-blox/gps 1:/gps 2:），这里用 `armed: false` 做近似 + `count_items`
+# 的 `contains=` 匹配上游 WARN_TOKENS（prearm / error / failed / bad  / denied /
+# not calibrated / unhealthy / inconsistent），最多出 6 条样本引用
+# （上游 MAX_FINDINGS=6），其余截断。
+
+id: apm-prearm-warnings
+name: 预解锁/启动消息扫描
+group: prearm_messages
+order: 1
+
+conditions:
+  armed: false
+  message:
+    - "MSG || STATUSTEXT"
+
+compute:
+  - msg_lines = _try(_ref("MSG.Message")) or []
+  - statustext_lines = _try(_ref("STATUSTEXT.Text")) or []
+  - n_prearm = count_items(msg_lines, contains="prearm")
+  - n_arm = count_items(msg_lines, contains="arm:")
+  - n_not_calibrated = count_items(msg_lines, contains="not calibrated")
+  - n_unhealthy = count_items(msg_lines, contains="unhealthy")
+  - n_inconsistent = count_items(msg_lines, contains="inconsistent")
+  - n_error = count_items(msg_lines, contains="error")
+  - n_failed = count_items(msg_lines, contains="failed")
+  - n_bad = count_items(msg_lines, contains="bad ")
+  - n_denied = count_items(msg_lines, contains="denied")
+  # STATUSTEXT 里也同样找
+  - n_st_prearm = count_items(statustext_lines, contains="prearm")
+  - n_st_error = count_items(statustext_lines, contains="error")
+  - n_st_failed = count_items(statustext_lines, contains="failed")
+  - n_st_denied = count_items(statustext_lines, contains="denied")
+  - total_warn = n_prearm + n_arm + n_not_calibrated + n_unhealthy + n_inconsistent + n_error + n_failed + n_bad + n_denied + n_st_prearm + n_st_error + n_st_failed + n_st_denied
+  # 取第一条匹配的样本作为证据
+  - 'samples = take_items(msg_lines, contains="prearm", limit=6, clip={"text": 120})'
+
+triggers:
+  - when: "total_warn >= 2"
+    severity: critical
+    suggestion: "启动阶段出现多条预解锁告警/错误消息（{total_warn} 条）。逐条检查 raw log 里的 MSG/STATUSTEXT 文本，解决所列问题后再飞。"
+    description: 启动阶段 {total_warn} 条预解锁/错误消息
+    evidence:
+      source: MSG.Message/STATUSTEXT.Text(启动阶段)
+      value: total_warn
+      threshold: 1
+      unit: 条
+  - when: "total_warn > 0"
+    severity: warning
+    suggestion: "启动阶段出现预解锁或错误消息。检查 raw log 里的 MSG/STATUSTEXT 定位问题。"
+    description: 启动阶段 {total_warn} 条预解锁/错误消息
+    evidence:
+      source: MSG.Message/STATUSTEXT.Text(启动阶段)
+      value: total_warn
+      threshold: 0
+      unit: 条
+tag: apm_prearm_warnings

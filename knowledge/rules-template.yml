@@ -62,7 +62,7 @@ conditions:
 #   算不出来（表达式抛异常）→ 整条中止，并**自动**记一条 skipped「数据不足，本条没算出结论」。
 #   要容错就用 _try(...)：内层出错或得 None 时结果为 None，不让整条中止。
 #
-# 字段引用（**所有形态都用裸写**——引擎自动补 ref()；只有挂 unit / alias / 候选组
+# 字段引用（**所有形态都用裸写**——引擎自动补 _ref()；只有挂 unit / alias / 候选组
 # 时才显式写 ref，因为那不能在裸写语法里表达）：
 #   topic.field                    —— 第 0 个实例（与 topic[0].field 同义）
 #   topic[N].field                 —— 第 N 个实例（N 可为负，按 Python 语义）
@@ -73,15 +73,15 @@ conditions:
 #   topic.field[i,j]               —— 二维下标：i 是行（采样）、j 是列（信号）
 #   topic[i].field[j]              —— 实例 + 元素双重下标
 #
-#   · topic.field                 裸写 = ref("topic.field")——完全等价，包了是白写
-#   · topic[0].field              裸写 = ref("topic[0].field")——等价，但更推荐 topic.field
-#   · topic[:].data               裸写 = ref("topic[:].data")——取所有实例
-#   · topic[i].field[j]           裸写 = ref("topic[i].field[j]")——变量下标也支持
+#   · topic.field                 裸写 = _ref("topic.field")——完全等价，包了是白写
+#   · topic[0].field              裸写 = _ref("topic[0].field")——等价，但更推荐 topic.field
+#   · topic[:].data               裸写 = _ref("topic[:].data")——取所有实例
+#   · topic[i].field[j]           裸写 = _ref("topic[i].field[j]")——变量下标也支持
 #
-# 以下情况才需要显式 ref(...)：
-#   ref("新名", "旧名")                      候选组：按顺序取第一个存在的
-#   ref("latitude_deg", "lat", unit="deg")   改名 + 改单位：取到谁都换算成 deg
-#   ref("...", alias="clipping")             备用命名，等价于放进候选组
+# 以下情况才需要显式 _ref(...)：
+#   _ref("新名", "旧名")                      候选组：按顺序取第一个存在的
+#   _ref("latitude_deg", "lat", unit="deg")   改名 + 改单位：取到谁都换算成 deg
+#   _ref("...", alias="clipping")             备用命名，等价于放进候选组
 #   ↑ **没有"这条引用只适用于某版本"**：升级换代就是老名字没了、新名字在，按存在性挑就够
 #
 # 可用内置（Python + numpy 子集，直接用、不用 import）：

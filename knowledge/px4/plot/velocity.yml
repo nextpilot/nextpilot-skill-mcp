@@ -1,4 +1,4 @@
-﻿id: velocity
+id: velocity
 title: Velocity
 description: 三轴速度估计值与 setpoint（vx/vy/vz）。
 order: 12
@@ -11,13 +11,13 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_local_position[0].vx")
-          - ref("vehicle_local_position[0].vy")
-          - ref("vehicle_local_position[0].vz")
+          - vehicle_local_position.vx
+          - vehicle_local_position.vy
+          - vehicle_local_position.vz
         label: ["X", "Y", "Z"]
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_local_position_setpoint[0].vx")
-          - ref("vehicle_local_position_setpoint[0].vy")
-          - ref("vehicle_local_position_setpoint[0].vz")
+          - vehicle_local_position_setpoint.vx
+          - vehicle_local_position_setpoint.vy
+          - vehicle_local_position_setpoint.vz
         label: ["X Setpoint", "Y Setpoint", "Z Setpoint"]

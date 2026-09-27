@@ -1,4 +1,4 @@
-﻿id: airspeed
+id: airspeed
 title: Airspeed
 description: 地速 / 真空速 / 指示空速与 GPS 地速、空速 setpoint。
 order: 18
@@ -11,10 +11,10 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("airspeed_validated[0].true_airspeed_m_s", "airspeed[0].indicated_airspeed_m_s")
-          - ref("airspeed[0].indicated_airspeed_m_s")
+          - _ref("airspeed_validated.true_airspeed_m_s", "airspeed.indicated_airspeed_m_s")
+          - airspeed.indicated_airspeed_m_s
         label: ["True Airspeed", "Indicated Airspeed"]
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_gps_position[0].vel_m_m_s", "vehicle_gps_position[0].vel_m_s")
+          - _ref("vehicle_gps_position.vel_m_m_s", "vehicle_gps_position.vel_m_s")
         label: ["Ground Speed (from GPS)"]

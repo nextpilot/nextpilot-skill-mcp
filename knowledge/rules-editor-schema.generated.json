@@ -107,10 +107,25 @@
               "enum": [
                 "airship",
                 "any",
+                "coax",
+                "copter",
+                "deca",
+                "dodeca",
                 "fixed_wing",
+                "heli",
+                "heli_dual",
+                "hexa",
+                "octa",
+                "octa_quad",
+                "plane",
+                "quad",
                 "rotary_wing",
                 "rover",
-                "unknown"
+                "single",
+                "tri",
+                "undefined",
+                "unknown",
+                "y6"
               ]
             },
             {
@@ -120,10 +135,25 @@
                 "enum": [
                   "airship",
                   "any",
+                  "coax",
+                  "copter",
+                  "deca",
+                  "dodeca",
                   "fixed_wing",
+                  "heli",
+                  "heli_dual",
+                  "hexa",
+                  "octa",
+                  "octa_quad",
+                  "plane",
+                  "quad",
                   "rotary_wing",
                   "rover",
-                  "unknown"
+                  "single",
+                  "tri",
+                  "undefined",
+                  "unknown",
+                  "y6"
                 ]
               }
             }
@@ -180,7 +210,7 @@
       "type": "array",
       "items": {
         "type": "string",
-        "description": "取值表达式：自上而下求值，输出的名字供后面与 triggers 引用。\n写法是 Python 的一个真子集（完整语法见 /guide/rule-schema）：\n  a, b = f(x, kw=1) / pct = frac * 100 / x if c else y / a and b / not a\n字段引用：topic.field（裸写）或 ref(\"topic[:].field\", alias=\"x\", unit=\"deg\")；\n  ref(\"新名\", \"旧名\") 是候选组，运行期取第一个存在的。\n⚠ 表达式**内部**（算子名、字段是否存在、单位换算）JSON Schema 查不了，由构建期校验。"
+        "description": "取值表达式：自上而下求值，输出的名字供后面与 triggers 引用。\n写法是 Python 的一个真子集（完整语法见 /guide/rule-schema）：\n  a, b = f(x, kw=1) / pct = frac * 100 / x if c else y / a and b / not a\n字段引用：topic.field（裸写）或 _ref(\"topic[:].field\", alias=\"x\", unit=\"deg\")；\n  _ref(\"新名\", \"旧名\") 是候选组，运行期取第一个存在的。\n⚠ 表达式**内部**（算子名、字段是否存在、单位换算）JSON Schema 查不了，由构建期校验。"
       },
       "description": "取值：一串表达式，自上而下求值"
     },
@@ -437,6 +467,7 @@
     "head",
     "head_tail_median_drop",
     "hypot",
+    "int",
     "interp_to",
     "interval_mask",
     "is_none",
@@ -446,6 +477,7 @@
     "keep_gt",
     "label_if",
     "larger",
+    "len",
     "length_of",
     "longest_true_run",
     "mask_and",
@@ -526,28 +558,21 @@
   ],
   "x-builtin-vars": [
     "AIRFRAME_ID",
-    "ARMED_INTERVALS",
     "ARMED_S",
     "DROPOUT_MS",
     "DURATION_S",
     "FLIGHT_TIME_S",
-    "FW_MINOR",
-    "HAS_ARMED",
     "HOME_ALT",
     "HOME_LAT",
     "HOME_LON",
     "HW_VER",
     "HW_VER_SUBTYPE",
-    "IS_FIXED_WING",
-    "MESSAGES",
-    "MODES_PRESENT",
-    "PARAMS",
-    "RESTART_DETECTED",
     "SW_VER",
     "SW_VER_HASH",
     "SYS_UUID",
     "T0_US",
     "VEHICLE",
-    "has_topic"
+    "has_topic",
+    "log_ok"
   ]
 }

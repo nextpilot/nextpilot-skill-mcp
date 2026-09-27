@@ -1,4 +1,4 @@
-﻿id: raw-accel
+id: raw-accel
 title: Raw Acceleration
 description: 传感器原始加速度（sensor_combined.accelerometer_m_s2）。
 order: 25
@@ -11,7 +11,7 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("sensor_combined[0].accelerometer_m_s2[0]")
-          - ref("sensor_combined[0].accelerometer_m_s2[1]")
-          - ref("sensor_combined[0].accelerometer_m_s2[2]")
+          - sensor_combined.accelerometer_m_s2[0]
+          - sensor_combined.accelerometer_m_s2[1]
+          - sensor_combined.accelerometer_m_s2[2]
         label: ["X", "Y", "Z"]

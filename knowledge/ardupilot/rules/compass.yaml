@@ -10,7 +10,7 @@
 # 两条都不过线才不出结论。2026-09 补上 std / cv 算子后 critical 那档才落地——
 # 在那之前本条只会出 warning，且没有为了凑出 critical 去编一个"极差比 > 1.2"之类的阈值。
 # 另：上游还检查 COMPASS_OFS_* 硬铁偏移，那个依赖参数。当初因为读不到参数（C2）没迁，
-# 2026-09 有 param() 之后障碍只剩"要算三轴偏移的模长"——还没做，不是不能做。
+# 2026-09 C2 解除后已迁至 `calibration.yaml`（`np.hypot` 求三轴偏移模长：300/600 mGauss）。
 
 id: apm-compass-interference
 name: 罗盘场强稳定性

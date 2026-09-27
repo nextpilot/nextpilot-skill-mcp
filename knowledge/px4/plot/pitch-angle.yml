@@ -1,4 +1,4 @@
-﻿id: pitch-angle
+id: pitch-angle
 title: Pitch Angle
 description: Pitch 欧拉角估计值与 setpoint、groundtruth。
 order: 5
@@ -17,5 +17,5 @@ outputs:
         label: ["Pitch Estimated"]
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_attitude_setpoint[0].pitch_d")
+          - vehicle_attitude_setpoint.pitch_d
         label: ["Pitch Setpoint"]

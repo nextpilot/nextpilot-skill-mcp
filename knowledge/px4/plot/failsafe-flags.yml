@@ -1,4 +1,4 @@
-﻿id: failsafe-flags
+id: failsafe-flags
 title: Failsafe Flags
 description: 失效保护标志：failsafe / user_took_over / failsafe_flags。
 order: 38
@@ -11,32 +11,32 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_status[0].failsafe")
-          - ref("vehicle_status[0].failsafe_and_user_took_over")
+          - vehicle_status.failsafe
+          - vehicle_status.failsafe_and_user_took_over
         label: ["In Failsafe", "User Took Over"]
       - mode: TimeSeries
         ydata:
-          - ref("failsafe_flags[0].auto_mission_missing")
-          - ref("failsafe_flags[0].geofence_breached")
-          - ref("failsafe_flags[0].local_position_accuracy_low")
-          - ref("failsafe_flags[0].local_position_required")
-          - ref("failsafe_flags[0].local_position_invalid")
-          - ref("failsafe_flags[0].local_velocity_invalid")
-          - ref("failsafe_flags[0].local_altitude_invalid")
-          - ref("failsafe_flags[0].global_position_accuracy_low")
-          - ref("failsafe_flags[0].global_position_required")
-          - ref("failsafe_flags[0].global_position_invalid")
-          - ref("failsafe_flags[0].global_velocity_invalid")
-          - ref("failsafe_flags[0].home_position_invalid")
-          - ref("failsafe_flags[0].manual_control_available")
-          - ref("failsafe_flags[0].gcs_connection_available")
-          - ref("failsafe_flags[0].offboard_control_signal_lost")
-          - ref("failsafe_flags[0].rc_signal_found")
-          - ref("failsafe_flags[0].battery_warning")
-          - ref("failsafe_flags[0].vtol_fixed_wing_system_failure")
-          - ref("failsafe_flags[0].engine_failure")
-          - ref("failsafe_flags[0].mission_failure")
-          - ref("failsafe_flags[0].avoidance_failure")
+          - failsafe_flags.auto_mission_missing
+          - failsafe_flags.geofence_breached
+          - failsafe_flags.local_position_accuracy_low
+          - failsafe_flags.local_position_required
+          - failsafe_flags.local_position_invalid
+          - failsafe_flags.local_velocity_invalid
+          - failsafe_flags.local_altitude_invalid
+          - failsafe_flags.global_position_accuracy_low
+          - failsafe_flags.global_position_required
+          - failsafe_flags.global_position_invalid
+          - failsafe_flags.global_velocity_invalid
+          - failsafe_flags.home_position_invalid
+          - failsafe_flags.manual_control_available
+          - failsafe_flags.gcs_connection_available
+          - failsafe_flags.offboard_control_signal_lost
+          - failsafe_flags.rc_signal_found
+          - failsafe_flags.battery_warning
+          - failsafe_flags.vtol_fixed_wing_system_failure
+          - failsafe_flags.engine_failure
+          - failsafe_flags.mission_failure
+          - failsafe_flags.avoidance_failure
         label:
           ["auto_mission_missing", "geofence_breached", "local_position_accuracy_low",
            "local_position_required", "local_position_invalid", "local_velocity_invalid",

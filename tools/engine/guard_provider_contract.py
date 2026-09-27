@@ -104,7 +104,7 @@ def check_provider(ns: dict, path: Path) -> list[tuple[str, str]]:
     rule_name = f"[{path.name}] armed_intervals 形状（升序/不重叠/时长一致）"
     failed = []
     sem = p.builtin_variables()
-    iv = sem["ARMED_INTERVALS"]
+    iv = p.armed_intervals
     if not isinstance(iv, list):
         failed.append(f"{where}: armed_intervals 应当是 list")
     else:
@@ -131,8 +131,8 @@ def check_provider(ns: dict, path: Path) -> list[tuple[str, str]]:
             total_dur = sum(((e if e is not None else fallback) - s) for s, e in iv)
             if abs(total_dur / 1e6 - sem["ARMED_S"]) >= 0.2:
                 failed.append(f"{where}: armed_s={sem['ARMED_S']} 与 armed_intervals 加起来的秒数对不上")
-        if sem["HAS_ARMED"] != bool(iv):
-            failed.append(f"{where}: has_armed 与 armed_intervals 矛盾")
+        if bool(iv) != (sem["ARMED_S"] > 0.0):
+            failed.append(f"{where}: armed_intervals 与 armed_s 不一致")
     ok = not failed
     detail = f"{len(iv) if isinstance(iv, list) else 0} 段区间，armed_s={sem.get('ARMED_S')}s"
     err = "\n".join(failed)
@@ -179,7 +179,8 @@ def check_provider(ns: dict, path: Path) -> list[tuple[str, str]]:
     step += 1
     rule_name = f"[{path.name}] match_version 契约（any/边界/非法串）"
     failed = []
-    unknown_fw = sem["FW_MINOR"] is None
+    vi = p.get_version_info()
+    unknown_fw = vi is None
     if p.match_version("any") is not True:
         failed.append(f"{where}: match_version('any') 应当为真")
     if p.match_version("") is not True:
@@ -198,7 +199,7 @@ def check_provider(ns: dict, path: Path) -> list[tuple[str, str]]:
     except Exception as exc:
         failed.append(f"{where}: 非法约束串抛了 {exc!r}，应当是 ValueError")
     ok = not failed
-    detail = f"FW_MINOR={sem.get('FW_MINOR')}（{'未知' if unknown_fw else '已知'}）"
+    detail = f"version_info={vi}（{'未知' if unknown_fw else '已知'}）"
     err = "\n".join(failed)
     log.print_check(step, TOTAL_STEPS, rule_name, ok, detail, err)
     results.append((rule_name, "ok" if ok else "fail"))
@@ -289,8 +290,8 @@ def check_provider(ns: dict, path: Path) -> list[tuple[str, str]]:
         failed.append(f"{where}: get_time_bounds 的 end < start")
     elif tb.get("duration_s") is not None and abs((tb["end_us"] - tb["start_us"]) / 1e6 - tb["duration_s"]) > 0.3:
         failed.append(f"{where}: get_time_bounds 的 duration_s 与 (end-start)/1e6 对不上")
-    if tb.get("has_wraparound") != sem["RESTART_DETECTED"]:
-        failed.append(f"{where}: has_wraparound 与 RESTART_DETECTED 矛盾")
+    if tb.get("has_wraparound") not in (True, False, None):
+        failed.append(f"{where}: has_wraparound 应当返回 True / False / None（未知）")
     if p.get_start_timestamp() != sem["T0_US"]:
         failed.append(f"{where}: get_start_timestamp() 与 T0_US 矛盾")
     if p.get_last_timestamp() != tb.get("end_us"):
@@ -326,7 +327,7 @@ def check_provider(ns: dict, path: Path) -> list[tuple[str, str]]:
         failed.append(f"{where}: has_file_corruption() 与 get_log_integrity 矛盾")
 
     ac = p.get_armed_changed()
-    iv = sem["ARMED_INTERVALS"]
+    iv = p.armed_intervals
     if len(ac) != len(iv):
         failed.append(f"{where}: get_armed_changed 段数({len(ac)}) 与 ARMED_INTERVALS({len(iv)}) 不一致")
     else:
@@ -340,8 +341,8 @@ def check_provider(ns: dict, path: Path) -> list[tuple[str, str]]:
     if p.get_vehicle_identity().get("vehicle_type") != sem["VEHICLE"]:
         failed.append(f"{where}: get_vehicle_identity().vehicle_type 与 VEHICLE 不一致")
 
-    if len(p.get_logged_events()) != len(sem["MESSAGES"]):
-        failed.append(f"{where}: get_logged_events() 全量长度与 MESSAGES 不一致")
+    if not isinstance(p.get_logged_events(), list):
+        failed.append(f"{where}: get_logged_events() 应当返回 list")
     if len(p.get_logged_events(pattern="\x00")) > 0:
         failed.append(f"{where}: get_logged_events(pattern=...) 没有起过滤作用")
     ok = not failed

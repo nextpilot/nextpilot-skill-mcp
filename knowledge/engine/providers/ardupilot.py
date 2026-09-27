@@ -87,18 +87,30 @@ _FMT_DTYPES = {
 # PX4 的 level_name 来自 facts.yaml（那份码表是 PX4 的），APM 不借用别人的码表
 _LEVEL_NAMES = {3: "ERROR", 4: "WARNING", 6: "INFO"}
 
-# FRAME_CLASS → 机型。**只映射有把握的**（待真实样本核对，见文件头）：
-# 1=Quad 2=Tricopter 4=Coax 5=Hexa 6=Octa 7=Helicopter 8=OctaQuad 都是旋翼；
-# 3=Plane 是固定翼；9(潜艇)/10/11(VTOL 变体)/0(未设) 与 rover 系不猜，给 unknown(N)
+# FRAME_CLASS → 机型。**上游权威源码**（AP_Motors / AP_Parameters）：
+#  1=Quad 2=Tri 3=Octa 4=Coax 5=Hexa 6=Y6 7=Heli 8=OctaQuad
+#  9=Single 10=HeliDual 11=Dodeca 12=Deca
+# Plane / Rover 没有 FRAME_CLASS 参数，由 _read_vehicle_type() 按固件名识别。
 _FRAME_CLASS_MAP = {
-    1: "rotary_wing",
-    2: "rotary_wing",
-    4: "rotary_wing",
-    5: "rotary_wing",
-    6: "rotary_wing",
-    7: "rotary_wing",
-    8: "rotary_wing",
-    3: "fixed_wing",
+    1: "quad",
+    2: "tri",
+    3: "octa",
+    4: "coax",
+    5: "hexa",
+    6: "y6",
+    7: "heli",
+    8: "octa_quad",
+    9: "single",
+    10: "heli_dual",
+    11: "dodeca",
+    12: "deca",
+}
+
+# 类别名 → 精确名集合。规则写 vehicle: [copter] 时引擎展开匹配。
+_VEHICLE_CATEGORIES = {
+    "copter": {"quad", "hexa", "octa", "tri", "coax", "y6", "heli", "heli_dual", "octa_quad", "single", "dodeca", "deca"},
+    "plane": {"plane"},
+    "rover": {"rover"},
 }
 
 # EV 事件码 → 解锁/上锁（待真实样本核对，见文件头）
@@ -115,6 +127,7 @@ class ApmProvider:
     """ArduPilot .bin 适配器。契约见 providers/api.py。"""
 
     log_type = "ardupilot-bin"
+    vehicle_categories = _VEHICLE_CATEGORIES
 
     def __init__(self, raw, facts_cfg):
         # facts_cfg 是 PX4 的数据配置（构建期只有一份 facts.yaml）——本适配器**不读它**，
@@ -327,7 +340,7 @@ class ApmProvider:
         """
         import re as _re
 
-        self.fw = {"major": None, "minor": None, "patch": None, "git": ""}
+        self.fw = {"major": None, "minor": None, "patch": None, "git": "", "vehicle": ""}
         texts = [
             str(dict(zip(self._fmt_by_name.get("MSG", {}).get("fields", []), r)).get("Message") or "")
             for r in self._iter_named("MSG")
@@ -346,6 +359,7 @@ class ApmProvider:
                     "minor": int(m.group(2)),
                     "patch": int(m.group(3)),
                     "git": m.group(4) or "",
+                    "vehicle": text.split(" ")[0],
                 }
                 break
         self.fw_minor = self.fw["minor"]
@@ -357,7 +371,16 @@ class ApmProvider:
         self.fw_display = self.fw_label if self.fw["minor"] is not None else "未知"
 
     def _read_vehicle_type(self):
-        """机型：FRAME_CLASS 参数映射（表见文件头，待真实样本核对）。"""
+        """机型：固件名优先（Plane/Rover 无 FRAME_CLASS），再回退 FRAME_CLASS 映射。"""
+        fw_name = self.fw.get("vehicle", "")
+        if "Plane" in fw_name:
+            self.vehicle_type = "plane"
+            self.airframe_id = None
+            return
+        if "Rover" in fw_name:
+            self.vehicle_type = "rover"
+            self.airframe_id = None
+            return
         fc = self._params.get("FRAME_CLASS")
         try:
             fc = int(fc)
@@ -442,7 +465,7 @@ class ApmProvider:
 
     def parser_version(self):
         """自研解析器（不依赖 pymavlink）：版本号在这里维护，进报告头的 parserVersion。"""
-        return "apm-bin-parser/1.2.0"  # 1.2.0：新增内置变量 PARAMS（规则用 param('NAME') 读飞控参数）
+        return "apm-bin-parser/1.3.0"  # 1.3.0：ARMED_INTERVALS 迁移到引擎注入；builtin_variables() 瘦身；新增 get_mode_present
 
     def get_topic_meta(self):
         out = []
@@ -469,7 +492,10 @@ class ApmProvider:
         return dict(cols) if cols else None
 
     def get_series(self, ref, instance=slice(None, None), alias=None):
-        """按 'topic.field' 取一条序列；取不到一律返回 None。APM 单实例，instance 只认 0 / 全部。"""
+        """按 'topic.field' 取一条序列；取不到一律返回 None。APM 单实例，instance 只认 0 / 全部。
+
+        FMT 声明为文本列（n/N/Z）的字段直接返回原始字符串序列，不做 float 转换；
+        数值列仍走 np.asarray(v, dtype=float)。"""
         if isinstance(instance, int) and instance != 0:
             return None
         topic, _, field = ref.partition(".")
@@ -481,10 +507,13 @@ class ApmProvider:
             v = cols.get(name)
             if v is None or len(v) == 0:
                 continue
+            dtype = self.get_field_dtype(topic, name)
+            if dtype == "str":
+                return v  # 文本列：直接返回，不做 float 转换
             try:
                 return np.asarray(v, dtype=float)
             except (TypeError, ValueError):
-                return None  # 文本列给不出浮点序列：如实 None，不硬转
+                return None
         return None
 
     def get_first_existing_column(self, topic, names):
@@ -559,22 +588,11 @@ class ApmProvider:
         键一律大写；APM 给不出的值给 None / 空串（不编值）。"""
         home = self.home_position or {}
         return {
-            "FW_MINOR": self.fw_minor,
             "VEHICLE": self.vehicle_type,
-            "IS_FIXED_WING": self.vehicle_type == "fixed_wing",
             "DURATION_S": self.duration_s if self.duration_s is not None else 0,
             "ARMED_S": self.armed_duration_s,
-            "ARMED_INTERVALS": list(self.armed_intervals),
             "T0_US": self.t0_us,
-            "HAS_ARMED": bool(self.armed_intervals),
-            # 出现过的模式名（conditions.mode 按它匹配）；MODE 消息缺失就是空列表
-            "MODES_PRESENT": sorted({str(s["mode"]) for s in self.get_mode_changed() if s.get("mode")}),
-            "RESTART_DETECTED": self.restart_topics > 0,
             "DROPOUT_MS": 0,  # .bin 没有丢包记录的概念：给 0，不装作查过
-            "MESSAGES": self.get_logged_events(),
-            # 参数表：PARM 消息的**最后一次值**（首现值 = 初始参数，运行中的变更另在
-            # _changed 里，见 get_changed_parameters()）。规则里用 param('NAME') 取单个值
-            "PARAMS": dict(self._params),
             # ---- 知识引擎内置变量 ----
             "SYS_UUID": "",  # v1 无来源（APM 的 UID 在 INFO 多值消息里，解析待真实样本）
             "AIRFRAME_ID": self.airframe_id,
@@ -704,6 +722,16 @@ class ApmProvider:
             )
         return segs
 
+    def get_mode_present(self):
+        """日志里出现过的所有模式名（用于 conditions.mode 匹配）。"""
+        modes = set()
+        for row in self._iter_named("MODE"):
+            rec = dict(zip(self._fmt_by_name.get("MODE", {}).get("fields", []), row))
+            mode = str(rec.get("Mode") or rec.get("CMode") or rec.get("ModeNum") or "")
+            if mode:
+                modes.add(mode)
+        return sorted(modes)
+
     def _armed_at(self, t_us):
         """时刻是否落在 armed 区间内（MODE 段没有 armed 字段，用区间折算）。"""
         for s, e in self.armed_intervals:
@@ -750,7 +778,11 @@ class ApmProvider:
     def has_file_corruption(self):
         return self._parse_errors > 0
 
-    # ================= 可选能力 =================
+    def is_log_ok(self):
+        """日志完整性：文件无损坏 且 解析走到文件尾。"""
+        return not self.has_file_corruption() and self._walked_ok
+
+    # ================= 可选能力 ================
 
     def get_message_type_counts(self):
         """按 FMT 名计数（.bin 按帧走，天然自描述）。走到尾 = walked_ok。"""

@@ -16,7 +16,7 @@ compute:
   # 经纬度字段跨固件改名**且**改了单位：旧固件 lat/lon（1e7 度）、1.15+ latitude_deg/longitude_deg（度）。
   # 候选组负责"有谁用谁"，unit= 负责"取到谁都换算成度"——所以不再需要两条 when_fw 分支。
   - >-
-    step = _try(adjacent_speed_mps( ref("vehicle_gps_position.latitude_deg", "vehicle_gps_position.lat", unit="deg"), ref("vehicle_gps_position.longitude_deg", "vehicle_gps_position.lon", unit="deg"), ref("vehicle_gps_position.timestamp")))
+    step = _try(adjacent_speed_mps( _ref("vehicle_gps_position.latitude_deg", "vehicle_gps_position.lat", unit="deg"), _ref("vehicle_gps_position.longitude_deg", "vehicle_gps_position.lon", unit="deg"), _ref("vehicle_gps_position.timestamp")))
   - njump = _try(np.sum(step > 50.0))
 
 outputs:

@@ -1,32 +1,9 @@
 {
-  "python-envs.defaultEnvManager": "ms-python.python:system",
-
-  // Python 风格：格式化的**唯一权威**是 ruff（配置见仓库根 pyproject.toml）。
-  // 这里把编辑器指到同一个工具，否则保存时各自按默认格式化器改文件，
-  // 同一份代码在不同机器上反复漂移（曾经一轮提交里混进 500 行纯格式改动）。
-  // 需要装扩展 charliermarsh.ruff。
-  //
-  // 只开"保存时格式化"，**不开** codeActionsOnSave 的 fixAll：knowledge/engine/ 下的文件是
-  // 拼接片段，自动修复会在单文件视角下删掉"看起来没用"的导入与名字。
-  "[python]": {
-    "editor.defaultFormatter": "charliermarsh.ruff",
-    "editor.formatOnSave": true
-  },
-
-  // rules/*.yaml 的键名补全与拼写检查（需要扩展 redhat.vscode-yaml）。
-  //
-  // **那份 schema 是构建期生成的**（`cd web && pnpm build:kb` →
-  // knowledge/rules-editor-schema.generated.json），**不要手改**：它的词表
-  // （group / vehicle / severity / 算子名）全部从 facts.yaml 与 knowledge/engine/ 派生。
-  // 手抄一份就是第二份真源 —— 改了 facts.yaml 而 schema 没跟上时，IDE 会拿旧词表
-  // 去纠正新写法，比完全没有提示更糟。`pnpm build:kb --check` 会比对它与源是否一致。
-  //
-  // 它只管"纯形状"（键名 / 枚举 / 类型）。compute 表达式**内部**的语法、算子、
-  // 字段存在性它管不了 —— 那部分在字符串里，仍然只有构建期校验能查。
-  "yaml.schemas": {
-    "./knowledge/rules-editor-schema.generated.json": [
-      "knowledge/px4/rules/*.yaml",
-      "knowledge/rules-template.yml"
-    ]
-  }
+    "terminal.integrated.profiles.windows": {
+        "PowerShell Core": {
+            "path": "pwsh.exe",
+            "icon": "terminal-powershell"
+        }
+    },
+    "terminal.integrated.defaultProfile.windows": "PowerShell Core"
 }

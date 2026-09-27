@@ -761,7 +761,12 @@ function infer(node, ctx) {
             return T_SCALAR;
         }
         case "bool": {
-            node.items.forEach((x) => noGroups(sub(x, ctx), ctx, x, "逻辑运算"));
+            // `_try(...) or []` 的语义是在求值失败时兜底——`or` 的第一个操作数必须是
+            // 能被 `_try` 包住的顶层调用；`and`/`not` 同理。
+            node.items.forEach((x) => {
+                const isTry = x.k === "call" && x.fn === "_try";
+                noGroups(isTry ? infer(x, { ...ctx, tryAllowed: true }) : sub(x, ctx), ctx, x, "逻辑运算");
+            });
             return T_UNKNOWN;
         }
         case "tern": {
@@ -781,26 +786,34 @@ function infer(node, ctx) {
 function inferCall(node, ctx) {
     const { fn, args, kwargs } = node;
 
-    if (fn === "ref") return checkRef(node, ctx);
+    if (fn === "_ref") return checkRef(node, ctx);
 
     if (fn === "has_topic") {
-        // 与 ref / _try 一样是引擎内置，不查算子表：只接受一个字符串字面量
+        // 引擎内置框架调用：只接受一个字符串字面量
         if (args.length !== 1 || Object.keys(kwargs).length || args[0].k !== "str") {
             fail("has_topic() 只接受一个字符串字面量，如 has_topic('cpuload')", ctx.src, node.pos);
         }
         return T_SCALAR;
     }
 
-    if (fn === "param") {
-        // 读飞控参数：与 ref / has_topic 一样是引擎内置（provider 的 PARAMS 表），不查算子表。
+    if (fn === "log_ok") {
+        // 引擎内置框架调用：无参，返回 bool
+        if (args.length !== 0 || Object.keys(kwargs).length) {
+            fail("log_ok() 不接受参数", ctx.src, node.pos);
+        }
+        return T_SCALAR;
+    }
+
+    if (fn === "_cfg") {
+        // 读飞控参数：引擎内置（provider 的 CFG 字典），不查算子表。
         // 第一个实参是参数名（必须是字符串字面量），第二个可选是缺失时的兜底值（字面量）。
         if (args.length < 1 || args.length > 2 || args[0].k !== "str") {
-            fail("param() 的第一个参数必须是参数名字面量，如 param('ARMING_CHECK')", ctx.src, node.pos);
+            fail("_cfg() 的第一个参数必须是参数名字面量，如 _cfg('ARMING_CHECK')", ctx.src, node.pos);
         }
         if (args.length === 2 && !["num", "str", "bool"].includes(args[1].k)) {
-            fail("param() 的兜底值必须是字面量，如 param('RNGFND_TYPE', 0.0)", ctx.src, node.pos);
+            fail("_cfg() 的兜底值必须是字面量，如 _cfg('RNGFND_TYPE', 0.0)", ctx.src, node.pos);
         }
-        if (Object.keys(kwargs).length) fail("param() 不接受关键字参数", ctx.src, node.pos);
+        if (Object.keys(kwargs).length) fail("_cfg() 不接受关键字参数", ctx.src, node.pos);
         return T_SCALAR;
     }
 
@@ -955,7 +968,7 @@ function unwrapTry(node) {
 }
 
 /** 只有"日志里写了 ver_sw_release"时才有值的固件版本号；老日志上它们是 None */
-const FW_VERSION_VARS = new Set(["FW_MINOR", "FW_MAJOR"]);
+const FW_VERSION_VARS = new Set(["FW_MAJOR"]);
 
 /**
  * 固件版本号必须判 None 才能做大小比较。
@@ -1062,7 +1075,7 @@ export function validateCompute(src, ctx) {
                     eff.pos,
                 );
             }
-        } else if (eff.fn === "ref" && targets.length !== 1) {
+        } else if (eff.fn === "_ref" && targets.length !== 1) {
             fail("ref() 只产出一个值，左边只能有一个变量", text, eff.pos);
         }
     } else if (targets.length !== 1) {
@@ -1089,14 +1102,14 @@ export function validateComputeList(list, ctx) {
         }
         // 引用的裸名字必须在本条之前已经赋值（字段引用是 attr 节点，不在其列）
         for (const name of collectNames(r.value)) {
-            // ref / _try 是语法层，has_topic / param 是引擎在 env 里注入的函数——都不是变量
+            // _ref / _try 是语法层，has_topic / _cfg / log_ok 是引擎注入的函数——都不是变量
             if (
                 ctx.signatures[name] ||
-                ["ref", "_try", "has_topic", "param"].includes(name) ||
+                ["_ref", "_try", "has_topic", "_cfg", "log_ok"].includes(name) ||
                 KNOWN_BUILTINS.has(name)
             )
                 continue;
-            if (!declared.has(name) && !ctx.builtinVars?.has(name)) {
+            if (!declared.has(name) && !ctx.builtinVars?.has(name) && !/^[A-Z][A-Z0-9_]*$/.test(name)) {
                 throw new Error(
                     `${where}：引用了未声明的名字 ${name}` + `（要么在本条之前用赋值声明，要么是内置变量）`,
                 );
@@ -1126,7 +1139,7 @@ export function collectRefs(src) {
             n.forEach(walk);
             return;
         }
-        if (n.k === "call" && n.fn === "ref") {
+        if (n.k === "call" && n.fn === "_ref") {
             const item = { fields: n.args.filter((a) => a.k === "str").map((a) => a.v) };
             for (const [k, v] of Object.entries(n.kwargs)) {
                 if (v.k === "str" || v.k === "num" || v.k === "const") item[k] = v.v;
@@ -1168,10 +1181,14 @@ export function checkFieldItem(src, opts = {}) {
         );
     }
     const node = nodes[0];
-    if (node.k === "attr" && typeof node.topic === "string") {
-        return { kind: "field", fields: [`${node.topic}.${node.field}`] };
+    if (node.k === "attr") {
+        const topicName = typeof node.topic === "string" ? node.topic : collectTopicName(node.topic);
+        if (topicName) {
+            const instSuffix = node.topic.k === "sub" ? reconstructInstSuffix(node.topic.slice) : "";
+            return { kind: "field", fields: [`${topicName}${instSuffix}.${node.field}`] };
+        }
     }
-    if (node.k === "call" && node.fn === "ref") {
+    if (node.k === "call" && node.fn === "_ref") {
         // 复用规则那套 ref 校验（位置实参必须是字符串、候选组实例写法一致、修饰键只有 alias/unit）
         checkRef(node, {
             src: text,
@@ -1200,12 +1217,45 @@ export function checkFieldItem(src, opts = {}) {
         }
         return { kind: "var", name: node.name };
     }
+    // 下标节点：topic[1].field[0] 这类带实例/索引的裸字段引用
+    if (node.k === "sub") {
+        // v 是 attr 节点（sub 下标在 attr 外层：vehicle_torque_setpoint[1].xyz[0]
+        // → sub(v=attr(topic=sub(name="vehicle_torque_setpoint")[1], field="xyz"))[0]）
+        const attrNode = node.v?.k === "attr" ? node.v : null;
+        if (attrNode) {
+            const topicName = typeof attrNode.topic === "string" ? attrNode.topic : collectTopicName(attrNode.topic);
+            if (topicName) return { kind: "field", fields: [`${topicName}.${attrNode.field}`] };
+        }
+    }
     fail(
         `只能是字段引用（topic.field，或 ref("a.b", "c.d", unit="deg")）或 compute 里赋过值的变量名；` +
             "算术与函数调用请写进 compute 节点",
         text,
         node.pos,
     );
+}
+
+/** 从 sub(name)[N] 链里提取 topic 名字（如 vehicle_torque_setpoint[1] → "vehicle_torque_setpoint"） */
+function collectTopicName(node) {
+    if (!node) return null;
+    if (node.k === "name") return node.name;
+    if (node.k === "sub") return collectTopicName(node.v);
+    return null;
+}
+
+/** 把 slice 节点数组重建为下标字符串，如 [slice(start=null,stop=null)] → "[:]" */
+function reconstructInstSuffix(slices) {
+    return slices
+        .map((s) => {
+            if (s.k === "slice") {
+                const start = s.start != null ? String(s.start) : "";
+                const stop = s.stop != null ? String(s.stop) : "";
+                return `[${start}:${stop}]`;
+            }
+            if (s.k === "num") return `[${s.v}]`;
+            return `[${s.v}]`;
+        })
+        .join("");
 }
 
 /** 收集表达式里引用到的**裸变量名**（不含字段引用的 topic、不含算子名） */

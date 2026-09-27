@@ -16,7 +16,7 @@ compute:
   # （原实现同样用条件性统计保持等价）
   - >-
     clip, clip_idx, clip_axis = worst_column_delta(
-      ref("vehicle_imu_status[:].accel_clipping", alias="clipping"))
+      _ref("vehicle_imu_status[:].accel_clipping", alias="clipping"))
   - clip_stat = clip if clip > 0 else None
 
 outputs:

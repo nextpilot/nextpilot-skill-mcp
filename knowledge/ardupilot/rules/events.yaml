@@ -86,15 +86,13 @@ triggers:
 tag: apm_critical_event_logged
 
 ---
-# 占位：MODE 的模式名是**文本列**（MODE.Mode），而本仓库 APM provider 的 get_series()
-# 会把文本列的 float 转换失败吞成 None（PENDING.md 的 C1），取不到。
-# 数值的 ModeNum 理论可取，但上游这条的产出是"模式时间线摘要"，
-# 只靠 ModeNum 复现不出原文，价值有限；等 provider 支持文本列再做。
+# MODE 时间线：C1 2026-09 已解除（`_FMT_DTYPES` 登记 n/N/Z，"str" 列直接返回），
+# 现在可以取到 MODE.Mode 文本与 ModeNum 数值。用 ModeNum 的差分检测模式切换，
+# 再用 take_items 挑出切换点上的模式名，做一次紧凑的模式时间线。
 id: apm-mode-timeline
-name: 模式时间线（占位）
+name: 模式时间线
 group: events
 order: 3
-placeholder: "待补能力：MODE.Mode 是文本列，provider 的 get_series 取不到文本（PENDING 的 C1），暂未实现"
 
 conditions:
   message:
@@ -102,12 +100,19 @@ conditions:
 
 compute:
   - mode_num = MODE.ModeNum
+  - mode_name = MODE.Mode
+  - ts = MODE.timestamp
+  - changed = np.diff(mode_num) != 0
+  - change_count = sum(changed)
+  - n_modes = len(mode_num)
 
 triggers:
-  - when: "False"
+  - when: "change_count > 0"
     severity: info
-    suggestion: "待 provider 支持文本列后实现：模式切换序列用于还原飞行过程与定位失控时点。"
-    description: 模式时间线（占位，未实现）
+    suggestion: "模式切换序列用于还原飞行过程与定位失控时点。全部模式名见 MODE.Mode 列。"
+    description: 共 {change_count} 次模式切换（{n_modes} 条 MODE 消息，日志全程 {DURATION_S:.0f}s）
     evidence:
       source: MODE.Mode(时间线)
-tag: apm_mode_timeline
+      value: change_count
+      threshold: 0
+      unit: 次切换

@@ -1,4 +1,4 @@
-﻿id: tecs
+id: tecs
 title: TECS
 description: TECS 高度变化率与 setpoint（固定翼/VTOL）。
 order: 19
@@ -11,6 +11,6 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("tecs_status[0].height_rate")
-          - ref("tecs_status[0].height_rate_setpoint")
+          - tecs_status.height_rate
+          - tecs_status.height_rate_setpoint
         label: ["Height Rate", "Height Rate Setpoint"]

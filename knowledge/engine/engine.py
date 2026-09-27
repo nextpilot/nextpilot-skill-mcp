@@ -22,9 +22,7 @@ import json
 import ast
 import math
 import re
-from types import SimpleNamespace as _SimpleNamespace
 import numpy as np
-
 
 # ============================================================================
 # 第一部分：规则框架
@@ -174,22 +172,27 @@ _ALLOWED_NODES = (
 # 表达式里**唯一**放行的函数调用。`has_topic('x')` 比 `'x' in topics` 直白，
 # 但把它做成函数就意味着要开"允许调用"这个口子，所以白名单只此一项、
 # 且要求实参是字符串字面量。其余能力（属性/下标/推导式）一律不给。
-_EXPR_CALLABLE = {"has_topic"}
+_EXPR_CALLABLE = {"has_topic", "log_ok"}
 
 
 def _eval_expr(expr, env):
     """受限表达式求值：先按白名单遍历 AST，再在空 __builtins__ 下求值。
 
     绝不 eval 用户可控代码：不允许属性访问、下标、推导式；函数调用只放行
-    `_EXPR_CALLABLE` 里的那几个，且实参必须是字符串字面量。
+    `_EXPR_CALLABLE` 里的那几个。`has_topic` 实参必须是字符串字面量；`log_ok` 无参。
     """
     tree = ast.parse(expr, mode="eval")
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):
-            ok = isinstance(node.func, ast.Name) and node.func.id in _EXPR_CALLABLE
-            arg_ok = len(node.args) == 1 and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str)
+            if not isinstance(node.func, ast.Name):
+                raise ValueError("表达式含不允许的语法 Call.unknown_func：%s" % expr)
+            ok = node.func.id in _EXPR_CALLABLE
+            if node.func.id == "log_ok":
+                arg_ok = len(node.args) == 0
+            else:
+                arg_ok = len(node.args) == 1 and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str)
             if not (ok and arg_ok and not node.keywords):
-                raise ValueError("表达式里只允许 %s('字符串')：%s" % ("/".join(sorted(_EXPR_CALLABLE)), expr))
+                raise ValueError("表达式里只允许 %s：%s" % ("/".join(sorted(_EXPR_CALLABLE)), expr))
             continue
         if not isinstance(node, _ALLOWED_NODES):
             raise ValueError("表达式含不允许的语法 %s：%s" % (type(node).__name__, expr))
@@ -213,18 +216,18 @@ def _placeholder_reason(spec):
     return None
 
 
-def _match_mode(spec, env):
-    """`conditions.mode`：与 `topics` **同形**——每项是「候选模式」，项间是「都要出现」。
+def _match_mode(spec):
+    """conditions.mode：要求日志里出现过某模式（名）。
 
     一项里写 `AUTO || LOITER` 表示任一出现过即满足；写成两项就要求都出现过。
-    匹配的是"日志里出现过"（`MODES_PRESENT`），不是"当前处于"——规则看的是
+    匹配的是"日志里出现过"（`provider.get_mode_present()`），不是"当前处于"——规则看的是
     整段日志，不是一个时刻。
 
     返回缺失项的原因文案（`"AUTO / LOITER 未在日志中出现"`），满足则返回 None。
-    ⚠ 日志没有模式段时 `MODES_PRESENT` 是空列表，写了 mode 约束就会跳过——
+    ⚠ 日志没有模式段时 `get_mode_present()` 返回空列表，写了 mode 约束就会跳过——
     这是**故意**的：拿不到模式就去跑只适用于某模式的阈值，只会误报。
     """
-    present = set(env.get("MODES_PRESENT") or [])
+    present = set(provider.get_mode_present() or [])
     for candidates in spec or []:
         if isinstance(candidates, str):
             candidates = [t.strip() for t in candidates.split("||")]
@@ -279,13 +282,10 @@ def _vehicle_label(spec):
 
 
 def _match_vehicle(spec, env):
-    """机架适用范围：`any` ｜ 单个机架名 ｜ 列表（如 `[fixed_wing, unknown]`）。
+    """机架适用范围：`any` ｜ 单个机架名 ｜ 列表（如 `[quad, hexa]`）。
 
-    **只做字符串精确比对，不解释语义**：拿 provider 在 `builtin_variables()` 里报的
-    `VEHICLE` 值去比（PX4 报 rotary_wing / fixed_wing / vtol / rover / unknown）。
-    所以换一种日志格式不用改这里——它的机架词表由它自己的适配器定义。
-
-    写成 `IS_FIXED_WING or VEHICLE == 'unknown'` 那种表达式是旧写法，构建期已拦。
+    支持类别简写（如 `copter`、`plane`、`rover`）：取 provider 的
+    `vehicle_categories` 属性把类别名映射到精确名集合。
     """
     if isinstance(spec, str):
         name = spec.strip()
@@ -299,7 +299,17 @@ def _match_vehicle(spec, env):
     else:
         raise ValueError("vehicle 必须是 any / 机架名 / 列表，收到 %r" % (spec,))
     current = (env or {}).get("VEHICLE")
-    return current is not None and str(current) in wanted
+    if current is None:
+        return False
+    current = str(current)
+    categories = getattr(provider, "vehicle_categories", {})
+    for w in wanted:
+        if w in categories:
+            if current in categories[w]:
+                return True
+        elif current == w:
+            return True
+    return False
 
 
 def _missing_topics(spec):
@@ -451,11 +461,12 @@ def _scale_series(x, scale):
 # 这类缝——两道关卡的判据不同，不能只留一道。
 
 # compute 里放行的**直接调用**：注册过的算子 + 这四个框架函数。
-#   ref("topic.field")  取一列
-#   _try(expr)          容错：内层出错时整条赋值结果为 None
-#   has_topic("name")   这个消息在不在（与 when 里同一个函数，语义一致）
-#   param("NAME")       读飞控参数（**不是算子**，见下面 `_param_fn` 的说明）
-_COMPUTE_CALLABLE = ("ref", "_try", "has_topic", "param", "len", "int")
+#   _ref("topic.field")   取一列（也支持多候选 + alias/unit 修饰）
+#   _try(expr)            容错：内层出错时整条赋值结果为 None
+#   has_topic("name")    这个消息在不在（与 when 里同一个函数，语义一致）
+#   _cfg("NAME")          读飞控参数（**不是算子**，见下面 `_param_fn` 的说明）
+#   log_ok()             日志文件完整性（有无损坏/截断）
+_COMPUTE_CALLABLE = ("_ref", "_try", "has_topic", "_cfg", "log_ok", "len", "int")
 
 # compute 里允许的**模块名**：裸 Name.attr 碰到这些名字不重写为 ref()，
 # 而是保留为模块.函数 调用（如 np.ptp / np.hypot / np.isin）。
@@ -518,11 +529,11 @@ class _ComputeRefs(ast.NodeTransformer):
         return "..."
 
     def _build_ref(self, node, prefix):
-        """构造 ref("prefix.attr") 调用节点"""
+        """构造 _ref("prefix.attr") 调用节点"""
         key = "%s.%s" % (prefix, node.attr)
         return ast.copy_location(
             ast.Call(
-                func=ast.Name(id="ref", ctx=ast.Load()),
+                func=ast.Name(id="_ref", ctx=ast.Load()),
                 args=[ast.Constant(value=key)],
                 keywords=[],
             ),
@@ -554,6 +565,20 @@ class _ComputeRefs(ast.NodeTransformer):
         """下标是否为简单索引（常数/变量/切片），可安全并入 ref 字符串。"""
         return isinstance(slc, (ast.Constant, ast.Name, ast.Slice, ast.Tuple))
 
+    def visit_Name(self, node):
+        """ALL_CAPS 内置变量 → _cfg("NAME") 调用（不在 env 声明过的才转）。
+        小写/混名保持原样，算 compute 变量。"""
+        if re.match(r"^[A-Z][A-Z0-9_]*$", node.id) and node.id not in self.env_keys:
+            return ast.copy_location(
+                ast.Call(
+                    func=ast.Name(id="_cfg", ctx=ast.Load()),
+                    args=[ast.Constant(value=node.id)],
+                    keywords=[],
+                ),
+                node,
+            )
+        return node
+
     def visit_Subscript(self, node):
         self.generic_visit(node)
 
@@ -562,7 +587,7 @@ class _ComputeRefs(ast.NodeTransformer):
         if (
             isinstance(node.value, ast.Call)
             and isinstance(node.value.func, ast.Name)
-            and node.value.func.id == "ref"
+            and node.value.func.id == "_ref"
             and node.value.args
             and self._is_simple_slice(node.slice)
         ):
@@ -573,7 +598,7 @@ class _ComputeRefs(ast.NodeTransformer):
             new_key = "%s[%s]" % (old_key, idx)
             return ast.copy_location(
                 ast.Call(
-                    func=ast.Name(id="ref", ctx=ast.Load()),
+                    func=ast.Name(id="_ref", ctx=ast.Load()),
                     args=[ast.Constant(value=new_key)],
                     keywords=[],
                 ),
@@ -629,62 +654,15 @@ def _compile_compute(stmt, env_keys):
     return compile(tree, "<compute>", "exec"), guarded, targets
 
 
-# 表达式求值的名字表：算子按注册名直接可调用，另加 ref（取数）与 has_topic。
-# __builtins__ 置空——表达式里不该有任意 Python 内置能力；按需逐类放行。
-_COMPUTE_GLOBALS = {
-    "__builtins__": {},
-    "ref": None,
-    "len": lambda x: None if x is None else len(x),
-    "int": lambda x: None if x is None else int(x),
-}
-_COMPUTE_GLOBALS.update(OPERATORS)
-
-# np 子集：只给纯数学运算，不给 I/O（load/save/savetxt 等）。用 types.SimpleNamespace
-# 是因为 ast.Attribute 会按 obj.attr 查属性，dict 不行。
-_COMPUTE_GLOBALS["np"] = _SimpleNamespace(
-    # ── 基本的 ──
-    abs=np.abs,
-    sum=np.sum,
-    mean=np.mean,
-    std=np.std,
-    median=np.median,
-    min=np.min,
-    max=np.max,
-    ptp=np.ptp,
-    percentile=np.percentile,
-    diff=np.diff,
-    count_nonzero=np.count_nonzero,
-    # ── NaN 安全的 ──
-    nanmean=np.nanmean,
-    nanstd=np.nanstd,
-    nanmedian=np.nanmedian,
-    nanmin=np.nanmin,
-    nanmax=np.nanmax,
-    nansum=np.nansum,
-    # ── 集合 ──
-    isin=np.isin,
-    # ── 三角 ──
-    hypot=np.hypot,
-    degrees=np.degrees,
-    radians=np.radians,
-    arctan2=np.arctan2,
-    # ── 逐元素 ──
-    maximum=np.maximum,
-    minimum=np.minimum,
-    clip=np.clip,
-    sign=np.sign,
-    # ── 数组工具 ──
-    isfinite=np.isfinite,
-    asarray=np.asarray,
-    where=np.where,
-    concatenate=np.concatenate,
-)
+# 表达式求值的名字表：算子本体从 operators.py 的 COMPUTE_GLOBALS 来，
+# 这里只补引擎负责的 _ref（需要 provider 上下文）。
+_COMPUTE_GLOBALS = COMPUTE_GLOBALS
 
 
 def _eval_compute(stmt, env, ref_fn=None):
     """求值一条 compute 表达式，结果写进 env。
 
-    ref_fn：把表达式里的 `ref(...)` 换成别的实现（图上"每实例一个面板"要覆盖实例切片，
+    ref_fn：把表达式里的 `_ref(...)` 换成别的实现（图上"每实例一个面板"要覆盖实例切片，
     见 `_pick_ref` 的 instance）。不传就是规则那套 `_ref`。
 
     空值语义（与老节点链的唯一差别，**有意为之**）：
@@ -699,7 +677,7 @@ def _eval_compute(stmt, env, ref_fn=None):
       就显式写 `require_true(is_not_none(x))`——那正是它的用途。
     """
     code, guarded, targets = _compile_compute(stmt, env)
-    glb = _COMPUTE_GLOBALS if ref_fn is None else {**_COMPUTE_GLOBALS, "ref": ref_fn}
+    glb = _COMPUTE_GLOBALS if ref_fn is None else {**_COMPUTE_GLOBALS, "_ref": ref_fn}
     try:
         exec(code, glb, env)
     except Exception:
@@ -709,40 +687,39 @@ def _eval_compute(stmt, env, ref_fn=None):
             env[name] = None
 
 
-_COMPUTE_GLOBALS["ref"] = _ref
-_COMPUTE_GLOBALS["has_topic"] = provider.has_topic
-
-
-def _param_fn(env):
-    """`param('NAME')`：读飞控参数。compute 里放行的第四个调用（与 ref / has_topic 同级）。
-
-    为什么不把它做成算子：算子只收数据、看不见 provider 与内置变量表，而参数是
-    **一份日志一个值的离散事实**（不是从列里算出来的）。它属于 `builtin_variables()`
-    给的 PARAMS 字典，取单个值本来就只是"查表"这件事本身——做成算子反而要开一个
-    "算子能读環境"的口子。
+def _cfg(name, default=None):
+    """读飞控参数。全大写裸名自动走这个函数。
 
     参数缺失（这份日志没录 / 名字写错）返回 `default`（默认 None）而**不抛异常**：
     "没这个参数"与"参数等于 0"是两件事，挑哪个由规则自己说——要兜底就把 default 写上
-    （`param('RNGFND_TYPE', 0.0)` 的语义是"没声明就等于没配"，正是这类检查想要的）。
+    （`_cfg('RNGFND_TYPE', 0.0)` 的语义是"没声明就等于没配"，正是这类检查想要的）。
     """
+    params = provider.get_initial_parameters()
+    val = (params or {}).get(str(name))
+    return default if val is None else val
 
-    def param(name, default=None):
-        val = (env.get("PARAMS") or {}).get(str(name))
-        return default if val is None else val
 
-    return param
+_COMPUTE_GLOBALS["_ref"] = _ref
+_COMPUTE_GLOBALS["_cfg"] = _cfg
+_COMPUTE_GLOBALS["has_topic"] = provider.has_topic
+_COMPUTE_GLOBALS["log_ok"] = provider.is_log_ok
 
 
 def _rule_env():
-    """一条规则求值时的名字空间：内置变量（provider 给）+ 框架补的这几个。
+    """一条规则求值时的名字空间：内置变量（provider 给）+ compute 输出存储。
 
     每次都要新的一份：compute 的输出直接写进这个 dict。
-      has_topic() —— 这个消息在不在
-      param()     —— 读飞控参数（按本 env 的 PARAMS 查表）
+
+    has_topic/log_ok 同时出现在 env 和 _COMPUTE_GLOBALS：
+    - _eval_expr（when 条件）只走 env，不走 _COMPUTE_GLOBALS
+    - exec（compute）都可见，但没有影响（globals 优先）
+
+    provider 提供原始数据；engine 提供翻译层（_ref / _cfg）；operators 提供算法。
     """
     env = provider.builtin_variables()
     env["has_topic"] = provider.has_topic
-    env["param"] = _param_fn(env)
+    env["log_ok"] = provider.is_log_ok
+    env["ARMED_INTERVALS"] = provider.armed_intervals
     return env
 
 
@@ -776,7 +753,7 @@ def _run_rules(group):
         if _missing:
             skipped(_rid, _missing)
             continue
-        _mode_miss = _match_mode(_rule.get("mode"), _env)
+        _mode_miss = _match_mode(_rule.get("mode"))
         if _mode_miss:
             skipped(_rid, _mode_miss)
             continue
@@ -1364,8 +1341,8 @@ def _panel_series(spec, env, inst):
 def _first_ref_bare(stmts):
     """换算节点里第一个"topic 在日志里存在"的字段引用（只用来定时间戳的 topic，不求值）。
 
-    两种写法都要认：`ref("topic.field")`，以及**裸写的** `topic.field`——后者在
-    `_compile_compute` 里才会被改写成 ref（见第一部分的 `_ComputeRefs`），这里看的是
+    两种写法都要认：`_ref("topic.field")`，以及**裸写的** `topic.field`——后者在
+    `_compile_compute` 里才会被改写成 _ref（见第一部分的 `_ComputeRefs`），这里看的是
     原文，所以得自己认一遍（踩过：`quat_to_euler(vehicle_attitude.q)` 因为只认 ref，
     整张图报"取不到时间戳"）。
     """
@@ -1375,7 +1352,7 @@ def _first_ref_bare(stmts):
         except SyntaxError:
             continue
         for node in ast.walk(tree):
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "ref":
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "_ref":
                 for arg in node.args:
                     if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
                         bare, _ = _split_ref(arg.value)

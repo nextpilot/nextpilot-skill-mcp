@@ -1,4 +1,4 @@
-﻿id: power
+id: power
 title: Power
 description: 电池电压 / 电流 / 放电量 / 剩余电量 / OCV / 内阻 / 5V / 3.3V。
 order: 35
@@ -11,20 +11,20 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("battery_status[0].voltage_v")
-          - ref("battery_status[0].current_a")
-          - ref("battery_status[0].discharged_mah")
-          - ref("battery_status[0].remaining")
+          - battery_status.voltage_v
+          - battery_status.current_a
+          - battery_status.discharged_mah
+          - battery_status.remaining
         label:
           ["Battery Voltage [V]", "Battery Current [A]",
            "Discharged Amount [mAh / 100]", "Battery remaining [0=empty, 10=full]"]
       - mode: TimeSeries
         ydata:
-          - ref("battery_status[0].ocv_estimate")
-          - ref("battery_status[0].internal_resistance_estimate")
+          - battery_status.ocv_estimate
+          - battery_status.internal_resistance_estimate
         label: ["OCV Estimate [V]", "Internal Resistance Estimate [mOhm]"]
       - mode: TimeSeries
         ydata:
-          - ref("system_power[0].voltage5v_v")
-          - ref("system_power[0].sensors3v3[0]")
+          - system_power.voltage5v_v
+          - system_power.sensors3v3[0]
         label: ["5 V", "3.3 V"]

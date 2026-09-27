@@ -5,7 +5,7 @@
  *   knowledge/engine/operators.py           算子注册表（通用，不认识具体字段）
  *   knowledge/engine/engine.py              引擎本体：规则/guard 框架 + 报告页数据层（Pyodide 执行）
  *   knowledge/px4/rules/*.yaml    检查经验：阈值与判定条件（工程师最常改这里）
- *   knowledge/px4/px4-fault-kb.yaml  第三层故障知识库
+ *   knowledge/px4/fault-kb.yaml  第三层故障知识库
  *   knowledge/llm/*.md            第四层 GJB-841 思考范式（LLM 只做组装，与固件族无关）
  *   knowledge/px4/meta/*.json     固件字段与参数字典
  *
@@ -221,7 +221,7 @@ function toRawTemplate(text) {
 // 框架自己往求值环境里补的名字（不属于 provider，见 providers/api.py 末尾的说明）。
 // `no_data` 曾经在这儿——它随 skip 机制一起退役了（compute 失败现在自动记一条 skipped），
 // 留着会让引用了它的规则构建期放行、运行期 NameError → 那条规则静默失效。
-const FRAMEWORK_VARS = ["has_topic"];
+const FRAMEWORK_VARS = ["has_topic", "log_ok"];
 
 /**
  * 规则表达式能引用的内置变量 = provider 契约的 BUILTIN_VARIABLES + 框架补的两个。
@@ -499,7 +499,12 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
                     if (typeof w !== "string") continue;
                     for (const name of stripStrings(w).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
                         if (EXPR_KEYWORDS.has(name)) continue;
-                        if (!declared.has(name) && !BUILTIN_VARS.has(name) && !eventKeys.has(name)) {
+                        if (
+                            !declared.has(name) &&
+                            !BUILTIN_VARS.has(name) &&
+                            !eventKeys.has(name) &&
+                            !/^[A-Z][A-Z0-9_]*$/.test(name)
+                        ) {
                             throw new Error(`${where}: 表达式引用了未声明的名字 ${name}（when: ${w}）`);
                         }
                     }
@@ -512,7 +517,12 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
                 if (typeof evVal === "string") {
                     for (const name of stripStrings(evVal).match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
                         if (EXPR_KEYWORDS.has(name) || name === "f") continue;
-                        if (!declared.has(name) && !BUILTIN_VARS.has(name) && !eventKeys.has(name)) {
+                        if (
+                            !declared.has(name) &&
+                            !BUILTIN_VARS.has(name) &&
+                            !eventKeys.has(name) &&
+                            !/^[A-Z][A-Z0-9_]*$/.test(name)
+                        ) {
                             throw new Error(`${where}: evidence.value 引用了未声明的名字 ${name}`);
                         }
                     }
@@ -528,7 +538,12 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
                     for (const tt of arr) {
                         if (typeof tt !== "string") continue;
                         for (const m of tt.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)(:[^}]*)?\}/g)) {
-                            if (!declared.has(m[1]) && !BUILTIN_VARS.has(m[1]) && !eventKeys.has(m[1])) {
+                            if (
+                                !declared.has(m[1]) &&
+                                !BUILTIN_VARS.has(m[1]) &&
+                                !eventKeys.has(m[1]) &&
+                                !/^[A-Z][A-Z0-9_]*$/.test(m[1])
+                            ) {
                                 throw new Error(`${where}: ${label} 引用了未声明的名字 ${m[1]}`);
                             }
                         }
@@ -1197,11 +1212,12 @@ function fmtTriggers(raw) {
         const descs = Array.isArray(t.description) ? t.description.join(" / ") : t.description;
         const thr = t.evidence?.threshold;
         const thrs = Array.isArray(thr) ? thr.join(" / ") : thr;
-        const bits = [`**${sevs}**`, `\`${whens}\``];
-        if (thrs !== undefined && thrs !== null) bits.push(`threshold ${thrs}`);
-        if (t.evidence?.unit) bits.push(`unit ${t.evidence.unit}`);
+        const escHtml = (s) => String(s).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const bits = [`<strong>${sevs}</strong>`, `\`${whens}\``];
+        if (thrs !== undefined && thrs !== null) bits.push(`threshold ${escHtml(thrs)}`);
+        if (t.evidence?.unit) bits.push(`unit ${escHtml(t.evidence.unit)}`);
         bits.push(`description "${escMdxText(descs)}"`);
-        if (t.label) bits.push(`label=${t.label}`);
+        if (t.label) bits.push(`label=${escHtml(t.label)}`);
         lines.push("- " + bits.join(" | "));
     }
     return lines.join("\n") || "-";

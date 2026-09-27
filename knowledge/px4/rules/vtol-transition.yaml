@@ -17,11 +17,11 @@ compute:
   - trans_n = _try(np.sum(vtol_vehicle_status.vtol_in_trans_mode > 0))
   # 转换标志按"向前保持"采样到姿态时间轴，作为掩码
   - >-
-    trans_mask = _try(fill_to(ref("vtol_vehicle_status.vtol_in_trans_mode"), ref("vtol_vehicle_status.timestamp"), ref("vehicle_attitude.timestamp")))
+    trans_mask = _try(fill_to(vtol_vehicle_status.vtol_in_trans_mode, vtol_vehicle_status.timestamp, vehicle_attitude.timestamp))
   # 姿态四元数 → 欧拉角；取横滚/俯仰里较大的倾角
   # （q 是"每元素一列"的数组字段，裸写就取到四列，quat_to_euler 收这一组即可）
   - >-
-    roll, pitch, yaw = _try(quat_to_euler(ref("vehicle_attitude.q")))
+    roll, pitch, yaw = _try(quat_to_euler(vehicle_attitude.q))
   - tilt_max = _try(masked_absmax(np.maximum(abs(roll), abs(pitch)), trans_mask))
   - trans_cnt = _try(sum(trans_mask))
   # 样本 > 5 才算数；enough / has_tilt 被 trigger 引用，所以必须是具名变量

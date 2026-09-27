@@ -1,4 +1,4 @@
-﻿id: estimator-flags
+id: estimator-flags
 title: Estimator Flags
 description: EKF 健康/超时/创新检验标志位。
 order: 37
@@ -11,19 +11,19 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("estimator_status[0].health_flags")
-          - ref("estimator_status[0].timeout_flags")
+          - estimator_status.health_flags
+          - estimator_status.timeout_flags
         label: ["Health Flags (vel, pos, hgt)", "Timeout Flags (vel, pos, hgt)"]
       - mode: TimeSeries
         ydata:
-          - ref("estimator_status[0].vel_test_ratio")
-          - ref("estimator_status[0].pos_test_ratio")
-          - ref("estimator_status[0].hgt_test_ratio")
-          - ref("estimator_status[0].hdg_test_ratio")
-          - ref("estimator_status[0].mag_test_ratio")
-          - ref("estimator_status[0].tas_test_ratio")
-          - ref("estimator_status[0].hagl_test_ratio")
-          - ref("estimator_status[0].beta_test_ratio")
+          - estimator_status.vel_test_ratio
+          - estimator_status.pos_test_ratio
+          - estimator_status.hgt_test_ratio
+          - estimator_status.hdg_test_ratio
+          - estimator_status.mag_test_ratio
+          - estimator_status.tas_test_ratio
+          - estimator_status.hagl_test_ratio
+          - estimator_status.beta_test_ratio
         label:
           ["Velocity Test Ratio", "Position Test Ratio", "Height Test Ratio",
            "Heading Test Ratio", "Mag Test Ratio", "TAS Test Ratio",

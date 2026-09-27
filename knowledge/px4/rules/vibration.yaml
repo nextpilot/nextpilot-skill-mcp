@@ -17,7 +17,7 @@ compute:
   # min_mean=0 复刻迁移前「以 0 为初值、严格更大才替换」的语义：全零视为无有效数据
   - >-
     vibe_mean, vibe_p95, vibe_max, imu_idx = worst_mean_stats(
-      ref("vehicle_imu_status[:].accel_vibration_metric"), min_mean=0)
+      _ref("vehicle_imu_status[:].accel_vibration_metric"), min_mean=0)
 
 outputs:
   - name: imuAccelVibrationMean

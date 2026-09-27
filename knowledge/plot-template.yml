@@ -44,14 +44,14 @@ outputs:
       - mode: TimeSeries # TimeSeries（横轴=时间）｜xyplot（横轴=你给的 xdata）
         # 横轴：不写 xdata 时取**命中字段那个话题的 timestamp**（同一份采样，天然对齐）。
         # 命中字段 = ydata 里第一个取到数据的字段；整张图都由 compute 算出来时，从 compute
-        # 语句里反推第一个"topic 存在于日志"的引用（ref(...) 与裸写 topic.field 都认）。
+        # 语句里反推第一个"topic 存在于日志"的引用（_ref(...) 与裸写 topic.field 都认）。
         # ⚠ 一张图的 compute 若**横跨两个话题**，反推可能取到另一个话题——采样数不同会报错
         #   （不是画错图）。这种图请显式写 xdata，或用 fill_to / head 把序列对齐。
         # 时间序列**通常不用写 xdata**（缺省就是时间戳）；要画"非时间"的横轴就用 mode: xyplot：
         #   - mode: xyplot
-        #     xdata: ref("vehicle_gps_position[0].latitude_deg", "vehicle_gps_position[0].lat", unit="deg")
+        #     xdata: _ref("vehicle_gps_position[0].latitude_deg", "vehicle_gps_position[0].lat", unit="deg")
         #     ydata:
-        #       - ref("vehicle_gps_position[0].altitude_msl_m", "vehicle_gps_position[0].alt", unit="m")
+        #       - _ref("vehicle_gps_position[0].altitude_msl_m", "vehicle_gps_position[0].alt", unit="m")
         #     label: 海拔
         # ydata：要画的线，**YAML 列表，一行一条**（流式的 [甲, 乙] 也行——但项里带逗号时
         # 必须给每项加引号，所以块列表更省事）。每一项要么是字段引用，要么是上面 compute
@@ -60,8 +60,8 @@ outputs:
         # meta/topic-overrides.yaml 即可）。只在**需要换算**时写 unit=；字段本来就是目标
         # 单位就别写（不写 = 不换算、也不查表）。
         ydata:
-          - ref("battery_status[0].voltage_v") # 行尾可以挂注释
-          - ref("battery_status[0].voltage_filtered_v")
+          - _ref("battery_status[0].voltage_v") # 行尾可以挂注释
+          - _ref("battery_status[0].voltage_filtered_v")
           - remaining_pct
         # label / style / color 都是 **YAML 列表**，与 ydata **逐项对齐**
         # （个数不等就构建失败，报错指出第几项；只有一项也要写 [甲]）
@@ -69,7 +69,7 @@ outputs:
         style: [solid, dashed, solid] # solid｜dashed｜dotted（缺省 solid）
         color: ["#409eff", "#ff4d4f"] # #rrggbb；不写就按站点调色板顺序取
         # 老固件少个字段怎么办：**什么都不用写** —— 那条线取到 null，前端自动不画；
-        # 要"换个名字继续画"就把它放进候选组：ref("新名", "旧名")。
+        # 要"换个名字继续画"就把它放进候选组：_ref("新名", "旧名")。
 
   # ── 地图：全局最多一个（报告页只有一块常驻地图，多个预设各声明一份谁都画不了）──
   - container: map
@@ -84,17 +84,17 @@ outputs:
         # 否则三路采样率不同、数组长度不一致，画出来是错的。
         # 候选顺序即优先级，第一个"三样都能给齐"的话题生效（这里 sensor_gps 优先）。
         lat: >-
-          ref("sensor_gps[0].latitude_deg", "vehicle_gps_position[0].latitude_deg",
+          _ref("sensor_gps[0].latitude_deg", "vehicle_gps_position[0].latitude_deg",
           "vehicle_gps_position[0].lat", unit="deg")
         lon: >-
-          ref("sensor_gps[0].longitude_deg", "vehicle_gps_position[0].longitude_deg",
+          _ref("sensor_gps[0].longitude_deg", "vehicle_gps_position[0].longitude_deg",
           "vehicle_gps_position[0].lon", unit="deg")
         alt: >-
-          ref("sensor_gps[0].altitude_msl_m", "vehicle_gps_position[0].altitude_msl_m",
+          _ref("sensor_gps[0].altitude_msl_m", "vehicle_gps_position[0].altitude_msl_m",
           "vehicle_gps_position[0].alt", unit="m")
       # 第二条轨道就是再写一项（多条叠在同一张地图上，图例可点选隐藏）
       # - mode: track
       #   label: ekf
-      #   lat: ref("vehicle_global_position[0].lat", unit="deg")
-      #   lon: ref("vehicle_global_position[0].lon", unit="deg")
-      #   alt: ref("vehicle_global_position[0].alt", unit="m")
+      #   lat: _ref("vehicle_global_position[0].lat", unit="deg")
+      #   lon: _ref("vehicle_global_position[0].lon", unit="deg")
+      #   alt: _ref("vehicle_global_position[0].alt", unit="m")

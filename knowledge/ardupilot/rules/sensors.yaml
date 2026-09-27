@@ -6,7 +6,7 @@
 #   · 罗盘健康：MAG 消息自带每样本的 Health 标志（1 健康 / 0 不健康），
 #     不健康样本占比 > 20% 说明罗盘在失效或掉线 → WARN
 #
-# 前两条读 `*_TYPE` 参数（`param('NAME', 0.0)`：没这个参数按"没配该传感器"处理，
+# 前两条读 `*_TYPE` 参数（`_cfg('NAME', 0.0)`：没这个参数按"没配该传感器"处理，
 # 于是不会误报），再用 `has_topic()` 判消息在不在——这正是"配置与数据对不上"这个口径。
 # 第三条只看 MAG.Health 这个数值字段。
 # 上游这一组刻意保守（只报"配置与数据明显矛盾"的），本轮沿用。
@@ -21,8 +21,8 @@ conditions:
     - PARM
 
 compute:
-  - rng_type = param("RNGFND_TYPE", 0.0)
-  - rng1_type = param("RNGFND1_TYPE", 0.0)
+  - rng_type = _cfg("RNGFND_TYPE", 0.0)
+  - rng1_type = _cfg("RNGFND1_TYPE", 0.0)
 
 triggers:
   - when: "(rng_type > 0 or rng1_type > 0) and not has_topic('RFND') and not has_topic('RNGFND')"
@@ -46,7 +46,7 @@ conditions:
     - PARM
 
 compute:
-  - gps_type = param("GPS_TYPE", 0.0)
+  - gps_type = _cfg("GPS_TYPE", 0.0)
 
 triggers:
   - when: "gps_type > 0 and not has_topic('GPS')"

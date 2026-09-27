@@ -39,14 +39,14 @@ export const PLOT_PRESETS = {
               "xdata": {
                 "kind": "field",
                 "fields": [
-                  "vehicle_local_position[0].x"
+                  "vehicle_local_position.x"
                 ]
               },
               "ydata": [
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_local_position[0].y"
+                    "vehicle_local_position.y"
                   ]
                 }
               ],
@@ -61,14 +61,14 @@ export const PLOT_PRESETS = {
               "xdata": {
                 "kind": "field",
                 "fields": [
-                  "vehicle_local_position_setpoint[0].x"
+                  "vehicle_local_position_setpoint.x"
                 ]
               },
               "ydata": [
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_local_position_setpoint[0].y"
+                    "vehicle_local_position_setpoint.y"
                   ]
                 }
               ],
@@ -118,22 +118,22 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_gps_position[0].altitude_msl_m",
-                    "vehicle_gps_position[0].alt"
+                    "vehicle_gps_position.altitude_msl_m",
+                    "vehicle_gps_position.alt"
                   ],
                   "unit": "m"
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_air_data[0].baro_alt_meter",
-                    "sensor_combined[0].baro_alt_meter"
+                    "vehicle_air_data.baro_alt_meter",
+                    "sensor_combined.baro_alt_meter"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_global_position[0].alt"
+                    "vehicle_global_position.alt"
                   ]
                 }
               ],
@@ -239,8 +239,8 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_angular_velocity[0].xyz[0]",
-                    "vehicle_attitude[0].rollspeed"
+                    "vehicle_angular_velocity.xyz[0]",
+                    "vehicle_attitude.rollspeed"
                   ]
                 }
               ],
@@ -257,7 +257,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_rates_setpoint[0].roll"
+                    "vehicle_rates_setpoint.roll"
                   ]
                 }
               ],
@@ -274,7 +274,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "rate_ctrl_status[0].rollspeed_integ"
+                    "rate_ctrl_status.rollspeed_integ"
                   ]
                 }
               ],
@@ -340,7 +340,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_attitude_setpoint[0].pitch_d"
+                    "vehicle_attitude_setpoint.pitch_d"
                   ]
                 }
               ],
@@ -389,8 +389,8 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_angular_velocity[0].xyz[1]",
-                    "vehicle_attitude[0].pitchspeed"
+                    "vehicle_angular_velocity.xyz[1]",
+                    "vehicle_attitude.pitchspeed"
                   ]
                 }
               ],
@@ -407,7 +407,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_rates_setpoint[0].pitch"
+                    "vehicle_rates_setpoint.pitch"
                   ]
                 }
               ],
@@ -424,7 +424,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "rate_ctrl_status[0].pitchspeed_integ"
+                    "rate_ctrl_status.pitchspeed_integ"
                   ]
                 }
               ],
@@ -490,7 +490,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_attitude_setpoint[0].yaw_d"
+                    "vehicle_attitude_setpoint.yaw_d"
                   ]
                 }
               ],
@@ -507,7 +507,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_attitude_setpoint[0].yaw_sp_move_rate"
+                    "vehicle_attitude_setpoint.yaw_sp_move_rate"
                   ]
                 }
               ],
@@ -556,8 +556,8 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_angular_velocity[0].xyz[2]",
-                    "vehicle_attitude[0].yawspeed"
+                    "vehicle_angular_velocity.xyz[2]",
+                    "vehicle_attitude.yawspeed"
                   ]
                 }
               ],
@@ -574,7 +574,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_rates_setpoint[0].yaw"
+                    "vehicle_rates_setpoint.yaw"
                   ]
                 }
               ],
@@ -591,7 +591,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "rate_ctrl_status[0].yawspeed_integ"
+                    "rate_ctrl_status.yawspeed_integ"
                   ]
                 }
               ],
@@ -640,7 +640,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_local_position[0].x"
+                    "vehicle_local_position.x"
                   ]
                 }
               ],
@@ -657,7 +657,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_local_position_setpoint[0].x"
+                    "vehicle_local_position_setpoint.x"
                   ]
                 }
               ],
@@ -706,7 +706,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_local_position[0].y"
+                    "vehicle_local_position.y"
                   ]
                 }
               ],
@@ -723,7 +723,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_local_position_setpoint[0].y"
+                    "vehicle_local_position_setpoint.y"
                   ]
                 }
               ],
@@ -772,7 +772,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_local_position[0].z"
+                    "vehicle_local_position.z"
                   ]
                 }
               ],
@@ -789,7 +789,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_local_position_setpoint[0].z"
+                    "vehicle_local_position_setpoint.z"
                   ]
                 }
               ],
@@ -838,19 +838,19 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_local_position[0].vx"
+                    "vehicle_local_position.vx"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_local_position[0].vy"
+                    "vehicle_local_position.vy"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_local_position[0].vz"
+                    "vehicle_local_position.vz"
                   ]
                 }
               ],
@@ -869,19 +869,19 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_local_position_setpoint[0].vx"
+                    "vehicle_local_position_setpoint.vx"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_local_position_setpoint[0].vy"
+                    "vehicle_local_position_setpoint.vy"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_local_position_setpoint[0].vz"
+                    "vehicle_local_position_setpoint.vz"
                   ]
                 }
               ],
@@ -932,19 +932,19 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_visual_odometry[0].x"
+                    "vehicle_visual_odometry.x"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_visual_odometry[0].y"
+                    "vehicle_visual_odometry.y"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_visual_odometry[0].z"
+                    "vehicle_visual_odometry.z"
                   ]
                 }
               ],
@@ -995,19 +995,19 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_visual_odometry[0].vx"
+                    "vehicle_visual_odometry.vx"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_visual_odometry[0].vy"
+                    "vehicle_visual_odometry.vy"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_visual_odometry[0].vz"
+                    "vehicle_visual_odometry.vz"
                   ]
                 }
               ],
@@ -1058,19 +1058,19 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_visual_odometry[0].roll"
+                    "vehicle_visual_odometry.roll"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_visual_odometry[0].pitch"
+                    "vehicle_visual_odometry.pitch"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_visual_odometry[0].yaw"
+                    "vehicle_visual_odometry.yaw"
                   ]
                 }
               ],
@@ -1121,19 +1121,19 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_visual_odometry[0].rollspeed"
+                    "vehicle_visual_odometry.rollspeed"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_visual_odometry[0].pitchspeed"
+                    "vehicle_visual_odometry.pitchspeed"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_visual_odometry[0].yawspeed"
+                    "vehicle_visual_odometry.yawspeed"
                   ]
                 }
               ],
@@ -1184,7 +1184,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_visual_odometry[0].latency"
+                    "vehicle_visual_odometry.latency"
                   ]
                 }
               ],
@@ -1235,14 +1235,14 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "airspeed_validated[0].true_airspeed_m_s",
-                    "airspeed[0].indicated_airspeed_m_s"
+                    "airspeed_validated.true_airspeed_m_s",
+                    "airspeed.indicated_airspeed_m_s"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "airspeed[0].indicated_airspeed_m_s"
+                    "airspeed.indicated_airspeed_m_s"
                   ]
                 }
               ],
@@ -1260,8 +1260,8 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_gps_position[0].vel_m_m_s",
-                    "vehicle_gps_position[0].vel_m_s"
+                    "vehicle_gps_position.vel_m_m_s",
+                    "vehicle_gps_position.vel_m_s"
                   ]
                 }
               ],
@@ -1310,13 +1310,13 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "tecs_status[0].height_rate"
+                    "tecs_status.height_rate"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "tecs_status[0].height_rate_setpoint"
+                    "tecs_status.height_rate_setpoint"
                   ]
                 }
               ],
@@ -1366,37 +1366,37 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "manual_control_setpoint[0].roll"
+                    "manual_control_setpoint.roll"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "manual_control_setpoint[0].pitch"
+                    "manual_control_setpoint.pitch"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "manual_control_setpoint[0].yaw"
+                    "manual_control_setpoint.yaw"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "manual_control_setpoint[0].throttle"
+                    "manual_control_setpoint.throttle"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "manual_control_setpoint[0].aux1"
+                    "manual_control_setpoint.aux1"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "manual_control_setpoint[0].aux2"
+                    "manual_control_setpoint.aux2"
                   ]
                 }
               ],
@@ -1418,15 +1418,15 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "manual_control_switches[0].mode_slot",
-                    "manual_control_setpoint[0].mode_slot"
+                    "manual_control_switches.mode_slot",
+                    "manual_control_setpoint.mode_slot"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "manual_control_switches[0].kill_switch",
-                    "manual_control_setpoint[0].kill_switch"
+                    "manual_control_switches.kill_switch",
+                    "manual_control_setpoint.kill_switch"
                   ]
                 }
               ],
@@ -1477,22 +1477,22 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_torque_setpoint[0].xyz[0]",
-                    "actuator_controls_0[0].control[0]"
+                    "vehicle_torque_setpoint.xyz[0]",
+                    "actuator_controls_0.control[0]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_torque_setpoint[0].xyz[1]",
-                    "actuator_controls_0[0].control[1]"
+                    "vehicle_torque_setpoint.xyz[1]",
+                    "actuator_controls_0.control[1]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_torque_setpoint[0].xyz[2]",
-                    "actuator_controls_0[0].control[2]"
+                    "vehicle_torque_setpoint.xyz[2]",
+                    "actuator_controls_0.control[2]"
                   ]
                 }
               ],
@@ -1544,7 +1544,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_torque_setpoint[1].xyz[0]"
+                    "vehicle_torque_setpoint.xyz"
                   ]
                 }
               ],
@@ -1561,7 +1561,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_torque_setpoint[1].xyz[1]"
+                    "vehicle_torque_setpoint.xyz"
                   ]
                 }
               ],
@@ -1578,7 +1578,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_torque_setpoint[1].xyz[2]"
+                    "vehicle_torque_setpoint.xyz"
                   ]
                 }
               ],
@@ -1629,49 +1629,49 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_motors[0].control[0]"
+                    "actuator_motors.control"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_motors[0].control[1]"
+                    "actuator_motors.control"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_motors[0].control[2]"
+                    "actuator_motors.control"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_motors[0].control[3]"
+                    "actuator_motors.control"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_motors[0].control[4]"
+                    "actuator_motors.control"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_motors[0].control[5]"
+                    "actuator_motors.control"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_motors[0].control[6]"
+                    "actuator_motors.control"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_motors[0].control[7]"
+                    "actuator_motors.control"
                   ]
                 }
               ],
@@ -1710,49 +1710,49 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_servos[0].control[0]"
+                    "actuator_servos.control"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_servos[0].control[1]"
+                    "actuator_servos.control"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_servos[0].control[2]"
+                    "actuator_servos.control"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_servos[0].control[3]"
+                    "actuator_servos.control"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_servos[0].control[4]"
+                    "actuator_servos.control"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_servos[0].control[5]"
+                    "actuator_servos.control"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_servos[0].control[6]"
+                    "actuator_servos.control"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_servos[0].control[7]"
+                    "actuator_servos.control"
                   ]
                 }
               ],
@@ -1791,49 +1791,49 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs[0].output[0]"
+                    "actuator_outputs.output"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs[0].output[1]"
+                    "actuator_outputs.output"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs[0].output[2]"
+                    "actuator_outputs.output"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs[0].output[3]"
+                    "actuator_outputs.output"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs[0].output[4]"
+                    "actuator_outputs.output"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs[0].output[5]"
+                    "actuator_outputs.output"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs[0].output[6]"
+                    "actuator_outputs.output"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs[0].output[7]"
+                    "actuator_outputs.output"
                   ]
                 }
               ],
@@ -1872,49 +1872,49 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs[1].output[0]"
+                    "actuator_outputs.output"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs[1].output[1]"
+                    "actuator_outputs.output"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs[1].output[2]"
+                    "actuator_outputs.output"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs[1].output[3]"
+                    "actuator_outputs.output"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs[1].output[4]"
+                    "actuator_outputs.output"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs[1].output[5]"
+                    "actuator_outputs.output"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs[1].output[6]"
+                    "actuator_outputs.output"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs[1].output[7]"
+                    "actuator_outputs.output"
                   ]
                 }
               ],
@@ -1970,19 +1970,19 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "sensor_combined[0].accelerometer_m_s2[0]"
+                    "sensor_combined.accelerometer_m_s2"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "sensor_combined[0].accelerometer_m_s2[1]"
+                    "sensor_combined.accelerometer_m_s2"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "sensor_combined[0].accelerometer_m_s2[2]"
+                    "sensor_combined.accelerometer_m_s2"
                   ]
                 }
               ],
@@ -2044,7 +2044,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_imu_status[0].accel_vibration_metric"
+                    "vehicle_imu_status.accel_vibration_metric"
                   ]
                 },
                 {
@@ -2114,19 +2114,19 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "sensor_combined[0].gyro_rad[0]"
+                    "sensor_combined.gyro_rad"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "sensor_combined[0].gyro_rad[1]"
+                    "sensor_combined.gyro_rad"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "sensor_combined[0].gyro_rad[2]"
+                    "sensor_combined.gyro_rad"
                   ]
                 }
               ],
@@ -2304,22 +2304,22 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_magnetometer[0].magnetometer_ga[0]",
-                    "sensor_combined[0].magnetometer_ga[0]"
+                    "vehicle_magnetometer.magnetometer_ga[0]",
+                    "sensor_combined.magnetometer_ga[0]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_magnetometer[0].magnetometer_ga[1]",
-                    "sensor_combined[0].magnetometer_ga[1]"
+                    "vehicle_magnetometer.magnetometer_ga[1]",
+                    "sensor_combined.magnetometer_ga[1]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_magnetometer[0].magnetometer_ga[2]",
-                    "sensor_combined[0].magnetometer_ga[2]"
+                    "vehicle_magnetometer.magnetometer_ga[2]",
+                    "sensor_combined.magnetometer_ga[2]"
                   ]
                 }
               ],
@@ -2370,13 +2370,13 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "distance_sensor[0].current_distance"
+                    "distance_sensor.current_distance"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "distance_sensor[0].variance"
+                    "distance_sensor.variance"
                   ]
                 }
               ],
@@ -2394,13 +2394,13 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_local_position[0].dist_bottom"
+                    "vehicle_local_position.dist_bottom"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_local_position[0].dist_bottom_valid"
+                    "vehicle_local_position.dist_bottom_valid"
                   ]
                 }
               ],
@@ -2451,50 +2451,50 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_gps_position[0].eph",
-                    "sensor_gps[0].eph"
+                    "vehicle_gps_position.eph",
+                    "sensor_gps.eph"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_gps_position[0].epv",
-                    "sensor_gps[0].epv"
+                    "vehicle_gps_position.epv",
+                    "sensor_gps.epv"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_gps_position[0].hdop",
-                    "sensor_gps[0].hdop"
+                    "vehicle_gps_position.hdop",
+                    "sensor_gps.hdop"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_gps_position[0].vdop",
-                    "sensor_gps[0].vdop"
+                    "vehicle_gps_position.vdop",
+                    "sensor_gps.vdop"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_gps_position[0].s_variance_m_s",
-                    "sensor_gps[0].s_variance_m_s"
+                    "vehicle_gps_position.s_variance_m_s",
+                    "sensor_gps.s_variance_m_s"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_gps_position[0].satellites_used",
-                    "sensor_gps[0].satellites_used"
+                    "vehicle_gps_position.satellites_used",
+                    "sensor_gps.satellites_used"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_gps_position[0].fix_type",
-                    "sensor_gps[0].fix_type"
+                    "vehicle_gps_position.fix_type",
+                    "sensor_gps.fix_type"
                   ]
                 }
               ],
@@ -2550,15 +2550,15 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_gps_position[0].noise_per_ms",
-                    "sensor_gps[0].noise_per_ms"
+                    "vehicle_gps_position.noise_per_ms",
+                    "sensor_gps.noise_per_ms"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_gps_position[0].jamming_indicator",
-                    "sensor_gps[0].jamming_indicator"
+                    "vehicle_gps_position.jamming_indicator",
+                    "sensor_gps.jamming_indicator"
                   ]
                 }
               ],
@@ -2609,22 +2609,22 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_magnetometer[0].magnetometer_ga[0]",
-                    "sensor_combined[0].magnetometer_ga[0]"
+                    "vehicle_magnetometer.magnetometer_ga[0]",
+                    "sensor_combined.magnetometer_ga[0]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_magnetometer[0].magnetometer_ga[1]",
-                    "sensor_combined[0].magnetometer_ga[1]"
+                    "vehicle_magnetometer.magnetometer_ga[1]",
+                    "sensor_combined.magnetometer_ga[1]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_magnetometer[0].magnetometer_ga[2]",
-                    "sensor_combined[0].magnetometer_ga[2]"
+                    "vehicle_magnetometer.magnetometer_ga[2]",
+                    "sensor_combined.magnetometer_ga[2]"
                   ]
                 }
               ],
@@ -2675,25 +2675,25 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "battery_status[0].voltage_v"
+                    "battery_status.voltage_v"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "battery_status[0].current_a"
+                    "battery_status.current_a"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "battery_status[0].discharged_mah"
+                    "battery_status.discharged_mah"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "battery_status[0].remaining"
+                    "battery_status.remaining"
                   ]
                 }
               ],
@@ -2713,13 +2713,13 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "battery_status[0].ocv_estimate"
+                    "battery_status.ocv_estimate"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "battery_status[0].internal_resistance_estimate"
+                    "battery_status.internal_resistance_estimate"
                   ]
                 }
               ],
@@ -2737,13 +2737,13 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "system_power[0].voltage5v_v"
+                    "system_power.voltage5v_v"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "system_power[0].sensors3v3[0]"
+                    "system_power.sensors3v3"
                   ]
                 }
               ],
@@ -2793,13 +2793,13 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "sensor_baro[0].temperature"
+                    "sensor_baro.temperature"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "sensor_accel[0].temperature"
+                    "sensor_accel.temperature"
                   ]
                 }
               ],
@@ -2817,7 +2817,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "airspeed[0].air_temperature_celsius"
+                    "airspeed.air_temperature_celsius"
                   ]
                 }
               ],
@@ -2834,7 +2834,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "battery_status[0].temperature"
+                    "battery_status.temperature"
                   ]
                 }
               ],
@@ -2883,13 +2883,13 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "estimator_status[0].health_flags"
+                    "estimator_status.health_flags"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "estimator_status[0].timeout_flags"
+                    "estimator_status.timeout_flags"
                   ]
                 }
               ],
@@ -2907,49 +2907,49 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "estimator_status[0].vel_test_ratio"
+                    "estimator_status.vel_test_ratio"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "estimator_status[0].pos_test_ratio"
+                    "estimator_status.pos_test_ratio"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "estimator_status[0].hgt_test_ratio"
+                    "estimator_status.hgt_test_ratio"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "estimator_status[0].hdg_test_ratio"
+                    "estimator_status.hdg_test_ratio"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "estimator_status[0].mag_test_ratio"
+                    "estimator_status.mag_test_ratio"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "estimator_status[0].tas_test_ratio"
+                    "estimator_status.tas_test_ratio"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "estimator_status[0].hagl_test_ratio"
+                    "estimator_status.hagl_test_ratio"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "estimator_status[0].beta_test_ratio"
+                    "estimator_status.beta_test_ratio"
                   ]
                 }
               ],
@@ -3005,13 +3005,13 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_status[0].failsafe"
+                    "vehicle_status.failsafe"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_status[0].failsafe_and_user_took_over"
+                    "vehicle_status.failsafe_and_user_took_over"
                   ]
                 }
               ],
@@ -3029,127 +3029,127 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].auto_mission_missing"
+                    "failsafe_flags.auto_mission_missing"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].geofence_breached"
+                    "failsafe_flags.geofence_breached"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].local_position_accuracy_low"
+                    "failsafe_flags.local_position_accuracy_low"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].local_position_required"
+                    "failsafe_flags.local_position_required"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].local_position_invalid"
+                    "failsafe_flags.local_position_invalid"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].local_velocity_invalid"
+                    "failsafe_flags.local_velocity_invalid"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].local_altitude_invalid"
+                    "failsafe_flags.local_altitude_invalid"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].global_position_accuracy_low"
+                    "failsafe_flags.global_position_accuracy_low"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].global_position_required"
+                    "failsafe_flags.global_position_required"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].global_position_invalid"
+                    "failsafe_flags.global_position_invalid"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].global_velocity_invalid"
+                    "failsafe_flags.global_velocity_invalid"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].home_position_invalid"
+                    "failsafe_flags.home_position_invalid"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].manual_control_available"
+                    "failsafe_flags.manual_control_available"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].gcs_connection_available"
+                    "failsafe_flags.gcs_connection_available"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].offboard_control_signal_lost"
+                    "failsafe_flags.offboard_control_signal_lost"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].rc_signal_found"
+                    "failsafe_flags.rc_signal_found"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].battery_warning"
+                    "failsafe_flags.battery_warning"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].vtol_fixed_wing_system_failure"
+                    "failsafe_flags.vtol_fixed_wing_system_failure"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].engine_failure"
+                    "failsafe_flags.engine_failure"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].mission_failure"
+                    "failsafe_flags.mission_failure"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "failsafe_flags[0].avoidance_failure"
+                    "failsafe_flags.avoidance_failure"
                   ]
                 }
               ],
@@ -3218,13 +3218,13 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "cpuload[0].ram_usage"
+                    "cpuload.ram_usage"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "cpuload[0].load"
+                    "cpuload.load"
                   ]
                 }
               ],
@@ -3274,7 +3274,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "estimator_status[0].time_slip"
+                    "estimator_status.time_slip"
                   ]
                 }
               ],
@@ -3314,25 +3314,25 @@ export const PLOT_PRESETS = {
               "max_points": 1500,
               "lat": {
                 "cands": [
-                  "sensor_gps[0].latitude_deg",
-                  "vehicle_gps_position[0].latitude_deg",
-                  "vehicle_gps_position[0].lat"
+                  "sensor_gps.latitude_deg",
+                  "vehicle_gps_position.latitude_deg",
+                  "vehicle_gps_position.lat"
                 ],
                 "unit": "deg"
               },
               "lon": {
                 "cands": [
-                  "sensor_gps[0].longitude_deg",
-                  "vehicle_gps_position[0].longitude_deg",
-                  "vehicle_gps_position[0].lon"
+                  "sensor_gps.longitude_deg",
+                  "vehicle_gps_position.longitude_deg",
+                  "vehicle_gps_position.lon"
                 ],
                 "unit": "deg"
               },
               "alt": {
                 "cands": [
-                  "sensor_gps[0].altitude_msl_m",
-                  "vehicle_gps_position[0].altitude_msl_m",
-                  "vehicle_gps_position[0].alt"
+                  "sensor_gps.altitude_msl_m",
+                  "vehicle_gps_position.altitude_msl_m",
+                  "vehicle_gps_position.alt"
                 ],
                 "unit": "m"
               },

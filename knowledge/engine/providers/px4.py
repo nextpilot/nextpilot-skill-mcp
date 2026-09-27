@@ -365,6 +365,10 @@ class Px4Provider:
         这里给查询 API 的 µs 形态；报告页阶段条的秒形态由 report_materials 从它换算。"""
         return [dict(seg) for seg in self.mode_runs_us]
 
+    def get_mode_present(self):
+        """日志里出现过的所有模式名（用于 conditions.mode 匹配）。"""
+        return list(self.modes) if self.modes else []
+
     def get_armed_changed(self):
         """解锁/上锁的连续区间（µs）。end 不会是 None——日志截止就用最后时间戳封口，
         时序算子用的 ARMED_INTERVALS 才保留 None 的开口语义，两份形态各按各的用途来。"""
@@ -409,31 +413,22 @@ class Px4Provider:
     def has_file_corruption(self):
         return bool(getattr(self.ulog, "file_corruption", False))
 
+    def is_log_ok(self):
+        """日志完整性：文件无损坏 且 解析走到文件尾。"""
+        _, walked_to_end, _, _ = self.get_message_type_counts()
+        return not self.has_file_corruption() and bool(walked_to_end)
+
     def builtin_variables(self):
         """内置变量表。**每次返回新 dict**（引擎会往里写 compute 的输出）。
 
         键一律大写（见 api.py 的 BUILTIN_VARIABLES）：规则里自己赋的变量是小写。
         """
         return {
-            "FW_MINOR": self.fw_minor,
             "VEHICLE": self.vehicle_type,
-            "IS_FIXED_WING": self.vehicle_type == "fixed_wing",
             "DURATION_S": self.duration_s if self.duration_s is not None else 0,
             "ARMED_S": self.armed_duration_s,
-            # 时序算子（如 head_tail_median_drop）按 armed 区间切窗用
-            "ARMED_INTERVALS": list(self.armed_intervals),
-            # 事件类算子的相对时间（t=xx.x s）基准
             "T0_US": self.t0_us,
-            "HAS_ARMED": bool(self.armed_intervals),
-            # 出现过的模式名（conditions.mode 按它匹配）；没有模式段就是空列表
-            "MODES_PRESENT": sorted({str(s["mode"]) for s in self.get_mode_changed() if s.get("mode")}),
-            # 数据质量事实（guards 类经验用）
-            "RESTART_DETECTED": self.restart_topics > 0,
             "DROPOUT_MS": self.dropout_total_ms,
-            # 日志消息：供「日志消息聚合」类经验按级别筛选
-            "MESSAGES": self.get_logged_events(),
-            # 初始参数表（ULog 的 'Q' 消息）。规则里用 param('NAME') 取单个值
-            "PARAMS": dict(self.get_initial_parameters()),
             # ---- 知识引擎内置变量（api.py 的 BUILTIN_VARIABLES；缺的给 None/空串，不编值）----
             "SYS_UUID": self.uuid,
             "AIRFRAME_ID": self.airframe_id,

@@ -7,7 +7,7 @@
   "result": {
     "platform": "PX4",
     "logType": "px4-ulog",
-    "parserVersion": "pyulog/1.1.0",
+    "parserVersion": "pyulog/1.2.4",
     "facts": {
       "durationSec": 7.4,
       "vehicleType": "rotary_wing",
@@ -94,18 +94,6 @@
         "unit": "Hz"
       },
       {
-        "key": "gyroBiasMaxRadS",
-        "label": "陀螺零偏最大",
-        "value": 0.0007752514211460948,
-        "unit": "rad/s"
-      },
-      {
-        "key": "gyroBiasDriftRadS",
-        "label": "陀螺零偏漂移",
-        "value": 0.00019348232308402658,
-        "unit": "rad/s"
-      },
-      {
         "key": "windSpeedP95M",
         "label": "风速 p95",
         "value": 0.0,
@@ -143,11 +131,6 @@
         "key": "gpsEphP95M",
         "label": "gpsEphP95M",
         "value": 0.0032078500747680667
-      },
-      {
-        "key": "gyroBiasSource",
-        "label": "gyroBiasSource",
-        "value": "estimator_status.states[10..12]"
       }
     ],
     "tags": [],
@@ -172,7 +155,6 @@
       "px4-failsafe-mission_failure",
       "px4-failsafe-nav",
       "px4-mode-thrash",
-      "px4-imu-bias-drift",
       "px4-attitude-overshoot",
       "px4-attitude-oscillation",
       "px4-vtol-transition-attitude",
@@ -195,6 +177,10 @@
       {
         "ruleId": "px4-motor-unbalance",
         "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "px4-imu-bias-drift",
+        "reason": "本条只在有解锁段时适用"
       },
       {
         "ruleId": "px4-airspeed-invalid",

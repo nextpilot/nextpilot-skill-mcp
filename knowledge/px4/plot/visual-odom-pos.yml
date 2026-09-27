@@ -1,4 +1,4 @@
-﻿id: visual-odom-pos
+id: visual-odom-pos
 title: Visual Odometry Position
 description: 视觉里程计位置（仅当 topic 存在时显示）。
 order: 13
@@ -11,7 +11,7 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_visual_odometry[0].x")
-          - ref("vehicle_visual_odometry[0].y")
-          - ref("vehicle_visual_odometry[0].z")
+          - vehicle_visual_odometry.x
+          - vehicle_visual_odometry.y
+          - vehicle_visual_odometry.z
         label: ["X", "Y", "Z"]

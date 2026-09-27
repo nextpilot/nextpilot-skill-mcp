@@ -243,36 +243,14 @@ OPTIONAL = {
 # 从这里生成。加名字 = 改契约；删名字 = 破坏兼容（老规则会构建失败，这是有意的）。
 # **名字一律大写**：规则里自己赋的变量是小写，一眼就能分出"这个数是引擎给的还是自己算的"。
 BUILTIN_VARIABLES = {
-    "FW_MINOR": {
-        "type": "int|None",
-        "doc": "固件次版本号。**版本分支唯一常用的量**；None = 这份日志没写版本号",
-    },
     "VEHICLE": {
         "type": "str",
         "doc": "机型：rotary_wing / fixed_wing / rover / airship / unknown",
     },
-    "IS_FIXED_WING": {"type": "bool", "doc": "机型别名（比 VEHICLE == 'fixed_wing' 好读）"},
     "DURATION_S": {"type": "float", "doc": "日志总时长（秒）"},
     "ARMED_S": {"type": "float", "doc": "armed 总时长（秒）"},
-    "ARMED_INTERVALS": {
-        "type": "list[(us,us)]",
-        "doc": "armed 区间，升序不重叠；end=None 表示持续到日志结束。时序算子按它切窗",
-    },
     "T0_US": {"type": "int", "doc": "日志起点时间戳（us），事件类算子算相对时刻的基准"},
-    "HAS_ARMED": {"type": "bool", "doc": "是否存在 armed 段"},
-    "MODES_PRESENT": {
-        "type": "list[str]",
-        "doc": "日志里出现过的飞行模式名（去重排序）。`conditions.mode` 按它匹配；没有模式段就给空列表——**空列表不是「模式不限」**，写 mode 约束时会因此跳过",
-    },
-    "RESTART_DETECTED": {"type": "bool", "doc": "是否有 topic 时间戳回退（疑似中途重启）"},
     "DROPOUT_MS": {"type": "int", "doc": "全日志丢包累计（毫秒）"},
-    "MESSAGES": {"type": "list[dict]", "doc": "日志消息条目（供消息类经验按级别筛选）"},
-    "PARAMS": {
-        "type": "dict",
-        "doc": "飞控参数表 {参数名: 值}。**规则里不直接引用它**——表达式没有下标能力，"
-        "取单个参数用框架的 `param('NAME')`（见 engine.py 的 `_rule_env`）。"
-        "这份日志没录参数就给空 dict（APM 是 PARM 消息的最后一次值，PX4 是初始参数表）",
-    },
     # ---- 知识引擎内置变量（docs/develop/engine-api-rework.md 并入）----
     # 缺什么给 None / ""（类型里写明 |None 或直接给空串），**不许编值**。
     "SYS_UUID": {"type": "str", "doc": "系统唯一 ID。这份日志没写就给空串"},
@@ -290,8 +268,10 @@ BUILTIN_VARIABLES = {
     "FLIGHT_TIME_S": {"type": "float|None", "doc": "载具累计飞行时长（秒，参数里的计数器）。没有就 None"},
 }
 
-# 框架自己往 env 里补的名字（**不属于** provider）：
-#   has_topic() —— 表达式里唯一放行的函数调用，指向 provider.has_topic
+# 框架提供的函数（engine.py 注入 _COMPUTE_GLOBALS + env）：
+#   has_topic()  —— 消息存在判定，指向 provider.has_topic
+#   _cfg()       —— 读飞控参数，查 provider.get_initial_parameters()
+#   log_ok()     —— 日志完整性，指向 provider.is_log_ok
 
 
 # ---------------- 格式注册表 ----------------

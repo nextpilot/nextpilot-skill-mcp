@@ -7,7 +7,7 @@
   "result": {
     "platform": "PX4",
     "logType": "px4-ulog",
-    "parserVersion": "pyulog/1.1.0",
+    "parserVersion": "pyulog/1.2.4",
     "facts": {
       "durationSec": 73.2,
       "vehicleType": "rover",
@@ -63,24 +63,6 @@
         "unit": "0..1"
       },
       {
-        "key": "imuTempRangeC",
-        "label": "IMU 温度跨度",
-        "value": 0.20803451538085938,
-        "unit": "°C"
-      },
-      {
-        "key": "gyroBiasMaxRadS",
-        "label": "陀螺零偏最大",
-        "value": 0.0010470404522493482,
-        "unit": "rad/s"
-      },
-      {
-        "key": "gyroBiasDriftRadS",
-        "label": "陀螺零偏漂移",
-        "value": 0.0007255891105160117,
-        "unit": "rad/s"
-      },
-      {
         "key": "gpsJumpCount",
         "label": "GPS 跳变次数",
         "value": 0,
@@ -106,11 +88,6 @@
         "key": "gpsEphP95M",
         "label": "gpsEphP95M",
         "value": 0.00037700000405311586
-      },
-      {
-        "key": "gyroBiasSource",
-        "label": "gyroBiasSource",
-        "value": "estimator_sensor_bias.gyro_bias[]"
       }
     ],
     "tags": [],
@@ -135,7 +112,6 @@
       "px4-failsafe-mission_failure",
       "px4-failsafe-nav",
       "px4-mode-thrash",
-      "px4-imu-bias-drift",
       "px4-vtol-transition-attitude",
       "px4-log-errors",
       "px4-log-warnings",
@@ -159,6 +135,10 @@
       {
         "ruleId": "px4-motor-unbalance",
         "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "px4-imu-bias-drift",
+        "reason": "本条只在有解锁段时适用"
       },
       {
         "ruleId": "px4-airspeed-invalid",

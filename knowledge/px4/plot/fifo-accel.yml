@@ -1,4 +1,4 @@
-﻿id: fifo-accel
+id: fifo-accel
 title: Raw Acceleration (FIFO)
 description: FIFO 加速度计原始数据（每 IMU 一张），仅当 sensor_accel_fifo 存在时显示。
 order: 28
@@ -12,7 +12,7 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("sensor_accel_fifo[:].x")
-          - ref("sensor_accel_fifo[:].y")
-          - ref("sensor_accel_fifo[:].z")
+          - sensor_accel_fifo[:].x
+          - sensor_accel_fifo[:].y
+          - sensor_accel_fifo[:].z
         label: ["X", "Y", "Z"]

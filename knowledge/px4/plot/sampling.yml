@@ -1,4 +1,4 @@
-﻿id: sampling
+id: sampling
 title: Sampling Regularity
 description: sensor_combined 采样间隔与 estimator_status time_slip。
 order: 40
@@ -11,5 +11,5 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("estimator_status[0].time_slip")
+          - estimator_status.time_slip
         label: ["Estimator time slip (cumulative)"]

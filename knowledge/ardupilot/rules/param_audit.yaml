@@ -1,0 +1,182 @@
+# 参数审计：上游 ardupilot-mcp 的 checks/param_audit.py。
+# 从前 198 条假设中提取 6 条静默危险的参数组合，全部照上游阈值，不做新编。
+#
+#  1. Rate P 增益异常低/高（<0.04 / >0.5）：默认 ~0.135
+#  2. 角加速度限制被禁用（ATC_ACCEL_R/P/Y_MAX=0）：允许不受限角加速 → 振荡/崩溃
+#  3. 电池失效保护阈值倒挂（BATT_CRT_VOLT >= BATT_LOW_VOLT）：分级保护失效
+#  4. MOT_SPIN_ARM > MOT_SPIN_MIN：解锁怠速高于最小飞行油门，推力控制反转
+#  5. MOT_PWM_MIN >= MOT_PWM_MAX：PWM 区间为空或反转（二者均为 0 = "用 RC 范围"，不是问题）
+#  6. FENCE_ENABLE=1 但 FENCE_ALT_MAX=0 且 FENCE_RADIUS=0：围栏启用但无实际边界
+#
+# 每条都是一等字段的精确等于判断，没有采样窗口、没有机型分支（与上游一致）。
+
+---
+id: apm-param-audit-rate-p
+name: Rate P 增益异常
+group: param_audit
+order: 1
+
+conditions:
+  message:
+    - PARM
+
+compute:
+  - rp_r = _cfg("ATC_RAT_RLL_P", 0.0)
+  - rp_p = _cfg("ATC_RAT_PIT_P", 0.0)
+  - rp_y = _cfg("ATC_RAT_YAW_P", 0.0)
+  - low_count = int(rp_r < 0.04) + int(rp_p < 0.04) + int(rp_y < 0.04)
+  - high_count = int(rp_r > 0.5) + int(rp_p > 0.5) + int(rp_y > 0.5)
+
+triggers:
+  - when: "low_count > 0"
+    severity: critical
+    suggestion: "ATC_RAT_RLL_P/PIT_P/YAW_P 过低（Copter 默认 ~0.135，<0.04 几乎不吃误差）。飞行会严重迟钝甚至不可控。在 AutoTune 或调参助手上调高到合理范围。"
+    description: "{low_count} 个轴的 Rate P 增益低于 0.04（R:{rp_r:.3f} P:{rp_p:.3f} Y:{rp_y:.3f}），可能不可控"
+    evidence:
+      source: ATC_RAT_RLL_P/PIT_P/YAW_P
+      value: low_count
+      threshold: 0
+      unit: 轴
+  - when: "high_count > 0"
+    severity: warning
+    suggestion: "ATC_RAT_RLL_P/PIT_P/YAW_P 偏高（Copter 默认 ~0.135，>0.5 远超正常范围）。太高会产生高频振荡、电机过热甚至炸机。"
+    description: "{high_count} 个轴的 Rate P 增益高于 0.5（R:{rp_r:.3f} P:{rp_p:.3f} Y:{rp_y:.3f}），可能振荡"
+    evidence:
+      source: ATC_RAT_RLL_P/PIT_P/YAW_P
+      value: high_count
+      threshold: 0
+      unit: 轴
+tag: apm_param_rate_p_anomaly
+
+---
+id: apm-param-audit-accel-max
+name: 角加速度限制被禁用
+group: param_audit
+order: 2
+
+conditions:
+  message:
+    - PARM
+
+compute:
+  - acc_r = _cfg("ATC_ACCEL_R_MAX", 110000.0)
+  - acc_p = _cfg("ATC_ACCEL_P_MAX", 110000.0)
+  - acc_y = _cfg("ATC_ACCEL_Y_MAX", 27000.0)
+  - zero_count = int(acc_r == 0) + int(acc_p == 0) + int(acc_y == 0)
+
+triggers:
+  - when: "zero_count > 0"
+    severity: critical
+    suggestion: "ATC_ACCEL_R/P/Y_MAX=0 会关掉角加速度限制（Copter 默认 ~110000），飞控可以不受限地请求最猛烈的角加速度——在你做了激烈打杆或陷进振荡时，不再有最后一道保护墙，可能导致炸机。恢复成固件默认值。"
+    description: "{zero_count} 个轴的角加速度限制被置零（R:{acc_r:.0f} P:{acc_p:.0f} Y:{acc_y:.0f}），无上限"
+    evidence:
+      source: ATC_ACCEL_R/P/Y_MAX
+      value: zero_count
+      threshold: 0
+      unit: 轴
+tag: apm_param_accel_limit_disabled
+
+---
+id: apm-param-audit-batt-crt
+name: 电池失效保护阈值倒挂
+group: param_audit
+order: 3
+
+conditions:
+  message:
+    - PARM
+
+compute:
+  - batt_crt = _cfg("BATT_CRT_VOLT", 0.0)
+  - batt_low = _cfg("BATT_LOW_VOLT", 0.0)
+
+triggers:
+  - when: "batt_crt >= batt_low and batt_low > 0.0"
+    severity: warning
+    suggestion: "BATT_CRT_VOLT ({batt_crt:.1f}V) >= BATT_LOW_VOLT ({batt_low:.1f}V) 会导致分级保护失效：本应先告警后急救，现在要么同时触发，要么低电压告警还没报就进入临界动作。设 BATT_CRT_VOLT 比 BATT_LOW_VOLT 低约 0.2V/节。"
+    description: 电池失效保护阈值倒挂（CRT:{batt_crt:.1f}V >= LOW:{batt_low:.1f}V）
+    evidence:
+      source: BATT_CRT_VOLT/BATT_LOW_VOLT
+      value: f"CRT={batt_crt:.1f} LOW={batt_low:.1f}"
+      threshold: CRT<LOW
+      unit: V
+tag: apm_param_batt_crt_inverted
+
+---
+id: apm-param-audit-spin-arm
+name: MOT_SPIN_ARM 高于 MOT_SPIN_MIN
+group: param_audit
+order: 4
+
+conditions:
+  message:
+    - PARM
+
+compute:
+  - spin_arm = _cfg("MOT_SPIN_ARM", 0.0)
+  - spin_min = _cfg("MOT_SPIN_MIN", 0.0)
+
+triggers:
+  - when: "spin_arm > spin_min and spin_min > 0.0"
+    severity: warning
+    suggestion: "MOT_SPIN_ARM ({spin_arm:.4f}) > MOT_SPIN_MIN ({spin_min:.4f}) 意味着解锁时空载怠速比空中最小油门还高——推力控制反过来了，降落后可能弹跳甚至无法正常降落。把它调低到 <= MOT_SPIN_MIN。"
+    description: MOT_SPIN_ARM ({spin_arm:.4f}) 高于 MOT_SPIN_MIN ({spin_min:.4f})，推力控制反转
+    evidence:
+      source: MOT_SPIN_ARM/MOT_SPIN_MIN
+      value: f"ARM={spin_arm:.4f} MIN={spin_min:.4f}"
+      threshold: ARM<=MIN
+      unit: ""
+tag: apm_param_spin_arm_gt_min
+
+---
+id: apm-param-audit-pwm-inverted
+name: MOT_PWM 区间异常
+group: param_audit
+order: 5
+
+conditions:
+  message:
+    - PARM
+
+compute:
+  - pwm_min = _cfg("MOT_PWM_MIN", 0)
+  - pwm_max = _cfg("MOT_PWM_MAX", 0)
+
+triggers:
+  - when: "pwm_min >= pwm_max and not (pwm_min == 0 and pwm_max == 0)"
+    severity: critical
+    suggestion: "MOT_PWM_MIN ({pwm_min}) >= MOT_PWM_MAX ({pwm_max}) 意味着 PWM 输出区间为空或反转——电机输出完全失控。立即修正（参考值：MIN~1000、MAX~2000）。"
+    description: MOT_PWM 区间异常（MIN:{pwm_min} >= MAX:{pwm_max}）
+    evidence:
+      source: MOT_PWM_MIN/MOT_PWM_MAX
+      value: f"MIN={pwm_min} MAX={pwm_max}"
+      threshold: MIN<MAX
+      unit: us
+tag: apm_param_pwm_inverted
+
+---
+id: apm-param-audit-fence-empty
+name: 围栏启用但无边界
+group: param_audit
+order: 6
+
+conditions:
+  message:
+    - PARM
+
+compute:
+  - fence_enable = _cfg("FENCE_ENABLE", 0)
+  - fence_alt = _cfg("FENCE_ALT_MAX", 0.0)
+  - fence_radius = _cfg("FENCE_RADIUS", 0.0)
+
+triggers:
+  - when: "fence_enable == 1 and fence_alt <= 0.0 and fence_radius <= 0.0"
+    severity: warning
+    suggestion: "FENCE_ENABLE=1 但 FENCE_ALT_MAX=0 且 FENCE_RADIUS=0：围栏已启用却没有实际高度或半径边界。飞出去不会触发任何动作。设 FENCE_ALT_MAX 与 FENCE_RADIUS 为合理的值，或者关闭围栏。"
+    description: 围栏已启用但没有高度或半径边界
+    evidence:
+      source: FENCE_ENABLE/FENCE_ALT_MAX/FENCE_RADIUS
+      value: fence_enable
+      threshold: 非空边界
+      unit: ""
+tag: apm_param_fence_empty

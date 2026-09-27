@@ -1,4 +1,4 @@
-﻿id: rc
+id: rc
 title: Manual Control Inputs
 description: 手动控制输入（遥控器/手柄）：Roll/Pitch/Yaw/Throttle + Aux + Flight Mode + Kill Switch。
 order: 20
@@ -11,15 +11,15 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("manual_control_setpoint[0].roll")
-          - ref("manual_control_setpoint[0].pitch")
-          - ref("manual_control_setpoint[0].yaw")
-          - ref("manual_control_setpoint[0].throttle")
-          - ref("manual_control_setpoint[0].aux1")
-          - ref("manual_control_setpoint[0].aux2")
+          - manual_control_setpoint.roll
+          - manual_control_setpoint.pitch
+          - manual_control_setpoint.yaw
+          - manual_control_setpoint.throttle
+          - manual_control_setpoint.aux1
+          - manual_control_setpoint.aux2
         label: ["Y / Roll", "X / Pitch", "Yaw", "Throttle [-1, 1]", "Aux1", "Aux2"]
       - mode: TimeSeries
         ydata:
-          - ref("manual_control_switches[0].mode_slot", "manual_control_setpoint[0].mode_slot")
-          - ref("manual_control_switches[0].kill_switch", "manual_control_setpoint[0].kill_switch")
+          - _ref("manual_control_switches.mode_slot", "manual_control_setpoint.mode_slot")
+          - _ref("manual_control_switches.kill_switch", "manual_control_setpoint.kill_switch")
         label: ["Flight Mode", "Kill Switch"]

@@ -11,6 +11,9 @@
 - 数据不足时返回 None，框架据此跳过该规则（不产出 finding）。
 """
 
+import numpy as np
+from types import SimpleNamespace
+
 OPERATORS: dict[str, object] = {}
 SIGNATURES: dict[str, dict] = {}
 
@@ -224,6 +227,25 @@ def op_mod(a, b, **kw):
         return float(a) % float(yb)
     p = _align_pair(a, b)
     return None if p is None else p[0] % p[1]
+
+
+@operator("len", doc="序列长度：返回数据点数，输入缺失则 None")
+def op_len(values, **kw):
+    if values is None:
+        return None
+    import numpy as np
+
+    return len(np.asarray(values))
+
+
+@operator("int", doc="取整：将标量转为 int，输入缺失则 None")
+def op_int(x, **kw):
+    if x is None:
+        return None
+    import numpy as np
+
+    a = np.asarray(x)
+    return int(a) if a.ndim == 0 else a.astype(int)
 
 
 # ─────────────────────────── 定长数组字段（任意 float32[n] 时间序列列集合）───────────────────────────
@@ -1736,3 +1758,41 @@ def op_cell_voltage_min(cell_cols, volt_v, volt_filtered, cell_count, **kw):
     cell_min = measured if have_measured else fallback
     no_cell = not have_measured and not have_fallback and vmin is not None
     return (vmin, cell_min, cells, have_measured, have_fallback, no_cell)
+
+
+# ---- compute 表达式全局名字空间 ----
+# 所有注册的算子 + np 数学函数子集。_ref 由引擎补。
+COMPUTE_GLOBALS: dict = {"__builtins__": {}}
+COMPUTE_GLOBALS.update(OPERATORS)
+COMPUTE_GLOBALS["np"] = SimpleNamespace(
+    abs=np.abs,
+    sum=np.sum,
+    mean=np.mean,
+    std=np.std,
+    median=np.median,
+    min=np.min,
+    max=np.max,
+    ptp=np.ptp,
+    percentile=np.percentile,
+    diff=np.diff,
+    count_nonzero=np.count_nonzero,
+    nanmean=np.nanmean,
+    nanstd=np.nanstd,
+    nanmedian=np.nanmedian,
+    nanmin=np.nanmin,
+    nanmax=np.nanmax,
+    nansum=np.nansum,
+    isin=np.isin,
+    hypot=np.hypot,
+    degrees=np.degrees,
+    radians=np.radians,
+    arctan2=np.arctan2,
+    maximum=np.maximum,
+    minimum=np.minimum,
+    clip=np.clip,
+    sign=np.sign,
+    isfinite=np.isfinite,
+    asarray=np.asarray,
+    where=np.where,
+    concatenate=np.concatenate,
+)

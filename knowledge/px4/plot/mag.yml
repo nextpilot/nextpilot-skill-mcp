@@ -1,4 +1,4 @@
-﻿id: mag
+id: mag
 title: Raw Magnetic Field Strength
 description: 传感器原始磁场强度（magnetometer_ga），兼容 vehicle_magnetometer / sensor_combined。
 order: 30
@@ -11,7 +11,7 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_magnetometer[0].magnetometer_ga[0]", "sensor_combined[0].magnetometer_ga[0]")
-          - ref("vehicle_magnetometer[0].magnetometer_ga[1]", "sensor_combined[0].magnetometer_ga[1]")
-          - ref("vehicle_magnetometer[0].magnetometer_ga[2]", "sensor_combined[0].magnetometer_ga[2]")
+          - _ref("vehicle_magnetometer.magnetometer_ga[0]", "sensor_combined.magnetometer_ga[0]")
+          - _ref("vehicle_magnetometer.magnetometer_ga[1]", "sensor_combined.magnetometer_ga[1]")
+          - _ref("vehicle_magnetometer.magnetometer_ga[2]", "sensor_combined.magnetometer_ga[2]")
         label: ["X", "Y", "Z"]

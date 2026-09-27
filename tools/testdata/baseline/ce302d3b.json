@@ -7,7 +7,7 @@
   "result": {
     "platform": "PX4",
     "logType": "px4-ulog",
-    "parserVersion": "pyulog/1.1.0",
+    "parserVersion": "pyulog/1.2.4",
     "facts": {
       "durationSec": 632.8,
       "vehicleType": "fixed_wing",
@@ -94,12 +94,6 @@
         "unit": "次"
       },
       {
-        "key": "imuTempRangeC",
-        "label": "IMU 温度跨度",
-        "value": 9.867813110351562,
-        "unit": "°C"
-      },
-      {
         "key": "ekfRejectRatioPct",
         "label": "EKF 拒绝占比",
         "value": 1.1494252873563218,
@@ -116,18 +110,6 @@
         "label": "姿态振荡频率",
         "value": 1.6168452716676067,
         "unit": "Hz"
-      },
-      {
-        "key": "gyroBiasMaxRadS",
-        "label": "陀螺零偏最大",
-        "value": 0.007327626924961805,
-        "unit": "rad/s"
-      },
-      {
-        "key": "gyroBiasDriftRadS",
-        "label": "陀螺零偏漂移",
-        "value": 0.005050195148214698,
-        "unit": "rad/s"
       },
       {
         "key": "windSpeedP95M",
@@ -179,11 +161,6 @@
         "key": "gpsEphP95M",
         "label": "gpsEphP95M",
         "value": 0.0005920000076293946
-      },
-      {
-        "key": "gyroBiasSource",
-        "label": "gyroBiasSource",
-        "value": "estimator_sensor_bias.gyro_bias[]"
       }
     ],
     "tags": [
@@ -211,7 +188,6 @@
       "px4-failsafe-mission_failure",
       "px4-failsafe-nav",
       "px4-mode-thrash",
-      "px4-imu-bias-drift",
       "px4-attitude-overshoot",
       "px4-attitude-oscillation",
       "px4-airspeed-invalid",
@@ -231,6 +207,10 @@
       {
         "ruleId": "px4-motor-unbalance",
         "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "px4-imu-bias-drift",
+        "reason": "本条只在有解锁段时适用"
       }
     ],
     "matchedFaults": [
@@ -381,20 +361,6 @@
         },
         "docUrl": "https://docs.px4.io/main/en/config/battery.html",
         "suggestion": "剩余电量低于 20%，注意返航裕度。"
-      },
-      {
-        "id": "F12",
-        "severity": "warning",
-        "ruleId": "px4-log-warnings",
-        "label": null,
-        "description": "日志中出现 18 条 WARNING 消息",
-        "evidence": {
-          "source": "ulog.logged_messages(log_level=4)",
-          "value": 18,
-          "threshold": 0,
-          "unit": "条"
-        },
-        "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html"
       },
       {
         "id": "F01",

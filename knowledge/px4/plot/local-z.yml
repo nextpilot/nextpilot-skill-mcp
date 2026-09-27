@@ -1,4 +1,4 @@
-﻿id: local-z
+id: local-z
 title: Local Position Z
 description: 局部位置 Z 轴估计值与 setpoint（向上为正）。
 order: 11
@@ -11,9 +11,9 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_local_position[0].z")
+          - vehicle_local_position.z
         label: ["Z Estimated"]
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_local_position_setpoint[0].z")
+          - vehicle_local_position_setpoint.z
         label: ["Z Setpoint"]

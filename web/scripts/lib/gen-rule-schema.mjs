@@ -53,8 +53,8 @@ export function buildRuleSchema({ signatures, facts, vehicles, builtinVars }) {
         "取值表达式：自上而下求值，输出的名字供后面与 triggers 引用。",
         "写法是 Python 的一个真子集（完整语法见 /guide/rule-schema）：",
         "  a, b = f(x, kw=1) / pct = frac * 100 / x if c else y / a and b / not a",
-        '字段引用：topic.field（裸写）或 ref("topic[:].field", alias="x", unit="deg")；',
-        '  ref("新名", "旧名") 是候选组，运行期取第一个存在的。',
+        '字段引用：topic.field（裸写）或 _ref("topic[:].field", alias="x", unit="deg")；',
+        '  _ref("新名", "旧名") 是候选组，运行期取第一个存在的。',
         "⚠ 表达式**内部**（算子名、字段是否存在、单位换算）JSON Schema 查不了，由构建期校验。",
     ].join("\n");
 

@@ -1,4 +1,4 @@
-﻿id: altitude
+id: altitude
 title: Altitude Estimate
 description: GPS / 气压计 / 融合高度估计值与 setpoint。
 order: 2
@@ -19,9 +19,9 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_gps_position[0].altitude_msl_m", "vehicle_gps_position[0].alt", unit="m")
-          - ref("vehicle_air_data[0].baro_alt_meter", "sensor_combined[0].baro_alt_meter")
-          - ref("vehicle_global_position[0].alt")
+          - _ref("vehicle_gps_position.altitude_msl_m", "vehicle_gps_position.alt", unit="m")
+          - _ref("vehicle_air_data.baro_alt_meter", "sensor_combined.baro_alt_meter")
+          - vehicle_global_position.alt
           # - alt_sp
         label:
           - "GPS Altitude (MSL)"

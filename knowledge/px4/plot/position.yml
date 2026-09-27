@@ -1,4 +1,4 @@
-﻿id: position
+id: position
 title: Position
 description: 2D 位置轨迹（vehicle_local_position y vs x），及 setpoint、GPS setpoint。
 order: 1
@@ -15,13 +15,13 @@ outputs:
     children:
       - mode: xyplot
         ydata:
-          - ref("vehicle_local_position[0].y")
-        xdata: ref("vehicle_local_position[0].x")
+          - vehicle_local_position.y
+        xdata: vehicle_local_position.x
         label:
           - Estimated
       - mode: xyplot
         ydata:
-          - ref("vehicle_local_position_setpoint[0].y")
-        xdata: ref("vehicle_local_position_setpoint[0].x")
+          - vehicle_local_position_setpoint.y
+        xdata: vehicle_local_position_setpoint.x
         label:
           - Setpoint

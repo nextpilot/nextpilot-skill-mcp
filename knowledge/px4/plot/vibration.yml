@@ -1,4 +1,4 @@
-﻿id: vibration
+id: vibration
 title: Vibration Metrics
 description: 每个 IMU 的高频振动指标 IMU0-3 合在一张图上，参考线 4.905 / 9.81。
 order: 26
@@ -14,8 +14,8 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("vehicle_imu_status[0].accel_vibration_metric")
-          - ref("vehicle_imu_status[1].accel_vibration_metric")
-          - ref("vehicle_imu_status[2].accel_vibration_metric")
-          - ref("vehicle_imu_status[3].accel_vibration_metric")
+          - vehicle_imu_status.accel_vibration_metric
+          - vehicle_imu_status[1].accel_vibration_metric
+          - vehicle_imu_status[2].accel_vibration_metric
+          - vehicle_imu_status[3].accel_vibration_metric
         label: ["Accel 0 Vibration Level [m/s^2]", "Accel 1 Vibration Level [m/s^2]", "Accel 2 Vibration Level [m/s^2]", "Accel 3 Vibration Level [m/s^2]"]

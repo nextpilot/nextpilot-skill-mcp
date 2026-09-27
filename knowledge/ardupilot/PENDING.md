@@ -1,8 +1,8 @@
 # ArduPilot 知识层：待办与已知缺口
 
 > **先把状态说清楚，免得被误读。**
-> **接线已完成（2026-09）**：`knowledge/ardupilot/` 下的 34 条规则与 `knowledge/px4/`
-> 的 31 条一起进构建产物（构建打印 `65 rules（ardupilot 34 + px4 31）`），跑一份
+> **接线已完成（2026-09）**：`knowledge/ardupilot/` 下的 43 条规则与 `knowledge/px4/`
+> 的 31 条一起进构建产物（构建打印 `74 rules（ardupilot 43 + px4 31）`），跑一份
 > APM `.bin` 会按 `log_type` 自动挑到这一族的知识并出 findings。
 > **但 `facts.yaml` 的 `rule_meta.defaults.status` 仍然是 `draft`**——不是谦虚，
 > 是阈值**没有一条经过真实 `.bin` 日志验证**，目前唯一的证据来自合成样本
@@ -52,7 +52,10 @@
   不含 `"all"` 的条目**直接跳过**。要修就得从 `MODE` 消息切段推阶段
   （`takeoff` / `hover` / `cruise` …），或者把匹配改成不依赖阶段。
 
-## 二、占位总表：1 条
+## 二、占位总表：0 条（2026-09 C1 解除后清零）
+
+C1 于 2026-09 解除（`_FMT_DTYPES` 登记 `n/N/Z` → `"str"`，`get_series()` 对文本列直接返回原始字符串），
+`apm-mode-timeline` 已从占位转为真规则。
 
 占位规则用 `conditions.placeholder` 写：值就是一句"缺什么"的原因文案，引擎跳过本条并
 原样显示它（2026-09-25 起）。
@@ -62,18 +65,12 @@
 > "未实现"伪装成"先决条件命中"，而且字符串里不能出现单引号。`precheck` 退役后换成了
 > 一等字段，这两个毛病都没了。
 
-| 规则 id             | 缺什么能力                                | 补上之后阈值是否现成 |
-| ------------------- | ----------------------------------------- | -------------------- |
-| `apm-mode-timeline` | provider 支持文本列（MODE.Mode 是字符串） | 无阈值，摘要性质     |
-
-原表的另外 5 条 2026-09 已转成真规则，全部靠新增的 `param()`（见第四节 C2 的解法）：
-`apm-config-arming-check` / `apm-config-batt-monitor` / `apm-config-fs-thr` /
-`apm-sensor-rangefinder` / `apm-sensor-gps`。阈值照上游（`==0` / `>0 但无数据`），
-**没有一条经过真实日志验证**。
-
 在此之前算子那批缺口补齐时解锁过 5 条：`apm-battery-sudden-drop`、`apm-attitude-yaw`、
-`apm-motor-imbalance`、`apm-motor-saturation`、`apm-timing-gaps`。
-所以占位从最初的 11 条一路降到现在的 1 条。
+`apm-motor-imbalance`、`apm-motor-saturation`、`apm-timing-gaps`；
+`_cfg()` 例程解锁 5 条参数配置类：`apm-config-arming-check` / `apm-config-batt-monitor` /
+`apm-config-fs-thr` / `apm-sensor-rangefinder` / `apm-sensor-gps`；
+C1 解除后解锁 `apm-mode-timeline` 与 `apm-prearm-*`。
+占位从最初的 11 条一路降到现在的 0 条。
 
 ## 三、算子缺口（2026-09 已补齐）
 
@@ -103,10 +100,10 @@
 
 ## 四、两条既有事实约束（改规则前必读）
 
-| 编号 | 事实                                                                                   | 后果                                                                                                                                                        |
-| ---- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C1   | provider 的 `get_series()` 把文本列 `np.asarray(..., float)` 的失败吞成 `None`         | `MSG.Message` / `MODE.Mode` / `STATUSTEXT.Text` / `PARM.Name` 一律取不到（剩下那 1 条占位卡的就是它）                                                       |
-| C3   | 上游 `FRAME_CLASSES[3]=Octo`（旋翼）与本仓库 `_FRAME_CLASS_MAP[3]=fixed_wing` **冲突** | `conditions.vehicle` 只能填 provider 真产出的 `rotary_wing / fixed_wing / unknown`，**不能写 copter/heli/plane**（引擎只做字符串精确比对，写错就静默 skip） |
+| 编号   | 事实                                                                                                                                                                                     | 后果                                                                                                                                                        |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~C1~~ | ~~provider 的 `get_series()` 把文本列 `np.asarray(..., float)` 的失败吞成 `None`~~ 2026-09 已解除：`_FMT_DTYPES` 已登记 `n/N/Z` → `"str"`，`get_series()` 对文本列直接返回原始字符串序列 | `MSG.Message` / `MODE.Mode` / `STATUSTEXT.Text` / `PARM.Name` 均可取到；`apm-mode-timeline` 与 `prearm` 已解锁                                              |
+| C3     | 上游 `FRAME_CLASSES[3]=Octo`（旋翼）与本仓库 `_FRAME_CLASS_MAP[3]=fixed_wing` **冲突**                                                                                                   | `conditions.vehicle` 只能填 provider 真产出的 `rotary_wing / fixed_wing / unknown`，**不能写 copter/heli/plane**（引擎只做字符串精确比对，写错就静默 skip） |
 
 **C3 有个必须在接线时处理的后果**：上游把电机平衡限制在多旋翼，因为 heli 的 RCOU C1-C4
 是斜盘舵机、"电机平衡"没有意义。而 provider 把 heli 也归到 `rotary_wing`，
@@ -121,19 +118,19 @@
   `get_initial_parameters()`，ardupilot 挂 PARM 消息的**最后一次值**（首现值 =
   初始参数，运行中的变更另在 `get_changed_parameters()`）。规则里**不直接引用**它
   ——表达式没有下标能力。
-- **`param('NAME', default=None)`**：compute 里放行的第 4 个框架调用，与
+- **`_cfg('NAME', default=None)`**：compute 里放行的第 4 个框架调用，与
   `ref` / `_try` / `has_topic` 同级，**不是算子**。参数是一份日志一个值的离散事实，
   算子只收数据、看不见 provider，所以做不成算子。缺失时返回 `default`（不抛异常）——
   "没这个参数"与"参数等于 0"是两件事，写规则时要分开。
-- **构建期同步校验**：`web/scripts/lib/rule-expr.mjs` 认 `param()`（1~2 个实参、
-  首参必须是字符串字面量、次参是字面量兜底、不接受 kwargs），并把 `param` 加进
+- **构建期同步校验**：`web/scripts/lib/rule-expr.mjs` 认 `_cfg()`（1~2 个实参、
+  首参必须是字符串字面量、次参是字面量兜底、不接受 kwargs），并把 `_cfg` 加进
   "非变量名"白名单，否则会被当成未定义的变量报错。
 
 规则里长这样（`config.yaml`）：
 
 ```yaml
 compute:
-  - x = param("ARMING_CHECK")
+  - x = _cfg("ARMING_CHECK")
 when: "x == 0"
 ```
 
@@ -142,7 +139,7 @@ when: "x == 0"
 
 ## 五、draft 状态意味着什么
 
-`facts.yaml` 里 `status: draft` 覆盖全部 34 条。要转成 `stable`，至少做完这些：
+`facts.yaml` 里 `status: draft` 覆盖全部 43 条。要转成 `stable`，至少做完这些：
 
 1. 找一份真实的 APM `.bin`（Copter 优先，最好再来一份 Plane），跑一遍，逐条确认
    **能不能取到数**——这是最大的未知，比阈值准不准更要紧。
@@ -151,7 +148,7 @@ when: "x == 0"
 3. 确认 `XKF4` 与 `NKF4` 在不同固件上的出现情况，以及 `ref` 候选组的挑选是否符合预期。
 4. 确认 `GPS.timestamp`（provider 把 `TimeUS` 改名而来）在规则里真能取到——
    `apm-gps-sats` / `apm-gps-hdop` 的 armed 窗口全靠它。
-5. 阈值回填：电池那条的 `BATT_*_VOLT` 现在**可以**用 `param()` 读了，
+5. 阈值回填：电池那条的 `BATT_*_VOLT` 现在**可以**用 `_cfg()` 读了，
    电芯数估算应当降级成兜底路径。
 6. **参数阈值本身要验**：新转真的 5 条用的都是上游的 `==0` / `>0` 判据，
    目前只在合成样本上见过一次发射（合成样本里 `ARMING_CHECK` / `BATT_MONITOR` /
@@ -162,10 +159,10 @@ when: "x == 0"
 
 - **校验脚本**：2026-09 已把端到端那条固化进 CI——`tools/engine/check_apm_e2e.py`
   挂在 `tools/ci/checklist.yml` 的 push 阶段（`check-apm-e2e`）。它验的是
-  " `.bin` 被认成 `ardupilot-bin`、装载的是 APM 规则、`param()` 取数与兜底、
+  " `.bin` 被认成 `ardupilot-bin`、装载的是 APM 规则、`_cfg()` 取数与兜底、
   4 条参数规则真发射、反例不报、`platform`/`logType` 来自 provider"。
   为什么非要有它：接线这种事**最容易被改回去**，而"进不了产物"没有任何运行时信号，
-  `param()` 少挂一次的表现也只是一条规则静默不发射。
+  `_cfg()` 少挂一次的表现也只是一条规则静默不发射。
   **仍未入库的是静态规则校验脚本**（算子名写错、group 未登记、`when` 里调算子这类），
   当初用它抓出过真错，目前还躺在临时目录里，要固化就搬进 `tools/ci/`。
 - **`doc_urls` 与 `rule_meta.by_group.doc` 的同步**：引擎的 `docUrl` 是单值，
@@ -173,7 +170,7 @@ when: "x == 0"
 - **不建 `fault-kb.yaml`**：它的 `trigger_tags` 必须是引擎真产出过的标签，
   而本轮一条都没在真机上验证过，写了就是编。等验证过再建。排它前面还有两条前置条件
   （都是 2026-09 实测）：
-  - **APM 标签已全部加 `apm_` 前缀**（2026-09-25，34 条规则、24 个标签）。
+  - **APM 标签已全部加 `apm_` 前缀**（2026-09-25，43 条规则、28 个标签）。
     此前两族共用一个命名空间：APM 写 `tag: high_vibration` / `accel_clipping`，
     其中 `high_vibration`、`motor_output_unbalance` 与 PX4 **字面重名**——
     两族同时接线时既分不清来源，也没法各配一份故障库。现在一律是

@@ -12,9 +12,8 @@
 #
 # 另有一处**上游已声明、本轮不修**的风险：上游把这条限制在 copter（多旋翼），
 # 因为 heli 的 RCOU C1-C4 是斜盘舵机、plane 是舵面，"电机平衡"没有意义。
-# 本仓库的 conditions.vehicle 只能填 provider 真产出的 rotary_wing / fixed_wing，
-# 而 heli 在 provider 里也归 rotary_wing（见 facts.yaml 的 C3 冲突），
-# 所以将来接线后这条在直升机上会误报——接线时必须处理，记在 PENDING.md。
+# 引擎 _match_vehicle 支持类别简写，写 vehicle: [copter] 可匹配多旋翼所有精确机型，
+# 但 heli 也在 copter 类别下——将来接线时如要区分，须在 provider 里把 heli 移出 copter。
 
 id: apm-motor-imbalance
 name: 电机输出不平衡

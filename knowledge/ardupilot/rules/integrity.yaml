@@ -1,0 +1,22 @@
+# 日志完整性：上游 ardupilot-mcp 的 checks/integrity.py。
+# 检测 .bin 文件是否被截断或解析出错误——不完整日志上的任何结论都可能是错的，
+# 所以这条 guard 必须在所有其他规则之前跑。
+#
+# 判据来自 provider：
+#   log_ok()  → False = 文件损坏 或 没走到文件尾（_walked_ok）
+#   has_file_corruption → True = 解析过程中遇到坏帧
+# 与 PX4 guard 的做法一致：只打 guard 标签，不产 finding。
+
+id: apm-guard-integrity
+name: 数据质量-日志完整性
+group: guards_early
+order: 1
+
+triggers:
+  - when: not log_ok()
+    severity: guard
+    label: log_incomplete
+    description: "Data quality: log_incomplete"
+    evidence:
+      source: ""
+tag: apm_guard_log_incomplete

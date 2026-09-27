@@ -31,7 +31,7 @@ outputs:
     children:
       - mode: TimeSeries
         ydata:
-          - ref("battery_status[0].voltage_v")
+          - _ref("battery_status[0].voltage_v")
 ```
 
 ## 字段
@@ -66,12 +66,12 @@ outputs:
 
 `axes` 的 child：
 
-| 键                          | 必填 | 说明                                                                                                                                                                                               |
-| --------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mode`                      | ✓    | `TimeSeries`（横轴=时间）｜`xyplot`（横轴=你给的 `xdata`）                                                                                                                                         |
-| `xdata`                     |      | `xyplot` 必填；写了的**优先**，不写才走"自动定时间轴"（见下）                                                                                                                                      |
-| `ydata`                     | ✓    | 要画的线，**YAML 列表、一行一条**（也可以流式 `[甲, 乙]`，但项里带逗号时必须给每项加引号，块列表更省事）。每一项要么是字段引用（`ref(...)` 或裸写 `topic.field`），要么是 `compute` 算出来的变量名 |
-| `label` / `style` / `color` |      | **YAML 列表**，与 `ydata` **逐项对齐**（个数不等就构建失败，报错指出第几项；只有一项也要写 `[甲]`）。`style` 取 `solid｜dashed｜dotted`；`color` 是 `#rrggbb`                                      |
+| 键                          | 必填 | 说明                                                                                                                                                                                                |
+| --------------------------- | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`                      | ✓    | `TimeSeries`（横轴=时间）｜`xyplot`（横轴=你给的 `xdata`）                                                                                                                                          |
+| `xdata`                     |      | `xyplot` 必填；写了的**优先**，不写才走"自动定时间轴"（见下）                                                                                                                                       |
+| `ydata`                     | ✓    | 要画的线，**YAML 列表、一行一条**（也可以流式 `[甲, 乙]`，但项里带逗号时必须给每项加引号，块列表更省事）。每一项要么是字段引用（`_ref(...)` 或裸写 `topic.field`），要么是 `compute` 算出来的变量名 |
+| `label` / `style` / `color` |      | **YAML 列表**，与 `ydata` **逐项对齐**（个数不等就构建失败，报错指出第几项；只有一项也要写 `[甲]`）。`style` 取 `solid｜dashed｜dotted`；`color` 是 `#rrggbb`                                       |
 
 `map` 的 child：`mode: track` + `label` + `max_points` + `lat` / `lon` / `alt`（各一个字段引用，
 **必须写明实例**：同一条轨道的时间戳与 `fix_type` 要跟坐标来自同一个话题的同一个实例）。
@@ -83,7 +83,7 @@ outputs:
 
 1. `ydata` 里**第一个取到数据**的字段引用所在的话题；
 2. 整张图都由 `compute` 算出来时（ydata 全是变量名），从 `compute` 语句里反推**第一个 topic
-   在日志里存在**的引用——`ref("topic.field")` 与裸写的 `topic.field` 都认。
+   在日志里存在**的引用——`_ref("topic.field")` 与裸写的 `topic.field` 都认。
    例：`roll, pitch, yaw = quat_to_euler(vehicle_attitude.q)` → 横轴 = `vehicle_attitude.timestamp`。
 
 **边界（要注意）**：第 2 条是启发式——它挑的是"文字上先出现的、话题存在的引用"，不是"哪条序列
@@ -100,11 +100,11 @@ outputs:
 
 ```yaml
 ydata:
-  - ref("sensor_gps[0].latitude_deg", "vehicle_gps_position[0].latitude_deg", unit="deg")
+  - _ref("sensor_gps[0].latitude_deg", "vehicle_gps_position[0].latitude_deg", unit="deg")
 ```
 
-- **候选组**按顺序取第一个在日志里存在的：字段改名（`ref("新名", "旧名")`）、话题改名
-  （`ref("sensor_gps[0].x", "vehicle_gps_position[0].x")`）都用它——**老固件少个字段不用写回退规则**，
+- **候选组**按顺序取第一个在日志里存在的：字段改名（`_ref("新名", "旧名")`）、话题改名
+  （`_ref("sensor_gps[0].x", "vehicle_gps_position[0].x")`）都用它——**老固件少个字段不用写回退规则**，
   取不到那条线就是 `null`，前端自动不画。
 - **`unit=` 是期望输出单位**，源单位构建期从 `meta/` 查（查不到会告警，补一行到
   `meta/topic-overrides.yaml` 即可）。**只在需要换算时才写**：字段本来就是目标单位就别写

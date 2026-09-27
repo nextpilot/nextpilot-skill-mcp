@@ -1,0 +1,44 @@
+# 校准质量（罗盘）：上游 ardupilot-mcp 的 checks/calibration.py。
+# 判据：罗盘硬铁偏移模长超过 600 mGauss 表示校准很差（critical），
+# 超过 300 mGauss 表示偏移偏大（warning）。只判主罗盘（COMPASS_OFS_X/Y/Z），
+# 其余实例（_OFS2/_OFS3）不做——避免因未安装的次罗盘默认值 0 误报"零偏移"。
+#
+# 上游也查加速度计出厂默认值（INS_ACCSCAL==1.0 且 INS_ACCOFFS==0.0），
+# 那是"从未校准过"的标志。但 Copter 预解锁里已经把"未校准加速度计"挡死了，
+# 加一条规则没有增量信息，本轮不迁。
+
+id: apm-calibration-compass-offset
+name: 罗盘校准偏移
+group: calibration
+order: 1
+
+conditions:
+  message:
+    - PARM
+
+compute:
+  - ofs_x = _cfg("COMPASS_OFS_X", 0.0)
+  - ofs_y = _cfg("COMPASS_OFS_Y", 0.0)
+  - ofs_z = _cfg("COMPASS_OFS_Z", 0.0)
+  - offset_mag = np.hypot(np.hypot(ofs_x, ofs_y), ofs_z)
+
+triggers:
+  - when: "offset_mag > 600.0"
+    severity: critical
+    suggestion: "罗盘硬铁偏移 {offset_mag:.0f} mGauss 远超正常范围（<300 mGauss），校准质量差或安装环境有强磁干扰。重新做一次罗盘校准（Mission Planner 的 Compass 页），确保没有金属物体在附近。"
+    description: 罗盘硬铁偏移 {offset_mag:.0f} mGauss，校准质量差
+    evidence:
+      source: COMPASS_OFS_X/Y/Z(模长)
+      value: f"{offset_mag:.0f}"
+      threshold: 600
+      unit: mGauss
+  - when: "offset_mag > 300.0"
+    severity: warning
+    suggestion: "罗盘硬铁偏移 {offset_mag:.0f} mGauss 偏高（健康范围通常 <300 mGauss）。如果飞行中出现 EKF 航向重置或偏航漂移，重做一次罗盘校准。"
+    description: 罗盘硬铁偏移 {offset_mag:.0f} mGauss，偏大
+    evidence:
+      source: COMPASS_OFS_X/Y/Z(模长)
+      value: f"{offset_mag:.0f}"
+      threshold: 300
+      unit: mGauss
+tag: apm_calibration_compass_large_offset
