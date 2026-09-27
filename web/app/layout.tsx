@@ -13,7 +13,7 @@ import {
 import { THIRD_PARTY_DOMAINS } from "@/lib/seo";
 import "./globals.css";
 
-const defaultTitle = `${SITE_NAME} · 专为飞行控制优化的 AI Skill 与 MCP 平台`;
+const defaultTitle = `${SITE_NAME} · 无人机 AI 技能、MCP服务与智能诊断平台`;
 
 function buildVerification(): Metadata["verification"] {
     const v: Metadata["verification"] = {};

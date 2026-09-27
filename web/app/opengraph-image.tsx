@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 
 export const runtime = "nodejs";
 
-export const alt = "NextPilot Skill — 飞控 AI Skill 与 MCP 平台";
+export const alt = "NextPilot Skill — 无人机 AI 技能、MCP服务与智能诊断平台";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -91,7 +91,7 @@ export default function Image() {
                     marginBottom: 32,
                 }}
             >
-                专为飞行控制优化的 AI Skill 与 MCP 平台
+                无人机 AI 技能、MCP服务与智能诊断平台
             </p>
 
             {/* 底部标签 */}
