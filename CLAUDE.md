@@ -1525,7 +1525,7 @@ AI（Claude / 任何自动化 agent）在执行 `git commit` 和 `git push` 时�
 **第一步：运行 pre-commit 钩子**
 
 ```bash
-.git/hooks/pre-commit
+.githooks/pre-commit
 # 或等效触发（git commit 会自动跑，但 agent 应主动验证）
 ```
 
@@ -1534,7 +1534,7 @@ pre-commit 不绿（退出码非 0）→ **禁止 commit**，先修复它报出�
 **第二步：运行 pre-push 钩子**
 
 ```bash
-.git/hooks/pre-push
+.githooks/pre-push
 # 或等效触发（git push 会自动跑，但 agent 应在 push 前主动验证）
 ```
 

@@ -15,6 +15,7 @@ export function SiteHeader() {
     const switchLanguage = useCallback(() => {
         const nextLang = language === "zh" ? "en" : "zh";
         setLanguage(nextLang);
+        document.cookie = `NEXT_LOCALE=${nextLang};path=/;max-age=31536000;SameSite=Lax`;
         window.location.href = `/${nextLang}${pathname}`;
     }, [language, pathname, setLanguage]);
 

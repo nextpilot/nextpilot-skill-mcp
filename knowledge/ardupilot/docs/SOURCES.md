@@ -25,7 +25,7 @@ MCP spec) on 2026-06-14. Generated from a fan-out verification pass over **198 a
 ## Corrections applied (were wrong → fixed)
 
 | File · location | Claim | Corrected to | Source |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `ardupilot_mcp/ardupilot_meta.py` · line 89-111, EV_IDS | EV Id maps to event names (ARMED=10, DISARMED=11, TAKEOFF=16, LAND_COMPLETE=18, etc.) | Correct ids: EKF_ALT_RESET=60, LAND_CANCELLED_BY_PILOT=61, EKF_YAW_RESET=62, ZIGZAG_STORE_A=71, FENCE_FLOOR_ENABLE=80, SET_SUPERSIMPLE_ON=29; TAKEOFF is not a LogEvent. | [ArduPilot AP_Logger.h LogEvent enum](https://raw.githubusercontent.com/ArduPilot/ardupilot/Copter-4.5.7/libraries/AP_Logger/AP_Logger.h) |
 | `ardupilot_mcp/ardupilot_meta.py` · line 151, HELI_FRAME_CLASSES | FRAME_CLASS values 6, 13, 14 represent traditional helicopters (single/dual/quad heli) | HELI_FRAME_CLASSES = {6, 11, 13} (6=Heli, 11=Heli_Dual, 13=HeliQuad). 14 = Deca (multirotor). | [ArduPilot FRAME_CLASS parameter values](https://autotest.ardupilot.org/Parameters/versioned/Copter/stable-4.5.7/apm.pdef.xml) |
 | `ardupilot_mcp/checks/config.py` · line 32, FS_THR_DISABLED | FS_THR_ENABLE=0 disables the RC/throttle failsafe (copter/plane/heli only) | FS_THR_ENABLE: Copter/Heli only (0=Disabled). Plane uses THR_FAILSAFE instead. | [ArduPilot FS_THR_ENABLE (Copter) vs THR_FAILSAFE (Plane)](https://autotest.ardupilot.org/Parameters/versioned/Plane/stable-4.5.7/apm.pdef.xml) |
@@ -38,7 +38,7 @@ MCP spec) on 2026-06-14. Generated from a fan-out verification pass over **198 a
 ## Confirmed against authoritative sources
 
 | File · location | Claim | Source |
-|---|---|---|
+| --- | --- | --- |
 | `ardupilot_mcp/ardupilot_docs.py` · line 34, versioned_param_doc_url | ArduPilot firmware version 4.0+ has versioned parameter definitions available in archive | [ArduPilot versioned parameter archive](https://autotest.ardupilot.org/Parameters/versioned/Copter/stable-4.5.7/apm.pdef.xml) |
 | `ardupilot_mcp/ardupilot_meta.py` · line 11-37, COPTER_MODES | ArduCopter flight mode numbers 0-27 map to specific mode names (STABILIZE=0, ACRO=1, etc.) | [ArduPilot Copter mode.h Number enum](https://raw.githubusercontent.com/ArduPilot/ardupilot/Copter-4.5.7/ArduCopter/mode.h) |
 | `ardupilot_mcp/ardupilot_meta.py` · line 40-72, ERR_SUBSYSTEMS | ERR Subsys field (1-31) maps to named subsystems (MAIN=1, RADIO=2, etc.) | [ArduPilot AP_Logger.h LogErrorSubsystem enum](https://raw.githubusercontent.com/ArduPilot/ardupilot/Copter-4.5.7/libraries/AP_Logger/AP_Logger.h) |
@@ -129,7 +129,7 @@ MCP spec) on 2026-06-14. Generated from a fan-out verification pass over **198 a
 ## Heuristic thresholds (our conservative choices)
 
 | File · location | Claim | Source |
-|---|---|---|
+| --- | --- | --- |
 | `ardupilot_mcp/ardupilot_meta.py` · line 205-211, estimate_cells (per_cell range 3.3-4.4, min 4.0 V, max 70 V) | Per-cell voltage range 3.3-4.4 V is sane for LiPo batteries; min pack voltage 4.0V, max 70V to detect valid monitor | [Complete Guide to LiPo Battery Voltage - Ufine (4.2 V full, 4.25 specialty, 3.0 floor, 3.2-3.3 cutoff)](https://www.ufinebattery.com/blog/useful-overview-of-lipo-battery-voltage/) |
 | `ardupilot_mcp/checks/calibration.py` · line 45, LARGE_OFFSET_MGAUSS | Compass hard-iron offset magnitude > 600 mGauss indicates poor calibration; healthy < ~300 mGauss | [ArduPilot COMPASS_OFS_X parameter (units mGauss, range -400..400)](https://autotest.ardupilot.org/Parameters/versioned/Copter/stable-4.5.7/apm.pdef.xml) |
 | `ardupilot_mcp/checks/compass.py` · docstring | Clean compass sits well under 0.1 coefficient of variation | [ArduPilot - Diagnosing problems using logs (compass interference)](https://ardupilot.org/copter/docs/common-diagnosing-problems-using-logs.html) |
@@ -138,7 +138,7 @@ MCP spec) on 2026-06-14. Generated from a fan-out verification pass over **198 a
 | `ardupilot_mcp/checks/gps.py` · HDOP_SENTINEL | When there is no fix receiver reports HDOP ~99.99 as sentinel | [ArduPilot AP_GPS.h GPS_UNKNOWN_DOP](https://raw.githubusercontent.com/ArduPilot/ardupilot/Copter-4.5.7/libraries/AP_GPS/AP_GPS.h) |
 | `ardupilot_mcp/checks/gps.py` · line 34-35, SATS_WARN and SATS_CRIT | GPS wants roughly 6+ satellites; below 4 cannot maintain 3D fix | [ArduPilot - Diagnosing problems using logs](https://ardupilot.org/copter/docs/common-diagnosing-problems-using-logs.html) |
 | `ardupilot_mcp/checks/gps.py` · line 42, HDOP_SENTINEL | No-fix receiver reports sentinel HDOP ~99.99, not real dilution | [ArduPilot AP_GPS.h GPS_UNKNOWN_DOP](https://raw.githubusercontent.com/ArduPilot/ardupilot/Copter-4.5.7/libraries/AP_GPS/AP_GPS.h) |
-| `ardupilot_mcp/checks/integrity.py` · _TRUNCATED_FLAG | LogIntegrity.TRUNCATED is flagged numerically as 1.0 | There is no external/canonical standard for this number. It  |
+| `ardupilot_mcp/checks/integrity.py` · _TRUNCATED_FLAG | LogIntegrity.TRUNCATED is flagged numerically as 1.0 | There is no external/canonical standard for this number. It |
 | `ardupilot_mcp/checks/integrity.py` · _PARTIAL_FLAG | LogIntegrity.PARTIAL is flagged numerically as 2.0 | Internal sentinel only, no external authority. Packed into s |
 | `ardupilot_mcp/checks/integrity.py` · _UNKNOWN_FLAG | Unknown LogIntegrity state is flagged numerically as 9.0 | Internal defensive sentinel only, no external authority. 9.0 |
 | `ardupilot_mcp/checks/motors.py` · ACTIVE_MIN_PWM | Channel mean PWM above 1100 us is an active motor; below is idle/unused | [ArduPilot MOT_PWM_MIN/MAX parameter docs](https://autotest.ardupilot.org/Parameters/versioned/Copter/stable-4.5.7/apm.pdef.xml) |
@@ -156,7 +156,7 @@ MCP spec) on 2026-06-14. Generated from a fan-out verification pass over **198 a
 ## Design choices (our severity cut-offs — not external facts)
 
 | File · location | Threshold / choice |
-|---|---|
+| --- | --- |
 | `ardupilot_mcp/checks/attitude.py` · SUSTAINED_S | Divergence held for 1.0 second or more is sustained |
 | `ardupilot_mcp/checks/attitude.py` · CRIT_DEG | Sustained attitude error above 25 degrees is critical loss-of-tracking |
 | `ardupilot_mcp/checks/attitude.py` · WARN_DEG | Sustained attitude error above 15 degrees is concerning |
