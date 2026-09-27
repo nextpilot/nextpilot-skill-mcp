@@ -7,6 +7,7 @@ group: 开发指南
 groupEn: For Developers
 order: 12
 ---
+
 引擎当前内置的 **74 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
 每条给出：**适用**（固件 / 机架 / 依赖）、**取值**（读哪些字段、过哪个算子）、**判定**（自上而下
 命中第一条即发射）、**产出**（写进报告的 check 名、喂故障库匹配的标签、UI 用的统计）。
@@ -33,7 +34,6 @@ order: 12
 - <strong>warning</strong> | `has_invalid and invalid_frac >= 0.10` | threshold 0.1 | description "空速传感器间歇无效（\{invalid_frac:.0%\} 样本）" | label=low_airspeed
 - 产出：airspeedInvalidRatio=invalid_frac, airspeedMinM=tas_min, tag=low_airspeed
 
-
 ## attitude_tracking（group: `attitude_tracking`）
 
 ### apm-attitude-roll — 横滚跟踪误差
@@ -56,17 +56,17 @@ order: 12
 - 文件：`rules/undefined` ｜ 位置：group `attitude_tracking` #1
 - 适用：总是适用
 - 取值：
-- `p99, osc_hz, seg_n = _try(att_tracking_stats(
+- `p99, osc_hz, seg_n = \_try(att_tracking_stats(
   att_q=vehicle_attitude.q,
-  # 指令源：两路都给，**有 q_d 就用 q_d**（新版只记它），没有才回退 roll/pitch_body。
-  # 顺序由算子定，规则不用管版本——按存在性挑，不按版本号挑。
-  sp_q=_ref("vehicle_attitude_setpoint.q_d"),
-  sp_roll=_ref("vehicle_attitude_setpoint.roll_body"),
-  sp_pitch=_ref("vehicle_attitude_setpoint.pitch_body"),
-  att_ts=vehicle_attitude.timestamp,
-  sp_ts=vehicle_attitude_setpoint.timestamp,
-  intervals=ARMED_INTERVALS,
-  tilt_min_deg=10.0, min_samples=50, sample_rate=50))`
+    # 指令源：两路都给，**有 q_d 就用 q_d**（新版只记它），没有才回退 roll/pitch_body。
+    # 顺序由算子定，规则不用管版本——按存在性挑，不按版本号挑。
+    sp_q=\_ref("vehicle_attitude_setpoint.q_d"),
+    sp_roll=\_ref("vehicle_attitude_setpoint.roll_body"),
+    sp_pitch=\_ref("vehicle_attitude_setpoint.pitch_body"),
+    att_ts=vehicle_attitude.timestamp,
+    sp_ts=vehicle_attitude_setpoint.timestamp,
+    intervals=ARMED_INTERVALS,
+    tilt_min_deg=10.0, min_samples=50, sample_rate=50))`
 - `seg_ok = seg_n > 50 if seg_n else False`
 - `p99_stat = p99 if seg_ok else None`
 - `osc_stat = osc_hz if seg_ok else None`
@@ -97,17 +97,17 @@ order: 12
 - 文件：`rules/undefined` ｜ 位置：group `attitude_tracking` #2
 - 适用：总是适用
 - 取值：
-- `p99, osc_hz, seg_n = _try(att_tracking_stats(
+- `p99, osc_hz, seg_n = \_try(att_tracking_stats(
   att_q=vehicle_attitude.q,
-  # 指令源：两路都给，**有 q_d 就用 q_d**（新版只记它），没有才回退 roll/pitch_body。
-  # 顺序由算子定，规则不用管版本——按存在性挑，不按版本号挑。
-  sp_q=_ref("vehicle_attitude_setpoint.q_d"),
-  sp_roll=_ref("vehicle_attitude_setpoint.roll_body"),
-  sp_pitch=_ref("vehicle_attitude_setpoint.pitch_body"),
-  att_ts=vehicle_attitude.timestamp,
-  sp_ts=vehicle_attitude_setpoint.timestamp,
-  intervals=ARMED_INTERVALS,
-  tilt_min_deg=10.0, min_samples=50, sample_rate=50))`
+    # 指令源：两路都给，**有 q_d 就用 q_d**（新版只记它），没有才回退 roll/pitch_body。
+    # 顺序由算子定，规则不用管版本——按存在性挑，不按版本号挑。
+    sp_q=\_ref("vehicle_attitude_setpoint.q_d"),
+    sp_roll=\_ref("vehicle_attitude_setpoint.roll_body"),
+    sp_pitch=\_ref("vehicle_attitude_setpoint.pitch_body"),
+    att_ts=vehicle_attitude.timestamp,
+    sp_ts=vehicle_attitude_setpoint.timestamp,
+    intervals=ARMED_INTERVALS,
+    tilt_min_deg=10.0, min_samples=50, sample_rate=50))`
 - `seg_ok = seg_n > 50 if seg_n else False`
 - `p99_stat = p99 if seg_ok else None`
 - `osc_stat = osc_hz if seg_ok else None`
@@ -130,7 +130,6 @@ order: 12
 - <strong>warning</strong> | `dur_s >= 1.0` | threshold 15 | unit deg | description "航向持续偏离指令 \{dur_s:.1f\} s，误差峰值 \{peak:.0f\}°（t=\{start_s:.1f\}s）"
 - <strong>warning</strong> | `peak_yaw > 30.0` | threshold 30 | unit deg | description "航向跟踪误差瞬时尖峰 \{peak_yaw:.0f\}°"
 - 产出：tag=apm_attitude_tracking_error
-
 
 ## battery（group: `battery`）
 
@@ -216,7 +215,6 @@ order: 12
 - <strong>warning</strong> | `rem <= 0.20` | threshold 0.2 | description "电池剩余电量偏低（\{rem_pct:.0f\}%）"
 - 产出：batteryRemainingMin=rem, tag=battery_voltage_drop
 
-
 ## calibration（group: `calibration`）
 
 ### apm-calibration-compass-offset — 罗盘校准偏移
@@ -232,7 +230,6 @@ order: 12
 - <strong>critical</strong> | `offset_mag > 600.0` | threshold 600 | unit mGauss | description "罗盘硬铁偏移 \{offset_mag:.0f\} mGauss，校准质量差"
 - <strong>warning</strong> | `offset_mag > 300.0` | threshold 300 | unit mGauss | description "罗盘硬铁偏移 \{offset_mag:.0f\} mGauss，偏大"
 - 产出：tag=apm_calibration_compass_large_offset
-
 
 ## compass（group: `compass`）
 
@@ -250,7 +247,6 @@ order: 12
 - <strong>critical</strong> | `cv_mag > 0.60 and n_mag >= 10` | threshold 0.6 | description "罗盘场强极不稳定，变异系数 \{cv_mag:.2f\}（\{mean_mag:.0f\} mGauss 均值上摆动）"
 - <strong>warning</strong> | `(cv_mag > 0.30 or range_ratio > 0.60) and n_mag >= 10` | threshold 0.3 | description "罗盘场强摆动偏大，变异系数 \{cv_mag:.2f\}、极差比 \{range_ratio:.2f\}（均值 \{mean_mag:.0f\} mGauss）"
 - 产出：tag=apm_compass_interference
-
 
 ## config_safety（group: `config_safety`）
 
@@ -284,7 +280,6 @@ order: 12
 - <strong>info</strong> | `fs_thr_enable == 0` | threshold 0 | description "油门失效保护被禁用（FS_THR_ENABLE=0）"
 - 产出：tag=apm_config_thr_failsafe_disabled
 
-
 ## cpu（group: `cpu`）
 
 ### px4-cpu-load — CPU 负载
@@ -297,7 +292,6 @@ order: 12
 - <strong>critical</strong> | `cpu_max >= 0.95` | threshold 0.95 | description "CPU 负载峰值 \{cpu_max:.0%\} 超阈值"
 - <strong>warning</strong> | `cpu_max >= 0.90` | threshold 0.9 | description "CPU 负载峰值 \{cpu_max:.0%\} 偏高"
 - 产出：cpuLoadMax=cpu_max
-
 
 ## ekf_faults（group: `ekf_faults`）
 
@@ -314,7 +308,6 @@ order: 12
 - <strong>info</strong> | `fault_union > 0 and not crit_bits` | threshold 0 | description "EKF 报告非核心辅助传感器融合拒绝（filter_fault_flags=\{fault_union\}，常见为未使用视觉/光流）"
 - 产出：tag=ekf_innovation_failure
 
-
 ## ekf_innovations（group: `ekf_innovations`）
 
 ### px4-ekf-innovation — EKF 创新检验
@@ -323,28 +316,27 @@ order: 12
 - 适用：总是适用
 - 取值：
 - `frac, names, inst = worst_reject_ratio(
-  _ref("estimator_status[:].innovation_check_flags"),
-  _ref("estimator_status[:].vel_test_ratio"),
-  _ref("estimator_status[:].pos_test_ratio"),
-  _ref("estimator_status[:].hgt_test_ratio"),
-  _ref("estimator_status[:].hdg_test_ratio"),
-  _ref("estimator_status[:].mag_test_ratio"),
-  _ref("estimator_status[:].tas_test_ratio"),
-  _ref("estimator_status[:].hagl_test_ratio"),
-  _ref("estimator_status[:].beta_test_ratio"),
-  primary_min=3,
-  primary_names=["速度", "水平位置", "垂直位置", "磁罗盘 X", "磁罗盘 Y", "磁罗盘 Z",
-                 "航向", "空速", "侧滑", "离地高度", "光流 X", "光流 Y"],
-  ge=1.0,                    # 通道判拒阈值：ratio >= 1 即该路观测被 EKF 拒绝
-  channel_min=3,             # 通道最少被拒样本数，去偶发尖峰毛刺
-  channel_labels=["速度", "水平位置", "垂直高度", "航向", "磁罗盘", "空速", "离地高度", "侧滑"],
-  fallback_label="未知通道")`
+_ref("estimator_status[:].innovation_check_flags"),
+_ref("estimator_status[:].vel_test_ratio"),
+_ref("estimator_status[:].pos_test_ratio"),
+_ref("estimator_status[:].hgt_test_ratio"),
+_ref("estimator_status[:].hdg_test_ratio"),
+_ref("estimator_status[:].mag_test_ratio"),
+_ref("estimator_status[:].tas_test_ratio"),
+_ref("estimator_status[:].hagl_test_ratio"),
+_ref("estimator_status[:].beta_test_ratio"),
+primary_min=3,
+primary_names=["速度", "水平位置", "垂直位置", "磁罗盘 X", "磁罗盘 Y", "磁罗盘 Z",
+               "航向", "空速", "侧滑", "离地高度", "光流 X", "光流 Y"],
+ge=1.0,                    # 通道判拒阈值：ratio >= 1 即该路观测被 EKF 拒绝
+channel_min=3,             # 通道最少被拒样本数，去偶发尖峰毛刺
+channel_labels=["速度", "水平位置", "垂直高度", "航向", "磁罗盘", "空速", "离地高度", "侧滑"],
+fallback_label="未知通道")`
 - `pct = frac * 100`
 - 判定：
 - <strong>critical</strong> | `pct >= 5.0` | threshold 5 | unit % | description "EKF 创新检验持续失败（estimator #\{inst\}：\{names\}）"
 - <strong>warning</strong> | `pct >= 1.0` | threshold 1 | unit % | description "EKF 创新检验偶发失败（estimator #\{inst\}：\{names\}）"
 - 产出：ekfRejectRatioPct=pct, tag=ekf_innovation_failure
-
 
 ## ekf_variance（group: `ekf_variance`）
 
@@ -392,7 +384,6 @@ order: 12
 - <strong>warning</strong> | `sm_max > 0.8` | threshold 0.8 | description "EKF 磁罗盘检验比偏高，峰值 \{sm_max:.2f\}"
 - 产出：tag=apm_ekf_variance_high
 
-
 ## events（group: `events`）
 
 ### apm-err-subsystem — 子系统错误（ERR）
@@ -435,7 +426,6 @@ order: 12
 - 判定：
 - <strong>info</strong> | `change_count > 0` | threshold 0 | unit 次切换 | description "共 \{change_count\} 次模式切换（\{n_modes\} 条 MODE 消息，日志全程 \{DURATION_S:.0f\}s）"
 - 产出：-
-
 
 ## failsafe（group: `failsafe`）
 
@@ -498,7 +488,6 @@ order: 12
 - 判定：
 - <strong>critical</strong> | `True` | description "飞行中导航状态切换为 \{name\}（t=\{t_s:.1f\}s）" | label=failsafe
 - 产出：-
-
 
 ## gps_health（group: `gps_health`）
 
@@ -573,7 +562,6 @@ order: 12
 - <strong>warning</strong> | `njump >= 3` | threshold 3 | unit 次 | description "GPS 位置出现 \{njump\} 次异常跳变（>50 m/s）" | label=gps_jump
 - 产出：gpsJumpCount=njump, tag=gps_jump
 
-
 ## 数据质量 guard（group: `guards`）
 
 ### px4-guard-restart — 数据质量-中途重启
@@ -593,9 +581,12 @@ order: 12
 - 取值：
 - （无 compute）
 - 判定：
-- <strong>guard</strong> | `not has_topic('vehicle_status')` | description "Data quality: topic_missing:vehicle_status" | label=topic_missing:vehicle_status
-- <strong>guard</strong> | `not has_topic('battery_status')` | description "Data quality: topic_missing:battery_status" | label=topic_missing:battery_status
-- <strong>guard</strong> | `not has_topic('estimator_status')` | description "Data quality: topic_missing:estimator_status" | label=topic_missing:estimator_status
+- <strong>guard</strong> | `not has_topic('vehicle_status')` | description "Data quality: topic_missing:vehicle_status"
+  | label=topic_missing:vehicle_status
+- <strong>guard</strong> | `not has_topic('battery_status')` | description "Data quality: topic_missing:battery_status"
+  | label=topic_missing:battery_status
+- <strong>guard</strong> | `not has_topic('estimator_status')` | description "Data quality:
+  topic_missing:estimator_status" | label=topic_missing:estimator_status
 - 产出：-
 
 ### px4-guard-log-dropouts — 数据质量-日志丢包
@@ -607,7 +598,6 @@ order: 12
 - 判定：
 - <strong>guard</strong> | `DROPOUT_MS > 1000` | description "Data quality: log_dropouts_high" | label=log_dropouts_high
 - 产出：-
-
 
 ## 数据质量 guard（最早执行）（group: `guards_early`）
 
@@ -632,7 +622,6 @@ order: 12
 - <strong>guard</strong> | `ARMED_S == 0 and DURATION_S < 60` | description "Data quality: insufficient_data" | label=insufficient_data
 - 产出：-
 
-
 ## imu_bias（group: `imu_bias`）
 
 ### px4-imu-bias-drift — 陀螺零偏漂移
@@ -641,8 +630,8 @@ order: 12
 - 适用：总是适用
 - 取值：
 - `bx, by, bz, bts, src_text = _try(gyro_bias_series( estimator_sensor_bias.gyro_bias, estimator_sensor_bias.timestamp, estimator_states.states, estimator_states.timestamp, estimator_status.states, estimator_status.timestamp, slot=10, sources=["estimator_sensor_bias.gyro_bias[]",
-         "estimator_states.states[10..12]",
-         "estimator_status.states[10..12]"]))`
+       "estimator_states.states[10..12]",
+       "estimator_status.states[10..12]"]))`
 - `worst_abs, worst_axis, worst_drift, drift_axis = gyro_bias_worst( bx, by, bz, bts, ARMED_INTERVALS, labels=["X", "Y", "Z"], min_count=10)`
 - `temp_range = _try(max_temp_range(vehicle_imu_status.temperature_gyro, vehicle_air_data.ambient_temperature))`
 - `bias_stat = _try(np.maximum(worst_abs, worst_drift))`
@@ -651,7 +640,6 @@ order: 12
 - <strong>warning</strong> | `worst_abs >= 0.02 or worst_drift >= 0.02` | threshold 0.02 | unit rad/s | description "陀螺零偏异常（轴 \{worst_axis\}：绝对值 \{worst_abs:.4f\} rad/s，漂移 \{worst_drift:.4f\} rad/s）" | label=imu_bias_drift
 - <strong>guard</strong> | `temp_range >= 15` | description "Data quality: temperature_change_large" | label=temperature_change_large
 - 产出：gyroBiasMaxRadS=worst_abs, gyroBiasDriftRadS=worst_drift, gyroBiasSource=src_text, imuTempRangeC=temp_range, tag=imu_bias_drift
-
 
 ## logged_messages（group: `logged_messages`）
 
@@ -677,7 +665,6 @@ order: 12
 - <strong>warning</strong> | `n > 0` | threshold 0 | unit 条 | description "日志中出现 \{n\} 条 WARNING 消息"
 - 产出：-
 
-
 ## mode_thrash（group: `mode_thrash`）
 
 ### px4-mode-thrash — 飞行模式抖动
@@ -689,7 +676,6 @@ order: 12
 - 判定：
 - <strong>warning</strong> | `n_changes > 12` | threshold 12 | unit 次 | description "飞行模式切换 \{n_changes\} 次（>12），可能存在模式抖动"
 - 产出：navStateChanges=n_changes
-
 
 ## motor_balance（group: `motor_balance`）
 
@@ -732,7 +718,6 @@ order: 12
 - <strong>critical</strong> | `frac > 0.50` | threshold 0.5 | unit % | description "电机 \{channel\} 号通道长时间满舵（均值 \{mean:.0f\} us）"
 - <strong>warning</strong> | `True` | threshold 0.2 | unit % | description "电机 \{channel\} 号通道接近满舵（均值 \{mean:.0f\} us）"
 - 产出：tag=apm_motor_output_saturated
-
 
 ## param_audit（group: `param_audit`）
 
@@ -809,7 +794,6 @@ order: 12
 - <strong>warning</strong> | `fence_enable == 1 and fence_alt <= 0.0 and fence_radius <= 0.0` | threshold 非空边界 | description "围栏已启用但没有高度或半径边界"
 - 产出：tag=apm_param_fence_empty
 
-
 ## prearm_messages（group: `prearm_messages`）
 
 ### apm-prearm-warnings — 预解锁/启动消息扫描
@@ -839,7 +823,6 @@ order: 12
 - <strong>warning</strong> | `total_warn > 0` | threshold 0 | unit 条 | description "启动阶段 \{total_warn\} 条预解锁/错误消息"
 - 产出：tag=apm_prearm_warnings
 
-
 ## rc_input（group: `rc_input`）
 
 ### apm-rcin-link-loss — 遥控输入链路
@@ -859,7 +842,6 @@ order: 12
 - <strong>critical</strong> | `duration_s >= 2.0 or end_s >= DURATION_S - 1.0` | threshold 1000 | unit us | description "四个主通道持续低于 1000us，持续 \{duration_s:.1f\}s（t=\{start_s:.1f\}s 起）"
 - <strong>warning</strong> | `True` | threshold 1000 | unit us | description "四个主通道同时低于 1000us，持续 \{duration_s:.1f\}s（t=\{start_s:.1f\}s 起，共 \{lost_samples\} 个样本）"
 - 产出：tag=apm_rc_link_loss
-
 
 ## sensor_health（group: `sensor_health`）
 
@@ -894,7 +876,6 @@ order: 12
 - <strong>warning</strong> | `unhealthy_ratio > 0.20` | threshold 0.2 | description "罗盘不健康样本占比 \{unhealthy_ratio:.0%\}"
 - 产出：tag=apm_compass_unhealthy
 
-
 ## timing（group: `timing`）
 
 ### apm-timing-gaps — 日志间隙
@@ -917,7 +898,6 @@ order: 12
 - 判定：
 - <strong>warning</strong> | `long_loops > 0` | threshold 0 | unit 次 | description "调度记录到 \{long_loops:.0f\} 次长循环"
 - 产出：tag=apm_scheduler_long_loops
-
 
 ## vibration（group: `vibration`）
 
@@ -942,7 +922,7 @@ order: 12
 - 适用：总是适用
 - 取值：
 - `vibe_mean, vibe_p95, vibe_max, imu_idx = worst_mean_stats(
-  _ref("vehicle_imu_status[:].accel_vibration_metric"), min_mean=0)`
+_ref("vehicle_imu_status[:].accel_vibration_metric"), min_mean=0)`
 - 判定：
 - <strong>critical</strong> | `vibe_mean >= 9.81` | threshold 9.81 | unit m/s^2 | description "高频振动严重超标（IMU #\{imu_idx\}）"
 - <strong>warning</strong> | `vibe_mean >= 4.905` | threshold 4.905 | unit m/s^2 | description "高频振动偏大（IMU #\{imu_idx\}）"
@@ -984,7 +964,7 @@ order: 12
 - 适用：总是适用
 - 取值：
 - `clip, clip_idx, clip_axis = worst_column_delta(
-  _ref("vehicle_imu_status[:].accel_clipping", alias="clipping"))`
+_ref("vehicle_imu_status[:].accel_clipping", alias="clipping"))`
 - `clip_stat = clip if clip > 0 else None`
 - 判定：
 - <strong>critical</strong> | `clip >= 1000` | threshold 1000 | unit count | description "加速度计削波严重：IMU #\{clip_idx\} 轴 \{clip_axis\} 全日志累计削波 \{clip\} 次（理想值为 0）"
@@ -1025,7 +1005,6 @@ order: 12
 - <strong>warning</strong> | `clip2_total > 0.0` | threshold 0 | unit 次 | description "IMU2 削波 \{clip2_total:.0f\} 次"
 - 产出：tag=apm_accel_clipping
 
-
 ## vtol_transition（group: `vtol_transition`）
 
 ### px4-vtol-transition-attitude — VTOL 转换姿态越限
@@ -1045,7 +1024,6 @@ order: 12
 - <strong>warning</strong> | `has_tilt and enough and tilt_max > 8.0` | threshold 8 | unit ° | description "VTOL 转换阶段姿态越限（最大 \{tilt_max:.1f\}°，限值 8°）" | label=vtol_convert_attitude_over
 - 产出：vtolTransitionSamples=trans_n, vtolTransitionMaxTiltDeg=tilt_stat, tag=vtol_convert_attitude_over
 
-
 ## wind_estimate（group: `wind_estimate`）
 
 ### px4-wind-estimate — 风扰估计
@@ -1054,11 +1032,11 @@ order: 12
 - 适用：总是适用
 - 取值：
 - `w_p95 = percentile(
-  np.hypot(coalesce(estimator_wind.windspeed_north,
-                 wind_estimate.windspeed_north),
-        coalesce(estimator_wind.windspeed_east,
-                 wind_estimate.windspeed_east)),
-  p=95)`
+np.hypot(coalesce(estimator_wind.windspeed_north,
+               wind_estimate.windspeed_north),
+      coalesce(estimator_wind.windspeed_east,
+               wind_estimate.windspeed_east)),
+p=95)`
 - 判定：
 - <strong>warning</strong> | `w_p95 >= 12.0` | threshold 8 | unit m/s | description "估计风速较大（p95 \{w_p95:.1f\} m/s）" | label=wind_disturb
 - <strong>info</strong> | `w_p95 >= 8.0` | threshold 8 | unit m/s | description "估计风速偏大（p95 \{w_p95:.1f\} m/s）" | label=wind_disturb

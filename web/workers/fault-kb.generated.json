@@ -6,17 +6,10 @@
         "id": "F001",
         "name": "high_vibration",
         "description": "机身高频振动超标，可能影响IMU数据质量和姿态控制精度",
-        "vehicle": [
-          "multirotor",
-          "vtol"
-        ],
+        "vehicle": ["multirotor", "vtol"],
         "phase": "any",
-        "trigger": [
-          "high_vibration"
-        ],
-        "exclude_triggers": [
-          "collision_detected"
-        ],
+        "trigger": ["high_vibration"],
+        "exclude_triggers": ["collision_detected"],
         "exclude_notes": {
           "collision_detected": "碰撞后的振动是\"果\"而非\"因\"，优先排查撞击损伤"
         },
@@ -39,19 +32,10 @@
         "id": "F002",
         "name": "gps_jump",
         "description": "GPS位置发生跳变或定位精度异常下降，可能导致定点悬停漂移或返航偏差",
-        "vehicle": [
-          "multirotor",
-          "vtol"
-        ],
+        "vehicle": ["multirotor", "vtol"],
         "phase": "any",
-        "trigger": [
-          "gps_jump",
-          "gps_eph_high"
-        ],
-        "exclude_triggers": [
-          "collision_detected",
-          "flight_in_door"
-        ],
+        "trigger": ["gps_jump", "gps_eph_high"],
+        "exclude_triggers": ["collision_detected", "flight_in_door"],
         "exclude_notes": {
           "collision_detected": "碰撞时GPS定位精度下降，不判定故障",
           "flight_in_door": "室内环境GPS跳变属于正常现象，不判定故障"
@@ -75,16 +59,10 @@
         "id": "F003",
         "name": "vtol_convert_attitude_over",
         "description": "VTOL转换过程中姿态角度超出安全范围，可能导致转换失败或失控",
-        "vehicle": [
-          "vtol"
-        ],
+        "vehicle": ["vtol"],
         "phase": "any",
-        "trigger": [
-          "vtol_convert_attitude_over"
-        ],
-        "exclude_triggers": [
-          "wind_strong"
-        ],
+        "trigger": ["vtol_convert_attitude_over"],
+        "exclude_triggers": ["wind_strong"],
         "exclude_notes": {
           "wind_strong": "强风环境下姿态超限，优先判定环境扰动，不要直接修改参数"
         },
@@ -105,14 +83,9 @@
         "id": "F004",
         "name": "battery_voltage_drop",
         "description": "飞行中电池电压持续骤降，可能导致动力不足或触发低电压保护",
-        "vehicle": [
-          "multirotor",
-          "vtol"
-        ],
+        "vehicle": ["multirotor", "vtol"],
         "phase": "any",
-        "trigger": [
-          "battery_voltage_drop"
-        ],
+        "trigger": ["battery_voltage_drop"],
         "exclude_triggers": [],
         "exclude_notes": {},
         "risk_level": "高",
@@ -133,17 +106,10 @@
         "id": "F005",
         "name": "imu_bias_drift",
         "description": "IMU偏置在飞行中持续漂移，影响姿态解算精度",
-        "vehicle": [
-          "multirotor",
-          "vtol"
-        ],
+        "vehicle": ["multirotor", "vtol"],
         "phase": "any",
-        "trigger": [
-          "imu_bias_drift"
-        ],
-        "exclude_triggers": [
-          "temperature_change_large"
-        ],
+        "trigger": ["imu_bias_drift"],
+        "exclude_triggers": ["temperature_change_large"],
         "exclude_notes": {
           "temperature_change_large": "温度剧烈变化场景漂移属于物理现象，优先排除温度因素"
         },
@@ -164,29 +130,16 @@
         "id": "F006",
         "name": "attitude_overshoot",
         "description": "姿态控制出现超调震荡，影响飞行稳定性和操控手感",
-        "vehicle": [
-          "multirotor",
-          "vtol"
-        ],
+        "vehicle": ["multirotor", "vtol"],
         "phase": "any",
-        "trigger": [
-          "attitude_overshoot"
-        ],
-        "exclude_triggers": [
-          "wind_strong"
-        ],
+        "trigger": ["attitude_overshoot"],
+        "exclude_triggers": ["wind_strong"],
         "exclude_notes": {
           "wind_strong": "大风环境下超调优先归为环境扰动，禁止直接大幅度下调PID"
         },
         "risk_level": "中",
-        "possible_root_cause": [
-          "姿态环PID增益过高，系统阻尼不足",
-          "机架共振，激励控制环震荡"
-        ],
-        "troubleshooting_steps": [
-          "适当降低姿态环P增益，优先调阻尼D项",
-          "排查整机共振点，避开控制带宽"
-        ],
+        "possible_root_cause": ["姿态环PID增益过高，系统阻尼不足", "机架共振，激励控制环震荡"],
+        "troubleshooting_steps": ["适当降低姿态环P增益，优先调阻尼D项", "排查整机共振点，避开控制带宽"],
         "doc_urls": []
       },
       {
@@ -195,9 +148,7 @@
         "description": "遥控信号中断或丢失，可能触发失控保护（如返航或降落）",
         "vehicle": [],
         "phase": "any",
-        "trigger": [
-          "rc_lost"
-        ],
+        "trigger": ["rc_lost"],
         "exclude_triggers": [],
         "exclude_notes": {},
         "risk_level": "高",
@@ -218,16 +169,10 @@
         "id": "F008",
         "name": "motor_output_unbalance",
         "description": "悬停状态下各电机输出功率差异过大，表明动力系统存在不对称",
-        "vehicle": [
-          "multirotor"
-        ],
+        "vehicle": ["multirotor"],
         "phase": "any",
-        "trigger": [
-          "motor_output_unbalance"
-        ],
-        "exclude_triggers": [
-          "collision_detected"
-        ],
+        "trigger": ["motor_output_unbalance"],
+        "exclude_triggers": ["collision_detected"],
         "exclude_notes": {
           "collision_detected": "碰撞后机身可能变形，优先排查结构损伤"
         },
@@ -248,27 +193,14 @@
         "id": "F009",
         "name": "low_airspeed",
         "description": "固定翼巡航阶段空速过低，存在失速风险",
-        "vehicle": [
-          "fixed_wing",
-          "vtol"
-        ],
+        "vehicle": ["fixed_wing", "vtol"],
         "phase": "any",
-        "trigger": [
-          "low_airspeed"
-        ],
+        "trigger": ["low_airspeed"],
         "exclude_triggers": [],
         "exclude_notes": {},
         "risk_level": "高",
-        "possible_root_cause": [
-          "空速管堵塞、积水",
-          "空速校准未完成",
-          "总压/静压管路漏气"
-        ],
-        "troubleshooting_steps": [
-          "检查空速管有无异物堵塞",
-          "检查管路接头，确认无漏气",
-          "重新执行空速校准"
-        ],
+        "possible_root_cause": ["空速管堵塞、积水", "空速校准未完成", "总压/静压管路漏气"],
+        "troubleshooting_steps": ["检查空速管有无异物堵塞", "检查管路接头，确认无漏气", "重新执行空速校准"],
         "doc_urls": []
       },
       {
@@ -277,18 +209,12 @@
         "description": "外部强风环境扰动，非机载硬件故障，建议关注飞行安全",
         "vehicle": [],
         "phase": "any",
-        "trigger": [
-          "wind_strong"
-        ],
+        "trigger": ["wind_strong"],
         "exclude_triggers": [],
         "exclude_notes": {},
         "risk_level": "低",
-        "possible_root_cause": [
-          "外部大风环境扰动，非机载故障"
-        ],
-        "troubleshooting_steps": [
-          "记录本场气象数据，大风条件建议缩减任务或停飞"
-        ],
+        "possible_root_cause": ["外部大风环境扰动，非机载故障"],
+        "troubleshooting_steps": ["记录本场气象数据，大风条件建议缩减任务或停飞"],
         "doc_urls": []
       }
     ]
