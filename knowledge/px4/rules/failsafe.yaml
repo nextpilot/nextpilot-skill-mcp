@@ -3,27 +3,134 @@
 # 合并在这里；每条仍是自包含经验，id 即 finding.ruleId（与原实现一致）。
 # 事件列表由 rising_edge_events / step_into_events 产出，框架按 foreach 展开。
 
-- id: px4-failsafe-failsafe
-  name: 失效保护触发
-  group: failsafe
-  order: 1 # failsafe group 内次序与原过程式 bool_fields 列表一致
+id: px4-failsafe-failsafe
+name: 失效保护触发
+group: failsafe
+order: 1 # failsafe group 内次序与原过程式 bool_fields 列表一致
 
-  condition:
-    message:
-      - vehicle_status
+compute:
+  - >-
+    events = rising_edge_events(vehicle_status.failsafe, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)
 
-  compute:
-    - >-
-      events = rising_edge_events(vehicle_status.failsafe, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)
+foreach: { var: events, keys: [ t_s ] }
 
-  foreach: { var: events, keys: [ t_s ] }
+trigger:
+  - when: "True"
+    label: failsafe
+    severity: critical
+    suggestion: "结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"
+    description: 触发失效保护（飞行中，t={t_s:.1f}s）
+    evidence:
+      source: vehicle_status.failsafe
+      value: f"set at {t_s:.1f}s"
 
-  trigger:
-    - when: "True"
-      label: failsafe
-      severity: critical
-      suggestion: "结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"
-      description: 触发失效保护（飞行中，t={t_s:.1f}s）
-      evidence:
-        source: vehicle_status.failsafe
-        value: f"set at {t_s:.1f}s"
+---
+id: px4-failsafe-rc_signal_lost
+name: 遥控信号丢失
+group: failsafe
+order: 2
+
+compute:
+  - >-
+    events = rising_edge_events(vehicle_status.rc_signal_lost, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)
+
+foreach: { var: events, keys: [ t_s ] }
+
+trigger:
+  - when: "True"
+    label: rc_lost
+    severity: warning
+    suggestion: "结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"
+    description: 遥控信号丢失（飞行中，t={t_s:.1f}s）
+    evidence:
+      source: vehicle_status.rc_signal_lost
+      value: f"set at {t_s:.1f}s"
+
+---
+id: px4-failsafe-data_link_lost
+name: 数据链路丢失
+group: failsafe
+order: 3
+
+compute:
+  - >-
+    events = rising_edge_events(vehicle_status.data_link_lost, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)
+
+foreach: { var: events, keys: [ t_s ] }
+
+trigger:
+  - when: "True"
+    severity: warning
+    suggestion: "结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"
+    description: 数据链路丢失（飞行中，t={t_s:.1f}s）
+    evidence:
+      source: vehicle_status.data_link_lost
+      value: f"set at {t_s:.1f}s"
+
+---
+id: px4-failsafe-engine_failure
+name: 动力故障保护
+group: failsafe
+order: 4
+
+compute:
+  - >-
+    events = rising_edge_events(vehicle_status.engine_failure, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)
+
+foreach: { var: events, keys: [ t_s ] }
+
+trigger:
+  - when: "True"
+    severity: critical
+    suggestion: "结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"
+    description: 发动机/动力故障保护（飞行中，t={t_s:.1f}s）
+    evidence:
+      source: vehicle_status.engine_failure
+      value: f"set at {t_s:.1f}s"
+
+---
+id: px4-failsafe-mission_failure
+name: 任务失效保护
+group: failsafe
+order: 5
+
+compute:
+  - >-
+    events = rising_edge_events(vehicle_status.mission_failure, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)
+
+foreach: { var: events, keys: [ t_s ] }
+
+trigger:
+  - when: "True"
+    severity: critical
+    suggestion: "结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"
+    description: 任务失效保护（飞行中，t={t_s:.1f}s）
+    evidence:
+      source: vehicle_status.mission_failure
+      value: f"set at {t_s:.1f}s"
+
+---
+id: px4-failsafe-nav
+name: 失效保护导航状态
+group: failsafe
+order: 6 # 原实现里 nav 分支在 5 个布尔字段之后
+
+condition:
+  message:
+    - vehicle_status
+
+compute:
+  - >-
+    events = step_into_events(vehicle_status.nav_state, vehicle_status.timestamp, ARMED_INTERVALS, T0_US, codes={5: "AUTO_RTL", 12: "DESCEND", 13: "TERMINATION", 18: "LAND"})
+
+foreach: { var: events, keys: [ t_s, code, name ] }
+
+trigger:
+  - when: "True"
+    label: failsafe
+    severity: critical
+    suggestion: "说明飞控进入失效保护状态，需结合前文事件定位触发原因。"
+    description: 飞行中导航状态切换为 {name}（t={t_s:.1f}s）
+    evidence:
+      source: vehicle_status.nav_state
+      value: name

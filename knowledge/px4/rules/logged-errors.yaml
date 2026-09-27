@@ -20,6 +20,7 @@ compute:
 
 trigger:
   - when: "n > 0"
+    label: null
     severity: critical
     suggestion: "按时间顺序核对错误原文，这通常是定位根因最直接的证据。"
     evidence_extra: { samples: samples }

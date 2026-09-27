@@ -8,10 +8,10 @@ id: px4-imu-bias-drift
 name: 陀螺零偏漂移
 group: imu_bias
 order: 1
+tag: imu_bias_drift
 version: 1.1.0
 
 # 没有 armed 段就谈不上"飞行中的零偏"——先决条件直接不跑（原实现外层是 `if armed_intervals:`）。
-tag: imu_bias_drift
 
 condition:
   armed: true

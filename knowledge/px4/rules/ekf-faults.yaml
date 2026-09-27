@@ -30,6 +30,7 @@ trigger:
       threshold: 0
   # 仅非核心位（如未启用视觉）且无核心故障：给 info 提示，不当作故障
   - when: "fault_union > 0 and not crit_bits"
+    label: null
     severity: info
     suggestion: "若该机确实未启用视觉/光流定位，此位可忽略；否则检查对应传感器。"
     description: EKF 报告非核心辅助传感器融合拒绝（filter_fault_flags={fault_union}，常见为未使用视觉/光流）

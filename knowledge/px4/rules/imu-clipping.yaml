@@ -45,6 +45,7 @@ trigger:
       threshold: 100
       unit: count
   - when: "clip > 0"
+    label: null
     severity: info
     suggestion: "少量削波可先观察；频次升高或伴随振动告警需排查机械问题。"
     description: "偶发加速度计削波：IMU #{clip_idx} 轴 {clip_axis} 全日志累计削波 {clip} 次（理想值为 0）"

@@ -6,8 +6,8 @@ id: px4-attitude-oscillation
 name: 姿态误差高频振荡
 group: attitude_tracking
 order: 2
-version: 1.1.0
 tag: attitude_overshoot
+version: 1.1.0
 
 condition:
   message:
@@ -22,9 +22,9 @@ compute:
       att_q=vehicle_attitude.q,
       # 指令源：两路都给，**有 q_d 就用 q_d**（新版只记它），没有才回退 roll/pitch_body。
       # 顺序由算子定，规则不用管版本——按存在性挑，不按版本号挑。
-      sp_q=vehicle_attitude_setpoint.q_d,
-      sp_roll=vehicle_attitude_setpoint.roll_body,
-      sp_pitch=vehicle_attitude_setpoint.pitch_body,
+      sp_q=_ref("vehicle_attitude_setpoint.q_d"),
+      sp_roll=_ref("vehicle_attitude_setpoint.roll_body"),
+      sp_pitch=_ref("vehicle_attitude_setpoint.pitch_body"),
       att_ts=vehicle_attitude.timestamp,
       sp_ts=vehicle_attitude_setpoint.timestamp,
       intervals=ARMED_INTERVALS,
@@ -44,7 +44,7 @@ output:
     round: 2
 
 trigger:
-  - when: "osc_stat >= 4.0 and p99_stat >= 25.0 and VEHICLE == 'fixed_wing'"
+  - when: "osc_stat >= 4.0 and p99_stat >= 25.0 and IS_FIXED_WING"
     label: attitude_overshoot
     severity: warning
     suggestion: "振荡多与控制增益/机架共振相关，禁用大幅调参，先做频响检查。"
@@ -54,7 +54,7 @@ trigger:
       value: f"{osc_stat:.2f}"
       threshold: 4
       unit: Hz
-  - when: "osc_stat >= 4.0 and p99_stat >= 15.0 and not VEHICLE == 'fixed_wing'"
+  - when: "osc_stat >= 4.0 and p99_stat >= 15.0 and not IS_FIXED_WING"
     label: attitude_overshoot
     severity: warning
     suggestion: "振荡多与控制增益/机架共振相关，禁用大幅调参，先做频响检查。"

@@ -125,7 +125,6 @@
     ],
     "tags": [
       "high_vibration",
-      "attitude_overshoot",
       "low_airspeed"
     ],
     "guardTags": [
@@ -180,8 +179,9 @@
     ],
     "matchedFaults": [
       {
-        "faultId": "F001",
-        "faultTag": "high_vibration",
+        "id": "F001",
+        "name": "high_vibration",
+        "description": "机身高频振动超标，可能影响IMU数据质量和姿态控制精度",
         "riskLevel": "中高",
         "possibleRootCause": [
           "螺旋桨破损、变形、动平衡失衡",
@@ -195,32 +195,15 @@
           "复核机架、机臂、电机座紧固件力矩",
           "检查IMU减震组件，确认减震球无开裂硬化"
         ],
-        "note": "日志存在碰撞标记时，本条失效，优先排查撞击损伤",
-        "matchedPhases": [
-          "maneuver",
-          "fw_cruise"
-        ]
+        "docUrls": [],
+        "excludeNotes": {
+          "collision_detected": "碰撞后的振动是\"果\"而非\"因\"，优先排查撞击损伤"
+        }
       },
       {
-        "faultId": "F006",
-        "faultTag": "attitude_overshoot",
-        "riskLevel": "中",
-        "possibleRootCause": [
-          "姿态环PID增益过高，系统阻尼不足",
-          "机架共振，激励控制环震荡"
-        ],
-        "troubleshootingSteps": [
-          "适当降低姿态环P增益，优先调阻尼D项",
-          "排查整机共振点，避开控制带宽"
-        ],
-        "note": "大风环境下超调优先归为环境扰动，禁止直接大幅度下调PID",
-        "matchedPhases": [
-          "maneuver"
-        ]
-      },
-      {
-        "faultId": "F009",
-        "faultTag": "low_airspeed",
+        "id": "F009",
+        "name": "low_airspeed",
+        "description": "固定翼巡航阶段空速过低，存在失速风险",
         "riskLevel": "高",
         "possibleRootCause": [
           "空速管堵塞、积水",
@@ -232,15 +215,13 @@
           "检查管路接头，确认无漏气",
           "重新执行空速校准"
         ],
-        "note": "VTOL固定翼阶段空速失效极易引发失速",
-        "matchedPhases": [
-          "fw_cruise"
-        ]
+        "docUrls": [],
+        "excludeNotes": {}
       }
     ],
     "findings": [
       {
-        "id": "F05",
+        "id": "F04",
         "severity": "critical",
         "ruleId": "px4-airspeed-invalid",
         "label": "low_airspeed",
@@ -284,22 +265,7 @@
         "suggestion": "削波表明振动峰值已超出传感器量程，建议排查机械振动源。"
       },
       {
-        "id": "F04",
-        "severity": "warning",
-        "ruleId": "px4-attitude-overshoot",
-        "label": "attitude_overshoot",
-        "description": "姿态跟踪误差偏大（p99 27.5°）",
-        "evidence": {
-          "source": "vehicle_attitude vs vehicle_attitude_setpoint（机动段）",
-          "value": "27.5",
-          "threshold": 25,
-          "unit": "°"
-        },
-        "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html",
-        "suggestion": "结合故障库 F006 排查；大风环境下优先归因环境扰动。"
-      },
-      {
-        "id": "F06",
+        "id": "F05",
         "severity": "warning",
         "ruleId": "px4-airspeed-invalid",
         "label": "low_airspeed",
@@ -328,7 +294,7 @@
         "suggestion": "少量削波可先观察；频次升高或伴随振动告警需排查机械问题。"
       },
       {
-        "id": "F07",
+        "id": "F06",
         "severity": "guard",
         "ruleId": "px4-guard-topic-missing",
         "label": "topic_missing:battery_status",

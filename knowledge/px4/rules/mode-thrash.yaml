@@ -19,6 +19,7 @@ output:
 
 trigger:
   - when: "n_changes > 12"
+    label: null
     severity: warning
     suggestion: "频繁切模式易诱发操纵混乱；检查遥控器开关与失效保护反复触发。"
     description: 飞行模式切换 {n_changes} 次（>12），可能存在模式抖动

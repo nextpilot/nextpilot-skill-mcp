@@ -215,8 +215,9 @@
     ],
     "matchedFaults": [
       {
-        "faultId": "F004",
-        "faultTag": "battery_voltage_drop",
+        "id": "F004",
+        "name": "battery_voltage_drop",
+        "description": "飞行中电池电压持续骤降，可能导致动力不足或触发低电压保护",
         "riskLevel": "高",
         "possibleRootCause": [
           "电池电芯老化、内阻增大",
@@ -229,11 +230,8 @@
           "检查插头、接线端子有无发热、氧化松动",
           "复核整机起飞重量，确认不超过最大起飞重量"
         ],
-        "note": "大机动动作瞬时压降属于正常，持续压降才判定故障",
-        "matchedPhases": [
-          "hover",
-          "maneuver"
-        ]
+        "docUrls": [],
+        "excludeNotes": {}
       }
     ],
     "findings": [

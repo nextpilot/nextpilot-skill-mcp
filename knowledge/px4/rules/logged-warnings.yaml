@@ -15,6 +15,7 @@ compute:
 
 trigger:
   - when: "n > 0"
+    label: null
     severity: warning
     evidence_extra: { samples: samples }
     description: 日志中出现 {n} 条 WARNING 消息

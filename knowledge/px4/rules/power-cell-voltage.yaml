@@ -6,8 +6,8 @@ id: px4-power-cell-voltage
 name: 单电芯电压
 group: battery
 order: 1 # battery group 内次序：cell-voltage=1, sag=2, remaining=3
-version: 1.1.0
 tag: battery_voltage_drop
+version: 1.1.0
 
 condition:
   message:
@@ -71,6 +71,7 @@ trigger:
       threshold: 3.7
       unit: V/cell
   - when: "no_cell"
+    label: null
     severity: info
     description: 日志缺少电芯电压与 cell_count，未做单电芯判断
     evidence:

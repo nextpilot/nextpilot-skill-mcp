@@ -6,8 +6,8 @@ id: px4-motor-unbalance
 name: 电机输出不平衡
 group: motor_balance
 order: 1
-version: 1.1.0
 tag: motor_output_unbalance
+version: 1.1.0
 
 condition:
   message:

@@ -781,7 +781,7 @@ def _run_rules(group):
             ran(_rid)
 
         # outputs：指标输出（纯数据，数组）
-        for _out_item in _rule.get("outputs") or []:
+        for _out_item in _rule.get("output") or []:
             _v = _env.get(_out_item.get("value"))
             if _v is not None:
                 metrics[_out_item["name"]] = _v
@@ -809,7 +809,7 @@ def _run_rules(group):
                 _tenv = dict(_env)
                 _tenv.update(_item)
 
-            for _trig in _rule.get("triggers") or []:
+            for _trig in _rule.get("trigger") or []:
                 # when 缺省 = True；单值/数组归一化成列表
                 _when_raw = _trig.get("when", "True")
                 _when_list = _when_raw if isinstance(_when_raw, list) else [_when_raw]
