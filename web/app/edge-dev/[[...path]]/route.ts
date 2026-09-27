@@ -1,10 +1,12 @@
 /**
- * 开发环境边缘函数垫片（仅 NODE_ENV=development 生效）。
+ * 边缘函数垫片（dev + prod 均生效）。
  *
- * pnpm dev 只有 Next 自身，不跑 web/functions 的 Edge 函数；通过 next.config 的
- * afterFiles rewrite，把"Next 路由未命中"的 /api/*、/internal/* 转到这里，
- * 用内存 KV（lib/dev/dev-kv）执行同一份 functions/ 处理器代码。
- * 生产构建 NODE_ENV=production，rewrite 不注册且本路由直接 404。
+ * pnpm dev 没有 EdgeOne Functions 运行时，通过 next.config 的 afterFiles rewrite
+ * 把 /api/*、/internal/* 转到这里，用内存 KV（lib/dev/dev-kv）执行 functions/ 代码。
+ *
+ * 生产环境 EdgeOne 的 opennext 适配器生成的 SSR 路由会覆盖边缘函数路由，
+ * /api/* 请求被 SSR 函数劫持后同样 rewrite 到这里，在 Node.js 侧执行同一份
+ * functions/ 代码（KV 由 EdgeOne 平台注入 process.env）。
  */
 import { NextRequest } from "next/server";
 import { installDevKv } from "@/lib/dev/dev-kv";
@@ -44,22 +46,19 @@ const handlers: Record<string, () => Promise<Record<string, unknown>>> = {
     "internal/users/upsert": () => import("@/functions/internal/users/upsert.js"),
     "api/admin/settings": () => import("@/functions/api/admin/settings.js"),
     "internal/settings/get": () => import("@/functions/internal/settings/get.js"),
+    "api/kv-probe": () => import("@/functions/api/kv-probe.js"),
+    "api/issue-probe": () => import("@/functions/api/issue-probe.js"),
 };
 
-// 探针类处理器依赖 EdgeOne 边缘运行时内置模块（如 @edgeone/pages-blob），
-// 仅在开发环境注册，避免生产构建时 Turbopack 解析失败。
+// blob 依赖 @edgeone/pages-blob（EdgeOne 边缘运行时内置模块），
+// 仅开发环境注册，避免生产构建时 Turbopack 解析失败。
+// 生产环境 /api/blob 需要在边缘函数层单独部署。
 if (process.env.NODE_ENV === "development") {
-    handlers["api/kv-probe"] = () => import("@/functions/api/kv-probe.js");
-    handlers["api/issue-probe"] = () => import("@/functions/api/issue-probe.js");
     handlers["api/blob"] = () => import("@/functions/api/blob.js");
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function invoke(req: NextRequest, path: string[]): Promise<Response> {
-    if (process.env.NODE_ENV !== "development") {
-        return new Response("not found", { status: 404 });
-    }
-
     let handlerKey = path.join("/");
     let params: Record<string, string> = {};
     if (!(handlerKey in handlers) && path[0] === "api" && path[1] === "reports" && path.length === 3) {
@@ -69,7 +68,9 @@ async function invoke(req: NextRequest, path: string[]): Promise<Response> {
     const loader = handlers[handlerKey];
     if (!loader) return new Response("not found", { status: 404 });
 
-    installDevKv();
+    if (process.env.NODE_ENV === "development") {
+        installDevKv();
+    }
 
     const env = process.env as unknown as Record<string, string | undefined>;
     const module = await loader();

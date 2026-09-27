@@ -3,8 +3,6 @@ import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import createNextIntlPlugin from "next-intl/plugin";
 
-const isDev = process.env.NODE_ENV === "development";
-
 /**
  * 站点版本：footer 要显示「版本号 + 日期」，这两样都不该由人手写在组件里（写在那里的
  * 版本号一定会忘记改，而它偏偏是"看起来一直正常"的那种错）。
@@ -97,13 +95,14 @@ const nextConfig: NextConfig = {
             afterFiles: [] as { source: string; destination: string }[],
         };
 
-        if (isDev) {
-            rules.afterFiles.push(
-                { source: "/api/:path((?!auth/|skills/).*)", destination: "/edge-dev/api/:path*" },
-                { source: "/internal/:path*", destination: "/edge-dev/internal/:path*" },
-                // 探针已统一迁移到 /api 前缀下（functions/api/），根级路径不再可用。
-            );
-        }
+        // opennext（EdgeOne Next.js 适配器）生成的 SSR 路由会覆盖边缘函数路由，
+        // 导致 /api/* 请求被 SSR 函数劫持，边缘函数无法执行。因此生产环境同样需要
+        // 将 /api/*、/internal/* rewrite 到 edge-dev 垫片，在 SSR 侧运行函数代码。
+        // 排除 auth（NextAuth 需要真实路由）和 skills（需要 node:fs 打包 zip）。
+        rules.afterFiles.push(
+            { source: "/api/:path((?!auth/|skills/).*)", destination: "/edge-dev/api/:path*" },
+            { source: "/internal/:path*", destination: "/edge-dev/internal/:path*" },
+        );
         return rules;
     },
 };
