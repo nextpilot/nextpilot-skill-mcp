@@ -90,6 +90,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 if (record) {
                     token.uid = record.uid;
                     token.plan = record.plan;
+                    // GitHub 个人设置里邮箱可能为私密，OAuth profile 拿不到；
+                    // 但 KV upsert 时如果能从之前的登录记录里取回邮箱，就写回 token，
+                    // 否则管理员白名单依赖 email 就会永远判 false。
+                    if (record.email) token.email = record.email;
                 }
                 token.loginType = "github";
             } else if (user) {

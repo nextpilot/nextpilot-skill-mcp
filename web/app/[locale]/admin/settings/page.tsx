@@ -22,7 +22,36 @@ export const metadata: Metadata = {
 
 export default async function AdminSettingsPage() {
     const session = await auth();
-    if (!session?.user?.isAdmin) notFound();
+
+    // DEBUG: 诊断 /admin/settings 的 session 状态，部署后访问此页会显示详细信息
+    if (!session?.user?.isAdmin) {
+        const envValue = process.env.AUTH_ADMIN_EMAILS ?? "<未设置>";
+        const hasSession = session !== null;
+        const userEmail = session?.user?.email ?? "<无>";
+        const name = session?.user?.name ?? "<无>";
+        const uid = session?.user?.id ?? "<无>";
+        const loginType = (session?.user as { loginType?: string } | undefined)?.loginType ?? "<无>";
+        const isAdmin = String(session?.user?.isAdmin);
+        return (
+            <div className="page-shell py-10">
+                <h1 className="text-xl font-bold text-red-600">Admin Debug</h1>
+                <pre className="mt-4 rounded border border-red-200 bg-red-50 p-4 text-sm leading-relaxed">
+                    {`session 是否为 null = ${!hasSession}
+AUTH_ADMIN_EMAILS     = "${envValue}"
+session.user.email    = "${userEmail}"
+session.user.isAdmin  = ${isAdmin}
+session.user.id       = "${uid}"
+session.user.name     = "${name}"
+session.user.loginType = "${loginType}"
+
+→ 如果 session 为 null，说明 auth() 拿不到 cookie
+→ 如果 isAdmin=false 但 email 在白名单，env var 未生效
+→ 对比 /api/auth/session 的返回值确认差异`}
+                </pre>
+            </div>
+        );
+    }
+    // END DEBUG
 
     // 用脱敏版：这个对象要当 props 传给客户端表单组件，明文密钥会被序列化进页面 HTML
     const settings = await getSiteSettingsForDisplay();
