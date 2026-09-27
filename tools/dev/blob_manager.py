@@ -71,7 +71,7 @@ def _resolve_site(args: argparse.Namespace) -> str:
 
 def _api_url(site: str, workspace: str, params: dict) -> str:
     qs = urllib.parse.urlencode({**params, "store": workspace})
-    return f"{site}/blob?{qs}"
+    return f"{site}/api/blob?{qs}"
 
 
 def _auth_headers() -> dict:
@@ -87,7 +87,7 @@ def _http_err(resp: requests.Response) -> str:
     except Exception:
         err = resp.text[:300]
     if resp.status_code == 404 and "<!DOCTYPE" in str(resp.text[:100]):
-        err = "端点未找到。请先部署 web/functions/blob.js 到 EdgeOne。"
+        err = "端点未找到。请先部署 web/functions/blob.js + app/api/blob/route.ts 到 EdgeOne。"
     return str(err)
 
 
