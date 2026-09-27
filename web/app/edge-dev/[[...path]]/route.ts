@@ -38,19 +38,21 @@ const handlers: Record<string, () => Promise<Record<string, unknown>>> = {
     "api/comments": () => import("@/functions/api/comments.js"),
     "api/favorite": () => import("@/functions/api/favorite.js"),
     "api/download/track": () => import("@/functions/api/download/track.js"),
-    // 浏览器错误上报的唯一入口（见 lib/issue-bridge.ts）。少了它，本地所有报错都无处可去
     "api/issues": () => import("@/functions/api/issues.js"),
     "internal/otp/set": () => import("@/functions/internal/otp/set.js"),
     "internal/otp/consume": () => import("@/functions/internal/otp/consume.js"),
     "internal/users/upsert": () => import("@/functions/internal/users/upsert.js"),
-    // 后台站点设置：GET/POST /api/admin/settings（浏览器直连）+ Node 侧读 KV 的中转
     "api/admin/settings": () => import("@/functions/api/admin/settings.js"),
     "internal/settings/get": () => import("@/functions/internal/settings/get.js"),
-    // 探针（统一在 /api 前缀下，根级路径不再可用）
-    "api/kv-probe": () => import("@/functions/api/kv-probe.js"),
-    "api/issue-probe": () => import("@/functions/api/issue-probe.js"),
-    "api/blob": () => import("@/functions/api/blob.js"),
 };
+
+// 探针类处理器依赖 EdgeOne 边缘运行时内置模块（如 @edgeone/pages-blob），
+// 仅在开发环境注册，避免生产构建时 Turbopack 解析失败。
+if (process.env.NODE_ENV === "development") {
+    handlers["api/kv-probe"] = () => import("@/functions/api/kv-probe.js");
+    handlers["api/issue-probe"] = () => import("@/functions/api/issue-probe.js");
+    handlers["api/blob"] = () => import("@/functions/api/blob.js");
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function invoke(req: NextRequest, path: string[]): Promise<Response> {
