@@ -11,8 +11,6 @@
 import { getKv, sanitizeId } from "../../_lib/kv.js";
 import { jsonResponse, readJson } from "../../_lib/http.js";
 import { getSessionUser, isAdminSession } from "../../_lib/auth.js";
-import { hkdf } from "../../_lib/hkdf.js";
-import { jwtDecrypt } from "jose";
 import {
     SETTINGS_KEY,
     SETTINGS_LOG_PREFIX,
@@ -24,72 +22,7 @@ import {
 
 export async function onRequestGet({ request, env }) {
     const session = await getSessionUser(request, env);
-
-    // DEBUG: 诊断边缘函数侧鉴权失败原因，部署后确认，随后删除
-    if (!isAdminSession(session, env)) {
-        const cookieHeader = request.headers.get("cookie") ?? "";
-        const hasCookie = cookieHeader.length > 0;
-        const hasSession = session !== null;
-        const email = session?.email ?? null;
-        const isAdminFromJwt = session?.isAdmin;
-        const envEmailList = String(env?.AUTH_ADMIN_EMAILS ?? "");
-        const secret = env?.AUTH_SESSION_SECRET;
-
-        // 直接尝试解密，捕获具体异常
-        let decryptError = null;
-        let decryptPayloadKeys = null;
-        const cookies = Object.fromEntries(
-            cookieHeader
-                .split(";")
-                .map((p) => {
-                    const i = p.indexOf("=");
-                    return i < 0 ? null : [p.slice(0, i).trim(), decodeURIComponent(p.slice(i + 1).trim())];
-                })
-                .filter(Boolean),
-        );
-        const TOKEN_COOKIES = ["__Secure-authjs.session-token", "authjs.session-token"];
-        for (const name of TOKEN_COOKIES) {
-            const token = cookies[name];
-            if (!token) continue;
-            try {
-                const encKey = await hkdf(
-                    secret ?? "NO_SECRET",
-                    name,
-                    `Auth.js Generated Encryption Key (${name})`,
-                    64,
-                );
-                const { payload } = await jwtDecrypt(token, encKey, {
-                    clockTolerance: 15,
-                    keyManagementAlgorithms: ["dir"],
-                    contentEncryptionAlgorithms: ["A256CBC-HS512"],
-                });
-                decryptPayloadKeys = Object.keys(payload);
-            } catch (e) {
-                decryptError = String(e?.message ?? e);
-            }
-            break;
-        }
-
-        return jsonResponse(
-            {
-                error: "not found",
-                debug: {
-                    hasCookie,
-                    hasSession,
-                    sessionEmail: email,
-                    isAdminFromJwt,
-                    env_AUTH_ADMIN_EMAILS: envEmailList || "<未设置>",
-                    secretSnapshot: secret
-                        ? `length=${secret.length}, first4=${secret.slice(0, 4)}, last4=${secret.slice(-4)}`
-                        : "<未设置>",
-                    decryptError: decryptError || (decryptPayloadKeys ? "解密成功" : "未找到session cookie"),
-                    decryptPayloadKeys,
-                },
-            },
-            404,
-        );
-    }
-    // END DEBUG
+    if (!isAdminSession(session, env)) return jsonResponse({ error: "not found" }, 404);
 
     const kv = getKv(env);
     const raw = kv ? await kv.get(SETTINGS_KEY, { type: "json" }).catch(() => null) : null;
