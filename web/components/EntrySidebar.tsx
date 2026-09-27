@@ -110,7 +110,7 @@ export function EntrySidebar({
                 {kind === "skill" && (
                     <button type="button" onClick={download} className="btn-ghost mt-2 w-full py-2.5 text-muted">
                         {downloaded ? <Check className="h-4 w-4 text-ok" /> : <Download className="h-4 w-4" />}
-                        {downloaded ? "已下载" : "下载 SKILL 安装包"}
+                        {downloaded ? "已下载, 请解压到 AI 目录" : "下载 SKILL 安装包"}
                     </button>
                 )}
 
@@ -123,7 +123,7 @@ export function EntrySidebar({
                     }`}
                 >
                     {fav.favorited ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-                    {fav.favorited ? "已收藏" : "收藏"}
+                    {fav.favorited ? "已收藏, 请通过 /me 查看" : "收藏 SKILL 到清单"}
                     {fav.count > 0 && <span className="text-xs">· {fav.count}</span>}
                 </button>
 

@@ -140,11 +140,11 @@ export function SiteFooter() {
                 {/* 手机（<md）：品牌区 + 分组 2×2 平铺，标题比链接醒目一档 */}
                 <div className="md:hidden">
                     {brand}
-                    <div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-8">
+                    <div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-5">
                         {groups.map((group) => (
-                            <nav key={group.title} aria-label={group.title}>
+                            <nav key={group.title} aria-label={group.title} className="text-center">
                                 <h2 className="text-sm font-semibold text-text">{group.title}</h2>
-                                <ul className="mt-3.5 space-y-3">
+                                <ul className="mt-2 space-y-2">
                                     {group.links.map((l) => (
                                         <li key={l.href}>
                                             <FooterLinkItem link={l} />
@@ -160,7 +160,8 @@ export function SiteFooter() {
                     手机上整条居中（左对齐的堆叠块看着歪，用户点过名）；sm 起恢复两端对齐。 */}
                 <div className="mt-9 flex flex-col items-center gap-4 border-t border-border pt-5 text-center text-xs text-muted sm:flex-row sm:justify-between sm:text-left">
                     <p>
-                        {year ? `© ${year} ` : "© "}NextPilot Skill · {t("让无人机更智能", "Making aircraft smarter")}
+                        {year ? `© ${year} ` : "© "}NextPilot Skill ·{" "}
+                        {t("让无人机更智能，让数据开口说话", "Making aircraft smarter")}
                     </p>
 
                     <div className="flex flex-wrap items-center gap-3">
