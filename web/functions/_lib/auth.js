@@ -42,6 +42,9 @@ export async function getSessionUser(request, env) {
                 email: payload.email ? String(payload.email) : null,
                 name: payload.name ? String(payload.name) : null,
                 plan: typeof payload.plan === "string" ? payload.plan : "free",
+                // JWT 里的 isAdmin 来自 NextAuth jwt 回调（读 process.env.AUTH_ADMIN_EMAILS），
+                // 边缘函数 env 里同名变量可能没配 / 不一致 —— 以 JWT 为准是唯一事实源。
+                isAdmin: payload.isAdmin === true,
             };
         } catch {
             // 该 cookie 解不开就尝试下一个候选名
@@ -60,6 +63,11 @@ export async function getSessionUser(request, env) {
  * @param {Record<string,string|undefined>} env
  */
 export function isAdminSession(session, env) {
+    // JWT 里的 isAdmin 来自 NextAuth jwt 回调（读 process.env.AUTH_ADMIN_EMAILS），
+    // 边缘函数 env 里同名变量可能没配或不同步 —— JWT 是唯一事实源。
+    if (session?.isAdmin === true) return true;
+
+    // 兜底：旧 JWT 没 isAdmin 字段时，用边缘函数自身的 env.AUTH_ADMIN_EMAILS 再算一次
     const email = String(session?.email ?? "")
         .toLowerCase()
         .trim();
