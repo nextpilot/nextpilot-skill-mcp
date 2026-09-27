@@ -2,9 +2,9 @@ id: power
 title: Power
 description: 电池电压 / 电流 / 放电量 / 剩余电量 / OCV / 内阻 / 5V / 3.3V。
 order: 35
-conditions:
+condition:
   message: [battery_status]
-outputs:
+output:
   - container: axes
     title: Power
     ylabel: "mixed"

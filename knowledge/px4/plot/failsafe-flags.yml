@@ -2,9 +2,9 @@ id: failsafe-flags
 title: Failsafe Flags
 description: 失效保护标志：failsafe / user_took_over / failsafe_flags。
 order: 38
-conditions:
+condition:
   message: [vehicle_status]
-outputs:
+output:
   - container: axes
     title: Failsafe Flags
     ylabel: "flag"

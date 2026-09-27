@@ -14,8 +14,9 @@ id: apm-battery-low
 name: 电池最低电压
 group: battery
 order: 1
+tag: apm_battery_low_voltage
 
-conditions:
+condition:
   message:
     - "BAT || CURR"
 
@@ -34,7 +35,7 @@ compute:
   - crit_v = cells * 3.3
   - low_v = cells * 3.5
 
-triggers:
+trigger:
   # 闸门已在 cells 里（峰值电压不在 4~70 V、或折算每节电压不在 3.3~4.4 V 时 cells 为 None，
   # crit_v / low_v 随之缺失、比较抛错被视作未命中）；这里再写一次是给读数的人看的。
   - when: "vmin <= crit_v and vmax <= 70.0"
@@ -55,17 +56,18 @@ triggers:
       value: f"{vmin:.2f}"
       threshold: 3.5
       unit: V
-tag: apm_battery_low_voltage
 
 ---
 # 负载压降：只在高电流（>=20 A）的样本里看电压跨度。
 # 上游用 max-min；np.ptp 就是极差，等价。
+
 id: apm-battery-sag
 name: 电池负载压降
 group: battery
 order: 2
+tag: apm_battery_sag
 
-conditions:
+condition:
   message:
     - "BAT || CURR"
 
@@ -76,7 +78,7 @@ compute:
   # 只保留电流 >= 20 A 的时刻
   - sag = np.ptp(volts[curr > 20.0])
 
-triggers:
+trigger:
   - when: "sag >= 1.0"
     severity: info
     suggestion: "带载压降一部分是正常的，但跨度偏大通常意味着电池老化、内阻升高，值得关注。"
@@ -86,18 +88,19 @@ triggers:
       value: f"{sag:.2f}"
       threshold: 1
       unit: V
-tag: apm_battery_sag
 
 ---
 # 突发跌落：上游 DROP_WARN_V=2.0 / DROP_CRIT_V=4.0 / DROP_MAX_DT_S=0.5，
 # 且**必须排除"跌一拍就弹回"的毛刺**——跌后 1 s 内回升到跌幅一半以上就不算数。
 # 这两条判据（间隔上限 + 恢复判据）封在 step_drop_events 里，经验文件只负责阈值与文案。
+
 id: apm-battery-sudden-drop
 name: 电池电压突降
 group: battery
 order: 3
+tag: apm_battery_sudden_drop
 
-conditions:
+condition:
   message:
     - "BAT || CURR"
 
@@ -110,7 +113,7 @@ compute:
 
 foreach: { var: drops, keys: [ drop, dt_s, start_s, end_s, recovered ] }
 
-triggers:
+trigger:
   - when: "not recovered and drop > 4.0"
     severity: critical
     suggestion: "跌完没有回升，指向电池插头虚接、单节失效或瞬时掉电。检查电池插头与线缆、电池健康度；掉电会复位外设甚至飞控。"
@@ -129,4 +132,3 @@ triggers:
       value: f"{drop:.2f}"
       threshold: 2
       unit: V
-tag: apm_battery_sudden_drop

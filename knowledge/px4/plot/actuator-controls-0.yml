@@ -2,9 +2,9 @@ id: actuator-controls-0
 title: Actuator Controls
 description: Actuator Controls 0：扭矩轴（Roll/Pitch/Yaw）+ 推力。
 order: 21
-conditions:
+condition:
   message: ["vehicle_torque_setpoint || actuator_controls_0"]
-outputs:
+output:
   - container: axes
     title: Actuator Controls
     ylabel: "normalized"

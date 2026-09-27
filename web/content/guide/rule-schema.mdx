@@ -38,8 +38,8 @@ knowledge/engine/engine.py  ← ──┘                                  运�
 | `group` | 所属分组（字符串）。必须在 `knowledge/px4/facts.yaml` 的 `group_order` 里登记，否则引擎直接跳过。 |
 | `slot` | 执行位置（字符串）。决定了这条经验在哪个阶段跑——不同阶段能读的原始数据不同，详见下一节。 |
 | `compute` | 数据流表达式（**多行的 YAML 字符串块**，写法见 §3）。 |
-| `condition` | 触发条件（字符串，Python 表达式）。`True` 表示总是触发。 |
-| `triggers` | 需要哪些原始 Topic（列表）。引擎据此决定取哪些数据；[`facts.yaml` 的 topic 白名单](/knowledge/px4/facts#topic) 里找不到的 topic 不能用。 |
+| `condition` | 适用范围（字符串）。`True` 表示总是触发。 |
+| `trigger` | 需要哪些原始 Topic（列表）。引擎据此决定取哪些数据；[`facts.yaml` 的 topic 白名单](/knowledge/px4/facts#topic) 里找不到的 topic 不能用。 |
 
 ### 额外注意
 - `title` / `suggestion` / `value_text`：Python `str.format_map` 模板占位符。`{name}` 引用 `compute` 里声明的名字或内置变量。用到的名跨两个 docstring 时—致即可；不—致的启动自检会报错。
@@ -109,15 +109,14 @@ compute:
 
 
 
-## 5. triggers 与 outputs
+## 5. trigger 与 output
 
-### 5.1 `triggers`
+### 5.1 `trigger`
 
-- **数组**。每一项是一个 ULog Topic 名（字符串）。
-- 列举需要哪些 Topic 的原始数据；引擎据此决定取哪些。
-- Topic 必须在 `facts.yaml` 的 `building-topics` 或 ULog 格式内存块表里存在；构造不存在的 Topic 会导致构建失败。
+- **数组**。每一项是一个触发条件条目。
+- 包含 `when`（判定表达式）、`severity`、`description` 等。
 
-### 5.2 `outputs`
+### 5.2 `output`
 
 类型：
 - **`tags`（必填）**：字符串列表。每个值必须在 `facts.yaml` → `tags` 字典的键里出现（中文+英文文案）。

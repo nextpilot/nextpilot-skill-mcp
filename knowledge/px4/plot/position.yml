@@ -2,12 +2,12 @@ id: position
 title: Position
 description: 2D 位置轨迹（vehicle_local_position y vs x），及 setpoint、GPS setpoint。
 order: 1
-conditions:
+condition:
   message: 
   - vehicle_local_position
   - vehicle_local_position_setpoint
   # - vehicle_local_position_groundtruth
-outputs:
+output:
   - container: axes
     title: 位置 2D 轨迹
     ylabel: "[m]"

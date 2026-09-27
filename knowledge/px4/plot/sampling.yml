@@ -2,9 +2,9 @@ id: sampling
 title: Sampling Regularity
 description: sensor_combined 采样间隔与 estimator_status time_slip。
 order: 40
-conditions:
+condition:
   message: [sensor_combined]
-outputs:
+output:
   - container: axes
     title: Sampling Regularity of Sensor Data
     ylabel: "[us]"

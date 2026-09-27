@@ -9,7 +9,8 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RULES_DIR = REPO_ROOT / "knowledge" / "px4" / "rules"
+PX4_RULES_DIR = REPO_ROOT / "knowledge" / "px4" / "rules"
+APM_RULES_DIR = REPO_ROOT / "knowledge" / "ardupilot" / "rules"
 
 # Section display order (after metadata)
 SECTION_ORDER = ["condition", "compute", "foreach", "output", "trigger"]
@@ -46,7 +47,11 @@ def split_sections(lines):
         current_lines = []
 
     for line in lines:
-        if _RE_DOC.match(line):
+        if line.strip() == "---":
+            _flush()
+            current_key = "doc_sep"
+            current_lines = [line]
+        elif _RE_DOC.match(line):
             _flush()
             current_key = "doc_start"
             current_lines = [line]
@@ -184,30 +189,47 @@ def format_single_doc(sections):
 
 
 def format_file_lines(lines):
-    """Format lines of a YAML file."""
-    has_multi = any(_RE_DOC.search(line) for line in lines)
+    """Format lines of a YAML file.
+
+    Single-doc files (PX4 rules): full formatting with section ordering.
+    Multi-doc files (APM rules using --- between rules): split at ---, format
+    each rule individually, then rejoin with --- separators.
+    """
+    has_multi = any(line.strip() == "---" for line in lines)
 
     if not has_multi:
         sections = split_sections(lines)
         result = format_single_doc(sections)
     else:
         result = []
-        docs = []
-        current_doc = []
+        chunks = []
+        current = []
 
         for line in lines:
-            if _RE_DOC.match(line) and current_doc:
-                docs.append(current_doc)
-                current_doc = [line]
+            if line.strip() == "---":
+                if current:
+                    chunks.append(current)
+                    current = []
             else:
-                current_doc.append(line)
-        if current_doc:
-            docs.append(current_doc)
+                current.append(line)
+        if current:
+            chunks.append(current)
 
-        for i, doc_lines in enumerate(docs):
+        for i, chunk in enumerate(chunks):
+            # Strip leading/trailing blank lines
+            while chunk and chunk[0].strip() == "":
+                chunk.pop(0)
+            while chunk and chunk[-1].strip() == "":
+                chunk.pop()
+
+            if not chunk:
+                continue
+
             if i > 0:
                 _ensure_blank_before(result)
-            sections = split_sections(doc_lines)
+                result.append("---")
+
+            sections = split_sections(chunk)
             doc_result = format_single_doc(sections)
             result.extend(doc_result)
 
@@ -232,30 +254,43 @@ def format_file_text(text, dry_run=False):
 
 def main(dry_run=False):
     """If dry_run=True, only print diffs (1-line summary)."""
-    files = sorted([f for f in os.listdir(RULES_DIR) if f.endswith(".yaml")])
-    changed = 0
-    for fname in files:
-        filepath = RULES_DIR / fname
-        with open(filepath, "r", encoding="utf-8") as f:
-            original = f.read()
+    dirs = [
+        ("PX4", PX4_RULES_DIR),
+        ("APM", APM_RULES_DIR),
+    ]
+    total_files = 0
+    total_changed = 0
 
-        formatted = format_file_text(original)
+    for label, rules_dir in dirs:
+        if not rules_dir.exists():
+            continue
+        files = sorted([f for f in os.listdir(rules_dir) if f.endswith(".yaml")])
+        changed = 0
+        for fname in files:
+            filepath = rules_dir / fname
+            with open(filepath, "r", encoding="utf-8") as f:
+                original = f.read()
 
-        if original != formatted:
-            changed += 1
-            if dry_run:
-                # Count line diffs
-                ol = original.count("\n")
-                fl = formatted.count("\n")
-                print(f"  ~ {fname}: {ol} -> {fl} lines")
+            formatted = format_file_text(original)
+
+            if original != formatted:
+                changed += 1
+                if dry_run:
+                    ol = original.count("\n")
+                    fl = formatted.count("\n")
+                    print(f"  ~ {label}/{fname}: {ol} -> {fl} lines")
+                else:
+                    with open(filepath, "w", encoding="utf-8") as f:
+                        f.write(formatted)
+                    print(f"  OK  {label}/{fname}")
             else:
-                with open(filepath, "w", encoding="utf-8") as f:
-                    f.write(formatted)
-                print(f"  OK  {fname}")
-        else:
-            print(f"  -- {fname} (no change)")
+                print(f"  -- {label}/{fname} (no change)")
 
-    print(f"\n{len(files)} files, {changed} changed")
+        print(f"\n  [{label}] {len(files)} files, {changed} changed")
+        total_files += len(files)
+        total_changed += changed
+
+    print(f"\nTotal: {total_files} files, {total_changed} changed")
 
 
 if __name__ == "__main__":

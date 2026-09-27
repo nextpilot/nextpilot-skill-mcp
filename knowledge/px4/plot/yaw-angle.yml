@@ -2,11 +2,11 @@ id: yaw-angle
 title: Yaw Angle
 description: Yaw 欧拉角估计值与 setpoint、FF。
 order: 7
-conditions:
+condition:
   message: [vehicle_attitude]
 compute:
   - roll, pitch, yaw = quat_to_euler(vehicle_attitude.q)
-outputs:
+output:
   - container: axes
     title: Yaw Angle
     ylabel: deg

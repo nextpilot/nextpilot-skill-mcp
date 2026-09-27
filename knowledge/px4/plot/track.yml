@@ -2,12 +2,12 @@ id: track
 title: 轨迹
 description: 地图上的飞行轨迹（原始 GNSS），多条轨道叠画、可点选隐藏。
 order: 41
-conditions:
+condition:
   message: ["sensor_gps || vehicle_gps_position"]
 # 地图容器的声明方式与曲线**完全一样**，只是 container 不同、children 画的是轨道。
 # 取数走 ref 的候选组 + unit=：sensor_gps 优先（1.16+），老固件退回 vehicle_gps_position，
 # 且要写成 `[N]` 指明实例——同一条轨道的时间戳与 fix_type 必须来自同一个 topic 的同一个实例。
-outputs:
+output:
   - container: map
     title: 轨迹
     legend: true

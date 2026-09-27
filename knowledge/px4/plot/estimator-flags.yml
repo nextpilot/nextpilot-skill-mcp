@@ -2,9 +2,9 @@ id: estimator-flags
 title: Estimator Flags
 description: EKF 健康/超时/创新检验标志位。
 order: 37
-conditions:
+condition:
   message: [estimator_status]
-outputs:
+output:
   - container: axes
     title: Estimator Flags
     ylabel: "flag / ratio"

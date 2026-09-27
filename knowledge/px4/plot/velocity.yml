@@ -2,9 +2,9 @@ id: velocity
 title: Velocity
 description: 三轴速度估计值与 setpoint（vx/vy/vz）。
 order: 12
-conditions:
+condition:
   message: [vehicle_local_position]
-outputs:
+output:
   - container: axes
     title: Velocity
     ylabel: "[m/s]"

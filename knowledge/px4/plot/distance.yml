@@ -2,9 +2,9 @@ id: distance
 title: Distance Sensor
 description: 距离传感器读数（current_distance / variance / dist_bottom）。
 order: 31
-conditions:
+condition:
   message: [distance_sensor]
-outputs:
+output:
   - container: axes
     title: Distance Sensor
     ylabel: "[m]"

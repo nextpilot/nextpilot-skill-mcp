@@ -2,9 +2,9 @@ id: yaw-rate
 title: Yaw Angular Rate
 description: Yaw 角速度估计值与 setpoint、积分。
 order: 8
-conditions:
+condition:
   message: [vehicle_attitude]
-outputs:
+output:
   - container: axes
     title: Yaw Angular Rate
     ylabel: deg/s

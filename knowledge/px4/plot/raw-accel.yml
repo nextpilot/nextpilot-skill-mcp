@@ -2,9 +2,9 @@ id: raw-accel
 title: Raw Acceleration
 description: 传感器原始加速度（sensor_combined.accelerometer_m_s2）。
 order: 25
-conditions:
+condition:
   message: [sensor_combined]
-outputs:
+output:
   - container: axes
     title: Raw Acceleration
     ylabel: "[m/s^2]"

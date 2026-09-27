@@ -12,8 +12,9 @@ id: apm-err-subsystem
 name: 子系统错误（ERR）
 group: events
 order: 1
+tag: apm_subsystem_error
 
-conditions:
+condition:
   message:
     - ERR
 
@@ -23,7 +24,7 @@ compute:
   # 这 10 个子系统出错是硬性安全失效（电池/GPS/EKF/崩机/振动等失效保护），直接 critical
   - crit_count = sum(np.isin(err_subsys, [5, 6, 7, 9, 12, 16, 17, 25, 29, 30]))
 
-triggers:
+trigger:
   - when: "crit_count > 0"
     severity: critical
     suggestion: "涉及失效保护类子系统（电池/GPS/EKF/崩机/振动/推力丧失/内部错误），是直接影响飞行安全的硬故障。先查清根因再飞。"
@@ -42,18 +43,19 @@ triggers:
       value: err_count
       threshold: 0
       unit: 条
-tag: apm_subsystem_error
 
 ---
 # 上游把 EV 事件统一出 INFO 摘要。**这里有意偏离**：把几个本身就是故障信号的事件
 # 提到 warning——丢 GPS、EKF 高度/航向重置、电机紧急停转、旋翼转速不足。
 # 它们压在 INFO 里会被淹没，而这几条几乎不可能是"正常现象"。
+
 id: apm-ev-events
 name: 关键事件（EV）
 group: events
 order: 2
+tag: apm_critical_event_logged
 
-conditions:
+condition:
   message:
     - EV
 
@@ -64,7 +66,7 @@ compute:
   # 60 EKF_ALT_RESET / 62 EKF_YAW_RESET
   - key_count = sum(np.isin(ev_id, [19, 54, 59, 60, 62]))
 
-triggers:
+trigger:
   - when: "key_count > 0"
     severity: warning
     suggestion: "丢 GPS、EKF 高度或航向重置、电机紧急停转、旋翼转速不足都属于明确的异常。按事件类型查对应子系统（GPS/罗盘/动力）。"
@@ -83,18 +85,18 @@ triggers:
       value: ev_count
       threshold: 0
       unit: 条
-tag: apm_critical_event_logged
 
 ---
 # MODE 时间线：C1 2026-09 已解除（`_FMT_DTYPES` 登记 n/N/Z，"str" 列直接返回），
 # 现在可以取到 MODE.Mode 文本与 ModeNum 数值。用 ModeNum 的差分检测模式切换，
 # 再用 take_items 挑出切换点上的模式名，做一次紧凑的模式时间线。
+
 id: apm-mode-timeline
 name: 模式时间线
 group: events
 order: 3
 
-conditions:
+condition:
   message:
     - MODE
 
@@ -106,7 +108,7 @@ compute:
   - change_count = sum(changed)
   - n_modes = len(mode_num)
 
-triggers:
+trigger:
   - when: "change_count > 0"
     severity: info
     suggestion: "模式切换序列用于还原飞行过程与定位失控时点。全部模式名见 MODE.Mode 列。"

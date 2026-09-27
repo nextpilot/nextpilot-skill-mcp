@@ -16,8 +16,9 @@ id: apm-gps-fix
 name: GPS 定位状态
 group: gps_health
 order: 1
+tag: apm_gps_no_fix
 
-conditions:
+condition:
   message:
     - GPS
 
@@ -29,7 +30,7 @@ compute:
   - status_armed = status[interval_mask(GPS.timestamp, ARMED_INTERVALS)]
   - smin_armed = min(status_armed)
 
-triggers:
+trigger:
   - when: "smax < 3.0"
     severity: warning
     suggestion: "没有 3D 定位 GPS 就无法给 EKF 提供可用位置。检查天线布置与干扰，起飞前留出更充裕的搜星时间。"
@@ -48,15 +49,15 @@ triggers:
       value: f"{smin_armed:.0f}"
       threshold: 3
       unit: ""
-tag: apm_gps_no_fix
 
 ---
 id: apm-gps-sats
 name: GPS 搜星数
 group: gps_health
 order: 2
+tag: apm_gps_low_sats
 
-conditions:
+condition:
   message:
     - GPS
   # 没有 armed 区间就不用全程替代（会把起飞前搜星期判成故障），宁可跳过
@@ -65,7 +66,7 @@ conditions:
 compute:
   - nmin = min(GPS.NSats[interval_mask(GPS.timestamp, ARMED_INTERVALS)])
 
-triggers:
+trigger:
   - when: "nmin < 4"
     severity: critical
     suggestion: "低于 4 颗时接收机无法维持 3D 定位，位置不可信。查天线视野、遮挡与干扰，解决前不要用依赖 GPS 的模式。"
@@ -84,18 +85,19 @@ triggers:
       value: nmin
       threshold: 6
       unit: 颗
-tag: apm_gps_low_sats
 
 ---
 # HDOP 只在有定位时才有意义：无定位时接收机会报哨兵值（约 99.99），那属于"没信号"
 # 而不是"几何精度差"，已由 apm-gps-fix / apm-gps-sats 覆盖，这里必须剔除。
 # 剔除方式是与 Status>=3 的掩码做 &（> 2.5 即 >=3）。
+
 id: apm-gps-hdop
 name: GPS 水平精度因子
 group: gps_health
 order: 3
+tag: apm_gps_high_hdop
 
-conditions:
+condition:
   message:
     - GPS
   armed: true
@@ -103,7 +105,7 @@ conditions:
 compute:
   - hmax = max(GPS.HDop[interval_mask(GPS.timestamp, ARMED_INTERVALS) & (GPS.Status > 2.5)])
 
-triggers:
+trigger:
   - when: "hmax > 5.0"
     severity: critical
     suggestion: "HDOP 超过 5 时水平位置基本不可用。先解决成因（视野、干扰、多径），再飞依赖 GPS 的模式。"
@@ -122,4 +124,3 @@ triggers:
       value: f"{hmax:.1f}"
       threshold: 2
       unit: ""
-tag: apm_gps_high_hdop

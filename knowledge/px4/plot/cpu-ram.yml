@@ -2,9 +2,9 @@ id: cpu-ram
 title: CPU & RAM
 description: CPU 负载与 RAM 使用率。
 order: 39
-conditions:
+condition:
   message: [cpuload]
-outputs:
+output:
   - container: axes
     title: CPU & RAM
     ylabel: "[0, 1]"

@@ -26,7 +26,7 @@ knowledge/
 px4/
   ── 知识本体（不是文档，是经验与字典）──
   rules/*.yaml          检查经验：一条经验一个 YAML，判定阈值就写在各自经验里
-                        （32 条经验；failsafe.yaml 一个文件装了 6 条同构经验）
+                        （31 条经验；failsafe.yaml 一个文件装了 6 条同构经验）
   fault-kb.yaml     故障树：标签 → 根因 / 排查步骤 / 禁忌 / 风险等级
   facts.yaml            事实层的数据声明：字段名 / 码值 / 飞行阶段分组 / slot 执行顺序，
                         以及「关键数据」的展示清单（中文名 / 单位 / 顺序）与兜底取数
@@ -43,8 +43,7 @@ px4/
 
 ```text
 ardupilot/
-  rules/*.yaml          12 个文件共 34 条经验（上游 16 项检查里迁了 12 项，同构项合并）；
-                        33 条能算、1 条占位（卡在 MODE.Mode 文本列，记在 PENDING.md）
+  rules/*.yaml          16 个文件共 43 条经验（上游 16 项检查全部迁移）；
   facts.yaml            码表（飞行模式 / ERR 子系统 / EV 事件 / 机架）与规则元数据
   ATTRIBUTION.md        上游署名、迁了什么、改了什么
   PENDING.md            剩余待办：占位那一条、FRAME_CLASS 3 号冲突、曲线预设、真实样本

@@ -2,9 +2,9 @@ id: mag
 title: Raw Magnetic Field Strength
 description: 传感器原始磁场强度（magnetometer_ga），兼容 vehicle_magnetometer / sensor_combined。
 order: 30
-conditions:
+condition:
   message: ["vehicle_magnetometer || sensor_combined"]
-outputs:
+output:
   - container: axes
     title: Raw Magnetic Field Strength
     ylabel: "[gauss]"

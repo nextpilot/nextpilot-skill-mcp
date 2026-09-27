@@ -2,9 +2,9 @@ id: vibration
 title: Vibration Metrics
 description: 每个 IMU 的高频振动指标 IMU0-3 合在一张图上，参考线 4.905 / 9.81。
 order: 26
-conditions:
+condition:
   message: [vehicle_imu_status]
-outputs:
+output:
   - container: axes
     title: Vibration Metrics
     ylabel: m/s²

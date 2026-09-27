@@ -11,8 +11,9 @@ id: apm-rcin-link-loss
 name: 遥控输入链路
 group: rc_input
 order: 1
+tag: apm_rc_link_loss
 
-conditions:
+condition:
   message:
     - RCIN
 
@@ -28,7 +29,7 @@ compute:
 
 foreach: { var: runs, keys: [ duration_s, start_s, end_s ] }
 
-triggers:
+trigger:
   - when: "duration_s >= 2.0 or end_s >= DURATION_S - 1.0"
     severity: critical
     suggestion: "四个主通道持续低于 1000us 达 {duration_s:.1f}s，说明遥控链路确实断开且未恢复。检查接收机供电、天线接触、失效保护设置（FS_THR_ENABLE）。"
@@ -47,4 +48,3 @@ triggers:
       value: f"{lost_samples}样本/{duration_s:.1f}s"
       threshold: 1000
       unit: us
-tag: apm_rc_link_loss

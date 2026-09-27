@@ -93,7 +93,7 @@ export function buildRuleSchema({ signatures, facts, vehicles, builtinVars }) {
             status: { type: "string" },
             license: { type: "string" },
             author: { type: "object", additionalProperties: true },
-            conditions: {
+            condition: {
                 type: "object",
                 description: "适用范围，整块可省（省 = 什么都适用）。任一键不满足都会记一条 skipped 并带自动文案",
                 additionalProperties: false,
@@ -148,7 +148,7 @@ export function buildRuleSchema({ signatures, facts, vehicles, builtinVars }) {
                 items: { type: "string", description: computeDesc },
                 description: "取值：一串表达式，自上而下求值",
             },
-            outputs: {
+            output: {
                 type: "array",
                 description: "指标输出（纯数据，写入 metrics）。多条 = 多个指标",
                 items: {
@@ -163,7 +163,7 @@ export function buildRuleSchema({ signatures, facts, vehicles, builtinVars }) {
                     },
                 },
             },
-            triggers: {
+            trigger: {
                 type: "array",
                 description: "判定：各大组之间**全部执行**，同组内的 when[] 短路（命中第一条即停）",
                 items: {
@@ -246,7 +246,7 @@ export function buildRuleSchema({ signatures, facts, vehicles, builtinVars }) {
             },
         },
         // guard 类经验通过 triggers.severity: guard 表达，与普通经验同一形态
-        anyOf: [{ required: ["triggers"], title: "所有经验都要有 triggers（guard 用 severity: guard 表达）" }],
+        anyOf: [{ required: ["trigger"], title: "所有经验都要有 trigger" }],
         // 机器可读的派生词表（`x-` 前缀是 JSON Schema 允许的自定义字段）。
         // 编辑器不消费，但脚本与其它工具可以查，省得再去解析 knowledge/engine/ 源码
         "x-operators": uniqSorted(Object.keys(signatures ?? {})),

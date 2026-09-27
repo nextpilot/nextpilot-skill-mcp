@@ -12,8 +12,9 @@ id: apm-prearm-warnings
 name: 预解锁/启动消息扫描
 group: prearm_messages
 order: 1
+tag: apm_prearm_warnings
 
-conditions:
+condition:
   armed: false
   message:
     - "MSG || STATUSTEXT"
@@ -39,7 +40,7 @@ compute:
   # 取第一条匹配的样本作为证据
   - 'samples = take_items(msg_lines, contains="prearm", limit=6, clip={"text": 120})'
 
-triggers:
+trigger:
   - when: "total_warn >= 2"
     severity: critical
     suggestion: "启动阶段出现多条预解锁告警/错误消息（{total_warn} 条）。逐条检查 raw log 里的 MSG/STATUSTEXT 文本，解决所列问题后再飞。"
@@ -58,4 +59,3 @@ triggers:
       value: total_warn
       threshold: 0
       unit: 条
-tag: apm_prearm_warnings

@@ -2,9 +2,9 @@ id: temperature
 title: Temperature
 description: 传感器温度：Baro / Accel / Airspeed / Battery / ESC。
 order: 36
-conditions:
+condition:
   message: [sensor_baro]
-outputs:
+output:
   - container: axes
     title: Temperature
     ylabel: "[C]"

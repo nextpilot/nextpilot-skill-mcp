@@ -11,8 +11,9 @@ id: apm-timing-gaps
 name: 日志间隙
 group: timing
 order: 1
+tag: apm_logging_gap
 
-conditions:
+condition:
   message:
     - "IMU || ATT || VIBE"
 
@@ -22,9 +23,10 @@ compute:
   - gaps = gap_events(gts, T0_US)
 
 # 上游最多报 3 处（`MAX_GAP_FINDINGS`），按间隔降序——截断已在算子内完成
+
 foreach: { var: gaps, keys: [ gap_s, start_s, end_s, nominal_dt_s, threshold_s ] }
 
-triggers:
+trigger:
   - when: "True"
     severity: warning
     suggestion: "名义间隔 {nominal_dt_s:.3f} s，本次阈值 {threshold_s:.2f} s（绝对下限 0.5 s 与名义间隔 10 倍取大者）。该窗口的数据缺失，会影响所有其它结论；排查 SD 卡写入性能与 CPU 负载。"
@@ -34,24 +36,25 @@ triggers:
       value: f"{gap_s:.2f}"
       threshold: 0.5
       unit: s
-tag: apm_logging_gap
 
 ---
 # 长循环总数：上游是累加所有 PM 记录的 NLon（NLon 是每条 PM 记录里的增量计数）。
 # 直接 `sum`——早先写成"均值 × 样本数"是因为那时引擎没有求和算子，现在有了就不必绕。
+
 id: apm-timing-long-loops
 name: 调度长循环
 group: timing
 order: 2
+tag: apm_scheduler_long_loops
 
-conditions:
+condition:
   message:
     - PM
 
 compute:
   - long_loops = sum(PM.NLon)
 
-triggers:
+trigger:
   - when: "long_loops > 0"
     severity: warning
     suggestion: "主循环曾跑超时间预算，说明飞控一度 CPU 饥饿，会拖慢控制更新并劣化估计与控制。降低负载：调低日志/陷波/EKF 速率、关掉用不到的功能，或检查循环速率是否设得超出板子能力。"
@@ -61,4 +64,3 @@ triggers:
       value: f"{long_loops:.0f}"
       threshold: 0
       unit: 次
-tag: apm_scheduler_long_loops

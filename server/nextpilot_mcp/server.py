@@ -256,7 +256,7 @@ async def list_checks() -> CheckCatalog:
     rules = loader.load_rules()
     entries = []
     for r in rules:
-        outputs = r.get("outputs") or {}
+        outputs = r.get("output") or {}
         entries.append(
             CatalogEntry(
                 ruleId=str(r.get("id") or ""),
@@ -289,9 +289,9 @@ async def get_rule(rule_id: str) -> dict[str, Any]:
                 "sourceFile": str(f.relative_to(_REPO_ROOT)).replace("\\", "/"),
                 "name": doc.get("name"),
                 "group": doc.get("group"),
-                "conditions": doc.get("conditions"),
-                "outputs": doc.get("outputs"),
-                "triggers": doc.get("triggers"),
+                "condition": doc.get("condition"),
+                "output": doc.get("output"),
+                "trigger": doc.get("trigger"),
                 "raw": f.read_text(encoding="utf-8"),
             }
     raise ValueError(f"没有 id 为 {rule_id!r} 的规则；先用 list_checks 看有哪些。")

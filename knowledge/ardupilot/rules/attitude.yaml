@@ -18,8 +18,9 @@ id: apm-attitude-roll
 name: 横滚跟踪误差
 group: attitude_tracking
 order: 1
+tag: apm_attitude_tracking_error
 
-conditions:
+condition:
   message:
     - ATT
 
@@ -31,7 +32,7 @@ compute:
 
 foreach: { var: worst_roll, keys: [ dur_s, peak, start_s, end_s ] }
 
-triggers:
+trigger:
   - when: "dur_s >= 1.0 and peak > 25.0"
     severity: critical
     suggestion: "持续超过 1 s 且误差大于 25°，说明机体达不到指令姿态：失控、机械故障（电机/电调/桨、舵面连杆）或动力不足/超重。查机体机械与动力余量，并复核是否超重。"
@@ -59,15 +60,15 @@ triggers:
       value: f"{peak_roll:.1f}"
       threshold: 30
       unit: deg
-tag: apm_attitude_tracking_error
 
 ---
 id: apm-attitude-pitch
 name: 俯仰跟踪误差
 group: attitude_tracking
 order: 2
+tag: apm_attitude_tracking_error
 
-conditions:
+condition:
   message:
     - ATT
 
@@ -79,7 +80,7 @@ compute:
 
 foreach: { var: worst_pitch, keys: [ dur_s, peak, start_s, end_s ] }
 
-triggers:
+trigger:
   - when: "dur_s >= 1.0 and peak > 25.0"
     severity: critical
     suggestion: "持续超过 1 s 且误差大于 25°，说明机体达不到指令姿态：失控、舵面/连杆故障或动力不足/超重。查重心、舵面连杆与动力余量。"
@@ -107,16 +108,17 @@ triggers:
       value: f"{peak_pitch:.1f}"
       threshold: 30
       unit: deg
-tag: apm_attitude_tracking_error
 
 ---
 # 航向要绕回：误差 = (实测 - 期望) 后 wrap 到 ±180°，否则跨 ±180° 时会给出约 360° 的假误差。
+
 id: apm-attitude-yaw
 name: 航向跟踪误差
 group: attitude_tracking
 order: 3
+tag: apm_attitude_tracking_error
 
-conditions:
+condition:
   message:
     - ATT
 
@@ -128,7 +130,7 @@ compute:
 
 foreach: { var: worst_yaw, keys: [ dur_s, peak, start_s, end_s ] }
 
-triggers:
+trigger:
   - when: "dur_s >= 1.0 and peak > 25.0"
     severity: critical
     suggestion: "持续超过 1 s 且误差大于 25°，说明机体达不到指令航向：罗盘干扰、偏航通道机械问题或电机失衡。查罗盘（见 apm-compass-interference）与偏航方向的一致性。"
@@ -156,4 +158,3 @@ triggers:
       value: f"{peak_yaw:.1f}"
       threshold: 30
       unit: deg
-tag: apm_attitude_tracking_error

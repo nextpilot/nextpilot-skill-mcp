@@ -11,8 +11,9 @@ id: apm-calibration-compass-offset
 name: 罗盘校准偏移
 group: calibration
 order: 1
+tag: apm_calibration_compass_large_offset
 
-conditions:
+condition:
   message:
     - PARM
 
@@ -22,7 +23,7 @@ compute:
   - ofs_z = _cfg("COMPASS_OFS_Z", 0.0)
   - offset_mag = np.hypot(np.hypot(ofs_x, ofs_y), ofs_z)
 
-triggers:
+trigger:
   - when: "offset_mag > 600.0"
     severity: critical
     suggestion: "罗盘硬铁偏移 {offset_mag:.0f} mGauss 远超正常范围（<300 mGauss），校准质量差或安装环境有强磁干扰。重新做一次罗盘校准（Mission Planner 的 Compass 页），确保没有金属物体在附近。"
@@ -41,4 +42,3 @@ triggers:
       value: f"{offset_mag:.0f}"
       threshold: 300
       unit: mGauss
-tag: apm_calibration_compass_large_offset

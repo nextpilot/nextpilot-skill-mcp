@@ -12,8 +12,8 @@
 
 ## 实施状态（2026-09-15：已实施）
 
-**已完成**：15 组过程式检查（原 `knowledge/engine/ulog_checks.py` 1095 行，已迁移为 `knowledge/engine/rule_engine.py`）→ **32 条自包含经验**（含 4 条数据质量
-guard），**73 个通用算子**；`px4-thresholds.toml` 已退场（阈值随各自经验内联）。引擎侧每个
+**已完成**：15 组过程式检查（原 `knowledge/engine/ulog_checks.py` 1095 行，已迁移为 `knowledge/engine/rule_engine.py`）→ **31 条自包含经验**（含 4 条数据质量
+guard），**92 个通用算子**；`px4-thresholds.toml` 已退场（阈值随各自经验内联）。引擎侧每个
 检查块只剩一行 `_run_rules("<slot>")`。6 条真实日志的冻结基线逐字段一致；生成产物真实执行
 通过；构建期护栏生效（算子名/入参数量、表达式与文案里的未声明名字、缺 `firmware`/`vehicle`、
 guard 条件写错名字都会构建失败，而不是进浏览器才炸）。

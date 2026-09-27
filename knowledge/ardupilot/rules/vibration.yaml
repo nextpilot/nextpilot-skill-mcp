@@ -16,8 +16,9 @@ id: apm-vibration-x
 name: X 轴振动
 group: vibration
 order: 1
+tag: apm_high_vibration
 
-conditions:
+condition:
   message:
     - VIBE
 
@@ -28,7 +29,7 @@ compute:
   - frac_warn = np.sum(vx > 30.0) / len(vx)
   - frac_crit = np.sum(vx > 60.0) / len(vx)
 
-triggers:
+trigger:
   - when: "vx_max > 60.0 or frac_crit > 0.0"
     severity: critical
     suggestion: "超过 60 m/s^2 会让加速度计数据失真并可能触发 EKF 失效。改善飞控减震与桨/电机动平衡后再飞。"
@@ -56,15 +57,15 @@ triggers:
       value: f"{vx_max:.1f}"
       threshold: 30
       unit: m/s^2
-tag: apm_high_vibration
 
 ---
 id: apm-vibration-y
 name: Y 轴振动
 group: vibration
 order: 2
+tag: apm_high_vibration
 
-conditions:
+condition:
   message:
     - VIBE
 
@@ -74,7 +75,7 @@ compute:
   - frac_warn = np.sum(vy > 30.0) / len(vy)
   - frac_crit = np.sum(vy > 60.0) / len(vy)
 
-triggers:
+trigger:
   - when: "vy_max > 60.0 or frac_crit > 0.0"
     severity: critical
     suggestion: "超过 60 m/s^2 会让加速度计数据失真并可能触发 EKF 失效。改善飞控减震与桨/电机动平衡后再飞。"
@@ -102,15 +103,15 @@ triggers:
       value: f"{vy_max:.1f}"
       threshold: 30
       unit: m/s^2
-tag: apm_high_vibration
 
 ---
 id: apm-vibration-z
 name: Z 轴振动
 group: vibration
 order: 3
+tag: apm_high_vibration
 
-conditions:
+condition:
   message:
     - VIBE
 
@@ -120,7 +121,7 @@ compute:
   - frac_warn = np.sum(vz > 30.0) / len(vz)
   - frac_crit = np.sum(vz > 60.0) / len(vz)
 
-triggers:
+trigger:
   - when: "vz_max > 60.0 or frac_crit > 0.0"
     severity: critical
     suggestion: "Z 轴超标最常来自桨叶/机架共振与减震球老化，会直接影响定高。优先查这一轴。"
@@ -148,24 +149,25 @@ triggers:
       value: f"{vz_max:.1f}"
       threshold: 30
       unit: m/s^2
-tag: apm_high_vibration
 
 ---
 # 削波：Clip0/1/2 是**单调递增的累计计数器**，所以总次数 = 末值 - 初值 = np.ptp。
 # 任何非零都值得报（上游 warns on any clipping），>=100 升 critical。
+
 id: apm-clip-0
 name: 加速度计削波（IMU0）
 group: vibration
 order: 4
+tag: apm_accel_clipping
 
-conditions:
+condition:
   message:
     - VIBE
 
 compute:
   - clip0_total = np.ptp(VIBE.Clip0)
 
-triggers:
+trigger:
   - when: "clip0_total >= 100.0"
     severity: critical
     suggestion: "削波期间该 IMU 数据完全不可用。必须从源头降振动：桨动平衡、飞控软安装、检查机架共振。"
@@ -184,22 +186,22 @@ triggers:
       value: f"{clip0_total:.0f}"
       threshold: 0
       unit: 次
-tag: apm_accel_clipping
 
 ---
 id: apm-clip-1
 name: 加速度计削波（IMU1）
 group: vibration
 order: 5
+tag: apm_accel_clipping
 
-conditions:
+condition:
   message:
     - VIBE
 
 compute:
   - clip1_total = np.ptp(VIBE.Clip1)
 
-triggers:
+trigger:
   - when: "clip1_total >= 100.0"
     severity: critical
     suggestion: "削波期间该 IMU 数据完全不可用。必须从源头降振动：桨动平衡、飞控软安装、检查机架共振。"
@@ -218,22 +220,22 @@ triggers:
       value: f"{clip1_total:.0f}"
       threshold: 0
       unit: 次
-tag: apm_accel_clipping
 
 ---
 id: apm-clip-2
 name: 加速度计削波（IMU2）
 group: vibration
 order: 6
+tag: apm_accel_clipping
 
-conditions:
+condition:
   message:
     - VIBE
 
 compute:
   - clip2_total = np.ptp(VIBE.Clip2)
 
-triggers:
+trigger:
   - when: "clip2_total >= 100.0"
     severity: critical
     suggestion: "削波期间该 IMU 数据完全不可用。必须从源头降振动：桨动平衡、飞控软安装、检查机架共振。"
@@ -252,4 +254,3 @@ triggers:
       value: f"{clip2_total:.0f}"
       threshold: 0
       unit: 次
-tag: apm_accel_clipping

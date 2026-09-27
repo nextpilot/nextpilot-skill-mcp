@@ -16,8 +16,9 @@ id: apm-compass-interference
 name: 罗盘场强稳定性
 group: compass
 order: 1
+tag: apm_compass_interference
 
-conditions:
+condition:
   message:
     - MAG
 
@@ -32,7 +33,7 @@ compute:
   # when 走 _eval_expr 白名单，只允许 has_topic('...') 这类调用，调不了算子。
   - n_mag = len(mag)
 
-triggers:
+trigger:
   # 上游：CV > 0.60 是"场强极不稳定"，直接 critical
   - when: "cv_mag > 0.60 and n_mag >= 10"
     severity: critical
@@ -53,4 +54,3 @@ triggers:
       value: f"{cv_mag:.2f}"
       threshold: 0.3
       unit: ""
-tag: apm_compass_interference

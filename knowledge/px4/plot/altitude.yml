@@ -2,7 +2,7 @@ id: altitude
 title: Altitude Estimate
 description: GPS / 气压计 / 融合高度估计值与 setpoint。
 order: 2
-conditions:
+condition:
   message:
    - vehicle_gps_position || sensor_gps
 # ⚠️ setpoint 那条线暂时缺着，卡在 DSL 上，不是忘了写：
@@ -12,7 +12,7 @@ conditions:
 # 原来的 position_setpoint_triplet.current.alt 也不行：嵌套字段（current.alt）超出
 # 「topic.field」的表达范围，而且它在日志里只有 5 个采样（航点级），画不成时间序列。
 # 等有了 neg_series 算子（或字面量判定认一元负号）再补这条线。
-outputs:
+output:
   - container: axes
     title: 高度估计
     ylabel: "[m]"

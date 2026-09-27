@@ -2,9 +2,9 @@ id: airspeed
 title: Airspeed
 description: 地速 / 真空速 / 指示空速与 GPS 地速、空速 setpoint。
 order: 18
-conditions:
+condition:
   message: ["airspeed || airspeed_validated || vehicle_global_position"]
-outputs:
+output:
   - container: axes
     title: Airspeed
     ylabel: "[m/s]"

@@ -1,13 +1,12 @@
 // ⚠️ 自动生成，请勿手改。源文件在 knowledge/（按固件族分目录）与 knowledge/engine/，改完跑 `pnpm build:kb`（dev/build 自动执行）。
 // 源：knowledge/<族>/plot/*.yml（改图请改那边）
 export const PLOT_PRESETS = {
-  "ardupilot-bin": [],
   "px4-ulog": [
     {
       "id": "position",
       "title": "Position",
       "description": "2D 位置轨迹（vehicle_local_position y vs x），及 setpoint、GPS setpoint。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -86,7 +85,7 @@ export const PLOT_PRESETS = {
       "id": "altitude",
       "title": "Altitude Estimate",
       "description": "GPS / 气压计 / 融合高度估计值与 setpoint。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -153,7 +152,7 @@ export const PLOT_PRESETS = {
       "id": "roll-angle",
       "title": "Roll Angle",
       "description": "Roll 欧拉角估计值与 setpoint、groundtruth。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -208,7 +207,7 @@ export const PLOT_PRESETS = {
       "id": "roll-rate",
       "title": "Roll Angular Rate",
       "description": "Roll 角速度估计值与 setpoint、积分。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -292,7 +291,7 @@ export const PLOT_PRESETS = {
       "id": "pitch-angle",
       "title": "Pitch Angle",
       "description": "Pitch 欧拉角估计值与 setpoint、groundtruth。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -358,7 +357,7 @@ export const PLOT_PRESETS = {
       "id": "pitch-rate",
       "title": "Pitch Angular Rate",
       "description": "Pitch 角速度估计值与 setpoint、积分。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -442,7 +441,7 @@ export const PLOT_PRESETS = {
       "id": "yaw-angle",
       "title": "Yaw Angle",
       "description": "Yaw 欧拉角估计值与 setpoint、FF。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -525,7 +524,7 @@ export const PLOT_PRESETS = {
       "id": "yaw-rate",
       "title": "Yaw Angular Rate",
       "description": "Yaw 角速度估计值与 setpoint、积分。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -609,7 +608,7 @@ export const PLOT_PRESETS = {
       "id": "local-x",
       "title": "Local Position X",
       "description": "局部位置 X 轴估计值与 setpoint。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -675,7 +674,7 @@ export const PLOT_PRESETS = {
       "id": "local-y",
       "title": "Local Position Y",
       "description": "局部位置 Y 轴估计值与 setpoint。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -741,7 +740,7 @@ export const PLOT_PRESETS = {
       "id": "local-z",
       "title": "Local Position Z",
       "description": "局部位置 Z 轴估计值与 setpoint（向上为正）。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -807,7 +806,7 @@ export const PLOT_PRESETS = {
       "id": "velocity",
       "title": "Velocity",
       "description": "三轴速度估计值与 setpoint（vx/vy/vz）。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -901,7 +900,7 @@ export const PLOT_PRESETS = {
       "id": "visual-odom-pos",
       "title": "Visual Odometry Position",
       "description": "视觉里程计位置（仅当 topic 存在时显示）。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -964,7 +963,7 @@ export const PLOT_PRESETS = {
       "id": "visual-odom-vel",
       "title": "Visual Odometry Velocity",
       "description": "视觉里程计速度（仅当 topic 存在时显示）。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -1027,7 +1026,7 @@ export const PLOT_PRESETS = {
       "id": "visual-odom-att",
       "title": "Visual Odometry Attitude",
       "description": "视觉里程计姿态角（仅当 topic 存在时显示）。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -1090,7 +1089,7 @@ export const PLOT_PRESETS = {
       "id": "visual-odom-rate",
       "title": "Visual Odometry Attitude Rate",
       "description": "视觉里程计角速率（仅当 topic 存在时显示）。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -1153,7 +1152,7 @@ export const PLOT_PRESETS = {
       "id": "visual-odom-latency",
       "title": "Visual Odometry Latency",
       "description": "视觉里程计延迟（仅当 topic 存在时显示）。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -1202,7 +1201,7 @@ export const PLOT_PRESETS = {
       "id": "airspeed",
       "title": "Airspeed",
       "description": "地速 / 真空速 / 指示空速与 GPS 地速、空速 setpoint。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -1279,7 +1278,7 @@ export const PLOT_PRESETS = {
       "id": "tecs",
       "title": "TECS",
       "description": "TECS 高度变化率与 setpoint（固定翼/VTOL）。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -1335,7 +1334,7 @@ export const PLOT_PRESETS = {
       "id": "rc",
       "title": "Manual Control Inputs",
       "description": "手动控制输入（遥控器/手柄）：Roll/Pitch/Yaw/Throttle + Aux + Flight Mode + Kill Switch。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -1445,7 +1444,7 @@ export const PLOT_PRESETS = {
       "id": "actuator-controls-0",
       "title": "Actuator Controls",
       "description": "Actuator Controls 0：扭矩轴（Roll/Pitch/Yaw）+ 推力。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -1512,7 +1511,7 @@ export const PLOT_PRESETS = {
       "id": "actuator-controls-1",
       "title": "Actuator Controls 1 (VTOL in Fixed-Wing mode)",
       "description": "第二组 Actuator Controls（仅 VTOL/固定翼配置时存在）。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -1596,7 +1595,7 @@ export const PLOT_PRESETS = {
       "id": "actuator-outputs",
       "title": "Actuator Outputs",
       "description": "执行机构输出（Motor/Servo 或 Main/AUX/EXTRA），取决于 dynamic_control_alloc。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -1939,7 +1938,7 @@ export const PLOT_PRESETS = {
       "id": "raw-accel",
       "title": "Raw Acceleration",
       "description": "传感器原始加速度（sensor_combined.accelerometer_m_s2）。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -2002,7 +2001,7 @@ export const PLOT_PRESETS = {
       "id": "vibration",
       "title": "Vibration Metrics",
       "description": "每个 IMU 的高频振动指标 IMU0-3 合在一张图上，参考线 4.905 / 9.81。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -2083,7 +2082,7 @@ export const PLOT_PRESETS = {
       "id": "raw-gyro",
       "title": "Raw Angular Speed (Gyroscope)",
       "description": "传感器原始角速度（sensor_combined.gyro_rad）。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -2146,7 +2145,7 @@ export const PLOT_PRESETS = {
       "id": "fifo-accel",
       "title": "Raw Acceleration (FIFO)",
       "description": "FIFO 加速度计原始数据（每 IMU 一张），仅当 sensor_accel_fifo 存在时显示。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -2209,7 +2208,7 @@ export const PLOT_PRESETS = {
       "id": "fifo-gyro",
       "title": "Raw Gyro (FIFO)",
       "description": "FIFO 陀螺仪原始数据（每 IMU 一张），仅当 sensor_gyro_fifo 存在时显示。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -2272,7 +2271,7 @@ export const PLOT_PRESETS = {
       "id": "mag",
       "title": "Raw Magnetic Field Strength",
       "description": "传感器原始磁场强度（magnetometer_ga），兼容 vehicle_magnetometer / sensor_combined。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -2339,7 +2338,7 @@ export const PLOT_PRESETS = {
       "id": "distance",
       "title": "Distance Sensor",
       "description": "距离传感器读数（current_distance / variance / dist_bottom）。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -2419,7 +2418,7 @@ export const PLOT_PRESETS = {
       "id": "gps-uncertainty",
       "title": "GPS Uncertainty",
       "description": "GPS 不确定度：eph / epv / hdop / vdop / s_variance_m_s / satellites_used / fix_type。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -2518,7 +2517,7 @@ export const PLOT_PRESETS = {
       "id": "gps-noise",
       "title": "GPS Noise & Jamming",
       "description": "GPS 噪声与干扰指示器。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -2577,7 +2576,7 @@ export const PLOT_PRESETS = {
       "id": "thrust-mag",
       "title": "Thrust and Magnetic Field",
       "description": "推力与磁场强度范数对比。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -2644,7 +2643,7 @@ export const PLOT_PRESETS = {
       "id": "power",
       "title": "Power",
       "description": "电池电压 / 电流 / 放电量 / 剩余电量 / OCV / 内阻 / 5V / 3.3V。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -2762,7 +2761,7 @@ export const PLOT_PRESETS = {
       "id": "temperature",
       "title": "Temperature",
       "description": "传感器温度：Baro / Accel / Airspeed / Battery / ESC。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -2852,7 +2851,7 @@ export const PLOT_PRESETS = {
       "id": "estimator-flags",
       "title": "Estimator Flags",
       "description": "EKF 健康/超时/创新检验标志位。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -2974,7 +2973,7 @@ export const PLOT_PRESETS = {
       "id": "failsafe-flags",
       "title": "Failsafe Flags",
       "description": "失效保护标志：failsafe / user_took_over / failsafe_flags。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -3187,7 +3186,7 @@ export const PLOT_PRESETS = {
       "id": "cpu-ram",
       "title": "CPU & RAM",
       "description": "CPU 负载与 RAM 使用率。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -3243,7 +3242,7 @@ export const PLOT_PRESETS = {
       "id": "sampling",
       "title": "Sampling Regularity",
       "description": "sensor_combined 采样间隔与 estimator_status time_slip。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [
@@ -3292,7 +3291,7 @@ export const PLOT_PRESETS = {
       "id": "track",
       "title": "轨迹",
       "description": "地图上的飞行轨迹（原始 GNSS），多条轨道叠画、可点选隐藏。",
-      "conditions": {
+      "condition": {
         "firmware": "any",
         "vehicle": "any",
         "message": [

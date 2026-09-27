@@ -22,7 +22,7 @@
 支持 PX4 `.ulg` 和 ArduPilot `.bin` 两种飞控日志格式，平台在**浏览器本地**完成全部分析，输出中文报告：
 
 - **原始日志不出浏览器** —— 隐私安全有保障
-- **规则引擎做数值判断** —— PX4：32 条检查规则覆盖 16 个维度；ArduPilot：34 条规则（阈值 draft）
+- **规则引擎做数值判断** —— PX4：31 条检查规则覆盖 16 个维度；ArduPilot：43 条规则（阈值 draft）
 - **LLM 只做中文解释** —— AI 接收的是脱敏后的结构化结论，不接触原始数据
 
 在线体验：已上线 [Skill Hub](https://nextpilot-skill-mcp.pages.dev)，支持 GitHub / 邮箱登录。
@@ -122,8 +122,8 @@ pnpm web:dev
   │
   ▼
 第二层 · 规则检查
-  PX4：32 条 YAML 规则（16 个维度）
-  ArduPilot：34 条 YAML 规则（来自 ardupilot-mcp 的 16 项检查）
+  PX4：31 条 YAML 规则（16 个维度）
+  ArduPilot：43 条 YAML 规则（来自 ardupilot-mcp 的 16 项检查）
   构建期编译为 Python → 内联到 Worker
   │
   ▼

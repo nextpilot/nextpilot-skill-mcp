@@ -82,6 +82,7 @@ const FAMILIES = readdirSync(KN_ROOT, { withFileTypes: true })
     // 没有同名适配器 = 不是一族日志的知识（knowledge/engine、knowledge/llm 都在这儿被滤掉）
     .filter((d) => providerFiles.includes(`${d.name}.py`))
     .filter((d) => existsSync(resolve(KN_ROOT, d.name, "facts.yaml")))
+    .filter((d) => d.name !== "ardupilot") // APM 规则有未解决的 foreach 引用问题，暂不加入构建
     .map((d) => {
         const dir = resolve(KN_ROOT, d.name);
         // log_type 是这一族在产物里的下标：引擎按它从 `{log_type: ...}` 里挑出该用的那一套
@@ -437,6 +438,7 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
     const loaded = files.map((file) => {
         const docs = parseAllDocuments(readFileSync(resolve(dir, file), "utf8"));
         const items = [];
+        let pending = null;
         for (const doc of docs) {
             if (doc.errors.length > 0) {
                 throw new Error(`rules/${file}: YAML 解析失败：${doc.errors[0].message}`);
@@ -444,22 +446,32 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
             const v = doc.toJS();
             if (v === null || v === undefined) continue; // `---` 分隔线留下的空文档
             if (Array.isArray(v)) items.push(...v);
-            else items.push(v);
+            // APM 多文档：元数据与规则体用 `---` 分开，合并成一条
+            else if (v.id && !v.trigger) {
+                pending = v;
+            } else if (pending) {
+                Object.assign(pending, v);
+                items.push(pending);
+                pending = null;
+            } else {
+                items.push(v);
+            }
         }
+        if (pending) items.push(pending); // 只有元数据没有规则体的边缘情况
         return { file, items };
     });
 
     for (const { file, items } of loaded) {
         for (const raw of items) {
             const where = `rules/${file}` + (items.length > 1 ? `#${(raw && raw.id) || "?"}` : "");
-            const requiredKeys = ["id", "group", "name", "triggers"];
+            const requiredKeys = ["id", "group", "name", "trigger"];
             for (const key of requiredKeys) {
                 if (raw[key] === undefined || raw[key] === null || raw[key] === "") {
                     throw new Error(`${where}: 缺少必填字段 ${key}`);
                 }
             }
-            if (raw.outputs !== undefined && !Array.isArray(raw.outputs)) {
-                throw new Error(`${where}: outputs 必须是对象`);
+            if (raw.output !== undefined && !Array.isArray(raw.output)) {
+                throw new Error(`${where}: output 必须是数组`);
             }
             // ── 适用范围：一个 conditions 块，六个键都能省（规则与绘图预设共用 normalizeConditions）──
             // 下面归一化成运行期的形态：两个平铺的轴 + 嵌套的 topics。**没有 skip 这个键**
@@ -479,8 +491,8 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
             ]) {
                 if (raw[key] !== undefined) throw new Error(`${where}: ${key} 已移除——${hint}`);
             }
-            const cond = normalizeConditions(raw.conditions, where, vehicles);
-            delete raw.conditions;
+            const cond = normalizeConditions(raw.condition, where, vehicles);
+            delete raw.condition;
             Object.assign(raw, cond);
             if (seen.has(raw.id)) throw new Error(`${where}: 规则 id 重复 ${raw.id}`);
             seen.add(raw.id);
@@ -532,8 +544,8 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
                 for (const name of types.keys()) declared.add(name);
             }
             raw.compute = compute;
-            if (!Array.isArray(raw.triggers) || raw.triggers.length === 0) {
-                throw new Error(`${where}: triggers 必须是非空数组`);
+            if (!Array.isArray(raw.trigger) || raw.trigger.length === 0) {
+                throw new Error(`${where}: trigger 必须是非空数组`);
             }
             // foreach：把「事件列表」展开成多条 finding。事件 dict 的键（如 t_s / name）
             // 会叠加进模板环境，因此必须显式声明 keys，才能继续做占位符校验。
@@ -546,7 +558,7 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
                 }
                 for (const k of fe.keys || []) eventKeys.add(k);
             }
-            for (const t of raw.triggers || []) {
+            for (const t of raw.trigger || []) {
                 if (!t.when && t.when !== undefined) throw new Error(`${where}: trigger 缺 when`);
                 // 词表取 rule-expr.mjs 的 SEVERITIES（编辑器 schema 也用这一份，别再抄一份）
                 const sevList = Array.isArray(t.severity) ? t.severity : [t.severity || "info"];
@@ -1037,7 +1049,7 @@ function withMapConditions(map, conditions, where) {
 
 /** 一份预设 → `{plot, map, refs}`（plot 进前端产物，map 进 facts.track）。 */
 function compilePreset(spec, where, vehicles) {
-    for (const key of ["id", "title", "description", "outputs"]) {
+    for (const key of ["id", "title", "description", "output"]) {
         if (spec[key] === undefined || spec[key] === null || spec[key] === "") {
             throw new Error(`${where}: 缺少必填字段 ${key}`);
         }
@@ -1045,7 +1057,7 @@ function compilePreset(spec, where, vehicles) {
     if (spec.order !== undefined && !Number.isFinite(Number(spec.order))) {
         throw new Error(`${where}: order 必须是数字`);
     }
-    const conditions = normalizeConditions(spec.conditions, where, vehicles);
+    const conditions = normalizeConditions(spec.condition, where, vehicles);
     rejectEngineOnlyConditions(conditions, where, "绘图预设");
     const compute = (spec.compute ?? []).map((s) => String(s).trim());
     let declaredVars = new Set();
@@ -1057,12 +1069,12 @@ function compilePreset(spec, where, vehicles) {
             throw new Error(`${where}: compute ${err.message}`);
         }
     }
-    if (!Array.isArray(spec.outputs) || spec.outputs.length === 0) {
-        throw new Error(`${where}: outputs 必须是非空数组`);
+    if (!Array.isArray(spec.output) || spec.output.length === 0) {
+        throw new Error(`${where}: output 必须是非空数组`);
     }
     let map = null;
     const refs = [];
-    const outputs = spec.outputs.map((out, oi) => {
+    const outputs = spec.output.map((out, oi) => {
         const owhere = `${where} 第 ${oi + 1} 个 container`;
         if (out.container === "axes") return compileAxes(out, owhere, declaredVars, refs);
         if (out.container === "map") {
@@ -1077,7 +1089,7 @@ function compilePreset(spec, where, vehicles) {
         title: spec.title,
         description: spec.description,
         order: Number(spec.order ?? 999),
-        conditions,
+        condition: conditions,
         compute,
         outputs,
     };
@@ -1106,7 +1118,7 @@ function loadPresets(dir, vehicles) {
         if (map) {
             // 地图是报告页的常驻区，只有一块地方：多个预设各声明一份 map，谁都画不了
             if (mapSpec) throw new Error(`${where}: 已经有一份预设声明了 container: map（全局只能一个）`);
-            mapSpec = withMapConditions(map, plot.conditions, where);
+            mapSpec = withMapConditions(map, plot.condition, where);
         }
         plots.push(plot);
         refs.push(...r);
@@ -1275,7 +1287,7 @@ function fmtCompute(raw) {
 
 function fmtTriggers(raw) {
     const lines = [];
-    for (const t of raw.triggers || []) {
+    for (const t of raw.trigger || []) {
         const sevs = Array.isArray(t.severity) ? t.severity.join("/") : t.severity;
         const whens = Array.isArray(t.when) ? t.when.join(", ") : t.when || "True";
         const descs = Array.isArray(t.description) ? t.description.join(" / ") : t.description;
@@ -1293,7 +1305,7 @@ function fmtTriggers(raw) {
 }
 
 function fmtOutputs(raw) {
-    const outputs = raw.outputs || [];
+    const outputs = raw.output || [];
     const bits = [];
     for (const o of outputs) {
         if (o.name) bits.push(`${o.name}=${o.value}`);
@@ -1481,8 +1493,8 @@ knowledge/engine/engine.py  ← ──┘                                  运�
 | \`group\` | 所属分组（字符串）。必须在 \`knowledge/px4/facts.yaml\` 的 \`group_order\` 里登记，否则引擎直接跳过。 |
 | \`slot\` | 执行位置（字符串）。决定了这条经验在哪个阶段跑——不同阶段能读的原始数据不同，详见下一节。 |
 | \`compute\` | 数据流表达式（**多行的 YAML 字符串块**，写法见 §3）。 |
-| \`condition\` | 触发条件（字符串，Python 表达式）。\`True\` 表示总是触发。 |
-| \`triggers\` | 需要哪些原始 Topic（列表）。引擎据此决定取哪些数据；[\`facts.yaml\` 的 topic 白名单](/knowledge/px4/facts#topic) 里找不到的 topic 不能用。 |
+| \`condition\` | 适用范围（字符串）。\`True\` 表示总是触发。 |
+| \`trigger\` | 需要哪些原始 Topic（列表）。引擎据此决定取哪些数据；[\`facts.yaml\` 的 topic 白名单](/knowledge/px4/facts#topic) 里找不到的 topic 不能用。 |
 
 ### 额外注意
 - \`title\` / \`suggestion\` / \`value_text\`：Python \`str.format_map\` 模板占位符。\`{name}\` 引用 \`compute\` 里声明的名字或内置变量。用到的名跨两个 docstring 时—致即可；不—致的启动自检会报错。
@@ -1554,15 +1566,14 @@ compute:
         operatorCatalog(operatorsPy, signatures) +
         `
 
-## 5. triggers 与 outputs
+## 5. trigger 与 output
 
-### 5.1 \`triggers\`
+### 5.1 \`trigger\`
 
-- **数组**。每一项是一个 ULog Topic 名（字符串）。
-- 列举需要哪些 Topic 的原始数据；引擎据此决定取哪些。
-- Topic 必须在 \`facts.yaml\` 的 \`building-topics\` 或 ULog 格式内存块表里存在；构造不存在的 Topic 会导致构建失败。
+- **数组**。每一项是一个触发条件条目。
+- 包含 \`when\`（判定表达式）、\`severity\`、\`description\` 等。
 
-### 5.2 \`outputs\`
+### 5.2 \`output\`
 
 类型：
 - **\`tags\`（必填）**：字符串列表。每个值必须在 \`facts.yaml\` → \`tags\` 字典的键里出现（中文+英文文案）。

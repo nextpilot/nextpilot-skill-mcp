@@ -2,9 +2,9 @@ id: visual-odom-att
 title: Visual Odometry Attitude
 description: 视觉里程计姿态角（仅当 topic 存在时显示）。
 order: 15
-conditions:
+condition:
   message: [vehicle_visual_odometry]
-outputs:
+output:
   - container: axes
     title: Visual Odometry Attitude
     ylabel: "[deg]"

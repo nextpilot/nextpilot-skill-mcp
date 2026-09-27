@@ -15,8 +15,9 @@ id: apm-sensor-rangefinder
 name: 测距仪配置但无数据
 group: sensor_health
 order: 1
+tag: apm_sensor_configured_but_silent
 
-conditions:
+condition:
   message:
     - PARM
 
@@ -24,7 +25,7 @@ compute:
   - rng_type = _cfg("RNGFND_TYPE", 0.0)
   - rng1_type = _cfg("RNGFND1_TYPE", 0.0)
 
-triggers:
+trigger:
   - when: "(rng_type > 0 or rng1_type > 0) and not has_topic('RFND') and not has_topic('RNGFND')"
     severity: warning
     suggestion: "参数声明了测距仪（RNGFND_TYPE/RNGFND1_TYPE > 0）却一条数据都没有：通常是接线松动、插错串口，或驱动没探测到设备。先确认日志里有 RFND（新）/ RNGFND（旧）消息。"
@@ -33,22 +34,22 @@ triggers:
       source: RNGFND_TYPE(>0) 但无 RFND/RNGFND 消息
       threshold: 0
       unit: ""
-tag: apm_sensor_configured_but_silent
 
 ---
 id: apm-sensor-gps
 name: GPS 配置但无数据
 group: sensor_health
 order: 2
+tag: apm_sensor_configured_but_silent
 
-conditions:
+condition:
   message:
     - PARM
 
 compute:
   - gps_type = _cfg("GPS_TYPE", 0.0)
 
-triggers:
+trigger:
   - when: "gps_type > 0 and not has_topic('GPS')"
     severity: warning
     suggestion: "参数声明了 GPS 接收机（GPS_TYPE > 0）却完全没有 GPS 消息：查接线、串口与驱动探测；没有 GPS 就无法定位与返航。"
@@ -57,24 +58,25 @@ triggers:
       source: GPS_TYPE(>0) 但无 GPS 消息
       threshold: 0
       unit: ""
-tag: apm_sensor_configured_but_silent
 
 ---
 # MAG.Health 是每样本的 0/1 标志，不需要参数，本轮可实现。
 # np.mean(health == 0.0)：值为 0 的样本占比，即"不健康"占比。
+
 id: apm-sensor-compass-health
 name: 罗盘健康标志
 group: sensor_health
 order: 3
+tag: apm_compass_unhealthy
 
-conditions:
+condition:
   message:
     - MAG
 
 compute:
   - unhealthy_ratio = np.mean(MAG.Health == 0.0)
 
-triggers:
+trigger:
   - when: "unhealthy_ratio > 0.20"
     severity: warning
     suggestion: "健康罗盘的 Health 标志几乎恒为 1。占比这么高说明磁罗盘在失效或掉线，航向会受影响；查接线、供电与干扰，必要时换罗盘。"
@@ -84,4 +86,3 @@ triggers:
       value: f"{unhealthy_ratio:.2f}"
       threshold: 0.2
       unit: ""
-tag: apm_compass_unhealthy

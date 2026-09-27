@@ -24,28 +24,17 @@
         "airspeed",
         "attitude_tracking",
         "battery",
-        "calibration",
-        "compass",
-        "config_safety",
         "cpu",
         "ekf_faults",
         "ekf_innovations",
-        "ekf_variance",
-        "events",
         "failsafe",
         "gps_health",
         "guards",
         "guards_early",
         "imu_bias",
-        "integrity",
         "logged_messages",
         "mode_thrash",
         "motor_balance",
-        "param_audit",
-        "prearm_messages",
-        "rc_input",
-        "sensor_health",
-        "timing",
         "vibration",
         "vtol_transition",
         "wind_estimate"
@@ -83,7 +72,7 @@
       "type": "object",
       "additionalProperties": true
     },
-    "conditions": {
+    "condition": {
       "type": "object",
       "description": "适用范围，整块可省（省 = 什么都适用）。任一键不满足都会记一条 skipped 并带自动文案",
       "additionalProperties": false,
@@ -107,25 +96,10 @@
               "enum": [
                 "airship",
                 "any",
-                "coax",
-                "copter",
-                "deca",
-                "dodeca",
                 "fixed_wing",
-                "heli",
-                "heli_dual",
-                "hexa",
-                "octa",
-                "octa_quad",
-                "plane",
-                "quad",
                 "rotary_wing",
                 "rover",
-                "single",
-                "tri",
-                "undefined",
-                "unknown",
-                "y6"
+                "unknown"
               ]
             },
             {
@@ -135,25 +109,10 @@
                 "enum": [
                   "airship",
                   "any",
-                  "coax",
-                  "copter",
-                  "deca",
-                  "dodeca",
                   "fixed_wing",
-                  "heli",
-                  "heli_dual",
-                  "hexa",
-                  "octa",
-                  "octa_quad",
-                  "plane",
-                  "quad",
                   "rotary_wing",
                   "rover",
-                  "single",
-                  "tri",
-                  "undefined",
-                  "unknown",
-                  "y6"
+                  "unknown"
                 ]
               }
             }
@@ -214,7 +173,7 @@
       },
       "description": "取值：一串表达式，自上而下求值"
     },
-    "outputs": {
+    "output": {
       "type": "array",
       "description": "指标输出（纯数据，写入 metrics）。多条 = 多个指标",
       "items": {
@@ -244,7 +203,7 @@
         }
       }
     },
-    "triggers": {
+    "trigger": {
       "type": "array",
       "description": "判定：各大组之间**全部执行**，同组内的 when[] 短路（命中第一条即停）",
       "items": {
@@ -423,9 +382,9 @@
   "anyOf": [
     {
       "required": [
-        "triggers"
+        "trigger"
       ],
-      "title": "所有经验都要有 triggers（guard 用 severity: guard 表达）"
+      "title": "所有经验都要有 trigger"
     }
   ],
   "x-operators": [

@@ -2,9 +2,9 @@ id: local-x
 title: Local Position X
 description: 局部位置 X 轴估计值与 setpoint。
 order: 9
-conditions:
+condition:
   message: [vehicle_local_position]
-outputs:
+output:
   - container: axes
     title: Local Position X
     ylabel: "[m]"

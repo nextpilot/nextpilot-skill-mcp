@@ -2,9 +2,9 @@ id: rc
 title: Manual Control Inputs
 description: 手动控制输入（遥控器/手柄）：Roll/Pitch/Yaw/Throttle + Aux + Flight Mode + Kill Switch。
 order: 20
-conditions:
+condition:
   message: [manual_control_setpoint]
-outputs:
+output:
   - container: axes
     title: Manual Control Inputs (Radio or Joystick)
     ylabel: "[-1, 1]"

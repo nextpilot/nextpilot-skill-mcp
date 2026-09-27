@@ -2,9 +2,9 @@ id: tecs
 title: TECS
 description: TECS 高度变化率与 setpoint（固定翼/VTOL）。
 order: 19
-conditions:
+condition:
   message: [tecs_status]
-outputs:
+output:
   - container: axes
     title: TECS
     ylabel: "[m/s]"

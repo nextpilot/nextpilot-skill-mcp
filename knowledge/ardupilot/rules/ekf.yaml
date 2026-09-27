@@ -20,15 +20,16 @@ id: apm-ekf-velocity
 name: EKF 速度检验比
 group: ekf_variance
 order: 1
+tag: apm_ekf_variance_high
 
-conditions:
+condition:
   message:
     - "XKF4 || NKF4"
 
 compute:
   - sv_max = max(_ref("XKF4.SV", "NKF4.SV"))
 
-triggers:
+trigger:
   - when: "sv_max > 1.0"
     severity: critical
     suggestion: "超过 1.0 说明 EKF 在拒绝速度数据。结合振动、GPS 的结论找根因：振动会让加速度计失真，进而污染速度新息。"
@@ -47,22 +48,22 @@ triggers:
       value: f"{sv_max:.2f}"
       threshold: 0.8
       unit: ""
-tag: apm_ekf_variance_high
 
 ---
 id: apm-ekf-position
 name: EKF 位置检验比
 group: ekf_variance
 order: 2
+tag: apm_ekf_variance_high
 
-conditions:
+condition:
   message:
     - "XKF4 || NKF4"
 
 compute:
   - sp_max = max(_ref("XKF4.SP", "NKF4.SP"))
 
-triggers:
+trigger:
   - when: "sp_max > 1.0"
     severity: critical
     suggestion: "超过 1.0 说明 EKF 在拒绝位置数据，是定点漂移的直接前兆。优先查 GPS（搜星/HDOP/跳变）。"
@@ -81,22 +82,22 @@ triggers:
       value: f"{sp_max:.2f}"
       threshold: 0.8
       unit: ""
-tag: apm_ekf_variance_high
 
 ---
 id: apm-ekf-height
 name: EKF 高度检验比
 group: ekf_variance
 order: 3
+tag: apm_ekf_variance_high
 
-conditions:
+condition:
   message:
     - "XKF4 || NKF4"
 
 compute:
   - sh_max = max(_ref("XKF4.SH", "NKF4.SH"))
 
-triggers:
+trigger:
   - when: "sh_max > 1.0"
     severity: critical
     suggestion: "超过 1.0 说明 EKF 在拒绝高度数据。常见根因：振动（尤其 Z 轴）、气压计受桨流扰动、减震球老化。"
@@ -115,22 +116,22 @@ triggers:
       value: f"{sh_max:.2f}"
       threshold: 0.8
       unit: ""
-tag: apm_ekf_variance_high
 
 ---
 id: apm-ekf-magnetometer
 name: EKF 磁罗盘检验比
 group: ekf_variance
 order: 4
+tag: apm_ekf_variance_high
 
-conditions:
+condition:
   message:
     - "XKF4 || NKF4"
 
 compute:
   - sm_max = max(_ref("XKF4.SM", "NKF4.SM"))
 
-triggers:
+trigger:
   - when: "sm_max > 1.0"
     severity: critical
     suggestion: "超过 1.0 说明 EKF 在拒绝磁罗盘数据，航向会漂。查罗盘干扰（供电线走线、GPS/罗盘支架高度）与校准。"
@@ -149,4 +150,3 @@ triggers:
       value: f"{sm_max:.2f}"
       threshold: 0.8
       unit: ""
-tag: apm_ekf_variance_high

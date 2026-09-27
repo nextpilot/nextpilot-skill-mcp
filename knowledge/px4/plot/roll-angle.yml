@@ -1,13 +1,13 @@
-﻿id: roll-angle
+id: roll-angle
 title: Roll Angle
 description: Roll 欧拉角估计值与 setpoint、groundtruth。
 order: 3
-conditions:
+condition:
   message: [vehicle_attitude]
 compute:
   - roll, pitch, yaw = quat_to_euler(vehicle_attitude.q)
   - roll_d, pitch_d, yaw_d = quat_to_euler(vehicle_attitude_setpoint.q_d)
-outputs:
+output:
   - container: axes
     title: Roll Angle
     ylabel: deg

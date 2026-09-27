@@ -2,9 +2,9 @@ id: roll-rate
 title: Roll Angular Rate
 description: Roll 角速度估计值与 setpoint、积分。
 order: 4
-conditions:
+condition:
   message: [vehicle_attitude]
-outputs:
+output:
   - container: axes
     title: Roll Angular Rate
     ylabel: deg/s

@@ -2,9 +2,9 @@ id: thrust-mag
 title: Thrust and Magnetic Field
 description: 推力与磁场强度范数对比。
 order: 34
-conditions:
+condition:
   message: ["vehicle_magnetometer || sensor_combined"]
-outputs:
+output:
   - container: axes
     title: Thrust and Magnetic Field
     ylabel: "value"

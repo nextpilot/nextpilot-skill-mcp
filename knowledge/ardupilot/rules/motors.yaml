@@ -19,8 +19,9 @@ id: apm-motor-imbalance
 name: 电机输出不平衡
 group: motor_balance
 order: 1
+tag: apm_motor_output_unbalance
 
-conditions:
+condition:
   message:
     - RCOU
 
@@ -32,7 +33,7 @@ compute:
   - hot_ch = hot + 1
   - cold_ch = cold + 1
 
-triggers:
+trigger:
   - when: "spread > 300.0"
     severity: critical
     suggestion: "最热的是 {hot_ch} 号通道、最冷的是 {cold_ch} 号通道。飞控在持续对抗某个不对称（重心偏移、机架扭转、电机/桨不一致或某个电机偏弱），重点查这几项与电调校准。"
@@ -51,15 +52,15 @@ triggers:
       value: f"{spread:.0f}"
       threshold: 150
       unit: us
-tag: apm_motor_output_unbalance
 
 ---
 id: apm-motor-saturation
 name: 电机输出饱和
 group: motor_balance
 order: 2
+tag: apm_motor_output_saturated
 
-conditions:
+condition:
   message:
     - RCOU
 
@@ -69,9 +70,10 @@ compute:
   - sats = column_ratio_events(cols, 1950.0, min_frac=0.20, min_mean=1100.0)
 
 # 上游对每个超标通道各出一条 finding，这里靠 foreach 展开（占比最高的排在前）
+
 foreach: { var: sats, keys: [ channel, frac, mean ] }
 
-triggers:
+trigger:
   - when: "frac > 0.50"
     severity: critical
     suggestion: "超过一半时间贴着满舵，说明动力余量严重不足（超重或动力偏弱），已接近失去姿态控制权。减轻起飞重量或换更大推力的电机/桨。"
@@ -90,4 +92,3 @@ triggers:
       value: f"{frac*100:.0f}"
       threshold: 0.2
       unit: "%"
-tag: apm_motor_output_saturated
