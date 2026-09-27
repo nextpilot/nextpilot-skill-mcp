@@ -56,6 +56,7 @@ test-results/
 # 含 GPS 轨迹，勿入库；用小样本/合成日志做 CI
 tools/testdata/logs/*.ulg
 tools/testdata/logs/*.bin
+tools/testdata/logs/*.BIN
 
 # ========== IDE / 编辑器 ==========
 .vscode/

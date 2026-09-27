@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 
 export async function GET() {
     const body = [
-        `Contact: mailto:security@nextpilot.org`,
+        `Contact: mailto:latercomer@qq.com`,
         `Expires: ${new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()}`,
         `Preferred-Languages: zh, en`,
         `Canonical: ${SITE_URL}/.well-known/security.txt`,

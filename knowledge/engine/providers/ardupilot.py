@@ -111,6 +111,7 @@ _VEHICLE_CATEGORIES = {
     "copter": {"quad", "hexa", "octa", "tri", "coax", "y6", "heli", "heli_dual", "octa_quad", "single", "dodeca", "deca"},
     "plane": {"plane"},
     "rover": {"rover"},
+    "sub": {"sub"},
 }
 
 # EV 事件码 → 解锁/上锁（待真实样本核对，见文件头）
@@ -381,6 +382,10 @@ class ApmProvider:
             self.vehicle_type = "rover"
             self.airframe_id = None
             return
+        if "Sub" in fw_name:
+            self.vehicle_type = "sub"
+            self.airframe_id = None
+            return
         fc = self._params.get("FRAME_CLASS")
         try:
             fc = int(fc)
@@ -465,7 +470,7 @@ class ApmProvider:
 
     def parser_version(self):
         """自研解析器（不依赖 pymavlink）：版本号在这里维护，进报告头的 parserVersion。"""
-        return "apm-bin-parser/1.3.0"  # 1.3.0：ARMED_INTERVALS 迁移到引擎注入；builtin_variables() 瘦身；新增 get_mode_present
+        return "apm-bin-parser/1.5.0"  # 1.5.0：report_materials 填充 sysInfo；支持 ArduSub + sub vehicle_category；基线新增 APM .BIN 样本
 
     def get_topic_meta(self):
         out = []
@@ -852,8 +857,14 @@ class ApmProvider:
     def report_materials(self):
         """报告页原料。形态与 PX4 版本对齐（前端同一张表渲染）：能给的给，给不了给空。"""
         counts, walked_ok, _off, file_size = self.get_message_type_counts()
+        sys_info = {
+            "ver_sw": self.fw_label or "ArduPilot",
+            "ver_hw": "",
+            "sys_name": self.fw.get("vehicle", "") or "",
+            "replay": "false",
+        }
         return {
-            "sysInfo": {},
+            "sysInfo": sys_info,
             "infoDict": [],
             "msgTypeStats": [
                 {"code": name, "name": name, "en": "", "desc": "", "count": n} for name, n in sorted(counts.items())

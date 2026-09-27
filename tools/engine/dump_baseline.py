@@ -5,8 +5,8 @@ guardTags、phases、checksRun/checksSkipped、matchedFaults）冻结到 baselin
 作为后续"一条经验一个 YAML"重构的等价比对真相。
 
 用法：
-  python tools/engine/dump_baseline.py             # 冻结全部回归日志
-  python tools/engine/dump_baseline.py <ulg> ...    # 只冻结指定日志
+  python tools/engine/dump_baseline.py                    # 冻结全部回归日志
+  python tools/engine/dump_baseline.py <ulg_or_bin> ...   # 只冻结指定日志
 
 产物是**冻结的快照**：重构规则时不允许改基线（除非有明确理由并单独提交）。
 """
@@ -44,9 +44,10 @@ def slug(path: Path) -> str:
 
 
 def source_of(path: Path) -> str:
-    """记录日志来源：.ulg 不入库（见 .gitignore），基线必须自带“怎么把它取回来”。
+    """记录日志来源：.ulg/.BIN 不入库（见 .gitignore），基线必须自带"怎么把它取回来"。
 
     uuid 命名的日志来自 Flight Review（logs.px4.io）公开日志集。
+    APM 日志来自 ArduPilot SITL autotest 或用户提供的 .BIN。
     """
     stem = path.stem
     first = stem.split("-")[0]
@@ -54,6 +55,9 @@ def source_of(path: Path) -> str:
         return (
             "logs.px4.io 公开日志：GET https://logs.px4.io/download?log=%s（或 python tools/dev/download_px4_logs.py）" % stem
         )
+    suffix = path.suffix.lower()
+    if suffix == ".bin":
+        return "ArduPilot SITL autotest 日志（本地 .cache/ardupilot/logs/）"
     return "本仓库自带（tools/testdata/logs/，未入库，需自备）"
 
 
@@ -78,9 +82,12 @@ def dump_one(path: Path) -> Path:
 
 def main(argv: list[str]) -> int:
     args = argv[1:]
-    logs = [Path(a) for a in args] if args else sorted(LOG_DIR.glob("*.ulg"))
+    if args:
+        logs = [Path(a) for a in args]
+    else:
+        logs = sorted(LOG_DIR.glob("*.ulg")) + sorted(LOG_DIR.glob("*.BIN"))
     if not logs:
-        log.warning("没有可冻结的日志（tools/testdata/logs/*.ulg）")
+        log.warning("没有可冻结的日志（tools/testdata/logs/*.ulg *.BIN）")
         return 2
     log.info(f"冻结 {len(logs)} 个日志的引擎输出到 {BASELINE_DIR.relative_to(REPO_ROOT)}/")
     for p in logs:

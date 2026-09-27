@@ -1,0 +1,199 @@
+{
+  "log": "ArduCopter-GSF-00000001.BIN",
+  "slug": "ArduCopter-GSF-00000001",
+  "source": "ArduPilot SITL autotest 日志（本地 .cache/ardupilot/logs/）",
+  "engine": "knowledge/engine/engine.py",
+  "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
+  "result": {
+    "platform": "ArduPilot",
+    "logType": "ardupilot-bin",
+    "parserVersion": "apm-bin-parser/1.5.0",
+    "facts": {
+      "durationSec": 127.9,
+      "vehicleType": "quad",
+      "firmware": "4.8.0",
+      "firmwareDisplay": "4.8.0",
+      "armedDurationSec": 84.5,
+      "phases": [],
+      "dropoutTotalMs": 0,
+      "verSw": "368dc0c4",
+      "airframeId": 1
+    },
+    "metrics": [
+      {
+        "key": "vibrationMaxX",
+        "label": "最大振动(X)",
+        "value": 0.01,
+        "unit": "m/s^2"
+      },
+      {
+        "key": "vibrationMaxY",
+        "label": "最大振动(Y)",
+        "value": 0.02,
+        "unit": "m/s^2"
+      },
+      {
+        "key": "vibrationMaxZ",
+        "label": "最大振动(Z)",
+        "value": 1.74,
+        "unit": "m/s^2"
+      },
+      {
+        "key": "batteryVoltageMin",
+        "label": "最低电压(BAT)",
+        "value": 12.2,
+        "unit": "V"
+      },
+      {
+        "key": "currentMax",
+        "label": "最大电流",
+        "value": 39.18,
+        "unit": "A"
+      },
+      {
+        "key": "gpsSatellitesMin",
+        "label": "最少搜星",
+        "value": 3,
+        "unit": "颗"
+      },
+      {
+        "key": "gpsHdopMax",
+        "label": "最大 HDOP",
+        "value": 1.21
+      },
+      {
+        "key": "ekfVarianceMax",
+        "label": "EKF 最大检验比(XKF4)",
+        "value": 0.05
+      },
+      {
+        "key": "ekfVarianceMaxLegacy",
+        "label": "EKF 最大检验比(NKF4)",
+        "value": 0.07
+      },
+      {
+        "key": "longLoopCount",
+        "label": "长循环数",
+        "value": 5,
+        "unit": "次"
+      }
+    ],
+    "tags": [],
+    "guardTags": [],
+    "checksRun": [
+      "apm-guard-integrity",
+      "apm-ekf-velocity",
+      "apm-ekf-position",
+      "apm-ekf-height",
+      "apm-ekf-magnetometer",
+      "apm-battery-low",
+      "apm-battery-sag",
+      "apm-battery-sudden-drop",
+      "apm-timing-gaps",
+      "apm-config-arming-check",
+      "apm-config-batt-monitor",
+      "apm-config-fs-thr",
+      "apm-calibration-compass-offset",
+      "apm-sensor-rangefinder",
+      "apm-sensor-gps",
+      "apm-param-audit-rate-p",
+      "apm-param-audit-accel-max",
+      "apm-param-audit-batt-crt",
+      "apm-param-audit-spin-arm",
+      "apm-param-audit-pwm-inverted",
+      "apm-param-audit-fence-empty"
+    ],
+    "checksSkipped": [
+      {
+        "ruleId": "apm-err-subsystem",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-ev-events",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-mode-timeline",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-vibration-x",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-vibration-y",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-vibration-z",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-clip-0",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-clip-1",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-clip-2",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-gps-fix",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-gps-sats",
+        "reason": "本条只在有解锁段时适用"
+      },
+      {
+        "ruleId": "apm-gps-hdop",
+        "reason": "本条只在有解锁段时适用"
+      },
+      {
+        "ruleId": "apm-compass-interference",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-attitude-roll",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-attitude-pitch",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-attitude-yaw",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-motor-imbalance",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-motor-saturation",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-rcin-link-loss",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-timing-long-loops",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-sensor-compass-health",
+        "reason": "数据不足，本条没算出结论"
+      },
+      {
+        "ruleId": "apm-prearm-warnings",
+        "reason": "数据不足，本条没算出结论"
+      }
+    ],
+    "matchedFaults": [],
+    "findings": []
+  }
+}

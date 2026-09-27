@@ -312,11 +312,15 @@ def main(argv: list[str]) -> int:
     _ARGS = args
 
     log_dir = ROOT / "tools" / "testdata" / "logs"
-    logs = sorted(log_dir.glob("*.ulg")) + sorted(log_dir.glob("*.bin")) if not args.skip_logs else []
+    logs = (
+        sorted(log_dir.glob("*.ulg")) + sorted(log_dir.glob("*.bin")) + sorted(log_dir.glob("*.BIN"))
+        if not args.skip_logs
+        else []
+    )
     has_logs = bool(logs)
     log_paths = [str(p) for p in logs]
     logs_skip_reason = (
-        "skipped via --skip-logs" if args.skip_logs else f"no .ulg under {log_dir.relative_to(ROOT)} (expected in CI)"
+        "skipped via --skip-logs" if args.skip_logs else f"no .ulg/.BIN under {log_dir.relative_to(ROOT)} (expected in CI)"
     )
 
     stages = _load_checklist(has_logs, log_paths)
