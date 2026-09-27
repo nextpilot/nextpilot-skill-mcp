@@ -54,16 +54,23 @@
 ├── docs/               # 文档
 │   ├── guide/          # 面向用户的指南（发布到站内 /guide）
 │   └── develop/        # 面向开发与运维
-├── knowledge/engine/             # 确定性分析引擎源码（operators / engine）
-├── knowledge/          # 日志分析的经验与数据
-│   ├── px4/            # PX4 相关（rules/*.yaml / 故障库 / LLM 提示词 / meta）
-│   ├── ardupilot/      # ArduPilot 相关（规则 / 故障库）
-│   ├── skills/         # Skill 卡片内容
-│   └── mcp/            # MCP 条目内容
-├── tools/              # 手动运行的工具
-│   ├── px4/            # PX4 上游同步与文档生成
-│   ├── calibrate/      # 回归校准
-│   └── ci/             # CI 校验入口
+├── knowledge/          # 经验与引擎的唯一真源（改经验只改这里）
+│   ├── engine/         # 确定性分析引擎源码（engine.py / loader.py / operators.py）
+│   │   ├── providers/  # 日志格式适配器（PX4 .ulg / ArduPilot .bin）
+│   │   └── tests/      # 引擎单测（单测跟着被测模块走）
+│   ├── px4/            # PX4：rules/*.yaml（31 条）+ fault-kb.yaml + meta/ + plot/
+│   ├── ardupilot/      # ArduPilot：rules/*.yaml（43 条）+ docs/ + facts.yaml
+│   ├── llm/            # LLM 提示词（GJB-841 system prompt 等）
+│   └── rules-template.yml / plot-template.yml / rules-editor-schema.generated.json
+├── server/             # 本地 MCP 服务（stdio，全部只读工具）
+│   └── nextpilot_mcp/  # 日志侧 analyze_log 等 + 知识侧 get_rule 等
+├── tools/              # 人手动跑的开发与校验工具（构建脚本在 web/scripts/，不在这里）
+│   ├── ci/             # 编排层：check_all.py + checklist.yml（唯一入口）
+│   ├── engine/         # 引擎守卫与回归（纯净性、provider 契约、字段引用、冻结基线）
+│   ├── common/         # 仓库级检查（密钥扫描、工具链自查、校验机制卫生）
+│   ├── dev/            # 给人用：下载日志、抓上游字典、探查字段 / 阈值、本地工作台
+│   ├── setup/          # 装开发环境（uv / pnpm / git hook）
+│   └── testdata/       # logs/（真实 .ulg，含 GPS 不入库）+ baseline/（冻结基线）
 └── web/                # Next.js 站点 + Pages Functions（独立项目，有自己的 package.json）
     ├── content/        # 站点内容唯一真源（guide/skills/mcp，入库）
     ├── app/            # 页面与 /api/auth 路由
@@ -71,7 +78,7 @@
     ├── functions/      # EdgeOne 边缘函数（KV、配额、DeepSeek 转发）
     ├── lib/            # 工具库
     ├── scripts/        # 构建脚本（build-knowledge.mjs）
-    └── workers/        # Pyodide Web Worker + 自动生成的 Python 规则脚本（勿手改）
+    └── workers/        # Pyodide Web Worker + 构建生成的引擎产物（*.generated.*，勿手改）
 ```
 
 > **经验法则**：日志分析的规则、阈值与提示词**只在 `knowledge/` 下维护**。
