@@ -207,7 +207,7 @@ console.log("\n[5] 未配置时完全 no-op（本地开发不该往库里写东�
     const r2 = await reportIssue({ ISSUE_ENABLED: "1" }, { level: "fatal", type: "X", message: "y" });
     check("开了但缺 repo/token → unconfigured", r2.skipped === "unconfigured", JSON.stringify(r2));
     const r3 = await reportIssue(
-        { ISSUE_ENABLED: "1", ISSUE_REPO: "not-a-repo", ISSUE_TOKEN: "t" },
+        { ISSUE_ENABLED: "1", ISSUE_REPO: "not-a-repo", AUTH_GITEE_TOKEN: "t" },
         { level: "fatal", type: "X", message: "y" },
     );
     check("repo 格式不对 → bad-repo", r3.skipped === "bad-repo", JSON.stringify(r3));
@@ -227,7 +227,7 @@ console.log("\n[6] 建单链路（stub fetch，不联网）");
                 ISSUE_ENABLED: "1",
                 ISSUE_PROVIDER: "gitee",
                 ISSUE_REPO: "nextpilot/nextpilot-skill-mcp",
-                ISSUE_TOKEN: "tk",
+                AUTH_GITEE_TOKEN: "tk",
                 ISSUE_LABELS: "auto-report",
             },
             {
@@ -283,7 +283,7 @@ console.log("\n[7] 去重与评论节流（stub fetch + 假 KV）");
         ISSUE_ENABLED: "1",
         ISSUE_PROVIDER: "gitee",
         ISSUE_REPO: "a/b",
-        ISSUE_TOKEN: "tk",
+        AUTH_GITEE_TOKEN: "tk",
         NEXTPILOT_KV: fakeKv,
     };
     const payload = {

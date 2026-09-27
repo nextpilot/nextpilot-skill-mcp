@@ -137,6 +137,16 @@ GUARDS = {
     # 指南 MDX 可编译：guide 页正文请求期才编译，next build / markdownlint / build:kb
     # --check 三道门都看不见它 —— 快、无依赖、不需要日志
     "guide-mdx": ([NODE, "scripts/check-guide-mdx.mjs"], WEB, "指南 MDX 可编译（check-guide-mdx）", "fail-lines"),
+    # 后台站点设置：三层取值（KV > env > 代码地板）与字段表驱动这套机制里，
+    # **五种回归都不报错、只是悄悄失效**（两侧字段表不一致 = 存了读不到／页脚写死 = 改了
+    # 没反应／metadata 退回静态常量 = 烙进构建产物／密钥名进客户端组件 = 明文进 SSR HTML／
+    # 密钥没有消费点 = 轮换失效）。只扫源码文本，无依赖无网络，约 1s。
+    "site-settings": (
+        [NODE, "scripts/check-site-settings.mjs"],
+        WEB,
+        "站点设置（check-site-settings）",
+        "fail-lines",
+    ),
 }
 
 
@@ -865,6 +875,75 @@ MUTATIONS: list[Mutation] = [
         new="",
         guard="guide-mdx",
         expect="mdx-wiring",
+        note="check_all.py 只按清单转发 —— 清单里没它，这份检查就再也不会被执行",
+    ),
+    # ---- 后台站点设置：五种「不报错、只是悄悄失效」的回归（2026-09-27） ----
+    #
+    # 这套机制的坏法有一个共同点：**构建照过、页面照开，只有管理员改了没反应**。
+    # 字段表两侧对不上（存了读不到）、页脚写死（改了不变）、metadata 退回静态常量
+    # （烙进构建产物）、密钥名进客户端组件（明文进 SSR HTML）、密钥没有消费点
+    # （轮换失效）——没有一条会抛异常，所以只能静态拦。
+    Mutation(
+        name="边缘侧字段表的 kind 与 Node 侧对不上（存进去了读不出来）",
+        path="web/functions/_lib/settings-schema.js",
+        old='    { key: "icp", label: "备案号", kind: "text", optional: true },',
+        new='    { key: "icp", label: "备案号", kind: "url", optional: true },',
+        guard="site-settings",
+        expect="settings-schema",
+        note="边缘按自己那份校验落库、Node 按自己那份回落渲染，kind 不一致时 API 回 ok 而页面读不到值",
+    ),
+    Mutation(
+        name="页脚 props 少接一项（那一项就永远停在默认值上）",
+        path="web/components/SiteFooter.tsx",
+        old="export function SiteFooter({ footerCopyright, footerTagline, sourceUrl, icp }: SiteFooterProps) {",
+        new="export function SiteFooter({ footerCopyright, footerTagline, sourceUrl }: SiteFooterProps) {",
+        guard="site-settings",
+        expect="settings-footer-props",
+        note="客户端组件读不到 KV，没接进来的那项后台改了也没用（备案号就是这么一项）",
+    ),
+    Mutation(
+        name="页脚把仓库地址写回组件里（后台改链接不生效）",
+        path="web/components/SiteFooter.tsx",
+        old="export interface SiteFooterProps {",
+        new='const SOURCE_URL_FALLBACK = "https://gitee.com/nextpilot/nextpilot-skill-mcp";\nexport interface SiteFooterProps {',
+        guard="site-settings",
+        expect="settings-footer-url",
+        note="改托管平台时顺手把链接贴回组件是最容易回潮的一种：代码看着完全正常，后台那条设置成了摆设",
+    ),
+    Mutation(
+        name="根 layout 的 metadata 退回静态常量（标题被烙进构建产物）",
+        path="web/app/layout.tsx",
+        old="export async function generateMetadata(): Promise<Metadata> {",
+        new="export async function buildMetadata(): Promise<Metadata> {",
+        guard="site-settings",
+        expect="settings-metadata",
+        note="NEXT_PUBLIC_* 在构建期内联，退回 export const metadata 之后后台改名再也不生效",
+    ),
+    Mutation(
+        name="密钥字段名进了客户端组件（明文被序列化进 SSR HTML）",
+        path="web/components/SiteHeader.tsx",
+        old="export function SiteHeader() {",
+        new='export const SMTP_FIELD = "smtpPass";\nexport function SiteHeader() {',
+        guard="site-settings",
+        expect="settings-secret-client",
+        note="客户端组件的 props 会进 SSR 的 HTML：字段名在那儿出现，等于密钥明文能被查看源代码拿走",
+    ),
+    Mutation(
+        name="消费点把 key 改名成 V2 而字段表没跟着改（存的是 A、读的是 B）",
+        path="web/functions/api/explain.js",
+        old='    const apiKey = await getSecret(env, "deepseekApiKey", "DEEPSEEK_API_KEY");',
+        new='    const apiKey = await getSecret(env, "deepseekApiKeyV2", "DEEPSEEK_API_KEY");',
+        guard="site-settings",
+        expect="settings-secret-wiring",
+        note="管理员以为轮换过了，实际走的还是环境变量里那份。判据必须整词匹配：子串匹配会把 xxxV2 也算成有人在读",
+    ),
+    Mutation(
+        name="站点设置这道门从 checklist.yml 里被摘掉（没人再跑它）",
+        path="tools/ci/checklist.yml",
+        old='      - id: "check-site-settings"',
+        new="",
+        guard="site-settings",
+        expect="settings-wiring",
         note="check_all.py 只按清单转发 —— 清单里没它，这份检查就再也不会被执行",
     ),
 ]

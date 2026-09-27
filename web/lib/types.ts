@@ -26,6 +26,8 @@ export interface SkillMeta {
     /** 致动能力：read-only 表示仅分析不写参数，config 表示可修改配置/参数 */
     capability?: "read-only" | "config";
     updatedAt: string;
+    /** @internal 拼音全拼（构建期预计算，用于 Fuse.js 拼音容错搜索） */
+    _pinyin?: string;
 }
 
 export interface ChangelogEntry {

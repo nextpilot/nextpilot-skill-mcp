@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import { pinyin } from "pinyin-pro";
 import type { SkillFile, SkillMeta } from "./types";
 import { parseChangelogFromMarkdown } from "./changelog";
 import { SKILLS_DIR } from "./content-dir";
@@ -62,7 +63,7 @@ function parseSkillDir(dirName: string): Skill {
         rating: Number(meta.seed_rating ?? 0),
         downloads: Number(meta.seed_downloads ?? 0),
         featured: meta.featured === "true",
-        sourceUrl: meta.source_url,
+        sourceUrl: meta.repo_url,
         paperUrl: meta.paper_url,
         license: data.license ? String(data.license) : undefined,
         icon: meta.icon,
@@ -72,7 +73,20 @@ function parseSkillDir(dirName: string): Skill {
         updatedAt: latest?.date ?? "",
         readme: readme.trim(),
         skillMd: skillMd.trimEnd(),
+        _pinyin: pinyinSkill(
+            meta.display_name ?? String(data.name ?? dirName),
+            String(data.description ?? ""),
+            splitList(meta.tags),
+        ),
     };
+}
+
+/** 构建期预计算拼音，用于浏览器端 Fuse.js 拼音容错搜索 */
+function pinyinSkill(name: string, description: string, tags: string[]): string {
+    const parts = [name, ...tags.map((t) => `#${t}`)];
+    // 描述取前 60 字（足够匹配核心关键词，避免索引过长）
+    if (description) parts.push(description.slice(0, 60));
+    return parts.map((s) => pinyin(s, { toneType: "none", nonZh: "consecutive" }).replace(/\s+/g, " ")).join(" ");
 }
 
 /** metadata 只允许 string→string，列表在写入时被转成 `A, B, C`，这里拆回来 */

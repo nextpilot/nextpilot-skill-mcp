@@ -18,6 +18,7 @@
 // 改规则只改那里——本文件与 lib/issue-bridge.ts 都不许再各写一份。
 
 import { getKv, sha256Hex } from "./kv.js";
+import { getSecret } from "./secrets.js";
 import {
     MAX_MESSAGE,
     MAX_STACK,
@@ -107,13 +108,15 @@ export async function fingerprintOf(p) {
     ).slice(0, 16);
 }
 
-function readConfig(env) {
+// async：令牌现在也可能来自后台 KV（`getSecret`），不再是"读一下 env 就好"。
+// 两处调用点都在 async 函数里，改成 await 即可。
+async function readConfig(env) {
     const provider = String(env?.ISSUE_PROVIDER ?? "gitee").toLowerCase() === "github" ? "github" : "gitee";
     return {
         enabled: String(env?.ISSUE_ENABLED ?? "") === "1",
         provider,
         repo: String(env?.ISSUE_REPO ?? "").trim(),
-        token: String(env?.ISSUE_TOKEN ?? "").trim(),
+        token: await getSecret(env, "issueToken", "AUTH_GITEE_TOKEN"),
         labels: String(env?.ISSUE_LABELS ?? "")
             .split(",")
             .map((s) => s.trim())
@@ -244,7 +247,7 @@ async function recordFailure(kv, stage, detail) {
 export async function reportIssue(env, payload) {
     let cfg;
     try {
-        cfg = readConfig(env);
+        cfg = await readConfig(env);
         if (!cfg.enabled) return { skipped: "disabled" };
         if (!cfg.repo || !cfg.token) return { skipped: "unconfigured" };
         if (!/^[^/\s]+\/[^/\s]+$/.test(cfg.repo)) return { skipped: "bad-repo" };
@@ -312,7 +315,7 @@ function safeParse(text) {
 
 /** 供自检端点用：把当前配置与一次真实调用的结果摊开，避免"以为配好了其实没通"。 */
 export async function probeConfig(env) {
-    const cfg = readConfig(env);
+    const cfg = await readConfig(env);
     const out = {
         enabled: cfg.enabled,
         provider: cfg.provider,

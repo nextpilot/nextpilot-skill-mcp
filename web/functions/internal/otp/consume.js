@@ -1,4 +1,4 @@
-// POST /internal/otp/consume  仅供 Node 侧 SSR 调用（AUTH_INTERNAL_SECRET）。
+// POST /internal/otp/consume  仅供 Node 侧 SSR 调用（AUTH_EDGE_SECRET）。
 // 校验验证码：10 分钟过期、最多错 5 次、成功一次性消费（删除）。
 import { getKv, sha256Hex } from "../../_lib/kv.js";
 import { jsonResponse, readJson, assertInternal, isValidEmail } from "../../_lib/http.js";

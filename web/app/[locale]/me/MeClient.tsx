@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Link } from "@/i18n/routing";
-import { ChevronRight, Cloud, GitBranch, HardDrive, Loader2, LogOut, Mail, ShieldAlert } from "lucide-react";
+import { ChevronRight, Cloud, GitBranch, HardDrive, Loader2, LogOut, Mail, Settings2, ShieldAlert } from "lucide-react";
 import { signOut, useSession } from "@/components/SessionProvider";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { LocalizedText } from "@/components/LocalizedText";
@@ -170,6 +170,17 @@ export function MeClient() {
                                 )}
                             </div>
                         </div>
+                        {/* 后台入口只对管理员渲染——白名单外的用户连这个按钮都不该看到，
+                            跟 /admin/settings 自己返回 404 是一个口径：不暴露入口存在 */}
+                        {session.user.isAdmin && (
+                            <Link
+                                href="/admin/settings"
+                                className="flex shrink-0 items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5 text-sm text-primary transition-colors hover:bg-primary/10"
+                            >
+                                <Settings2 className="h-4 w-4" />
+                                <LocalizedText zh="管理后台" en="Admin" />
+                            </Link>
+                        )}
                         <button
                             type="button"
                             onClick={() => void signOut({ redirectTo: "/" })}

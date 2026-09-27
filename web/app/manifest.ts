@@ -1,11 +1,14 @@
 import type { MetadataRoute } from "next";
-import { SITE_NAME, SITE_SHORT, SITE_URL, SITE_DESCRIPTION } from "@/lib/seo";
+import { getSiteSettings } from "@/lib/site-settings";
 
-export default function manifest(): MetadataRoute.Manifest {
+// PWA 应用名取自运行期设置：后台改了站名，"添加到桌面"的图标名跟着变。
+// （manifest 是构建期产物还是请求期生成取决于框架；这里按请求期取值，改完即生效。）
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+    const { siteName, siteShort, siteDescription } = await getSiteSettings();
     return {
-        name: SITE_NAME,
-        short_name: SITE_SHORT,
-        description: SITE_DESCRIPTION,
+        name: siteName,
+        short_name: siteShort,
+        description: siteDescription,
         start_url: "/zh",
         display: "standalone",
         background_color: "#ffffff",

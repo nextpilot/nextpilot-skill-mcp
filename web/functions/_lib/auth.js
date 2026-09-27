@@ -1,5 +1,5 @@
 // 边缘函数侧的会话校验：解密 next-auth v5 的 JWE 会话 cookie。
-// next-auth 默认把 JWT 用 dir / A256CBC-HS512 加密，密钥 = HKDF(AUTH_SECRET, salt=cookie名)。
+// next-auth 默认把 JWT 用 dir / A256CBC-HS512 加密，密钥 = HKDF(AUTH_SESSION_SECRET, salt=cookie名)。
 import { jwtDecrypt } from "jose";
 import { hkdf } from "./hkdf.js";
 
@@ -12,7 +12,7 @@ const TOKEN_COOKIES = ["__Secure-authjs.session-token", "authjs.session-token"];
  * @returns {Promise<{uid:string,email:string|null,name:string|null,plan:string}|null>}
  */
 export async function getSessionUser(request, env) {
-    const secret = env?.AUTH_SECRET;
+    const secret = env?.AUTH_SESSION_SECRET;
     if (!secret) return null;
 
     const cookieHeader = request.headers.get("cookie") ?? "";
@@ -48,4 +48,25 @@ export async function getSessionUser(request, env) {
         }
     }
     return null;
+}
+
+/**
+ * 后台（/admin/settings）管理员判定 —— 与 `web/auth.ts` 的 jwt 回调同一套规则。
+ *
+ * 没配 AUTH_ADMIN_EMAILS 时任何人都不算管理员：宁可后台进不去，也不能让
+ * "没配 = 全放行"这种默认成立。
+ *
+ * @param {{email?: string|null}|null} session getSessionUser 的结果
+ * @param {Record<string,string|undefined>} env
+ */
+export function isAdminSession(session, env) {
+    const email = String(session?.email ?? "")
+        .toLowerCase()
+        .trim();
+    if (!email) return false;
+    const list = String(env?.AUTH_ADMIN_EMAILS ?? "")
+        .split(",")
+        .map((item) => item.trim().toLowerCase())
+        .filter(Boolean);
+    return list.includes(email);
 }

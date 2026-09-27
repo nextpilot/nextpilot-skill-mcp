@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { makePageMeta, articleJsonLd, extractFaqItems, faqPageJsonLd, SITE_URL } from "@/lib/seo";
+import { makePageMeta, articleJsonLd, extractFaqItems, faqPageJsonLd } from "@/lib/seo";
 import { GuideArticle } from "@/components/GuideArticle";
 import { getAllGuideDocs, getGuideDoc } from "@/lib/guide";
 import { JsonLd } from "@/components/JsonLd";
+import { getSiteSettings } from "@/lib/site-settings";
 
 export function generateStaticParams() {
     return getAllGuideDocs()
@@ -32,13 +33,14 @@ export default async function GuideDocPage({ params }: { params: Promise<{ slug:
     const { slug } = await params;
     const doc = getGuideDoc(slug);
     if (!doc) notFound();
+    const { siteUrl } = await getSiteSettings();
 
     return (
         <>
             <GuideArticle doc={doc} />
             <JsonLd
-                data={articleJsonLd({
-                    url: `${SITE_URL}/guide/${slug}`,
+                data={await articleJsonLd({
+                    url: `${siteUrl}/guide/${slug}`,
                     title: `${doc.title} · 使用指南`,
                     description: doc.description,
                 })}

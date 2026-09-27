@@ -1,4 +1,4 @@
-// POST /internal/users/upsert  仅供 Node 侧 SSR 调用（AUTH_INTERNAL_SECRET）。
+// POST /internal/users/upsert  仅供 Node 侧 SSR 调用（AUTH_EDGE_SECRET）。
 // body: {mode:"email", email, name?} 或 {mode:"github", githubId, email?, name?}
 import { getKv } from "../../_lib/kv.js";
 import { jsonResponse, readJson, assertInternal, isValidEmail } from "../../_lib/http.js";

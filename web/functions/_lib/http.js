@@ -19,9 +19,9 @@ export function isValidEmail(email) {
     return typeof email === "string" && email.length <= 200 && EMAIL_RE.test(email);
 }
 
-/** /functions/internal/* 只允许 Node 侧 SSR 持 AUTH_INTERNAL_SECRET 调用 */
+/** /functions/internal/* 只允许 Node 侧 SSR 持 AUTH_EDGE_SECRET 调用 */
 export function assertInternal(request, env) {
-    const expected = env?.AUTH_INTERNAL_SECRET;
+    const expected = env?.AUTH_EDGE_SECRET;
     const got = request.headers.get("x-internal-secret");
     if (!expected || !got) return false;
     if (got.length !== expected.length) return false;

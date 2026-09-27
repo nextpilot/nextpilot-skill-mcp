@@ -17,7 +17,7 @@ metadata:
   seed_rating: "4.6"
   seed_downloads: "720"
   featured: "true"
-  source_url: "https://github.com/robotto-xyz"
+  repo_url: "https://github.com/robotto-xyz"
 ---
 
 # PX4 ULog 日志字段诊断

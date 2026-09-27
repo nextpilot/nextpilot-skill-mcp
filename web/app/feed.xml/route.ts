@@ -1,16 +1,19 @@
-import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site-config";
 import { getAllSkills } from "@/lib/skills";
 import { getAllMcpServers } from "@/lib/mcp";
 import { getAllGuideDocs } from "@/lib/guide";
+import { getSiteSettings } from "@/lib/site-settings";
 
 export const runtime = "nodejs";
 
 export async function GET() {
+    // RSS 的 <link> 与 <guid> 是订阅者点开的地址，域名必须跟后台走（改了域名还发旧地址，
+    // 订阅器会一直跳到一个已经不是本站的域名上）。
+    const { siteUrl, siteName, siteDescription } = await getSiteSettings();
     const items: string[] = [];
 
     const skills = getAllSkills();
     for (const skill of skills) {
-        const url = `${SITE_URL}/zh/skills/${skill.slug}`;
+        const url = `${siteUrl}/zh/skills/${skill.slug}`;
         const date = skill.updatedAt ? new Date(skill.updatedAt) : new Date();
         items.push(`    <item>
       <title>${xmlEscape(skill.name)}</title>
@@ -24,7 +27,7 @@ export async function GET() {
 
     const mcps = getAllMcpServers();
     for (const mcp of mcps) {
-        const url = `${SITE_URL}/zh/mcp/${mcp.slug}`;
+        const url = `${siteUrl}/zh/mcp/${mcp.slug}`;
         const date = mcp.updatedAt ? new Date(mcp.updatedAt) : new Date();
         items.push(`    <item>
       <title>${xmlEscape(mcp.name)}</title>
@@ -39,7 +42,7 @@ export async function GET() {
     const guides = getAllGuideDocs();
     for (const guide of guides) {
         if (!guide.slug) continue;
-        const url = `${SITE_URL}${guide.href}`;
+        const url = `${siteUrl}${guide.href}`;
         items.push(`    <item>
       <title>${xmlEscape(guide.title || guide.slug)}</title>
       <link>${xmlEscape(url)}</link>
@@ -55,12 +58,12 @@ export async function GET() {
     const rss = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>${xmlEscape(SITE_NAME)}</title>
-    <link>${xmlEscape(SITE_URL)}</link>
-    <description>${xmlEscape(SITE_DESCRIPTION)}</description>
+    <title>${xmlEscape(siteName)}</title>
+    <link>${xmlEscape(siteUrl)}</link>
+    <description>${xmlEscape(siteDescription)}</description>
     <language>zh-CN</language>
     <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
-    <atom:link href="${xmlEscape(`${SITE_URL}/feed.xml`)}" rel="self" type="application/rss+xml"/>
+    <atom:link href="${xmlEscape(`${siteUrl}/feed.xml`)}" rel="self" type="application/rss+xml"/>
 ${items.join("\n")}
   </channel>
 </rss>`;

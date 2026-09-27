@@ -5,17 +5,18 @@ import { asRecord } from "./json-boundary";
 
 /**
  * Node 侧 SSR 调用同源 /internal/* 边缘函数的薄客户端。
- * KV 只能在边缘运行时访问，Node 侧（NextAuth、发信路由）通过 AUTH_INTERNAL_SECRET 中转。
+ * KV 只能在边缘运行时访问，Node 侧（NextAuth、发信路由）通过 AUTH_EDGE_SECRET 中转。
  */
 
 const INTERNAL_PATHS = {
     otpSet: "/internal/otp/set",
     otpConsume: "/internal/otp/consume",
     usersUpsert: "/internal/users/upsert",
+    settingsGet: "/internal/settings/get",
 } as const;
 
 /** 从当前请求的转发头推导公网源站（EdgeOne 注入 x-forwarded-*）。
- *  优先使用环境变量 SITE_URL，未配置时从请求头推导。 */
+ *  优先使用环境变量 NEXT_PUBLIC_SITE_URL，未配置时从请求头推导。 */
 async function publicOrigin(): Promise<string> {
     if (SITE_URL && SITE_URL !== "http://localhost:3000") return SITE_URL;
     const h = await headers();
@@ -40,8 +41,8 @@ async function callInternal(
     init?: { ip?: string },
 ): Promise<Record<string, unknown>> {
     const origin = await publicOrigin();
-    const secret = process.env.AUTH_INTERNAL_SECRET;
-    if (!secret) throw new InternalApiError("AUTH_INTERNAL_SECRET 未配置", 500);
+    const secret = process.env.AUTH_EDGE_SECRET;
+    if (!secret) throw new InternalApiError("AUTH_EDGE_SECRET 未配置", 500);
 
     const resp = await fetch(`${origin}${path}`, {
         method: "POST",
@@ -197,4 +198,20 @@ export async function upsertGithubUser(input: {
         name: input.name ?? null,
     });
     return requireUser(r.user, "/internal/users/upsert");
+}
+
+/**
+ * 后台保存的站点设置覆盖项（/internal/settings/get）。
+ *
+ * 返回 null 表示"没有覆盖"，**不是出错**——KV 没绑定、内部密钥没配、后台从来没存过
+ * 都是这个结果。调用方一律回落到 site-config.ts 的静态默认值：
+ * 配置丢了网站必须照常起来，不能白屏。
+ */
+export async function fetchSiteSettings(): Promise<Record<string, unknown> | null> {
+    try {
+        const data = await callInternal(INTERNAL_PATHS.settingsGet, {});
+        return asRecord(data.settings);
+    } catch {
+        return null;
+    }
 }

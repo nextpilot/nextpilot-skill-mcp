@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import {
     SITE_URL,
-    SITE_NAME,
-    SITE_DESCRIPTION,
     SITE_KEYWORDS,
     SITE_AUTHOR,
     GOOGLE_VERIFICATION,
@@ -11,9 +9,24 @@ import {
     BAIDU_STAT_ID,
 } from "@/lib/site-config";
 import { THIRD_PARTY_DOMAINS } from "@/lib/seo";
+import { getSiteSettings } from "@/lib/site-settings";
 import "./globals.css";
 
-const defaultTitle = `${SITE_NAME} · 无人机 AI 技能、MCP服务与智能诊断平台`;
+/** title 里 `·` 后面那半句固定文案（品牌 slogan，不是后台可改项，改它要动代码） */
+const TITLE_SUFFIX = "无人机 AI 技能、MCP服务与智能诊断平台";
+
+/**
+ * metadataBase 要的是绝对地址，而站点域名现在是后台可改的。
+ * 后台那侧已经校验过 http(s) 且不带路径，但**兜底值也可能来自环境变量**（控制台手填，
+ * 谁都会打错一个字符）——构造失败会让整站 500，所以这里必须兜住，坏值回落到 site-config。
+ */
+function safeUrl(value: string): URL {
+    try {
+        return new URL(value);
+    } catch {
+        return new URL(SITE_URL);
+    }
+}
 
 function buildVerification(): Metadata["verification"] {
     const v: Metadata["verification"] = {};
@@ -25,51 +38,56 @@ function buildVerification(): Metadata["verification"] {
     return Object.keys(v).length > 0 ? v : undefined;
 }
 
-export const metadata: Metadata = {
-    metadataBase: new URL(SITE_URL),
-    title: {
-        template: `%s · ${SITE_NAME}`,
-        default: defaultTitle,
-    },
-    description: SITE_DESCRIPTION,
-    keywords: SITE_KEYWORDS,
-    authors: [{ name: SITE_AUTHOR }],
-    alternates: {
-        languages: {
-            "zh-CN": "/zh",
-            en: "/en",
+export async function generateMetadata(): Promise<Metadata> {
+    const settings = await getSiteSettings();
+    const defaultTitle = `${settings.siteName} · ${TITLE_SUFFIX}`;
+
+    return {
+        metadataBase: safeUrl(settings.siteUrl),
+        title: {
+            template: `%s · ${settings.siteName}`,
+            default: defaultTitle,
         },
-    },
-    openGraph: {
-        title: defaultTitle,
-        description: SITE_DESCRIPTION,
-        siteName: SITE_NAME,
-        locale: "zh_CN",
-        type: "website",
-        images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: defaultTitle, type: "image/png" }],
-    },
-    twitter: {
-        card: "summary_large_image",
-        title: defaultTitle,
-        description: SITE_DESCRIPTION,
-        images: [{ url: "/opengraph-image", alt: defaultTitle }],
-    },
-    robots: {
-        index: true,
-        follow: true,
-    },
-    referrer: "origin-when-cross-origin",
-    creator: SITE_AUTHOR,
-    publisher: SITE_AUTHOR,
-    verification: buildVerification(),
-    other: {
-        "DC.title": defaultTitle,
-        "DC.description": SITE_DESCRIPTION,
-        "DC.publisher": SITE_AUTHOR,
-        "DC.language": "zh_CN",
-        "DC.coverage": "China",
-    },
-};
+        description: settings.siteDescription,
+        keywords: SITE_KEYWORDS,
+        authors: [{ name: SITE_AUTHOR }],
+        alternates: {
+            languages: {
+                "zh-CN": "/zh",
+                en: "/en",
+            },
+        },
+        openGraph: {
+            title: defaultTitle,
+            description: settings.siteDescription,
+            siteName: settings.siteName,
+            locale: "zh_CN",
+            type: "website",
+            images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: defaultTitle, type: "image/png" }],
+        },
+        twitter: {
+            card: "summary_large_image",
+            title: defaultTitle,
+            description: settings.siteDescription,
+            images: [{ url: "/opengraph-image", alt: defaultTitle }],
+        },
+        robots: {
+            index: true,
+            follow: true,
+        },
+        referrer: "origin-when-cross-origin",
+        creator: SITE_AUTHOR,
+        publisher: SITE_AUTHOR,
+        verification: buildVerification(),
+        other: {
+            "DC.title": defaultTitle,
+            "DC.description": settings.siteDescription,
+            "DC.publisher": SITE_AUTHOR,
+            "DC.language": "zh_CN",
+            "DC.coverage": "China",
+        },
+    };
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (

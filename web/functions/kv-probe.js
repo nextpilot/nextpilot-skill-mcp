@@ -10,9 +10,13 @@ function getBinding(env) {
     return getKv(env);
 }
 
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ request, env }) {
     const result = { ok: false, kv: null, deepseek: null };
     const kv = getBinding(env);
+
+    // 前缀可用 `?prefix=` 覆盖：探针的用途就是"KV 里到底存了什么"，写死成自己的前缀就
+    // 只能看到自己。排查线上问题时靠它看别的前缀（如 `settings_log_`）有没有落记录。
+    const prefix = new URL(request.url).searchParams.get("prefix") ?? "kvprobe_";
 
     if (!kv) {
         return new Response(JSON.stringify({ ok: false, error: "NEXTPILOT_KV binding not found" }), {
@@ -36,7 +40,7 @@ export async function onRequestGet({ env }) {
         await kv.put(SHAPE_KEY, JSON.stringify({ t: "probe" }));
         const plain = await kv.get(SHAPE_KEY);
         const asJson = await kv.get(SHAPE_KEY, { type: "json" });
-        const listed = await kv.list({ prefix: "kvprobe_", limit: 10 });
+        const listed = await kv.list({ prefix, limit: 10 });
         result.kvApi = {
             getReturns: typeof plain === "string" ? "string" : typeof plain,
             getJsonType: asJson === null ? "null" : typeof asJson,
@@ -48,7 +52,7 @@ export async function onRequestGet({ env }) {
 
     // 复现配额计数实际走的调用：listAll 的翻页参数
     try {
-        result.listAll = { count: (await listAll(kv, "kvprobe_")).length };
+        result.listAll = { count: (await listAll(kv, prefix)).length };
     } catch (err) {
         result.listAll = { error: String(err && err.message ? err.message : err) };
     }

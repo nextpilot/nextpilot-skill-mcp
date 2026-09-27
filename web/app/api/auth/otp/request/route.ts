@@ -20,7 +20,9 @@ export async function POST(req: NextRequest) {
     if (!EMAIL_RE.test(email) || email.length > 200) {
         return NextResponse.json({ ok: false, error: "邮箱格式不正确" }, { status: 400 });
     }
-    if (!isMailConfigured()) {
+    // await 不能省：isMailConfigured 现在是 async（SMTP 密码可能来自后台 KV）。
+    // 少了 await，`!Promise` 恒为 false，"邮件服务没配"这个分支就成了死代码。
+    if (!(await isMailConfigured())) {
         return NextResponse.json({ ok: false, error: "邮件服务尚未配置 SMTP，暂时无法发送验证码" }, { status: 503 });
     }
 

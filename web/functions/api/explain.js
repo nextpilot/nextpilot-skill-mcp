@@ -21,6 +21,7 @@ import {
 import { getSessionUser } from "../_lib/auth.js";
 import { jsonResponse, readJson } from "../_lib/http.js";
 import { reportIssue } from "../_lib/issue-filer.js";
+import { getSecret } from "../_lib/secrets.js";
 // 思考范式与空结论文案的单一事实源在 knowledge/llm/，由 build-knowledge.mjs 生成
 import {
     GJB841_SYSTEM_PROMPT as SYSTEM_PROMPT,
@@ -47,7 +48,8 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
     // 本地联调：显式开启 LLM_MOCK=1（或 key 填 mock）时，用模板报告替代真实调用，
     // 让配额/限流/报告落盘等链路可在没有 API key 的情况下完整验证。
-    const apiKey = env?.DEEPSEEK_API_KEY;
+    // 后台（KV）优先于环境变量：轮换密钥不必再动控制台 + 重新部署
+    const apiKey = await getSecret(env, "deepseekApiKey", "DEEPSEEK_API_KEY");
     const mockMode = env?.LLM_MOCK === "1" || apiKey === "mock";
     if (!apiKey && !mockMode) {
         return jsonResponse({ error: "LLM 解释层未配置 DEEPSEEK_API_KEY" }, 503);

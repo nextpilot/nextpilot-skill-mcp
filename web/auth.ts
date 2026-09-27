@@ -5,12 +5,26 @@ import { consumeEmailOtp, upsertEmailUser, upsertGithubUser } from "@/lib/intern
 
 /**
  * 冲刺 2 认证（CLAUDE.md 6.1）：
- * - JWT 会话策略，无数据库；边缘函数用同一 AUTH_SECRET 解密（见 functions/_lib/auth.js）
+ * - JWT 会话策略，无数据库；边缘函数用同一 AUTH_SESSION_SECRET 解密（见 functions/_lib/auth.js）
  * - GitHub OAuth + 邮箱验证码（Credentials 承载 OTP 校验）
  * - 用户资料存 EdgeOne KV，经 /internal/* 边缘函数中转
  */
 const githubId = process.env.AUTH_GITHUB_ID;
 const githubSecret = process.env.AUTH_GITHUB_SECRET;
+
+/**
+ * 后台（/admin/settings）管理员白名单。
+ *
+ * 没配 AUTH_ADMIN_EMAILS 时任何人都不算管理员——宁可后台进不去，也不能让
+ * "没配 = 全放行"这种默认成立。邮箱比对大小写不敏感，逗号分隔。
+ */
+function isAdminEmail(email: string): boolean {
+    const list = (process.env.AUTH_ADMIN_EMAILS ?? "")
+        .split(",")
+        .map((item) => item.trim().toLowerCase())
+        .filter(Boolean);
+    return list.includes(email);
+}
 
 const providers = [];
 
@@ -56,6 +70,7 @@ providers.push(
 );
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+    secret: process.env.AUTH_SESSION_SECRET,
     trustHost: true,
     session: { strategy: "jwt" },
     pages: { signIn: "/login" },
@@ -82,6 +97,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 token.plan = (user as { plan?: string }).plan ?? "free";
                 token.loginType = "email";
             }
+            // 管理员身份每次刷新 token 时重算：AUTH_ADMIN_EMAILS 改了，老会话下一次刷新即生效，
+            // 不用逼用户重新登录。GitHub 登录可能拿不到邮箱，那就不是管理员。
+            const email = (typeof token.email === "string" ? token.email : (user?.email ?? "")).toLowerCase().trim();
+            token.isAdmin = email ? isAdminEmail(email) : false;
             return token;
         },
         async session({ session, token }) {
@@ -94,6 +113,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             if (loginType === "email" || loginType === "github") {
                 session.user.loginType = loginType;
             }
+            session.user.isAdmin = token.isAdmin === true;
             return session;
         },
     },

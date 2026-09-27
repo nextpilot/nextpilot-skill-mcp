@@ -88,7 +88,7 @@ const CATEGORY_ACCENT: Record<string, string> = {
     toolchain: "border-t-primary/30 shadow-[0_-3px_12px_-3px_rgba(24,121,78,0.04)]",
 };
 
-export default function HomePage() {
+export default async function HomePage() {
     const skills = getSkillIndex();
     const mcps = getMcpIndex();
     const featured = skills.filter((s) => s.featured).slice(0, 6);
@@ -126,7 +126,7 @@ export default function HomePage() {
                                 <Zap className="h-3.5 w-3.5 text-primary" />
                                 <span className="text-[12px] font-medium text-primary">
                                     <LocalizedText
-                                        zh="NextPilot AI 技术社区 · 专为飞控系统优化的 Skill / MCP 平台"
+                                        zh="NextPilot AI 技术社区 · 无人机 AI 技能、MCP服务与智能诊断平台"
                                         en="Flight AI community · Skill / MCP platform"
                                     />
                                 </span>
@@ -458,7 +458,7 @@ export default function HomePage() {
                     </div>
                 </div>
             </section>
-            <JsonLd data={siteJsonLd()} />
+            <JsonLd data={await siteJsonLd()} />
         </div>
     );
 }

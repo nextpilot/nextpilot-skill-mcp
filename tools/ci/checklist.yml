@@ -248,6 +248,17 @@ jobs:
         command: ["{NODE}", "scripts/check-guide-mdx.mjs"]
         hint: "content/guide/ 下有 mdx 编译不过（多半是裸 { 未转义）。生成页改 build-knowledge.mjs 的 escMdxText 注入点后重新 build:kb；手写页用反斜杠转义或挪进反引号。"
 
+      # 后台站点设置：这套「三层取值（KV > env > 代码地板）+ 字段表驱动」的机制里，
+      # **没有任何一处会在运行时报错**——字段表两侧对不上是"存了读不到"、页脚写死是
+      # "后台改了没反应"、metadata 退回静态常量是"烙进构建产物"、密钥名进客户端组件是
+      # 明文被序列化进 SSR HTML、密钥没人读是"轮换静默失效"。五种都是全绿通过、只是悄悄
+      # 失效，只能静态拦。只扫源码文本，无依赖无网络，约 1s。
+      - id: "check-site-settings"
+        name: "Admin site settings wiring (check-site-settings)"
+        workdir: "{WEB}"
+        command: ["{NODE}", "scripts/check-site-settings.mjs"]
+        hint: "站点设置的机制被改坏了。看上面 FAIL 那一行对应的规则 id：settings-schema = 两侧字段表不一致；settings-footer-* = 页脚写死；settings-metadata = metadata 退回静态常量；settings-secret-client = 密钥名进了客户端组件；settings-secret-wiring = 密钥没有消费点。"
+
       # 需要真实日志的回归。日志不入仓库（CLAUDE.md 第 9 节：原始日志不上传服务器），
       # 所以 CI 上这四项必然 SKIP —— 这就是它们归 push 而不是 ci 的原因。
       - id: "compare-baseline"

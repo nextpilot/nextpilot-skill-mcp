@@ -5,7 +5,25 @@ import { Code2, ExternalLink, Radar } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { hasSiteVersion, siteVersionLabel, siteVersionTitle } from "@/lib/site-version";
 
-const SOURCE_URL = "https://gitee.com/nextpilot/nextpilot-skill-mcp";
+/**
+ * 页脚的可变文案由服务端（`app/[locale]/layout.tsx`）传进来。
+ *
+ * 本组件是 `"use client"`，自己没法 async 读 KV——客户端组件里没有 KV 绑定，也没有
+ * 服务端环境变量。所以版权行 / 品牌介绍 / 源码链接 / 备案号一律 props 传入，
+ * **不许在组件里写死**（写死的那份在后台改完之后永远不变，且看代码看不出问题）。
+ *
+ * 空串的语义是「后台没配，用内置的双语文案」，不是「这一行空着」。
+ */
+export interface SiteFooterProps {
+    /** 版权行（© 之后那半句）；空 = 用内置双语文案 */
+    footerCopyright: string;
+    /** 品牌区介绍语；空 = 用内置双语文案 */
+    footerTagline: string;
+    /** "源代码"链接地址 */
+    sourceUrl: string;
+    /** 备案号；空 = 不显示这一行 */
+    icp: string;
+}
 
 /** external = 外站链接：新标签页打开，标尾带 ExternalLink 小图标 */
 type FooterLink = { href: string; label: string; external?: boolean };
@@ -44,7 +62,7 @@ function FooterLinkItem({ link }: { link: FooterLink }) {
  * 链接灰色宽行距、全部展开不折叠——就 11 条链接，折叠反而多一步点击）。
  * display:none 的那份不进无障碍树，两份 DOM 不会读两遍。
  */
-export function SiteFooter() {
+export function SiteFooter({ footerCopyright, footerTagline, sourceUrl, icp }: SiteFooterProps) {
     const { t } = useLanguage();
 
     const groups: FooterGroup[] = [
@@ -105,10 +123,11 @@ export function SiteFooter() {
                 </span>
             </Link>
             <p className="mt-3 text-sm leading-6 text-muted">
-                {t(
-                    "围绕感知 → 决策 → 控制 → 工具链的飞控 AI Skill 与 MCP 社区，内置 PX4 / ArduPilot 确定性日志分析。",
-                    "A flight-control AI Skill & MCP hub across perception, decision, control and toolchain, with deterministic PX4 / ArduPilot log analysis built in.",
-                )}
+                {footerTagline ||
+                    t(
+                        "围绕感知 → 决策 → 控制 → 工具链的飞控 AI Skill 与 MCP 社区，内置 PX4 / ArduPilot 确定性日志分析。",
+                        "A flight-control AI Skill & MCP hub across perception, decision, control and toolchain, with deterministic PX4 / ArduPilot log analysis built in.",
+                    )}
             </p>
             {/* 隐私承诺那句原来也写在这里，2026-09-21 挪去了上传卡（用户交日志的地方才是
                 它该在的位置），页脚不再重复——措辞见 lib/log-analysis-notes.ts。 */}
@@ -159,14 +178,18 @@ export function SiteFooter() {
                 {/* 底栏：版权 + 版本（免责那句在分析页上传卡上，见 lib/log-analysis-notes.ts）。
                     手机上整条居中（左对齐的堆叠块看着歪，用户点过名）；sm 起恢复两端对齐。 */}
                 <div className="mt-9 flex flex-col items-center gap-4 border-t border-border pt-5 text-center text-xs text-muted sm:flex-row sm:justify-between sm:text-left">
-                    <p>
-                        {year ? `© ${year} ` : "© "}NextPilot Skill ·{" "}
-                        {t("让无人机更智能，让数据开口说话", "Making aircraft smarter")}
-                    </p>
+                    <div>
+                        <p>
+                            {year ? `© ${year} ` : "© "}
+                            {footerCopyright ||
+                                `NextPilot Skill · ${t("让无人机更智能，让数据开口说话", "Making aircraft smarter")}`}
+                        </p>
+                        {icp ? <p className="mt-1">{icp}</p> : null}
+                    </div>
 
                     <div className="flex flex-wrap items-center gap-3">
                         <a
-                            href={SOURCE_URL}
+                            href={sourceUrl}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center gap-1.5 text-muted transition-colors hover:text-primary"

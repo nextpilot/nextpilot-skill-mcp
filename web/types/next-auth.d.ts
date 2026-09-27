@@ -8,6 +8,8 @@ declare module "next-auth" {
             plan: string;
             /** 登录方式（/me 页展示用）：GitHub OAuth 或邮箱验证码 */
             loginType?: "email" | "github";
+            /** 后台管理员（/admin/settings）：登录邮箱在 AUTH_ADMIN_EMAILS 白名单内 */
+            isAdmin?: boolean;
         } & DefaultSession["user"];
     }
 

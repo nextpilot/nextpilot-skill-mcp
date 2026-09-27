@@ -43,6 +43,9 @@ const handlers: Record<string, () => Promise<Record<string, unknown>>> = {
     "internal/otp/set": () => import("@/functions/internal/otp/set.js"),
     "internal/otp/consume": () => import("@/functions/internal/otp/consume.js"),
     "internal/users/upsert": () => import("@/functions/internal/users/upsert.js"),
+    // 后台站点设置：GET/POST /api/admin/settings（浏览器直连）+ Node 侧读 KV 的中转
+    "api/admin/settings": () => import("@/functions/api/admin/settings.js"),
+    "internal/settings/get": () => import("@/functions/internal/settings/get.js"),
     // 根级自检探针（手动 curl 用，不走 /api 前缀）
     ping: () => import("@/functions/ping.js"),
     "kv-probe": () => import("@/functions/kv-probe.js"),

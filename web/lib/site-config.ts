@@ -6,7 +6,7 @@
  */
 
 /** 站点完整域名（不含末尾斜杠） */
-export const SITE_URL = (process.env.SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
 
 /** 站点名称（全局品牌名） */
 export const SITE_NAME = process.env.NEXT_PUBLIC_SITE_NAME || "NextPilot Skill";
@@ -39,6 +39,27 @@ export const TWITTER_HANDLE = process.env.NEXT_PUBLIC_TWITTER_HANDLE || "";
 
 /** 百度统计 ID */
 export const BAIDU_STAT_ID = process.env.NEXT_PUBLIC_BAIDU_STAT_ID || "";
+
+/* ── 页脚文案（后台 /admin/settings 可覆盖；这里是"没配过"时的地板）────────────
+ * 空串在这里的语义是"不覆盖"：页脚现在内置的是中英双语文案，后台存的是单值，
+ * 留空 = 双语照旧，填了 = 中英都用这一个值（本期不做 i18n，方案第 9 节已声明）。 */
+export const FOOTER_COPYRIGHT =
+    process.env.NEXT_PUBLIC_FOOTER_COPYRIGHT || "NextPilot Skill · 让无人机更智能，让数据开口说话";
+
+/** 页脚品牌介绍：留空表示沿用页脚内置的双语介绍 */
+export const FOOTER_TAGLINE = process.env.NEXT_PUBLIC_FOOTER_TAGLINE || "";
+
+/**
+ * 页脚"源代码"链接。
+ *
+ * 名字用 REPO_URL 而不是 GITEE_URL：这个字段填的是**仓库地址**，而实际填进来的
+ * 完全可能是 GitHub（SKILL.md 里就有 `https://github.com/robotto-xyz` 这种）。
+ * 叫 gitee 会把一个中性字段变成"名不副实"，改托管平台时还得连带改名。
+ */
+export const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL || "https://gitee.com/nextpilot/nextpilot-skill-mcp";
+
+/** 备案号：留空则页脚不显示这一行 */
+export const ICP_NUMBER = process.env.NEXT_PUBLIC_ICP_NUMBER || "";
 
 export const SOCIAL_GITHUB =
     process.env.NEXT_PUBLIC_SOCIAL_GITHUB || "https://github.com/nextpilot/nextpilot-skill-mcp";

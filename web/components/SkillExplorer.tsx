@@ -6,12 +6,11 @@ import { Search } from "lucide-react";
 import type { SkillMeta } from "@/lib/types";
 import { CATEGORIES, type CategoryKey } from "@/lib/constants";
 import { useLanguage } from "./LanguageProvider";
-import { SkillCard } from "./SkillCard";
+import { SkillCard, type MatchHighlights } from "./SkillCard";
 import { applyDeltas, useLeaderboard } from "@/lib/community-stats";
 
 type SortKey = "hot" | "rating" | "newest";
 
-/** 与 lib/constants.ts 的 CATEGORIES 对齐；URL 里的分类名要先过这一关再进筛选 */
 const VALID_CATEGORIES = new Set<string>(["perception", "decision", "control", "toolchain"]);
 
 const SORT_LABELS: Record<SortKey, string> = {
@@ -20,15 +19,20 @@ const SORT_LABELS: Record<SortKey, string> = {
     newest: "最新",
 };
 
+const CATEGORY_EN: Record<string, string> = {
+    perception: "Perception",
+    decision: "Decision",
+    control: "Control",
+    toolchain: "Toolchain",
+};
+
 export function SkillExplorer({ skills, initialCategory }: { skills: SkillMeta[]; initialCategory?: CategoryKey }) {
     const { language, t } = useLanguage();
     const [query, setQuery] = useState("");
     const [category, setCategory] = useState<CategoryKey | "all">(initialCategory ?? "all");
 
-    // `?category=xxx`（首页的分类入口指向这里）在浏览器端读一次：
-    // 页面本身要保持静态、不能接 searchParams——那会变成按需渲染，而 Skill 清单是构建期读盘的。
     useEffect(() => {
-        if (initialCategory) return; // 服务端已给初值（旧的调用方式）就不覆盖
+        if (initialCategory) return;
         const c = new URLSearchParams(window.location.search).get("category");
         if (c && VALID_CATEGORIES.has(c as CategoryKey)) setCategory(c as CategoryKey);
     }, [initialCategory]);
@@ -38,29 +42,69 @@ export function SkillExplorer({ skills, initialCategory }: { skills: SkillMeta[]
     const fuse = useMemo(
         () =>
             new Fuse(skills, {
-                keys: ["name", "description", "tags", "models", "platforms"],
+                keys: [
+                    { name: "name", weight: 3 },
+                    { name: "tags", weight: 2 },
+                    { name: "_pinyin", weight: 1 },
+                    { name: "description", weight: 0.5 },
+                    { name: "models", weight: 0.5 },
+                    { name: "platforms", weight: 0.5 },
+                ],
                 threshold: 0.35,
+                includeMatches: true,
             }),
         [skills],
     );
 
     const enriched = useMemo(() => applyDeltas(skills, board), [skills, board]);
 
-    const result = useMemo(() => {
+    const { results, highlights } = useMemo(() => {
         const byCategory = category === "all" ? enriched : enriched.filter((s) => s.category === category);
-        const matched = query.trim()
-            ? fuse.search(query).map((r) => {
-                  // Fuse 用的是传入时的对象，用 slug 找到带增量的版本
-                  const live = byCategory.find((b) => b.slug === r.item.slug);
-                  return live ?? r.item;
-              })
-            : byCategory;
+
+        if (!query.trim()) {
+            const sorted = [...byCategory];
+            if (sort === "hot") sorted.sort((a, b) => b.downloads - a.downloads || b.rating - a.rating);
+            if (sort === "rating") sorted.sort((a, b) => b.rating - a.rating || b.downloads - a.downloads);
+            if (sort === "newest") sorted.sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+            return { results: sorted, highlights: new Map<string, MatchHighlights>() };
+        }
+
+        const fuseResults = fuse.search(query);
+        const matched: SkillMeta[] = [];
+        const hlMap = new Map<string, MatchHighlights>();
+
+        for (const r of fuseResults) {
+            const live = byCategory.find((b) => b.slug === r.item.slug);
+            const skill = live ?? r.item;
+            matched.push(skill);
+
+            if (r.matches) {
+                const hl: MatchHighlights = {};
+                for (const m of r.matches) {
+                    const key = m.key === "_pinyin" ? undefined : m.key;
+                    if (key && m.indices.length > 0) {
+                        hl[key as keyof MatchHighlights] = [...m.indices] as [number, number][];
+                    }
+                }
+                hlMap.set(skill.slug, hl);
+            }
+        }
+
         const sorted = [...matched];
         if (sort === "hot") sorted.sort((a, b) => b.downloads - a.downloads || b.rating - a.rating);
         if (sort === "rating") sorted.sort((a, b) => b.rating - a.rating || b.downloads - a.downloads);
         if (sort === "newest") sorted.sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
-        return sorted;
+
+        return { results: sorted, highlights: hlMap };
     }, [query, category, sort, fuse, enriched]);
+
+    const categoryCounts = useMemo(() => {
+        const counts: Record<string, number> = { all: enriched.length };
+        for (const c of CATEGORIES) {
+            counts[c.key] = enriched.filter((s) => s.category === c.key).length;
+        }
+        return counts;
+    }, [enriched]);
 
     return (
         <div>
@@ -75,22 +119,19 @@ export function SkillExplorer({ skills, initialCategory }: { skills: SkillMeta[]
             </div>
 
             <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-                <FilterChip active={category === "all"} onClick={() => setCategory("all")}>
+                <FilterChip active={category === "all"} onClick={() => setCategory("all")} count={categoryCounts.all}>
                     {t("全部", "All")}
                 </FilterChip>
                 {CATEGORIES.map((c) => (
-                    <FilterChip key={c.key} active={category === c.key} onClick={() => setCategory(c.key)}>
-                        {language === "zh"
-                            ? c.label
-                            : {
-                                  perception: "Perception",
-                                  decision: "Decision",
-                                  control: "Control",
-                                  toolchain: "Toolchain",
-                              }[c.key]}
+                    <FilterChip
+                        key={c.key}
+                        active={category === c.key}
+                        onClick={() => setCategory(c.key)}
+                        count={categoryCounts[c.key]}
+                    >
+                        {language === "zh" ? c.label : CATEGORY_EN[c.key]}
                     </FilterChip>
                 ))}
-                {/* 窄屏分类会折行，排序另起一行右对齐，避免看起来像是分类的一部分 */}
                 <span className="flex w-full items-center justify-end gap-1 text-xs text-muted sm:ml-auto sm:w-auto">
                     {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
                         <button
@@ -107,22 +148,22 @@ export function SkillExplorer({ skills, initialCategory }: { skills: SkillMeta[]
                 </span>
             </div>
 
-            {result.length === 0 ? (
+            {results.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-border py-16 text-center text-sm text-muted">
                     {t("没有匹配的 Skill，换个关键词试试", "No matching skills. Try another search.")}
                 </p>
             ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {result.map((skill) => (
-                        <SkillCard key={skill.slug} skill={skill} />
+                    {results.map((skill) => (
+                        <SkillCard key={skill.slug} skill={skill} highlights={highlights.get(skill.slug)} />
                     ))}
                 </div>
             )}
 
             <p className="mt-6 text-xs text-muted">
                 {t(
-                    "当前为关键词搜索（Fuse.js）。语义搜索（本地 BGE 向量匹配，无需上传查询内容）在计划中。",
-                    "Keyword search (Fuse.js) for now. Local BGE semantic search — no query ever leaves the browser — is planned.",
+                    "当前为关键词搜索（Fuse.js + 拼音），支持中文、拼音、英文混合输入。语义搜索（本地 BGE 向量匹配）在计划中。",
+                    "Keyword search (Fuse.js + Pinyin). Supports Chinese, pinyin, and English queries. Semantic search (local BGE) is planned.",
                 )}
             </p>
         </div>
@@ -132,21 +173,26 @@ export function SkillExplorer({ skills, initialCategory }: { skills: SkillMeta[]
 function FilterChip({
     active,
     onClick,
+    count,
     children,
 }: {
     active: boolean;
     onClick: () => void;
+    count?: number;
     children: React.ReactNode;
 }) {
     return (
         <button
             type="button"
             onClick={onClick}
-            className={`chip px-3 py-1.5 transition-colors ${
+            className={`chip flex items-center gap-1.5 px-3 py-1.5 transition-colors ${
                 active ? "chip-brand border-transparent" : "hover:border-border-strong hover:text-text"
             }`}
         >
             {children}
+            {count !== undefined && (
+                <span className={`text-[11px] ${active ? "opacity-70" : "text-faint"}`}>{count}</span>
+            )}
         </button>
     );
 }

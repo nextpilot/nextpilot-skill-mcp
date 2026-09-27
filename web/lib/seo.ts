@@ -12,8 +12,14 @@ import {
     SOCIAL_GITEE,
     SOCIAL_TWITTER,
 } from "@/lib/site-config";
+import { getSiteSettings } from "@/lib/site-settings";
 
-// 为兼容旧引用保留导出（其他文件 `import { SITE_URL } from "@/lib/seo"` 仍可用）
+// 为兼容旧引用保留导出（其他文件 `import { SITE_URL } from "@/lib/seo"` 仍可用）。
+//
+// ⚠️ 这些是**构建期/环境变量兜底值**，不含后台覆盖。页面里凡是"能被后台改到的项"
+// （域名、站名、短名、描述）都不该直接用它们：canonical、og:url、title 后缀这些
+// 一旦烙上旧域名就是坏的外链（搜索引擎照着爬）。`makePageMeta` 等工厂函数内部已经
+// 改读 `getSiteSettings()`，新代码优先用那些函数。
 export { SITE_URL, SITE_NAME, SITE_SHORT, SITE_DESCRIPTION, OG_IMAGE, SITE_KEYWORDS, SITE_AUTHOR, TWITTER_HANDLE };
 
 /** @deprecated 请使用 `SITE_DESCRIPTION`（来自 @/lib/site-config） */
@@ -57,11 +63,14 @@ export interface PageMeta {
  * 为任一页面生成标准化 Metadata。
  *
  * 用法：
- *   export const metadata = makeMetadata({ title: "分析日志", description: "..." });
- *   或
- *   export async function generateMetadata() { return makeMetadata({ ... }); }
+ *   export async function generateMetadata() { return makePageMeta({ ... }); }
+ *
+ * **为什么是 async**：域名 / 站名 / 短名现在后台可改（`getSiteSettings()` 读 KV），
+ * 而 canonical、og:url、title 后缀全都由域名和站名拼出来——用构建期的常量拼，后台改完
+ * 域名后这些外链还指向旧地址。调用方本来就是 `async generateMetadata()`，返回
+ * Promise 是合法的，所以**改这个函数不需要动那十几个页面**。
  */
-export function makePageMeta({
+export async function makePageMeta({
     title,
     description,
     keywords,
@@ -75,15 +84,16 @@ export function makePageMeta({
     articleSection,
     articleTags,
     author,
-}: PageMeta): Metadata {
+}: PageMeta): Promise<Metadata> {
+    const s = await getSiteSettings();
     const canonicalPath = locale ? `/${locale}${path}` : path || "/";
-    const canonicalUrl = `${SITE_URL}${canonicalPath}`;
-    const ogUrl = path ? `${SITE_URL}${path}` : SITE_URL;
+    const canonicalUrl = `${s.siteUrl}${canonicalPath}`;
+    const ogUrl = path ? `${s.siteUrl}${path}` : s.siteUrl;
     const image = ogImage
         ? ogImage.startsWith("http")
             ? ogImage
-            : `${SITE_URL}${ogImage}`
-        : `${SITE_URL}${DEFAULT_OG_IMAGE}`;
+            : `${s.siteUrl}${ogImage}`
+        : `${s.siteUrl}${DEFAULT_OG_IMAGE}`;
     const pageAuthor = author || SITE_AUTHOR;
 
     const meta: Metadata = {
@@ -96,17 +106,17 @@ export function makePageMeta({
             ...(locale
                 ? {
                       languages: {
-                          "zh-CN": `${SITE_URL}/zh${path}`,
-                          en: `${SITE_URL}/en${path}`,
+                          "zh-CN": `${s.siteUrl}/zh${path}`,
+                          en: `${s.siteUrl}/en${path}`,
                       },
                   }
                 : {}),
         },
         openGraph: {
-            title: `${title} · ${SITE_SHORT}`,
+            title: `${title} · ${s.siteShort}`,
             description,
             url: ogUrl,
-            siteName: SITE_NAME,
+            siteName: s.siteName,
             images: [
                 {
                     url: image,
@@ -125,7 +135,7 @@ export function makePageMeta({
         },
         twitter: {
             card: "summary_large_image",
-            title: `${title} · ${SITE_SHORT}`,
+            title: `${title} · ${s.siteShort}`,
             description,
             images: [{ url: image, alt: title }],
             ...(TWITTER_HANDLE ? { site: `@${TWITTER_HANDLE}`, creator: `@${TWITTER_HANDLE}` } : {}),
@@ -138,27 +148,33 @@ export function makePageMeta({
 
 /* ========== JSON-LD 结构化数据 ========== */
 
-/** 站点级结构化数据（Organization + WebSite） */
-export function siteJsonLd(): object {
+/**
+ * 站点级结构化数据（Organization + WebSite）。
+ *
+ * async 的理由同 `makePageMeta`：Organization 的 url / logo 与 WebSite 的搜索入口都由
+ * 站点域名拼出，域名是后台可改项，烙死就是错的。
+ */
+export async function siteJsonLd(): Promise<object> {
+    const s = await getSiteSettings();
     return {
         "@context": "https://schema.org",
         "@graph": [
             {
                 "@type": "Organization",
-                name: SITE_NAME,
-                url: SITE_URL,
-                logo: `${SITE_URL}/icon.svg`,
+                name: s.siteName,
+                url: s.siteUrl,
+                logo: `${s.siteUrl}/icon.svg`,
                 sameAs: [SOCIAL_GITHUB, SOCIAL_GITEE, SOCIAL_TWITTER].filter(Boolean),
             },
             {
                 "@type": "WebSite",
-                name: SITE_NAME,
-                url: SITE_URL,
-                description: DEFAULT_DESCRIPTION,
+                name: s.siteName,
+                url: s.siteUrl,
+                description: s.siteDescription,
                 inLanguage: ["zh-CN", "en"],
                 potentialAction: {
                     "@type": "SearchAction",
-                    target: { "@type": "EntryPoint", urlTemplate: `${SITE_URL}/skills?q={search_term_string}` },
+                    target: { "@type": "EntryPoint", urlTemplate: `${s.siteUrl}/skills?q={search_term_string}` },
                     "query-input": "required name=search_term_string",
                 },
             },
@@ -167,13 +183,14 @@ export function siteJsonLd(): object {
 }
 
 /** 文章 / 指南页面结构化数据 */
-export function articleJsonLd(params: {
+export async function articleJsonLd(params: {
     url: string;
     title: string;
     description: string;
     datePublished?: string;
     dateModified?: string;
-}): object {
+}): Promise<object> {
+    const s = await getSiteSettings();
     return {
         "@context": "https://schema.org",
         "@type": "TechArticle",
@@ -182,8 +199,8 @@ export function articleJsonLd(params: {
         url: params.url,
         ...(params.datePublished ? { datePublished: params.datePublished } : {}),
         ...(params.dateModified ? { dateModified: params.dateModified } : {}),
-        author: { "@type": "Organization", name: SITE_NAME, url: SITE_URL },
-        publisher: { "@type": "Organization", name: SITE_NAME, url: SITE_URL },
+        author: { "@type": "Organization", name: s.siteName, url: s.siteUrl },
+        publisher: { "@type": "Organization", name: s.siteName, url: s.siteUrl },
     };
 }
 
@@ -271,13 +288,14 @@ export function faqPageJsonLd(items: FaqItem[]): object {
 }
 
 /** Product 结构化数据（一个统一的 JSON-LD，不需每页单独发） */
-export function productJsonLd(): object {
+export async function productJsonLd(): Promise<object> {
+    const s = await getSiteSettings();
     return {
         "@context": "https://schema.org",
         "@type": "Product",
-        name: SITE_NAME,
-        description: SITE_DESCRIPTION,
-        url: SITE_URL,
+        name: s.siteName,
+        description: s.siteDescription,
+        url: s.siteUrl,
         category: "AIApplication",
         manufacturer: { "@type": "Organization", name: SITE_AUTHOR },
     };
