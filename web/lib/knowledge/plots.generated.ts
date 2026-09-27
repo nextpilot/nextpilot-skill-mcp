@@ -1,6 +1,7 @@
 // ⚠️ 自动生成，请勿手改。源文件在 knowledge/（按固件族分目录）与 knowledge/engine/，改完跑 `pnpm build:kb`（dev/build 自动执行）。
 // 源：knowledge/<族>/plot/*.yml（改图请改那边）
 export const PLOT_PRESETS = {
+  "ardupilot-bin": [],
   "px4-ulog": [
     {
       "id": "position",

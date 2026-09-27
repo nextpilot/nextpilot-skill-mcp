@@ -82,7 +82,6 @@ const FAMILIES = readdirSync(KN_ROOT, { withFileTypes: true })
     // 没有同名适配器 = 不是一族日志的知识（knowledge/engine、knowledge/llm 都在这儿被滤掉）
     .filter((d) => providerFiles.includes(`${d.name}.py`))
     .filter((d) => existsSync(resolve(KN_ROOT, d.name, "facts.yaml")))
-    .filter((d) => d.name !== "ardupilot") // APM 规则有未解决的 foreach 引用问题，暂不加入构建
     .map((d) => {
         const dir = resolve(KN_ROOT, d.name);
         // log_type 是这一族在产物里的下标：引擎按它从 `{log_type: ...}` 里挑出该用的那一套
