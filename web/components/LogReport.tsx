@@ -241,10 +241,11 @@ export function LogReport({
             </div>
 
             <div className="mt-5">
-                {effectiveTab === "metrics" && <MetricsTab report={report} />}
-                {effectiveTab === "summary" && <SummaryTab report={report} />}
+                {effectiveTab === "metrics" && <MetricsTab key="metrics" report={report} />}
+                {effectiveTab === "summary" && <SummaryTab key="summary" report={report} />}
                 {effectiveTab === "ai" && (
                     <AiTab
+                        key="ai"
                         aiMarkdown={aiMarkdown}
                         explaining={explaining}
                         loggedIn={loggedIn}
@@ -253,6 +254,7 @@ export function LogReport({
                 )}
                 {effectiveTab === "charts" && (manifest || storedPlots?.panels?.length) && info && (
                     <LogCharts
+                        key="charts"
                         manifest={manifest}
                         storedPanels={storedPlots?.panels ?? null}
                         storedSeries={storedPlots?.series ?? null}
@@ -261,9 +263,9 @@ export function LogReport({
                         notes={report.instanceNotes ?? null}
                     />
                 )}
-                {effectiveTab === "messages" && info && <LogEventsMsg info={info} />}
-                {effectiveTab === "sysmsg" && info && <LogSystemMsg info={info} />}
-                {effectiveTab === "params" && info && <LogParamsMsg info={info} />}
+                {effectiveTab === "messages" && info && <LogEventsMsg key="messages" info={info} />}
+                {effectiveTab === "sysmsg" && info && <LogSystemMsg key="sysmsg" info={info} />}
+                {effectiveTab === "params" && info && <LogParamsMsg key="params" info={info} />}
             </div>
         </div>
     );
