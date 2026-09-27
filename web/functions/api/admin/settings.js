@@ -22,7 +22,34 @@ import {
 
 export async function onRequestGet({ request, env }) {
     const session = await getSessionUser(request, env);
-    if (!isAdminSession(session, env)) return jsonResponse({ error: "not found" }, 404);
+
+    // DEBUG: 诊断边缘函数侧鉴权失败原因，部署后确认，随后删除
+    if (!isAdminSession(session, env)) {
+        const cookieHeader = request.headers.get("cookie") ?? "";
+        const hasCookie = cookieHeader.length > 0;
+        const hasSession = session !== null;
+        const email = session?.email ?? null;
+        const isAdminFromJwt = session?.isAdmin;
+        const envEmailList = String(env?.AUTH_ADMIN_EMAILS ?? "");
+        const envSecretExists = Boolean(env?.AUTH_SESSION_SECRET);
+        return jsonResponse(
+            {
+                error: "not found",
+                debug: {
+                    hasCookie,
+                    hasSession,
+                    sessionEmail: email,
+                    isAdminFromJwt,
+                    env_AUTH_ADMIN_EMAILS: envEmailList || "<未设置>",
+                    env_AUTH_SESSION_SECRET: envSecretExists
+                        ? "已设置(长度:" + String(env.AUTH_SESSION_SECRET).length + ")"
+                        : "<未设置>",
+                },
+            },
+            404,
+        );
+    }
+    // END DEBUG
 
     const kv = getKv(env);
     const raw = kv ? await kv.get(SETTINGS_KEY, { type: "json" }).catch(() => null) : null;

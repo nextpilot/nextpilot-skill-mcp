@@ -5,34 +5,50 @@ import { useSession } from "next-auth/react";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { AdminSettingsForm, type SettingFieldView } from "./AdminSettingsForm";
 
+interface DebugInfo {
+    hasCookie?: boolean;
+    hasSession?: boolean;
+    sessionEmail?: string | null;
+    isAdminFromJwt?: boolean;
+    env_AUTH_ADMIN_EMAILS?: string;
+    env_AUTH_SESSION_SECRET?: string;
+}
+
 export default function AdminSettingsPage() {
     const { data: session, status } = useSession();
     const [fields, setFields] = useState<SettingFieldView[]>([]);
     const [settings, setSettings] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [debug, setDebug] = useState<DebugInfo | null>(null);
 
     useEffect(() => {
         if (status !== "authenticated") return;
         fetch("/api/admin/settings", { cache: "no-store" })
             .then((res) => {
-                if (res.status === 404) {
-                    setError("无权限访问");
-                    return null;
+                if (!res.ok) {
+                    return res.json().then((body) => {
+                        throw { status: res.status, debug: body?.debug };
+                    });
                 }
-                if (!res.ok) throw new Error(`${res.status}`);
                 return res.json() as Promise<{
                     settings?: Record<string, string>;
                     fields?: SettingFieldView[];
                 }>;
             })
             .then((data) => {
-                if (!data) return;
                 setSettings(data.settings ?? {});
                 setFields(data.fields ?? []);
             })
             .catch((err) => {
-                setError(err instanceof Error ? err.message : "加载失败");
+                if (err?.debug) {
+                    setDebug(err.debug);
+                    setError(
+                        `边缘函数返回 ${err.status}: isAdminFromJwt=${String(err.debug.isAdminFromJwt)}, hasSession=${String(err.debug.hasSession)}`,
+                    );
+                } else {
+                    setError(err instanceof Error ? err.message : "加载失败");
+                }
             })
             .finally(() => setLoading(false));
     }, [status]);
@@ -69,6 +85,11 @@ export default function AdminSettingsPage() {
         return (
             <div className="page-shell py-10">
                 <p className="text-sm text-red-500">加载设置失败：{error}</p>
+                {debug ? (
+                    <pre className="mt-4 rounded border border-red-200 bg-red-50 p-4 text-xs leading-relaxed">
+                        {JSON.stringify(debug, null, 2)}
+                    </pre>
+                ) : null}
             </div>
         );
     }
