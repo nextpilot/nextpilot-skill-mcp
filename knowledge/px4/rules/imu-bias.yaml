@@ -11,7 +11,9 @@ order: 1
 version: 1.1.0
 
 # 没有 armed 段就谈不上"飞行中的零偏"——先决条件直接不跑（原实现外层是 `if armed_intervals:`）。
-conditions:
+tag: imu_bias_drift
+
+condition:
   armed: true
 
 compute:
@@ -32,7 +34,7 @@ compute:
     temp_range = _try(max_temp_range(vehicle_imu_status.temperature_gyro, vehicle_air_data.ambient_temperature))
   - bias_stat = _try(np.maximum(worst_abs, worst_drift))
 
-outputs:
+output:
   - name: gyroBiasMaxRadS
     value: worst_abs
     round: 4
@@ -45,8 +47,9 @@ outputs:
     value: temp_range
     round: 1
 
-triggers:
+trigger:
   - when: "worst_abs >= 0.05 or worst_drift >= 0.05"
+    label: imu_bias_drift
     severity: critical
     suggestion: "结合故障库 F005：检查 IMU 安装紧固、执行陀螺/加计标定；若温度跨度大，优先按温度漂移解释。"
     description: 陀螺零偏异常（轴 {worst_axis}：绝对值 {worst_abs:.4f} rad/s，漂移 {worst_drift:.4f} rad/s）
@@ -55,8 +58,8 @@ triggers:
       value: f"{bias_stat:.4f}"
       threshold: 0.02
       unit: rad/s
-    label: imu_bias_drift
   - when: "worst_abs >= 0.02 or worst_drift >= 0.02"
+    label: imu_bias_drift
     severity: warning
     suggestion: "结合故障库 F005：检查 IMU 安装紧固、执行陀螺/加计标定；若温度跨度大，优先按温度漂移解释。"
     description: 陀螺零偏异常（轴 {worst_axis}：绝对值 {worst_abs:.4f} rad/s，漂移 {worst_drift:.4f} rad/s）
@@ -65,11 +68,9 @@ triggers:
       value: f"{bias_stat:.4f}"
       threshold: 0.02
       unit: rad/s
-    label: imu_bias_drift
   - when: temp_range >= 15
-    severity: guard
     label: temperature_change_large
+    severity: guard
     description: "Data quality: temperature_change_large"
     evidence:
       source: ""
-tag: imu_bias_drift

@@ -7,8 +7,9 @@ name: 单电芯电压
 group: battery
 order: 1 # battery group 内次序：cell-voltage=1, sag=2, remaining=3
 version: 1.1.0
+tag: battery_voltage_drop
 
-conditions:
+condition:
   message:
     - battery_status
 
@@ -20,7 +21,7 @@ compute:
   - >-
     vmin, cell_min, cells, have_measured, have_fallback, no_cell = _try(cell_voltage_min( battery_status.voltage_cell_v, battery_status.voltage_v, battery_status.voltage_filtered_v, battery_status.cell_count))
 
-outputs:
+output:
   - name: batteryVoltageMin
     value: vmin
     round: 2
@@ -31,7 +32,8 @@ outputs:
     round: 3
 
 # 阈值 [暂定]：单电芯最低电压 V（crit 3.55 / warn 3.70）
-triggers:
+
+trigger:
   - when: "have_measured and cell_min < 3.55"
     severity: critical
     suggestion: "存在过放风险，检查电池老化、放电倍率匹配与低压告警阈值。"
@@ -74,5 +76,3 @@ triggers:
     evidence:
       source: battery_status.voltage_cell_v / cell_count
       value: f"missing"
-    label: null
-tag: battery_voltage_drop

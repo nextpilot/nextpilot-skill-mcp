@@ -8,7 +8,9 @@ group: vtol_transition
 order: 1
 
 # 原实现的外层条件是「有 vehicle_status 且有 armed 段」，不成立时静默（既不 ran 也不 skipped）
-conditions:
+tag: vtol_convert_attitude_over
+
+condition:
   message:
     - vtol_vehicle_status
 
@@ -29,15 +31,16 @@ compute:
   - has_tilt = tilt_max is not None
   - tilt_stat = _try(tilt_max if enough else None)
 
-outputs:
+output:
   - name: vtolTransitionSamples
     value: trans_n
   - name: vtolTransitionMaxTiltDeg
     value: tilt_stat
     round: 1
 
-triggers:
+trigger:
   - when: "has_tilt and enough and tilt_max > 8.0"
+    label: vtol_convert_attitude_over
     severity: warning
     suggestion: "结合故障库 F003：复盘转换时序与推力匹配，强风环境优先归因环境扰动。"
     description: VTOL 转换阶段姿态越限（最大 {tilt_max:.1f}°，限值 8°）
@@ -46,5 +49,3 @@ triggers:
       value: f"{tilt_max:.1f}"
       threshold: 8
       unit: °
-    label: vtol_convert_attitude_over
-tag: vtol_convert_attitude_over

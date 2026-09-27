@@ -4,27 +4,31 @@
 id: px4-cpu-load
 # group：决定这条规则在引擎里的执行位置。finding.id（F01、F02…）按发射顺序生成，
 # 所以 group 必须与它所替换的原过程式检查位置一致（执行顺序见 ../facts.yaml 的 slot_order）。
-group: cpu
 name: CPU 负载
 
 # ── 适用范围：不限就整个省掉；依赖的 topic 缺了记一条 skipped，不误报 ──
-conditions:
+group: cpu
+
+condition:
   message:
     - cpuload
 
 # ── 计算：算子节点数据流（输出命名进环境，供表达式引用）──
+
 compute:
   # 实测里 cpuload 通常只有一个实例，默认合并后统计（与原 max over instances 等价）
   - cpu_max = max(cpuload.load)
 
 # ── 输出：溯源与副作用 ──
-outputs:
+
+output:
   - name: cpuLoadMax
     value: cpu_max
     round: 3
 
 # ── 触发：自上而下，命中第一条 ──
-triggers:
+
+trigger:
   - when: "cpu_max >= 0.95"
     severity: critical
     suggestion: "CPU 长期接近满载会导致控制环丢步；检查高耗率模块与日志流配置。"

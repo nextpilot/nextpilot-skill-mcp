@@ -7,8 +7,9 @@ name: 电机输出不平衡
 group: motor_balance
 order: 1
 version: 1.1.0
+tag: motor_output_unbalance
 
-conditions:
+condition:
   message:
     - actuator_motors
 # 活跃通道 >= 4 才算跑过：通道不足由算子的 min_channels=4 兜住，算不出来就记一条
@@ -22,15 +23,16 @@ compute:
   - >-
     spread, busiest, idlest, n_active = column_spread_stats( cols, seg, min_mean=0.01, min_channels=4)
 
-outputs:
+output:
   - name: motorControlSpread
     value: spread
     round: 3
   - name: motorCountActive
     value: n_active
 
-triggers:
+trigger:
   - when: "spread >= 0.15"
+    label: motor_output_unbalance
     severity: critical
     suggestion: "结合故障库 F008：检查桨叶型号/正反桨是否一致、单电机效率、机架形变。"
     description: 电机输出不平衡（悬停段通道 {busiest} 与 {idlest} 差 {spread:.3f}）
@@ -38,8 +40,8 @@ triggers:
       source: actuator_motors.control[](悬停段均值极差)
       value: f"{spread:.3f}"
       threshold: 0.15
-    label: motor_output_unbalance
   - when: "spread >= 0.08"
+    label: motor_output_unbalance
     severity: warning
     suggestion: "结合故障库 F008 排查动力一致性；偶发差异可先观察。"
     description: 电机输出差异偏大（通道 {busiest} 与 {idlest} 差 {spread:.3f}）
@@ -47,5 +49,3 @@ triggers:
       source: actuator_motors.control[](悬停段均值极差)
       value: f"{spread:.3f}"
       threshold: 0.08
-    label: motor_output_unbalance
-tag: motor_output_unbalance

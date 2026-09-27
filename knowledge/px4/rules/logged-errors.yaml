@@ -18,7 +18,7 @@ compute:
   - >-
     samples = take_items(MESSAGES, key="level_name", in_list=["EMERGENCY", "ALERT", "CRITICAL", "ERROR"], limit=5, clip={"message": 200}, drop=["level", "level_name"])
 
-triggers:
+trigger:
   - when: "n > 0"
     severity: critical
     suggestion: "按时间顺序核对错误原文，这通常是定位根因最直接的证据。"
@@ -29,4 +29,3 @@ triggers:
       value: n
       threshold: 0
       unit: 条
-    label: null

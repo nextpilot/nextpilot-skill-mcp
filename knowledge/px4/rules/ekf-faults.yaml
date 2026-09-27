@@ -6,8 +6,9 @@ id: px4-ekf-fault
 name: EKF 融合硬故障
 group: ekf_faults
 order: 1
+tag: ekf_innovation_failure
 
-conditions:
+condition:
   message:
     - estimator_status
 
@@ -18,7 +19,7 @@ compute:
   - fault_union = _try(coalesce(fault_raw, 0))
   - crit_bits = _try(has_bits(fault_union, 63))
 
-triggers:
+trigger:
   - when: "crit_bits"
     severity: critical
     suggestion: "估计器出现硬故障，建议停飞排查传感器与振动后重新标定。"
@@ -36,5 +37,3 @@ triggers:
       source: estimator_status.filter_fault_flags
       value: fault_union
       threshold: 0
-    label: null
-tag: ekf_innovation_failure

@@ -5,10 +5,11 @@ id: px4-guard-log-dropouts
 name: 数据质量-日志丢包
 group: guards
 order: 3
-triggers:
+
+trigger:
   - when: DROPOUT_MS > 1000
-    severity: guard
     label: log_dropouts_high
+    severity: guard
     description: "Data quality: log_dropouts_high"
     evidence:
       source: ""

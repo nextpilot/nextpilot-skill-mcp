@@ -13,11 +13,12 @@
       events = rising_edge_events(vehicle_status.failsafe, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)
 
   foreach: { var: events, keys: [ t_s ] }
-  triggers:
+
+  trigger:
     - when: "True"
+      label: failsafe
       severity: critical
       suggestion: "结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"
-      label: failsafe
       description: 触发失效保护（飞行中，t={t_s:.1f}s）
       evidence:
         source: vehicle_status.failsafe
@@ -33,11 +34,12 @@
       events = rising_edge_events(vehicle_status.rc_signal_lost, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)
 
   foreach: { var: events, keys: [ t_s ] }
-  triggers:
+
+  trigger:
     - when: "True"
+      label: rc_lost
       severity: warning
       suggestion: "结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"
-      label: rc_lost
       description: 遥控信号丢失（飞行中，t={t_s:.1f}s）
       evidence:
         source: vehicle_status.rc_signal_lost
@@ -53,7 +55,8 @@
       events = rising_edge_events(vehicle_status.data_link_lost, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)
 
   foreach: { var: events, keys: [ t_s ] }
-  triggers:
+
+  trigger:
     - when: "True"
       severity: warning
       suggestion: "结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"
@@ -72,7 +75,8 @@
       events = rising_edge_events(vehicle_status.engine_failure, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)
 
   foreach: { var: events, keys: [ t_s ] }
-  triggers:
+
+  trigger:
     - when: "True"
       severity: critical
       suggestion: "结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"
@@ -91,7 +95,8 @@
       events = rising_edge_events(vehicle_status.mission_failure, vehicle_status.timestamp, ARMED_INTERVALS, T0_US)
 
   foreach: { var: events, keys: [ t_s ] }
-  triggers:
+
+  trigger:
     - when: "True"
       severity: critical
       suggestion: "结合故障库与失效保护配置确认返航/降落行为；RC 丢失见 F007。"
@@ -105,7 +110,7 @@
   group: failsafe
   order: 6 # 原实现里 nav 分支在 5 个布尔字段之后
 
-  conditions:
+  condition:
     message:
       - vehicle_status
 
@@ -114,11 +119,12 @@
       events = step_into_events(vehicle_status.nav_state, vehicle_status.timestamp, ARMED_INTERVALS, T0_US, codes={5: "AUTO_RTL", 12: "DESCEND", 13: "TERMINATION", 18: "LAND"})
 
   foreach: { var: events, keys: [ t_s, code, name ] }
-  triggers:
+
+  trigger:
     - when: "True"
+      label: failsafe
       severity: critical
       suggestion: "说明飞控进入失效保护状态，需结合前文事件定位触发原因。"
-      label: failsafe
       description: 飞行中导航状态切换为 {name}（t={t_s:.1f}s）
       evidence:
         source: vehicle_status.nav_state

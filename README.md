@@ -8,7 +8,7 @@
 
 ## 这是什么？
 
-这是一个面向 PX4 无人机开发者和飞控工程师的开源平台，提供两大核心能力：
+这是一个面向 PX4 和 ArduPilot 无人机开发者和飞控工程师的开源平台，提供两大核心能力：
 
 ### 1. 飞控 AI Skill 与 MCP 分享
 
@@ -19,10 +19,10 @@
 
 ### 2. 确定性日志分析引擎
 
-上传 PX4 飞控的 `.ulg` 日志文件，平台在**浏览器本地**完成全部分析，输出中文报告：
+支持 PX4 `.ulg` 和 ArduPilot `.bin` 两种飞控日志格式，平台在**浏览器本地**完成全部分析，输出中文报告：
 
 - **原始日志不出浏览器** —— 隐私安全有保障
-- **规则引擎做数值判断** —— 内置 32 条检查规则，覆盖振动、电源、GPS、姿态、失效保护等 16 个维度
+- **规则引擎做数值判断** —— PX4：32 条检查规则覆盖 16 个维度；ArduPilot：34 条规则（阈值 draft）
 - **LLM 只做中文解释** —— AI 接收的是脱敏后的结构化结论，不接触原始数据
 
 在线体验：已上线 [Skill Hub](https://nextpilot-skill-mcp.pages.dev)，支持 GitHub / 邮箱登录。
@@ -31,13 +31,15 @@
 
 ## 关键术语
 
-| 术语        | 说明                                                               |
-| ----------- | ------------------------------------------------------------------ |
-| **PX4**     | 开源的无人机飞控固件，广泛用于多旋翼、固定翼等无人系统             |
-| **.ulg**    | PX4 的标准飞行日志格式，记录飞行过程中的传感器、状态、控制量等数据 |
-| **Skill**   | 面向 AI 的技能卡片，告诉 AI "怎么帮你做某件事"                     |
-| **MCP**     | Model Context Protocol，Anthropic 推出的 AI 工具调用标准协议       |
-| **GJB-841** | 中国军用标准《军用飞机飞行数据记录设备通用规范》                   |
+| 术语          | 说明                                                               |
+| ------------- | ------------------------------------------------------------------ |
+| **PX4**       | 开源的无人机飞控固件，广泛用于多旋翼、固定翼等无人系统             |
+| **ArduPilot** | 开源的无人机 / 无人车 / 无人船自动驾驶系统                          |
+| **.ulg**      | PX4 的标准飞行日志格式，记录飞行过程中的传感器、状态、控制量等数据 |
+| **.bin**      | ArduPilot 的数据闪存日志格式，自带 FMT 声明                         |
+| **Skill**     | 面向 AI 的技能卡片，告诉 AI "怎么帮你做某件事"                     |
+| **MCP**       | Model Context Protocol，Anthropic 推出的 AI 工具调用标准协议       |
+| **GJB-841**   | 中国军用标准《军用飞机飞行数据记录设备通用规范》                   |
 
 ---
 
@@ -55,6 +57,7 @@
 ├── knowledge/engine/             # 确定性分析引擎源码（operators / engine）
 ├── knowledge/          # 日志分析的经验与数据
 │   ├── px4/            # PX4 相关（rules/*.yaml / 故障库 / LLM 提示词 / meta）
+│   ├── ardupilot/      # ArduPilot 相关（规则 / 故障库）
 │   ├── skills/         # Skill 卡片内容
 │   └── mcp/            # MCP 条目内容
 ├── tools/              # 手动运行的工具
@@ -98,7 +101,10 @@ pnpm web:dev
 | `/guide`   | Skill / MCP 帮助文档与提交指南                |
 | `/skills`  | Skill 技能库（支持 Fuse.js 客户端搜索）       |
 | `/mcp`     | 收录的 MCP 服务                               |
-| `/analyze` | PX4 日志分析（Pyodide + pyulog 浏览器端解析） |
+| `/analyze` | PX4 / ArduPilot 日志分析（Pyodide 浏览器端解析） |
+| `/login`   | 登录（GitHub / 邮箱验证码）                   |
+| `/me`      | 个人中心与历史报告                            |
+| `/tools`   | 开发工具与资源                                |
 
 ---
 
@@ -107,16 +113,18 @@ pnpm web:dev
 整个日志分析在用户浏览器中完成，流程如下：
 
 ```
-用户选择 .ulg 文件（全程留在浏览器，不上传原始文件）
+用户选择 .ulg / .bin 文件（全程留在浏览器，不上传原始文件）
   │
   ▼
 第一层 · 解析引擎
-  Pyodide（WASM 中的 Python）+ pyulog 本地解析日志
+  Pyodide（WASM 中的 Python）本地解析日志
+  PX4：pyulog；ArduPilot：自研解析器（无 pymavlink）
   │
   ▼
 第二层 · 规则检查
-  32 条 YAML 规则 → 构建期编译为 Python → 内联到 Worker
-  覆盖：振动、EKF、电源、GPS、姿态、失效保护等 16 个维度
+  PX4：32 条 YAML 规则（16 个维度）
+  ArduPilot：34 条 YAML 规则（来自 ardupilot-mcp 的 16 项检查）
+  构建期编译为 Python → 内联到 Worker
   │
   ▼
 第三层 · LLM 解读
@@ -208,3 +216,16 @@ git config core.hooksPath .githooks
 > **重要提醒**：CI 全绿不等于回归通过。修改规则、算子或引擎后，必须在本地跑一次"需要日志"那组检查，这是真正的回归门槛，云端 CI 覆盖不到。
 >
 > 校验项设计与原理详见 [`tools/ci/check_all.py`](tools/ci/check_all.py) 的模块文档。
+
+---
+
+## 仓库与远程
+
+项目同时托管在 Gitee 和 GitHub，两者互为镜像：
+
+```bash
+origin  → https://gitee.com/nextpilot/nextpilot-skill-mcp.git  # Gitee（主）
+github  → git@github.com/nextpilot/nextpilot-skill-mcp.git     # GitHub（镜像）
+```
+
+> 推送时两个远程都必须推到。详细开发流程见 [CLAUDE.md §6.9.2](CLAUDE.md)。

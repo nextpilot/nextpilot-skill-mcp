@@ -7,8 +7,9 @@ name: 姿态误差高频振荡
 group: attitude_tracking
 order: 2
 version: 1.1.0
+tag: attitude_overshoot
 
-conditions:
+condition:
   message:
     - vehicle_attitude
     - vehicle_attitude_setpoint
@@ -34,7 +35,7 @@ compute:
   - p99_stat = p99 if seg_ok else None
   - osc_stat = osc_hz if seg_ok else None
 
-outputs:
+output:
   - name: attitudeErrDegP99
     value: p99_stat
     round: 1
@@ -42,8 +43,9 @@ outputs:
     value: osc_stat
     round: 2
 
-triggers:
+trigger:
   - when: "osc_stat >= 4.0 and p99_stat >= 25.0 and VEHICLE == 'fixed_wing'"
+    label: attitude_overshoot
     severity: warning
     suggestion: "振荡多与控制增益/机架共振相关，禁用大幅调参，先做频响检查。"
     description: 姿态误差高频振荡（约 {osc_stat:.1f} Hz）
@@ -52,8 +54,8 @@ triggers:
       value: f"{osc_stat:.2f}"
       threshold: 4
       unit: Hz
-    label: attitude_overshoot
   - when: "osc_stat >= 4.0 and p99_stat >= 15.0 and not VEHICLE == 'fixed_wing'"
+    label: attitude_overshoot
     severity: warning
     suggestion: "振荡多与控制增益/机架共振相关，禁用大幅调参，先做频响检查。"
     description: 姿态误差高频振荡（约 {osc_stat:.1f} Hz）
@@ -62,5 +64,3 @@ triggers:
       value: f"{osc_stat:.2f}"
       threshold: 4
       unit: Hz
-    label: attitude_overshoot
-tag: attitude_overshoot

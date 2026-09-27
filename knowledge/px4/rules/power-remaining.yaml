@@ -4,8 +4,9 @@ id: px4-power-remaining
 name: 电池剩余电量
 group: battery
 order: 3 # battery group 内的次序：cell-voltage=1, sag=2, remaining=3
+tag: battery_voltage_drop
 
-conditions:
+condition:
   message:
     - battery_status
 
@@ -14,12 +15,12 @@ compute:
   - rem = min_ge(battery_status.remaining, ge=0)
   - rem_pct = rem * 100
 
-outputs:
+output:
   - name: batteryRemainingMin
     value: rem
     round: 3
 
-triggers:
+trigger:
   - when: "rem <= 0.10"
     severity: critical
     suggestion: "剩余电量低于 10%，应立即返航；检查电量估算与电池健康。"
@@ -36,4 +37,3 @@ triggers:
       source: battery_status.remaining(min)
       value: f"{rem:.3f}"
       threshold: 0.2
-tag: battery_voltage_drop

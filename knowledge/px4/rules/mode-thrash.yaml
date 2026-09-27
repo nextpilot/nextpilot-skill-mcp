@@ -6,18 +6,18 @@ name: 飞行模式抖动
 group: mode_thrash
 order: 1
 
-conditions:
+condition:
   message:
     - vehicle_status
 
 compute:
   - n_changes = edges_count(vehicle_status.nav_state)
 
-outputs:
+output:
   - name: navStateChanges
     value: n_changes
 
-triggers:
+trigger:
   - when: "n_changes > 12"
     severity: warning
     suggestion: "频繁切模式易诱发操纵混乱；检查遥控器开关与失效保护反复触发。"
@@ -27,4 +27,3 @@ triggers:
       value: n_changes
       threshold: 12
       unit: 次
-    label: null

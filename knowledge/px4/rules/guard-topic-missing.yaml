@@ -5,22 +5,23 @@ id: px4-guard-topic-missing
 name: 数据质量-关键 topic 缺失
 group: guards
 order: 2
-triggers:
+
+trigger:
   - when: not has_topic('vehicle_status')
-    severity: guard
     label: topic_missing:vehicle_status
+    severity: guard
     description: "Data quality: topic_missing:vehicle_status"
     evidence:
       source: ""
   - when: not has_topic('battery_status')
-    severity: guard
     label: topic_missing:battery_status
+    severity: guard
     description: "Data quality: topic_missing:battery_status"
     evidence:
       source: ""
   - when: not has_topic('estimator_status')
-    severity: guard
     label: topic_missing:estimator_status
+    severity: guard
     description: "Data quality: topic_missing:estimator_status"
     evidence:
       source: ""

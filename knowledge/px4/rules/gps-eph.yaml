@@ -5,8 +5,9 @@ id: px4-gps-eph
 name: GPS 水平位置误差
 group: gps_health
 order: 1 # gps_health group 内次序：eph=1, sats=2, jump=3
+tag: gps_eph_high
 
-conditions:
+condition:
   message:
     - vehicle_gps_position
 
@@ -17,7 +18,7 @@ compute:
   - e_p95 = percentile(eph_m, p=95)
   - e_max = max(eph_m)
 
-outputs:
+output:
   - name: gpsEphP95M
     value: e_p95
     round: 2
@@ -25,8 +26,9 @@ outputs:
     value: e_max
     round: 2
 
-triggers:
+trigger:
   - when: "e_p95 >= 10.0"
+    label: gps_eph_high
     severity: warning
     suggestion: "结合故障库 F002：排查天线电磁干扰/遮挡/馈线虚接/多路径。"
     description: GPS 水平位置误差持续偏大（p95 {e_p95:.1f} m）
@@ -35,8 +37,8 @@ triggers:
       value: f"{e_p95:.2f}"
       threshold: 10
       unit: m
-    label: gps_eph_high
   - when: "e_p95 >= 5.0"
+    label: gps_eph_high
     severity: info
     suggestion: "关注天线安装位置与遮挡。"
     description: GPS 水平位置误差偶发偏大（p95 {e_p95:.1f} m）
@@ -45,5 +47,3 @@ triggers:
       value: f"{e_p95:.2f}"
       threshold: 5
       unit: m
-    label: gps_eph_high
-tag: gps_eph_high

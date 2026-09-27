@@ -7,8 +7,9 @@ id: px4-gps-jump
 name: GPS 位置跳变
 group: gps_health
 order: 3
+tag: gps_jump
 
-conditions:
+condition:
   message:
     - vehicle_gps_position
 
@@ -19,12 +20,13 @@ compute:
     step = _try(adjacent_speed_mps( _ref("vehicle_gps_position.latitude_deg", "vehicle_gps_position.lat", unit="deg"), _ref("vehicle_gps_position.longitude_deg", "vehicle_gps_position.lon", unit="deg"), _ref("vehicle_gps_position.timestamp")))
   - njump = _try(np.sum(step > 50.0))
 
-outputs:
+output:
   - name: gpsJumpCount
     value: njump
 
-triggers:
+trigger:
   - when: "njump >= 3"
+    label: gps_jump
     severity: warning
     suggestion: "结合故障库 F002：排查多路径、馈线与电磁干扰；室内跳变为正常现象。"
     description: GPS 位置出现 {njump} 次异常跳变（>50 m/s）
@@ -33,5 +35,3 @@ triggers:
       value: njump
       threshold: 3
       unit: 次
-    label: gps_jump
-tag: gps_jump

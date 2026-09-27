@@ -7,8 +7,9 @@ id: px4-wind-estimate
 name: 风扰估计
 group: wind_estimate
 order: 1
+tag: wind_disturb
 
-conditions:
+condition:
   message:
     - estimator_wind || wind_estimate
 
@@ -26,13 +27,14 @@ compute:
                      wind_estimate.windspeed_east)),
       p=95)
 
-outputs:
+output:
   - name: windSpeedP95M
     value: w_p95
     round: 1
 
-triggers:
+trigger:
   - when: "w_p95 >= 12.0"
+    label: wind_disturb
     severity: warning
     suggestion: "结合故障库 F010：强风属环境扰动，姿态超调/转换越限优先归因风，不要直接改 PID。"
     description: 估计风速较大（p95 {w_p95:.1f} m/s）
@@ -41,8 +43,8 @@ triggers:
       value: f"{w_p95:.1f}"
       threshold: 8
       unit: m/s
-    label: wind_disturb
   - when: "w_p95 >= 8.0"
+    label: wind_disturb
     severity: info
     suggestion: "解释姿态类异常时需考虑风扰因素。"
     description: 估计风速偏大（p95 {w_p95:.1f} m/s）
@@ -51,11 +53,9 @@ triggers:
       value: f"{w_p95:.1f}"
       threshold: 8
       unit: m/s
-    label: wind_disturb
   - when: w_p95 >= 8.0
-    severity: guard
     label: wind_strong
+    severity: guard
     description: "Data quality: wind_strong"
     evidence:
       source: ""
-tag: wind_disturb

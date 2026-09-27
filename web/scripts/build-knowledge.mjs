@@ -124,12 +124,32 @@ function writeArtifact(path, content) {
     writeFileSync(path, content, "utf8");
 }
 
-/** 极简 YAML 解析：只支持本故障库用到的子集，结构固定，宁可构建失败也不静默产出错 KB */
+/** 极简 YAML 解析：只支持本故障库用到的子集，结构固定，宁可构建失败也不静默产出错 KB。
+ *
+ * 字段表（11 字段，与 fault-kb.yaml 头部注释一致）：
+ *   id                        稳定编号
+ *   name                      故障名称
+ *   description               故障简述
+ *   vehicle                   [可选] 适用机型，默认 []
+ *   phase                     [可选] 飞行阶段，默认 "any"
+ *   trigger                   匹配标签列表
+ *   exclude                   [可选] 排除条件 [{trigger, note?}]
+ *   risk_level                高 / 中高 / 中 / 低
+ *   possible_root_cause       根因列表（已排序）
+ *   troubleshooting_steps     排查步骤（由简到繁）
+ *   doc_urls                  [可选] 参考链接
+ *
+ * exclude 是结构化对象数组（每项 {trigger: "...", note?: "..."}），解析成
+ *   {exclude_triggers: string[], exclude_notes: Record<string,string>} 双通道，
+ *   运行期 match_fault_kb() 只用 exclude_triggers 做匹配。
+ */
 function parseFaultKb(text) {
     const lines = text.split(/\r?\n/);
     const kb = [];
     let item = null;
     let listKey = null;
+    let inExclude = false;
+    let excludeEntries = [];
 
     const scalar = (raw) => {
         let v = raw.trim();
@@ -147,32 +167,51 @@ function parseFaultKb(text) {
         if (!line.trim() || line.trim().startsWith("#")) continue;
         if (/^fault_knowledge_base:\s*$/.test(line)) continue;
 
-        const itemHead = line.match(/^\s*-\s+fault_id:\s*(.+)$/);
+        const itemHead = line.match(/^\s*-\s+id:\s*(.+)$/);
         if (itemHead) {
+            if (item) _closeItem(item, excludeEntries);
             item = {
-                fault_id: "",
-                fault_tag: "",
-                trigger_tags: [],
-                flight_phase: [],
-                exclude_tags: [],
+                id: "",
+                name: "",
+                description: "",
+                vehicle: [],
+                phase: "any",
+                trigger: [],
+                exclude_triggers: [],
+                exclude_notes: {},
+                risk_level: "",
                 possible_root_cause: [],
                 troubleshooting_steps: [],
-                risk_level: "",
+                doc_urls: [],
             };
             kb.push(item);
-            item.fault_id = scalar(itemHead[1]);
+            item.id = scalar(itemHead[1]);
             listKey = null;
+            inExclude = false;
+            excludeEntries = [];
             continue;
         }
 
         if (!item) continue;
         const indent = line.length - line.trimStart().length;
 
-        const listItem = line.match(/^\s+-\s+(.+)$/);
-        if (listItem && listKey && indent >= 6) {
-            item[listKey].push(scalar(listItem[1]));
+        // exclude 是对象列表（缩进 >= 6）：内地有 trigger / note 两键
+        // 注意：- trigger 的缩进 >= 6（在 4 空格缩进的 exclude: 下再缩 2 格），
+        // 而同级键（如 risk_level）缩进是 4，不会误入这里
+        if (indent >= 6 && inExclude) {
+            const eTrig = line.match(/^\s+-\s+trigger:\s*(.+)$/);
+            if (eTrig) {
+                excludeEntries.push({ trigger: scalar(eTrig[1]), note: "" });
+                continue;
+            }
+            const eNote = line.match(/^\s+note:\s*(.+)$/);
+            if (eNote && excludeEntries.length > 0) {
+                excludeEntries[excludeEntries.length - 1].note = scalar(eNote[1]);
+                continue;
+            }
             continue;
         }
+        if (indent < 6) inExclude = false;
 
         const kv = line.match(/^\s{2,}([a-z_]+):\s*(.*)$/);
         if (kv) {
@@ -181,7 +220,8 @@ function parseFaultKb(text) {
                 item[key] = [];
                 listKey = key;
                 if (valRaw.trim()) item[key].push(scalar(valRaw.replace(/^-\s*/, "")));
-            } else if (key === "trigger_tags" || key === "flight_phase" || key === "exclude_tags") {
+            } else if (key === "trigger" || key === "vehicle" || key === "doc_urls") {
+                inExclude = false;
                 listKey = null;
                 const inline = valRaw.trim();
                 if (inline.startsWith("[")) {
@@ -193,21 +233,50 @@ function parseFaultKb(text) {
                 } else {
                     item[key] = [];
                 }
-            } else {
+            } else if (key === "exclude") {
+                inExclude = true;
+                listKey = null;
+                excludeEntries = [];
+            } else if (key === "phase") {
+                inExclude = false;
+                listKey = null;
+                const v = valRaw.trim();
+                item[key] = v.startsWith('"') || v.startsWith("'") ? v.slice(1, -1) : v;
+            } else if (key === "risk_level" || key === "description" || key === "name") {
+                inExclude = false;
                 listKey = null;
                 item[key] = scalar(valRaw);
             }
         }
+
+        // 列表项：possible_root_cause / troubleshooting_steps 的行内项
+        const listItem = line.match(/^\s+-\s+(.+)$/);
+        if (listItem && listKey && indent >= 6) {
+            item[listKey].push(scalar(listItem[1]));
+            continue;
+        }
     }
+    // 最后一条收口
+    if (item) _closeItem(item, excludeEntries);
 
     for (const it of kb) {
-        for (const req of ["fault_id", "fault_tag", "trigger_tags", "flight_phase", "risk_level"]) {
-            if (it[req] === "" || (Array.isArray(it[req]) && it[req].length === 0 && req !== "fault_tag")) {
-                throw new Error(`故障库条目 ${it.fault_id || "?"} 缺少字段 ${req}`);
+        for (const req of ["id", "name", "trigger", "risk_level"]) {
+            const v = it[req];
+            if (v === "" || (Array.isArray(v) && v.length === 0)) {
+                throw new Error(`故障库条目 ${it.id || "?"} 缺少字段 ${req}`);
             }
         }
     }
     return kb;
+
+    function _closeItem(it, entries) {
+        if (entries.length > 0) {
+            it.exclude_triggers = entries.map((e) => e.trigger).filter(Boolean);
+            for (const e of entries) {
+                if (e.note) it.exclude_notes[e.trigger] = e.note;
+            }
+        }
+    }
 }
 
 /**

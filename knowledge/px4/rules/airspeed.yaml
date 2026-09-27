@@ -10,7 +10,9 @@ order: 1
 # 原实现只对固定翼判空速；旋翼/Rover 既不 ran 也不 skipped（静默）。
 # 机型未知过去靠机架轴放行 + 一条 skip 记录留痕，现在 skip 已退役——未知直接被轴挡在门外。
 # 原外层条件还要求存在 vehicle_attitude_setpoint（本经验并不读它），该条件一并去掉。
-conditions:
+tag: low_airspeed
+
+condition:
   vehicle: fixed_wing
   message:
     - airspeed_validated
@@ -25,7 +27,7 @@ compute:
   - has_invalid = invalid_frac is not None
   - tas_min = _try(min(airspeed_validated.true_airspeed_m_s))
 
-outputs:
+output:
   - name: airspeedInvalidRatio
     value: invalid_frac
     round: 3
@@ -33,8 +35,9 @@ outputs:
     value: tas_min
     round: 1
 
-triggers:
+trigger:
   - when: "has_invalid and invalid_frac >= 0.50"
+    label: low_airspeed
     severity: critical
     suggestion: "结合故障库 F009：空速失效极易引发失速，检查空速管堵塞/积水、管路漏气与校准。"
     description: 空速传感器在固定翼段大部分时间无效（{invalid_frac:.0%} 样本）
@@ -42,8 +45,8 @@ triggers:
       source: airspeed_validated.airspeed_sensor_measurement_valid
       value: f"{invalid_frac:.3f}"
       threshold: 0.5
-    label: low_airspeed
   - when: "has_invalid and invalid_frac >= 0.10"
+    label: low_airspeed
     severity: warning
     suggestion: "结合故障库 F009 检查空速管与管路密封。"
     description: 空速传感器间歇无效（{invalid_frac:.0%} 样本）
@@ -51,5 +54,3 @@ triggers:
       source: airspeed_validated.airspeed_sensor_measurement_valid
       value: f"{invalid_frac:.3f}"
       threshold: 0.1
-    label: low_airspeed
-tag: low_airspeed

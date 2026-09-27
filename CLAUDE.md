@@ -8,7 +8,7 @@
 
 1. **Skill / MCP 社区（Skill Hub）**：飞控 AI Skill 与 MCP 服务的提交、浏览、语义搜索、在线试用与评分分享，免费开放引流。
 
-2. **飞控日志分析服务（内置核心服务）**：平台自营的确定性日志诊断服务，**首发支持 PX4 **`.ulg`**（已上线，32 条检查经验 + 74 个算子），ArduPilot **`.bin`** 待排期**，输出结构化检查结果与 LLM 中文报告，是主要收费锚点。
+2. **飞控日志分析服务（内置核心服务）**：平台自营的确定性日志诊断服务，**首发支持 PX4 **`.ulg`**（已上线，32 条检查经验 + 74 个算子），ArduPilot **`.bin`**（已端到端打通，34 条规则，阈值 draft）**，输出结构化检查结果与 LLM 中文报告，是主要收费锚点。
 
 内容与能力按 **感知 → 决策 → 控制 → 工具链** 四个维度组织。
 
@@ -1518,73 +1518,155 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 
 `mutate_guards.py` 的「某一节丢了编号」守卫在 Windows 控制台（GBK）下会因打印 `\ufffd` 字符触发 `UnicodeEncodeError` 而失败。这是已知的**既存问题**，不影响守卫本身的逻辑正确性（仅在打印报错信息时编码失败），修复方案见该文件注释。在 Windows 上运行 `check_all.py` 时可暂时接受此项失败，其余检查的通过 / 失败判定不变。
 
-### 6.9.2 AI Agent 提交与推送规则
+### 6.9.2 AI Agent 开发与推送全流程
 
-AI（Claude / 任何自动化 agent）在执行 `git commit` 和 `git push` 时，**必须**遵守以下流程，不得跳过任何一步：
+AI（Claude / 任何自动化 agent）在执行开发任务时，**必须**遵守以下完整流程，**不得**直接在 `master` 分支上修改代码，不得跳过任何一步。
 
-**第一步：运行 pre-commit 钩子**
+---
+
+**第一阶段：开发准备（拉取 + 建分支）**
+
+**Step 1 — 拉取远程最新 master**
+
+```bash
+git fetch origin master    # Gitee（主远程）
+git fetch github master    # GitHub（备份远程）
+```
+
+如果能正常 fetch → 将本地 master 更新到最新：
+
+```bash
+git checkout master
+git pull --rebase origin master
+```
+
+如果两个远程均 fetch 失败（网络问题等）→ fallback 本地 master：
+
+```bash
+git checkout master
+# 以本地 master 的当前状态继续
+```
+
+**Step 2 — 从 master 创建 feature 分支**
+
+```bash
+git checkout -b feature/<任务简述>
+```
+
+分支命名：`feature/` + 英文短横线描述（如 `feature/add-security-page`）。
+
+**Step 3 — 在 feature 分支上开发**
+
+所有代码修改均在 feature 分支上进行，`master` 保持不动。
+
+---
+
+**第二阶段：合并校验（整理 commit + merge + pre-commit）**
+
+> 钩子实际路径在 `.githooks/`，首次使用前执行一次（整机生效，不随仓库同步）：
+>
+> ```bash
+> git config core.hooksPath .githooks
+> ```
+
+**Step 4 — 整理 feature 分支的 commit 历史**
+
+`master` 上的提交历史必须保持线性、干净、可读。合入前先整理 feature 分支的 commit：
+
+```bash
+git log --oneline master..HEAD             # 查看 feature 分支上的所有提交
+git rebase -i master                       # 交互式整理（squash / fixup / reword）
+```
+
+整理规则：
+
+1. **一个逻辑变更 = 一个 commit**。同一个功能的多轮修补（"fix typo""再改一下""补漏"）必须 squash 成一个。
+2. **commit message 必须能独立读懂** — 不依赖上下文、不看 diff 也知道做了什么和为什么。
+3. **禁止出现** `WIP`、`fix`、`tmp`、`test` 这类无信息量的 message。
+4. **rebase 后再次运行 Step 6（pre-commit）**，确保整理过程没有引入问题。
+
+**Step 5 — 合回 master**
+
+```bash
+git checkout master
+git merge feature/<任务简述>
+```
+
+merge 产生 merge commit → 接受（`git merge` 默认行为），不要用 `--squash` 重写已整理好的历史。
+
+**Step 6 — 运行 pre-commit 钩子**
 
 ```bash
 .githooks/pre-commit
-# 或等效触发（git commit 会自动跑，但 agent 应主动验证）
 ```
 
 pre-commit 不绿（退出码非 0）→ **禁止 commit**，先修复它报出的问题。
 
-**第二步：运行 pre-push 钩子**
+---
+
+**第三阶段：推送校验（pre-push + 远程比对 + rebase + push）**
+
+**Step 7 — 运行 pre-push 钩子**
 
 ```bash
 .githooks/pre-push
-# 或等效触发（git push 会自动跑，但 agent 应在 push 前主动验证）
 ```
 
-pre-push 不绿 → **禁止 push**，先修复它报出的问题。
+pre-push 不绿 → **禁止 push**，先修复。
 
-> 注意：钩子实际路径在 `.githooks/`，本地开发需执行 `git config core.hooksPath .githooks` 使其生效。
-
-**第三步：检查远程是否有新提交**
-
-在 push 之前，**必须**同时检查 Gitee（`origin`）和 GitHub（`github`）两个远程：
+**Step 8 — 检查远程是否有新提交**
 
 ```bash
 git fetch origin
 git fetch github
-```
-
-然后对比本地分支与远程分支：
-
-```bash
-# 假设当前在 master 分支
 git log HEAD..origin/master --oneline   # Gitee 上领先于本地的提交
 git log HEAD..github/master --oneline   # GitHub 上领先于本地的提交
 ```
 
-**第四步：如果远程有新提交，用 rebase 方式集成**
+**Step 9 — 有远程新提交则 rebase**
 
 ```bash
-# 如果 origin/master（Gitee）有新提交
-git pull --rebase origin master
-
-# 如果 github/master（GitHub）有新提交
-git pull --rebase github master
+git pull --rebase origin master    # Gitee 优先
+# 或
+git pull --rebase github master    # GitHub
 ```
 
-rebase 过程中出现冲突 → **暂停 push**，修复冲突后 `git rebase --continue`，然后**重新从第一步开始**（pre-commit → pre-push → 远程比对）。
+rebase 冲突 → 修复后 `git rebase --continue`，然后**回到 Step 4 重新整理 commit**。
 
-**第五步：全部通过后才允许 push**
+**Step 10 — 全绿后才允许 push**
 
 ```bash
-git push origin master   # 推送 Gitee
-git push github master   # 推送 GitHub
+git push origin master   # Gitee
+git push github master   # GitHub
 ```
 
-**完整流程总结**：
+---
+
+**全流程图**：
 
 ```
-pre-commit 全绿 → pre-push 全绿 → fetch 所有远程 → 无超前提交或有超前已在本地 rebase → git push
+┌── 第一阶段：开发准备 ──────────────────────────┐
+│  fetch 远程 master → (失败 fallback 本地)       │
+│  → checkout master → pull/rebase               │
+│  → checkout -b feature/<描述>                   │
+│  → 开发...                                     │
+└────────────────────────────────────────────────┘
+                      ↓
+┌── 第二阶段：合并校验 ──────────────────────────┐
+│  整理 commit（一个变更一个 commit，无 WIP）      │
+│  → checkout master → merge feature/<描述>       │
+│  → pre-commit 全绿 ✓                           │
+└────────────────────────────────────────────────┘
+                      ↓
+┌── 第三阶段：推送校验 ──────────────────────────┐
+│  pre-push 全绿 ✓                               │
+│  → fetch origin + github                       │
+│  → 有新提交？→ rebase → 回到整理 commit        │
+│  → 无新提交？→ git push origin + github        │
+└────────────────────────────────────────────────┘
 ```
 
-任何一步不通过，都必须停下来修复，不得强行跳过。
+任何一步不通过，都必须停下来修复，不得强行跳过。完成后可选删除 feature 分支：`git branch -d feature/<描述>`
 
 ---
 
@@ -1616,7 +1698,7 @@ pre-commit 全绿 → pre-push 全绿 → fetch 所有远程 → 无超前提交
 | 阶段                               | 状态                         | 目标                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | ---------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 冲刺 1：Skill/MCP 社区网站         | ✅ 已上线                    | 网站基础框架与内容：预制 Skill（8 个种子）+ MCP 专区 + 使用指南；**登录与账号体系（GitHub + 邮箱验证码，微信 / 手机号待企业资质）**；EdgeOne KV 持久化；**社区指标：真实下载 / 获取次数（设备 + IP 每日去重的 KV 事件计数）、1-5 星评分、按下载 / 评分 / 更新排序、热门排行榜**；关键词搜索（客户端 Fuse.js）。语义搜索（BGE 端侧 embedding）待补。详情页：头部元信息、复制提示词 / 安装命令、评分与获取入口、版本 / 许可证 / 更新时间。 |
-| 冲刺 2：日志分析（核心收费锚点）   | ✅ 核心已上线（.bin 待排期） | **确定性日志诊断引擎 + 所有用户免费试用**。PX4 `.ulg`：32 条检查经验覆盖 16 个维度，六条真实日志冻结基线回归；四层架构（pyulog 解析 → rule_engine/operators → 规则匹配 → LLM 按 GJB-841 组装输出中文报告）。**ArduPilot **`.bin`** 待排期**（pymavlink + ardupilot-mcp 检查套件，同样打包进 Pyodide）。多日志趋势对比与误报率精细校准待后续迭代。                                                                                        |
+| 冲刺 2：日志分析（核心收费锚点）   | ✅ 核心已上线（.bin 端到端已通，阈值 draft） | **确定性日志诊断引擎 + 所有用户免费试用**。PX4 `.ulg`：32 条检查经验覆盖 16 个维度，六条真实日志冻结基线回归；四层架构（pyulog 解析 → rule_engine/operators → 规则匹配 → LLM 按 GJB-841 组装输出中文报告）。**ArduPilot **`.bin`**：端到端已打通**（自研解析器，无 pymavlink；34 条规则来自 ardupilot-mcp 的 16 项检查），阈值全部 draft（仓库暂无真实 `.bin`，靠合成样本 + `check-apm-e2e` 门禁）。多日志趋势对比与误报率精细校准待后续迭代。                                                                                        |
 | 冲刺 3：会员与社区商业化           | ⏳ 待启动                    | **会员 / 付费体系**（免费 / Pro / 团队，微信支付 + 支付宝），在线试用（不跳转就能跑）；规则 / 故障知识包贡献与 **70/30 分成**；Skill 组合编排；LLM 自动实测评分；语义搜索；**微信 / 手机号登录（取得企业资质后）**。                                                                                                                                                                                                                     |
 | 冲刺 4：轻量服务器 → 平台 MCP 服务 | ⏳ 待启动                    | **先解决承载，再对外分发**。见下方分步说明。                                                                                                                                                                                                                                                                                                                                                                                             |
 

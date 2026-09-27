@@ -12,7 +12,9 @@ order: 1
 version: 1.1.0
 
 # 原外层条件：两个 topic 齐备且存在 armed 段，否则静默（skip 已退役，见 ../CLAUDE.md）
-conditions:
+tag: attitude_overshoot
+
+condition:
   message:
     - vehicle_attitude
     - vehicle_attitude_setpoint
@@ -39,7 +41,7 @@ compute:
   - p99_stat = p99 if seg_ok else None
   - osc_stat = osc_hz if seg_ok else None
 
-outputs:
+output:
   - name: attitudeErrDegP99
     value: p99_stat
     round: 1
@@ -47,8 +49,9 @@ outputs:
     value: osc_stat
     round: 2
 
-triggers:
+trigger:
   - when: "p99_stat >= 40.0 and VEHICLE == 'fixed_wing'"
+    label: attitude_overshoot
     severity: critical
     suggestion: "结合故障库 F006：检查姿态环增益、机架共振；避免直接大幅降 PID。"
     description: 姿态跟踪误差过大（p99 {p99_stat:.1f}°）
@@ -57,8 +60,8 @@ triggers:
       value: f"{p99_stat:.1f}"
       threshold: 25
       unit: °
-    label: attitude_overshoot
   - when: "p99_stat >= 25.0 and VEHICLE == 'fixed_wing'"
+    label: attitude_overshoot
     severity: warning
     suggestion: "结合故障库 F006 排查；大风环境下优先归因环境扰动。"
     description: 姿态跟踪误差偏大（p99 {p99_stat:.1f}°）
@@ -67,8 +70,8 @@ triggers:
       value: f"{p99_stat:.1f}"
       threshold: 25
       unit: °
-    label: attitude_overshoot
   - when: "p99_stat >= 30.0 and not VEHICLE == 'fixed_wing'"
+    label: attitude_overshoot
     severity: critical
     suggestion: "结合故障库 F006：检查姿态环增益、机架共振；避免直接大幅降 PID。"
     description: 姿态跟踪误差过大（p99 {p99_stat:.1f}°）
@@ -77,8 +80,8 @@ triggers:
       value: f"{p99_stat:.1f}"
       threshold: 15
       unit: °
-    label: attitude_overshoot
   - when: "p99_stat >= 15.0 and not VEHICLE == 'fixed_wing'"
+    label: attitude_overshoot
     severity: warning
     suggestion: "结合故障库 F006 排查；大风环境下优先归因环境扰动。"
     description: 姿态跟踪误差偏大（p99 {p99_stat:.1f}°）
@@ -87,5 +90,3 @@ triggers:
       value: f"{p99_stat:.1f}"
       threshold: 15
       unit: °
-    label: attitude_overshoot
-tag: attitude_overshoot

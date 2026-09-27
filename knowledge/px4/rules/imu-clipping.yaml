@@ -5,8 +5,9 @@ id: px4-imu-clipping
 name: 加速度计削波
 group: vibration
 order: 3
+tag: high_vibration
 
-conditions:
+condition:
   message:
     - vehicle_imu_status
 
@@ -19,11 +20,11 @@ compute:
       _ref("vehicle_imu_status[:].accel_clipping", alias="clipping"))
   - clip_stat = clip if clip > 0 else None
 
-outputs:
+output:
   - name: imuAccelClippingCountMax
     value: clip_stat
 
-triggers:
+trigger:
   # 0 次不报（与原实现 worst_clip["count"] > 0 一致）
   - when: "clip >= 1000"
     severity: critical
@@ -52,5 +53,3 @@ triggers:
       value: clip
       threshold: 0
       unit: count
-    label: null
-tag: high_vibration

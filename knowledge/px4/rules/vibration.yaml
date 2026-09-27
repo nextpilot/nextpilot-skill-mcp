@@ -6,8 +6,9 @@ id: px4-vibration
 name: 高频振动
 group: vibration
 order: 1 # vibration group 内次序：vibration=1, stddev=2, clipping=3
+tag: high_vibration
 
-conditions:
+condition:
   message:
     - vehicle_imu_status
 
@@ -19,7 +20,7 @@ compute:
     vibe_mean, vibe_p95, vibe_max, imu_idx = worst_mean_stats(
       _ref("vehicle_imu_status[:].accel_vibration_metric"), min_mean=0)
 
-outputs:
+output:
   - name: imuAccelVibrationMean
     value: vibe_mean
     round: 3
@@ -30,7 +31,7 @@ outputs:
     value: vibe_max
     round: 3
 
-triggers:
+trigger:
   - when: "vibe_mean >= 9.81"
     severity: critical
     suggestion: "Flight Review 红色区间（>9.81 m/s^2）。结合故障库条目排查桨叶/电机/机架/减震。"
@@ -49,4 +50,3 @@ triggers:
       value: f"{vibe_mean:.3f}"
       threshold: 4.905
       unit: m/s^2
-tag: high_vibration

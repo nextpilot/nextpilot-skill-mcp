@@ -298,26 +298,26 @@ async def get_rule(rule_id: str) -> dict[str, Any]:
 
 
 @mcp.tool(annotations=_READONLY)
-async def get_fault(fault_tag: str) -> dict[str, Any]:
-    """按异常标签读故障库条目（根因清单 + 排查步骤 + 风险等级 + 禁忌）。
+async def get_fault(name: str) -> dict[str, Any]:
+    """按故障名称读故障库条目（描述 + 根因清单 + 排查步骤 + 风险等级）。
 
     **禁止**用条目以外的故障模式推断根因 —— 这是知识库的硬边界。
 
     Args:
-        fault_tag: 主故障标签（如 `high_vibration`），来自 analyze_log 的 findings[].tag。
+        name: 故障名称（如 `high_vibration`），来自 analyze_log 的 matchedFaults[].name。
     """
     doc = _load_yaml(_FAULT_KB) or {}
     entries = doc.get("fault_knowledge_base") or []
     for e in entries:
-        if e.get("fault_tag") == fault_tag:
+        if e.get("name") == name:
             return dict(e)
-    known = sorted({str(e.get("fault_tag")) for e in entries})
-    raise ValueError(f"没有 fault_tag 为 {fault_tag!r} 的条目；现有：{'、'.join(known)}")
+    known = sorted({str(e.get("name")) for e in entries})
+    raise ValueError(f"没有 name 为 {name!r} 的条目；现有：{'、'.join(known)}")
 
 
 @mcp.tool(annotations=_READONLY)
 async def list_faults() -> dict[str, Any]:
-    """列出故障库全部条目的索引（fault_id / fault_tag / 风险等级 / 适用阶段）。"""
+    """列出故障库全部条目的索引（id / name / 风险等级）。"""
     doc = _load_yaml(_FAULT_KB) or {}
     entries = doc.get("fault_knowledge_base") or []
     return {
@@ -325,10 +325,10 @@ async def list_faults() -> dict[str, Any]:
         "sourceFile": str(_FAULT_KB.relative_to(_REPO_ROOT)).replace("\\", "/"),
         "entries": [
             {
-                "faultId": e.get("fault_id"),
-                "faultTag": e.get("fault_tag"),
+                "id": e.get("id"),
+                "name": e.get("name"),
+                "description": e.get("description"),
                 "riskLevel": e.get("risk_level"),
-                "flightPhase": e.get("flight_phase"),
             }
             for e in entries
         ],

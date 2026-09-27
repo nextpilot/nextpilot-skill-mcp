@@ -5519,29 +5519,33 @@ def _metric_fallback(m):
 
 # ---------------- 第三层：故障知识库确定性匹配 ----------------
 def match_fault_kb():
-    phases = phases_present
+    """按 active_tags / guard_tags 匹配故障知识库，返回命中的故障条目。
+
+    匹配规则（两层关卡）：
+    1. trigger: 至少一个命中 active_tags → 进入下一关
+    2. exclude: 任一命中 guard_tags 或 active_tags → 本条失效
+
+    飞行阶段判定已上移到规则层（rules/*.yaml），故障库不再重复判断。
+    """
     active_tags = set(tags)
     matched = []
     for e in FAULT_KB:
-        trig = e.get("trigger_tags", [])
-        e_phases = e.get("flight_phase", ["all"])
-        excl = e.get("exclude_tags", [])
+        trig = e.get("trigger", [])
+        excl = e.get("exclude_triggers", [])
         if not any(t in active_tags for t in trig):
             continue
         if any(x in guard_tags or x in active_tags for x in excl):
             continue
-        if "all" not in e_phases:
-            if not any(p in phases for p in e_phases):
-                continue
         matched.append(
             {
-                "faultId": e["fault_id"],
-                "faultTag": e["fault_tag"],
+                "id": e["id"],
+                "name": e["name"],
+                "description": e.get("description", ""),
                 "riskLevel": e.get("risk_level", ""),
                 "possibleRootCause": e.get("possible_root_cause", []),
                 "troubleshootingSteps": e.get("troubleshooting_steps", []),
-                "note": e.get("note", ""),
-                "matchedPhases": [p for p in e_phases if p == "all" or p in phases],
+                "docUrls": e.get("doc_urls", []),
+                "excludeNotes": e.get("exclude_notes", {}),
             }
         )
     return matched

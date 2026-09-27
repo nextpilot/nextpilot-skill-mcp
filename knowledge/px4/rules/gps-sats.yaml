@@ -5,20 +5,22 @@ id: px4-gps-sats
 name: GPS 卫星数
 group: gps_health
 order: 2
+tag: gps_eph_high
 
-conditions:
+condition:
   message:
     - vehicle_gps_position
 
 compute:
   - s_min = min(vehicle_gps_position.satellites_used)
 
-outputs:
+output:
   - name: gpsSatellitesMin
     value: s_min
 
-triggers:
+trigger:
   - when: "s_min <= 6"
+    label: gps_eph_high
     severity: warning
     suggestion: "卫星数不足时定位易跳变；排查遮挡与天线。"
     description: GPS 卫星数最少仅 {s_min} 颗
@@ -27,5 +29,3 @@ triggers:
       value: s_min
       threshold: 8
       unit: 颗
-    label: gps_eph_high
-tag: gps_eph_high

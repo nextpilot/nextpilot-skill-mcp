@@ -6,8 +6,9 @@ id: px4-power-sag
 name: 飞行中持续压降
 group: battery
 order: 2
+tag: battery_voltage_drop
 
-conditions:
+condition:
   message:
     - battery_status
 
@@ -19,13 +20,14 @@ compute:
   - >-
     drop, tail = head_tail_median_drop(cell_min_t, battery_status.timestamp, ARMED_INTERVALS, skip_first_s=5, min_seg=20)
 
-outputs:
+output:
   - name: batteryCellSagFlight
     value: drop
     round: 3
 
 # 阈值 [暂定]：drop >= 0.30 V 且尾段中位已低于单电芯告警线 3.70 V
-triggers:
+
+trigger:
   - when: "drop >= 0.30 and tail < 3.70"
     severity: warning
     suggestion: "持续压降区别于大机动瞬时压降：排查电芯老化内阻、插头虚接、线缆线径与负载匹配。"
@@ -35,4 +37,3 @@ triggers:
       value: f"{drop:.3f}"
       threshold: 0.3
       unit: V
-tag: battery_voltage_drop

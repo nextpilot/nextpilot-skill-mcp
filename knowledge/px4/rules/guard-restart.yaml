@@ -5,10 +5,11 @@ id: px4-guard-restart
 name: 数据质量-中途重启
 group: guards
 order: 1
-triggers:
+
+trigger:
   - when: RESTART_DETECTED
-    severity: guard
     label: restart_detected
+    severity: guard
     description: "Data quality: restart_detected"
     evidence:
       source: ""

@@ -104,13 +104,14 @@ export interface Finding {
 
 /** 第三层确定性匹配到的故障知识库条目（见 knowledge/px4/fault-kb.yaml） */
 export interface MatchedFault {
-    faultId: string;
-    faultTag: string;
+    id: string;
+    name: string;
+    description: string;
     riskLevel: string;
     possibleRootCause: string[];
     troubleshootingSteps: string[];
-    note?: string;
-    matchedPhases: string[];
+    docUrls: string[];
+    excludeNotes: Record<string, string>;
 }
 
 /** 事实层产出之一：日志客观"是什么"（离散、驱动判定），由 knowledge/engine/rule_engine.py 按 facts.yaml 的绑定取出 */

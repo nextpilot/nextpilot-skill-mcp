@@ -8,8 +8,9 @@ id: px4-ekf-innovation
 name: EKF 创新检验
 group: ekf_innovations
 order: 1
+tag: ekf_innovation_failure
 
-conditions:
+condition:
   message:
     - estimator_status
 
@@ -36,12 +37,12 @@ compute:
       fallback_label="未知通道")
   - pct = frac * 100 # 证据里换算成 %
 
-outputs:
+output:
   - name: ekfRejectRatioPct
     value: pct
     round: 2
 
-triggers:
+trigger:
   - when: "pct >= 5.0"
     severity: critical
     suggestion: "涉及：{names}。检查对应传感器健康度、安装与校准。"
@@ -60,4 +61,3 @@ triggers:
       value: f"{pct:.2f}"
       threshold: 1
       unit: "%"
-tag: ekf_innovation_failure

@@ -326,13 +326,13 @@ function SummaryTab({ report }: { report: AnalysisReport }) {
                 <div className="mt-6 space-y-3">
                     <h2 className="text-sm font-semibold">匹配故障模式（{report.matchedFaults.length}）</h2>
                     {report.matchedFaults.map((mf) => (
-                        <div key={mf.faultId} className="rounded-lg border border-border bg-surface-2 p-4 text-sm">
+                        <div key={mf.id} className="rounded-lg border border-border bg-surface-2 p-4 text-sm">
                             <div className="flex items-center gap-2">
                                 <span className="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-xs text-primary">
-                                    {mf.faultId}
+                                    {mf.id}
                                 </span>
                                 <span className="text-xs text-muted">风险等级：{mf.riskLevel}</span>
-                                {mf.note && <span className="text-xs text-warning">禁忌：{mf.note}</span>}
+                                {mf.description && <span className="text-xs text-muted">{mf.description}</span>}
                             </div>
                             <div className="mt-2 grid gap-2 sm:grid-cols-2">
                                 <div>
