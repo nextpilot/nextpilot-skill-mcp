@@ -24,20 +24,25 @@
  */
 
 const params = new URL(self.location).searchParams;
-// 正常情况下注册方（RuntimeCacheRegistrar）一定会带上绝对 URL 的 pyodide/wheel 参数；
-// 这里的默认值只在"参数缺失"时兜底，用自托管路径（相对 self.origin 拼绝对地址）。
-const PYODIDE_INDEX = params.get("pyodide") || new URL("/pyodide/v0.27.7/full/", self.location.origin).href;
-const PYULOG_WHEEL =
-    params.get("wheel") || new URL("/pyodide/wheels/pyulog-1.2.4-py3-none-any.whl", self.location.origin).href;
+// 注册方（RuntimeCacheRegistrar）一定会传这些参数；这里不兜底：缺参数说明调用方出 bug，
+// 静默填一个错的前缀比直接报错更难排查。
+const PYODIDE_INDEX = params.get("pyodide");
+const PYULOG_WHEEL = params.get("wheel");
+
+if (!PYODIDE_INDEX || !PYULOG_WHEEL) {
+    throw new Error("[sw] 缺少配置参数，请通过 RuntimeCacheRegistrar 注册，不要直接注册 /sw.js");
+}
 
 /** 运行时资源的地址前缀（命中即缓存） */
 const RUNTIME_PREFIXES = [
     PYODIDE_INDEX,
     PYULOG_WHEEL,
-    // 没配自托管 wheel 时，micropip 会走 PyPI：索引页 no-cache，正是最该缓存的那一步
+    // 兜底源：Pyodide 自托管不可用时回退 jsdelivr CDN
+    "https://cdn.jsdelivr.net/pyodide/",
+    // PyPI 兜底：micropip 查索引 + 下载 wheel（索引页 no-cache，正是最该缓存的那一步）
     "https://pypi.org/simple/",
     "https://files.pythonhosted.org/",
-].filter(Boolean);
+];
 
 // 缓存名带上配置指纹：换源/升级后自动启用新缓存，旧的在 activate 里删掉
 const CONFIG_KEY = `${PYODIDE_INDEX}|${PYULOG_WHEEL}`;

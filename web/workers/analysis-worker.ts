@@ -15,13 +15,7 @@
 import { PY_ULG_ENGINE } from "./analysis-engine.generated";
 import type { LogInfo, TopicManifest } from "@/lib/types";
 import type { SeriesRequest } from "@/lib/chart-presets";
-
-// 运行时资产的自托管路径（随站点一起部署，见 web/public/pyodide/）。
-//
-// 为什么默认自托管而不是公网 CDN：jsdelivr 从国内访问随机 TLS 断连（实测单文件成功率约一半），
-// 而 `pyodide.asm.js` 是 `importScripts` **同步**加载的 1.25MB——中途断流整块失败。
-// 资产由 `tools/dev/fetch_pyodide_assets.py` 抓取，随站点构建分发到 EdgeOne 边缘节点。
-const PYODIDE_LOCAL_PATH = "/pyodide/v0.27.7/full/";
+import { PYODIDE_INDEX_PATH, PYULOG_WHEEL_PATH } from "@/lib/site-config";
 
 /**
  * 把「可能是相对路径」的索引目录转成绝对 URL。
@@ -38,16 +32,14 @@ function toAbsoluteUrl(path: string): string {
     return origin + (path.startsWith("/") ? path : "/" + path);
 }
 
-// 环境变量可覆盖（想换回公网 CDN 或指向 Blob 时不用改代码）；
-// 用 `||` 而非 `??`：.env 里留空会得到空字符串，`??` 兜不住（2026-09-28 踩过）。
-const PYODIDE_INDEX_URL = toAbsoluteUrl(process.env.NEXT_PUBLIC_PYODIDE_URL || PYODIDE_LOCAL_PATH);
+// 运行时资产的自托管路径（统一在 site-config.ts 定义；ev 可覆盖）
+const PYODIDE_INDEX_URL = toAbsoluteUrl(PYODIDE_INDEX_PATH);
 
-// pyulog 的 wheel 地址（可选）。给了就直接装这个文件：**跳过 PyPI 索引查询**（那一步每次
-// 都要联网、且不受缓存保护），配合自托管就是"下载一次"。
-// 默认走自托管 wheel：由 tools/dev/fetch_pyodide_assets.py 抓取，版本随该脚本更新。
-// 升级 pyulog 时：重跑脚本拿到新 wheel，改这里的文件名（路径变了 SW 缓存会自动失效重下）。
-const PYULOG_WHEEL =
-    process.env.NEXT_PUBLIC_PYULOG_WHEEL || toAbsoluteUrl("/pyodide/wheels/pyulog-1.2.4-py3-none-any.whl");
+// pyulog 的自托管 wheel：直接装文件，跳过 PyPI 索引查询
+const PYULOG_WHEEL_URL = toAbsoluteUrl(PYULOG_WHEEL_PATH);
+
+// 公网 CDN 兜底：自托管不可用时回退 jsdelivr（版本与 site-config.ts 保持一致）
+const PYODIDE_CDN_FALLBACK = "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/";
 
 export type WorkerStage = "loading-runtime" | "installing-parser" | "parsing" | "done";
 
@@ -162,8 +154,8 @@ async function preloadOne(url: string): Promise<boolean> {
  * 两轮都失败也不抛错——让 `importScripts` 照常去试，失败时报它原本的错误，
  * 保持"预热只是加速，不是必需步骤"的定位（比如 SW 未启用的隐私模式下就靠它兜底）。
  */
-async function preloadForImportScripts(): Promise<void> {
-    const urls = PRELOAD_FILES.map((name) => PYODIDE_INDEX_URL + name);
+async function preloadForImportScripts(baseUrl: string): Promise<void> {
+    const urls = PRELOAD_FILES.map((name) => baseUrl + name);
     for (let round = 1; round <= 2; round++) {
         const results = await Promise.allSettled(urls.map(preloadOne));
         const allOk = results.every((r) => r.status === "fulfilled" && r.value === true);
@@ -175,71 +167,104 @@ async function preloadForImportScripts(): Promise<void> {
     }
 }
 
+/** 尝试从指定 indexURL 加载 Pyodide 运行时（含预热） */
+async function tryLoadPyodide(indexURL: string): Promise<Pyodide> {
+    // 先预热 importScripts 要拉的文件（见 preloadForImportScripts 注释）
+    await preloadForImportScripts(indexURL);
+    // CDN 的 pyodide.js 是 UMD 经典脚本：import 只触发副作用，函数挂在全局，
+    // 没有 ESM 命名导出（直接取 mod.loadPyodide 会是 undefined）。
+    await import(
+        /* webpackIgnore: true */
+        /* turboIgnore: true */
+        indexURL + "pyodide.js"
+    );
+    const loadPyodide = (self as unknown as { loadPyodide?: LoadPyodide }).loadPyodide;
+    if (typeof loadPyodide !== "function") {
+        throw new Error("Pyodide 脚本已加载但未找到 loadPyodide，请检查 pyodide.js 分发目录是否完整");
+    }
+    return await loadPyodide({ indexURL });
+}
+
 async function getPyodide(): Promise<Pyodide> {
     if (pyodidePromise) return pyodidePromise;
     pyodidePromise = (async () => {
         post({ type: "stage", stage: "loading-runtime", detail: "加载 Pyodide 运行时…" });
-        // 先预热 importScripts 要拉的文件（见上方注释：它绕过 SW 缓存，必须先 fetch 进缓存）
-        await preloadForImportScripts();
-        // CDN 的 pyodide.js 是 UMD 经典脚本：import 只触发副作用，函数挂在全局，
-        // 没有 ESM 命名导出（直接取 mod.loadPyodide 会是 undefined）。
-        await import(
-            /* webpackIgnore: true */
-            /* turboIgnore: true */
-            PYODIDE_INDEX_URL + "pyodide.js"
-        );
-        const loadPyodide = (self as unknown as { loadPyodide?: LoadPyodide }).loadPyodide;
-        if (typeof loadPyodide !== "function") {
-            throw new Error(
-                "Pyodide 脚本已加载但未找到 loadPyodide，请检查 NEXT_PUBLIC_PYODIDE_URL 是否指向完整的 pyodide.js 分发目录",
-            );
+
+        // Pyodide 加载：自托管 → CDN 兜底
+        let pyodide: Pyodide;
+        for (const [label, indexURL] of [
+            ["自托管", PYODIDE_INDEX_URL],
+            ["CDN", PYODIDE_CDN_FALLBACK],
+        ] as const) {
+            try {
+                pyodide = await tryLoadPyodide(indexURL);
+                break;
+            } catch (e) {
+                if (label === "CDN") {
+                    throw new Error(
+                        `Pyodide 加载失败（自托管和 CDN 均不可用）：${e instanceof Error ? e.message : String(e)}`,
+                    );
+                }
+                post({ type: "stage", stage: "loading-runtime", detail: "自托管加载失败，回退 CDN…" });
+            }
         }
-        const pyodide = await loadPyodide({ indexURL: PYODIDE_INDEX_URL });
 
         post({ type: "stage", stage: "installing-parser", detail: "安装 pyulog…" });
-        await pyodide.loadPackage(["micropip", "numpy"]);
+        await pyodide!.loadPackage(["micropip", "numpy"]);
         // lzma（可加载包，约 100KB）：日志自带的事件定义 metadata_events 是 xz 压缩的，解 PX4 事件要用。
         // 单独装且**允许失败**——拿不到就退化成"不解码事件"（日志里的旧格式事件文本仍在），
         // 不能因为它把整个解析挡在门外。
         try {
-            await pyodide.loadPackage(["lzma"]);
+            await pyodide!.loadPackage(["lzma"]);
         } catch (err) {
             console.warn("lzma 加载失败，PX4 事件将不解码：", err);
         }
-        const micropip = pyodide.pyimport("micropip");
+        const micropip = pyodide!.pyimport("micropip");
 
-        // 装了自托管 wheel 就直接装它（不走 PyPI 索引）；否则回退到按包名装，重试 3 次
-        const pyulogTarget = PYULOG_WHEEL || "pyulog";
+        // pyulog 安装：自托管 wheel → PyPI 兜底（各重试 3 次）
         let lastErr: unknown;
-        for (let attempt = 1; attempt <= 3; attempt++) {
-            try {
-                await micropip.install(pyulogTarget);
-                lastErr = null;
-                break;
-            } catch (e) {
-                lastErr = e;
-                if (attempt < 3) {
-                    post({
-                        type: "stage",
-                        stage: "installing-parser",
-                        detail: `安装 pyulog 失败，重试 ${attempt}/3…`,
-                    });
-                    await new Promise((r) => setTimeout(r, attempt * 2000));
+        for (const [label, target] of [
+            ["自托管", PYULOG_WHEEL_URL],
+            ["PyPI", "pyulog"],
+        ]) {
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    await micropip.install(target);
+                    lastErr = null;
+                    break;
+                } catch (e) {
+                    lastErr = e;
+                    if (attempt < 3) {
+                        post({
+                            type: "stage",
+                            stage: "installing-parser",
+                            detail: `安装 pyulog 失败，重试 ${attempt}/3…`,
+                        });
+                        await new Promise((r) => setTimeout(r, attempt * 2000));
+                    }
                 }
+            }
+            if (lastErr === null) break;
+            if (label === "自托管") {
+                post({
+                    type: "stage",
+                    stage: "installing-parser",
+                    detail: "自托管 wheel 失败，回退 PyPI…",
+                });
             }
         }
         if (lastErr) {
             const msg = lastErr instanceof Error ? lastErr.message : String(lastErr);
             throw new Error(
-                `pyulog 安装失败（已重试 3 次）：${msg}\n\n` +
+                `pyulog 安装失败（自托管和 PyPI 均已重试 3 次）：${msg}\n\n` +
                     "可能原因：\n" +
-                    "1. 网络不稳定或防火墙拦截了 PyPI 请求\n" +
+                    "1. 网络不稳定或防火墙拦截了所有请求\n" +
                     "2. PyPI 服务暂时不可用\n" +
                     "3. 浏览器扩展（如广告拦截器）阻止了请求\n\n" +
                     "建议：刷新页面重试，或检查网络/防火墙设置。",
             );
         }
-        return pyodide;
+        return pyodide!;
     })();
     return pyodidePromise;
 }

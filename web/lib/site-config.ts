@@ -82,3 +82,18 @@ export const SOCIAL_GITHUB =
     process.env.NEXT_PUBLIC_SOCIAL_GITHUB || "https://github.com/nextpilot/nextpilot-skill-mcp";
 export const SOCIAL_GITEE = process.env.NEXT_PUBLIC_SOCIAL_GITEE || "https://gitee.com/nextpilot/nextpilot-skill-mcp";
 export const SOCIAL_TWITTER = process.env.NEXT_PUBLIC_SOCIAL_TWITTER || "";
+
+/* ── Pyodide 运行时 & pyulog wheel 自托管路径（tools/dev/fetch_pyodide_assets.py 同步）── */
+
+/** Pyodide 运行时索引目录（相对路径）。换版本或指向外部 Blob 时用环境变量覆盖。 */
+export const PYODIDE_INDEX_PATH = process.env.NEXT_PUBLIC_PYODIDE_URL || "/pyodide/v0.27.7/full/";
+
+/**
+ * pyulog 的 wheel 地址（相对路径）。
+ *
+ * 给了自托管 wheel 就直接装这个文件：**跳过 PyPI 索引查询**（那一步每次都要联网、
+ * 且不受缓存保护）。换版本时重跑 fetch_pyodide_assets.py，改这里的文件名即可。
+ * 路径变了 SW 缓存会自动失效重下。
+ */
+export const PYULOG_WHEEL_PATH =
+    process.env.NEXT_PUBLIC_PYULOG_WHEEL || "/pyodide/wheels/pyulog-1.2.4-py3-none-any.whl";
