@@ -464,12 +464,13 @@ rewrite 的负向排除（`source: "/api/:path((?!auth/|skills/|ping(?:/|$)).*)"
 
 **`setRequestLocale` 的坑值得单独记一笔**：它是 next-intl 的静态化开关，与 `generateStaticParams` **成对出现**——前者给构建期 locale 列表，后者把「本次渲染的 locale」登记进去，少任何一个静态化都不成立。它属于**最有欺骗性**的一类回归：删掉它，`pnpm build` 一样成功、页面一样能打开、CI 一样全绿，只有路由表里 `● (SSG)` 悄悄变回 `ƒ (Dynamic)`。所以必须写成守卫（见 6.9 的 `check-site-settings` 规则 `settings-static-locale`，判据是**调用**而非名字出现——`import { setRequestLocale }` 那行本身就是代码，只看名字会漏掉「导入但没调用」）。
 
-配套守卫（`web/scripts/check-site-settings.mjs`，挂在 push 门禁上）共 10 条规则，其中四条守的是静态化与域名：
+配套守卫（`web/scripts/check-site-settings.mjs`，挂在 push 门禁上）共 11 条规则，其中五条守的是静态化与域名：
 
 - `settings-static-metadata`：根 layout 必须是静态 `export const metadata`，**不得**有 `generateMetadata`（极性是反的——它保护的是「静态」而不是「可改」）
 - `settings-render-path`：`app/**`（页面 + sitemap/robots/manifest/opengraph-image 等元数据路由）与 `lib/seo.ts` **不得**读 `getSiteSettings()`；白名单 `ALLOWED_RUNTIME_READERS` 只列纯请求期接口
 - `settings-static-locale`：`[locale]` 的 layout 与 page 都必须**调用** `setRequestLocale(...)`
 - `settings-site-url-fallback`：`SITE_URL` 必须有**非 localhost 的生产兜底**
+- `settings-env-var-name`：`.env*` 里站点域名变量名必须带 `NEXT_PUBLIC_` 前缀（裸 `SITE_URL=x` 是没人读的孤儿变量）
 
 **副作用（意外收获）**：修好这三件事后，整棵树都变静态了——不止首页，`/zh/guide`、`/zh/skills`、`/zh/mcp` 与全部详情页、`/zh/tools/*`、`/zh/me` 全部 `● (SSG)`。仍为 `ƒ (Dynamic)` 的都是**该动态**的：`analyze/[id]`（用户报告）、`login`（会话）、`mcp/[slug]/server.json`（route handler）、API 路由、`feed.xml` / `security.txt`。
 
@@ -494,6 +495,20 @@ rewrite 的负向排除（`source: "/api/:path((?!auth/|skills/|ping(?:/|$)).*)"
 > 2. **控制台**：仍然建议在 EdgeOne 配 `NEXT_PUBLIC_SITE_URL`，让换域名不必改代码。
 >
 > 教训（通用）：**把运行期取值改成构建期常量时，必须逐字段确认「该字段在构建环境里真的配了」**。不能假定「环境变量都配好了」——有些变量只是过去被别的取值路径掩盖着，从来没配过。
+>
+> ### 连带清出的两处遗留（同日一起修）
+>
+> **① 变量名不一致**：`.env.local` 里写的是裸名 `SITE_URL=`，而代码读的是 `NEXT_PUBLIC_SITE_URL`——**孤儿变量**：编辑器/控制台看着"配了"，代码根本读不到。`.env.example` 是对的，`.env.local` 是错的，两处对不上时以「代码实际读的名字」为准。已加守卫 `settings-env-var-name`。
+>
+> **② `publicOrigin()` 的过时判据**（`web/lib/internal-kv.ts`）：旧实现是
+>
+> ```ts
+> if (SITE_URL && SITE_URL !== "http://localhost:3000") return SITE_URL;
+> ```
+>
+> 用「`SITE_URL` 是不是 localhost」当「是不是本地环境」的判据。给 `SITE_URL` 加了生产兜底之后，这个条件**在 production 下永远为真**，于是：**本地 `next start`（`NODE_ENV` 也是 production）测试登录/发信时，自请求会真的打到线上域名**；配错 `NEXT_PUBLIC_SITE_URL` 时自请求跟着打错地址。
+>
+> 改成「**请求头推导优先、常量兜底**」：线上 EdgeOne 一定注入 `x-forwarded-host`/`x-forwarded-proto`，推导结果就是本次真实访问的域名（多域名、预览环境都对），请求头缺失才回落到 `SITE_URL`。**通用教训：用「值长什么样」判断「环境是什么」是不可靠的，要用环境本身（`NODE_ENV`）或请求事实（转发头）判断。**
 
 ### 6.3 数据模型（EdgeOne KV + Blob）
 

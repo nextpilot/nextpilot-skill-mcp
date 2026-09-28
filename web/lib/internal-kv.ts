@@ -15,14 +15,32 @@ const INTERNAL_PATHS = {
     settingsGet: "/internal/settings/get",
 } as const;
 
-/** 从当前请求的转发头推导公网源站（EdgeOne 注入 x-forwarded-*）。
- *  优先使用环境变量 NEXT_PUBLIC_SITE_URL，未配置时从请求头推导。 */
+/**
+ * 推导 Node 侧同源调用 `/internal/*` 时的公网源站。
+ *
+ * ⚠️ **不能直接信 `SITE_URL`**（`lib/site-config.ts` 的常量），有两个坑：
+ *
+ * 1. **本地 `next start` 会被打成线上**：`next start` 的 `NODE_ENV` 也是 `production`，
+ *    于是 `SITE_URL` 的生产兜底让 `publicOrigin()` 返回**生产域名**——本地测登录/发信时
+ *    请求真的打到 `skill.nextpilot.org`。必须优先用**本次请求的转发头**推导。
+ * 2. **配错域名会连带自请求失败**：`NEXT_PUBLIC_SITE_URL` 填了错值（或换了域名没同步改
+ *    代码兜底）时，自请求跟着打到错地址，登录整条链路静默失效。
+ *
+ * 所以口径是「**用请求头推导的现实值**优先，`SITE_URL` 只作最后兜底」：
+ * 线上 EdgeOne 一定会注入 `x-forwarded-host`/`x-forwarded-proto`，推导结果就是当前
+ * 真实访问的域名（多域名、预览环境都对）；请求头缺失（极端情况）才回落到常量。
+ *
+ * 历史：旧实现是 `if (SITE_URL && SITE_URL !== "http://localhost:3000") return SITE_URL`，
+ * 用「是不是 localhost」当「是不是本地」的判据。2026-09-28 首页静态化给 `SITE_URL` 加了
+ * 生产兜底后，这个判据永远为真，遂改成按请求头优先。
+ */
 async function publicOrigin(): Promise<string> {
-    if (SITE_URL && SITE_URL !== "http://localhost:3000") return SITE_URL;
     const h = await headers();
     const proto = h.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
     const host = h.get("x-forwarded-host")?.split(",")[0]?.trim() || h.get("host");
-    return `${proto}://${host}`;
+    if (host) return `${proto}://${host}`;
+    // 请求头缺失的极端情况：回落到构建期常量（线上有生产兜底，不会是 localhost）
+    return SITE_URL;
 }
 
 export class InternalApiError extends Error {

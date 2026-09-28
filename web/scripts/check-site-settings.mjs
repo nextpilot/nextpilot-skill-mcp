@@ -310,6 +310,39 @@ function parseFields(src, label) {
     }
 }
 
+// ---- 3e. 环境变量文件里的站点域名变量名必须带 NEXT_PUBLIC_ 前缀 ----
+// 代码读的是 `process.env.NEXT_PUBLIC_SITE_URL`（见 lib/site-config.ts）。若在 .env 里
+// 写成裸名 `SITE_URL=x`，它会是个**孤儿变量**：编辑器/控制台看着"配了"，代码却读不到，
+// 于是落到默认值——又是一个"改了没反应"的静默失败。2026-09-28 真实存在（.env.local）。
+{
+    const envFiles = [".env.local", ".env.example", ".env"];
+    const problems = [];
+    for (const f of envFiles) {
+        let src;
+        try {
+            src = read(join(webRoot, f));
+        } catch {
+            continue; // 文件不存在是正常的
+        }
+        for (const line of src.split("\n")) {
+            // 只看「未注释的、键名以 SITE_URL 结尾但不带 NEXT_PUBLIC_ 前缀」的赋值行
+            if (/^\s*#/.test(line)) continue;
+            const m = line.match(/^\s*([A-Z_]*SITE_URL[A-Z_]*)\s*=/);
+            if (m && m[1] !== "NEXT_PUBLIC_SITE_URL") {
+                problems.push(`${f}: ${m[1]}`);
+            }
+        }
+    }
+    if (problems.length > 0) {
+        fail(
+            "settings-env-var-name",
+            `环境变量文件名写错（代码读的是 NEXT_PUBLIC_SITE_URL，其余是没人读的孤儿变量）：${problems.join(", ")}`,
+        );
+    } else {
+        ok("settings-env-var-name", "环境变量文件里的站点域名变量名都带 NEXT_PUBLIC_ 前缀");
+    }
+}
+
 // ---- 4. 密钥字段名不得出现在客户端组件里 ----
 {
     const clients = [...walk(join(webRoot, "components")), ...walk(join(webRoot, "app"))].filter((p) =>

@@ -211,11 +211,12 @@ export const SITE_SETTINGS_FIELDS = [
 | `settings-render-path`       | 渲染路径读了 `getSiteSettings()` → 那一页退回动态渲染             |
 | `settings-static-locale`     | `[locale]` 忘调 `setRequestLocale(...)` → 整棵子树动态化          |
 | `settings-site-url-fallback` | `SITE_URL` 缺生产兜底 → 漏配变量时指向 `localhost:3000`           |
+| `settings-env-var-name`      | `.env*` 里的域名变量名没带 `NEXT_PUBLIC_` 前缀 → 孤儿变量没人读   |
 | `settings-secret-client`     | 密钥字段名进了客户端组件 → 明文被序列化进 SSR 的 HTML             |
 | `settings-secret-wiring`     | 某个密钥没有任何消费点在读它 → 管理员以为轮换过了，实际还在用旧的 |
 | `settings-wiring`            | 这道门自己被从 `checklist.yml` 摘掉                               |
 
-变异自证 11/11 各自变红（`mutate_guards.py --guard site-settings`）。
+变异自证 12/12 各自变红（`mutate_guards.py --guard site-settings`）。
 
 > **2026-09-28 极性反转**：`settings-metadata` 这条规则的原语义是「根 layout **必须**用
 > `generateMetadata` 读运行期设置」（为了「后台改名即时生效」）。实测发现这正是首页
@@ -242,6 +243,12 @@ export const SITE_SETTINGS_FIELDS = [
 「默认值 ≠ 线上值」的字段（站名/描述/页脚的默认值恰好就是想要的线上值），漏配后页面
 毫无异常、只有 sitemap/robots/canonical 全错。故加此规则，并给 `SITE_URL` 补生产兜底。
 详见 CLAUDE.md 6.2.5。
+
+**同日再追加 `settings-env-var-name`**：排查 `localhost:3000` 残留时发现 `.env.local`
+写的是裸名 `SITE_URL=`，而代码读 `NEXT_PUBLIC_SITE_URL`——孤儿变量，编辑器看着"配了"
+其实没人读。同一批还清出 `internal-kv.ts` 的 `publicOrigin()` 过时判据（旧实现用
+「`SITE_URL !== localhost`」当本地判断，加了生产兜底后在 production 下永远为真，
+导致本地 `next start` 的自请求打到线上）。两处都是「静默失败」类，故一并写成守卫。
 
 ---
 

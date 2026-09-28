@@ -964,6 +964,17 @@ MUTATIONS: list[Mutation] = [
         "2026-09-28 真实发生，且此前被「sitemap 走 KV 取值」掩盖着",
     ),
     Mutation(
+        name="环境变量文件把域名变量名写成裸 SITE_URL（孤儿变量，代码读不到）",
+        path="web/.env.example",
+        old="NEXT_PUBLIC_SITE_URL=https://skill.nextpilot.org",
+        new="SITE_URL=https://skill.nextpilot.org",
+        guard="site-settings",
+        expect="settings-env-var-name",
+        note="代码读的是 process.env.NEXT_PUBLIC_SITE_URL。写成裸名 SITE_URL，控制台/编辑器"
+        "看着「配了」，代码却读不到，落到默认值——又一个「改了没反应」的静默失败。"
+        "2026-09-28 .env.local 真实存在这个写法",
+    ),
+    Mutation(
         name="密钥字段名进了客户端组件（明文被序列化进 SSR HTML）",
         path="web/components/SiteHeader.tsx",
         old="export function SiteHeader() {",
