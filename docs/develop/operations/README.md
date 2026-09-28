@@ -22,11 +22,11 @@
       /api/ping、/api/kv-probe    兼容性探针（验证完可删）
 ```
 
-> 根级探针（`/ping`、`/kv-probe`、`/issue-probe`、`/blob`）是**历史路径**，现由
-> `web/proxy.ts` 的 middleware 统一 **307 重定向**到 `/api/` 前缀的等价端点
-> （query 原样保留，如 `/issue-probe?write=1`）。**规范入口一律用 `/api/` 前缀**；
-> 根级写法仅为兼容既有运维手册而保留——曾经直接访问根级路径会拿到 200 首页 HTML
-> （穿透到 `[locale]` 段），极具误导性。
+> 根级探针（`/ping`、`/kv-probe`、`/issue-probe`、`/blob`）**已退役**：探针统一迁到
+> `/api/` 前缀，根级写法治**直接 404**（`web/proxy.ts` 的 `RETIRED_ROOT_PATHS`），
+> 不做重定向。**入口一律用 `/api/` 前缀**（如 `/api/kv-probe`）。之所以要在 middleware
+> 里显式 404 而不是「删掉不管」，是因为交给 Next.js 兜底时这些路径会穿透到 `[locale]`
+> 段、渲染出 **200 首页 HTML**，比 404 还难认。
 
 - 会话：next-auth JWT 策略（JWE，A256CBC-HS512，密钥 HKDF(AUTH_SECRET, cookie名)）。边缘函数用 `jose` 以同一 `AUTH_SECRET` 验签（`functions/_lib/auth.js`）。
 - KV：`NEXTPILOT_KV` 绑定，**只在边缘函数可用**。key 仅允许字母/数字/下划线，无 TTL（过期写进 value 惰性清理）。
@@ -100,7 +100,7 @@ openssl rand -hex 24      # AUTH_INTERNAL_SECRET
 1. 控制台 → KV 存储 → 申请开通（申请理由写实际用途：登录资料/验证码/配额计数/报告元数据）。
 2. 创建命名空间：`nextpilot_skill_mcp`（**已开通**）。
 3. 绑定到 Pages 项目，**变量名 `NEXTPILOT_KV`**（绑定，不是环境变量）。绑定后需重新部署才生效。
-4. 部署后访问 `GET /api/kv-probe` 验证：返回的 `kv.after` 每次 +1 即绑定成功。（根级 `/kv-probe` 会 307 到这里。）
+4. 部署后访问 `GET /api/kv-probe` 验证：返回的 `kv.after` 每次 +1 即绑定成功。（根级 `/kv-probe` 已退役，直接 404。）
 
 > 命名空间名称本身不影响代码（代码只认绑定变量名 `NEXTPILOT_KV`）；控制台里绑定变量名若被固定成别的名字，
 > `getKv()` 会退化为「在 env 中查找具备 get/put/list 的对象」，仍能取到。
