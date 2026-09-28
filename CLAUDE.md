@@ -510,6 +510,48 @@ rewrite 的负向排除（`source: "/api/:path((?!auth/|skills/|ping(?:/|$)).*)"
 >
 > 改成「**请求头推导优先、常量兜底**」：线上 EdgeOne 一定注入 `x-forwarded-host`/`x-forwarded-proto`，推导结果就是本次真实访问的域名（多域名、预览环境都对），请求头缺失才回落到 `SITE_URL`。**通用教训：用「值长什么样」判断「环境是什么」是不可靠的，要用环境本身（`NODE_ENV`）或请求事实（转发头）判断。**
 
+### 6.2.6 端侧 Pyodide 运行时的三个坑（`importScripts` / `??` 空值 / SW 管不到）
+
+ULog 分析在浏览器内跑 Pyodide（WASM CPython）。这条链路上有三个**互相独立、但症状都表现为"加载失败"**的坑，2026-09-28 一次性踩全了。
+
+**坑 ①：`importScripts` 绕过 Service Worker 缓存（架构性，无法回避）**
+
+`pyodide.js` 内部用 `importScripts()` 加载 `pyodide.asm.js`（约 1.25MB）。**`importScripts` 由 `WorkerGlobalScope` 直接发起，规范上不经过 SW 的 `fetch` 事件**——`web/public/sw.js` 那套持久缓存对它**完全无效**，每次都从 CDN 裸拉。
+
+| 资源                      | 加载方式        | SW 能缓存？ |
+| ------------------------- | --------------- | ----------- |
+| `pyodide.asm.js` (1.25MB) | `importScripts` | ❌ **不能** |
+| `pyodide.asm.wasm` (10MB) | `fetch`         | ✅ 能       |
+| wheel（numpy 等）         | `fetch`         | ✅ 能       |
+
+所以「换个更快的 CDN」治不了本——`importScripts` 该裸拉还是裸拉。**解法：在 `loadPyodide()` 之前用 `fetch()` 把这两个文件先拉一遍**（`fetch` 能被 SW 拦到并写缓存），之后 `importScripts` 直接命中缓存。见 `web/workers/analysis-worker.ts` 的 `preloadForImportScripts()`。
+
+**坑 ②：`.env` 里留空 → 空字符串 → `??` 不兜底 → 拼出相对路径**
+
+```ts
+// ❌ 有 bug：.env 写 `NEXT_PUBLIC_PYODIDE_URL=`（留空）时，Next.js 替换成空字符串，
+//    ?? 只在 null/undefined 兜底，空字符串漏过去 → PYODIDE_INDEX_URL = ""
+//    → 拼出 "pyodide.asm.js" 这种相对路径，相对 worker 脚本位置解析 → 必然 404
+const PYODIDE_INDEX_URL = process.env.NEXT_PUBLIC_PYODIDE_URL ?? "https://cdn.../full/";
+
+// ✅ 正确：|| 对空字符串也兜底
+const PYODIDE_INDEX_URL = process.env.NEXT_PUBLIC_PYODIDE_URL || "https://cdn.../full/";
+```
+
+**这个坑的阴险之处**：`.env.local` 里「留空即走默认」是全仓库约定（`NEXT_PUBLIC_SITE_URL=`、`NEXT_PUBLIC_TIANDITU_TK=` 都这样），写空值是完全自然的动作。但只要该变量有**非空默认值**且用了 `??`，就会静默炸。
+
+> 排查手法：**构建产物里搜字符串**。`grep -oE '"[^"]*pyodide[^"]*"' .next/static/chunks/*.js`——如果看到裸串 `"pyodide.js"`（没有 URL 前缀），就是这个问题。构建成功、类型检查通过、页面能开，**只有产物里这个字符串能告诉你答案**。
+>
+> 判据：`process.env.X ?? 默认值` 只在「空字符串是合法值」时才对。若空值意味着「未配置、走默认」，必须用 `||`。全仓库排查过一遍，其余 `?? ""`（`TIANDITU_TK`、`APP_VERSION` 等）的空值语义确实是"就是空"，**不需要改**。
+
+**坑 ③：不要用 `cache: "force-cache"` 做 SW 预热**
+
+预热时若写 `fetch(url, { cache: "force-cache" })`，会优先命中 HTTP 缓存、**绕过 SW 的 `fetch` 事件**，达不到"把响应写进 SW 缓存"的目的。用默认模式交给 SW 正常拦截即可。
+
+另外两个实现细节：**必须读掉响应体**（`await resp.arrayBuffer()`）——只发请求不消费 body 时 SW 的 `cache.put()` 可能还没写完；**放大文件下载超时要给足**（1.25MB 在慢速网络下 30s 是合理值）。
+
+**CDN 前提已核实**：jsdelivr 返回 `access-control-allow-origin: *`，跨源 `fetch` 可行，预热不会被 CORS 挡住。
+
 ### 6.3 数据模型（EdgeOne KV + Blob）
 
 当前按 "KV 存元数据、Blob 存大对象" 分工，实体字段保持与远期关系型表结构一致，便于迁移：

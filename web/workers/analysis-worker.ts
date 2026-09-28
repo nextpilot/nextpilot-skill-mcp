@@ -18,11 +18,17 @@ import type { SeriesRequest } from "@/lib/chart-presets";
 
 // 默认走 jsdelivr CDN；生产建议改 NEXT_PUBLIC_PYODIDE_URL 指向自托管（EdgeOne Blob）——
 // 国内访问 jsdelivr / PyPI 都不稳，自托管后运行时与 wheel 都是一次下载、长期缓存。
-const PYODIDE_INDEX_URL = process.env.NEXT_PUBLIC_PYODIDE_URL ?? "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/";
+//
+// ⚠️ 这里必须用 `||` 而不是 `??`：.env 里把变量**留空**（`NEXT_PUBLIC_PYODIDE_URL=`）是很自然的
+// 写法，而 Next.js 会把它替换成**空字符串**（不是 undefined）。`??` 只在 null/undefined 时兜底，
+// 空字符串会漏过去，于是拼出 `"pyodide.js"` 这种**相对路径** —— `importScripts` 相对 worker
+// 脚本位置解析，请求地址直接错掉，报的却是 "failed to load" 这种看不出根因的错。
+// 2026-09-28 线上真实踩过这个坑（构建产物里躺着裸串 `"pyodide.js"`）。
+const PYODIDE_INDEX_URL = process.env.NEXT_PUBLIC_PYODIDE_URL || "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/";
 
 // pyulog 的 wheel 地址（可选）。给了就直接装这个文件：**跳过 PyPI 索引查询**（那一步每次
 // 都要联网、且不受缓存保护），配合自托管就是"下载一次"。用 tools/dev/fetch_pyodide_assets.py 抓。
-const PYULOG_WHEEL = process.env.NEXT_PUBLIC_PYULOG_WHEEL ?? "";
+const PYULOG_WHEEL = process.env.NEXT_PUBLIC_PYULOG_WHEEL || "";
 
 export type WorkerStage = "loading-runtime" | "installing-parser" | "parsing" | "done";
 
@@ -73,10 +79,89 @@ type LoadPyodide = (opts: { indexURL: string }) => Promise<Pyodide>;
 
 let pyodidePromise: Promise<Pyodide> | null = null;
 
+/**
+ * 预热 `importScripts` 要拉的文件，让它们进 Service Worker 缓存。
+ *
+ * **为什么必须单独做这一步**：`pyodide.js` 内部用 `importScripts()` 加载 `pyodide.asm.js`
+ * （约 1.25MB）。`importScripts` 由 WorkerGlobalScope 直接发起，**规范上不经过 Service Worker
+ * 的 `fetch` 事件**——所以 public/sw.js 那套缓存对它完全无效，它每次都从 CDN 裸拉。
+ * 而 `pyodide.asm.wasm` / wheel 走的是 `fetch()`，能被 SW 正常缓存。
+ *
+ * 症状：国内访问 jsdelivr 本就不稳，`importScripts` 同步加载 1.25MB 中途断流就整块失败，
+ * 报 `NetworkError: Failed to execute 'importScripts' ... failed to load`。
+ *
+ * 解法：在 `loadPyodide()` 之前，自己用 `fetch()` 把这两个文件拉一遍。
+ * `fetch` **能**被 SW 拦到并写入缓存，于是之后再执行 `importScripts` 时直接命中缓存，
+ * 不再裸拉。首次访问仍可能失败（缓存是空的），但失败只影响这一次，
+ * 且这里的 fetch 比 importScripts 更容易重试。
+ */
+const PRELOAD_FILES = ["pyodide.js", "pyodide.asm.js"] as const;
+
+/** 单个文件的预热超时（毫秒）。1.25MB 在国内慢速网络下给足余量，但也不能无限等。 */
+const PRELOAD_TIMEOUT_MS = 30_000;
+
+/**
+ * 拉一个文件并读掉响应体。读 body 是必需的：只发请求不消费响应体时，
+ * Service Worker 那边 `cache.put()` 可能还没写完就返回了。
+ */
+async function preloadOne(url: string): Promise<boolean> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PRELOAD_TIMEOUT_MS);
+    try {
+        // 刻意**不传** `cache: "force-cache"`：那会优先命中 HTTP 缓存、绕过 SW 的 fetch 事件，
+        // 达不到"把响应写进 SW 缓存"的目的。用默认模式交给 SW 正常拦截。
+        const resp = await fetch(url, { signal: controller.signal });
+        if (!resp.ok) {
+            console.warn(`[pyodide] 预热返回 HTTP ${resp.status}：${url}`);
+            return false;
+        }
+        await resp.arrayBuffer();
+        return true;
+    } catch (err) {
+        console.warn(`[pyodide] 预热失败：${url}`, err);
+        return false;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+/**
+ * 预热 `importScripts` 要拉的文件，让它们进 Service Worker 缓存。
+ *
+ * **为什么必须单独做这一步**：`pyodide.js` 内部用 `importScripts()` 加载 `pyodide.asm.js`
+ * （约 1.25MB）。`importScripts` 由 WorkerGlobalScope 直接发起，**规范上不经过 Service Worker
+ * 的 `fetch` 事件**——所以 public/sw.js 那套缓存对它完全无效，它每次都从 CDN 裸拉。
+ * 而 `pyodide.asm.wasm` / wheel 走的是 `fetch()`，能被 SW 正常缓存。
+ *
+ * 症状：国内访问 jsdelivr 本就不稳，`importScripts` 同步加载 1.25MB 中途断流就整块失败，
+ * 报 `NetworkError: Failed to execute 'importScripts' ... failed to load`。
+ *
+ * 解法：在 `loadPyodide()` 之前，自己用 `fetch()` 把这两个文件拉一遍。
+ * `fetch` **能**被 SW 拦到并写入缓存，于是之后再执行 `importScripts` 时直接命中缓存，不再裸拉。
+ *
+ * 失败处理：等所有文件都尝试完（`allSettled`），只要**有一个失败**就重试一轮。
+ * 两轮都失败也不抛错——让 `importScripts` 照常去试，失败时报它原本的错误，
+ * 保持"预热只是加速，不是必需步骤"的定位（比如 SW 未启用的隐私模式下就靠它兜底）。
+ */
+async function preloadForImportScripts(): Promise<void> {
+    const urls = PRELOAD_FILES.map((name) => PYODIDE_INDEX_URL + name);
+    for (let round = 1; round <= 2; round++) {
+        const results = await Promise.allSettled(urls.map(preloadOne));
+        const allOk = results.every((r) => r.status === "fulfilled" && r.value === true);
+        if (allOk) return;
+        if (round === 1) {
+            post({ type: "stage", stage: "loading-runtime", detail: "网络较慢，正在重试…" });
+            await new Promise((r) => setTimeout(r, 1000));
+        }
+    }
+}
+
 async function getPyodide(): Promise<Pyodide> {
     if (pyodidePromise) return pyodidePromise;
     pyodidePromise = (async () => {
         post({ type: "stage", stage: "loading-runtime", detail: "加载 Pyodide 运行时…" });
+        // 先预热 importScripts 要拉的文件（见上方注释：它绕过 SW 缓存，必须先 fetch 进缓存）
+        await preloadForImportScripts();
         // CDN 的 pyodide.js 是 UMD 经典脚本：import 只触发副作用，函数挂在全局，
         // 没有 ESM 命名导出（直接取 mod.loadPyodide 会是 undefined）。
         await import(
