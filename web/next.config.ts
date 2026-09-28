@@ -94,6 +94,16 @@ const nextConfig: NextConfig = {
     //     Next route 可达"，走垫片就失去对照意义
     // 注意 beforeFiles 优先级最高，漏排一个前缀 = 该真实 route 永远到不了（被转进垫片
     // 白名单外、静默 404），新增真实 API route 时必须同步加进这里。
+    // API 响应禁止 CDN 缓存：EdgeOne CDN 会缓存 404 等 HTML 错误页（实测部署切换
+    // 瞬间 /api/explain 的 404 被缓存、eo-cache-status: Cache Hit，且**缓存键忽略
+    // query string**，加随机参数也绕不开），导致部署后最长几分钟内该路径所有请求
+    // 都吃到旧错误响应。JSON API / zip 下载全是动态内容，no-store 一刀切最稳。
+    async headers() {
+        return [
+            { source: "/api/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
+            { source: "/internal/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
+        ];
+    },
     async rewrites() {
         return {
             beforeFiles: [
