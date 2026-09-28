@@ -41,10 +41,11 @@ const PYULOG_WHEEL_URL = toAbsoluteUrl(PYULOG_WHEEL_PATH);
 // 公网 CDN 兜底：自托管不可用时回退 jsdelivr（版本与 site-config.ts 保持一致）
 const PYODIDE_CDN_FALLBACK = "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/";
 
-export type WorkerStage = "loading-runtime" | "installing-parser" | "parsing" | "done";
+export type WorkerStage =
+    "loading-runtime" | "installing-parser" | "reading-log" | "parsing-log" | "running-checks" | "done";
 
 export type WorkerInMessage =
-    | { type: "analyze"; file: Uint8Array; logId: string }
+    | { type: "analyze"; file: Uint8Array; logId: string; name?: string }
     | { type: "track"; reqId: string; logId: string }
     | {
           type: "series";
@@ -154,23 +155,39 @@ async function preloadOne(url: string): Promise<boolean> {
  * 两轮都失败也不抛错——让 `importScripts` 照常去试，失败时报它原本的错误，
  * 保持"预热只是加速，不是必需步骤"的定位（比如 SW 未启用的隐私模式下就靠它兜底）。
  */
-async function preloadForImportScripts(baseUrl: string): Promise<void> {
+async function preloadForImportScripts(baseUrl: string, label: string): Promise<void> {
     const urls = PRELOAD_FILES.map((name) => baseUrl + name);
     for (let round = 1; round <= 2; round++) {
-        const results = await Promise.allSettled(urls.map(preloadOne));
-        const allOk = results.every((r) => r.status === "fulfilled" && r.value === true);
+        // 逐文件下载并汇报进度
+        let allOk = true;
+        for (let i = 0; i < urls.length; i++) {
+            const start = Date.now();
+            const ok = await preloadOne(urls[i]);
+            const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+            if (!ok) allOk = false;
+            if (round === 1) {
+                const status = ok ? `${elapsed}s` : "失败";
+                const fullPath = new URL(urls[i]).pathname;
+                post({
+                    type: "stage",
+                    stage: "loading-runtime",
+                    detail: `预热下载 ${fullPath} · ${status}`,
+                });
+            }
+        }
         if (allOk) return;
         if (round === 1) {
-            post({ type: "stage", stage: "loading-runtime", detail: "网络较慢，正在重试…" });
+            post({ type: "stage", stage: "loading-runtime", detail: "网络较慢，正在重试" });
             await new Promise((r) => setTimeout(r, 1000));
         }
     }
 }
 
 /** 尝试从指定 indexURL 加载 Pyodide 运行时（含预热） */
-async function tryLoadPyodide(indexURL: string): Promise<Pyodide> {
+async function tryLoadPyodide(indexURL: string, label: string): Promise<Pyodide> {
     // 先预热 importScripts 要拉的文件（见 preloadForImportScripts 注释）
-    await preloadForImportScripts(indexURL);
+    await preloadForImportScripts(indexURL, label);
+
     // CDN 的 pyodide.js 是 UMD 经典脚本：import 只触发副作用，函数挂在全局，
     // 没有 ESM 命名导出（直接取 mod.loadPyodide 会是 undefined）。
     await import(
@@ -182,13 +199,20 @@ async function tryLoadPyodide(indexURL: string): Promise<Pyodide> {
     if (typeof loadPyodide !== "function") {
         throw new Error("Pyodide 脚本已加载但未找到 loadPyodide，请检查 pyodide.js 分发目录是否完整");
     }
+    const displayPath = label === "自托管" ? new URL(indexURL, self.location.origin).pathname : indexURL;
+    post({
+        type: "stage",
+        stage: "loading-runtime",
+        detail: `正在从 ${displayPath} 加载 Python 运行时（WASM 约 6MB + 标准库约 3MB）`,
+    });
+
     return await loadPyodide({ indexURL });
 }
 
 async function getPyodide(): Promise<Pyodide> {
     if (pyodidePromise) return pyodidePromise;
     pyodidePromise = (async () => {
-        post({ type: "stage", stage: "loading-runtime", detail: "加载 Pyodide 运行时…" });
+        post({ type: "stage", stage: "loading-runtime" });
 
         // Pyodide 加载：自托管 → CDN 兜底
         let pyodide: Pyodide;
@@ -197,7 +221,7 @@ async function getPyodide(): Promise<Pyodide> {
             ["CDN", PYODIDE_CDN_FALLBACK],
         ] as const) {
             try {
-                pyodide = await tryLoadPyodide(indexURL);
+                pyodide = await tryLoadPyodide(indexURL, label);
                 break;
             } catch (e) {
                 if (label === "CDN") {
@@ -205,20 +229,32 @@ async function getPyodide(): Promise<Pyodide> {
                         `Pyodide 加载失败（自托管和 CDN 均不可用）：${e instanceof Error ? e.message : String(e)}`,
                     );
                 }
-                post({ type: "stage", stage: "loading-runtime", detail: "自托管加载失败，回退 CDN…" });
+                post({ type: "stage", stage: "loading-runtime", detail: "自托管加载失败，回退 CDN" });
             }
         }
 
-        post({ type: "stage", stage: "installing-parser", detail: "安装 pyulog…" });
+        const indexPath = new URL(PYODIDE_INDEX_URL).pathname;
+        post({
+            type: "stage",
+            stage: "installing-parser",
+            detail: `正在从 ${indexPath} 安装 micropip 和 numpy `,
+        });
         await pyodide!.loadPackage(["micropip", "numpy"]);
+
         // lzma（可加载包，约 100KB）：日志自带的事件定义 metadata_events 是 xz 压缩的，解 PX4 事件要用。
         // 单独装且**允许失败**——拿不到就退化成"不解码事件"（日志里的旧格式事件文本仍在），
         // 不能因为它把整个解析挡在门外。
+        post({
+            type: "stage",
+            stage: "installing-parser",
+            detail: `正在从 ${indexPath} 安装 lzma `,
+        });
         try {
             await pyodide!.loadPackage(["lzma"]);
         } catch (err) {
             console.warn("lzma 加载失败，PX4 事件将不解码：", err);
         }
+
         const micropip = pyodide!.pyimport("micropip");
 
         // pyulog 安装：自托管 wheel → PyPI 兜底（各重试 3 次）
@@ -226,9 +262,15 @@ async function getPyodide(): Promise<Pyodide> {
         for (const [label, target] of [
             ["自托管", PYULOG_WHEEL_URL],
             ["PyPI", "pyulog"],
-        ]) {
+        ] as const) {
             for (let attempt = 1; attempt <= 3; attempt++) {
                 try {
+                    const desc = `正在从 ${PYULOG_WHEEL_PATH.split("/").pop()!} 安装 pyulog`;
+                    post({
+                        type: "stage",
+                        stage: "installing-parser",
+                        detail: attempt > 1 ? `${desc} · 重试 ${attempt}/3` : `${desc} `,
+                    });
                     await micropip.install(target);
                     lastErr = null;
                     break;
@@ -238,7 +280,7 @@ async function getPyodide(): Promise<Pyodide> {
                         post({
                             type: "stage",
                             stage: "installing-parser",
-                            detail: `安装 pyulog 失败，重试 ${attempt}/3…`,
+                            detail: `安装 pyulog 失败，重试 ${attempt}/3`,
                         });
                         await new Promise((r) => setTimeout(r, attempt * 2000));
                     }
@@ -249,7 +291,7 @@ async function getPyodide(): Promise<Pyodide> {
                 post({
                     type: "stage",
                     stage: "installing-parser",
-                    detail: "自托管 wheel 失败，回退 PyPI…",
+                    detail: "自托管 wheel 失败，回退 PyPI",
                 });
             }
         }
@@ -264,6 +306,12 @@ async function getPyodide(): Promise<Pyodide> {
                     "建议：刷新页面重试，或检查网络/防火墙设置。",
             );
         }
+
+        // 预编译引擎（371KB），后续分析直接 exec 编译产物，省去每次重编译的开销
+        post({ type: "stage", stage: "installing-parser", detail: "预编译分析引擎" });
+        pyodide!.globals.set("_engine_src", PY_ULG_ENGINE);
+        await pyodide!.runPythonAsync("_engine_code = compile(_engine_src, '<engine>', 'exec')");
+
         return pyodide!;
     })();
     return pyodidePromise;
@@ -381,16 +429,42 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
 
         if (msg.type !== "analyze") return;
 
-        post({ type: "stage", stage: "parsing", detail: "解析日志并执行检查规则…" });
+        const fileSizeMB = (msg.file.byteLength / (1024 * 1024)).toFixed(1);
+        const logLabel = msg.name ? `${msg.name} · ${fileSizeMB} MB` : `${fileSizeMB} MB`;
+        post({ type: "stage", stage: "reading-log", detail: `${logLabel}` });
+
         pyodide.globals.set("ulog_bytes", msg.file);
-        // 装载：整段引擎（算子 + provider + 规则框架 + 数据层）在同一 __main__ globals 执行，共享 ulog 与 provider
-        await pyodide.runPythonAsync(PY_ULG_ENGINE);
-        // 执行：三样都走具名入口。以前 report 是"执行脚本的副作用"留下的 `__result`，
-        // 而 `__result` 是同一个全局、每次调用都被覆盖，所以读 report 必须先于读 manifest——
-        // 那个顺序约束只写在注释里。现在没有这回事了。
-        const report = await runJson(pyodide, "np_report()");
+        await pyodide.runPythonAsync("exec(_engine_code)");
+
+        // 汇报识别结果
+        const summary = (await runJson(
+            pyodide,
+            "__result = json.dumps({'type': provider.log_type, 'topics': len(provider.get_topic_meta()), 'platform': provider.platform_label()})",
+        )) as { type: string; topics: number; platform: string };
+        post({
+            type: "stage",
+            stage: "reading-log",
+            detail: `已打开 ${summary.platform} · ${msg.name} · ${summary.topics} 个话题`,
+        });
+
+        // 收集日志元信息（topic 清单 / 事件 / 模式 / 参数 / 材料清单等）
+        post({ type: "stage", stage: "parsing-log", detail: "正在提取话题清单" });
         const manifest = (await runJson(pyodide, "np_manifest()")) as TopicManifest;
+        post({ type: "stage", stage: "parsing-log", detail: "正在整理系统信息与事件" });
         const info = (await runJson(pyodide, "np_materials()")) as LogInfo;
+
+        // 执行规则
+        const ruleStats = (await runJson(
+            pyodide,
+            "__result = json.dumps({'rules': len(RULES), 'groups': len(FACTS.get('group_order', []))})",
+        )) as { rules: number; groups: number };
+        post({
+            type: "stage",
+            stage: "running-checks",
+            detail: `共 ${ruleStats.groups} 组 ${ruleStats.rules} 条规则 · 正在逐组执行`,
+        });
+
+        const report = await runJson(pyodide, "np_report()");
 
         // **成功之后**才记"现在装的是这一份"：解析中途失败时命名空间里可能还留着上一份的
         // provider，先记就会让 track / series 把旧日志的数据当成新日志的交出去

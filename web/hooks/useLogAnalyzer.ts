@@ -180,6 +180,7 @@ export function useLogAnalyzer() {
     const parseBytesRef = useRef<((bytes: Uint8Array, meta: ParseBytesMeta) => void) | null>(null);
 
     const [stage, setStage] = useState<WorkerStage | "idle" | "explaining">("idle");
+    const [stageDetail, setStageDetail] = useState<string>("");
     const [error, setError] = useState<string | null>(null);
     const [report, setReport] = useState<AnalysisReport | null>(null);
     const [manifest, setManifest] = useState<TopicManifest | null>(null);
@@ -613,6 +614,7 @@ export function useLogAnalyzer() {
         (m: WorkerOutMessage) => {
             if (m.type === "stage") {
                 setStage(m.stage);
+                setStageDetail(m.detail ?? "");
             } else if (m.type === "error") {
                 setError(m.message ?? "解析失败");
                 setStage("idle");
@@ -744,7 +746,7 @@ export function useLogAnalyzer() {
             setAiMarkdown(meta.priorAi);
             setPendingBytes(null);
             setStage("loading-runtime");
-            worker.postMessage({ type: "analyze", file: bytes, logId: meta.hash });
+            worker.postMessage({ type: "analyze", file: bytes, logId: meta.hash, name: meta.name });
         },
         [dropOtherReportData, ensureWorker, failPendingAnalyze],
     );
@@ -1024,6 +1026,7 @@ export function useLogAnalyzer() {
         pendingHashRef,
         // state
         stage,
+        stageDetail,
         error,
         report,
         manifest,

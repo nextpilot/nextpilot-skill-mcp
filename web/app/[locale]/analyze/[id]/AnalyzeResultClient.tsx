@@ -8,15 +8,9 @@ import { LogReport } from "@/components/LogReport";
 import { getReport, initReportStore } from "@/lib/report-history";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { ArrowLeft, Loader2, Sparkles } from "lucide-react";
+import { STAGE_TEXT, STAGE_PROGRESS } from "@/lib/stage-labels";
 
 type TabKey = "sysmsg" | "metrics" | "messages" | "params" | "charts" | "summary" | "ai";
-
-const STAGE_TEXT: Record<string, string> = {
-    "loading-runtime": "加载 Pyodide 运行时",
-    "installing-parser": "安装解析器",
-    parsing: "解析日志数据",
-    done: "完成",
-};
 
 export function AnalyzeResultClient() {
     const params = useParams();
@@ -25,6 +19,7 @@ export function AnalyzeResultClient() {
 
     const {
         stage,
+        stageDetail,
         error,
         report,
         manifest,
@@ -146,8 +141,16 @@ export function AnalyzeResultClient() {
                         <p className="font-medium text-text">正在处理数据…{report ? "（补齐图表数据）" : ""}</p>
                         <p className="mt-0.5 text-xs text-muted">
                             {STAGE_TEXT[stage] ?? "加载中…"}
-                            {stage === "loading-runtime" && "（首次运行需下载解析运行时，约十余秒）"}
+                            {(stage === "loading-runtime" || stage === "installing-parser") &&
+                                "（首次运行需下载解析运行时，约十余秒）"}
                         </p>
+                        {stageDetail && <p className="text-xs text-muted mt-1">{stageDetail}</p>}
+                        <div className="mt-2 h-1 w-full rounded-full bg-border">
+                            <div
+                                className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
+                                style={{ width: `${STAGE_PROGRESS[stage] ?? 5}%` }}
+                            />
+                        </div>
                         {report && (
                             <p className="mt-0.5 text-xs text-faint">
                                 这份报告生成时没有缓存图表数据，会重新解析一遍原始日志；之后打开即秒开。

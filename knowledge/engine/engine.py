@@ -70,6 +70,14 @@ FIELD_UNITS = _LOG_TYPE_KNOWLEDGE["field_units"].get(_LOG_TYPE, {})
 # 而 finding 的 id（F01、F02…）按发射顺序生成，所以改 group_order 会改报告里的编号。
 RULES.sort(key=lambda r: (r.get("order", 100000), r.get("id", "")))
 
+# 预分组：避免 _run_rules 每次遍历全部 RULES（O(n×m) → O(n)）
+_RULES_BY_GROUP = {}
+for _rule in RULES:
+    _g = _rule.get("group")
+    if _g not in _RULES_BY_GROUP:
+        _RULES_BY_GROUP[_g] = []
+    _RULES_BY_GROUP[_g].append(_rule)
+
 # 阈值不再集中存放：每条经验的判定阈值都写在它自己的 rules/*.yaml 里
 # （px4-thresholds.toml 已退场）。本文件只保留引擎级格式常量。
 
@@ -729,9 +737,7 @@ def _run_rules(group):
     finding 的 id 是按发射顺序（F01、F02…）生成的，所以每条规则的 group **必须与
     它所替换的原过程式检查的位置一致**；同一 group 内按 order / id 排序执行。
     """
-    for _rule in RULES:
-        if _rule.get("group") != group:
-            continue
+    for _rule in _RULES_BY_GROUP.get(group, ()):
         _rid = _rule["id"]
         _env = _rule_env()
         _not_applicable = None

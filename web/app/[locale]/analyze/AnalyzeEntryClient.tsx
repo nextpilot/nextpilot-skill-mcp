@@ -9,20 +9,15 @@ import { UploadCloud, Loader2, History, ShieldAlert, Cloud, HardDrive } from "lu
 import { LocalizedText } from "@/components/LocalizedText";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { ANALYSIS_DISCLAIMER, LOG_PRIVACY_NOTE } from "@/lib/log-analysis-notes";
+import { STAGE_TEXT, STAGE_PROGRESS } from "@/lib/stage-labels";
 import type { HistoryItem } from "@/components/ReportHistoryList";
-
-const STAGE_TEXT: Record<string, string> = {
-    "loading-runtime": "加载浏览器端 Pyodide 运行时",
-    "installing-parser": "安装解析器",
-    parsing: "解析日志并执行检查规则",
-    done: "完成",
-};
 
 export function AnalyzeEntryClient() {
     const router = useRouter();
     const {
         inputRef,
         stage,
+        stageDetail,
         error,
         report,
         history,
@@ -118,23 +113,40 @@ export function AnalyzeEntryClient() {
                     {/* 三行：标题带容量上限 → 隐私承诺 → 免责声明。容量上限并进标题，是为了让用户
               先看"能不能传"，再看"传上去安不安全"——这两句要在用户交出日志之前就看到。
               文案本体在 lib/log-analysis-notes.ts，这里只管排版，别在组件里手写措辞。 */}
-                    <p className="text-lg font-semibold">
+                    <div className="text-lg font-semibold">
                         {busy ? (
-                            (STAGE_TEXT[stage] ?? "处理中…")
+                            <div>
+                                <span>{STAGE_TEXT[stage] ?? "处理中…"}</span>
+                                {stageDetail && (
+                                    <div className="text-sm font-normal text-muted mt-1.5">{stageDetail}</div>
+                                )}
+                            </div>
                         ) : (
                             <LocalizedText
                                 zh="选择或拖入 PX4 .ulg 或 ArduPilot .bin 日志，最大支持300MB"
                                 en="Drop or choose a PX4 .ulg or ArduPilot .bin log — up to 300 MB"
                             />
                         )}
-                    </p>
+                    </div>
                     <p className="mt-2 max-w-md text-sm leading-relaxed text-muted">
                         {busy ? (
-                            "首次运行需下载约十余 MB 的 Pyodide 运行时，请稍候"
+                            stage === "loading-runtime" || stage === "installing-parser" ? (
+                                "首次运行需下载约十余 MB 的 Pyodide 运行时，请稍候"
+                            ) : (
+                                "\u00A0"
+                            )
                         ) : (
                             <LocalizedText zh={`${LOG_PRIVACY_NOTE.zh}。`} en={`${LOG_PRIVACY_NOTE.en}.`} />
                         )}
                     </p>
+                    {busy && (
+                        <div className="mt-3 h-1.5 w-full max-w-xs rounded-full bg-border">
+                            <div
+                                className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
+                                style={{ width: `${STAGE_PROGRESS[stage] ?? 5}%` }}
+                            />
+                        </div>
+                    )}
                     {!busy && (
                         // 与上面那句同等字号（两句是并列的说明，不是"一句正文 + 一行脚注"）
                         <p className="mt-1.5 max-w-md text-sm leading-relaxed text-muted">

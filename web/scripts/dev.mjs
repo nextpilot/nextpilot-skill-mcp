@@ -133,3 +133,26 @@ await checkPort(DEV_PORT);
 run(["scripts/build-knowledge.mjs", "--watch"], "build-knowledge --watch");
 run(["node_modules/next/dist/bin/next", "dev"], "next dev");
 console.log("[dev] 已启动：知识热重建 + Next 开发服务器（Ctrl+C 一起停）");
+
+// 预热首页：Turbopack 懒编译，第一个请求才编译器。等 Next 完全就绪后自动发一个
+// GET / 让编译器预热，用户打开浏览器时首页已是热的（2.5s → <200ms）。
+// 试 3 次，间隔 2s → 4s → 6s，任一次成功就停。
+let warmAttempt = 0;
+const warmMaxAttempts = 3;
+const warm = async () => {
+    while (warmAttempt < warmMaxAttempts) {
+        warmAttempt++;
+        await new Promise((r) => setTimeout(r, warmAttempt * 2000));
+        try {
+            const res = await fetch(`http://localhost:${DEV_PORT}/`);
+            if (res.ok) {
+                console.log("[dev] 预热完成（首页已编译）");
+                return;
+            }
+        } catch {
+            // Next 可能还没完全就绪，等下一轮
+        }
+    }
+    console.log("[dev] 预热跳过（超时，手动打开首页即可）");
+};
+warm();
