@@ -361,7 +361,7 @@ jobs:
         timeout: 900
         workdir: "{WEB}"
         command: ["{NODE}", "node_modules/@playwright/test/cli.js", "test", "--grep", "日志分析流程"]
-        hint: "The upload -> Pyodide parse -> render chain is broken. Run `pnpm test:e2e:analyze` locally to reproduce; the full flow needs ~7 minutes (Pyodide downloads WASM + numpy + pyulog on first run)."
+        hint: "The upload -> Pyodide parse -> render chain is broken. Run `pnpm test:e2e:log` locally to reproduce; the full flow needs ~7 minutes (Pyodide downloads WASM + numpy + pyulog on first run)."
 
   - id: deploy
     stage: "Deploy"

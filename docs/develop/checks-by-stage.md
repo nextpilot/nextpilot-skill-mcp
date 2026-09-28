@@ -15,7 +15,7 @@
 | 7   | 早期改动清单                                                | **已过期**，回滚命令不再有效——仅作历史记录                |
 | 8   | 复测方式                                                    | 已改为 `--stage` 写法                                     |
 | 9   | 日志测试只在本地                                            | 已定；E2E fixture 的隐私张力见 9.8                        |
-| 10  | `@smoke` 标记重整                                           | 已落地；**`test:e2e:analyze` 已接回 CI**（10.6 节）       |
+| 10  | `@smoke` 标记重整                                           | 已落地；**`test:e2e:log` 已接回 CI**（10.6 节）           |
 | 11  | 四项补强（删死参数 / secret 扫描 / 依赖审计 / commit 规范） | **四项全部已落地**                                        |
 | 12  | hook 语言统一                                               | 已落地；落地后发现并修掉 `--with-e2e` 漏传 bug（12.9 节） |
 
@@ -370,12 +370,12 @@ npmmirror 而失败（该镜像无 audit 端点），但 **CI 未配 registry，
 9. **加依赖漏洞审计**（第 11 节）。✅ — 上线即抓到 `pytest 8.3.4` 真漏洞（11.3 节）。
 10. **加 commit message 规范**（第 11 节）。✅
 11. **`.githooks/` 只留 Python，hook 自己探测解释器**（第 12 节）。✅
-12. **CI 接回 `test:e2e:analyze`**（第 10.6 节）：新增 `playwright-analyze` 步骤。✅
-    —— 用户 2026-09-22 拍板「CI 要跑 test:e2e:analyze」。
+12. **CI 接回 `test:e2e:log`**（第 10.6 节）：新增 `playwright-analyze` 步骤。✅
+    —— 用户 2026-09-22 拍板「CI 要跑 test:e2e:log」。
 
 ### 待你决定
 
-1. ~~CI 要不要跑 `test:e2e:analyze`~~ —— **已定：跑**（第 10.6 节）。
+1. ~~CI 要不要跑 `test:e2e:log`~~ —— **已定：跑**（第 10.6 节）。
    新增 `playwright-analyze` 步骤，`when: args.with_e2e`，timeout 900s。
 2. ~~原始 `.ulg` 能否随私仓走~~ —— **已定：不入库**（第 9 节）。
 3. ~~补充日志集规格~~ —— **已定：暂不做**，调查结论留在第 9.5 / 9.7 节备用。
@@ -742,7 +742,7 @@ python tools/ci/mutate_guards.py --list                 # 看变异注册表（�
 
 **`--with-e2e` 现在控制两条 E2E**：`playwright-smoke`（@smoke，约 1~2min）
 与 `playwright-analyze`（`--grep 日志分析流程` 11 条，约 5~7min）。
-只跑后者：`pnpm web:test:e2e:analyze`。
+只跑后者：`pnpm web:test:e2e:log`。
 
 **旧 flag（`--pre-push` / `--with-build`）仍可用**，是别名；但新代码一律用 `--stage`，
 别名留到所有调用点换完后再单独一个提交删除。
@@ -923,10 +923,10 @@ enterprise`，对照组 `oschina/git-osc` 同请求 200）。**将来真要存�
 
 ### 10.2 一个必须先说的坑（已实测，不是推测）
 
-`package.json` 的 `test:e2e:analyze` 用的是**中文描述 grep**：
+`package.json` 的 `test:e2e:log` 用的是**中文描述 grep**：
 
 ```json
-"test:e2e:analyze": "playwright test --grep '日志分析流程'"
+"test:e2e:log": "playwright test --grep '日志分析流程'"
 ```
 
 `日志分析流程` 是 `test.describe(...)` 的**名字**，不是 `test(...)` 的名字。
@@ -944,8 +944,8 @@ node node_modules/@playwright/test/cli.js test --grep '日志分析流程' --lis
 `--grep-invert '日志分析流程'` 曾因判据不对而失效，见 `2026-09-19` 记录。）
 
 **而且 tag 与它正交**：移出 `@smoke` 只改 tag，describe 名不动 →
-`test:e2e:analyze` 的 11 条**一条都不会少**，其中就包含那条 420s 的用例。
-**所以不用改 `test:e2e:analyze`。**
+`test:e2e:log` 的 11 条**一条都不会少**，其中就包含那条 420s 的用例。
+**所以不用改 `test:e2e:log`。**
 
 ### 10.3 实测用例数（改动的基准）
 
@@ -956,15 +956,15 @@ node node_modules/@playwright/test/cli.js test pages.spec.ts --list    # Total: 
 node node_modules/@playwright/test/cli.js test --grep '日志分析流程' --list  # Total: 11 tests in 1 file
 ```
 
-| 集合                        | 现状                | 改后应为                                    |
-| --------------------------- | ------------------- | ------------------------------------------- |
-| 全量                        | **42**              | **42（不变）**——只动 tag，不删测试          |
-| `@smoke`                    | **2**               | **16**（15 页面渲染 + 1 条 `analyze` 渲染） |
-| `pages.spec.ts`             | 31（0 个 `@smoke`） | 31（15 个 `@smoke`）                        |
-| `日志分析流程`（describe）  | 11                  | **11（不变）**                              |
-| `test:e2e:analyze` 实际跑到 | 11 条               | 11 条（含那条 420s）                        |
+| 集合                       | 现状                | 改后应为                                    |
+| -------------------------- | ------------------- | ------------------------------------------- |
+| 全量                       | **42**              | **42（不变）**——只动 tag，不删测试          |
+| `@smoke`                   | **2**               | **16**（15 页面渲染 + 1 条 `analyze` 渲染） |
+| `pages.spec.ts`            | 31（0 个 `@smoke`） | 31（15 个 `@smoke`）                        |
+| `日志分析流程`（describe） | 11                  | **11（不变）**                              |
+| `test:e2e:log` 实际跑到    | 11 条               | 11 条（含那条 420s）                        |
 
-**注意 `日志分析流程` 是 11 条不是 5 条**：`test:e2e:analyze` 现在跑的是整个 describe，
+**注意 `日志分析流程` 是 11 条不是 5 条**：`test:e2e:log` 现在跑的是整个 describe，
 包括「历史记录可见」「上传非 .ulg 文件不崩溃」等——**它不是"只跑那条 420s"的精确靶子**，
 而是"跑分析流程那一组"。要精确只跑那条，得用 `--grep '上传 .ulg 并完成分析'`。
 
@@ -974,7 +974,7 @@ node node_modules/@playwright/test/cli.js test --grep '日志分析流程' --lis
 | ----------------------------- | --------------------------------------------------- | ---------------------------------------------------- |
 | `web/e2e/pages.spec.ts`       | 「关键页面渲染」describe 下 15 条标 `@smoke`        | 覆盖面最广、单条最快（只验 HTTP 200 + 无错误覆盖层） |
 | `web/e2e/analyze.spec.ts:19`  | 去掉 `tag: "@smoke"`，**保留 420s timeout**         | 它是"按需跑"的那条，不再进冒烟                       |
-| `web/package.json`            | `test:e2e:analyze` 保持 `--grep '日志分析流程'`     | 判据是 describe 名，不受 tag 变化影响                |
+| `web/package.json`            | `test:e2e:log` 保持 `--grep '日志分析流程'`         | 判据是 describe 名，不受 tag 变化影响                |
 | `tools/ci/checklist.yml:152`  | `playwright-smoke` 的 timeout **从 180s 调到 300s** | 见 10.5                                              |
 | `docs/dev/checks-by-stage.md` | 更新第 2 节表的冒烟行                               | 耗时变了                                             |
 
@@ -1025,15 +1025,15 @@ node node_modules/@playwright/test/cli.js test --grep '日志分析流程' --lis
 **一处曾需要确认的覆盖率问题（现已解决）**：CI 原本只跑 `--grep @smoke`
 （`checklist.yml` 一条命令），**不跑全量 E2E**。所以 420s 那条从 `@smoke` 移出后：
 
-| 场合                         | 移出前                  | 移出后（当时） | **现在**                            |
-| ---------------------------- | ----------------------- | -------------- | ----------------------------------- |
-| CI                           | **跑**（它是 `@smoke`） | **不跑**       | **跑**（新增 `playwright-analyze`） |
-| 本地 `pnpm test:e2e:analyze` | 跑（11 条里含它）       | 跑（不变）     | 跑（不变）                          |
-| 部署后全量 E2E               | 跑                      | 跑             | 跑                                  |
+| 场合                     | 移出前                  | 移出后（当时） | **现在**                            |
+| ------------------------ | ----------------------- | -------------- | ----------------------------------- |
+| CI                       | **跑**（它是 `@smoke`） | **不跑**       | **跑**（新增 `playwright-analyze`） |
+| 本地 `pnpm test:e2e:log` | 跑（11 条里含它）       | 跑（不变）     | 跑（不变）                          |
+| 部署后全量 E2E           | 跑                      | 跑             | 跑                                  |
 
 **即：一度从"CI 时守"退成"上线时守"。现已接回 CI** ——
 `checklist.yml` 新增 `playwright-analyze` 步骤（`when: args.with_e2e`，timeout 900），
-跑 `--grep 日志分析流程` 共 11 条。用户 2026-09-22 拍板：「CI 要跑 test:e2e:analyze」。
+跑 `--grep 日志分析流程` 共 11 条。用户 2026-09-22 拍板：「CI 要跑 test:e2e:log」。
 
 **为什么这条能在云端真跑（而日志回归不能）**：它上传的是
 `web/e2e/fixtures/sample.ulg`——**已入库**的 fixture，不是 `tools/testdata/logs/` 下的

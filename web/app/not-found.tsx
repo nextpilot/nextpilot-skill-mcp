@@ -49,7 +49,7 @@ export default function NotFound() {
                     <ArrowLeft className="h-[18px] w-[18px]" />
                     返回基地
                 </a>
-                <a href="/analyze" className="btn-ghost inline-flex items-center gap-2 px-5 py-2.5 text-[15px]">
+                <a href="/log" className="btn-ghost inline-flex items-center gap-2 px-5 py-2.5 text-[15px]">
                     <Radar className="h-[18px] w-[18px]" />
                     分析飞控日志
                 </a>

@@ -21,7 +21,7 @@ export default async function LoginPage({
     const params = await searchParams;
     // 仅允许站内相对路径回跳，避免开放重定向
     const callbackUrl =
-        typeof params.callbackUrl === "string" && params.callbackUrl.startsWith("/") ? params.callbackUrl : "/analyze";
+        typeof params.callbackUrl === "string" && params.callbackUrl.startsWith("/") ? params.callbackUrl : "/log";
 
     return (
         <div className="page-shell flex justify-center py-16">

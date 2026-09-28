@@ -98,7 +98,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
                 setError("验证码错误或已过期，请重新获取");
                 return;
             }
-            router.push(callbackUrl || "/analyze");
+            router.push(callbackUrl || "/log");
             router.refresh();
         } catch {
             setError("登录失败，请稍后再试");
@@ -108,7 +108,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl: string }) {
     }
 
     function loginGithub() {
-        void signIn("github", { callbackUrl: callbackUrl || "/analyze" });
+        void signIn("github", { callbackUrl: callbackUrl || "/log" });
     }
 
     return (

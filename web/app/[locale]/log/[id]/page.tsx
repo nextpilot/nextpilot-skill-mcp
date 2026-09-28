@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { makePageMeta } from "@/lib/seo";
-import { AnalyzeResultClient } from "./AnalyzeResultClient";
+import { LogResultClient } from "./LogResultClient";
 
 export async function generateMetadata({
     params,
@@ -12,12 +12,12 @@ export async function generateMetadata({
         title: "分析结果",
         description:
             "飞控日志（PX4 / ArduPilot）确定性分析结果：检查结论、数据图表、事件消息、飞控参数与 AI 中文解读。",
-        path: `/analyze/${id}`,
+        path: `/log/${id}`,
         locale,
         noIndex: true,
     });
 }
 
-export default function AnalyzeResultPage() {
-    return <AnalyzeResultClient />;
+export default function LogPage() {
+    return <LogResultClient />;
 }

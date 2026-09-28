@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AnalysisReport, LogInfo, SeriesResponse, TopicManifest, TrackData } from "@/lib/types";
+import type { LogReportData, LogInfo, SeriesResponse, TopicManifest, TrackData } from "@/lib/types";
 import type { WorkerOutMessage, WorkerStage } from "@/workers/analysis-worker";
 import {
     resolvePlotPanels,
@@ -33,7 +33,7 @@ import { reportError } from "@/lib/issue-bridge";
 /**
  * Worker 跨路由复用（模块级单例）。
  *
- * 为什么不能跟 hook 一起销毁：本 hook 在 /analyze 与 /analyze/[id] 各挂一次，卸载时会 terminate；
+ * 为什么不能跟 hook 一起销毁：本 hook 在 /log 与 /log/[id] 各挂一次，卸载时会 terminate；
  * 而 Worker 里的 Pyodide 初始化很贵——运行时（约 10MB）要下载并做 WASM 编译，还要装 numpy
  * （约 6MB wheel）与 pyulog（micropym 会去 PyPI 查索引）。跟 hook 一起销毁的话，
  * 列表↔结果页来回切一趟就要重来一遍，表现出来就是"每次上传都要重新下载 pyulog"。
@@ -131,8 +131,8 @@ type ParseBytesMeta = {
  * `report.findings.filter`，缺了整页白屏）。其余字段 UI 本来就用 `?.` / `?? []` 取，
  * 缺了不会白屏——也就不该在这里编个默认值假装它有。
  */
-function normalizeWorkerReport(raw: unknown): AnalysisReport {
-    const r = (raw ?? {}) as AnalysisReport;
+function normalizeWorkerReport(raw: unknown): LogReportData {
+    const r = (raw ?? {}) as LogReportData;
     if (!Array.isArray(r.findings)) {
         const keys = r && typeof r === "object" ? Object.keys(r).join(",") : typeof raw;
         r.findings = [];
@@ -182,7 +182,7 @@ export function useLogAnalyzer() {
     const [stage, setStage] = useState<WorkerStage | "idle" | "explaining">("idle");
     const [stageDetail, setStageDetail] = useState<string>("");
     const [error, setError] = useState<string | null>(null);
-    const [report, setReport] = useState<AnalysisReport | null>(null);
+    const [report, setReport] = useState<LogReportData | null>(null);
     const [manifest, setManifest] = useState<TopicManifest | null>(null);
     const [info, setInfo] = useState<LogInfo | null>(null);
     const [aiMarkdown, setAiMarkdown] = useState<string | null>(null);
@@ -286,7 +286,7 @@ export function useLogAnalyzer() {
         }
     }, [refreshCloud]);
 
-    const persist = useCallback((r: AnalysisReport, id: string, ai: string | null, hash?: string) => {
+    const persist = useCallback((r: LogReportData, id: string, ai: string | null, hash?: string) => {
         saveReport({
             id,
             fileName: r.fileName,
@@ -311,7 +311,7 @@ export function useLogAnalyzer() {
     }, []);
 
     const explain = useCallback(
-        async (r: AnalysisReport, id: string) => {
+        async (r: LogReportData, id: string) => {
             setStage("explaining");
             let markdown: string | null = null;
             let ok = false;
@@ -572,7 +572,7 @@ export function useLogAnalyzer() {
             setReport({
                 fileName: saved.fileName,
                 fileSize: saved.fileSize,
-                platform: saved.platform as AnalysisReport["platform"],
+                platform: saved.platform as LogReportData["platform"],
                 parserVersion: saved.parserVersion,
                 logHash: saved.logHash,
                 findings: saved.findings,
@@ -922,7 +922,7 @@ export function useLogAnalyzer() {
                     return existing.id;
                 }
 
-                // 报告 id 直接用**日志内容指纹**（SHA-256）：地址栏 /analyze/<hash> 与 .ulg 一一对应，
+                // 报告 id 直接用**日志内容指纹**（SHA-256）：地址栏 /log/<hash> 与 .ulg 一一对应，
                 // 同一份日志在任何设备、任何浏览器上都是同一个链接，也不会再出现"同一份日志两条历史"。
                 // 非安全上下文（局域网 http）拿不到内容哈希时，退化为大小+时间+文件名，仍是确定的，
                 // 真的都没有才用随机 id。

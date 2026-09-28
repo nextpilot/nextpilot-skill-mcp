@@ -539,7 +539,7 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         name="上传区不再从唯一出处取文案",
-        path="web/app/[locale]/analyze/AnalyzeEntryClient.tsx",
+        path="web/app/[locale]/log/LogEntryClient.tsx",
         old='from "@/lib/log-analysis-notes"',
         new="",
         guard="ui",
@@ -548,7 +548,7 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         name="上传区取到了免责声明却不再渲染",
-        path="web/app/[locale]/analyze/AnalyzeEntryClient.tsx",
+        path="web/app/[locale]/log/LogEntryClient.tsx",
         old="zh={`${ANALYSIS_DISCLAIMER.zh}。`}",
         new='zh={""}',
         guard="ui",
@@ -557,7 +557,7 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         name="组件里又手抄了一份措辞（上传区标题版）",
-        path="web/app/[locale]/analyze/AnalyzeEntryClient.tsx",
+        path="web/app/[locale]/log/LogEntryClient.tsx",
         old="选择或拖入 PX4 .ulg 或 ArduPilot .bin 日志，最大支持300MB",
         new="选择或拖入 PX4 .ulg 或 ArduPilot .bin 日志，最大支持300MB。日志在浏览器本地解析，原始文件不上传。",
         guard="ui",
@@ -571,7 +571,7 @@ MUTATIONS: list[Mutation] = [
     # 要防的回归有三种形态（文案 / 数字对 / 进度条），三条路各自都要证明会红。
     Mutation(
         name="上传卡又把次数文案加回来了",
-        path="web/app/[locale]/analyze/AnalyzeEntryClient.tsx",
+        path="web/app/[locale]/log/LogEntryClient.tsx",
         old="<input",
         new='<p className="mt-3 text-xs text-faint">匿名试用：3/3 次</p>\n          <input',
         guard="ui",

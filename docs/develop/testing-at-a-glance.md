@@ -181,7 +181,7 @@ FULL_PUSH=1 git push    # 和 CI 一样全（+144s 的 next build）
 
 ```bash
 pnpm test:e2e:smoke      # 16 条关键路由，分钟级
-pnpm test:e2e:analyze    # 分析全流程，约 7min（首次要下 Pyodide WASM）
+pnpm test:e2e:log    # 分析全流程，约 7min（首次要下 Pyodide WASM）
 pnpm test:e2e            # 全量 42 条
 ```
 

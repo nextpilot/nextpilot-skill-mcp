@@ -68,7 +68,7 @@ export function MeClient() {
         };
     }, [status]);
 
-    // 本机报告存档（IndexedDB）：所有设备都不上传，/me 只给个概览，明细在 /analyze
+    // 本机报告存档（IndexedDB）：所有设备都不上传，/me 只给个概览，明细在 /log
     useEffect(() => {
         void (async () => {
             await initReportStore();
@@ -231,7 +231,7 @@ export function MeClient() {
                     </span>
                     {cloud && <span className="text-xs text-muted">（{cloud.length}）</span>}
                     <Link
-                        href="/analyze"
+                        href="/log"
                         className="ml-auto inline-flex items-center gap-0.5 text-xs text-muted hover:text-primary"
                     >
                         <LocalizedText zh="管理全部历史" en="Manage all history" />
@@ -254,7 +254,7 @@ export function MeClient() {
                         {cloud.slice(0, 10).map((r) => (
                             <li key={r.id}>
                                 <Link
-                                    href={`/analyze/${encodeURIComponent(r.id)}`}
+                                    href={`/log/${encodeURIComponent(r.id)}`}
                                     className="flex items-center gap-3 rounded-md px-1 py-2.5 transition-colors hover:bg-surface-2"
                                 >
                                     <span className="min-w-0 flex-1">
@@ -274,7 +274,7 @@ export function MeClient() {
                 {cloud !== null && cloud.length > 10 && (
                     <p className="mt-2 text-center text-[11px] text-faint">
                         仅显示最近 10 条，全部记录见
-                        <Link href="/analyze" className="mx-0.5 text-primary hover:underline">
+                        <Link href="/log" className="mx-0.5 text-primary hover:underline">
                             日志分析
                         </Link>
                         页

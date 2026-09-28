@@ -14,8 +14,8 @@ if (!logPath || !out) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // 每次开“全新标签页”：复用用户当前标签会被其上残留的调试状态/未关闭的 CDP 会话
 // 拖死（实测标签会永久不响应 Runtime.evaluate），新开的标签页无此问题。
-// 从 about:blank 起步，再用 Page.navigate 单次加载 /analyze。
-// 不能让新标签直接开 /analyze 再 navigate 一次：双次加载下实测页面在派发 change
+// 从 about:blank 起步，再用 Page.navigate 单次加载 /log。
+// 不能让新标签直接开 /log 再 navigate 一次：双次加载下实测页面在派发 change
 // 之后数秒主线程失去响应（Runtime.evaluate 永不回包），原因在 DevTools/加载竞态，
 // 单次导航稳定复现不了该问题。
 const page = await (
@@ -87,7 +87,7 @@ await send("Emulation.setDeviceMetricsOverride", {
     mobile: false,
 });
 
-await send("Page.navigate", { url: `${base}/analyze` });
+await send("Page.navigate", { url: `${base}/log` });
 
 const evalIn = async (expr) => {
     const r = await send("Runtime.evaluate", {

@@ -12,7 +12,7 @@ import { ANALYSIS_DISCLAIMER, LOG_PRIVACY_NOTE } from "@/lib/log-analysis-notes"
 import { STAGE_TEXT, STAGE_PROGRESS } from "@/lib/stage-labels";
 import type { HistoryItem } from "@/components/ReportHistoryList";
 
-export function AnalyzeEntryClient() {
+export function LogEntryClient() {
     const router = useRouter();
     const {
         inputRef,
@@ -44,7 +44,7 @@ export function AnalyzeEntryClient() {
             if (file) {
                 const reportId = await handleFile(file);
                 if (reportId) {
-                    setTimeout(() => router.push(`/analyze/${reportId}`), 100);
+                    setTimeout(() => router.push(`/log/${reportId}`), 100);
                 }
             }
         })();
@@ -55,7 +55,7 @@ export function AnalyzeEntryClient() {
     useEffect(() => {
         const rid = reportIdRef.current;
         if (report && rid && stage === "done") {
-            router.push(`/analyze/${rid}`);
+            router.push(`/log/${rid}`);
         }
     }, [report, stage, reportIdRef, router]);
 

@@ -10,7 +10,7 @@ const CRITICAL_PAGES = [
     { path: "/guide/publish-skill", label: "贡献我的技能" },
     { path: "/guide/write-skill", label: "编写技能" },
     { path: "/guide/write-mcp", label: "开发 MCP 服务" },
-    { path: "/analyze", label: "日志分析入口" },
+    { path: "/log", label: "日志分析入口" },
     { path: "/skills", label: "技能广场" },
     { path: "/mcp", label: "MCP 服务目录" },
     { path: "/me", label: "个人中心" },
@@ -156,10 +156,10 @@ test.describe("页面交互功能", () => {
     test("导航链接可点击 — 分析入口", async ({ page }) => {
         await page.goto("/", { waitUntil: "networkidle" });
 
-        const analyzeLink = page.locator('a[href="/analyze"]').first();
+        const analyzeLink = page.locator('a[href="/log"]').first();
         if (await analyzeLink.isVisible({ timeout: 2000 }).catch(() => false)) {
             await analyzeLink.click();
-            await page.waitForURL("**/analyze", { timeout: 5000 });
+            await page.waitForURL("**/log", { timeout: 5000 });
 
             const body = await page.locator("body").textContent();
             expect(body).not.toMatch(/Application error/);

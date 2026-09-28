@@ -25,7 +25,7 @@ export default function manifest(): MetadataRoute.Manifest {
                 name: "分析日志",
                 short_name: "分析",
                 description: "上传 PX4 / ArduPilot 日志进行分析",
-                url: "/zh/analyze",
+                url: "/zh/log",
             },
             {
                 name: "Skill 市场",

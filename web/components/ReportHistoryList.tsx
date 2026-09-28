@@ -554,7 +554,7 @@ export function ReportHistoryList({
                                           info: findings.filter((f) => f.severity === "info").length,
                                       }
                                     : null;
-                                const href = `/analyze/${encodeURIComponent(r.id)}`;
+                                const href = `/log/${encodeURIComponent(r.id)}`;
                                 const durSec = r.durationSec ?? r.facts?.durationSec;
                                 return (
                                     // 整行可点（表格里没法把 <a> 套在 <tr> 上）：文件名那格仍是真链接，

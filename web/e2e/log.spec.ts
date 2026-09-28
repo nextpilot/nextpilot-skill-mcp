@@ -5,7 +5,7 @@ const SAMPLE_ULG = path.resolve(process.cwd(), "e2e", "fixtures", "sample.ulg");
 
 test.describe("日志分析流程", () => {
     test("分析入口页渲染正常", { tag: "@smoke", timeout: 30_000 }, async ({ page }) => {
-        await page.goto("/analyze", { waitUntil: "networkidle" });
+        await page.goto("/log", { waitUntil: "networkidle" });
 
         await expect(page.locator("h1").first()).toBeVisible();
 
@@ -15,9 +15,9 @@ test.describe("日志分析流程", () => {
     });
 
     // 这条跑一次要 7 分钟（Pyodide 下载 WASM + numpy + pyulog），移出 @smoke 后由
-    // pnpm test:e2e:analyze 或部署后的全量 E2E 守住。timeout 保留——它是真实耗时需要，不是冒烟预算。
+    // pnpm test:e2e:log 或部署后的全量 E2E 守住。timeout 保留——它是真实耗时需要，不是冒烟预算。
     test("上传 .ulg 并完成分析（解析→显示断言）", { timeout: 420_000 }, async ({ page }) => {
-        await page.goto("/analyze", { waitUntil: "networkidle" });
+        await page.goto("/log", { waitUntil: "networkidle" });
 
         // 隐藏的 file input 应该存在
         const fileInput = page.locator('input[type="file"]').first();
@@ -31,9 +31,9 @@ test.describe("日志分析流程", () => {
         const doneIndicator = page.locator("text=完成").first();
         await expect(doneIndicator).toBeVisible({ timeout: 240_000 });
 
-        // 必须跳转到结果页 /analyze/[id]，否则解析链路没走完
-        await page.waitForURL("**/analyze/**", { timeout: 30_000 });
-        expect(page.url()).toMatch(/\/analyze\/.+/);
+        // 必须跳转到结果页 /log/[id]，否则解析链路没走完
+        await page.waitForURL("**/log/**", { timeout: 30_000 });
+        expect(page.url()).toMatch(/\/log\/.+/);
 
         // 默认停在「关键数据」tab：标题（确定性引擎实测）必须渲染 —— 证明解析产物进了显示层
         const metricsHeading = page.getByText("关键数据（确定性引擎实测）", { exact: true });
@@ -62,7 +62,7 @@ test.describe("日志分析流程", () => {
     });
 
     test("历史记录可见", { timeout: 30_000 }, async ({ page }) => {
-        await page.goto("/analyze", { waitUntil: "networkidle" });
+        await page.goto("/log", { waitUntil: "networkidle" });
 
         const historyTab = page.locator("text=历史").first();
         if (await historyTab.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -81,7 +81,7 @@ test.describe("日志分析流程", () => {
     });
 
     test("上传区域存在且可交互", { timeout: 30_000 }, async ({ page }) => {
-        await page.goto("/analyze", { waitUntil: "networkidle" });
+        await page.goto("/log", { waitUntil: "networkidle" });
 
         // 上传区域应可见（拖拽区 / 上传按钮 / 文件选择器至少存在一种）
         const uploadZone = page
@@ -94,7 +94,7 @@ test.describe("日志分析流程", () => {
     });
 
     test("分析入口页支持拖拽文案提示", { timeout: 30_000 }, async ({ page }) => {
-        await page.goto("/analyze", { waitUntil: "networkidle" });
+        await page.goto("/log", { waitUntil: "networkidle" });
 
         const body = await page.locator("body").innerText();
 
@@ -105,7 +105,7 @@ test.describe("日志分析流程", () => {
     });
 
     test("分析入口页关键 UI 元素存在", { timeout: 30_000 }, async ({ page }) => {
-        await page.goto("/analyze", { waitUntil: "networkidle" });
+        await page.goto("/log", { waitUntil: "networkidle" });
 
         // 页面标题区域
         const heading = page.locator("h1").first();
@@ -122,7 +122,7 @@ test.describe("日志分析流程", () => {
     });
 
     test("上传非 .ulg 文件不崩溃", { timeout: 30_000 }, async ({ page }) => {
-        await page.goto("/analyze", { waitUntil: "networkidle" });
+        await page.goto("/log", { waitUntil: "networkidle" });
 
         const fileInput = page.locator('input[type="file"]').first();
         if (!(await fileInput.count())) {
@@ -153,7 +153,7 @@ test.describe("日志分析流程", () => {
     });
 
     test("历史记录为空时的状态", { timeout: 30_000 }, async ({ page }) => {
-        await page.goto("/analyze", { waitUntil: "networkidle" });
+        await page.goto("/log", { waitUntil: "networkidle" });
 
         const historyTab = page.locator("text=历史").first();
         if (!(await historyTab.isVisible({ timeout: 3000 }).catch(() => false))) {
@@ -183,13 +183,13 @@ test.describe("日志分析流程", () => {
 
     test("分析页快速导航不崩溃", { timeout: 30_000 }, async ({ page }) => {
         // 进入分析页 → 离开 → 再回来，确保无状态残留崩溃
-        await page.goto("/analyze", { waitUntil: "networkidle" });
+        await page.goto("/log", { waitUntil: "networkidle" });
         await page.waitForTimeout(500);
 
         await page.goto("/skills", { waitUntil: "networkidle" });
         await page.waitForTimeout(500);
 
-        await page.goto("/analyze", { waitUntil: "networkidle" });
+        await page.goto("/log", { waitUntil: "networkidle" });
         await page.waitForTimeout(500);
 
         const body = await page.locator("body").textContent();
@@ -200,7 +200,7 @@ test.describe("日志分析流程", () => {
     });
 
     test("不选文件直接提交不崩溃", { timeout: 30_000 }, async ({ page }) => {
-        await page.goto("/analyze", { waitUntil: "networkidle" });
+        await page.goto("/log", { waitUntil: "networkidle" });
 
         // 尝试找提交/分析按钮
         const submitBtn = page
@@ -218,7 +218,7 @@ test.describe("日志分析流程", () => {
     });
 
     test("文件输入接受 .ulg 扩展名", { timeout: 30_000 }, async ({ page }) => {
-        await page.goto("/analyze", { waitUntil: "networkidle" });
+        await page.goto("/log", { waitUntil: "networkidle" });
 
         const fileInput = page.locator('input[type="file"]').first();
         if (!(await fileInput.count())) {

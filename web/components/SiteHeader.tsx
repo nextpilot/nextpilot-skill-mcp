@@ -28,7 +28,7 @@ export function SiteHeader() {
     const links = [
         // 图标本身是回首页的链接，但它不够显眼，菜单里再给一条明路
         { href: "/", label: t("首页", "Home") },
-        { href: "/analyze", label: t("日志分析", "Log analysis") },
+        { href: "/log", label: t("日志分析", "Log analysis") },
         { href: "/skills", label: t("Skill 技能", "Skill library") },
         { href: "/mcp", label: t("MCP 服务", "MCP servers") },
         { href: "/guide", label: t("使用指南", "Guide") },

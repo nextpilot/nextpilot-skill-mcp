@@ -24,7 +24,7 @@ import {
     HardDrive,
     FileUp,
 } from "lucide-react";
-import type { AnalysisReport, Finding, LogInfo, Severity, SeriesResponse, TopicManifest } from "@/lib/types";
+import type { LogReportData, Finding, LogInfo, Severity, SeriesResponse, TopicManifest } from "@/lib/types";
 import type { SeriesRequest } from "@/lib/chart-presets";
 import type { TrackData } from "@/lib/types";
 import { LogCharts } from "./LogCharts";
@@ -84,7 +84,7 @@ type TabKey = "sysmsg" | "metrics" | "messages" | "params" | "charts" | "summary
  * （`isHistory` / `manifest?` / `storedPanels`）。**集合类**（一次列很多份）不在此列，
  * 见 `ReportHistoryList.tsx` 那份说明。
  *
- * 名字曾叫 `AnalyzeReport`：`Analyze` 是**路由**的词（`app/analyze/`、`Analyze*Client`、
+ * 名字曾叫 `AnalyzeReport`：`Analyze` 是**路由**的词（`app/log/`、`Log*Client`、
  * `useLogAnalyzer`），让 `components/` 里的一个共享组件再挂一次同一个词，读的人看不出它在
  * `Log*` 家族里占哪一格——正是 §6.4「词根认亲」要避免的（同 §6.4 第②条的事故形态：
  * 名字读出的关系与真实关系不一致）。
@@ -105,7 +105,7 @@ export function LogReport({
     activeTab,
     onTabChange,
 }: {
-    report: AnalysisReport;
+    report: LogReportData;
     aiMarkdown: string | null;
     manifest: TopicManifest | null;
     /** 存档里的曲线（打开历史时用：面板 + 序列都在里面，不必再解析日志） */
@@ -273,7 +273,7 @@ export function LogReport({
 
 /** 关键数据：本份日志的实测值一览。顺序与中文名来自 facts.yaml 的 metrics；
  *  规则没跑到的那几项由声明里的兜底算式现算，所以不会因为某条规则 skip 就少几行。 */
-function MetricsTab({ report }: { report: AnalysisReport }) {
+function MetricsTab({ report }: { report: LogReportData }) {
     const metrics = report.metrics ?? [];
     return (
         <div>
@@ -306,7 +306,7 @@ function MetricsTab({ report }: { report: AnalysisReport }) {
     );
 }
 
-function SummaryTab({ report }: { report: AnalysisReport }) {
+function SummaryTab({ report }: { report: LogReportData }) {
     return (
         <div>
             <h2 className="mb-3 text-sm font-semibold">检查明细（确定性引擎）</h2>
@@ -374,7 +374,7 @@ function SummaryTab({ report }: { report: AnalysisReport }) {
  * （命中的规则 id、结论条数、固件版本、平台、路由）与用户自己写的一段话，
  * **不含**日志内容、字段数值、文件名与账号信息。界面上把这一点明说。
  */
-function ReportIssueButton({ report }: { report: AnalysisReport }) {
+function ReportIssueButton({ report }: { report: LogReportData }) {
     const [open, setOpen] = useState(false);
     const [note, setNote] = useState("");
     const [sent, setSent] = useState(false);
@@ -606,7 +606,7 @@ function formatDuration(sec: number): string {
  * 数据由引擎算好并随 report 存档（`report.facts`），历史卡片与这里同源；缺哪项就不显示哪行。
  * 标签列**不带图标**：一列小图标只会让人多扫一遍，字段名本身已经说清了。
  */
-function GeneralInfo({ report }: { report: AnalysisReport }) {
+function GeneralInfo({ report }: { report: LogReportData }) {
     const g = report.facts;
     const dark = isDarkTheme();
     const counts = {

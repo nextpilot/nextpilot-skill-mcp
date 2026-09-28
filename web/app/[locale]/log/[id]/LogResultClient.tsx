@@ -12,7 +12,7 @@ import { STAGE_TEXT, STAGE_PROGRESS } from "@/lib/stage-labels";
 
 type TabKey = "sysmsg" | "metrics" | "messages" | "params" | "charts" | "summary" | "ai";
 
-export function AnalyzeResultClient() {
+export function LogResultClient() {
     const params = useParams();
     const router = useRouter();
     const id = String(params.id);
@@ -91,11 +91,11 @@ export function AnalyzeResultClient() {
     if (!report) {
         return (
             <div className="page-shell pt-4 pb-10 sm:pt-5">
-                <Breadcrumbs items={[{ label: "日志分析", href: "/analyze" }, { label: "未找到" }]} />
+                <Breadcrumbs items={[{ label: "日志分析", href: "/log" }, { label: "未找到" }]} />
                 <div className="mt-12 flex flex-col items-center gap-4 text-center">
                     <p className="text-lg font-medium text-muted">未找到该分析报告</p>
                     <p className="text-sm text-muted">该报告可能已被删除，或从未在本机生成。</p>
-                    <Link href="/analyze" className="btn-primary mt-2">
+                    <Link href="/log" className="btn-primary mt-2">
                         <ArrowLeft className="h-4 w-4" /> 返回日志分析
                     </Link>
                 </div>
@@ -105,12 +105,12 @@ export function AnalyzeResultClient() {
 
     return (
         <div className="page-shell pt-4 pb-10 sm:pt-5">
-            <Breadcrumbs items={[{ label: "日志分析", href: "/analyze" }, { label: report.fileName }]} />
+            <Breadcrumbs items={[{ label: "日志分析", href: "/log" }, { label: report.fileName }]} />
 
             {/* 顶部导航栏 */}
             <div className="mb-5 flex flex-wrap items-center gap-3">
                 <Link
-                    href="/analyze"
+                    href="/log"
                     className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-muted transition-colors hover:bg-surface-2 hover:text-text"
                 >
                     <ArrowLeft className="h-4 w-4" />

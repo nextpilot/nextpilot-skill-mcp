@@ -236,7 +236,7 @@ console.log("\n[6] 建单链路（stub fetch，不联网）");
                 type: "ParseError",
                 message: "boom",
                 stack: "at x.js:1:1",
-                route: "/analyze",
+                route: "/log",
                 fileName: "secret-flight.ulg",
             },
         );
@@ -723,7 +723,7 @@ console.log("\n[15] 组件名跟着家族不变量走（`Log*` = 某一份日志
 {
     // 由来：两个名字各错一半，错的方向恰好相反（2026-09-18）。
     //  · `AnalyzeReport.tsx`（841 行，六个 `Log*` tab 组件的**父壳**）挂的是**路由**的词——
-    //    `Analyze` 已经被 `app/analyze/` + `Analyze*Client` + `useLogAnalyzer` 占着，
+    //    `Analyze` 已经被 `app/log/` + `Log*Client` + `useLogAnalyzer` 占着，
     //    读者看不出这个共享组件在 `Log*` 家族里占哪一格。
     //  · `HistoryList.tsx`（列 `SavedReport` / `HistoryItem`，含云端报告）一个词根都没有，
     //    看不出它的数据来自 `lib/report-history.ts`。
@@ -925,7 +925,7 @@ console.log("\n[20] 两句固定文案只有一个出处（措辞不许各写各
     // 这里守三件事：出处里两句都在、上传卡真的从出处取并渲染、全站任何别的文件不许手写
     // 这两句的字面量（否则下次有人往别的页面贴，措辞又会各长各的）。
     const notes = stripComments(read("../lib/log-analysis-notes.ts"));
-    const upload = stripComments(readWeb("app", "[locale]", "analyze", "AnalyzeEntryClient.tsx"));
+    const upload = stripComments(readWeb("app", "[locale]", "log", "LogEntryClient.tsx"));
 
     const zhPrivacy = "日志在浏览器本地解析，原始文件不上传";
     const zhDisclaimer = "分析结果为辅助判读，不能完全替代人工排查";
@@ -1005,8 +1005,8 @@ console.log("\n[21] 次数上限不在前端显示（上限由后台配置，前
     // 少一个文件不报错（撤掉显示本来就该变少），但**取数层不许被删**——
     // 它是后台配好上限之后唯一不用返工的地方。
     const EXPECTED = [
-        join("app", "analyze", "[id]", "AnalyzeResultClient.tsx"),
-        join("app", "analyze", "AnalyzeEntryClient.tsx"),
+        join("app", "log", "[id]", "LogResultClient.tsx"),
+        join("app", "log", "LogEntryClient.tsx"),
         join("app", "me", "MeClient.tsx"),
         join("components", "LogReport.tsx"),
         join("hooks", "useLogAnalyzer.ts"),

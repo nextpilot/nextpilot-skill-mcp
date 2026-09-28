@@ -69,7 +69,7 @@ export function SiteFooter({ footerCopyright, footerTagline, sourceUrl, icp }: S
         {
             title: t("产品", "Product"),
             links: [
-                { href: "/analyze", label: t("日志分析", "Log analysis") },
+                { href: "/log", label: t("日志分析", "Log analysis") },
                 { href: "/skills", label: t("Skill 技能", "Skill library") },
                 { href: "/mcp", label: t("MCP 服务", "MCP servers") },
             ],

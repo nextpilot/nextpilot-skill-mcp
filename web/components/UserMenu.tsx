@@ -15,7 +15,7 @@ export function UserMenu() {
     if (!session?.user) {
         return (
             <Link
-                href={`/login?callbackUrl=${encodeURIComponent(pathname || "/analyze")}`}
+                href={`/login?callbackUrl=${encodeURIComponent(pathname || "/log")}`}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
             >
                 <LogIn className="h-4 w-4" />

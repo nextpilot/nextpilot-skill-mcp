@@ -70,7 +70,7 @@ const state = `(() => {
   });
 })()`;
 
-await send("Page.navigate", { url: `${base}/analyze` });
+await send("Page.navigate", { url: `${base}/log` });
 await sleep(4500);
 
 const doc = await send("DOM.getDocument", { depth: 1 });

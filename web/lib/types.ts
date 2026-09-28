@@ -164,7 +164,7 @@ export interface MetricEntry {
     value: number | string;
 }
 
-export interface AnalysisReport {
+export interface LogReportData {
     fileName: string;
     fileSize: number;
     platform: "PX4" | "ArduPilot";
