@@ -368,6 +368,74 @@
 
 > 实施前需以 EdgeOne 官方文档核实：KV / Blob 的免费额度与上限（读写次数、单对象大小、总存储）、Functions 是否可直接写 Blob、CDN 流出流量计费口径、Blob 是否支持签名 / 私有 URL 与对象列举。
 
+### 6.2.1 EdgeOne 双层执行模型（排查一切线上路由问题的底座）
+
+**EdgeOne Pages 上跑的不是「一个 Next.js 应用」，而是两个各自路由的执行层。** 分不清在哪一层执行，就会把「请求根本没走到这段代码」误判成「这段代码写错了」，排查方向整个跑偏。
+
+| 层           | 是什么                                                                                 | 路由依据                                                                         | 能访问 KV 吗                      |
+| ------------ | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------- |
+| ① 边缘函数   | `web/functions/` 下的每个 `.js` 被部署成一个独立边缘函数                               | **纯字符串精确路径匹配**：`api/me.js` → `/api/me`。**不认 Next.js 的方括号语法** | ✅ 只有这层有 `NEXTPILOT_KV` 绑定 |
+| ② SSR 云函数 | opennext 适配器把 `.next` 打成的一个 Node 函数，承载页面渲染 + `app/api/**` 真实 route | Next.js 文件系统路由                                                             | ❌ 平台限制，KV 不注入到这层      |
+
+由此推出三条**必须记住**的结论：
+
+1. **边缘函数文件名里的方括号是字面量，不是通配。** `api/reports/[id].js` 在平台上被当成一个叫 `[id].js` 的精确路径，**实测根本不会被部署**；`[[default]].js` 同理。需要「动态」效果时，只能用**静态文件名 + query 参数**（本仓库最终方案：`/api/reports/detail?id=<id>`，见 6.2.3）。
+2. **同名文件与子目录共存时，子目录会被整个丢弃。** 有 `functions/api/reports.js` 又想建 `functions/api/reports/detail.js`，后者的整个目录树都不部署。修法是都改成目录形式：`reports/index.js` + `reports/detail.js`。
+3. **opennext 运行时不应用 `next.config.ts` 的 `rewrites`**（`beforeFiles` / `afterFiles` 实测均无效）。`next.config.ts` 的 rewrite 只对本地 `next start` 生效，线上 `beforeFiles` 之所以「看起来有效」，是它同时被编译进了构建产物、由 Next 自己的路由层处理——**别指望改 `next.config.ts` 能修复线上路由**。
+
+**判执行层的响应头指纹**（排查第一步永远是先看它）：
+
+- 出现 `eo-pages-inner-scf-status` + `functions-request-id` → 请求穿透到了 **② SSR 层**
+- 这两个头都没有 → 请求被 **① 边缘函数**接住了
+
+**CDN 缓存陷阱**：EdgeOne CDN 会缓存 404 等 HTML 错误页约 5 分钟，且**缓存键忽略 query string**（加随机参数也绕不开）。所以「部署后某路径仍返回旧错误」时，先看 `eo-cache-status` / `age` 判断是缓存还是新内容，别急着改代码。
+
+**部署有传播延迟，验证前必须先确认线上跑的是新构建**。`git push` 后 EdgeOne 自动部署需要**约 1~2 分钟甚至更久**才生效，且新版本上线前会持续返回**旧构建**的结果。页面 footer 显示了构建时的短哈希与日期（见 `web/lib/site-version.ts`），**验证任何线上改动前的第一步是比对线上 footer 哈希与本地 `git rev-parse --short HEAD`**——不一致就说明还没部署完，此时测出来的一切「失败」都不作数。2026-09-28 就因此误判过一次：修复推送后线上仍返回首页 HTML，实测 footer 发现线上还是上一个 commit，轮询等到新版本上线后行为即恢复正确。
+
+### 6.2.2 API 路由：`/api/*` 到底由谁处理
+
+`/api/*` 的归属**不确定**，取决于**边缘函数层有没有该精确路径**：
+
+- **边缘函数里存在** `functions/api/x.js` → ① 边缘层按**方法**（`onRequestGet` / `onRequestPost`…）拦截处理。**匹配不到方法时穿透回源**（穿透本身也算「接住了」——这点决定了修法）。
+- **边缘函数里不存在**该路径 → 穿透到 ② SSR 层。此时走 Next 路由：
+  - 命中真实 route（`app/api/**`，如 `/api/ping`、`/api/auth/**`、`/api/skills/**`）→ 正常返回；
+  - **没有真实 route** → 落入页面世界（`app/[locale]/` 通配 / 404），**返回的是 HTML 而不是 JSON**。
+  - 兜底：`app/api/[[...path]]/route.ts` 在路由排序里垫底，接住所有其他谁都没匹配的 `/api/*`，统一返回 `{"error":"not found"}` 404 JSON，**终结「返回 HTML」这种最难认的失败形态**。
+
+**`next.config.ts` 的 `beforeFiles` rewrite 是本地与线上行为的调和层**，但有个必须同步维护的负向排除清单（`source: "/api/:path((?!auth/|skills/|ping(?:/|$)).*)"`）——它把需要**真实 Next route** 的前缀排除在外，让它们不要被转进垫片：
+
+- `auth/` —— NextAuth（`app/api/auth/**`）
+- `skills/` —— Skill 安装包 zip 下载（要 `node:fs` + jszip，只能 Node 侧做）
+- `ping` —— 冒烟探针，**故意保留真实 route**：它 200 才说明「真实 Next route 可达」，走垫片就失去对照意义
+
+> ⚠️ **新增真实 API route 时必须同步把其前缀加进这个负向排除**。漏一个 = 该真实 route 永远到不了（被转进垫片、白名单外、静默 404）。这个 rewrite 必须用 **`beforeFiles`**：`afterFiles` 在 Next 原生语义下位于动态路由之前（本地 dev/prod 实测 `/api/me` 都能正常 rewrite），但 **opennext 在平台路由层会先匹配动态页面路由再处理 `afterFiles`**，导致线上 `/api/me` 被 `app/[locale]/me`（个人中心页）截胡、返回 HTML——2026-09-28 线上复现，本地 `next start` 无法复现，这是「本地好、线上坏」的典型样本。
+
+**dev + 线上共用同一份垫片**：`/api/*`、`/internal/*` 统一 rewrite 到 `app/edge-dev/[[...path]]/route.ts`，它在 Node 侧动态 import 同一份 `functions/` 代码，保证本地能跑。垫片里是一张**显式白名单**（`const handlers`），**漏一项就是「该功能本地整条静默 404」**——`scripts/test-issue-filer.mjs` §[13] 会拿 `functions/` 的目录清单核对这张表，漏了会红。新增 `functions/` 端点时必须同时加进垫片白名单。
+
+### 6.2.3 根级路径（探针等）必须显式处理，不能留给 Next 兜底
+
+**不要把根级自定义路径（`/kv-probe`、`/ping`、`/issue-probe`、`/blob`）留给 Next.js 兜底**——它们会得到 **200 首页 HTML**，而不是 404 或 JSON。
+
+机制：`web/proxy.ts`（Next.js 16 里 `proxy.ts` 即 middleware，构建产物显示 `ƒ Proxy (Middleware)`）的 `matcher` 是一张负向排除表。**被排除的路径根本不进 middleware**；这些路径又没有对应的真实 Next route，于是穿透后被 `app/[locale]/` 段接住、按默认 locale 渲染出首页。**失败形态极具误导性**：浏览器看到的是「一个正常的站点」，运维会以为探针「返回值不对」，而不是「路径根本没通」。
+
+本仓库的既有教训：早期为了「探针已迁到 `/api/` 前缀」就把 `ping|kv-probe|issue-probe|blob` 从 matcher 里排除掉，结果根级路径全部返回首页 HTML（2026-09-28 线上实测）。
+
+正确做法（`web/proxy.ts` 中的 `ROOT_PROBE_REDIRECTS`）：**让 middleware 接管，显式 307 到 `/api/` 等价端点**，query 原样保留（`/issue-probe?write=1` 的 `write=1` 要带过去）：
+
+```ts
+const ROOT_PROBE_REDIRECTS: Record<string, string> = {
+  "/ping": "/api/ping",
+  "/kv-probe": "/api/kv-probe",
+  "/issue-probe": "/api/issue-probe",
+  "/blob": "/api/blob",
+};
+// middleware 内：url.search = req.nextUrl.search; return NextResponse.redirect(url, 307);
+```
+
+> **两条通用规则**：
+> ① **新增根级路径 = 必须同时在 middleware 里显式处理**（rewrite / redirect / 明确 404 JSON），并确认它没被 matcher 负向排除掉——「排除」等于「交给 [locale] 渲染首页」。
+> ② 判断某路径线上行为时，**先按 6.2.1 的响应头指纹确认执行层**，再谈「代码写得对不对」。
+
 ### 6.3 数据模型（EdgeOne KV + Blob）
 
 当前按 "KV 存元数据、Blob 存大对象" 分工，实体字段保持与远期关系型表结构一致，便于迁移：
