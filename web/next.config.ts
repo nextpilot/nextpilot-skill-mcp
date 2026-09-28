@@ -105,10 +105,34 @@ const nextConfig: NextConfig = {
     // 控制台给 /api/*、/internal/* 配节点缓存规则（不缓存），middleware matcher 目前
     // 刻意排除 api|internal（next-intl 边界），不宜为加固去动它。
     // 本配置保留的原因：本地 next start（原生 Next）下生效，对自托管/其他平台有效。
+    // ⚠️ 线上 EdgeOne / opennext 可能忽略本 headers() 配置（实测 Eo-Cdn-Cache-Control
+    // 头由平台注入，覆盖应用层 Cache-Control）。本配置对本地 next start 和自托管有效，
+    // 同时作为预期缓存策略的声明。线上若未生效，需在 EdgeOne 控制台配节点缓存规则。
     async headers() {
         return [
+            // API / 内部端点：禁止一切缓存
             { source: "/api/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
             { source: "/internal/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
+            // 首页（含 /、/en、/zh）：CDN 缓存 60 秒，过期后用旧内容撑 5 分钟
+            {
+                source: "/:locale(zh|en)?",
+                headers: [
+                    {
+                        key: "Cache-Control",
+                        value: "public, s-maxage=60, stale-while-revalidate=300",
+                    },
+                ],
+            },
+            // 公开内容页（指南、Skill、MCP）：内容变更频率低，CDN 缓存 5 分钟，过期后兜底 10 分钟
+            {
+                source: "/:locale(zh|en)?/(guide|skills|mcp)/:path*",
+                headers: [
+                    {
+                        key: "Cache-Control",
+                        value: "public, s-maxage=300, stale-while-revalidate=600",
+                    },
+                ],
+            },
         ];
     },
     async rewrites() {
