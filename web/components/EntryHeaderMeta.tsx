@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bookmark, CalendarDays, Code2, Download, FileText, ShieldCheck, Sparkles, Star, Tag } from "lucide-react";
+import { Bookmark, CalendarDays, Code2, Download, FileText, ShieldCheck, Star, Tag } from "lucide-react";
 import { formatDate } from "@/lib/format";
 import {
     getFavorite,

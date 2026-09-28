@@ -19,8 +19,6 @@ import { contentHostLabel } from "@/lib/constants";
 export function EntrySidebar({
     kind,
     slug,
-    name,
-    baseDownloads,
     copyText,
     installHint,
     /** 下面这个默认值是 Skill 的文案；MCP 由详情页另传一份（"该 MCP 服务"） */

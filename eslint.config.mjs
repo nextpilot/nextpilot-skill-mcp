@@ -1,8 +1,10 @@
 import js from "@eslint/js";
 import nextPlugin from "@next/eslint-plugin-next";
 import globals from "globals";
+import reactHooks from "eslint-plugin-react-hooks";
+import tseslint from "typescript-eslint";
 
-export default [
+export default tseslint.config(
     {
         ignores: [
             "web/.next/**",
@@ -12,17 +14,38 @@ export default [
             "**/content/skills/**",
             "**/content/mcp/**",
             "**/node_modules/**",
-            "**/*.ts",
-            "**/*.tsx",
             // Pyodide 运行时与 wheel（第三方产物，由 tools/dev/fetch_pyodide_assets.py 抓取）。
             // 不排除的话 eslint 会去解析 pyodide.js / pyodide.asm.js，报出上万条 no-undef。
             "**/public/pyodide/**",
         ],
     },
     js.configs.recommended,
+    // TS/TSX 曾经被整体忽略（当年没装 TS parser，解析不了只能绕开）——代价是
+    // react-hooks / @next 全部规则对 TSX 从未生效过。现在接入 parser，规则只对
+    // ts/tsx 生效，js 文件维持下面的原生配置不受影响。
+    tseslint.config({
+        files: ["**/*.ts", "**/*.tsx"],
+        extends: [tseslint.configs.recommended],
+        rules: {
+            // 与下面 js 块的约定保持一致：`_` 前缀 = 刻意不用；caught 不强制带 cause
+            "@typescript-eslint/no-unused-vars": [
+                "error",
+                { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
+            ],
+            "preserve-caught-error": "off",
+        },
+    }),
     {
-        plugins: { "@next/next": nextPlugin },
+        plugins: { "@next/next": nextPlugin, "react-hooks": reactHooks },
         rules: { ...nextPlugin.configs.recommended.rules },
+    },
+    {
+        files: ["**/*.ts", "**/*.tsx"],
+        rules: {
+            "react-hooks/rules-of-hooks": "error",
+            // warn：依赖数组缺失不拦提交，但 CI 里可见（真出过事故的钩子见 analysis-worker）
+            "react-hooks/exhaustive-deps": "warn",
+        },
     },
     {
         files: ["web/scripts/**/*.{js,mjs}", "web/lib/**/*.{js,mjs}", "web/app/**/*.{js,mjs}"],
@@ -85,4 +108,4 @@ export default [
             "no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
         },
     },
-];
+);

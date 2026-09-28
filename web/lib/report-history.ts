@@ -241,7 +241,7 @@ let mirror: SavedReport[] = [];
 /** 把老版本 localStorage 里的记录搬进 IndexedDB（只做一次，搬完删键） */
 async function migrateFromLocalStorage(): Promise<void> {
     if (typeof window === "undefined") return;
-    let raw: string | null = null;
+    let raw: string | null;
     try {
         raw = window.localStorage.getItem(LEGACY_KEY);
     } catch {

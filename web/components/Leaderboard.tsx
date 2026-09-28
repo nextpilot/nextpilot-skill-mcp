@@ -14,7 +14,6 @@ export function Leaderboard({
     base: { slug: string; name: string; downloads: number }[];
 }) {
     const board = useLeaderboard(kind);
-    const bySlug = new Map(base.map((b) => [b.slug, b]));
 
     // 榜单 = 静态基值 + KV 增量合并排序
     const deltaMap = new Map(board.map((b) => [b.slug, b.delta]));

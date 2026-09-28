@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Link, usePathname, useRouter } from "@/i18n/routing";
+import { Link, useRouter } from "@/i18n/routing";
 import {
     Trash2,
     History,
@@ -290,7 +290,6 @@ function shortName(fileName: string): string {
 export function ReportHistoryList({
     items,
     localCount,
-    cachedHashes,
     cacheInfo,
     onClearLocal,
     onDeleteLocal,

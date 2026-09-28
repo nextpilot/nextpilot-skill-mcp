@@ -62,10 +62,9 @@ if (process.env.NODE_ENV === "development") {
     handlers["api/blob"] = () => import("@/functions/api/blob.js");
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function invoke(req: NextRequest, path: string[]): Promise<Response> {
-    let handlerKey = path.join("/");
-    let params: Record<string, string> = {};
+    const handlerKey = path.join("/");
+    const params: Record<string, string> = {};
     const loader = handlers[handlerKey];
     if (!loader) return new Response("not found", { status: 404 });
 
@@ -74,7 +73,7 @@ async function invoke(req: NextRequest, path: string[]): Promise<Response> {
     }
 
     const env = process.env as unknown as Record<string, string | undefined>;
-    const module = await loader();
+    const mod = await loader();
     const method = req.method.toUpperCase();
     const fnName =
         method === "GET"
@@ -84,7 +83,7 @@ async function invoke(req: NextRequest, path: string[]): Promise<Response> {
               : method === "DELETE"
                 ? "onRequestDelete"
                 : "onRequest";
-    const fn = module[fnName] ?? module.onRequest;
+    const fn = mod[fnName] ?? mod.onRequest;
     if (typeof fn !== "function") return new Response("method not allowed", { status: 405 });
 
     return (fn as EdgeHandler)({

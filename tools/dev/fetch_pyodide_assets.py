@@ -26,7 +26,13 @@ CDN 上，一次下载、长期缓存（配合 NEXT_PUBLIC_PYULOG_WHEEL 连索�
 
 **为什么要重试**：jsdelivr 从境内访问会出现随机 TLS 断连（`SSL: UNEXPECTED_EOF_WHILE_READING`），
 实测单文件成功率约 50%。没有重试的话脚本会随机失败，看起来像"某个文件不存在"，实则是网络抖动。
-落盘前用 `pyodide-lock.json` 里记录的 sha256 校验，避免把半截文件当成资产。
+
+**完整性校验分两类**（半截文件/坏代理都可能把坏字节当成资产，坏 wasm 的症状是浏览器里玄学报错）：
+  - wheel（numpy 等）：`pyodide-lock.json` 里记录了官方 sha256，逐个核对；
+  - 核心文件（asm.js/wasm/stdlib 等）：lock 不覆盖、GitHub release 又只发打包的 tar.bz2
+    （没有单文件 SHA256SUMS，且 github 从境内不稳），改用**两个不同源各拉一次、
+    sha256 一致才落盘**的交叉校验——`pyodide-lock.json` 本身排在最前面先过这道校验，
+    后面 wheel 的校验根基才成立。
 
 依赖：仅标准库。
 """
@@ -46,6 +52,7 @@ import urllib.request
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 PUBLIC_OUT = REPO_ROOT / "web" / "public" / "pyodide"
 CACHE_OUT = REPO_ROOT / ".cache" / "pyodide-dist"
+SITE_CONFIG = REPO_ROOT / "web" / "lib" / "site-config.ts"
 
 CDN = "https://cdn.jsdelivr.net/pyodide/{ver}/full/"
 # 备用源：主源被墙/抖动时按顺序回退。unpkg 与 npmmirror **不含 wheel**，只能当核文件的备选。
@@ -61,13 +68,14 @@ PYPI_JSON_FALLBACK = "https://pypi.tuna.tsinghua.edu.cn/pypi/pyulog/json"
 # 详见 fetch_pyulog_wheel()。清华镜像与 files.pythonhosted.org 实测均被 TLS 断连挡住。
 ALIYUN_SIMPLE = "https://mirrors.aliyun.com/pypi/simple/pyulog/"
 
-# 运行时必需的固定文件（其余包按 pyodide-lock.json 里的包名解析出来）
+# 运行时必需的固定文件（其余包按 pyodide-lock.json 里的包名解析出来）。
+# pyodide-lock.json 排第一：它先过交叉校验，后面 wheel 的 sha256 校验才可信。
 CORE_FILES = [
+    "pyodide-lock.json",
     "pyodide.js",
     "pyodide.asm.js",
     "pyodide.asm.wasm",
     "python_stdlib.zip",
-    "pyodide-lock.json",
 ]
 # 解析要用到的 Python 包（从 lock 里取 wheel 文件名，连同 wheel 一起自托管）
 # lzma 是 PX4 事件解压要用的，单独装且允许失败；一并自托管可避免它从公网拉。
@@ -112,6 +120,50 @@ def fetch_any(relpath: str, ver: str) -> bytes:
     raise RuntimeError("所有源都失败：\n  " + "\n  ".join(errs))
 
 
+def fetch_cross_checked(relpath: str, ver: str) -> bytes:
+    """核心文件用**两个不同源**交叉校验：sha256 一致才返回，不一致直接失败。
+
+    lock 只覆盖 Pyodide 自带包的 wheel，核心文件没有可查的单文件官方 hash
+    （GitHub release 只发 tar.bz2 打包，境内又直连不了 github release）。
+    威胁模型与对策：
+      - 半截响应/传输损坏：两个独立下载坏在**同一处且一致**的概率可忽略；
+      - 单一 CDN 内容被污染：交叉源顺序刻意把 unpkg（独立直连 npm registry）排在
+        gcore（jsdelivr 官方镜像，同源）之前——同源镜像之间比对只能证明"没坏在传输"，
+        证明不了"上游内容没被换"，尽量让两个源互不相关。
+    """
+    # jsdelivr 主源 → unpkg（独立源）→ gcore（官方镜像，兜底）
+    order = [CDN_FALLBACKS[0], CDN_FALLBACKS[-1]] + CDN_FALLBACKS[1:-1]
+    seen_urls: list[str] = []
+    first: tuple[str, bytes] | None = None
+    for tpl in order:
+        url = tpl.format(ver=ver, ver_nov=ver.lstrip("v")) + relpath
+        if url in seen_urls:
+            continue  # jsdelivr 主备模板相同，同一 URL 拉两次没有交叉意义
+        seen_urls.append(url)
+        try:
+            data = fetch(url)
+        except Exception as e:  # noqa: BLE001
+            print(f"    …… 交叉源不可用（{type(e).__name__}），换下一个", file=sys.stderr)
+            continue
+        digest = hashlib.sha256(data).hexdigest()
+        if first is None:
+            first = (digest, data)
+            continue
+        if digest != first[0]:
+            raise RuntimeError(
+                f"{relpath} 两个源的 sha256 不一致，内容可疑，拒绝落盘：\n"
+                f"  源 A {seen_urls[0]} → {first[0][:16]}…\n"
+                f"  源 B {url} → {digest[:16]}…\n"
+                f"请人工确认哪个源的内容可信后再重跑。"
+            )
+        return first[1]
+    if first is not None:
+        # 只有一个源可达：退化处理——没有交叉就不算校验过，明说而不是假装校验过
+        print(f"  !! {relpath} 只有单源可拉，本轮跳过交叉校验（内容未经第二源确认）", file=sys.stderr)
+        return first[1]
+    raise RuntimeError(f"交叉校验失败：没有任何源能拉到 {relpath}")
+
+
 def save(path: pathlib.Path, data: bytes, want_sha256: str | None = None) -> None:
     """落盘并（可选）校验 sha256 —— 防止把半截响应当成完整资产。"""
     if want_sha256:
@@ -132,41 +184,59 @@ def lock_sha(lock: dict, relpath: str) -> str | None:
     return None
 
 
-def fetch_pyulog_wheel() -> tuple[bytes, str, str]:
-    """取 pyulog 的纯 Python wheel。返回 (字节, 文件名, sha256)。
+def expected_pyulog_wheel() -> str:
+    """从 web/lib/site-config.ts 读代码侧锁定的 wheel 文件名（单一事实来源）。
+
+    下载侧若按"PyPI 最新版"取，PyPI 一发新版，自托管目录里的文件名就与代码写死的
+    默认值对不上 → worker 请求 404 → 静默回退 PyPI（境内慢，自托管形同虚设）。
+    所以**只取代码锁定的版本**：以 site-config.ts 为准，找不到直接失败。
+    """
+    text = SITE_CONFIG.read_text(encoding="utf-8")
+    m = re.search(r"(pyulog-[0-9.]+-py3-none-any\.whl)", text)
+    if not m:
+        raise RuntimeError(
+            f"在 {SITE_CONFIG.relative_to(REPO_ROOT)} 里找不到 pyulog wheel 文件名——"
+            "代码侧的版本约定变了，请同步更新本脚本的解析规则"
+        )
+    return m.group(1)
+
+
+def fetch_pyulog_wheel(expected: str) -> tuple[bytes, str, str]:
+    """取 pyulog 的纯 Python wheel（**只取 expected 这一个版本**）。返回 (字节, 文件名, sha256)。
 
     优先 PyPI 官方 JSON API（字段齐全、带 sha256）；拿不到就回退阿里云 simple 索引。
     阿里云那条是实测唯一稳定的路径——PyPI 官方与 files.pythonhosted.org 从境内
     都会被 TLS 断连掐掉，清华镜像同样过不去。
     """
-    # 1) PyPI 官方 JSON API
+    # 1) PyPI 官方 JSON API：只认锁定版本，绝不静默换版本
     for src in (PYPI_JSON, PYPI_JSON_FALLBACK):
         try:
             info = json.loads(fetch(src).decode("utf-8"))
         except Exception as e:  # noqa: BLE001
             print(f"  …… {src} 失败：{type(e).__name__}", file=sys.stderr)
             continue
-        wheel = next((u for u in info["urls"] if u["filename"].endswith("-py3-none-any.whl")), None)
+        wheel = next((u for u in info["urls"] if u["filename"] == expected), None)
         if wheel:
             return fetch(wheel["url"]), wheel["filename"], wheel.get("digests", {}).get("sha256", "")
+        available = sorted({u["filename"] for u in info["urls"] if u["filename"].endswith("-py3-none-any.whl")})
+        print(f"  …… {src} 上没有 {expected}；现有：{available}", file=sys.stderr)
 
     # 2) 阿里云 simple 索引（PEP 503 HTML：<a href="...">文件名</a>，sha256 在 URL 的 #sha256= 里）
     print(f"  …… 回退 {ALIYUN_SIMPLE}", file=sys.stderr)
     html = fetch(ALIYUN_SIMPLE, timeout=60).decode("utf-8", "replace")
     hrefs = re.findall(r'href="([^"]+)"', html)
-    cands = [h for h in hrefs if h.endswith("-py3-none-any.whl")]
+    cands = [h for h in hrefs if h.split("#")[0].endswith("/" + expected) or h.split("#")[0].endswith(expected)]
     if not cands:
-        raise RuntimeError("阿里云索引里也没有 py3-none-any 的 wheel")
+        raise RuntimeError(f"阿里云索引里也没有锁定的 {expected}（代码侧已升级 pyulog？先更新 site-config.ts 再跑本脚本）")
 
-    def ver_of(href: str) -> tuple:
-        m = re.search(r"pyulog-([0-9.]+)-py3-none-any\.whl", href)
-        return tuple(int(x) for x in m.group(1).split(".")) if m else (0,)
-
-    href = max(cands, key=ver_of)
+    href = cands[0]
     filename = href.split("#")[0].split("/")[-1]
     want_sha = href.split("#sha256=")[-1] if "#sha256=" in href else ""
     url = urllib.parse.urljoin(ALIYUN_SIMPLE, href)
-    return fetch(url), filename, want_sha
+    data = fetch(url)
+    if filename != expected:  # 双保险：解析链路出了岔子时宁可失败也不落错版本的文件
+        raise RuntimeError(f"下载到的文件名 {filename} 与锁定的 {expected} 不一致")
+    return data, filename, want_sha
 
 
 def main(argv: list[str]) -> int:
@@ -196,12 +266,15 @@ def main(argv: list[str]) -> int:
 
     print(f"Pyodide {args.pyodide}  →  {index_dir.relative_to(REPO_ROOT)}")
 
-    # 先取 lock：它记录了各 wheel 的 sha256，是后面校验的依据
+    # 先取 lock：它记录了各 wheel 的 sha256，是后面校验的依据（lock 本身排在 CORE_FILES
+    # 第一位，先过双源交叉校验，wheel 校验的根基才成立）
     lock = json.loads(fetch_any("pyodide-lock.json", args.pyodide).decode("utf-8"))
     for name in CORE_FILES:
         rel = name
+        # wheel 走 lock 的官方 sha256；核心文件 lock 不覆盖，用双源交叉校验
         want = lock_sha(lock, rel) if name.endswith(".whl") else None
-        save(index_dir / name, fetch_any(rel, args.pyodide), want)
+        data = fetch_cross_checked(rel, args.pyodide) if want is None else fetch_any(rel, args.pyodide)
+        save(index_dir / name, data, want)
 
     for pkg in PACKAGES:
         meta = (lock.get("packages") or {}).get(pkg)
@@ -211,10 +284,11 @@ def main(argv: list[str]) -> int:
         fname = meta["file_name"]
         save(index_dir / fname, fetch_any(fname, args.pyodide), meta.get("sha256"))
 
-    # pyulog：取一个纯 Python wheel（py3-none-any），自托管后不再走索引查询
-    print("pyulog wheel（PyPI 官方 → 阿里云镜像）")
+    # pyulog：只取代码侧（site-config.ts）锁定的那个版本，自托管后不再走索引查询
+    print("pyulog wheel（PyPI 官方 → 阿里云镜像，仅锁定版本）")
     try:
-        data, fname, want_sha = fetch_pyulog_wheel()
+        expected = expected_pyulog_wheel()
+        data, fname, want_sha = fetch_pyulog_wheel(expected)
     except Exception as e:  # noqa: BLE001
         print(f"  !! pyulog 获取失败：{e}", file=sys.stderr)
         return 1

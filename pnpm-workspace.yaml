@@ -1,6 +1,26 @@
 packages:
     - "web"
+# 见 pnpmfile.cjs 头注：给 eslint 的 TS 解析链单独注入 typescript@6（tseslint 尚不支持 TS 7）
+pnpmfile: pnpmfile.cjs
 allowBuilds:
     "@parcel/watcher": true
     "@swc/core": true
     unrs-resolver: true
+
+# 项目主工具链用 typescript@7（tsc/typecheck），但 typescript-eslint 8.x 尚不支持 TS >=7
+# （官方 tracking: typescript-eslint#10940）。这里给 eslint 的 TS 解析链**单独**注入 TS 6：
+# 仅作用于 eslint 侧的静态解析，web 的构建与类型检查不受影响。tseslint 官方支持 TS 7 后
+# 这段即可整体删除。
+packageExtensions:
+    typescript-eslint:
+        dependencies:
+            typescript: ^6
+    "@typescript-eslint/parser":
+        dependencies:
+            typescript: ^6
+    "@typescript-eslint/eslint-plugin":
+        dependencies:
+            typescript: ^6
+    "@typescript-eslint/typescript-estree":
+        dependencies:
+            typescript: ^6

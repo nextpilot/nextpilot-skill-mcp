@@ -23,7 +23,7 @@ function siteEnv(): Record<string, string> {
             return "";
         }
     };
-    let version = "";
+    let version: string;
     try {
         version = String(JSON.parse(readFileSync("package.json", "utf8")).version ?? "");
     } catch {

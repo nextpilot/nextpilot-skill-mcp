@@ -306,7 +306,7 @@ export function speakableJsonLd(xpathSections: string[]): object {
         "@type": "WebPage",
         speakable: {
             "@type": "SpeakableSpecification",
-            xpath: xpathSections.map((p) => `/html/head/title`).slice(0, 3),
+            xpath: xpathSections.map(() => `/html/head/title`).slice(0, 3),
         },
     };
 }
