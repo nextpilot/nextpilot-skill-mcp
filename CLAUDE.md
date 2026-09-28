@@ -448,6 +448,30 @@ rewrite 的负向排除（`source: "/api/:path((?!auth/|skills/|ping(?:/|$)).*)"
 >
 > 判断某路径线上行为时，**先按 6.2.1 的响应头指纹确认执行层**，再谈「代码写得对不对」。
 
+### 6.2.4 首页静态化：三件事任缺其一，整棵路由树退回动态渲染
+
+线上首页曾慢到 **TTFB ~1.5s**（`/api/ping` 同量级，纯静态 CSS 也要 0.5~0.7s），且 `cache-control: no-store`、`eo-cache-status: Cache Miss`——每次请求都实时 SSR，CDN 一个字节都不缓存。根因不是「设置读得慢」（实测 setting 只占约 10%），而是**首页被迫走 SSR**。
+
+**判据**：`pnpm build` 后看路由表，`/[locale]` 必须是 `● /zh`、`● /en`（SSG）。只要出现 `ƒ (Dynamic)`，就是下面三件事之一被破坏了。
+
+| 必须满足                                     | 在哪                                        | 破坏后的表现                                                                                                                 |
+| -------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| 根 layout 用**静态** `export const metadata` | `web/app/layout.tsx`                        | 只要导出 `generateMetadata()`（异步），Next.js 把**整棵路由树**判为动态渲染（2026-09-27「后台站点设置」就是这么坏的）        |
+| 渲染路径**不读** `getSiteSettings()`         | `app/**` + `lib/seo.ts`                     | 读 KV = 读请求期状态，那一页（乃至整棵子树）退回动态渲染                                                                     |
+| **`setRequestLocale(locale)`**               | `app/[locale]/layout.tsx` **与** `page.tsx` | next-intl 默认从请求头取 locale。不登记 locale 就会读请求头 → 整棵 `[locale]` 子树动态化（构建照样过、页面照样开，静默退化） |
+
+> **代价（有意取舍）**：站点名 / 描述 / 域名 / 页脚文案改完需**重新部署**才生效——它们来自 `web/lib/site-config.ts`（环境变量 + 代码兜底），不再由 `/admin/settings` 即时改。换回来的是首页从「每次 SSR ~1.5s」变成「CDN 直出」。密钥类（SMTP 授权码等）仍走运行期 KV，因为它们只在**请求期**的 API 路由里用（`lib/mailer.ts`），不参与静态化判定。
+
+**`setRequestLocale` 的坑值得单独记一笔**：它是 next-intl 的静态化开关，与 `generateStaticParams` **成对出现**——前者给构建期 locale 列表，后者把「本次渲染的 locale」登记进去，少任何一个静态化都不成立。它属于**最有欺骗性**的一类回归：删掉它，`pnpm build` 一样成功、页面一样能打开、CI 一样全绿，只有路由表里 `● (SSG)` 悄悄变回 `ƒ (Dynamic)`。所以必须写成守卫（见 6.9 的 `check-site-settings` 规则 `settings-static-locale`，判据是**调用**而非名字出现——`import { setRequestLocale }` 那行本身就是代码，只看名字会漏掉「导入但没调用」）。
+
+配套守卫（`web/scripts/check-site-settings.mjs`，挂在 push 门禁上）共 9 条规则，其中三条守的是静态化：
+
+- `settings-static-metadata`：根 layout 必须是静态 `export const metadata`，**不得**有 `generateMetadata`（极性是反的——它保护的是「静态」而不是「可改」）
+- `settings-render-path`：`app/**`（页面 + sitemap/robots/manifest/opengraph-image 等元数据路由）与 `lib/seo.ts` **不得**读 `getSiteSettings()`；白名单 `ALLOWED_RUNTIME_READERS` 只列纯请求期接口
+- `settings-static-locale`：`[locale]` 的 layout 与 page 都必须**调用** `setRequestLocale(...)`
+
+**副作用（意外收获）**：修好这三件事后，整棵树都变静态了——不止首页，`/zh/guide`、`/zh/skills`、`/zh/mcp` 与全部详情页、`/zh/tools/*`、`/zh/me` 全部 `● (SSG)`。仍为 `ƒ (Dynamic)` 的都是**该动态**的：`analyze/[id]`（用户报告）、`login`（会话）、`mcp/[slug]/server.json`（route handler）、API 路由、`feed.xml` / `security.txt`。
+
 ### 6.3 数据模型（EdgeOne KV + Blob）
 
 当前按 "KV 存元数据、Blob 存大对象" 分工，实体字段保持与远期关系型表结构一致，便于迁移：

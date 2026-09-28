@@ -1,11 +1,9 @@
 import { SITE_URL } from "@/lib/site-config";
-import { getSiteSettings } from "@/lib/site-settings";
 
-export async function GET() {
+export function GET() {
     try {
-        // 后台改了域名，security.txt 的 Canonical 也该跟着改（它是"本文件的权威地址"）。
-        // getSiteSettings 失败（KV 没绑等）时回落到环境变量，绝不因为取不到设置就报错。
-        const canonicalBase = (await getSiteSettings().catch(() => null))?.siteUrl ?? SITE_URL;
+        // Canonical 是"本文件的权威地址"，域名取自构建期常量（`SITE_URL`）。
+        const canonicalBase = SITE_URL;
         const body = [
             `Contact: mailto:latercomer@qq.com`,
             `Expires: ${new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()}`,

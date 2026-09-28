@@ -4,7 +4,7 @@ import { makePageMeta, articleJsonLd, extractFaqItems, faqPageJsonLd } from "@/l
 import { GuideArticle } from "@/components/GuideArticle";
 import { getAllGuideDocs, getGuideDoc } from "@/lib/guide";
 import { JsonLd } from "@/components/JsonLd";
-import { getSiteSettings } from "@/lib/site-settings";
+import { SITE_URL } from "@/lib/site-config";
 
 export function generateStaticParams() {
     return getAllGuideDocs()
@@ -33,13 +33,13 @@ export default async function GuideDocPage({ params }: { params: Promise<{ slug:
     const { slug } = await params;
     const doc = getGuideDoc(slug);
     if (!doc) notFound();
-    const { siteUrl } = await getSiteSettings();
+    const siteUrl = SITE_URL;
 
     return (
         <>
             <GuideArticle doc={doc} />
             <JsonLd
-                data={await articleJsonLd({
+                data={articleJsonLd({
                     url: `${siteUrl}/guide/${slug}`,
                     title: `${doc.title} · 使用指南`,
                     description: doc.description,

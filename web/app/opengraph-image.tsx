@@ -1,5 +1,4 @@
 import { ImageResponse } from "next/og";
-import { getSiteSettings } from "@/lib/site-settings";
 import { SITE_URL } from "@/lib/site-config";
 
 export const runtime = "nodejs";
@@ -13,11 +12,9 @@ function hostOf(url: string): string {
     return url.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
 }
 
-export default async function Image() {
-    // 分享图底部那行域名原来写死成字面量：后台改了域名，图上的字还是旧地址。
-    // 取不到设置（KV 没绑）时回落到环境变量的域名，不因为一张图让整页失败。
-    const settings = await getSiteSettings().catch(() => null);
-    const host = hostOf(settings?.siteUrl || SITE_URL);
+export default function Image() {
+    // 分享图底部那行域名取自构建期常量（`SITE_URL`），换域名 = 重新部署。
+    const host = hostOf(SITE_URL);
 
     return new ImageResponse(
         <div

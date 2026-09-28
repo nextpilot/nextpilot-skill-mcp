@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { makePageMeta, softwareAppJsonLd } from "@/lib/seo";
-import { getSiteSettings } from "@/lib/site-settings";
+import { SITE_URL } from "@/lib/site-config";
 import { Eye, Sparkles, Zap } from "lucide-react";
 import { getAllSkills, getSkillBySlug, getSkillFiles } from "@/lib/skills";
 import { JsonLd } from "@/components/JsonLd";
@@ -40,7 +40,7 @@ export default async function SkillDetailPage({ params }: { params: Promise<{ sl
     const { slug } = await params;
     const skill = getSkillBySlug(slug);
     if (!skill) notFound();
-    const { siteUrl } = await getSiteSettings();
+    const siteUrl = SITE_URL;
 
     // 同类推荐（同分类下取前 4 个，排除自身）
     const related = getAllSkills()

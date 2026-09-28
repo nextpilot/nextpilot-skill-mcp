@@ -1,10 +1,10 @@
 import type { MetadataRoute } from "next";
-import { getSiteSettings } from "@/lib/site-settings";
+import { SITE_URL } from "@/lib/site-config";
 
-// host / sitemap 两行必须是**当前生效的域名**：后台改了域名而这里还写旧地址，
-// 搜索引擎会照着 robots 里的 sitemap 去爬一个不存在（或已换站）的地址。
-export default async function robots(): Promise<MetadataRoute.Robots> {
-    const { siteUrl } = await getSiteSettings();
+// host / sitemap 两行必须是**当前生效的域名**。域名是构建期常量（`SITE_URL`），
+// 换域名 = 改环境变量 + 重新部署，robots 与 sitemap 永远指向同一个地址。
+export default function robots(): MetadataRoute.Robots {
+    const siteUrl = SITE_URL;
     return {
         rules: {
             userAgent: "*",

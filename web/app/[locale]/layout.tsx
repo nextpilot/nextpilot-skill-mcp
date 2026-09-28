@@ -1,5 +1,5 @@
 import { NextIntlClientProvider } from "next-intl";
-import { getMessages } from "next-intl/server";
+import { getMessages, setRequestLocale } from "next-intl/server";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import { SessionProvider } from "@/components/SessionProvider";
 import { RuntimeCacheRegistrar } from "@/components/RuntimeCacheRegistrar";
@@ -7,7 +7,7 @@ import { IssueBridgeMount } from "@/components/IssueBridgeMount";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { routing } from "@/i18n/routing";
-import { getSiteSettings } from "@/lib/site-settings";
+import { FOOTER_COPYRIGHT, FOOTER_TAGLINE, REPO_URL, ICP_NUMBER } from "@/lib/site-config";
 
 export function generateStaticParams() {
     return routing.locales.map((locale) => ({ locale }));
@@ -24,9 +24,23 @@ export default async function LocaleLayout({
 }) {
     const { locale } = await params;
 
-    // 页脚文案是运行期可变的（后台 /admin/settings）。SiteFooter 是客户端组件，读不到
-    // KV，只能在这里取值后传下去。getSiteSettings 有 60 秒模块缓存，不会每个页面一次请求。
-    const [messages, settings] = await Promise.all([getMessages(), getSiteSettings()]);
+    // ⚠️ 这一行是**首页静态化的开关**，不是可选的样板。
+    //
+    // next-intl 默认从请求头（Accept-Language / x-middleware-* 等）取当前 locale；
+    // 只要读了请求头，这一整棵子树就被 Next.js 判为**动态渲染**，`getMessages()` 也一样。
+    // `setRequestLocale(locale)` 告诉 next-intl「locale 已知，别再读请求头」，页面即可
+    // 在构建期预渲染。删掉它 → `/[locale]` 立刻退回 `ƒ (Dynamic)`（2026-09-28 实测）。
+    //
+    // 必须与 `generateStaticParams` **成对出现**：前者提供构建期的 locale 列表，
+    // 这里把它登记为"本次渲染的 locale"。少任何一个静态化都不成立。
+    setRequestLocale(locale);
+
+    // 页脚四项直接取构建期常量（见 site-config.ts）。
+    //
+    // ⚠️ 这里**不能**再 await 运行期设置：那会经 `/internal/settings/get` 发起一次
+    // "自己请求自己"的网络往返（DNS + TLS + 边缘函数 + KV），全额计入每个页面的 TTFB，
+    // 且让整棵路由树无法静态化（2026-09-28 移除）。代价是页脚文案改完要重新部署。
+    const messages = await getMessages();
 
     return (
         <NextIntlClientProvider messages={messages} locale={locale}>
@@ -37,10 +51,10 @@ export default async function LocaleLayout({
                     <SiteHeader />
                     <main className="pb-20">{children}</main>
                     <SiteFooter
-                        footerCopyright={settings.footerCopyright}
-                        footerTagline={settings.footerTagline}
-                        sourceUrl={settings.sourceUrl}
-                        icp={settings.icp}
+                        footerCopyright={FOOTER_COPYRIGHT}
+                        footerTagline={FOOTER_TAGLINE}
+                        sourceUrl={REPO_URL}
+                        icp={ICP_NUMBER}
                     />
                 </SessionProvider>
             </LanguageProvider>

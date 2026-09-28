@@ -911,13 +911,46 @@ MUTATIONS: list[Mutation] = [
         note="改托管平台时顺手把链接贴回组件是最容易回潮的一种：代码看着完全正常，后台那条设置成了摆设",
     ),
     Mutation(
-        name="根 layout 的 metadata 退回静态常量（标题被烙进构建产物）",
+        name="根 layout 改回 generateMetadata（首页退回动态渲染、CDN 零缓存）",
         path="web/app/layout.tsx",
-        old="export async function generateMetadata(): Promise<Metadata> {",
-        new="export async function buildMetadata(): Promise<Metadata> {",
+        old="export const metadata: Metadata = {",
+        new=(
+            "export async function generateMetadata(): Promise<Metadata> {\n"
+            "    return metadata;\n"
+            "}\nexport const metadata: Metadata = {"
+        ),
         guard="site-settings",
-        expect="settings-metadata",
-        note="NEXT_PUBLIC_* 在构建期内联，退回 export const metadata 之后后台改名再也不生效",
+        expect="settings-static-metadata",
+        note="根 layout 一旦导出 generateMetadata（异步），Next.js 把整棵路由树判为动态渲染："
+        "首页失去静态化，TTFB 从几十毫秒退化到 ~1.5s 且 CDN 无从缓存。2026-09-27 就是这么坏的",
+    ),
+    Mutation(
+        name="渲染路径重新读运行期设置（那一页退回动态渲染）",
+        path="web/app/sitemap.ts",
+        old="export default function sitemap(): MetadataRoute.Sitemap {\n    const baseUrl = SITE_URL;",
+        new=("export default function sitemap(): MetadataRoute.Sitemap {\n    const baseUrl = getSiteSettings();"),
+        guard="site-settings",
+        expect="settings-render-path",
+        note="站点信息改为「环境变量 + 重新部署」后，任何渲染期读 KV 都会把那一页拽回动态渲染，"
+        "首页静态化前功尽弃。只有纯请求期 API 路由（白名单）才允许读",
+    ),
+    Mutation(
+        name="next-intl 忘登记 locale（整棵子树悄悄退回动态渲染）",
+        path="web/app/[locale]/layout.tsx",
+        old="    setRequestLocale(locale);",
+        new="    void locale;",
+        guard="site-settings",
+        expect="settings-static-locale",
+        note="构建照样成功、页面照样能开，只是 ● (SSG) 变回 ƒ (Dynamic)、CDN 零缓存。这种「静默退化」没有守卫就永远没人发现",
+    ),
+    Mutation(
+        name="首页忘了登记 locale（只剩 layout 登记，首页照样动态化）",
+        path="web/app/[locale]/page.tsx",
+        old="    setRequestLocale(locale);",
+        new="    void locale;",
+        guard="site-settings",
+        expect="settings-static-locale",
+        note="判据必须覆盖到 page.tsx：只查 layout 的话，「layout 有、page 漏」这种半边坏法会漏网",
     ),
     Mutation(
         name="密钥字段名进了客户端组件（明文被序列化进 SSR HTML）",

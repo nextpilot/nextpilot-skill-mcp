@@ -88,42 +88,42 @@ hook 必须自己探测带 ruff 的解释器，否则每次都红（第 12 节�
 
 ### 逐项明细
 
-| 类别     | 检查                                                   | 实测                                   | 现在挂在哪            | 目标位置                               |
-| -------- | ------------------------------------------------------ | -------------------------------------- | --------------------- | -------------------------------------- |
-| 格式化   | `ruff format --check`                                  | 2s                                     | 每次                  | push                                   |
-| 格式化   | `ruff format`（自动改，仅 staged .py）                 | 2s                                     | commit                | commit                                 |
-| 格式化   | `prettier --check`（前端）                             | **3.7s**                               | 无                    | push                                   |
-| 格式化   | `prettier --write`（仅 staged 前端）                   | 秒级                                   | 无                    | commit                                 |
-| lint     | `eslint --fix`（仅 staged 前端，已定）                 | 秒级                                   | 无                    | commit                                 |
-| lint     | `ruff check`                                           | 1s                                     | 每次                  | push                                   |
-| lint     | `eslint .`（**只覆盖 35 个 .js/.mjs，0 个 .ts/.tsx**） | 3s                                     | 每次                  | push                                   |
-| 类型     | `tsc --noEmit`                                         | 2s                                     | 每次                  | push（另加 dev 的 `--watch`）          |
-| 单测     | `pytest knowledge/engine/tests`（算子 / CEL 沙箱）     | 3s                                     | 每次                  | push                                   |
-| 契约     | `build:kb --check`（产物 vs `knowledge/` 源）          | 1s                                     | 静态（pre-push 跳过） | CI                                     |
-| 契约     | `check_engine_pyodide`（产物是合法 Python 且真执行）   | 1s                                     | 每次                  | push                                   |
-| 契约     | `check_engine_purity`（`knowledge/engine/` 纯净性）    | 1s                                     | 每次                  | push                                   |
-| 契约     | `check_pnpm_filter`（`pnpm --filter` 值命中真实项目）  | **0.5s**                               | 每次                  | push                                   |
-| 契约     | `guard_apm_parser_version`（`.bin` 解析逻辑 vs 版本）  | 秒级                                   | 每次                  | push                                   |
-| 契约     | `check-skill-spec`                                     | 1s                                     | 每次                  | CI                                     |
-| 契约     | `check-mcp-spec`                                       | 1s                                     | 每次                  | CI                                     |
-| 契约     | `check-guide-mdx`（guide 页 mdx 可编译）               | ~1s                                    | 每次                  | push                                   |
-| 契约     | `check-site-settings`（后台站点设置的机制还在）        | ~1s                                    | 每次                  | push                                   |
-| 守卫集   | `test-issue-filer`（前端守卫）                         | **约 45s**                             | 静态（pre-push 跳过） | CI                                     |
-| 元检查   | `check_hygiene`（校验机制自身卫生）                    | 4s                                     | 每次                  | push                                   |
-| 日志回归 | `compare_baseline`                                     | 3s                                     | 本地 push             | **本地**（`.ulg` 不入库，第 9 节）     |
-| 日志回归 | `guard_provider_contract`                              | 3s                                     | 本地 push             | **本地**（同上）                       |
-| 日志回归 | `run_engine --probe-data`                              | 3s                                     | 本地 push             | **本地**（同上）                       |
-| 日志回归 | `check_rules_fields --strict`                          | 2s                                     | 本地 push             | **本地**（同上）                       |
-| 构建     | `build-knowledge`                                      | —                                      | dev / build           | dev / build                            |
-| 构建     | `next build`                                           | **144s**                               | CI（`--stage build`） | CI                                     |
-| 自证     | `mutate_guards`（74 条变异）                           | **约 26min**                           | 无人跑                | CI 独立 job                            |
-| 冒烟     | `playwright --grep @smoke`                             | 分钟级                                 | 原在 pre-push         | CI（**标记重整见第 10 节**）           |
-| E2E      | `playwright --grep 日志分析流程`（11 条）              | 约 5~7min                              | 无人跑                | CI（`playwright-analyze`，第 10.6 节） |
-| E2E      | `playwright.live.config.ts`（打线上）                  | —                                      | deploy 后             | deploy 后                              |
-| 机密     | `check_secrets`（复用 `SCRUB_RULES`）                  | **1.9s**（306 个跟踪文件，零命中）     | 无                    | push                                   |
-| 审计     | `pnpm audit`（**须带 `--registry` 官方源**）           | **6s**（实测，命令走 `{PNPM}` 占位符） | 无                    | CI                                     |
-| 审计     | `pip-audit`                                            | 秒级                                   | 无                    | CI                                     |
-| 提交规范 | `.githooks/commit-msg`                                 | < 1s                                   | 无                    | commit                                 |
+| 类别     | 检查                                                       | 实测                                   | 现在挂在哪            | 目标位置                               |
+| -------- | ---------------------------------------------------------- | -------------------------------------- | --------------------- | -------------------------------------- |
+| 格式化   | `ruff format --check`                                      | 2s                                     | 每次                  | push                                   |
+| 格式化   | `ruff format`（自动改，仅 staged .py）                     | 2s                                     | commit                | commit                                 |
+| 格式化   | `prettier --check`（前端）                                 | **3.7s**                               | 无                    | push                                   |
+| 格式化   | `prettier --write`（仅 staged 前端）                       | 秒级                                   | 无                    | commit                                 |
+| lint     | `eslint --fix`（仅 staged 前端，已定）                     | 秒级                                   | 无                    | commit                                 |
+| lint     | `ruff check`                                               | 1s                                     | 每次                  | push                                   |
+| lint     | `eslint .`（**只覆盖 35 个 .js/.mjs，0 个 .ts/.tsx**）     | 3s                                     | 每次                  | push                                   |
+| 类型     | `tsc --noEmit`                                             | 2s                                     | 每次                  | push（另加 dev 的 `--watch`）          |
+| 单测     | `pytest knowledge/engine/tests`（算子 / CEL 沙箱）         | 3s                                     | 每次                  | push                                   |
+| 契约     | `build:kb --check`（产物 vs `knowledge/` 源）              | 1s                                     | 静态（pre-push 跳过） | CI                                     |
+| 契约     | `check_engine_pyodide`（产物是合法 Python 且真执行）       | 1s                                     | 每次                  | push                                   |
+| 契约     | `check_engine_purity`（`knowledge/engine/` 纯净性）        | 1s                                     | 每次                  | push                                   |
+| 契约     | `check_pnpm_filter`（`pnpm --filter` 值命中真实项目）      | **0.5s**                               | 每次                  | push                                   |
+| 契约     | `guard_apm_parser_version`（`.bin` 解析逻辑 vs 版本）      | 秒级                                   | 每次                  | push                                   |
+| 契约     | `check-skill-spec`                                         | 1s                                     | 每次                  | CI                                     |
+| 契约     | `check-mcp-spec`                                           | 1s                                     | 每次                  | CI                                     |
+| 契约     | `check-guide-mdx`（guide 页 mdx 可编译）                   | ~1s                                    | 每次                  | push                                   |
+| 契约     | `check-site-settings`（后台站点设置机制 + 首页静态化还在） | ~1s                                    | 每次                  | push                                   |
+| 守卫集   | `test-issue-filer`（前端守卫）                             | **约 45s**                             | 静态（pre-push 跳过） | CI                                     |
+| 元检查   | `check_hygiene`（校验机制自身卫生）                        | 4s                                     | 每次                  | push                                   |
+| 日志回归 | `compare_baseline`                                         | 3s                                     | 本地 push             | **本地**（`.ulg` 不入库，第 9 节）     |
+| 日志回归 | `guard_provider_contract`                                  | 3s                                     | 本地 push             | **本地**（同上）                       |
+| 日志回归 | `run_engine --probe-data`                                  | 3s                                     | 本地 push             | **本地**（同上）                       |
+| 日志回归 | `check_rules_fields --strict`                              | 2s                                     | 本地 push             | **本地**（同上）                       |
+| 构建     | `build-knowledge`                                          | —                                      | dev / build           | dev / build                            |
+| 构建     | `next build`                                               | **144s**                               | CI（`--stage build`） | CI                                     |
+| 自证     | `mutate_guards`（74 条变异）                               | **约 26min**                           | 无人跑                | CI 独立 job                            |
+| 冒烟     | `playwright --grep @smoke`                                 | 分钟级                                 | 原在 pre-push         | CI（**标记重整见第 10 节**）           |
+| E2E      | `playwright --grep 日志分析流程`（11 条）                  | 约 5~7min                              | 无人跑                | CI（`playwright-analyze`，第 10.6 节） |
+| E2E      | `playwright.live.config.ts`（打线上）                      | —                                      | deploy 后             | deploy 后                              |
+| 机密     | `check_secrets`（复用 `SCRUB_RULES`）                      | **1.9s**（306 个跟踪文件，零命中）     | 无                    | push                                   |
+| 审计     | `pnpm audit`（**须带 `--registry` 官方源**）               | **6s**（实测，命令走 `{PNPM}` 占位符） | 无                    | CI                                     |
+| 审计     | `pip-audit`                                                | 秒级                                   | 无                    | CI                                     |
+| 提交规范 | `.githooks/commit-msg`                                     | < 1s                                   | 无                    | commit                                 |
 
 **`{PNPM}` 是新增占位符，不是笔误**：pnpm 是**全局工具**，`web/node_modules/` 下没有它。
 清单里原先写 `{NODE} node_modules/pnpm/bin/pnpm.cjs` —— **那条路径不存在**，

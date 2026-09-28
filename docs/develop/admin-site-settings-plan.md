@@ -4,6 +4,19 @@
 > 提出：2026-09-26，用户原话"能否增加一个后台配置网站，标题，域名，各种 key 等"。
 > 本版更新：2026-09-27，吸收三项拍板 + 命名改 settings + 当天代码现状复核。
 > v1（2026-09-26 版）与当前代码的差异集中在第 7 节，别照 v1 的说法去找代码。
+>
+> ⚠️ **2026-09-28 重大反转（读本文前先看这段）**：实测发现「站点信息走运行期 KV」
+> 这个设计的代价是**首页 TTFB ~1.5s**——根 layout 一旦导出 `generateMetadata` 读 KV，
+> Next.js 把整棵路由树判为动态渲染，CDN 零缓存。已改为：
+>
+> - **站点信息 8 项**（标题/短名/描述/域名/页脚四项）→ 退回 `web/lib/site-config.ts`
+>   构建期常量，改完**重新部署**生效，不再由 `/admin/settings` 即时改。
+> - **密钥 3 项**（SMTP 等）→ 仍走运行期 KV。它们只在**请求期** API 路由里用
+>   （`lib/mailer.ts` 读 SMTP 授权码），不参与静态化判定，保留「改完即生效」的价值。
+> - 守卫从 6 条扩到 9 条（见「步骤 5」），三条新增的守的是**静态化**。
+>
+> 因此本文中「站点信息可后台即时改」的段落均为**历史设计**，实现已按上述口径调整。
+> 静态化的完整说明见 CLAUDE.md **6.2.4**。
 
 ---
 
@@ -187,24 +200,40 @@ export const SITE_SETTINGS_FIELDS = [
 ### 步骤 5：守卫（`web/scripts/check-site-settings.mjs`）
 
 这套机制的坏法有一个共同点：**构建照过、页面照开，只有管理员改了没反应**。没有一条会
-抛异常，所以只能静态拦。六条规则：
+抛异常，所以只能静态拦。九条规则：
 
-| 规则 id                  | 拦什么                                                            |
-| ------------------------ | ----------------------------------------------------------------- |
-| `settings-schema`        | 两侧字段表（Node / 边缘）key 与 kind 不一致 → 存进去了读不出来    |
-| `settings-footer-props`  | 页脚四项不再由 props 传入 → 后台改了页脚不变                      |
-| `settings-footer-url`    | 页脚把仓库地址写回组件 → 后台改链接不生效                         |
-| `settings-metadata`      | 根 layout 退回 `export const metadata` → 标题烙进构建产物         |
-| `settings-secret-client` | 密钥字段名进了客户端组件 → 明文被序列化进 SSR 的 HTML             |
-| `settings-secret-wiring` | 某个密钥没有任何消费点在读它 → 管理员以为轮换过了，实际还在用旧的 |
-| `settings-wiring`        | 这道门自己被从 `checklist.yml` 摘掉                               |
+| 规则 id                    | 拦什么                                                            |
+| -------------------------- | ----------------------------------------------------------------- |
+| `settings-schema`          | 两侧字段表（Node / 边缘）key 与 kind 不一致 → 存进去了读不出来    |
+| `settings-footer-props`    | 页脚四项不再由 props 传入 → 后台改了页脚不变                      |
+| `settings-footer-url`      | 页脚把仓库地址写回组件 → 后台改链接不生效                         |
+| `settings-static-metadata` | 根 layout 用了 `generateMetadata` → **首页退回动态渲染**          |
+| `settings-render-path`     | 渲染路径读了 `getSiteSettings()` → 那一页退回动态渲染             |
+| `settings-static-locale`   | `[locale]` 忘调 `setRequestLocale(...)` → 整棵子树动态化          |
+| `settings-secret-client`   | 密钥字段名进了客户端组件 → 明文被序列化进 SSR 的 HTML             |
+| `settings-secret-wiring`   | 某个密钥没有任何消费点在读它 → 管理员以为轮换过了，实际还在用旧的 |
+| `settings-wiring`          | 这道门自己被从 `checklist.yml` 摘掉                               |
 
-变异自证 7/7 各自变红（`mutate_guards.py --guard site-settings`）。
+变异自证 10/10 各自变红（`mutate_guards.py --guard site-settings`）。
 
-**自证逼出来的一处判据修改**：`settings-secret-wiring` 原来用子串匹配，于是消费点把 key
-改名成 `deepseekApiKeyV2`（字段表没跟着改）时，**恰恰是最典型的坏法**却仍然算"有人在读"。
-改成整词匹配（`\bkey\b`）才抓得到。第一版变异写成 `deepseekApiKeyRenamed` 也是同一个坑——
-它含原串，变异没生效，看着像"守卫恒绿"，其实是变异等价。
+> **2026-09-28 极性反转**：`settings-metadata` 这条规则的原语义是「根 layout **必须**用
+> `generateMetadata` 读运行期设置」（为了「后台改名即时生效」）。实测发现这正是首页
+> TTFB ~1.5s 的根因——根 layout 一旦导出 `generateMetadata`，Next.js 把**整棵路由树**
+> 判为动态渲染。于是站点信息改为「环境变量 + 重新部署」，规则**极性反转**为
+> `settings-static-metadata`（必须静态、不得有 `generateMetadata`），并新增
+> `settings-render-path` 与 `settings-static-locale` 两条守静态化的规则。
+> 详见 CLAUDE.md 6.2.4。
+
+**自证逼出来的两处判据修改**：
+
+1. `settings-secret-wiring` 原来用子串匹配，于是消费点把 key 改名成 `deepseekApiKeyV2`
+   （字段表没跟着改）时，**恰恰是最典型的坏法**却仍然算"有人在读"。改成整词匹配
+   （`\bkey\b`）才抓得到。第一版变异写成 `deepseekApiKeyRenamed` 也是同一个坑——
+   它含原串，变异没生效，看着像"守卫恒绿"，其实是变异等价。
+2. `settings-static-locale` 最初匹配**名字出现**即可，结果 `import { setRequestLocale }`
+   这一行（真实代码）就足以判绿，「删掉调用却留着 import」这种最像样的坏法漏网。
+   改成匹配**调用** `setRequestLocale\s*\(` 才抓得到——变异自证当场把这个漏洞顶了出来
+   （报 `guard always-green`）。
 
 ---
 

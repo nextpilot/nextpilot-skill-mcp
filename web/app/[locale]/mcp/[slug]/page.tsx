@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { makePageMeta, softwareAppJsonLd } from "@/lib/seo";
-import { getSiteSettings } from "@/lib/site-settings";
+import { SITE_URL } from "@/lib/site-config";
 import { GuideBody } from "@/components/GuideBody";
 import { Eye, Sparkles, Zap } from "lucide-react";
 import { getAllMcpServers, getMcpServerBySlug } from "@/lib/mcp";
@@ -40,7 +40,7 @@ export default async function McpDetailPage({ params }: { params: Promise<{ slug
     const { slug } = await params;
     const server = getMcpServerBySlug(slug);
     if (!server) notFound();
-    const { siteUrl } = await getSiteSettings();
+    const siteUrl = SITE_URL;
 
     // 复制给 AI 客户端的完整配置说明
     const copyText = `# ${server.name}\n\n${server.description}\n\n## 工具\n${server.tools

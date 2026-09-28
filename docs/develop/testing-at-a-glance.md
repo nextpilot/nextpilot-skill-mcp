@@ -87,27 +87,27 @@
 清单定义在 `tools/ci/checklist.yml`（**单一事实源，改检查只改这里**），`check_all.py --list-stages` 可打印全貌。
 下表列出的是主要项。
 
-| #   | 文件                                          | 是什么         | 干什么                                                                                                                     | 耗时 |
-| --- | --------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------- | ---- |
-| 1   | `tools/common/check_secrets.py`               | 密钥扫描       | 有没有把密钥提交进去。**扫全部 313 个跟踪文件**（含 `.md`）                                                                | 1.3s |
-| 2   | `ruff format --check`                         | Python 格式化  | 风格统一吗（**只认 `.py`**）                                                                                               | 2s   |
-| 3   | `ruff check`                                  | Python lint    | 有没有可疑写法                                                                                                             | 1s   |
-| 4   | `knowledge/engine/tests/`                     | 单元测试       | 算子与 CEL 表达式**求值对不对**                                                                                            | 1.2s |
-| 5   | `tools/engine/check_engine_pyodide.py`        | 产物校验       | 生成的产物是合法可执行的 Python 吗；轨迹取不到时给没给逐条原因                                                             | 1s   |
-| 6   | `tools/engine/check_engine_purity.py`         | 纯净性守卫     | `knowledge/engine/` 还是纯 Python 吗（浏览器与本机共用同一份的前提）                                                       | 0.6s |
-| 7   | `tools/common/check_pnpm_filter.py`           | 转发脚本守卫   | 每个 `pnpm --filter` 都命中真实项目吗（匹配不到时 pnpm 静默成功）                                                          | 0.5s |
-| 8   | `tsc --noEmit`                                | 类型检查       | TypeScript 类型对得上吗                                                                                                    | 2s   |
-| 9   | `prettier --check`                            | 前端格式化     | 前端风格统一吗                                                                                                             | 3.7s |
-| 10  | `eslint`                                      | JS lint        | JS 有没有可疑写法（**只认 `.js`/`.mjs`，不含 `.ts`**）                                                                     | 3s   |
-| 11  | `tools/common/check_hygiene.py`               | 元检查         | **校验机制自己**还健康吗（悬空引用、静默失败、守卫恒真）                                                                   | 4.2s |
-| 12  | `tools/engine/compare_baseline.py`            | 基线比对       | 改规则后结论还准吗（6 份日志逐字段比对）                                                                                   | 3s   |
-| 13  | `tools/engine/guard_provider_contract.py`     | 适配器契约     | 数据适配层契约还成立吗（逐份日志跑同一套断言）                                                                             | 3s   |
-| 14  | `tools/engine/run_engine.py --probe-data`     | 数据层自检     | 数据层结构自洽吗                                                                                                           | 3s   |
-| 15  | `tools/engine/check_rules_fields.py --strict` | 字段引用 lint  | 规则里引用的**字段名真实存在**吗                                                                                           | 2s   |
-| 16  | `tools/engine/guard_apm_parser_version.py`    | 解析器版本     | `.bin` 解析逻辑变了升 `parserVersion` 了吗（自研解析器没有上游版本号替它变）                                               | 0.5s |
-| 17  | `tools/engine/guard_engine_names.py`          | 拼接命名守卫   | `knowledge/engine/` 的片段拼进同一命名空间后，有没有顶层名字被后来者静默覆盖                                               | 0.4s |
-| 18  | `web/scripts/check-guide-mdx.mjs`             | MDX 可编译守卫 | `content/guide/` 的每份 `.mdx` 都能过 @mdx-js/mdx 编译吗（正文是**请求期**才编译的，此前没人管；自带反例自检）             | ~1s  |
-| 19  | `web/scripts/check-site-settings.mjs`         | 站点设置守卫   | 后台改站点信息/密钥这套机制还在吗（两侧字段表一致、页脚走 props、metadata 读运行期设置、密钥名不进客户端组件、密钥有人读） | ~1s  |
+| #   | 文件                                          | 是什么         | 干什么                                                                                                                                                                                                   | 耗时 |
+| --- | --------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| 1   | `tools/common/check_secrets.py`               | 密钥扫描       | 有没有把密钥提交进去。**扫全部 313 个跟踪文件**（含 `.md`）                                                                                                                                              | 1.3s |
+| 2   | `ruff format --check`                         | Python 格式化  | 风格统一吗（**只认 `.py`**）                                                                                                                                                                             | 2s   |
+| 3   | `ruff check`                                  | Python lint    | 有没有可疑写法                                                                                                                                                                                           | 1s   |
+| 4   | `knowledge/engine/tests/`                     | 单元测试       | 算子与 CEL 表达式**求值对不对**                                                                                                                                                                          | 1.2s |
+| 5   | `tools/engine/check_engine_pyodide.py`        | 产物校验       | 生成的产物是合法可执行的 Python 吗；轨迹取不到时给没给逐条原因                                                                                                                                           | 1s   |
+| 6   | `tools/engine/check_engine_purity.py`         | 纯净性守卫     | `knowledge/engine/` 还是纯 Python 吗（浏览器与本机共用同一份的前提）                                                                                                                                     | 0.6s |
+| 7   | `tools/common/check_pnpm_filter.py`           | 转发脚本守卫   | 每个 `pnpm --filter` 都命中真实项目吗（匹配不到时 pnpm 静默成功）                                                                                                                                        | 0.5s |
+| 8   | `tsc --noEmit`                                | 类型检查       | TypeScript 类型对得上吗                                                                                                                                                                                  | 2s   |
+| 9   | `prettier --check`                            | 前端格式化     | 前端风格统一吗                                                                                                                                                                                           | 3.7s |
+| 10  | `eslint`                                      | JS lint        | JS 有没有可疑写法（**只认 `.js`/`.mjs`，不含 `.ts`**）                                                                                                                                                   | 3s   |
+| 11  | `tools/common/check_hygiene.py`               | 元检查         | **校验机制自己**还健康吗（悬空引用、静默失败、守卫恒真）                                                                                                                                                 | 4.2s |
+| 12  | `tools/engine/compare_baseline.py`            | 基线比对       | 改规则后结论还准吗（6 份日志逐字段比对）                                                                                                                                                                 | 3s   |
+| 13  | `tools/engine/guard_provider_contract.py`     | 适配器契约     | 数据适配层契约还成立吗（逐份日志跑同一套断言）                                                                                                                                                           | 3s   |
+| 14  | `tools/engine/run_engine.py --probe-data`     | 数据层自检     | 数据层结构自洽吗                                                                                                                                                                                         | 3s   |
+| 15  | `tools/engine/check_rules_fields.py --strict` | 字段引用 lint  | 规则里引用的**字段名真实存在**吗                                                                                                                                                                         | 2s   |
+| 16  | `tools/engine/guard_apm_parser_version.py`    | 解析器版本     | `.bin` 解析逻辑变了升 `parserVersion` 了吗（自研解析器没有上游版本号替它变）                                                                                                                             | 0.5s |
+| 17  | `tools/engine/guard_engine_names.py`          | 拼接命名守卫   | `knowledge/engine/` 的片段拼进同一命名空间后，有没有顶层名字被后来者静默覆盖                                                                                                                             | 0.4s |
+| 18  | `web/scripts/check-guide-mdx.mjs`             | MDX 可编译守卫 | `content/guide/` 的每份 `.mdx` 都能过 @mdx-js/mdx 编译吗（正文是**请求期**才编译的，此前没人管；自带反例自检）                                                                                           | ~1s  |
+| 19  | `web/scripts/check-site-settings.mjs`         | 站点设置守卫   | 后台改站点信息/密钥这套机制还在吗 + 首页静态化没被破坏（两侧字段表一致、页脚走 props、根 metadata 是静态、渲染路径不读运行期设置、`[locale]` 调了 `setRequestLocale`、密钥名不进客户端组件、密钥有人读） | ~1s  |
 
 **⚠ 第 12~15 项只在你的开发机跑。** 它们要真实 `.ulg` 日志，而原始日志含 GPS 轨迹、
 **不入仓库**——云端 checkout 里没有，所以这四项在 CI 上必然跳过。

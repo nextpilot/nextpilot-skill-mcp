@@ -10,9 +10,21 @@
  * - `settings-footer-props`：页脚四项（版权行 / 品牌介绍 / 源码链接 / 备案号）必须 props 传入。
  *   `SiteFooter` 是客户端组件，读不到 KV；一旦有人把值写回组件里（或 import `site-config`
  *   自己取），后台改完页脚永远不变，而代码看着完全正常。
- * - `settings-metadata`：根 layout 必须用 `generateMetadata()` 读运行期设置。退回
- *   `export const metadata` 的话站点标题/描述就烙死在构建产物里（`NEXT_PUBLIC_*` 也是同理），
- *   后台改名再也不生效——构建照样过，只是改不动。
+ * - `settings-static-metadata`：根 layout 的 metadata **必须是静态常量**
+ *   （`export const metadata`），且**不得**导出 `generateMetadata()`。
+ *   这是首页速度的命门：只要根 layout 导出 `generateMetadata`（异步），Next.js 会把
+ *   整棵路由树判为动态渲染，首页无法静态化、CDN 零缓存、每次请求实时 SSR。
+ *   2026-09-27 的「后台站点设置」正是踩了这个坑（首页 TTFB 从 ~0.05s 退化到 ~1.5s），
+ *   2026-09-28 改回静态后恢复。**本规则的极性是反的**：它保护的是「静态」，不是「可改」。
+ * - `settings-render-path`：渲染路径（`app/**` 的页面/元数据路由 + `lib/seo.ts`）一律
+ *   **不得**读 `getSiteSettings()`。站点名/域名/描述现在来自构建期常量（环境变量 +
+ *   重新部署），任何渲染期读 KV 都会把那一页拽回动态渲染，首页静态化前功尽弃。
+ *   运行期仍可读的只有**纯请求期**的 API 路由（如 `api/auth/otp/request` → `lib/mailer.ts`
+ *   读 SMTP 授权码），`ALLOWED_RUNTIME_READERS` 里列明。
+ * - `settings-static-locale`：`app/[locale]/layout.tsx` 与 `page.tsx` 都必须调
+ *   `setRequestLocale(locale)`。next-intl 默认从请求头取 locale，不登记就整棵子树动态化。
+ *   这个回归**构建照样过、页面照样开**，只是 `● (SSG)` 悄悄变回 `ƒ (Dynamic)`——
+ *   不写成守卫就没人察觉得到。
  * - `settings-secret-client`：密钥字段名不得出现在任何客户端组件里。字段名进了客户端组件，
  *   意味着那份明文正被序列化进 SSR 的 HTML（查看源代码即可拿走）。
  * - `settings-secret-wiring`：三个密钥各自必须至少有一个消费点在读它。后台存了却没人读 =
@@ -46,6 +58,14 @@ const SECRET_KEYS = ["deepseekApiKey", "smtpPass", "issueToken"];
 
 /** 只声明字段、不算「消费」的文件：把密钥存进 KV 不等于有人读它 */
 const DECLARATION_ONLY = ["lib/site-settings.ts", "functions/_lib/settings-schema.js", "functions/_lib/secrets.js"];
+
+/**
+ * 允许在**运行期**读 `getSiteSettings()` 的文件（渲染路径之外的白名单）。
+ *
+ * 只有纯请求期的接口才配出现在这里：它们不进静态化判定，读 KV 不产生副作用。
+ * 渲染路径（`app/**` 里的页面与元数据路由）一律不许读——那是首页静态化的命门。
+ */
+const ALLOWED_RUNTIME_READERS = ["lib/mailer.ts"];
 
 let failures = 0;
 
@@ -90,6 +110,17 @@ const rel = (p) => p.slice(webRoot.length + 1).replace(/\\/g, "/");
  */
 function mentions(src, key) {
     return new RegExp(`\\b${key}\\b`).test(src);
+}
+
+/**
+ * 去掉注释后再判「有没有真的读运行期设置」。
+ *
+ * 注释里出现 `getSiteSettings()` 是在**说明历史**（"曾经这里是 async + await …"），
+ * 不是真的在读 KV。守卫只认代码，所以先把块注释与行注释摘掉——否则任何一段解释性的
+ * 头注都会把规则判红，守卫就变成了「不许在注释里提这个名字」的荒谬规定。
+ */
+function stripComments(src) {
+    return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 }
 
 /**
@@ -192,17 +223,61 @@ function parseFields(src, label) {
     }
 }
 
-// ---- 3. 根 layout 的 metadata 走运行期设置 ----
+// ---- 3. 根 layout 的 metadata 必须是静态常量（首页静态化的命门） ----
 {
     const src = read(ROOT_LAYOUT);
-    if (/export\s+const\s+metadata\b/.test(src)) {
-        fail("settings-metadata", "app/layout.tsx 用了 export const metadata：标题与描述被烙进构建产物，后台改不动");
-    } else if (!src.includes("generateMetadata")) {
-        fail("settings-metadata", "app/layout.tsx 没有 generateMetadata，读不到运行期设置");
-    } else if (!src.includes("getSiteSettings")) {
-        fail("settings-metadata", "app/layout.tsx 的 generateMetadata 没有读 getSiteSettings()");
+    if (/export\s+(async\s+)?function\s+generateMetadata\b/.test(src)) {
+        fail(
+            "settings-static-metadata",
+            "app/layout.tsx 导出了 generateMetadata：整棵路由树被判为动态渲染，首页无法静态化、CDN 零缓存",
+        );
+    } else if (!/export\s+const\s+metadata\b/.test(src)) {
+        fail("settings-static-metadata", "app/layout.tsx 没有 export const metadata（静态根元数据缺失）");
+    } else if (/\bawait\b/.test(stripComments(src))) {
+        // 静态 const 里出现 await 说明它其实是个动态取值，静态化又会失效
+        fail("settings-static-metadata", "app/layout.tsx 的 metadata 里出现 await，静态导出名不副实");
     } else {
-        ok("settings-metadata", "根 layout 的 metadata 走 generateMetadata + getSiteSettings");
+        ok("settings-static-metadata", "根 layout 用静态 const metadata（首页可静态化）");
+    }
+}
+
+// ---- 3b. 渲染路径不得读运行期设置（任何一处都会把那一页拽回动态渲染） ----
+{
+    // 渲染路径 = app/** 全部（页面 + sitemap/robots/manifest/opengraph-image 等元数据路由）
+    // + lib/seo.ts（元数据工厂）。它们都被 Next.js 纳入静态化判定。
+    const renderPath = [...walk(join(webRoot, "app")), join(webRoot, "lib", "seo.ts")].filter(
+        (p) => !ALLOWED_RUNTIME_READERS.includes(rel(p)),
+    );
+    const hits = renderPath.filter((p) => mentions(stripComments(read(p)), "getSiteSettings")).map(rel);
+    if (hits.length > 0) {
+        fail(
+            "settings-render-path",
+            `渲染路径读了 getSiteSettings（会退回动态渲染，首页静态化失效）：${hits.join(",")}`,
+        );
+    } else {
+        ok("settings-render-path", `渲染路径（${renderPath.length} 个文件）没有读运行期设置`);
+    }
+}
+
+// ---- 3c. next-intl 静态化开关：setRequestLocale 必须与 generateStaticParams 成对 ----
+// next-intl 默认从请求头取 locale；不登记 locale 就会读请求头 → 整棵子树退回动态渲染。
+// 这个回归**构建照样成功**、页面照样能打开，只是 `○/●` 悄悄变回 `ƒ`，CI 里没人看得出来。
+//
+// 判据必须是**调用**（`setRequestLocale(...)`），不能只看名字出现：`import { … setRequestLocale }`
+// 这一行本身就是代码，只匹配名字的话「导入但没调用」也会被判绿——那正是最像样的坏法
+// （删掉调用却忘了删 import，TypeScript 也不报错，因为 import 仍被"使用"的假象不会触发 noUnusedLocals）。
+{
+    const localeRoot = join(webRoot, "app", "[locale]");
+    const targets = [join(localeRoot, "layout.tsx"), join(localeRoot, "page.tsx")];
+    const hasCall = (src) => /(^|[^.\w])setRequestLocale\s*\(/.test(stripComments(src));
+    const missing = targets.filter((p) => !hasCall(read(p))).map(rel);
+    if (missing.length > 0) {
+        fail(
+            "settings-static-locale",
+            `next-intl 未登记 locale（缺 setRequestLocale(...) 调用，页面会退回动态渲染）：${missing.join(",")}`,
+        );
+    } else {
+        ok("settings-static-locale", "[locale] 的 layout 与 page 都调用了 setRequestLocale");
     }
 }
 

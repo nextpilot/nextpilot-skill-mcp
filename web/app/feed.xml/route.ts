@@ -1,14 +1,15 @@
 import { getAllSkills } from "@/lib/skills";
 import { getAllMcpServers } from "@/lib/mcp";
 import { getAllGuideDocs } from "@/lib/guide";
-import { getSiteSettings } from "@/lib/site-settings";
+import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site-config";
 
 export const runtime = "nodejs";
 
-export async function GET() {
-    // RSS 的 <link> 与 <guid> 是订阅者点开的地址，域名必须跟后台走（改了域名还发旧地址，
-    // 订阅器会一直跳到一个已经不是本站的域名上）。
-    const { siteUrl, siteName, siteDescription } = await getSiteSettings();
+export function GET() {
+    // RSS 的 <link> 与 <guid> 是订阅者点开的地址，域名取自构建期常量（`SITE_URL`）。
+    const siteUrl = SITE_URL;
+    const siteName = SITE_NAME;
+    const siteDescription = SITE_DESCRIPTION;
     const items: string[] = [];
 
     const skills = getAllSkills();

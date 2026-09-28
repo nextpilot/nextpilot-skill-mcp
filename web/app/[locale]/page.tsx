@@ -21,6 +21,7 @@ import { LocalizedText } from "@/components/LocalizedText";
 import { HeroIllustration } from "@/components/HeroIllustration";
 import { JsonLd } from "@/components/JsonLd";
 import { siteJsonLd } from "@/lib/seo";
+import { setRequestLocale } from "next-intl/server";
 
 const CHECKS: { name: string; en: string; field: string }[] = [
     { name: "振动与 IMU 削波", en: "Vibration & clipping", field: "vehicle_imu_status.accel_vibration_metric" },
@@ -88,7 +89,12 @@ const CATEGORY_ACCENT: Record<string, string> = {
     toolchain: "border-t-primary/30 shadow-[0_-3px_12px_-3px_rgba(24,121,78,0.04)]",
 };
 
-export default async function HomePage() {
+export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
+    // 首页静态化的必要条件（与 [locale]/layout.tsx 同理，见那边的长注释）：
+    // 不登记 locale，next-intl 就会去读请求头，这一页立刻退回 `ƒ (Dynamic)`。
+    const { locale } = await params;
+    setRequestLocale(locale);
+
     const skills = getSkillIndex();
     const mcps = getMcpIndex();
     const featured = skills.filter((s) => s.featured).slice(0, 6);
@@ -458,7 +464,7 @@ export default async function HomePage() {
                     </div>
                 </div>
             </section>
-            <JsonLd data={await siteJsonLd()} />
+            <JsonLd data={siteJsonLd()} />
         </div>
     );
 }

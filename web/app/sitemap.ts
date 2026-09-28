@@ -2,12 +2,12 @@ import type { MetadataRoute } from "next";
 import { getAllSkills } from "@/lib/skills";
 import { getAllMcpServers } from "@/lib/mcp";
 import { getAllGuideDocs } from "@/lib/guide";
-import { getSiteSettings } from "@/lib/site-settings";
+import { SITE_URL } from "@/lib/site-config";
 
-// sitemap 里的每条 URL 都是给搜索引擎的"门牌号"——用构建期的常量域名拼，后台改完域名后
-// 整份 sitemap 全是错地址（比没有 sitemap 更糟：等于主动提交一批死链）。
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-    const baseUrl = (await getSiteSettings()).siteUrl;
+// sitemap 里的每条 URL 都是给搜索引擎的"门牌号"，域名取自构建期常量（`SITE_URL`）。
+// 换域名 = 改环境变量 + 重新部署，整份 sitemap 随之重建，不会出现"提交一批死链"。
+export default function sitemap(): MetadataRoute.Sitemap {
+    const baseUrl = SITE_URL;
 
     const locales = ["zh", "en"];
 

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import {
     SITE_URL,
+    SITE_NAME,
+    SITE_DESCRIPTION,
     SITE_KEYWORDS,
     SITE_AUTHOR,
     GOOGLE_VERIFICATION,
@@ -9,16 +11,14 @@ import {
     BAIDU_STAT_ID,
 } from "@/lib/site-config";
 import { THIRD_PARTY_DOMAINS } from "@/lib/seo";
-import { getSiteSettings } from "@/lib/site-settings";
 import "./globals.css";
 
 /** title 里 `·` 后面那半句固定文案（品牌 slogan，不是后台可改项，改它要动代码） */
 const TITLE_SUFFIX = "无人机 AI 技能、MCP服务与智能诊断平台";
 
 /**
- * metadataBase 要的是绝对地址，而站点域名现在是后台可改的。
- * 后台那侧已经校验过 http(s) 且不带路径，但**兜底值也可能来自环境变量**（控制台手填，
- * 谁都会打错一个字符）——构造失败会让整站 500，所以这里必须兜住，坏值回落到 site-config。
+ * metadataBase 要的是绝对地址。域名来自环境变量（控制台手填，谁都会打错一个字符），
+ * **构造失败会让整站 500**，所以这里必须兜住，坏值回落到 site-config。
  */
 function safeUrl(value: string): URL {
     try {
@@ -38,56 +38,74 @@ function buildVerification(): Metadata["verification"] {
     return Object.keys(v).length > 0 ? v : undefined;
 }
 
-export async function generateMetadata(): Promise<Metadata> {
-    const settings = await getSiteSettings();
-    const defaultTitle = `${settings.siteName} · ${TITLE_SUFFIX}`;
-
-    return {
-        metadataBase: safeUrl(settings.siteUrl),
-        title: {
-            template: `%s · ${settings.siteName}`,
-            default: defaultTitle,
+/**
+ * 根 metadata —— **必须是静态常量，不能是 `generateMetadata()`**。
+ *
+ * ⚠️ 这是一条 Next.js 的硬规则，也是首页速度的关键：只要根 layout 导出了
+ * `generateMetadata`（异步），**整棵路由树都会被判为动态渲染**，首页无法静态化，
+ * 每次请求都要实时 SSR（线上实测 TTFB ~1.5s，且 CDN 无从缓存）。
+ *
+ * 历史：2026-09-27 的「后台站点设置」把它改成了 `generateMetadata()` 读 KV，
+ * 首页随之从静态退化为动态（`cache-control: no-store`、`eo-cache-status: Cache Miss`）。
+ * 2026-09-28 改回静态常量，首页恢复 `○ (Static)`。
+ *
+ * 代价（有意取舍）：站点名/描述/域名改完需**重新部署**才生效——它们来自环境变量
+ * （`next.config.ts` 的 siteEnv + `NEXT_PUBLIC_*`），不再由后台即时改。
+ * 换回来的是首页从「每次 SSR ~1.5s」变成「CDN 直出几十毫秒」。
+ */
+export const metadata: Metadata = {
+    metadataBase: safeUrl(SITE_URL),
+    title: {
+        template: `%s · ${SITE_NAME}`,
+        default: `${SITE_NAME} · ${TITLE_SUFFIX}`,
+    },
+    description: SITE_DESCRIPTION,
+    keywords: SITE_KEYWORDS,
+    authors: [{ name: SITE_AUTHOR }],
+    alternates: {
+        languages: {
+            "zh-CN": "/zh",
+            en: "/en",
         },
-        description: settings.siteDescription,
-        keywords: SITE_KEYWORDS,
-        authors: [{ name: SITE_AUTHOR }],
-        alternates: {
-            languages: {
-                "zh-CN": "/zh",
-                en: "/en",
+    },
+    openGraph: {
+        title: `${SITE_NAME} · ${TITLE_SUFFIX}`,
+        description: SITE_DESCRIPTION,
+        siteName: SITE_NAME,
+        locale: "zh_CN",
+        type: "website",
+        images: [
+            {
+                url: "/opengraph-image",
+                width: 1200,
+                height: 630,
+                alt: `${SITE_NAME} · ${TITLE_SUFFIX}`,
+                type: "image/png",
             },
-        },
-        openGraph: {
-            title: defaultTitle,
-            description: settings.siteDescription,
-            siteName: settings.siteName,
-            locale: "zh_CN",
-            type: "website",
-            images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: defaultTitle, type: "image/png" }],
-        },
-        twitter: {
-            card: "summary_large_image",
-            title: defaultTitle,
-            description: settings.siteDescription,
-            images: [{ url: "/opengraph-image", alt: defaultTitle }],
-        },
-        robots: {
-            index: true,
-            follow: true,
-        },
-        referrer: "origin-when-cross-origin",
-        creator: SITE_AUTHOR,
-        publisher: SITE_AUTHOR,
-        verification: buildVerification(),
-        other: {
-            "DC.title": defaultTitle,
-            "DC.description": settings.siteDescription,
-            "DC.publisher": SITE_AUTHOR,
-            "DC.language": "zh_CN",
-            "DC.coverage": "China",
-        },
-    };
-}
+        ],
+    },
+    twitter: {
+        card: "summary_large_image",
+        title: `${SITE_NAME} · ${TITLE_SUFFIX}`,
+        description: SITE_DESCRIPTION,
+        images: [{ url: "/opengraph-image", alt: `${SITE_NAME} · ${TITLE_SUFFIX}` }],
+    },
+    robots: {
+        index: true,
+        follow: true,
+    },
+    referrer: "origin-when-cross-origin",
+    creator: SITE_AUTHOR,
+    publisher: SITE_AUTHOR,
+    verification: buildVerification(),
+    other: {
+        "DC.title": `${SITE_NAME} · ${TITLE_SUFFIX}`,
+        "DC.description": SITE_DESCRIPTION,
+        "DC.publisher": SITE_AUTHOR,
+        "DC.language": "zh_CN",
+        "DC.coverage": "China",
+    },
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
