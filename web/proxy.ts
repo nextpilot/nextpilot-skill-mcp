@@ -13,24 +13,22 @@ const REWRITE_MAP: Record<string, string> = {
     "/.well-known/security.txt": "/security.txt",
 };
 
-// 根级探针是**历史路径**：探针已统一迁到 /api/ 前缀（`/api/kv-probe` 等），
-// 根级路径**不再存在**，直接明确 404，不做重定向。
+// 注意：这里**没有**针对具体路径（如 /ping、/kv-probe）的特例分支，也不该有。
 //
-// 为什么要在这里显式拦一道，而不是「删掉、交给 Next.js 兜底」——实测（2026-09-28
-// 线上）那样会得到 **200 首页 HTML**：这些路径既没进 middleware（曾被 matcher 负向
-// 排除），又没有对应的真实 route，最终被 `app/[locale]/` 段接住、按默认 locale 渲染
-// 出了首页。表现极具误导性：浏览器看到的是"一个正常的站点"，而不是一个明确的 404，
-// 排查时只会以为探针"返回值不对"，而不会想到"这个路径根本不该存在"。
+// 路由只有两类，各归各的层，不维护任何"白名单"：
+//   · `/api/*`、`/internal/*` —— 由 matcher 负向排除，直接进各自的函数/垫片层。
+//     「有就有，没有就没有」：端点存在则执行，不存在返回 404，与 middleware 无关。
+//   · 其余一切 —— 页码路径（`/[locale]/*`）或未定义路径，统一交给 next-intl：
+//     命中页面则渲染，未定义则走站点 404。
 //
-// 子串匹配（pathname === p || pathname.startsWith(p + "/")）以覆盖可能的子路径；
-// 返回 `{error:"not found"}` 与 app/api/[[...path]] 兜底的响应体保持一致，运维/脚本
-// 一眼能看出"路径没了"而不是"服务挂了"。
-const RETIRED_ROOT_PATHS = ["/ping", "/kv-probe", "/issue-probe", "/blob"];
-
-function isRetiredRootPath(pathname: string) {
-    return RETIRED_ROOT_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-}
-
+// 曾经的坑（2026-09-28）：matcher 负向排除里写了 `ping|kv-probe|issue-probe|blob`，
+// 导致这些根级路径**不进 middleware**。它们既不是 `/api/*`、也不是页面，穿透后被
+// 根路由接住，渲染出了 **200 首页 HTML**——浏览器看到"一个正常的站点"，排查时只会
+// 以为探针"返回值不对"，绝不会想到"这个路径根本不该存在"。
+//
+// 修法就是**不加特例**：只要不被 matcher 排除，next-intl 会把这类路径统一判为 404
+// （`/abc`、`/foobar`、`/kv-probe`、`/ping` 本地实测结果完全一致）。**新增任何根级
+// 路径都不需要再改这里** —— 要做的只是别把它加进 matcher 的负向排除里。
 function isRootNextRoute(pathname: string) {
     return ROOT_ONLY.some((r) => pathname === `/${r}`) || pathname === "/opengraph-image";
 }
@@ -43,11 +41,6 @@ export default function middleware(req: NextRequest) {
     const rewriteTarget = REWRITE_MAP[pathname];
     if (rewriteTarget) {
         return NextResponse.rewrite(new URL(rewriteTarget, req.url));
-    }
-
-    // 历史根级探针路径 → 明确 404（见 RETIRED_ROOT_PATHS 说明），不重定向。
-    if (isRetiredRootPath(pathname)) {
-        return NextResponse.json({ error: "not found" }, { status: 404, headers: { "cache-control": "no-store" } });
     }
 
     // /en/sitemap.xml → 301 到 /sitemap.xml
@@ -80,9 +73,10 @@ export default function middleware(req: NextRequest) {
 //                足以把排查方向带偏到"函数没写对"上去
 //   edge-dev   = 开发环境垫片自身，rewrite 进来后再被加一次前缀就永远命中不了
 //
-// ⚠️ ping / kv-probe / issue-probe / blob **不能**排除在 matcher 之外：它们是已退役的
-// 根级路径，需要在这里被显式回 404（见 RETIRED_ROOT_PATHS）。一旦排除，middleware 不
-// 执行，请求穿透到 [locale] 段会渲染出**首页 HTML**（2026-09-28 线上实测），比 404 还难发现。
+// ⚠️ **除上述前缀外，什么都不要往这里加。** 任何被排除的路径都会绕过 middleware：
+// 它若既非 `/api/*`、又不是真实页面，就会被根路由接住、渲染成 **200 首页 HTML**
+// （2026-09-28 线上实测：曾把 ping|kv-probe|issue-probe|blob 排除在此，四条路径全
+// 返回首页）。让所有非 API 路径都进 middleware、由 next-intl 统一判 404，才是正解。
 export const config = {
     matcher: ["/((?!api|internal|_next|_vercel|edge-dev).*)"],
 };

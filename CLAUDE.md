@@ -412,32 +412,25 @@
 
 **dev + 线上共用同一份垫片**：`/api/*`、`/internal/*` 统一 rewrite 到 `app/edge-dev/[[...path]]/route.ts`，它在 Node 侧动态 import 同一份 `functions/` 代码，保证本地能跑。垫片里是一张**显式白名单**（`const handlers`），**漏一项就是「该功能本地整条静默 404」**——`scripts/test-issue-filer.mjs` §[13] 会拿 `functions/` 的目录清单核对这张表，漏了会红。新增 `functions/` 端点时必须同时加进垫片白名单。
 
-### 6.2.3 根级路径（已退役探针等）必须显式回 404，不能留给 Next 兜底
+### 6.2.3 路由只有两类，不要给任何路径开特例
 
-**不要把自定义根级路径留给 Next.js 兜底**——它们会得到 **200 首页 HTML**，而不是 404。
+**路由规则是通则，不是清单：**
 
-机制：`web/proxy.ts`（Next.js 16 里 `proxy.ts` 即 middleware，构建产物显示 `ƒ Proxy (Middleware)`）的 `matcher` 是一张负向排除表。**被排除的路径根本不进 middleware**；这些路径又没有对应的真实 Next route，于是穿透后被 `app/[locale]/` 段接住、按默认 locale 渲染出首页。**失败形态极具误导性**：浏览器看到的是「一个正常的站点」，排查者只会以为探针「返回值不对」，而不会想到「这个路径根本不该存在」。
+| 路径          | 归属                                        | 行为                                                   |
+| ------------- | ------------------------------------------- | ------------------------------------------------------ |
+| `/api/*`      | API 层（matcher 负向排除，不进 middleware） | **有就有，没有就没有**：端点存在则执行，不存在返回 404 |
+| `/internal/*` | 同上                                        | 同上                                                   |
+| 其余一切      | next-intl（middleware 内）                  | 命中页面则渲染；未定义则**统一 404**                   |
 
-本仓库的教训：早期为了「探针已迁到 `/api/` 前缀」就把 `ping|kv-probe|issue-probe|blob` 从 matcher 里排除掉，结果根级路径全部返回首页 HTML（2026-09-28 线上实测）。
+关键推论：**非 `/api`、非页面的根级路径（`/kv-probe`、`/abc`、`/foobar`…）本来就由 next-intl 统一判 404，无需任何特殊处理。** 新增或退役一条根级路径都**不需要改 `proxy.ts`**。
 
-**正确做法（`web/proxy.ts` 中的 `RETIRED_ROOT_PATHS`）：让 middleware 接管，显式返回 404 JSON，不做重定向。** 路径既然已退役，就干脆利落地「没有」——重定向会让调用方以为这是个还在维护的别名，反而留下含糊。
+**唯一的坑在 `matcher` 的负向排除表**（`web/proxy.ts`）：被排除的路径**根本不进 middleware**。它若既非 `/api/*`、又不是真实页面，就会被根路由接住、渲染成 **200 首页 HTML**——浏览器看到「一个正常的站点」，排查者只会以为探针「返回值不对」，绝不会想到「这个路径根本不该存在」。这是本仓库真实踩过的坑（2026-09-28）：早期把 `ping|kv-probe|issue-probe|blob` 加进负向排除，四条路径全部返回首页。
 
-```ts
-const RETIRED_ROOT_PATHS = ["/ping", "/kv-probe", "/issue-probe", "/blob"];
-function isRetiredRootPath(pathname: string) {
-  return RETIRED_ROOT_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-}
-// middleware 内：
-if (isRetiredRootPath(pathname)) {
-  return NextResponse.json({ error: "not found" }, { status: 404, headers: { "cache-control": "no-store" } });
-}
-```
-
-响应体 `{error:"not found"}` 与 `app/api/[[...path]]` 兜底保持一致，让人一眼看出是「路径没了」而不是「服务挂了」。
-
-> **两条通用规则**：
-> ① **新增根级路径 = 必须同时在 middleware 里显式处理**（rewrite / 明确 404 JSON），并确认它没被 matcher 负向排除掉——「排除」等于「交给 `[locale]` 渲染首页」。退役一条路径同样要在这里登记，不能只是「删掉不管」。
-> ② 判断某路径线上行为时，**先按 6.2.1 的响应头指纹确认执行层**，再谈「代码写得对不对」。
+> ⚠️ **所以规则只有一条：除 `api|internal|_next|_vercel|edge-dev` 这几个真实前缀外，什么都不要往 matcher 负向排除里加。** 加了就等于把该路径从「next-intl 统一 404」里踢出去、交给根路由当首页渲染。
+>
+> 反面教材（**不要这样做**）：维护一张 `RETIRED_ROOT_PATHS = [...]` 白名单、在 middleware 里逐个判断再回 404。那是把通则退化成清单——每退役一个路径都要记得登记，漏一个就复现首页 HTML。**正确做法恰恰是「什么都不做」**：不排除、不加特例，`/kv-probe` 与 `/abc` 自然行为一致（本地实测二者均为 404，响应完全相同）。
+>
+> 判断某路径线上行为时，**先按 6.2.1 的响应头指纹确认执行层**，再谈「代码写得对不对」。
 
 ### 6.3 数据模型（EdgeOne KV + Blob）
 

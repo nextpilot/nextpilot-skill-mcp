@@ -23,10 +23,9 @@
 ```
 
 > 根级探针（`/ping`、`/kv-probe`、`/issue-probe`、`/blob`）**已退役**：探针统一迁到
-> `/api/` 前缀，根级写法治**直接 404**（`web/proxy.ts` 的 `RETIRED_ROOT_PATHS`），
-> 不做重定向。**入口一律用 `/api/` 前缀**（如 `/api/kv-probe`）。之所以要在 middleware
-> 里显式 404 而不是「删掉不管」，是因为交给 Next.js 兜底时这些路径会穿透到 `[locale]`
-> 段、渲染出 **200 首页 HTML**，比 404 还难认。
+> `/api/` 前缀，根级写法自然 404。**入口一律用 `/api/` 前缀**（如 `/api/kv-probe`）。
+> 这类路径**不需要任何特殊处理**——非 `/api`、非页面的根级路径由 next-intl 统一判 404
+> （与 `/abc`、`/foobar` 行为完全一致）。详见 `CLAUDE.md` 6.2.3。
 
 - 会话：next-auth JWT 策略（JWE，A256CBC-HS512，密钥 HKDF(AUTH_SECRET, cookie名)）。边缘函数用 `jose` 以同一 `AUTH_SECRET` 验签（`functions/_lib/auth.js`）。
 - KV：`NEXTPILOT_KV` 绑定，**只在边缘函数可用**。key 仅允许字母/数字/下划线，无 TTL（过期写进 value 惰性清理）。
