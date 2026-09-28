@@ -50,6 +50,9 @@ const handlers: Record<string, () => Promise<Record<string, unknown>>> = {
     "internal/settings/get": () => import("@/functions/internal/settings/get.js"),
     "api/kv-probe": () => import("@/functions/api/kv-probe.js"),
     "api/issue-probe": () => import("@/functions/api/issue-probe.js"),
+    // /api/* 兜底（EdgeOne 边缘层：精确文件优先，其余落到 api/[[default]].js）。
+    // 目前用于接住 /api/reports/<id>（子目录不被部署，见 reports.js 头注）。
+    "api/[[default]]": () => import("@/functions/api/[[default]].js"),
 };
 
 // blob 依赖 @edgeone/pages-blob（EdgeOne 边缘运行时内置模块），
@@ -66,6 +69,11 @@ async function invoke(req: NextRequest, path: string[]): Promise<Response> {
     if (!(handlerKey in handlers) && path[0] === "api" && path[1] === "reports" && path.length === 3) {
         handlerKey = "api/reports/[id]";
         params = { id: path[2] };
+    }
+    // /api/* 兜底：与线上 api/[[default]].js 行为对齐。精确键未命中时落到它，
+    // 由兜底文件自行按路径分流（目前接住 /api/reports/<id>）。
+    if (!(handlerKey in handlers) && path[0] === "api") {
+        handlerKey = "api/[[default]]";
     }
     const loader = handlers[handlerKey];
     if (!loader) return new Response("not found", { status: 404 });
