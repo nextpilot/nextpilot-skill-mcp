@@ -953,6 +953,17 @@ MUTATIONS: list[Mutation] = [
         note="判据必须覆盖到 page.tsx：只查 layout 的话，「layout 有、page 漏」这种半边坏法会漏网",
     ),
     Mutation(
+        name="SITE_URL 去掉生产兜底（漏配变量就变 localhost，页面看不出异常）",
+        path="web/lib/site-config.ts",
+        old='    (process.env.NODE_ENV === "production" ? "https://skill.nextpilot.org" : "http://localhost:3000")',
+        new='    "http://localhost:3000"',
+        guard="site-settings",
+        expect="settings-site-url-fallback",
+        note="SITE_URL 是唯一「默认值 ≠ 线上值」的字段：站名/描述/页脚漏配看不出来，"
+        "它漏配则 sitemap/robots/canonical/og:url 全指向 localhost —— 等于主动提交死链。"
+        "2026-09-28 真实发生，且此前被「sitemap 走 KV 取值」掩盖着",
+    ),
+    Mutation(
         name="密钥字段名进了客户端组件（明文被序列化进 SSR HTML）",
         path="web/components/SiteHeader.tsx",
         old="export function SiteHeader() {",

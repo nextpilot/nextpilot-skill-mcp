@@ -257,7 +257,7 @@ jobs:
         name: "Admin site settings wiring (check-site-settings)"
         workdir: "{WEB}"
         command: ["{NODE}", "scripts/check-site-settings.mjs"]
-        hint: "站点设置的机制被改坏了。看上面 FAIL 那一行对应的规则 id：settings-schema = 两侧字段表不一致；settings-footer-* = 页脚写死；settings-static-metadata = 根 layout 用了 generateMetadata（首页退回动态渲染）；settings-render-path = 渲染路径读了运行期设置；settings-static-locale = next-intl 忘调 setRequestLocale（整棵子树动态化）；settings-secret-client = 密钥名进了客户端组件；settings-secret-wiring = 密钥没有消费点。"
+        hint: "站点设置的机制被改坏了。看上面 FAIL 那一行对应的规则 id：settings-schema = 两侧字段表不一致；settings-footer-* = 页脚写死；settings-static-metadata = 根 layout 用了 generateMetadata（首页退回动态渲染）；settings-render-path = 渲染路径读了运行期设置；settings-static-locale = next-intl 忘调 setRequestLocale（整棵子树动态化）；settings-site-url-fallback = SITE_URL 缺生产兜底（漏配变量会指向 localhost）；settings-secret-client = 密钥名进了客户端组件；settings-secret-wiring = 密钥没有消费点。"
 
       # 需要真实日志的回归。日志不入仓库（CLAUDE.md 第 9 节：原始日志不上传服务器），
       # 所以 CI 上这四项必然 SKIP —— 这就是它们归 push 而不是 ci 的原因。

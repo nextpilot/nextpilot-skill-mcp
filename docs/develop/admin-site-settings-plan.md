@@ -202,19 +202,20 @@ export const SITE_SETTINGS_FIELDS = [
 这套机制的坏法有一个共同点：**构建照过、页面照开，只有管理员改了没反应**。没有一条会
 抛异常，所以只能静态拦。九条规则：
 
-| 规则 id                    | 拦什么                                                            |
-| -------------------------- | ----------------------------------------------------------------- |
-| `settings-schema`          | 两侧字段表（Node / 边缘）key 与 kind 不一致 → 存进去了读不出来    |
-| `settings-footer-props`    | 页脚四项不再由 props 传入 → 后台改了页脚不变                      |
-| `settings-footer-url`      | 页脚把仓库地址写回组件 → 后台改链接不生效                         |
-| `settings-static-metadata` | 根 layout 用了 `generateMetadata` → **首页退回动态渲染**          |
-| `settings-render-path`     | 渲染路径读了 `getSiteSettings()` → 那一页退回动态渲染             |
-| `settings-static-locale`   | `[locale]` 忘调 `setRequestLocale(...)` → 整棵子树动态化          |
-| `settings-secret-client`   | 密钥字段名进了客户端组件 → 明文被序列化进 SSR 的 HTML             |
-| `settings-secret-wiring`   | 某个密钥没有任何消费点在读它 → 管理员以为轮换过了，实际还在用旧的 |
-| `settings-wiring`          | 这道门自己被从 `checklist.yml` 摘掉                               |
+| 规则 id                      | 拦什么                                                            |
+| ---------------------------- | ----------------------------------------------------------------- |
+| `settings-schema`            | 两侧字段表（Node / 边缘）key 与 kind 不一致 → 存进去了读不出来    |
+| `settings-footer-props`      | 页脚四项不再由 props 传入 → 后台改了页脚不变                      |
+| `settings-footer-url`        | 页脚把仓库地址写回组件 → 后台改链接不生效                         |
+| `settings-static-metadata`   | 根 layout 用了 `generateMetadata` → **首页退回动态渲染**          |
+| `settings-render-path`       | 渲染路径读了 `getSiteSettings()` → 那一页退回动态渲染             |
+| `settings-static-locale`     | `[locale]` 忘调 `setRequestLocale(...)` → 整棵子树动态化          |
+| `settings-site-url-fallback` | `SITE_URL` 缺生产兜底 → 漏配变量时指向 `localhost:3000`           |
+| `settings-secret-client`     | 密钥字段名进了客户端组件 → 明文被序列化进 SSR 的 HTML             |
+| `settings-secret-wiring`     | 某个密钥没有任何消费点在读它 → 管理员以为轮换过了，实际还在用旧的 |
+| `settings-wiring`            | 这道门自己被从 `checklist.yml` 摘掉                               |
 
-变异自证 10/10 各自变红（`mutate_guards.py --guard site-settings`）。
+变异自证 11/11 各自变红（`mutate_guards.py --guard site-settings`）。
 
 > **2026-09-28 极性反转**：`settings-metadata` 这条规则的原语义是「根 layout **必须**用
 > `generateMetadata` 读运行期设置」（为了「后台改名即时生效」）。实测发现这正是首页
@@ -234,6 +235,13 @@ export const SITE_SETTINGS_FIELDS = [
    这一行（真实代码）就足以判绿，「删掉调用却留着 import」这种最像样的坏法漏网。
    改成匹配**调用** `setRequestLocale\s*\(` 才抓得到——变异自证当场把这个漏洞顶了出来
    （报 `guard always-green`）。
+
+**2026-09-28 追加 `settings-site-url-fallback`**：首页静态化把站点信息从运行期 KV 改成
+构建期常量后，线上 sitemap 立刻指向 `http://localhost:3000`——因为 `NEXT_PUBLIC_SITE_URL`
+**从来没在控制台配过**，过去只是被「sitemap 走 KV 取值」掩盖着。`SITE_URL` 是唯一一个
+「默认值 ≠ 线上值」的字段（站名/描述/页脚的默认值恰好就是想要的线上值），漏配后页面
+毫无异常、只有 sitemap/robots/canonical 全错。故加此规则，并给 `SITE_URL` 补生产兜底。
+详见 CLAUDE.md 6.2.5。
 
 ---
 

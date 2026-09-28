@@ -25,6 +25,11 @@
  *   `setRequestLocale(locale)`。next-intl 默认从请求头取 locale，不登记就整棵子树动态化。
  *   这个回归**构建照样过、页面照样开**，只是 `● (SSG)` 悄悄变回 `ƒ (Dynamic)`——
  *   不写成守卫就没人察觉得到。
+ * - `settings-site-url-fallback`：`SITE_URL` 必须有**非 localhost 的生产兜底**。
+ *   它是唯一一个「默认值 ≠ 线上值」的站点字段：漏配 `NEXT_PUBLIC_SITE_URL` 时，
+ *   站名/描述/页脚完全看不出来，而 `SITE_URL` 变成 `localhost:3000` —— 页面上毫无异常，
+ *   只有 sitemap / robots / canonical / og:url / JSON-LD 的域名全错，等于主动提交死链。
+ *   2026-09-28 真实发生（首页静态化改读常量后暴露）。
  * - `settings-secret-client`：密钥字段名不得出现在任何客户端组件里。字段名进了客户端组件，
  *   意味着那份明文正被序列化进 SSR 的 HTML（查看源代码即可拿走）。
  * - `settings-secret-wiring`：三个密钥各自必须至少有一个消费点在读它。后台存了却没人读 =
@@ -278,6 +283,30 @@ function parseFields(src, label) {
         );
     } else {
         ok("settings-static-locale", "[locale] 的 layout 与 page 都调用了 setRequestLocale");
+    }
+}
+
+// ---- 3d. SITE_URL 必须有生产兜底（不能落到 localhost） ----
+// `SITE_URL` 是**唯一一个默认值 ≠ 线上值**的字段：站名/描述/页脚的默认值恰好就是
+// 想要的线上值，漏配 NEXT_PUBLIC_SITE_URL 也看不出来；而 SITE_URL 一漏配就变
+// localhost:3000，页面上却毫无异常——只有 sitemap / robots / canonical / og:url /
+// JSON-LD 里的域名全错，等于主动把死链提交给搜索引擎。2026-09-28 真实发生。
+// 判据：SITE_URL 的表达式里必须出现**非 localhost 的生产兜底**，否则这道门就该红。
+{
+    const src = read(join(webRoot, "lib", "site-config.ts"));
+    const m = src.match(/export\s+const\s+SITE_URL\s*=\s*([\s\S]*?);/);
+    if (!m) {
+        fail("settings-site-url-fallback", "lib/site-config.ts 找不到 SITE_URL 定义，守卫空转");
+    } else if (!/NODE_ENV\s*===\s*"production"/.test(m[1])) {
+        fail(
+            "settings-site-url-fallback",
+            "SITE_URL 缺少生产兜底：漏配 NEXT_PUBLIC_SITE_URL 时会落到 localhost:3000，" +
+                "而页面毫无异常（只有 sitemap/robots/canonical/og:url 全错）",
+        );
+    } else if (!/https:\/\/[a-z0-9.-]+\.[a-z]{2,}/i.test(m[1].replace(/localhost:\d+/g, ""))) {
+        fail("settings-site-url-fallback", "SITE_URL 的生产兜底不是合法域名（应形如 https://skill.nextpilot.org）");
+    } else {
+        ok("settings-site-url-fallback", "SITE_URL 有生产兜底（漏配环境变量不会落到 localhost）");
     }
 }
 

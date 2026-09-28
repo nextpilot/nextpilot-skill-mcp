@@ -464,13 +464,36 @@ rewrite 的负向排除（`source: "/api/:path((?!auth/|skills/|ping(?:/|$)).*)"
 
 **`setRequestLocale` 的坑值得单独记一笔**：它是 next-intl 的静态化开关，与 `generateStaticParams` **成对出现**——前者给构建期 locale 列表，后者把「本次渲染的 locale」登记进去，少任何一个静态化都不成立。它属于**最有欺骗性**的一类回归：删掉它，`pnpm build` 一样成功、页面一样能打开、CI 一样全绿，只有路由表里 `● (SSG)` 悄悄变回 `ƒ (Dynamic)`。所以必须写成守卫（见 6.9 的 `check-site-settings` 规则 `settings-static-locale`，判据是**调用**而非名字出现——`import { setRequestLocale }` 那行本身就是代码，只看名字会漏掉「导入但没调用」）。
 
-配套守卫（`web/scripts/check-site-settings.mjs`，挂在 push 门禁上）共 9 条规则，其中三条守的是静态化：
+配套守卫（`web/scripts/check-site-settings.mjs`，挂在 push 门禁上）共 10 条规则，其中四条守的是静态化与域名：
 
 - `settings-static-metadata`：根 layout 必须是静态 `export const metadata`，**不得**有 `generateMetadata`（极性是反的——它保护的是「静态」而不是「可改」）
 - `settings-render-path`：`app/**`（页面 + sitemap/robots/manifest/opengraph-image 等元数据路由）与 `lib/seo.ts` **不得**读 `getSiteSettings()`；白名单 `ALLOWED_RUNTIME_READERS` 只列纯请求期接口
 - `settings-static-locale`：`[locale]` 的 layout 与 page 都必须**调用** `setRequestLocale(...)`
+- `settings-site-url-fallback`：`SITE_URL` 必须有**非 localhost 的生产兜底**
 
 **副作用（意外收获）**：修好这三件事后，整棵树都变静态了——不止首页，`/zh/guide`、`/zh/skills`、`/zh/mcp` 与全部详情页、`/zh/tools/*`、`/zh/me` 全部 `● (SSG)`。仍为 `ƒ (Dynamic)` 的都是**该动态**的：`analyze/[id]`（用户报告）、`login`（会话）、`mcp/[slug]/server.json`（route handler）、API 路由、`feed.xml` / `security.txt`。
+
+### 6.2.5 `SITE_URL` 是唯一「默认值 ≠ 线上值」的站点字段
+
+`web/lib/site-config.ts` 里 12 个站点字段都是 `process.env.NEXT_PUBLIC_xxx || 默认值`，但**只有 `SITE_URL` 的默认值不是线上值**：
+
+| 字段                       | 代码默认值                      | 漏配环境变量的后果                                                                           |
+| -------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------- |
+| `SITE_NAME` / `SITE_SHORT` | `NextPilot Skill` / `NextPilot` | **看不出来**（默认值恰好就是想要的）                                                         |
+| `SITE_DESCRIPTION`         | 那句「围绕感知 → 决策…」        | **看不出来**                                                                                 |
+| `FOOTER_*` / `REPO_URL`    | 与线上一致                      | **看不出来**                                                                                 |
+| **`SITE_URL`**             | **`http://localhost:3000`**     | ⚠️ **静默炸**：页面照常打开，只有 sitemap / robots / canonical / og:url / JSON-LD 的域名全错 |
+
+**静默炸**是最难的形态：`/zh` 页面打开完全正常，肉眼、curl 首页、浏览器都看不出异常；只有 `curl /sitemap.xml` 才会发现全是 `localhost:3000`——等于主动把一批死链提交给搜索引擎（比没有 sitemap 更糟）。
+
+> **2026-09-28 真实踩坑**：首页静态化之前，`sitemap.ts` 走 `getSiteSettings()` 读 KV，而 KV 里存着正确域名——**恰好掩盖了控制台从未配过 `NEXT_PUBLIC_SITE_URL` 这件事**。改读常量后隐患立刻暴露，线上 sitemap 变成 localhost。
+>
+> 修法（两层）：
+>
+> 1. **代码兜底**：`SITE_URL = NEXT_PUBLIC_SITE_URL || (NODE_ENV === "production" ? "https://skill.nextpilot.org" : "http://localhost:3000")`。把「记得去控制台配」从**必要条件**降级为**可选优化**。
+> 2. **控制台**：仍然建议在 EdgeOne 配 `NEXT_PUBLIC_SITE_URL`，让换域名不必改代码。
+>
+> 教训（通用）：**把运行期取值改成构建期常量时，必须逐字段确认「该字段在构建环境里真的配了」**。不能假定「环境变量都配好了」——有些变量只是过去被别的取值路径掩盖着，从来没配过。
 
 ### 6.3 数据模型（EdgeOne KV + Blob）
 
