@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, ChevronDown, Loader2, LineChart, Maximize2, RotateCcw, Share2, X } from "lucide-react";
-import { modeStyle } from "@/lib/phase-colors";
 import type { FlightPhase, SeriesResponse, TopicManifest } from "@/lib/types";
 import {
     CHART_PRESETS,
@@ -325,17 +324,23 @@ function PanelChart({
         };
 
         let cancelled = false;
+        // unmount 时 React 先把 ref 置 null 再跑 cleanup——cleanup 里要 purge 的话，
+        // 必须用这里捕获的引用，到时再读 fullscreenRef.current 拿到的是 null，purge 会被跳过
+        const el = fullscreenRef.current;
         (async () => {
             const Plotly = await getPlotly();
-            if (cancelled) return;
-            await Plotly.newPlot(fullscreenRef.current!, cached.traces, fullscreenLayout, plotlyConfig);
+            if (cancelled || !el) return;
+            await Plotly.newPlot(el, cached.traces, fullscreenLayout, plotlyConfig);
         })();
 
         return () => {
             cancelled = true;
-            const Plotly = getPlotly();
-            if (fullscreenRef.current) {
-                Plotly.then((P) => P.purge(fullscreenRef.current!)).catch(() => {});
+            // 全屏图与内联图是两个独立 graph（各自挂 resize 监听），关全屏或带全屏状态离开
+            // 页面都要清掉，否则双份持有数据持续泄漏
+            if (el) {
+                void getPlotly()
+                    .then((P) => P.purge(el))
+                    .catch(() => {});
             }
         };
     }, [fullscreen]);
@@ -371,6 +376,10 @@ function PanelChart({
 
     useEffect(() => {
         let cancelled = false;
+        // cleanup 里要 purge（见文件内其他 effect 的说明）：unmount 时 React 已把 ref 置 null，
+        // 必须在 effect 同步段捕获元素引用
+        const el = elRef.current;
+        if (!el) return;
         (async () => {
             try {
                 // 存档可能是**旧版格式**（取数声明从"topic + 列名"改成 ref 之后，`ydata` 才存在）：
@@ -386,10 +395,10 @@ function PanelChart({
                 const responses = await Promise.all(
                     panel.requests.map((r, i) => (stored && stored[i] ? Promise.resolve(stored[i]) : requestSeries(r))),
                 );
-                if (cancelled || !elRef.current) return;
+                if (cancelled) return;
                 onWarnings(responses.flatMap((r) => r?.warnings ?? []));
                 const Plotly = await getPlotly();
-                if (cancelled || !elRef.current) return;
+                if (cancelled) return;
 
                 const colors = isDark() ? SERIES_COLORS_DARK : SERIES_COLORS_LIGHT;
                 const traces: unknown[] = [];
@@ -447,7 +456,7 @@ function PanelChart({
                     }));
                 }
 
-                await Plotly.newPlot(elRef.current, traces, layout, {
+                await Plotly.newPlot(el, traces, layout, {
                     responsive: true,
                     displayModeBar: false, // 工具栏改用图右侧那列自绘按钮，避免两组按钮叠在一起
                     modeBarButtonsToRemove: [
@@ -473,24 +482,25 @@ function PanelChart({
                 cacheRef.current = { traces, layout };
 
                 // Listen for relayout events (zoom/pan)
-                const gd = elRef.current as unknown as {
+                const gd = el as unknown as {
                     on?: (event: string, cb: (e: Record<string, unknown>) => void) => void;
                 };
-                gd.on?.("plotly_relayout", (eventData) => {
-                    if (ignoreNextRelayout.current) {
-                        ignoreNextRelayout.current = false;
-                        return;
-                    }
-                    const r0 = eventData["xaxis.range[0]"] as number | undefined;
-                    const r1 = eventData["xaxis.range[1]"] as number | undefined;
-                    if (r0 !== undefined && r1 !== undefined) {
-                        localRangeRef.current = [r0, r1];
-                        onXRangeChange([r0, r1]);
-                    } else if (eventData["xaxis.autorange"] === true) {
-                        localRangeRef.current = null;
-                        onXRangeChange(null);
-                    }
-                });
+                if (!cancelled)
+                    gd.on?.("plotly_relayout", (eventData) => {
+                        if (ignoreNextRelayout.current) {
+                            ignoreNextRelayout.current = false;
+                            return;
+                        }
+                        const r0 = eventData["xaxis.range[0]"] as number | undefined;
+                        const r1 = eventData["xaxis.range[1]"] as number | undefined;
+                        if (r0 !== undefined && r1 !== undefined) {
+                            localRangeRef.current = [r0, r1];
+                            onXRangeChange([r0, r1]);
+                        } else if (eventData["xaxis.autorange"] === true) {
+                            localRangeRef.current = null;
+                            onXRangeChange(null);
+                        }
+                    });
 
                 if (!cancelled) setState("done");
             } catch (err) {
@@ -502,6 +512,12 @@ function PanelChart({
         })();
         return () => {
             cancelled = true;
+            // responsive:true 会挂 window resize 监听并持有图数据；同时 newPlot 反复在同一个
+            // div 上重建 graph 也会累积旧事件绑定——不 purge 的话切 tab / 换报告反复挂载
+            // 就持续泄漏内存
+            void getPlotly()
+                .then((P) => P.purge(el))
+                .catch(() => {});
         };
     }, [panel, phases, requestSeries, groupKey, onWarnings]);
 

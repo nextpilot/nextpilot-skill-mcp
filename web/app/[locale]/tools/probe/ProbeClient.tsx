@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLogProbe } from "@/hooks/useLogProbe";
-import { UploadCloud, Loader2, Search, X, Plus, Trash2, BarChart3 } from "lucide-react";
-import type { TopicManifest, SeriesResponse, TopicMeta } from "@/lib/types";
+import { UploadCloud, Loader2, Search, X, Plus, BarChart3 } from "lucide-react";
+import type { TopicManifest, SeriesResponse } from "@/lib/types";
 import type { SeriesRequest } from "@/lib/chart-presets";
 
 type PlotlyType = {
@@ -55,6 +55,10 @@ function ProbeChart({
 
     useEffect(() => {
         let cancelled = false;
+        // cleanup 里要 purge（见下方 return）：unmount 时 React 已把 ref 置 null，
+        // 必须在 effect 同步段捕获元素引用，放进 async 闭包里 cleanup 就够不着了
+        const el = elRef.current;
+        if (!el) return;
 
         void (async () => {
             setState("loading");
@@ -84,7 +88,7 @@ function ProbeChart({
                 }
 
                 const Plotly = await getPlotly();
-                if (cancelled || !elRef.current) return;
+                if (cancelled) return;
 
                 const traces = data.series.map((s, i) => ({
                     x: data.t,
@@ -114,11 +118,11 @@ function ProbeChart({
                     hovermode: "x unified",
                 };
 
-                if (elRef.current.dataset.plotted === "1") {
-                    await Plotly.react(elRef.current, traces, layout, { responsive: true });
+                if (el.dataset.plotted === "1") {
+                    await Plotly.react(el, traces, layout, { responsive: true });
                 } else {
-                    await Plotly.newPlot(elRef.current, traces, layout, { responsive: true });
-                    elRef.current.dataset.plotted = "1";
+                    await Plotly.newPlot(el, traces, layout, { responsive: true });
+                    el.dataset.plotted = "1";
                 }
                 setState("done");
             } catch (e) {
@@ -131,6 +135,11 @@ function ProbeChart({
 
         return () => {
             cancelled = true;
+            // responsive:true 会挂 window resize 监听并持有图数据——不 purge 的话，
+            // 探针页反复加图/删图就持续泄漏（cleanup 时 React 已把 ref 置 null，所以上面捕获了 el）
+            void getPlotly()
+                .then((P) => P.purge(el))
+                .catch(() => {});
         };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

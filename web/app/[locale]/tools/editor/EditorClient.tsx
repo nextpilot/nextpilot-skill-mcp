@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLogProbe } from "@/hooks/useLogProbe";
 import { yamlToPanels } from "@/lib/tools/compile-yaml-preset";
-import { UploadCloud, Loader2, Play, AlertCircle, CheckCircle2, FileCode, X } from "lucide-react";
+import { UploadCloud, Loader2, Play, AlertCircle, CheckCircle2, FileCode } from "lucide-react";
 import type { SeriesResponse } from "@/lib/types";
 import type { PanelSpec, SeriesRequest } from "@/lib/chart-presets";
 
@@ -55,6 +55,10 @@ function PanelChart({
 
     useEffect(() => {
         let cancelled = false;
+        // cleanup 里要 purge（见下方 return）：unmount 时 React 已把 ref 置 null，
+        // 必须在 effect 同步段捕获元素引用，放进 async 闭包里 cleanup 就够不着了
+        const el = elRef.current;
+        if (!el) return;
         void (async () => {
             setState("loading");
             try {
@@ -101,7 +105,7 @@ function PanelChart({
                     }
                 }
 
-                if (cancelled || !elRef.current) return;
+                if (cancelled) return;
 
                 const layout: Record<string, unknown> = {
                     font: { size: 11, color: isDark() ? "#94a3b8" : "#64748b" },
@@ -131,11 +135,11 @@ function PanelChart({
                     })),
                 };
 
-                if (elRef.current.dataset.plotted === "1") {
-                    await Plotly.react(elRef.current, tracesList, layout, { responsive: true });
+                if (el.dataset.plotted === "1") {
+                    await Plotly.react(el, tracesList, layout, { responsive: true });
                 } else {
-                    await Plotly.newPlot(elRef.current, tracesList, layout, { responsive: true });
-                    elRef.current.dataset.plotted = "1";
+                    await Plotly.newPlot(el, tracesList, layout, { responsive: true });
+                    el.dataset.plotted = "1";
                 }
                 setState("done");
             } catch (e) {
@@ -147,6 +151,11 @@ function PanelChart({
         })();
         return () => {
             cancelled = true;
+            // responsive:true 会挂 window resize 监听并持有图数据——编辑预设反复出图，
+            // 不 purge 就持续泄漏（cleanup 时 React 已把 ref 置 null，所以上面捕获了 el）
+            void getPlotly()
+                .then((P) => P.purge(el))
+                .catch(() => {});
         };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

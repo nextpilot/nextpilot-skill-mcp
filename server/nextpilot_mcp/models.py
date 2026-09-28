@@ -119,7 +119,9 @@ class LogSummary(BaseModel):
 class LogEvent(BaseModel):
     """一条日志消息 / 事件。"""
 
-    tSec: float
+    # APM 的 MSG/ERR 行可能没有 TimeUS（providers/ardupilot.py 明确给 None）：
+    # 不允许 None 的话，不带时间窗的 list_events 会在 pydantic 校验时炸掉整条响应。
+    tSec: float | None = Field(default=None, description="相对日志起点的秒数；源日志缺时间戳（如部分 APM MSG 行）时为 None。")
     level: int
     levelStr: str
     kind: str = Field(description="event 等类别；list_events 可按它筛。")

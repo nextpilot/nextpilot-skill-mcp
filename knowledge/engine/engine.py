@@ -750,8 +750,11 @@ def _run_rules(group):
                     _not_applicable = "固件不满足 %s" % _rule["firmware"]
                 elif not _match_vehicle(_rule["vehicle"], _env):
                     _not_applicable = "机架不适用 %s" % _vehicle_label(_rule["vehicle"])
-            except Exception:
-                _not_applicable = None
+            except Exception as _spec_exc:
+                # 规格解析失败（firmware/vehicle 写错类型等）必须**跳过**并说明原因，
+                # 不能吞掉当成"适用"——api.py 的 match_version 契约就是要求这类错误抛
+                # ValueError。吞成 None 的话，错误规则会在所有日志上照跑：误报且无提示。
+                _not_applicable = "规则规格解析失败：%s" % _spec_exc
         if _not_applicable:
             skipped(_rid, _not_applicable)
             continue

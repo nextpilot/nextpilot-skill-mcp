@@ -155,7 +155,7 @@ async function preloadOne(url: string): Promise<boolean> {
  * 两轮都失败也不抛错——让 `importScripts` 照常去试，失败时报它原本的错误，
  * 保持"预热只是加速，不是必需步骤"的定位（比如 SW 未启用的隐私模式下就靠它兜底）。
  */
-async function preloadForImportScripts(baseUrl: string, label: string): Promise<void> {
+async function preloadForImportScripts(baseUrl: string, _label: string): Promise<void> {
     const urls = PRELOAD_FILES.map((name) => baseUrl + name);
     for (let round = 1; round <= 2; round++) {
         // 逐文件下载并汇报进度
@@ -314,6 +314,13 @@ async function getPyodide(): Promise<Pyodide> {
 
         return pyodide!;
     })();
+    // 初始化失败不能把 rejected promise 留在缓存里：否则自托管 + CDN 双失败的瞬时网络抖动，
+    // 会让这个共享 Worker 后续**所有**消息复用同一个 rejection，刷新页面前永不恢复。
+    // 失败时清空，下一条消息会重新走一遍完整初始化（源切换与重试逻辑都在 getPyodide 里）。
+    // `.catch` 的返回值用 void 丢弃——这里只为清缓存，不消费错误，错误由调用方 await 时接管。
+    void pyodidePromise.catch(() => {
+        pyodidePromise = null;
+    });
     return pyodidePromise;
 }
 
@@ -471,6 +478,13 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
         loadedLogId = msg.logId;
         post({ type: "done", report, manifest, info, logId: msg.logId });
     } catch (err) {
+        // analyze 半途失败时，命名空间里可能已经装着**新**日志（exec 引擎 + open_log 已跑、
+        // 后面的步骤才抛错），而 loadedLogId 还是旧的那份——若不清，旧日志的 series/track
+        // 请求会通过 logNotLoadedReason 的指纹校验，拿到另一份日志的数据（错得静悄悄）。
+        // 清掉后取数请求走"未装载"路径，前端 ensureLogLoaded 会重新解析，宁可多解析一次。
+        // （getPyodide 失败走到这里时还没动过命名空间，清掉同样只是多一次重解析，无副作用。
+        //  track/series 的错误在内层就消化了，到不了这个 catch。）
+        loadedLogId = null;
         post({
             type: "error",
             message: err instanceof Error ? `${err.name}: ${err.message}` : "解析失败：" + String(err),

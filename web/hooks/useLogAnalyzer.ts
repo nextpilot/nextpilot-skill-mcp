@@ -708,10 +708,19 @@ export function useLogAnalyzer() {
         };
         sharedListeners.add(onMsg);
         sharedErrorListeners.add(onErr);
+        // Map 实例与 hook 同生命周期（useRef 初始化，不换对象）：捕获一份给 cleanup 用，
+        // 也顺带满足 exhaustive-deps 对"cleanup 里读 ref"的保守提示
+        const pending = pendingRef.current;
         return () => {
             sharedListeners.delete(onMsg);
             sharedErrorListeners.delete(onErr);
-            pendingRef.current.clear();
+            // 卸载时把在途的 series/track 等待者**全部结算**：只 clear 的话这些 Promise
+            // 永远 pending，await 点的异步帧（含其闭包）就挂在内存里等一个不会来的响应。
+            // 哨兵带 error 字段，消费方按"取数失败"处理（如 LogCharts 对 resp.error 直接跳过）。
+            for (const resolve of pending.values()) {
+                resolve({ error: "页面已离开，取数取消" });
+            }
+            pending.clear();
         };
     }, [handleWorkerMessage, refreshMe]);
 

@@ -152,10 +152,12 @@ async def list_events(
     events = raw
     if kinds:
         events = [e for e in events if e.get("kind") in kinds]
+    # tSec 可能为 None（APM 的 MSG/ERR 行缺 TimeUS，见 providers/ardupilot.py）：
+    # 直接比较会 TypeError，带时间窗的查询必须先把没有时间戳的行排掉。
     if start_s is not None:
-        events = [e for e in events if e["tSec"] >= start_s]
+        events = [e for e in events if e.get("tSec") is not None and e["tSec"] >= start_s]
     if end_s is not None:
-        events = [e for e in events if e["tSec"] <= end_s]
+        events = [e for e in events if e.get("tSec") is not None and e["tSec"] <= end_s]
     return EventTimeline(
         total=len(events),
         unfilteredTotal=len(raw),
@@ -195,6 +197,11 @@ async def query_timeseries(
     for f in fields:
         one = {"instance": instance, "ydata": [{"kind": "field", "fields": [f"{message_type}.{f}"]}]}
         r = loader.call(ns, f"np_series({_json_str(one)}, {max_points})")
+        # np_series 取不到数时返回 {"error": …}（topic/字段不存在、没有时间戳列等，
+        # 见 engine.py）——那是写给人看的提示，不检查就 r["t"] 只会变成 KeyError 内部崩溃，
+        # 把已经写好的原因丢掉。AI 客户端传错字段名是必经路径，必须转成可读错误。
+        if "error" in r:
+            raise ValueError(f"取 {message_type}.{f} 失败：{r['error']}")
         if not time:
             time = r["t"]
             full = r.get("fullCount") or len(time)
