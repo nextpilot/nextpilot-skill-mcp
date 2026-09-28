@@ -613,8 +613,11 @@ console.log("\n[13] functions/ 下的端点在本地 dev 垫片里必须可达�
     // `[[default]].js`（EdgeOne 兜底动态路由）不含动态段字面值：它在垫片映射表里
     // 以所在目录的 [id] 代表名出现（如 functions/api/reports/[[default]].js ↔
     // "api/reports/[id]"）。按目录前缀判定映射，避免要求字面键。
+    // `index.js` 是目录自身的入口（functions/api/reports/index.js ↔ "/api/reports"），
+    // 映射表里以去掉 /index 的目录键出现。
     const isMapped = (e) => {
         if (mapped.has(e)) return true;
+        if (e.endsWith("/index")) return mapped.has(e.slice(0, -"/index".length));
         if (!e.endsWith("/[[default]]")) return false;
         const prefix = e.slice(0, -"/[[default]]".length);
         return [...mapped].some((k) => k.startsWith(`${prefix}/`));
