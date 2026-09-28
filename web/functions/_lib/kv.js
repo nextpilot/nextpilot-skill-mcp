@@ -1,6 +1,14 @@
 // KV 绑定获取、key 规则与通用计数。
 // KV 平台约束（官方文档）：key 仅允许字母/数字/下划线、长度 ≤512B；value ≤25MB；
 // 最终一致（60s 全球同步）；put 无 TTL，过期时间写进 value 惰性清理。
+//
+// ⚠️ **平台硬限制（2026-09-28 排查线上确认）**：
+//   1. EdgeOne 官方明确「KV 仅边缘函数可用，Node Functions（opennext SSR 云函数）不支持」
+//      —— Next.js 全栈部署下 /api/* 被 rewrite 进 SSR 垫片（见 next.config.ts），
+//      因此 **SSR 侧拿不到 KV 注入，所有 KV 写路径在该形态下必然降级/丢失**；
+//   2. 绑定变量是**全局变量而非 env 属性**（控制台绑定时的变量名必须与本文件的
+//      NEXTPILOT_KV 约定一字不差），getKv 的 globalThis 通道 + env 兜底扫描就是为
+//      兼容这两种注入方式；若哪天平台给 SSR 也注入了 KV，代码无需再改。
 
 export const FREE_DAILY_QUOTA = 10; // 登录用户每日（冲刺 3 会员体系再分层）
 export const ANONYMOUS_DAILY_QUOTA = 3; // 匿名设备每日

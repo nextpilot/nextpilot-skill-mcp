@@ -77,33 +77,38 @@ const nextConfig: NextConfig = {
     outputFileTracingIncludes: {
         "/**": ["./content/**"],
     },
-    // 仅开发环境：Next 路由未命中的 /api、/internal 转给边缘函数垫片（app/edge-dev）。
-    // afterFiles 保证 /api/auth/*（NextAuth）等真实路由优先，生产构建不注册这些 rewrite。
+    // /api、/internal 未命中真实 Next route 时转给边缘函数垫片（app/edge-dev）。
     //
-    // 负向排除清单 = 需要真实 Next route 的前缀（auth 之外新增了 skills/）：
-    // 实测 afterFiles 在 dev 下会**抢在真实 route 之前** rewrite，所以凡是有真实
-    // route 的前缀必须在这里放行，否则本地被转进垫片白名单、静默 404。
-    // skills/ = Skill 安装包下载（app/api/skills/[slug]/download）：zip 打包要
-    // node:fs + jszip，边缘函数运行时没有文件系统，只能在 Node 侧做。
+    // ⚠️ 必须用 **beforeFiles**，不能用 afterFiles：Next.js 原生语义里 afterFiles 在
+    // 动态路由之前执行（本地 dev/prod 实测 /api/me 都能正常 rewrite 进垫片），但
+    // EdgeOne 的 opennext 适配器在平台路由层会**先匹配动态页面路由再处理 afterFiles
+    // rewrite**——线上 /api/me 被 app/[locale]/me（个人中心页）截胡，返回 HTML 而不是
+    // JSON（2026-09-28 线上复现，本地 next start 无法复现）。beforeFiles 在一切文件
+    // 系统（含动态）路由之前执行，两端行为一致。
+    //
+    // 负向排除清单 = 需要真实 Next route 的前缀：
+    //   · auth/   —— NextAuth（app/api/auth/**）
+    //   · skills/ —— Skill 安装包 zip 下载（app/api/skills/[slug]/download）：打包要
+    //     node:fs + jszip，边缘/垫片运行时没有完整文件系统，只能在 Node 侧做
+    //   · ping    —— 冒烟探针（app/api/ping），故意保留真实 route：它 200 说明"真实
+    //     Next route 可达"，走垫片就失去对照意义
+    // 注意 beforeFiles 优先级最高，漏排一个前缀 = 该真实 route 永远到不了（被转进垫片
+    // 白名单外、静默 404），新增真实 API route 时必须同步加进这里。
     async rewrites() {
-        const rules = {
+        return {
             beforeFiles: [
                 // /.well-known/security.txt 在部分部署平台中路由层的处理与 Next.js 不一致，
                 // 可能导致 500 内部错误。显式 rewrite 到 /security.txt 兜底。
                 { source: "/.well-known/security.txt", destination: "/security.txt" },
+                // opennext（EdgeOne Next.js 适配器）生成的 SSR 路由会覆盖边缘函数路由，
+                // 导致 /api/*、/internal/* 请求被 SSR 函数劫持，functions/ 边缘函数无法
+                // 执行。dev + 生产统一 rewrite 到 edge-dev 垫片，在 Node 侧运行同一份
+                // functions/ 代码（KV 的平台限制见 functions/_lib/kv.js 头注）。
+                { source: "/api/:path((?!auth/|skills/|ping(?:/|$)).*)", destination: "/edge-dev/api/:path*" },
+                { source: "/internal/:path*", destination: "/edge-dev/internal/:path*" },
             ],
             afterFiles: [] as { source: string; destination: string }[],
         };
-
-        // opennext（EdgeOne Next.js 适配器）生成的 SSR 路由会覆盖边缘函数路由，
-        // 导致 /api/* 请求被 SSR 函数劫持，边缘函数无法执行。因此生产环境同样需要
-        // 将 /api/*、/internal/* rewrite 到 edge-dev 垫片，在 SSR 侧运行函数代码。
-        // 排除 auth（NextAuth 需要真实路由）和 skills（需要 node:fs 打包 zip）。
-        rules.afterFiles.push(
-            { source: "/api/:path((?!auth/|skills/).*)", destination: "/edge-dev/api/:path*" },
-            { source: "/internal/:path*", destination: "/edge-dev/internal/:path*" },
-        );
-        return rules;
     },
 };
 
