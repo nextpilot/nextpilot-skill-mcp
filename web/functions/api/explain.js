@@ -298,3 +298,10 @@ ${markdown}`;
 
     return jsonResponse({ markdown, reportId: body.reportId, quota });
 }
+
+// GET 不拦截就会穿透回源（opennext 不应用 rewrites），落到 [locale] 得 404 HTML、
+// 还会被 EdgeOne CDN 缓存约 5 分钟（2026-09-28 线上实测）。照 issues.js 的模式
+// 显式 405，让请求在边缘层被接住。
+export function onRequestGet() {
+    return jsonResponse({ ok: false, error: "请用 POST 上送 findings" }, 405);
+}
