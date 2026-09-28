@@ -97,7 +97,14 @@ const nextConfig: NextConfig = {
     // API 响应禁止 CDN 缓存：EdgeOne CDN 会缓存 404 等 HTML 错误页（实测部署切换
     // 瞬间 /api/explain 的 404 被缓存、eo-cache-status: Cache Hit，且**缓存键忽略
     // query string**，加随机参数也绕不开），导致部署后最长几分钟内该路径所有请求
-    // 都吃到旧错误响应。JSON API / zip 下载全是动态内容，no-store 一刀切最稳。
+    // 都吃到旧错误响应。
+    //
+    // ⚠️ 实测 opennext（EdgeOne Next.js 适配器）**忽略本配置**——线上 /api/me 30aaec9
+    // 构建下响应仍无 cache-control。线上现状：EdgeOne 默认缓存 TTL 约 5 分钟自然过期，
+    // 部署后短暂窗口内可能命中旧错误页（仅 GET；POST 不缓存）。要根治需在 EdgeOne
+    // 控制台给 /api/*、/internal/* 配节点缓存规则（不缓存），middleware matcher 目前
+    // 刻意排除 api|internal（next-intl 边界），不宜为加固去动它。
+    // 本配置保留的原因：本地 next start（原生 Next）下生效，对自托管/其他平台有效。
     async headers() {
         return [
             { source: "/api/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
