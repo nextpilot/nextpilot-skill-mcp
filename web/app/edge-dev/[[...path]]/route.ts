@@ -35,9 +35,9 @@ const handlers: Record<string, () => Promise<Record<string, unknown>>> = {
     "api/me": () => import("@/functions/api/me.js"),
     "api/explain": () => import("@/functions/api/explain.js"),
     "api/reports": () => import("@/functions/api/reports/index.js"),
-    // 详情走同目录 [id].js；列表用 index.js 与其共存，避免「与同名文件共存的子目录
-    // 被 EdgeOne 丢弃」的坑（见 functions/api/reports/index.js 头注）。
-    "api/reports/[id]": () => import("@/functions/api/reports/[id].js"),
+    // 详情/删除走 /api/reports/detail?id=<id>（静态名）。EdgeOne 边缘层不部署带动态段
+    // [xxx] 的函数文件名，见 functions/api/reports/detail.js 头注。
+    "api/reports/detail": () => import("@/functions/api/reports/detail.js"),
     "api/rating": () => import("@/functions/api/rating.js"),
     "api/comments": () => import("@/functions/api/comments.js"),
     "api/favorite": () => import("@/functions/api/favorite.js"),
@@ -63,10 +63,6 @@ if (process.env.NODE_ENV === "development") {
 async function invoke(req: NextRequest, path: string[]): Promise<Response> {
     let handlerKey = path.join("/");
     let params: Record<string, string> = {};
-    if (!(handlerKey in handlers) && path[0] === "api" && path[1] === "reports" && path.length === 3) {
-        handlerKey = "api/reports/[id]";
-        params = { id: path[2] };
-    }
     const loader = handlers[handlerKey];
     if (!loader) return new Response("not found", { status: 404 });
 

@@ -64,7 +64,7 @@ export function AnalyzeResultClient() {
                 return;
             }
             try {
-                const resp = await fetch(`/api/reports/${id}`);
+                const resp = await fetch(`/api/reports/detail?id=${encodeURIComponent(id)}`);
                 if (!resp.ok) throw new Error("not found");
                 const data = await resp.json();
                 if (data.report) await openSaved(data.report);

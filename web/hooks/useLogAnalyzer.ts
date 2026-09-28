@@ -882,7 +882,7 @@ export function useLogAnalyzer() {
                     if (existing.source === "cloud") {
                         // 云端列表只给了摘要，先取回完整记录再走统一的打开路径
                         try {
-                            const resp = await fetch(`/api/reports/${existing.id}`);
+                            const resp = await fetch(`/api/reports/detail?id=${encodeURIComponent(existing.id)}`);
                             if (resp.ok) {
                                 const data = await resp.json();
                                 if (data.report) opened = await openSaved(data.report);
@@ -1006,7 +1006,7 @@ export function useLogAnalyzer() {
     const deleteCloud = useCallback(
         async (id: string) => {
             try {
-                await fetch(`/api/reports/${encodeURIComponent(id)}`, { method: "DELETE" });
+                await fetch(`/api/reports/detail?id=${encodeURIComponent(id)}`, { method: "DELETE" });
             } catch {
                 // 网络失败就保持列表不动，用户还能再试
             }
