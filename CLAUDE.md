@@ -552,6 +552,36 @@ const PYODIDE_INDEX_URL = process.env.NEXT_PUBLIC_PYODIDE_URL || "https://cdn...
 
 **CDN 前提已核实**：jsdelivr 返回 `access-control-allow-origin: *`，跨源 `fetch` 可行，预热不会被 CORS 挡住。
 
+**最终形态：资产自托管在 `web/public/pyodide/`（不依赖任何公网 CDN）**
+
+17MB 资产（Pyodide 运行时 13.2MB + numpy/micropip/lzma/packaging wheel 3.3MB + pyulog 51KB）
+随站点构建分发到 EdgeOne 边缘节点。三者默认值统一为绝对化后的同源路径：
+
+| 位置                                   | 默认值                                          | 作用                                            |
+| -------------------------------------- | ----------------------------------------------- | ----------------------------------------------- |
+| `workers/analysis-worker.ts`           | `/pyodide/v0.27.7/full/`                        | 运行时索引目录（`toAbsoluteUrl()` 转绝对）      |
+| 同上                                   | `/pyodide/wheels/pyulog-1.2.4-py3-none-any.whl` | 跳过 PyPI 索引查询                              |
+| `components/RuntimeCacheRegistrar.tsx` | 同上两者                                        | 转成绝对 URL 后作为 SW 注册参数                 |
+| `public/sw.js`                         | 同上两者                                        | 参数缺失时的兜底（相对 `self.location.origin`） |
+
+> **为什么必须 `toAbsoluteUrl()`**：worker 里 `import()` / `importScripts()` 遇到相对路径是按
+> **worker 脚本自身位置**解析的（不是站点根）。写成裸 `"pyodide.js"` 会请求到
+> `/_next/static/media/pyodide.js`。这正是坑 ② 的成因，所以现在把"转绝对"做成必经步骤。
+>
+> **SW 拦截范围要收窄**：自托管后 `PYODIDE_INDEX` 落到同源下，若 `RUNTIME_PREFIXES` 直接前缀匹配，
+> 会把站点自身的 `/_next/` 一起纳入。所以 `isRuntimeRequest` 对同源请求额外要求命中
+> `/pyodide/` 前缀——**改这里时务必保留这个收窄**。
+
+**抓取工具**：`tools/dev/fetch_pyodide_assets.py`（`--out public` 默认 / `--out cache` 供上传 Blob）。
+它带 4 次指数退避重试 + sha256 校验——**这不是过度设计**：实测 jsdelivr 单文件成功率约一半，
+原版无重试的脚本会随机挂在 TLS 断连上，看起来却像"文件不存在"。pyulog 官方源
+（`files.pythonhosted.org` / 清华镜像）从境内均被 TLS 断连挡住，**只有阿里云 simple 索引可达**，
+脚本已内置该回退路径。
+
+**这些目录必须排除在工具扫描外**：`.prettierignore`（`**/public/pyodide/`）与
+`eslint.config.mjs`（`**/public/pyodide/**`）。漏了后者，eslint 会去解析 `pyodide.asm.js`
+并报出**上万条 `no-undef`**——这类噪音会淹没真实问题。
+
 ### 6.3 数据模型（EdgeOne KV + Blob）
 
 当前按 "KV 存元数据、Blob 存大对象" 分工，实体字段保持与远期关系型表结构一致，便于迁移：

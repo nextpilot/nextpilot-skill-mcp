@@ -16,19 +16,38 @@ import { PY_ULG_ENGINE } from "./analysis-engine.generated";
 import type { LogInfo, TopicManifest } from "@/lib/types";
 import type { SeriesRequest } from "@/lib/chart-presets";
 
-// 默认走 jsdelivr CDN；生产建议改 NEXT_PUBLIC_PYODIDE_URL 指向自托管（EdgeOne Blob）——
-// 国内访问 jsdelivr / PyPI 都不稳，自托管后运行时与 wheel 都是一次下载、长期缓存。
+// 运行时资产的自托管路径（随站点一起部署，见 web/public/pyodide/）。
 //
-// ⚠️ 这里必须用 `||` 而不是 `??`：.env 里把变量**留空**（`NEXT_PUBLIC_PYODIDE_URL=`）是很自然的
-// 写法，而 Next.js 会把它替换成**空字符串**（不是 undefined）。`??` 只在 null/undefined 时兜底，
-// 空字符串会漏过去，于是拼出 `"pyodide.js"` 这种**相对路径** —— `importScripts` 相对 worker
-// 脚本位置解析，请求地址直接错掉，报的却是 "failed to load" 这种看不出根因的错。
-// 2026-09-28 线上真实踩过这个坑（构建产物里躺着裸串 `"pyodide.js"`）。
-const PYODIDE_INDEX_URL = process.env.NEXT_PUBLIC_PYODIDE_URL || "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/";
+// 为什么默认自托管而不是公网 CDN：jsdelivr 从国内访问随机 TLS 断连（实测单文件成功率约一半），
+// 而 `pyodide.asm.js` 是 `importScripts` **同步**加载的 1.25MB——中途断流整块失败。
+// 资产由 `tools/dev/fetch_pyodide_assets.py` 抓取，随站点构建分发到 EdgeOne 边缘节点。
+const PYODIDE_LOCAL_PATH = "/pyodide/v0.27.7/full/";
+
+/**
+ * 把「可能是相对路径」的索引目录转成绝对 URL。
+ *
+ * **必须转**：worker 里 `import()` / `importScripts()` 遇到相对路径是按 **worker 脚本自身位置**
+ * 解析的，不是站点根目录——写成 `"pyodide.js"` 会请求到 `/_next/static/media/pyodide.js` 这种
+ * 错误地址。2026-09-28 线上就是这么炸的（空环境变量 → 裸相对路径）。
+ * Service Worker 的缓存前缀也需要绝对 URL 才能匹配。
+ */
+function toAbsoluteUrl(path: string): string {
+    if (/^https?:\/\//i.test(path)) return path;
+    // worker 的 self.location 就是站点自身的源（同源部署），用 origin 拼绝对地址
+    const origin = self.location?.origin ?? "";
+    return origin + (path.startsWith("/") ? path : "/" + path);
+}
+
+// 环境变量可覆盖（想换回公网 CDN 或指向 Blob 时不用改代码）；
+// 用 `||` 而非 `??`：.env 里留空会得到空字符串，`??` 兜不住（2026-09-28 踩过）。
+const PYODIDE_INDEX_URL = toAbsoluteUrl(process.env.NEXT_PUBLIC_PYODIDE_URL || PYODIDE_LOCAL_PATH);
 
 // pyulog 的 wheel 地址（可选）。给了就直接装这个文件：**跳过 PyPI 索引查询**（那一步每次
-// 都要联网、且不受缓存保护），配合自托管就是"下载一次"。用 tools/dev/fetch_pyodide_assets.py 抓。
-const PYULOG_WHEEL = process.env.NEXT_PUBLIC_PYULOG_WHEEL || "";
+// 都要联网、且不受缓存保护），配合自托管就是"下载一次"。
+// 默认走自托管 wheel：由 tools/dev/fetch_pyodide_assets.py 抓取，版本随该脚本更新。
+// 升级 pyulog 时：重跑脚本拿到新 wheel，改这里的文件名（路径变了 SW 缓存会自动失效重下）。
+const PYULOG_WHEEL =
+    process.env.NEXT_PUBLIC_PYULOG_WHEEL || toAbsoluteUrl("/pyodide/wheels/pyulog-1.2.4-py3-none-any.whl");
 
 export type WorkerStage = "loading-runtime" | "installing-parser" | "parsing" | "done";
 

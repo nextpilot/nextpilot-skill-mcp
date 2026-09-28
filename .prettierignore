@@ -12,6 +12,8 @@
 **/content/mcp/
 **/.generated/
 **/public/params/
+# Pyodide 运行时资产（17MB，由 tools/dev/fetch_pyodide_assets.py 抓取，第三方二进制/压缩产物）
+**/public/pyodide/
 
 # ========== build:kb 生成物 ==========
 # analysis-engine.generated.ts 已被下面 **/*.generated.* 覆盖

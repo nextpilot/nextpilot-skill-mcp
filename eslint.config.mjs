@@ -14,6 +14,9 @@ export default [
             "**/node_modules/**",
             "**/*.ts",
             "**/*.tsx",
+            // Pyodide 运行时与 wheel（第三方产物，由 tools/dev/fetch_pyodide_assets.py 抓取）。
+            // 不排除的话 eslint 会去解析 pyodide.js / pyodide.asm.js，报出上万条 no-undef。
+            "**/public/pyodide/**",
         ],
     },
     js.configs.recommended,
