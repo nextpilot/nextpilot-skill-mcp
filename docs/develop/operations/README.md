@@ -9,7 +9,7 @@
   ├─ Next.js SSR（Node 运行时，ssr-node）
   │    /login                      登录页
   │    /api/auth/*                 next-auth v5：GitHub OAuth、邮箱验证码（Credentials）
-  │    /api/auth/otp/request       生成验证码 + QQ SMTP 发信，经 AUTH_INTERNAL_SECRET 调内部边缘函数
+  │    /api/auth/otp/request       生成验证码 + QQ SMTP 发信，经 AUTH_EDGE_SECRET 调内部边缘函数
   │
   └─ Edge Functions（V8 边缘运行时，web/functions/，可访问 KV）
        /api/me                     会话 + 本月配额
@@ -56,14 +56,14 @@ edgeone pages dev         # 本地同时跑 Next、functions、KV 模拟
 
 ```bash
 openssl rand -base64 32   # AUTH_SECRET
-openssl rand -hex 24      # AUTH_INTERNAL_SECRET
+openssl rand -hex 24      # AUTH_EDGE_SECRET
 ```
 
 | 变量                                            | 说明                                                                                     |
 | ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | `AUTH_SECRET`                                   | 会话 JWE 密钥，Node 与边缘函数共享，改了全员掉线                                         |
 | `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET`         | GitHub OAuth App                                                                         |
-| `AUTH_INTERNAL_SECRET`                          | SSR ↔ `/functions/internal/*` 共享密钥                                                   |
+| `AUTH_EDGE_SECRET`                              | SSR ↔ `/functions/internal/*` 共享密钥（探针 `/api/kv-probe`、`/api/issue-probe` 同用）  |
 | `SITE_URL`                                      | 公网源站，Node 侧同源调内部函数用，如 `https://skill.nextpilot.org`                      |
 | `SMTP_*`                                        | QQ/163 SMTP，`SMTP_PASS` 填**邮箱授权码**（QQ 邮箱 → 设置 → 账户 → 开启 SMTP）           |
 | `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL`           | 边缘函数 `/api/explain` 读取                                                             |
@@ -100,6 +100,8 @@ openssl rand -hex 24      # AUTH_INTERNAL_SECRET
 2. 创建命名空间：`nextpilot_skill_mcp`（**已开通**）。
 3. 绑定到 Pages 项目，**变量名 `NEXTPILOT_KV`**（绑定，不是环境变量）。绑定后需重新部署才生效。
 4. 部署后访问 `GET /api/kv-probe` 验证：返回的 `kv.after` 每次 +1 即绑定成功。（根级 `/kv-probe` 已退役，直接 404。）
+   探针带内部密钥访问：`curl -H "x-internal-secret: $AUTH_EDGE_SECRET" https://<域名>/api/kv-probe`
+   —— kv-probe / issue-probe 与 `/internal/*` 走同一道门，不带密钥一律 403（防 KV 键位枚举）。
 
 > 命名空间名称本身不影响代码（代码只认绑定变量名 `NEXTPILOT_KV`）；控制台里绑定变量名若被固定成别的名字，
 > `getKv()` 会退化为「在 env 中查找具备 get/put/list 的对象」，仍能取到。
@@ -135,7 +137,7 @@ KV key 规则（代码见 `functions/_lib/kv.js`）：
 | `/api/explain` 返回 503 | 边缘函数未配 `DEEPSEEK_API_KEY`                                                                                                                                                                             |
 | 登录后仍 401            | 检查生产是否 HTTPS（cookie 名 `__Secure-` 前缀）；边缘函数与 SSR 的 `AUTH_SECRET` 是否一致                                                                                                                  |
 | 验证码发不出            | `SMTP_*` 是否配置；QQ 授权码是否正确；Node 函数出网 465 是否可用                                                                                                                                            |
-| `/internal/*` 403       | `AUTH_INTERNAL_SECRET` 未配或不一致                                                                                                                                                                         |
+| `/internal/*` 403       | `AUTH_EDGE_SECRET` 未配或不一致（探针 `/api/kv-probe`、`/api/issue-probe` 同用这把钥匙）                                                                                                                    |
 | KV 报 binding missing   | KV 命名空间（`nextpilot_skill_mcp`）未绑定到 Pages 项目；绑定后需重新部署                                                                                                                                   |
 | 配额数不准              | KV 最终一致，60s 内可能滞后；唯一键设计保证不会重复计数                                                                                                                                                     |
 | 报错没生成 issue        | 访问 `/api/issue-probe`，看 `enabled` / `repo` / `tokenSet` 与 `recentFailures`。**Gitee 的写接口与读接口表现可能不一致**（读 200、写 404 `project or enterprise`），所以必须用 `?write=1` 真发一次才能确认 |
@@ -157,8 +159,8 @@ KV key 规则（代码见 `functions/_lib/kv.js`）：
 部署后自检顺序：
 
 ```text
-GET  /api/issue-probe        确认 enabled=true、repo/tokenSet 正确、readRepo.ok=true
-GET  /api/issue-probe?write=1 确认写入真的通（需要 ISSUE_DEBUG=1）——会建一个 [自动上报] SelfCheck issue
+curl -H "x-internal-secret: $AUTH_EDGE_SECRET" https://<域名>/api/issue-probe          确认 enabled=true、repo/tokenSet 正确、readRepo.ok=true
+curl -H "x-internal-secret: $AUTH_EDGE_SECRET" "https://<域名>/api/issue-probe?write=1" 确认写入真的通（需要 ISSUE_DEBUG=1）——会建一个 [自动上报] SelfCheck issue
 ```
 
 `write=1` 走正常上报路径，反复自检只会建**一个** issue（同指纹后续都是评论），验完手动关掉即可。

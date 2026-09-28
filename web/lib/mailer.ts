@@ -23,7 +23,9 @@ async function getTransporter() {
         if (t.options?.auth) t.options.auth.pass = pass;
         return transporterPromise;
     }
-    const port = Number(process.env.SMTP_PORT ?? 465);
+    // `??` 兜不住空字符串（控制台把 SMTP_PORT 留空时 env 是 ""，Number("") === 0 → 端口 0，
+    // OTP 邮件全挂）——项目在 Pyodide 路径上踩过同款坑，凡 env 兜底一律用 `||`。
+    const port = Number(process.env.SMTP_PORT) || 465;
     transporterPromise = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port,

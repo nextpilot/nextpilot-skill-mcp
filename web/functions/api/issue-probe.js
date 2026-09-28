@@ -4,11 +4,18 @@
 //
 //   GET /api/issue-probe            只读探测：配置齐不齐、仓库能不能读到
 //   GET /api/issue-probe?write=1    真发一次创建（需要 ISSUE_DEBUG=1）
+//
+// **必须带内部密钥**（请求头 `x-internal-secret`，值为环境变量 AUTH_EDGE_SECRET——
+// 与 /internal/* 同一道门）：
+// 只读探测会回显仓库全名 / tokenSet / labels 与最近几条上报失败原文（运维信息），
+// 且每次访问都真实外呼 Gitee/GitHub——不设防可被脚本刷成第三方 API 的跳板。
 import { getKv, listAll } from "../_lib/kv.js";
-import { jsonResponse } from "../_lib/http.js";
+import { assertInternal, jsonResponse } from "../_lib/http.js";
 import { probeConfig, reportIssue } from "../_lib/issue-filer.js";
 
 export async function onRequestGet({ request, env }) {
+    if (!assertInternal(request, env)) return jsonResponse({ error: "forbidden" }, 403);
+
     const url = new URL(request.url);
     const out = await probeConfig(env);
 
