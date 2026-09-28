@@ -381,7 +381,7 @@
 
 1. **边缘函数文件名里的方括号是字面量，不是通配。** `api/reports/[id].js` 在平台上被当成一个叫 `[id].js` 的精确路径，**实测根本不会被部署**；`[[default]].js` 同理。需要「动态」效果时，只能用**静态文件名 + query 参数**（本仓库最终方案：`/api/reports/detail?id=<id>`，见 6.2.3）。
 2. **同名文件与子目录共存时，子目录会被整个丢弃。** 有 `functions/api/reports.js` 又想建 `functions/api/reports/detail.js`，后者的整个目录树都不部署。修法是都改成目录形式：`reports/index.js` + `reports/detail.js`。
-3. **opennext 运行时不应用 `next.config.ts` 的 `rewrites`**（`beforeFiles` / `afterFiles` 实测均无效）。`next.config.ts` 的 rewrite 只对本地 `next start` 生效，线上 `beforeFiles` 之所以「看起来有效」，是它同时被编译进了构建产物、由 Next 自己的路由层处理——**别指望改 `next.config.ts` 能修复线上路由**。
+3. **opennext 运行时不应用 `next.config.ts` 的 `rewrites`**（`beforeFiles` / `afterFiles` 实测均无效，实证见 6.2.2 的两端对比实验）。`next.config.ts` 的 rewrite 只对本地 dev / `next start` 生效，线上 `/api/*` 的可达性由「边缘函数精确匹配 → SSR 文件系统路由」直接决定——**别指望改 `next.config.ts` 能修复线上路由**。
 
 **判执行层的响应头指纹**（排查第一步永远是先看它）：
 
@@ -402,15 +402,31 @@
   - **没有真实 route** → 落入页面世界（`app/[locale]/` 通配 / 404），**返回的是 HTML 而不是 JSON**。
   - 兜底：`app/api/[[...path]]/route.ts` 在路由排序里垫底，接住所有其他谁都没匹配的 `/api/*`，统一返回 `{"error":"not found"}` 404 JSON，**终结「返回 HTML」这种最难认的失败形态**。
 
-**`next.config.ts` 的 `beforeFiles` rewrite 是本地与线上行为的调和层**，但有个必须同步维护的负向排除清单（`source: "/api/:path((?!auth/|skills/|ping(?:/|$)).*)"`）——它把需要**真实 Next route** 的前缀排除在外，让它们不要被转进垫片：
+**两份「负向排除」要分开看，生效范围完全不同：**
+
+| 清单                                                   | 位置             | 线上                     | 本地 | 作用                                   |
+| ------------------------------------------------------ | ---------------- | ------------------------ | ---- | -------------------------------------- |
+| rewrite 排除 `auth/`、`skills/`、`ping`                | `next.config.ts` | ❌ 整条 rewrite 都不生效 | ✅   | 保真实 route 在本地不被转进垫片        |
+| matcher 排除 `api\|internal\|_next\|_vercel\|edge-dev` | `proxy.ts`       | ✅ 编译进构建产物        | ✅   | 防 next-intl 给 API 路径加 locale 前缀 |
+
+rewrite 的负向排除（`source: "/api/:path((?!auth/|skills/|ping(?:/|$)).*)"`）把需要**真实 Next route** 的前缀留下，不让它们在本地被转进垫片：
 
 - `auth/` —— NextAuth（`app/api/auth/**`）
 - `skills/` —— Skill 安装包 zip 下载（要 `node:fs` + jszip，只能 Node 侧做）
 - `ping` —— 冒烟探针，**故意保留真实 route**：它 200 才说明「真实 Next route 可达」，走垫片就失去对照意义
 
-> ⚠️ **新增真实 API route 时必须同步把其前缀加进这个负向排除**。漏一个 = 该真实 route 永远到不了（被转进垫片、白名单外、静默 404）。这个 rewrite 必须用 **`beforeFiles`**：`afterFiles` 在 Next 原生语义下位于动态路由之前（本地 dev/prod 实测 `/api/me` 都能正常 rewrite），但 **opennext 在平台路由层会先匹配动态页面路由再处理 `afterFiles`**，导致线上 `/api/me` 被 `app/[locale]/me`（个人中心页）截胡、返回 HTML——2026-09-28 线上复现，本地 `next start` 无法复现，这是「本地好、线上坏」的典型样本。
+> **实证（2026-09-28，同一请求两端对比，rewrite 归属一锤定音）**：
+>
+> | 请求                    | 本地（rewrite 生效）                  | 线上（rewrite 不生效）                         |
+> | ----------------------- | ------------------------------------- | ---------------------------------------------- |
+> | `/api/nonexistent`      | 转进垫片 → `not found` **纯文本** 404 | 直达 `app/api/[[...path]]` 兜底 → **JSON** 404 |
+> | `/internal/nonexistent` | 转进垫片 → 纯文本 404                 | 无人接 → Next **HTML** 404 页                  |
+>
+> 若线上也应用 rewrite，两端应返回同一个垫片文本响应——实际没有。所以线上 `/api/ping`、`/api/auth/**` 可达，**不是「被排除救了」，而是整条 rewrite 在线上根本不执行**（穿透 SSR 后直接命中文件系统路由）。
+>
+> ⚠️ **新增真实 API route 时仍必须同步把其前缀加进 rewrite 的负向排除**——但要说清后果发生在哪：**本地**（以及任何自托管 Next 部署）漏一个 = 该 route 被转进垫片、垫片白名单没登记 → **本地静默 404**；线上因 rewrite 整条失效反而不受影响。本地先炸就足以堵死联调，照加不误。rewrite 用 **`beforeFiles`** 不用 `afterFiles`：历史上 opennext 平台层曾先匹配动态页面路由再处理 `afterFiles`，线上 `/api/me` 被 `app/[locale]/me`（个人中心页）截胡返回 HTML（2026-09-28 复现）。平台行为可能随版本变化，**判层永远以 6.2.1 的响应头指纹实测为准，不要凭配置推断**。
 
-**dev + 线上共用同一份垫片**：`/api/*`、`/internal/*` 统一 rewrite 到 `app/edge-dev/[[...path]]/route.ts`，它在 Node 侧动态 import 同一份 `functions/` 代码，保证本地能跑。垫片里是一张**显式白名单**（`const handlers`），**漏一项就是「该功能本地整条静默 404」**——`scripts/test-issue-filer.mjs` §[13] 会拿 `functions/` 的目录清单核对这张表，漏了会红。新增 `functions/` 端点时必须同时加进垫片白名单。
+**垫片是本地的桥**：本地没有边缘运行时，rewrite 把 `/api/*`、`/internal/*` 转到 `app/edge-dev/[[...path]]/route.ts`，在 Node 侧动态 import 同一份 `functions/` 代码——保证本地与线上跑的是**同一份逻辑**（线上由平台边缘函数层直接执行，不经垫片）。垫片里是一张**显式白名单**（`const handlers`），**漏一项就是「该功能本地整条静默 404」**——`scripts/test-issue-filer.mjs` §[13] 会拿 `functions/` 的目录清单核对这张表，漏了会红。新增 `functions/` 端点时必须同时加进垫片白名单。
 
 ### 6.2.3 路由只有两类，不要给任何路径开特例
 

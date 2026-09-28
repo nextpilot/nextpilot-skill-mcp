@@ -1,12 +1,15 @@
 /**
- * 边缘函数垫片（dev + prod 均生效）。
+ * 边缘函数垫片（仅本地生效）。
  *
- * pnpm dev 没有 EdgeOne Functions 运行时，通过 next.config 的 afterFiles rewrite
- * 把 /api/*、/internal/* 转到这里，用内存 KV（lib/dev/dev-kv）执行 functions/ 代码。
+ * pnpm dev / next start 没有 EdgeOne Functions 运行时，通过 next.config 的
+ * beforeFiles rewrite 把 /api/*、/internal/* 转到这里，用内存 KV（lib/dev/dev-kv）
+ * 执行 functions/ 代码，保证本地与线上跑的是同一份逻辑。
  *
- * 生产环境 EdgeOne 的 opennext 适配器生成的 SSR 路由会覆盖边缘函数路由，
- * /api/* 请求被 SSR 函数劫持后同样 rewrite 到这里，在 Node.js 侧执行同一份
- * functions/ 代码（KV 由 EdgeOne 平台注入 process.env）。
+ * 生产环境不经过这里：functions/ 下的文件由 EdgeOne 平台按「纯字符串精确路径」
+ * 部署为边缘函数直接执行（KV 在该层注入）；没有边缘函数文件的 /api/* 穿透到 SSR，
+ * 走真实 route 或 app/api/[[...path]] 兜底。opennext 运行时不应用 next.config 的
+ * rewrites（2026-09-28 实测：同一个不存在的端点，本地吃到本垫片的纯文本 404，
+ * 线上吃到兜底 route 的 JSON 404——两端响应来自不同层，证明线上没有 rewrite）。
  */
 import { NextRequest } from "next/server";
 import { installDevKv } from "@/lib/dev/dev-kv";
