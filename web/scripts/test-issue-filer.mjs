@@ -589,9 +589,14 @@ console.log("\n[13] functions/ 下的端点在本地 dev 垫片里必须可达�
     const mapBody = mapAt >= 0 && mapEnd > mapAt ? route.slice(mapAt, mapEnd) : "";
     check("垫片里有显式处理器映射表", mapBody.length > 0);
     // 键可能带引号（"api/reports/[id]"）也可能不带（ping）
-    const mapped = new Set(
-        [...mapBody.matchAll(/^\s*"?([A-Za-z0-9\-_/[\]]+)"?\s*:\s*\(\s*\)\s*=>/gm)].map((m) => m[1]),
-    );
+    //
+    // 还包含映射表**之后的条件注册**（如 `if (NODE_ENV === "development") { handlers["api/blob"] = ... }`）：
+    // 那类端点只在特定环境下可达，但仍必须在垫片里注册，不能算漏项。
+    const mapped = new Set([
+        ...[...route.matchAll(/^\s*"?([A-Za-z0-9\-_/[\]]+)"?\s*:\s*\(\s*\)\s*=>/gm)].map((m) => m[1]),
+        // 条件注册写法：handlers["api/blob"] = () => import(...)
+        ...[...route.matchAll(/handlers\["([A-Za-z0-9\-_/[\]]+)"\]\s*=\s*\(\s*\)\s*=>/g)].map((m) => m[1]),
+    ]);
 
     // 端点 = functions/ 目录树里的每个 .js；`_` 开头的（_lib）是共享库，不是端点
     const endpoints = [];
@@ -605,7 +610,16 @@ console.log("\n[13] functions/ 下的端点在本地 dev 垫片里必须可达�
     walk(join(WEB, "functions"), "");
     check("扫到了端点清单", endpoints.length > 0, `实际 ${endpoints.length} 个`);
 
-    const missing = endpoints.filter((e) => !mapped.has(e));
+    // `[[default]].js`（EdgeOne 兜底动态路由）不含动态段字面值：它在垫片映射表里
+    // 以所在目录的 [id] 代表名出现（如 functions/api/reports/[[default]].js ↔
+    // "api/reports/[id]"）。按目录前缀判定映射，避免要求字面键。
+    const isMapped = (e) => {
+        if (mapped.has(e)) return true;
+        if (!e.endsWith("/[[default]]")) return false;
+        const prefix = e.slice(0, -"/[[default]]".length);
+        return [...mapped].some((k) => k.startsWith(`${prefix}/`));
+    };
+    const missing = endpoints.filter((e) => !isMapped(e));
     check(
         "functions/ 下每个端点都在垫片映射表里",
         missing.length === 0,

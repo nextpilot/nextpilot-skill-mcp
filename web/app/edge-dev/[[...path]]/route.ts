@@ -35,7 +35,10 @@ const handlers: Record<string, () => Promise<Record<string, unknown>>> = {
     "api/me": () => import("@/functions/api/me.js"),
     "api/explain": () => import("@/functions/api/explain.js"),
     "api/reports": () => import("@/functions/api/reports.js"),
-    "api/reports/[id]": () => import("@/functions/api/reports/[id].js"),
+    // 动态段用 [[default]].js（而非 [id].js）：EdgeOne 边缘函数层实测不部署
+    // 子目录 + 一级动态段（见该文件头注），垫片跟随同一份实现保证两端一致。
+    // 垫片路由用 [id] 键名，invoke() 里的 reports 分支按 path 长度匹配后查这张表。
+    "api/reports/[id]": () => import("@/functions/api/reports/[[default]].js"),
     "api/rating": () => import("@/functions/api/rating.js"),
     "api/comments": () => import("@/functions/api/comments.js"),
     "api/favorite": () => import("@/functions/api/favorite.js"),

@@ -5,6 +5,19 @@ import { useSession } from "next-auth/react";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { AdminSettingsForm, type SettingFieldView } from "./AdminSettingsForm";
 
+/** 读边界归一：网络响应先按 unknown 收，再逐字段收敛（不直接 as 具名类型，见 CI §[10]）。 */
+function normalizeSettingsPayload(raw: unknown): { settings: Record<string, string>; fields: SettingFieldView[] } {
+    const obj = (raw ?? {}) as Record<string, unknown>;
+    const settings: Record<string, string> = {};
+    if (obj.settings && typeof obj.settings === "object") {
+        for (const [k, v] of Object.entries(obj.settings as Record<string, unknown>)) {
+            if (typeof v === "string") settings[k] = v;
+        }
+    }
+    const fields = Array.isArray(obj.fields) ? (obj.fields as SettingFieldView[]) : [];
+    return { settings, fields };
+}
+
 export default function AdminSettingsPage() {
     const { data: session, status } = useSession();
     const [fields, setFields] = useState<SettingFieldView[]>([]);
@@ -21,15 +34,13 @@ export default function AdminSettingsPage() {
                     return null;
                 }
                 if (!res.ok) throw new Error(`${res.status}`);
-                return res.json() as Promise<{
-                    settings?: Record<string, string>;
-                    fields?: SettingFieldView[];
-                }>;
+                return res.json() as unknown;
             })
             .then((data) => {
                 if (!data) return;
-                setSettings(data.settings ?? {});
-                setFields(data.fields ?? []);
+                const parsed = normalizeSettingsPayload(data);
+                setSettings(parsed.settings);
+                setFields(parsed.fields);
             })
             .catch((err) => {
                 setError(err instanceof Error ? err.message : "加载失败");
