@@ -19,7 +19,7 @@
 
 ## 目录
 
-- `code-style.md` —— 代码风格、注释规范、打印消息、提交消息与文档规范（**已成文**；CLAUDE.md §6.8.x 只留指针）
+- `code-style.md` —— 代码风格、注释规范、打印消息、提交消息与文档规范（**已成文**；本仓风格要求的唯一权威落点）
 - `checks-by-stage.md` —— 检查的分类、分阶段安排与实测耗时（**已成文**）
 - `testing-at-a-glance.md` —— 测试流程速查：什么时候自动跑什么、耗时、红了怎么办（**已成文**；要论证看 `checks-by-stage.md`）
 - `architecture/` —— 系统边界与数据流（待写；现状速览暂在 `operations/README.md` 第 1 节）
