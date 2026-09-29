@@ -14,6 +14,13 @@
 """
 
 import struct
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger("apm-sample")
 
 MAGIC = b"\xa3\x95"
 
@@ -127,11 +134,9 @@ def build_sample_bytes() -> bytes:
 
 
 if __name__ == "__main__":
-    import sys
-
     if len(sys.argv) != 2:
-        print(__doc__)
+        log.info(__doc__)
         raise SystemExit(2)
     with open(sys.argv[1], "wb") as f:
         f.write(build_sample_bytes())
-    print("written:", sys.argv[1])
+    log.info("OK written: %s" % sys.argv[1])

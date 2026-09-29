@@ -5,7 +5,13 @@ Only KNOWN top-level keys at their expected indent levels are section boundaries
 
 import os
 import re
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger("format-rules")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PX4_RULES_DIR = REPO_ROOT / "knowledge" / "px4" / "rules"
@@ -267,20 +273,20 @@ def main(dry_run=False):
                 if dry_run:
                     ol = original.count("\n")
                     fl = formatted.count("\n")
-                    print(f"  ~ {label}/{fname}: {ol} -> {fl} lines")
+                    log.warning(f"  ~ {label}/{fname}: {ol} -> {fl} lines")
                 else:
                     with open(filepath, "w", encoding="utf-8") as f:
                         f.write(formatted)
-                    print(f"  OK  {label}/{fname}")
+                    log.info(f"  OK  {label}/{fname}")
             else:
-                print(f"  -- {label}/{fname} (no change)")
+                log.info(f"  -- {label}/{fname} (no change)")
 
-        print(f"\n  [{label}] {len(files)} files, {changed} changed")
+        log.info(f"\n  [{label}] {len(files)} files, {changed} changed")
         total_files += len(files)
         total_changed += changed
 
-    print(f"\nTotal: {total_files} files, {total_changed} changed")
+    log.info(f"\nTotal: {total_files} files, {total_changed} changed")
 
 
 if __name__ == "__main__":
-    main(dry_run="--dry" in os.sys.argv or "--check" in os.sys.argv)
+    main(dry_run="--dry" in sys.argv or "--check" in sys.argv)

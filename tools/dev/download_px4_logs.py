@@ -29,6 +29,11 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger("px4-logs")
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DEST = REPO_ROOT / ".cache" / "px4" / "logs"
 
@@ -68,7 +73,7 @@ def http_get(url: str, *, timeout: float = 60.0, max_bytes: int | None = None, r
             last_err = err
             if attempt < retries:
                 wait = 2 ** (attempt - 1)
-                print(f"  GET 失败（{err}），{wait}s 后重试：{url[:90]}")
+                log.warning(f"  GET 失败（{err}），{wait}s 后重试：{url[:90]}")
                 time.sleep(wait)
     raise last_err  # type: ignore[misc]
 
@@ -188,7 +193,7 @@ def main() -> int:
         page = fetch_browse_page(start, args.page_size, args.search)
         if total is None:
             total = page.get("recordsTotal")
-            print(f"站点公开日志总数：{total}")
+            log.info(f"站点公开日志总数：{total}")
         rows = page.get("data") or []
         if not rows:
             break
@@ -200,9 +205,9 @@ def main() -> int:
                     break
         start += len(rows)
 
-    print(f"命中候选 {len(candidates)} 条（扫描 {start} 条）")
+    log.info(f"命中候选 {len(candidates)} 条（扫描 {start} 条）")
     for meta in candidates:
-        print(
+        log.info(
             f"  {meta['uuid']}  {meta['date']}  {meta['vehicle_type']:<12} "
             f"{meta['firmware']:<12} {meta['duration']:<7} {meta['hardware']}"
         )
@@ -215,7 +220,7 @@ def main() -> int:
         ulg_path = args.dest / f"{meta['uuid']}.ulg"
         meta_path = args.dest / f"{meta['uuid']}.json"
         if ulg_path.exists() and is_valid_ulg(ulg_path):
-            print(f"[{i + 1}/{len(candidates)}] 已存在，跳过 {meta['uuid']}")
+            log.info(f"[{i + 1}/{len(candidates)}] SKIP 已存在 {meta['uuid']}")
             skipped += 1
             continue
 
@@ -238,21 +243,23 @@ def main() -> int:
                 with index_path.open("a", encoding="utf-8") as f:
                     f.write(json.dumps(meta_out, ensure_ascii=False) + "\n")
                 downloaded += 1
-                print(f"[{i + 1}/{len(candidates)}] 下载 {meta['uuid']} ({len(data) / 1024 / 1024:.1f} MB, {meta['duration']})")
+                log.info(
+                    f"[{i + 1}/{len(candidates)}] 下载 {meta['uuid']} ({len(data) / 1024 / 1024:.1f} MB, {meta['duration']})"
+                )
                 break
             except Exception as err:  # 单条失败不拖垮整批
                 last_err = err
                 if attempt < args.retries:
                     wait = 2 ** (attempt - 1)
-                    print(f"  第 {attempt} 次失败（{err}），{wait}s 后重试…")
+                    log.warning(f"  第 {attempt} 次失败（{err}），{wait}s 后重试…")
                     time.sleep(wait)
         else:
             failed += 1
-            print(f"[{i + 1}/{len(candidates)}] 放弃 {meta['uuid']}：{last_err}")
+            log.err(f"FAIL [{i + 1}/{len(candidates)}] 放弃 {meta['uuid']}：{last_err}")
         if i < len(candidates) - 1 and args.delay:
             time.sleep(args.delay)
 
-    print(f"完成：新下载 {downloaded}，已存在跳过 {skipped}，失败 {failed}，目录 {args.dest}")
+    log.info(f"完成：新下载 {downloaded}，已存在跳过 {skipped}，失败 {failed}，目录 {args.dest}")
     return 1 if failed else 0
 
 

@@ -182,7 +182,8 @@ _REDACT_RULES = [...]
 
 ## 3. 打印消息
 
-**所有输出走 `tools/_logging.py` 的 `get_logger()`，不许裸 `print()`。**
+**本仓的可执行工具（`tools/` 下的 Python）所有输出走 `tools/_logging.py` 的 `get_logger()`，
+不许裸 `print()`。**
 
 | 出口               | 去向             | 用途                                           |
 | ------------------ | ---------------- | ---------------------------------------------- |
@@ -191,6 +192,13 @@ _REDACT_RULES = [...]
 | `log.err()`        | **stderr**       | 失败消息（`log.error()` 同义，新代码用 `err`） |
 | `log.print_*()`    | stdout           | 结构化块（header / step / check / summary）    |
 | `log.write_line()` | stdout（不缓冲） | 伪进度条刷新                                   |
+
+**两类例外，`print` 是对的，不要改：**
+
+- `.githooks/_venv_python.py`：它在 logger 之前运行（负责找到正确的解释器），引 `_logging`
+  会成循环依赖。`.githooks/` 本身是独立部署单元。
+- `web/content/skills/*/scripts/*.py`：这是**发布给用户的 Skill 内容**（打包成 zip 供下载），
+  必须零依赖、可单独执行，不能依赖本仓的 `tools/`。
 
 消息文案约定：
 

@@ -35,6 +35,11 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger("apm-logs")
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DEST = REPO_ROOT / ".cache" / "ardupilot" / "logs"
 
@@ -79,7 +84,7 @@ def http_get(url: str, *, timeout: float = 60.0, max_bytes: int | None = None, r
             last_err = err
             if attempt < retries:
                 wait = 2 ** (attempt - 1)
-                print(f"  GET 失败（{err}），{wait}s 后重试：{url[:90]}")
+                log.warning(f"  GET 失败（{err}），{wait}s 后重试：{url[:90]}")
                 time.sleep(wait)
     raise last_err  # type: ignore[misc]
 
@@ -188,14 +193,14 @@ def main() -> int:
 
     files = fetch_index()
     if not files:
-        print("首页没解析出任何日志文件 —— 页面结构可能变了，检查 FILE_RE")
+        log.err("FAIL 首页没解析出任何日志文件 —— 页面结构可能变了，检查 FILE_RE")
         return 1
-    print(f"首页解析到 {len(files)} 个日志文件")
+    log.info(f"首页解析到 {len(files)} 个日志文件")
 
     targets, groups = select(files, args)
-    print(f"命中 {len(targets)} 条")
+    log.info(f"命中 {len(targets)} 条")
     for f in targets:
-        print(f"  {f['vehicle']:<12} {f['test']:<32} {f['file']}")
+        log.info(f"  {f['vehicle']:<12} {f['test']:<32} {f['file']}")
     if args.list_only:
         return 0
 
@@ -220,7 +225,7 @@ def main() -> int:
         i += 1
         dest = args.dest / f["file"]
         if dest.exists() and is_valid_dataflash(dest):
-            print(f"[{i}] 已存在，跳过 {f['file']}")
+            log.info(f"[{i}] SKIP 已存在 {f['file']}")
             skipped += 1
             done_keys.add(group_key(f))
             continue
@@ -246,13 +251,13 @@ def main() -> int:
                     }
                 )
                 downloaded += 1
-                print(f"[{i}] 下载 {f['file']} ({len(data) / 1024 / 1024:.2f} MB)")
+                log.info(f"[{i}] 下载 {f['file']} ({len(data) / 1024 / 1024:.2f} MB)")
                 break
             except Exception as err:  # 单条失败不拖垮整批
                 last_err = err
                 if attempt < args.retries:
                     wait = 2 ** (attempt - 1)
-                    print(f"  第 {attempt} 次失败（{err}），{wait}s 后重试…")
+                    log.warning(f"  第 {attempt} 次失败（{err}），{wait}s 后重试…")
                     time.sleep(wait)
         else:
             # 列表里已失效的文件会返 404；同组还有别的日志就换一条顶上，同一测试的
@@ -270,16 +275,16 @@ def main() -> int:
             )
             if alt and key not in done_keys:
                 subs[key] = used + 1
-                print(f"[{i}] {f['file']} 拿不到（{last_err}），换同组 {alt['file']} 再试（第 {used + 1} 次）")
+                log.warning(f"[{i}] {f['file']} 拿不到（{last_err}），换同组 {alt['file']} 再试（第 {used + 1} 次）")
                 queue.insert(0, alt)
                 continue
             failed += 1
-            print(f"[{i}] 放弃 {f['file']}：{last_err}")
+            log.err(f"FAIL [{i}] 放弃 {f['file']}：{last_err}")
         done_keys.add(group_key(f))
         if queue and args.delay:
             time.sleep(args.delay)
 
-    print(f"完成：新下载 {downloaded}，已存在跳过 {skipped}，失败 {failed}，目录 {args.dest}")
+    log.info(f"完成：新下载 {downloaded}，已存在跳过 {skipped}，失败 {failed}，目录 {args.dest}")
     return 1 if failed else 0
 
 

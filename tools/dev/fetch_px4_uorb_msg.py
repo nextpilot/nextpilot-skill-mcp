@@ -26,6 +26,11 @@ import tarfile
 import urllib.request
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger("px4-uorb")
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CACHE_DIR = REPO_ROOT / ".cache" / "px4"
 OUT_ROOT = REPO_ROOT / "knowledge" / "px4"
@@ -326,15 +331,15 @@ def sync(tags: list[str], params_url: str, params_tag: str, check: bool, base_ur
         label = f"meta/{tag}.json"
         if check:
             if not out_file.exists() or out_file.read_text(encoding="utf-8") != content:
-                print(f"CHECK FAIL: {label} 与上游不一致，重跑同步")
+                log.err(f"FAIL {label} 与上游不一致，重跑同步")
                 changed = True
             else:
                 n_params = len(params) if tag == params_tag else 0
-                print(f"OK {label}（{len(topics)} 个 topic, {n_params} 个参数）")
+                log.info(f"OK {label}（{len(topics)} 个 topic, {n_params} 个参数）")
         else:
             out_file.parent.mkdir(parents=True, exist_ok=True)
             out_file.write_text(content, encoding="utf-8")
-            print(f"META_WRITTEN {tag} topics={len(topics)} params={len(params) if tag == params_tag else 0}")
+            log.info(f"META_WRITTEN {tag} topics={len(topics)} params={len(params) if tag == params_tag else 0}")
 
     if not check:
         # 清理历史形态：topics/<tag>/*.yaml、topics/<tag>.json、params/<tag>.json|yaml
