@@ -1,4 +1,4 @@
-"""校验机制自身的卫生：四处「坏掉时都没有输出」的裂缝，落成 6 项检查（见 `CLAUDE.md` §6.6）。
+"""校验机制自身的卫生：五处「坏掉时都没有输出」的裂缝，落成 7 项检查（见 `CLAUDE.md` §6.6）。
 
 它们全靠人记得，而人会忘，所以把判据固化成可重跑的检查：
 
@@ -16,6 +16,9 @@
 6. `--with-*` 开关不许从阶段列表反推。开关控制阶段内的步骤，与"跑哪些阶段"正交，要各自独立传给
    check_all.py；写成 `if with_e2e and "ci" not in stages` 而目标步骤住在 ci 里时条件不成立，
    命令照常拼出、退出码照常 0，只是那一步从没跑。
+7. 前端不许裸 `console`。这条没有"坏掉时没输出"的裂缝，它是把 §6.8.3 / code-style §3 那条规范
+   固化成守卫：Python 侧禁裸 print 已有 §6.6 之外的检查，前端侧原本只有 ESLint 不报 console，
+   于是清零后随时会被写回去而不被任何人发现。
 
 第 4、5 项要留意格式契约：本脚本总结行不许写成 `FAIL <名字>`，因为 `tools/ci/mutate_guards.py`
 逐行取 "FAIL 后面的东西" 当检查名（见下面 main()）。
@@ -57,8 +60,16 @@ SKIP_FILES = frozenset(
         "web/workers/analysis-engine.generated.ts",
         "web/workers/prompts.generated.js",
         "tools/_logging.py",
+        # 下面两份是出口本身，文件里当然要出现 console / process.stdout。
+        "web/lib/log.ts",
+        "web/scripts/lib/log.mjs",
     }
 )
+
+# 裸 console 不许出现在源码里，理由与 Python 侧禁止裸 print 同源：
+# console.log 与 console.error 在浏览器/终端里长得几乎一样，失败会被埋进日志流。
+# 唯一例外是出口本身（已进 SKIP_FILES）与 eslint 配置——配置写不了 import。
+CONSOLE_CALL_RE = re.compile(r"\bconsole\.(?:log|info|warn|error|debug|trace|dir|table)\s*\(")
 
 # 走 `git ls-files` 拿清单：`--cached` 是已跟踪的，`--others --exclude-standard` 是还没 add
 # 但没被忽略的。两样都要：只取被跟踪的会让新建文件在 add 之前不在覆盖范围内。
@@ -593,6 +604,38 @@ def check_hook_flags_not_rederived() -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# 5. 前端不许裸 console
+#
+# 与 Python 侧"不许裸 print"是同一条规范的两种语言。没有守卫的话，这次清零过几个月
+# 就会被新代码写回去，而且写回去时不会有任何东西报错。
+# ---------------------------------------------------------------------------
+
+
+def _console_scanned_files() -> list[Path]:
+    """前端源码：只看 web/ 下的 js/ts/tsx，不含产物与 node_modules。"""
+    out = []
+    for path in _scanned_files():
+        if path.suffix not in (".js", ".mjs", ".ts", ".tsx"):
+            continue
+        rel = _rel(path)
+        if not rel.startswith(("web/", "eslint.config.mjs")):
+            continue
+        out.append(path)
+    return out
+
+
+def check_no_raw_console() -> list[str]:
+    problems: list[str] = []
+    for path in _console_scanned_files():
+        code = _js_code_only(_read(path))
+        for m in CONSOLE_CALL_RE.finditer(code):
+            line = code.count("\n", 0, m.start()) + 1
+            problems.append(
+                f"{_rel(path)}:{line} 直接调 {m.group(0).strip()}——前端输出统一走 web/lib/log.ts 的 log.info/log.warn/log.err，"
+                "脚本走 web/scripts/lib/log.mjs；裸 console 会让失败混进日志流，也让 grep 不出问题出在哪"
+            )
+    return problems
+
 
 CHECKS: list[tuple[str, object]] = [
     ("悬空 § 引用", check_section_refs),
@@ -601,6 +644,7 @@ CHECKS: list[tuple[str, object]] = [
     ("打了 FAIL/ERROR 就要能非零退出", check_failure_visible),
     ("坏输入必须非零退出", check_bad_input_exit),
     ("hook 不从阶段列表反推开关", check_hook_flags_not_rederived),
+    ("前端不许裸 console", check_no_raw_console),
 ]
 
 

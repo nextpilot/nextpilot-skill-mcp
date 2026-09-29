@@ -218,8 +218,16 @@ _REDACT_RULES = [...]
 
 ## 3. 打印消息
 
-**本仓的可执行工具（`tools/` 下的 Python）所有输出走 `tools/_logging.py` 的 `get_logger()`，
-不许裸 `print()`。**
+**所有输出走统一出口，不许裸 `print()` / `console.*`。** 出口本身是唯一权威，改了出口要同步改
+`check_hygiene.py` 里认前缀的那条正则（`_REPORT_ATTRS` 与 `JS_FAIL_PRINT_RE`），否则守卫会静默放行。
+
+| 位置             | 出口                                  | 对照                                                         |
+| ---------------- | ------------------------------------- | ------------------------------------------------------------ |
+| `tools/` Python  | `tools/_logging.py` 的 `get_logger()` | `log.info` / `log.warn` / `log.err` / `log.print_*`          |
+| `web/scripts/`   | `web/scripts/lib/log.mjs` 的 `log`    | `log.info` / `log.ok` / `log.warn` / `log.err` / `log.write` |
+| 浏览器与边缘函数 | `web/lib/log.ts` 的 `log`             | `log.info` / `log.warn` / `log.err`                          |
+
+Python 侧出口去向：
 
 | 出口               | 去向             | 用途                                           |
 | ------------------ | ---------------- | ---------------------------------------------- |
@@ -229,7 +237,11 @@ _REDACT_RULES = [...]
 | `log.print_*()`    | stdout           | 结构化块（header / step / check / summary）    |
 | `log.write_line()` | stdout（不缓冲） | 伪进度条刷新                                   |
 
-**两类例外，`print` 是对的，不要改：**
+脚本侧（`log.mjs`）同理：`info` / `ok` / `warn` 走 stdout，`err` 走 stderr，`write` 不换行直写。
+浏览器侧（`log.ts`）的 `err` 走 `console.error`，其余走 `console.log`——浏览器控制台按级别着色，
+`console.log` 与 `console.error` 长得几乎一样，所以失败必须走后者才能被单独筛出来。
+
+**两类例外，`print` / `console` 是对的，不要改：**
 
 - `.githooks/_venv_python.py`：它在 logger 之前运行（负责找到正确的解释器），引 `_logging`
   会成循环依赖。`.githooks/` 本身是独立部署单元。
