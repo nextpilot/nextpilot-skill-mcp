@@ -398,7 +398,7 @@ def check_freshness_gate_alive() -> list[str]:
 _FAIL_MARK_RE = re.compile(r"\s*(?:FAIL|ERROR)\b")
 
 # 会把字串送到人眼前的调用：`print(...)` 与 `log.xxx(...)`。
-_REPORT_ATTRS = frozenset({"print_check", "error", "warning", "critical", "exception", "print"})
+_REPORT_ATTRS = frozenset({"print_check", "error", "warning", "critical", "exception", "err", "print"})
 
 
 def _literal_starts_with_fail(node: ast.AST) -> bool:
