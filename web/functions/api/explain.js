@@ -1,5 +1,5 @@
 // POST /api/explain：登录用户上送端侧确定性引擎产出的 findings，边缘函数配额校验后转发 DeepSeek
-// 生成中文报告，并写 usage 计数与报告记录。架构铁律（CLAUDE.md 4.1/9）：LLM 只翻译 findings，不做数值判断。
+// 生成中文报告，并写 usage 计数与报告记录。架构铁律：LLM 只翻译 findings，不做数值判断。
 import {
     getKv,
     listAll,

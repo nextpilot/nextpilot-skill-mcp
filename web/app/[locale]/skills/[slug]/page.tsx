@@ -157,8 +157,8 @@ export default async function SkillDetailPage({ params }: { params: Promise<{ sl
                     />
                 </div>
 
-                {/* 右栏：不做 sticky，2026-09-26 试过（top-20 + 内部滚动那套），用户实测
-                    否决「跟随滚动不好用」，撤回。self-start 保持右栏与左栏顶对齐。 */}
+                {/* 右栏不做 sticky：跟随滚动会让侧栏在阅读长正文时脱离视线。
+                    self-start 保持右栏与左栏顶对齐。 */}
                 <aside className="lg:self-start">
                     <EntrySidebar
                         kind="skill"

@@ -68,7 +68,7 @@ async function callInternal(
     return data;
 }
 
-/* ── 外部 JSON → 内部类型的唯一闸门（CLAUDE.md §6.5）──
+/* ── 外部 JSON → 内部类型的唯一闸门 ──
  * 响应来自边缘函数且与 Node 侧分开部署，中间版本可能缺字段；直接 as 强转只是关掉检查，
  * 缺失的 uid 会以 id:undefined 一路写进 JWT。 */
 

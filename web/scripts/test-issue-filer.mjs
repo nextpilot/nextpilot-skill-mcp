@@ -335,7 +335,7 @@ log.info("\n[10] 外部数据的读取边界（网络响应与存档一律过归
 
     // 线上真炸过：SavedReport 一半来自外部 JSON——索引库老记录、云端 KV 里任意历史版本写的记录，
     // TypeScript 在这里没用。以前靠 `as SavedReport` 强转接住，缺字段的报告一路走到
-    // `report.findings.filter` 才崩（白屏）。规则见 CLAUDE.md §6.5，机器化成两条：
+    // `report.findings.filter` 才崩（白屏）。规则机器化成两条：
     //   ① 读边界的同一行不许 `as <具名类型>`（读边界标记见 BOUNDARY_READS）；漏网形态靠 ② 兜。
     //   ② GATED_TYPES 里有唯一闸门的形状，任何位置的 `as <类型>` 都违规（新增链要登记类型名）。
     // `as unknown` / `as Record<…>` 放行，但只该活在归一函数内部。
@@ -394,7 +394,7 @@ log.info("\n[10] 外部数据的读取边界（网络响应与存档一律过归
         const n = internalSrc.split(fn).length - 1;
         check(`${fn} 已定义且被调用`, n >= 2, `出现 ${n} 次`);
     }
-    // 通用形状判断不许各写一份（§6.5 末段）
+    // 通用形状判断不许各写一份
     check(
         "边界工具收在 lib/json-boundary.ts",
         read("../lib/json-boundary.ts").includes("export function asRecord(") &&

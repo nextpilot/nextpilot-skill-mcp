@@ -10,9 +10,9 @@ import { installIssueBridge, setBridgeSession } from "@/lib/issue-bridge";
  * 挂在 RootLayout 里，只渲染 null。监听器在 hydration 之后才装上，更早的错误抓不到，
  * 那段窗口里能抓的只有 global-error.tsx。
  *
- * 叫 `IssueBridgeMount` 而不是 `IssueBridge`：`bridge` 角色词归 `lib/issue-bridge.ts`（逻辑在那）。
- * 这层只管"在哪挂、什么时候挂"，是独立角色，另取 `mount`；两个都叫 IssueBridge 会让 grep
- * 命中两个且分不清哪个是模块、哪个是组件（§6.4 第①条）。
+ * 叫 `IssueBridgeMount` 而不是 `IssueBridge`：`bridge` 角色词归 `lib/issue-bridge.ts`（逻辑在那），
+ * 这层只管"在哪挂、什么时候挂"，另取 `mount`。两个都叫 IssueBridge 会让 grep 命中两个
+ * 且分不清哪个是模块、哪个是组件。
  */
 export function IssueBridgeMount() {
     const { status } = useSession();

@@ -123,8 +123,7 @@ export function buildRuleSchema({ signatures, facts, vehicles, builtinVars }) {
                         ],
                     },
                     placeholder: {
-                        description:
-                            "这条经验**还没实现**：引擎跳过并把这句原样当作原因显示。占位专用，别拿它写判据（2026-09 取代原先塞进 precheck 的字符串 hack）",
+                        description: "这条经验**还没实现**：引擎跳过并把这句原样当作原因显示。占位专用，别拿它写判据",
                         oneOf: [{ type: "string" }, { type: "boolean" }],
                     },
                 },

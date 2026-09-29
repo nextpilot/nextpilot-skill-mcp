@@ -240,7 +240,7 @@ export interface TrackData {
     error?: string;
     /** 取不到轨迹的逐条原因（有 error 时才有，界面按列表渲染）。error 只有一句话，
      *  而画不出轨迹有六种：topic 缺失 / 坐标字段缺失 / ref() 取值失败 / 无 timestamp 列 /
-     *  timestamp 与坐标采样数不一致 / 有效定位不足 2 个；只给一句概括易误导。见 CLAUDE.md §6.8 */
+     *  timestamp 与坐标采样数不一致 / 有效定位不足 2 个；只给一句概括易误导。 */
     errorReasons?: string[];
     /** 出错种类（有 error 时才有）。log-not-loaded = 该 Worker 没装这份日志，
      *  重选 .ulg 重新解析即恢复（界面给重选按钮）；其它错误重选无用，不给按钮 */

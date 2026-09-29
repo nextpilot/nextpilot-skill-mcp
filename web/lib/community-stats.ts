@@ -27,7 +27,7 @@ export interface FavoriteStats {
     favorited: boolean;
 }
 
-/* ── 外部 JSON → 内部类型的唯一闸门（CLAUDE.md §6.5）──
+/* ── 外部 JSON → 内部类型的唯一闸门 ──
  * 响应由边缘函数产生且与静态页分开部署，页面更新后请求可能落在旧版本函数上；直接 as 只是关掉检查，
  * 缺字段到 UI 才现形（undefined 收藏、NaN 评分）。边界处一律过归一，函数内部信任类型。 */
 

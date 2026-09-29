@@ -122,16 +122,16 @@ class Skip(Exception):
 # 编号标题：`## 6. 技术栈与部署` / `### 6.8 报错要说清"缺什么"`。允许 `§` 前缀与 `、` 收尾。
 HEADING_RE = re.compile(r"\s{0,3}#{1,6}\s*§?(\d+(?:\.\d+)*)[.、]?\s")
 REF_RE = re.compile(r"§\s*(\d+(?:\.\d+)*)")
-# 同一行里点名的文档：`见 CLAUDE.md §6.4` / `见 docs/architecture/plot-schema.md §3`
+# 同一行里点名的文档：`见 CLAUDE.md 6.4 节` / `见 docs/architecture/plot-schema.md 3 节`
 DOC_MENTION_RE = re.compile(r"([\w.\-/]*[\w\-]+\.mdx?)")
 
 # 只有 Markdown 才可能自成一册。两个反例：`build-knowledge.mjs` 内嵌整份指南页模板（模板
 # 字符串），有 25 个看着像标题的行；`api.py` 注释里有 `# 1.` / `# 2.`，同样"看起来有编号"。
-# 语义上也不该算：代码文件没有"自己的 §"，它引用的总是文档。条款见 `CLAUDE.md` §6.6。
+# 语义上也不该算：代码文件没有"自己的 §"，它引用的总是文档。
 DOC_SUFFIXES = (".md", ".mdx")
 
-# 要算"编号文档"至少得有这么多编号标题，挡住"只有一条编号行的说明文档"：它的 `§2` 多半是在
-# 引用 root `CLAUDE.md`，按本文档比会把对的判成悬空。真手册都有 7 个以上。
+# 要算"编号文档"至少得有这么多编号标题，挡住"只有一条编号行的说明文档"：那种文件的编号行
+# 多半是在引用 root `CLAUDE.md`，按本文档比会把对的判成悬空。真手册都有 7 个以上。
 MIN_SECTIONS = 3
 
 
@@ -195,7 +195,7 @@ def check_section_refs() -> list[str]:
                 refs.append((_rel(path), lineno, m.group(1), line, m.start()))
 
     problems: list[str] = []
-    # 防"恒绿"：全局回退（root CLAUDE.md）要真在索引里，否则所有源码里的 `§6.x` 都会变成
+    # 防"恒绿"：全局回退（root CLAUDE.md）要真在索引里，否则源码里那些章节号引用都会变成
     # 悬空，那是噪声不是发现。索引塌了要当场说，而不是照常报一堆。
     if "CLAUDE.md" not in sections:
         problems.append("CLAUDE.md 不在编号文档索引里（被改名？编号标题被删？）—— 全局回退没有落点，本次检查无意义")
@@ -629,6 +629,39 @@ def check_no_raw_console() -> list[str]:
     return problems
 
 
+def check_no_section_ref_in_code() -> list[str]:
+    """代码注释里不许出现 § 引用。
+
+    注释是给人读的，读完这段就该接着读代码。`§6.4` 把读者推去翻另一份文档，
+    而那份文档是给 AI 看的，节号还会随文档改动作废——留着只会指向错的地方。
+    要交代的结论就地写进注释，写不下就说明该进文档而不是注释。
+    """
+    problems: list[str] = []
+    for path in _scanned_files():
+        if path.suffix not in (".py", ".ts", ".tsx", ".mjs", ".js"):
+            continue
+        for lineno, line in enumerate(_read(path).splitlines(), 1):
+            if not _is_comment_line(line, path.suffix):
+                continue
+            for m in REF_RE.finditer(line):
+                problems.append(
+                    f"{_rel(path)}:{lineno} 注释里引用 §{m.group(1)} —— 注释要能独立读懂，"
+                    "结论就地写；写不下就说明该进文档，别把读者推去翻章节号"
+                )
+    return problems
+
+
+def _is_comment_line(line: str, suffix: str) -> bool:
+    """只看注释行本身：字符串里的 § 是数据，不是给读者看的引用。
+
+    JSDoc 中间行要 `* ` 才算，`**加粗**` 是内嵌 markdown 模板里的正文，不是注释。
+    """
+    stripped = line.strip()
+    if suffix == ".py":
+        return stripped.startswith("#")
+    return stripped.startswith(("//", "/*", "*/", "* "))
+
+
 CHECKS: list[tuple[str, object]] = [
     ("悬空 § 引用", check_section_refs),
     ("产物新鲜度不许用 git 当判据", check_git_criterion),
@@ -637,6 +670,7 @@ CHECKS: list[tuple[str, object]] = [
     ("坏输入必须非零退出", check_bad_input_exit),
     ("hook 不从其他开关推导 flag", check_hook_flags_not_rederived),
     ("前端不许裸 console", check_no_raw_console),
+    ("注释不许引章节号", check_no_section_ref_in_code),
 ]
 
 

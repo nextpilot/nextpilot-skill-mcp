@@ -1,5 +1,5 @@
 // 浏览器侧「错误 → issue」的桥：挂全局兜底钩子 → 组装 → 去抖 → 脱敏 → POST 到 /api/issues。
-// 链路三文件共用 `issue` 词根、各占一个角色词（改名前先读，见 CLAUDE.md §6.4）：
+// 链路三文件共用 `issue` 词根、各占一个角色词（改名前先读）：
 //   issue-bridge.ts（bridge：浏览器采集+投递）→ functions/api/issues.js（入口：接收+限流）
 //   → functions/_lib/issue-filer.js（filer：判定+去重+提交）。
 // 不叫 telemetry/report：前者语义过宽，后者与本仓库"飞行分析报告"（/api/reports）撞名。

@@ -106,7 +106,7 @@ type ParseBytesMeta = {
 };
 
 /**
- * Worker 交上来的报告 → 前端敢直接解引用的形状（外部边界，见 CLAUDE.md §6.5）。
+ * Worker 交上来的报告 → 前端敢直接解引用的形状。
  * Worker 是常驻单例、不会随代码更新重建，所以"页面已是新代码、Worker 还揣着上一版产物"是常态。
  *
  * 只保证前端会直接解引用的字段：`findings` 是唯一一个（缺了 `GeneralInfo` 的

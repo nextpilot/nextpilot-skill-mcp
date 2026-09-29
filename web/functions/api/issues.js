@@ -1,8 +1,8 @@
 // POST /api/issues：浏览器端错误上报的唯一入口（只接收与限流，判定在 _lib/issue-filer.js）。
 //
-// 命名（改名前先读）：这条链三个文件共用 `issue` 词根、各占一个角色词，读成"谁采、谁收、谁建单"
-// （见 CLAUDE.md §6.4）：lib/issue-bridge.ts（bridge：浏览器采集）→ api/issues.js（入口：本文件）
-// → _lib/issue-filer.js（filer：建单）。文件名即路由。
+// 命名（改名前先读）：这条链三个文件共用 `issue` 词根、各占一个角色词，读成"谁采、谁收、谁建单"：
+// lib/issue-bridge.ts（采集）→ api/issues.js（入口，本文件）→ _lib/issue-filer.js（建单）。
+// 文件名即路由。
 //
 // 不让浏览器直接调 issue API：那等于把 issue token 发给全世界（开 DevTools 就能拿到写权限），
 // 所以浏览器只 POST 到这里，token 始终留在边缘函数。
@@ -34,7 +34,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
         const ipHash = await sha256Hex(clientIp(request));
         const day = dateStamp();
         const prefix = `errrl_${ipHash}_${day}_`;
-        // 平台坑：kv.list 无匹配时返回体里没有 keys 字段，统一走 listAll（见 docs/operations/README.md §1）
+        // 平台坑：kv.list 无匹配时返回体里没有 keys 字段，统一走 listAll
         const used = (await listAll(kv, prefix)).length;
         if (used >= DAILY_CAP_PER_IP) {
             return jsonResponse({ ok: false, error: "今日上报次数已达上限" }, 429);

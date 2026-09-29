@@ -72,9 +72,9 @@ type StoredReport = SavedReport & { savedAt?: number };
 /** 读取边界补默认值（老记录可能缺字段，真机上 crash 过）。这是所有外部来源进 SavedReport 的
  *  唯一闸门（索引库旧记录、localStorage 迁移、云端 KV TTL 内的旧部署记录），到前端都是无类型
  *  JSON，必须过这里；不要写 `xxx as SavedReport`（强转关掉检查，缺字段渲染时才炸）。
- *  名字刻意不叫 normalize：error-policy.js 已有一个 normalize（脱敏正则），同名不同义是 §6.4 禁的。 */
+ *  名字刻意不叫 normalize：error-policy.js 已有一个 normalize（脱敏正则），同名不同义会让 grep 分不清。 */
 export function normalizeSavedReport(raw: unknown): SavedReport {
-    // 入参用 unknown 而非 Partial<SavedReport>：边界上拿到的就是无类型数据（§6.5），强转集中在这一行
+    // 入参用 unknown 而非 Partial<SavedReport>：边界上拿到的本就是无类型数据，强转集中在这一行
     const r = (raw ?? {}) as Partial<SavedReport>;
     return {
         id: String(r.id ?? ""),

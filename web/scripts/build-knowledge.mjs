@@ -333,7 +333,7 @@ function parseProviderApi(py) {
     };
 }
 
-// 解析 `BUILTIN_VARIABLES` 每个条目的 `type` 与 `doc`（指南页 §6.1 要用）。
+// 解析 `BUILTIN_VARIABLES` 每个条目的 `type` 与 `doc`（指南页「内置变量」一节要用）。
 // `doc` 允许隐式字符串拼接（一句太长折成几行相邻字面量），所以收集条目体内所有字符串字面量再拼；
 // 只取 `doc` 之后的字面量（`type` 写在它前面）。
 function parseBuiltinVarDocs(body) {

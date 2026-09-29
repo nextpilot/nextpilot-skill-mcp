@@ -153,9 +153,8 @@ export function LogEntryClient() {
                             <LocalizedText zh={`${ANALYSIS_DISCLAIMER.zh}。`} en={`${ANALYSIS_DISCLAIMER.en}.`} />
                         </p>
                     )}
-                    {/* 这里原先还有一行「匿名试用：3/3 次」，2026-09-21 撤掉了：
-              次数上限以后由后台配置，前端不先报一个写死的数字。上传卡现在只保留
-              容量上限 + 隐私承诺 + 免责三行。 */}
+                    {/* 上传卡只保留容量上限 + 隐私承诺 + 免责三行：次数上限由后台配置，
+              前端不先报一个写死的数字。 */}
                     <input
                         ref={inputRef}
                         type="file"

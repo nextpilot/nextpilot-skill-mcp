@@ -8,7 +8,7 @@
 所以改了 `knowledge/px4/rules/` 要先 `pnpm web:build:kb` 再回归（loader 会检查陈旧）。
 
 任何一份日志出错都以非零退出码结束（`check_all.py` 只看退出码）。别把它改回"只打印、
-不计数"，那会让这一项一直绿着，而它其实什么都没检（见 CLAUDE.md §6.6）。
+不计数"，那会让这一项一直绿着，而它其实什么都没检。
 """
 
 import json

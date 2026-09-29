@@ -439,8 +439,8 @@ export function LogFlightMap({
                 </select>
             </h4>
 
-            {/* 容器始终可见：Leaflet 建图时要拿到真实尺寸，曾经是 display:none 时建图 →
-          尺寸算成 0×0 → fitBounds 只能给到全球视野，事后 invalidateSize 也救不回缩放级别。 */}
+            {/* 容器始终可见：display:none 时 Leaflet 拿到的尺寸是 0×0，fitBounds 只能给到
+          全球视野，事后 invalidateSize 也救不回缩放级别。 */}
             {/* isolate：给地图单独开一个层叠上下文。Leaflet 自己的面板 / 控件用的是
           z-index 400~1000，不隔离的话它们会盖过站点的 sticky 顶栏（z-40）。 */}
             <div className="relative isolate">
