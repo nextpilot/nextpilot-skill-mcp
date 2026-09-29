@@ -378,8 +378,7 @@ function logNotLoadedReason(pyodide: Pyodide, logId: string): string | null {
     return null;
 }
 
-self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
-    const msg = event.data;
+async function handleMessage(msg: WorkerInMessage): Promise<void> {
     try {
         const pyodide = await getPyodide();
 
@@ -490,4 +489,20 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
             message: err instanceof Error ? `${err.name}: ${err.message}` : "解析失败：" + String(err),
         });
     }
+}
+
+// 消息必须串行处理：整个引擎跑在**同一个** Pyodide 命名空间里（provider / __result /
+// 规则脚本共享全局），analyze 进行中插队的 series / track 若与它并发执行，会在同一批
+// 全局上交错读写，取到「半份 analyze 状态」的数据（审计 M13）。Worker 的消息到达本身
+// 有序，把"处理完成"串成一条链，到达顺序即执行顺序。队列永不 reject：单条消息的错误
+// 在 handleMessage 内部消化（内层 track/series 各自有 try，analyze 走外层 catch 转
+// error 消息），链上再兜一层保证后续消息不被前一条的意外异常饿死。
+let queue: Promise<void> = Promise.resolve();
+self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
+    const msg = event.data;
+    queue = queue
+        .then(() => handleMessage(msg))
+        .catch(() => {
+            // handleMessage 正常路径不该到这里；真到了也不能让链断掉，下一报告还能继续
+        });
 };

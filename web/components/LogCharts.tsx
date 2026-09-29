@@ -264,16 +264,18 @@ function PanelChart({
 
     /** 复位缩放：让本面板回到自动量程（并把 X 轴的同步状态一并清掉，与顶部的「恢复」等价） */
     const resetAxes = useCallback(() => {
-        const el = elRef.current;
         localRangeRef.current = null;
         onXRangeChange(null);
-        if (!el) return;
+        // 全屏时操作的是全屏图：内联图此刻被浮层盖住，relayout 它用户看不到任何变化
+        // （「点了没效果」的由来）；全屏图是独立 newPlot 的另一份 graph，得单独 relayout
+        const target = (fullscreen ? fullscreenRef.current : null) ?? elRef.current;
+        if (!target) return;
         void getPlotly()
             .then((Plotly) => {
-                Plotly.relayout(el, { "xaxis.autorange": true, "yaxis.autorange": true });
+                Plotly.relayout(target, { "xaxis.autorange": true, "yaxis.autorange": true });
             })
             .catch(() => {});
-    }, [onXRangeChange]);
+    }, [onXRangeChange, fullscreen]);
 
     // 容器可见后让 Plotly 重新量一次尺寸（tab 切换时容器宽度会变）
     useEffect(() => {

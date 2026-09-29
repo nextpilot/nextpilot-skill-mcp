@@ -128,7 +128,9 @@ export function EntryComments({ kind, slug }: { kind: Kind; slug: string }) {
             ) : (
                 <p className="rounded-lg border border-dashed border-border-strong p-4 text-sm text-muted">
                     <a
-                        href={`/login?callbackUrl=${encodeURIComponent(`/skills/${slug}`)}`}
+                        // 回跳目标跟着条目类型走：Skill 与 MCP 两页共用这个组件，
+                        // 写死 /skills/ 的话，从 mcp 页来登录的用户会被送回技能页
+                        href={`/login?callbackUrl=${encodeURIComponent(`/${kind === "mcp" ? "mcp" : "skills"}/${slug}`)}`}
                         className="text-primary hover:underline"
                     >
                         登录
