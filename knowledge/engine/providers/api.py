@@ -1,19 +1,15 @@
 # 日志适配器（provider）契约：引擎唯一认识的"日志"长相
 #
-# 为什么是这份常量表，而不是 typing.Protocol：
-#   · 构建期不执行 Python（web/scripts/build-knowledge.mjs 只把源码当文本搬运），
-#     Pyodide 里也没有 mypy，两端都没有类型检查器，写 Protocol 只是"看着有约束、实际没人管"。
-#   · 所以契约做成可执行的：这份表既是文档，也是三道机器检查的输入。
+# 为什么是常量表而不是 typing.Protocol：构建期不执行 Python（build-knowledge.mjs 只把源码当文本
+# 搬运），Pyodide 里也没有 mypy，两端都没有类型检查器，写 Protocol 只是"看着有约束、实际没人管"。
+# 所以契约做成可执行的：这份表既是文档，也是三道机器检查的输入。
+#   1. 构建期：build-knowledge.mjs 用 ast 解析 providers/*.py，查 REQUIRED 方法有没有定义、
+#      builtin_variables() 字典字面量键齐不齐
+#   2. 运行期：check_provider()，引擎建好 provider 后立刻跑一次
+#   3. 契约测试：tools/engine/guard_provider_contract.py（失败语义、meta 与 series 自洽……）
 #
-# 三道检查（分工是"构建期挡住漏写、运行期挡住类型与缺席、测试挡住语义"）：
-#   1. 构建期：web/scripts/build-knowledge.mjs 用 ast 解析 providers/*.py，
-#      查 REQUIRED 的方法有没有定义、builtin_variables() 返回的字典字面量键齐不齐
-#   2. 运行期：下面的 check_provider()，引擎建好 provider 之后立刻跑一次
-#   3. 契约测试：tools/engine/guard_provider_contract.py，对每个 provider 跑同一套断言
-#      （失败语义、get_topic_meta() 与 get_series() 自洽、armed_intervals 的形状……）
-#
-# 加一个适配器（如 ardupilot.py）要做的事：实现 REQUIRED，按需实现 OPTIONAL，
-# 把工厂追加进 FORMATS，然后跑通 guard_provider_contract.py，引擎一行都不用改。
+# 加一个适配器要做的：实现 REQUIRED，按需实现 OPTIONAL，把工厂追加进 FORMATS，
+# 跑通 guard_provider_contract.py，引擎一行都不用改。
 
 # ---------------- 必需能力：规则与曲线会直接依赖 ----------------
 REQUIRED = {
@@ -81,7 +77,7 @@ REQUIRED = {
     # ---- 知识引擎查询 API（docs/develop/engine-api-rework.md 并入契约）----
     # 这组方法就是 provider 的正式名字（2026-09-24 迁移：get_topic_data→get_dataset、
     # get_logged_information→get_info_dict、get_logged_messages→get_logged_events、
-    # get_flight_phases→get_mode_changed，旧名一律退场，不搞双轨）。
+    # get_flight_phases→get_mode_changed，旧名退场，不搞双轨）。
     # 取不到一律返回 None / [] / {}（不抛异常），与上面同一套失败语义。
     "get_start_timestamp": {
         "kind": "method",
@@ -275,17 +271,15 @@ BUILTIN_VARIABLES = {
 
 
 # ---------------- 格式注册表 ----------------
-# 各 providers/<格式>.py 在文件末尾把 (探测器, 工厂, 说明, log_type) 追加进来。探测靠文件头
-# magic，不靠扩展名（用户上传的文件名不可信）。
+# 各 providers/<格式>.py 在文件末尾把 (探测器, 工厂, 说明, log_type) 追加进来。
+# 探测靠文件头 magic，不靠扩展名（用户上传的文件名不可信）。
 #   探测器  detect(raw) -> bool
-#   工厂    make(raw, facts_cfg) -> provider（facts_cfg 是那一份数据 YAML，由引擎传进来；
-#           之所以显式传而不是读全局，是为了让"这个 provider 用哪份数据"一目了然）
-#   log_type  格式标识（如 px4-ulog），与适配器类上的 `log_type` 是同一个串。
+#   工厂    make(raw, facts_cfg) -> provider（facts_cfg 由引擎显式传进来，让"用哪份数据"一目了然）
+#   log_type  格式标识（如 px4-ulog），与适配器类上的 `log_type` 同一个串。
 #
-# 为什么把它塞进注册表而不是"引擎从 provider 实例上读"：引擎同时装着好几套知识
-# （knowledge/px4 与 knowledge/ardupilot 各自的规则 / 数据 / 故障库），而挑知识要先
-# 知道格式、挑格式又发生在打开日志之前，探测器是唯一能在"还没构造 provider"时就回答
-# 这一步的东西。有了它 `open_log()` 一行都不用改。
+# 为什么塞进注册表而不是从 provider 实例上读：引擎同时装着好几套知识（px4 与 ardupilot 各自的
+# 规则 / 数据 / 故障库），挑知识要先知道格式、挑格式又发生在打开日志之前，探测器是唯一能在
+# "还没构造 provider"时就回答这一步的东西。有了它 `open_log()` 一行都不用改。
 FORMATS = []
 
 _VALUE_TYPES = {
@@ -301,10 +295,9 @@ _VALUE_TYPES = {
 def match_version_spec(cur, spec):
     """固件约束串的共享解释器（各 provider 的 match_version 都走这里，别各写一份）。
 
-    语法：any / ">=1.15" / "<1.15" / ">=1.14,<1.15"（逗号=与）。cur 是 (major, minor)
-    二元组；None = 版本未知。
-    解析失败一律抛 ValueError，那是规则作者的笔误，与这份日志有没有版本号无关，
-    不能被"版本未知就放行"盖过去；版本未知时按"不因版本排除"处理（返回 True）。
+    语法：any / ">=1.15" / "<1.15" / ">=1.14,<1.15"（逗号=与）。cur 是 (major, minor)，None = 版本未知。
+    解析失败一律抛 ValueError（那是规则作者的笔误，与有没有版本号无关，不能被"版本未知就放行"
+    盖过去）；版本未知时按"不因版本排除"处理（返回 True）。
     """
     import re as _re
 
@@ -334,7 +327,7 @@ def detect_log_type(raw):
     """按文件头认出这是哪种日志，不构造 provider（只跑探测器）。
 
     引擎拿它当"该用哪一套知识"的开关：规则 / 数据 / 故障库 / 单位表在产物里都是
-    `{log_type: ...}` 的形状，先认格式才能取出对应那一套。认不出来返回 None。
+    `{log_type: ...}` 的形状。认不出来返回 None。
     """
     for detect, _make, _label, log_type in FORMATS:
         if detect(raw):
@@ -345,8 +338,8 @@ def detect_log_type(raw):
 def open_log(raw, facts_cfg=None):
     """按文件头挑一个适配器打开日志，并立刻做一次契约自检；挑不出来就报人话错误。
 
-    facts_cfg 是已经挑好的那一份数据（多格式时代由引擎按 `detect_log_type()` 挑，
-    见 engine.py），这里不做挑选，因为挑知识要先知道格式，而格式是探测器说了算。
+    facts_cfg 是已经挑好的那一份数据（多格式时代由引擎按 `detect_log_type()` 挑，见 engine.py）。
+    这里不挑：挑知识要先知道格式，而格式是探测器说了算。
     """
     for detect, make, label, _log_type in FORMATS:
         if detect(raw):
@@ -372,9 +365,9 @@ def _type_matches_spec(value, spec):
 def check_provider(provider, where="provider"):
     """运行期自检：契约里要求的东西，这个 provider 真的给了吗、类型对吗。
 
-    为什么还要这一道（构建期不是已经查过 AST 了吗）：AST 只看"有没有定义"，
-    看不了"跑起来给的是什么"，比如 builtin_variables() 少返回一个键、FW_MINOR 给了字符串。
-    这类问题如果放过，表现是静默失效（规则算不出数据 → 不发射 finding），很难查。
+    为什么还要这一道（构建期不是已经查过 AST 了吗）：AST 只看"有没有定义"，看不了
+    "跑起来给的是什么"，比如 builtin_variables() 少返回一个键、FW_MINOR 给了字符串。
+    这类问题放过就是静默失效（规则算不出数据 → 不发射 finding），很难查。
     """
     for name, spec in REQUIRED.items():
         if not hasattr(provider, name):
@@ -400,7 +393,7 @@ def check_provider(provider, where="provider"):
     if not isinstance(provider.parser_version(), str):
         raise ValueError("%s.parser_version() 必须返回 str" % where)
     # 时间边界是这批查询 API 里唯一被其他断言拿来做基准的聚合（guard 用它核对 duration），
-    # 形状错了要让所有下游跟着错，在这里先拦住
+    # 形状错了会让所有下游跟着错，在这里先拦住
     tb = provider.get_time_bounds()
     if not isinstance(tb, dict) or not {"start_us", "end_us", "duration_s", "has_wraparound"} <= set(tb):
         raise ValueError("%s.get_time_bounds() 必须返回含 start_us/end_us/duration_s/has_wraparound 的 dict" % where)

@@ -1,12 +1,8 @@
 """engine.py 的 CEL 沙箱与 compute 估值单元测试，不需要真实日志。
 
 加载方式：与 web/scripts/build-knowledge.mjs 的拼接顺序一致（operators → engine），
-把 engine/ 里的占位符 __FAULT_KB__ / __RULES__ / __FACTS__ / __FIELD_UNITS__ 替换成
-安全桩，再用一个桩 provider 顶替 `open_log(...)`，exec 进一个独立命名空间。
-
-这样测的是拼进 Pyodide 的那份代码，而不是一份被测试改写的复制：
-- _eval_expr：条件表达式沙箱（白名单 AST + 空 __builtins__）
-- _eval_compute：compute 表达式求值（只允许算子 / ref / _try / has_topic）
+把 engine/ 里的占位符替换成安全桩，再用一个桩 provider 顶替 `open_log(...)`，
+exec 进独立命名空间——测的是拼进 Pyodide 的那份代码，而不是被测试改写的复制。
 """
 
 from __future__ import annotations
@@ -20,7 +16,7 @@ def _load_engine() -> dict:
     operators_src = (ENGINE / "operators.py").read_text(encoding="utf-8")
     rule_src = (ENGINE / "engine.py").read_text(encoding="utf-8")
     # 占位符替换（与 build-knowledge.mjs 的 .replace 链等价）。
-    # 四样知识在产物里都是 {log_type: ...}（引擎按文件头挑一套），所以桩也要给这个形状，
+    # 四样知识在产物里都是 {log_type: ...}（引擎按文件头挑一套），桩也要给这个形状，
     # 下标用 `stub`，与下面 `detect_log_type` 桩的返回值对上。
     rule_src = (
         rule_src.replace("__FAULT_KB__", "{}")

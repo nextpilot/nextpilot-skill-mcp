@@ -1,16 +1,12 @@
 /// <reference lib="webworker" />
 /**
- * ULog 端侧解析 Worker（CLAUDE.md 4.2 第一、二层）。
- * Pyodide（WASM CPython）在浏览器内运行 pyulog，原始日志不离开本机。
+ * ULog 端侧解析 Worker（CLAUDE.md 4.2 第一、二层）：Pyodide 在浏览器内跑 pyulog，原始日志不出本机。
  *
- * 协议：
- * - 入站 analyze {file, logId}：加载运行时（只一次）→ 解析 → 规则 → done
- * - 入站 series {reqId, request, logId}：按预设的取数声明懒抽取降采样时序（换算在引擎侧）
- * - 入站 track {reqId, logId}：GPS 轨迹（多条）
- * - 出站 done {report, manifest, info, logId} / series {reqId, data} / track {reqId, data} / stage / error
+ * 协议：入站 analyze {file, logId} / series {reqId, request, logId} / track {reqId, logId}；
+ * 出站 done {report, manifest, info, logId} / series / track / stage / error。
  *
- * 请求都带 `logId`（日志内容指纹）：这个 Worker 是共享的、跨报告存活，
- * 一旦里面装的是另一份日志，取数据会静默拿错，见 logNotLoadedReason 的说明。
+ * 请求都带 `logId`（日志内容指纹）：这个 Worker 共享且跨报告存活，装错日志会静默取错数据，
+ * 见 logNotLoadedReason。
  */
 import { PY_ULG_ENGINE } from "./analysis-engine.generated";
 import type { LogInfo, TopicManifest } from "@/lib/types";
@@ -20,9 +16,8 @@ import { PYODIDE_INDEX_PATH, PYULOG_WHEEL_PATH } from "@/lib/site-config";
 /**
  * 把「可能是相对路径」的索引目录转成绝对 URL。
  *
- * 一定要转：worker 里 `import()` / `importScripts()` 遇到相对路径是按 worker 脚本自身位置
- * 解析的，不是站点根目录，写成 `"pyodide.js"` 会请求到 `/_next/static/media/pyodide.js` 这种
- * 错误地址。2026-09-28 线上就是这么炸的（空环境变量 → 裸相对路径）。
+ * 一定要转：worker 里 `import()` / `importScripts()` 遇相对路径是按 worker 脚本自身位置
+ * 解析的，不是站点根目录，写成 `"pyodide.js"` 会请求到 `/_next/static/media/pyodide.js`。
  * Service Worker 的缓存前缀也需要绝对 URL 才能匹配。
  */
 function toAbsoluteUrl(path: string): string {
@@ -63,11 +58,9 @@ export type WorkerOutMessage =
           manifest: TopicManifest;
           info: LogInfo;
           /** 这次真正装进命名空间的是哪一份日志（analyze 带上来的指纹，原样回给前端）。
-           *
-           *  前端要拿它记住"Worker 现在装着谁"：这个 Worker 是共享且常驻的，
-           *  跨报告存活，取数据前先要知道要不要为当前这份日志补一次解析
-           *  （见 hooks/useLogAnalyzer.ts 的 ensureLogLoaded）。不回传的话前端只能
-           *  假设"我发过 analyze 就装上了"，而 analyze 是可能失败的。 */
+           *  前端靠它记住"Worker 现在装着谁"：Worker 共享且常驻，取数据前要知道要不要补解析
+           *  （见 hooks/useLogAnalyzer.ts 的 ensureLogLoaded）。不回传则前端只能假设
+           *  "发过 analyze 就装上了"，而 analyze 是可能失败的。 */
           logId: string;
       }
     | { type: "series"; reqId: string; data: unknown }
@@ -92,30 +85,17 @@ type LoadPyodide = (opts: { indexURL: string }) => Promise<Pyodide>;
 let pyodidePromise: Promise<Pyodide> | null = null;
 
 /**
- * 预热 `importScripts` 要拉的文件，让它们进 Service Worker 缓存。
- *
- * 为什么要单独做这一步：`pyodide.js` 内部用 `importScripts()` 加载 `pyodide.asm.js`
- * （约 1.25MB）。`importScripts` 由 WorkerGlobalScope 直接发起，规范上不经过 Service Worker
- * 的 `fetch` 事件，所以 public/sw.js 那套缓存对它完全无效，它每次都从 CDN 裸拉。
- * 而 `pyodide.asm.wasm` / wheel 走的是 `fetch()`，能被 SW 正常缓存。
- *
- * 症状：国内访问 jsdelivr 本就不稳，`importScripts` 同步加载 1.25MB 中途断流就整块失败，
- * 报 `NetworkError: Failed to execute 'importScripts' ... failed to load`。
- *
- * 解法：在 `loadPyodide()` 之前，自己用 `fetch()` 把这两个文件拉一遍。
- * `fetch` 能被 SW 拦到并写入缓存，于是之后再执行 `importScripts` 时直接命中缓存，
- * 不再裸拉。首次访问仍可能失败（缓存是空的），但失败只影响这一次，
- * 且这里的 fetch 比 importScripts 更容易重试。
+ * PRELOAD_FILES：`pyodide.js` 内部用 `importScripts()` 加载 `pyodide.asm.js`（约 1.25MB），
+ * importScripts 由 WorkerGlobalScope 直接发起、不经 SW 的 fetch 事件，故 public/sw.js 缓存对它
+ * 无效，每次从 CDN 裸拉；断流即报 `NetworkError: Failed to execute 'importScripts' ... failed to load`。
+ * 故在 loadPyodide() 前先用 fetch() 拉一遍让 SW 写进缓存（首次仍可能失败，只影响这一次）。
  */
 const PRELOAD_FILES = ["pyodide.js", "pyodide.asm.js"] as const;
 
-/** 单个文件的预热超时（毫秒）。1.25MB 在国内慢速网络下给足余量，但也不能无限等。 */
+/** 单个文件的预热超时（毫秒）：1.25MB 在国内慢速网络下给足余量，也不能无限等。 */
 const PRELOAD_TIMEOUT_MS = 30_000;
 
-/**
- * 拉一个文件并读掉响应体。读 body 是必需的：只发请求不消费响应体时，
- * Service Worker 那边 `cache.put()` 可能还没写完就返回了。
- */
+/** 拉一个文件并读掉响应体：只发请求不消费响应体时，SW 的 `cache.put()` 可能还没写完就返回了。 */
 async function preloadOne(url: string): Promise<boolean> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PRELOAD_TIMEOUT_MS);
@@ -138,22 +118,9 @@ async function preloadOne(url: string): Promise<boolean> {
 }
 
 /**
- * 预热 `importScripts` 要拉的文件，让它们进 Service Worker 缓存。
- *
- * 为什么要单独做这一步：`pyodide.js` 内部用 `importScripts()` 加载 `pyodide.asm.js`
- * （约 1.25MB）。`importScripts` 由 WorkerGlobalScope 直接发起，规范上不经过 Service Worker
- * 的 `fetch` 事件，所以 public/sw.js 那套缓存对它完全无效，它每次都从 CDN 裸拉。
- * 而 `pyodide.asm.wasm` / wheel 走的是 `fetch()`，能被 SW 正常缓存。
- *
- * 症状：国内访问 jsdelivr 本就不稳，`importScripts` 同步加载 1.25MB 中途断流就整块失败，
- * 报 `NetworkError: Failed to execute 'importScripts' ... failed to load`。
- *
- * 解法：在 `loadPyodide()` 之前，自己用 `fetch()` 把这两个文件拉一遍。
- * `fetch` 能被 SW 拦到并写入缓存，于是之后再执行 `importScripts` 时直接命中缓存，不再裸拉。
- *
- * 失败处理：等所有文件都尝试完（`allSettled`），只要有一个失败就重试一轮。
- * 两轮都失败也不抛错，让 `importScripts` 照常去试，失败时报它原本的错误，
- * 保持"预热只是加速，不是必需步骤"的定位（比如 SW 未启用的隐私模式下就靠它兜底）。
+ * 预热看 PRELOAD_FILES 说明。等所有文件试完（allSettled），有一个失败就重试一轮；
+ * 两轮都失败也不抛错，让 importScripts 照常去试，保持"预热只是加速，不是必需步骤"
+ * （SW 未启用的隐私模式下就靠它兜底）。
  */
 async function preloadForImportScripts(baseUrl: string, _label: string): Promise<void> {
     const urls = PRELOAD_FILES.map((name) => baseUrl + name);
@@ -188,8 +155,8 @@ async function tryLoadPyodide(indexURL: string, label: string): Promise<Pyodide>
     // 先预热 importScripts 要拉的文件（见 preloadForImportScripts 注释）
     await preloadForImportScripts(indexURL, label);
 
-    // CDN 的 pyodide.js 是 UMD 经典脚本：import 只触发副作用，函数挂在全局，
-    // 没有 ESM 命名导出（直接取 mod.loadPyodide 会是 undefined）。
+    // CDN 的 pyodide.js 是 UMD 经典脚本：import 只触发副作用，函数挂在全局，无 ESM 命名导出
+    // （直接取 mod.loadPyodide 会是 undefined）。
     await import(
         /* webpackIgnore: true */
         /* turboIgnore: true */
@@ -242,8 +209,7 @@ async function getPyodide(): Promise<Pyodide> {
         await pyodide!.loadPackage(["micropip", "numpy"]);
 
         // lzma（可加载包，约 100KB）：日志自带的事件定义 metadata_events 是 xz 压缩的，解 PX4 事件要用。
-        // 单独装且允许失败，拿不到就退化成"不解码事件"（日志里的旧格式事件文本仍在），
-        // 不要因为它把整个解析挡在门外。
+        // 单独装且允许失败，拿不到就退化成"不解码事件"，不要因此挡住整个解析。
         post({
             type: "stage",
             stage: "installing-parser",
@@ -314,10 +280,8 @@ async function getPyodide(): Promise<Pyodide> {
 
         return pyodide!;
     })();
-    // 初始化失败不能把 rejected promise 留在缓存里：否则自托管 + CDN 双失败的瞬时网络抖动，
-    // 会让这个共享 Worker 后续所有消息复用同一个 rejection，刷新页面前一直恢复不了。
-    // 失败时清空，下一条消息会重新走一遍完整初始化（源切换与重试逻辑都在 getPyodide 里）。
-    // `.catch` 的返回值用 void 丢弃，这里只为清缓存，不消费错误，错误由调用方 await 时接管。
+    // 初始化失败不能把 rejected promise 留在缓存里：否则双源失败的瞬时抖动会让这个共享 Worker
+    // 后续所有消息复用同一个 rejection，刷新页面前一直恢复不了。失败时清空，下一条消息重走初始化。
     void pyodidePromise.catch(() => {
         pyodidePromise = null;
     });
@@ -339,37 +303,27 @@ async function runJson(pyodide: Pyodide, code: string): Promise<unknown> {
 let loadedLogId: string | null = null;
 
 /**
- * 这次请求要的日志，现在答得了吗？答不了就返回给人看的理由。
+ * 这次请求要的日志，现在答得了吗？答不了就返回给人看的理由。两件事要同时成立：
  *
- * 两件事要同时成立，所以放在一个函数里答，少了哪一条都会出问题：
+ * 1. 引擎命名空间装载了没有。规则脚本与数据层每次 analyze 时 exec 进同一个 `__main__`，
+ *    没跑过分析就调 `np_track()` / `np_series()` 会是 NameError。这里探的名字要和 bootstrap
+ *    真建的名字一致：产物里是 `provider = open_log(...)`，所以查 `provider`。
+ *    `tools/engine/check_engine_pyodide.py` 现在会真执行产物、核对这里查的名字。
  *
- * 1. 引擎命名空间装载了没有。规则脚本与数据层是每次 analyze 时 exec 进同一个
- *    `__main__` 命名空间的，没跑过分析就调 `np_track()` / `np_series()` 会是 NameError。
- *    这里探的名字要和 bootstrap 真建的名字一致：产物里那行是 `provider = open_log(...)`，
- *    所以查 `provider`。2026-09-18 的事故就是这里查了个不存在的名字，写的是 `ulog`，
- *    而全仓库从来没有名为 `ulog` 的全局（pyulog 的 ULog 对象挂在 provider 上，`from pyulog
- *    import ULog` 只带来 `ULog`）。守卫于是恒真：轨迹请求一直被当成"没解析过"，
- *    轨迹画不出来、也从没进过存档，界面还一直说"重选文件即可恢复"，
- *    用户照做一遍，回到报告页看到同一句（复解析是成功的，只是 track 请求又被这道守卫挡了）。
- *    `tools/engine/check_engine_pyodide.py` 现在会真执行产物、拿命名空间核对这里查的名字。
+ * 2. 装的就是这一份。探到 provider 就直接发数据的话，工作区装着日志 A、用户打开没有轨迹存档的
+ *    报告 B 时，会把 A 的轨迹画成 B 的飞行记录，错得静悄悄，比报错难查。系列曲线同理。
  *
- * 2. 装的就是这一份。探到 provider 就直接发数据的话，工作区里装着日志 A、
- *    用户打开没有轨迹存档的报告 B 时，会把 A 的轨迹画成 B 的飞行记录，
- *    错得静悄悄，比报错难查得多。系列曲线同理。
- *
- * 指纹对不上不算异常，而且正常情况下走不到这里：前端在取数据之前会先补一次解析
- * （见 hooks/useLogAnalyzer.ts 的 ensureLogLoaded），让这个 Worker 装上它要的那一份。
- * 剩下能走到这里的只有一种情况，字节已经不在用户手里了（历史记录 + 本机缓存被淘汰／
- * 那份记录来自别的设备）：这时 Worker 只能说"确认不了"，界面给"重新选择该 .ulg 文件"的按钮，
- * 用户选一次即可恢复。不要在这里给"能自己解决"的出路：Worker 手里没有字节，救不了。
+ * 指纹对不上不算异常：前端取数据前会先补一次解析（见 hooks/useLogAnalyzer.ts 的
+ * ensureLogLoaded），正常走不到这里。剩下能走到的情况只有字节已不在用户手里（历史记录 +
+ * 本机缓存被淘汰／记录来自别的设备），界面给"重新选择该 .ulg 文件"的按钮即可恢复。
+ * 不要在这里给"能自己解决"的出路：Worker 手里没有字节。
  */
 function logNotLoadedReason(pyodide: Pyodide, logId: string): string | null {
     if (!pyodide.globals.get("provider")) {
         return "这份日志本次还没解析过，重新选择该日志文件即可恢复。";
     }
     if (!logId) {
-        // 极老的记录没有日志指纹（内容哈希是后加的）：无从比对。这里说的是"确认不了"，
-        // 而不是"装的是另一份"，后者是替用户下一个我们并不知道的结论
+        // 极老的记录没有日志指纹：无从比对。这里说的是"确认不了"，而不是"装的是另一份"
         return "这份报告没有记录日志指纹，无法确认当前解析的就是它，重新选择该 .ulg 文件即可恢复。";
     }
     if (logId !== loadedLogId) {
@@ -389,8 +343,8 @@ async function handleMessage(msg: WorkerInMessage): Promise<void> {
                     post({
                         type: "track",
                         reqId: msg.reqId,
-                        // code 让界面能区分"重选文件就能救回来"与"这份日志本来就没有轨迹"：
-                        // 前者要给按钮，后者给按钮是误导（再选一次还是同样的结果）
+                        // code 让界面区分"重选文件能救回来"与"这份日志本来就没有轨迹"：
+                        // 前者给按钮，后者给按钮是误导（再选一次还是同样结果）
                         data: { error: why, code: "log-not-loaded" },
                     });
                     return;
@@ -411,15 +365,15 @@ async function handleMessage(msg: WorkerInMessage): Promise<void> {
         if (msg.type === "series") {
             try {
                 // 与 track 同一道闸门：没有 provider 时直接跑 np_series 只会抛 NameError 给用户看，
-                // 而装的是另一份日志时会静默取到别的日志的曲线（见 logNotLoadedReason）
+                // 装的是另一份日志时会静默取到别的日志的曲线（见 logNotLoadedReason）
                 const why = logNotLoadedReason(pyodide, msg.logId);
                 if (why) {
                     post({ type: "series", reqId: msg.reqId, data: { error: why } });
                     return;
                 }
                 // 取数声明整份由前端从预设拼好（字段引用/候选组/单位/换算节点），这里只转发给引擎：
-                // np_series 自己解释它（见 knowledge/engine/report_data.py）。入参经 json.dumps 字符串传入，
-                // 避免 Python 侧注入问题。
+                // np_series 自己解释它（见 knowledge/engine/report_data.py）。入参经 json.dumps 字符串
+                // 传入，避免 Python 侧注入。
                 const code = `np_series(${JSON.stringify(JSON.stringify(msg.request))}, 3000)`;
                 const data = await runJson(pyodide, code);
                 post({ type: "series", reqId: msg.reqId, data });
@@ -477,12 +431,9 @@ async function handleMessage(msg: WorkerInMessage): Promise<void> {
         loadedLogId = msg.logId;
         post({ type: "done", report, manifest, info, logId: msg.logId });
     } catch (err) {
-        // analyze 半途失败时，命名空间里可能已经装上新日志（exec 引擎 + open_log 已跑、
-        // 后面的步骤才抛错），而 loadedLogId 还是旧的那份，若不清，旧日志的 series/track
-        // 请求会通过 logNotLoadedReason 的指纹校验，拿到另一份日志的数据（错得静悄悄）。
-        // 清掉后取数请求走"未装载"路径，前端 ensureLogLoaded 会重新解析，宁可多解析一次。
-        // （getPyodide 失败走到这里时还没动过命名空间，清掉同样只是多一次重解析，无副作用。
-        //  track/series 的错误在内层就消化了，到不了这个 catch。）
+        // analyze 半途失败时命名空间里可能已装上新日志（exec 引擎 + open_log 已跑、后面才抛错），
+        // 而 loadedLogId 还是旧的，不清则旧日志的 series/track 请求会通过指纹校验拿到另一份日志
+        // 的数据（错得静悄悄）。清掉后取数走"未装载"路径，前端 ensureLogLoaded 会重新解析。
         loadedLogId = null;
         post({
             type: "error",
@@ -491,12 +442,10 @@ async function handleMessage(msg: WorkerInMessage): Promise<void> {
     }
 }
 
-// 消息要串行处理：整个引擎跑在同一个 Pyodide 命名空间里（provider / __result /
-// 规则脚本共享全局），analyze 进行中插队的 series / track 若与它并发执行，会在同一批
-// 全局上交错读写，取到「半份 analyze 状态」的数据（审计 M13）。Worker 的消息到达本身
-// 有序，把"处理完成"串成一条链，到达顺序即执行顺序。队列不 reject：单条消息的错误
-// 在 handleMessage 内部消化（内层 track/series 各自有 try，analyze 走外层 catch 转
-// error 消息），链上再兜一层保证后续消息不被前一条的意外异常饿死。
+// 消息要串行处理：整个引擎跑在同一个 Pyodide 命名空间里（provider / __result / 规则脚本
+// 共享全局），analyze 进行中插队的 series / track 若并发执行会在同一批全局上交错读写，
+// 取到「半份 analyze 状态」的数据（审计 M13）。Worker 消息到达本身有序，把"处理完成"
+// 串成一条链，到达顺序即执行顺序；链上兜一层保证后续消息不被前一条的意外异常饿死。
 let queue: Promise<void> = Promise.resolve();
 self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
     const msg = event.data;

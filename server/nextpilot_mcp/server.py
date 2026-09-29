@@ -1,18 +1,14 @@
 """NextPilot 日志分析 + 知识库的本地 MCP 服务（stdio）。
 
 工具分两类，全部只读（`ToolAnnotations(read_only_hint=True, open_world_hint=False)`）：
-
-- 日志侧：把 PX4 `.ulg` 喂给知识库编译出的引擎，返回确定性结果
+- 日志侧：PX4 `.ulg` → 知识库编译出的引擎，返回确定性结果
   （`analyze_log` / `log_summary` / `list_events` / `query_timeseries` / `get_params`）。
-- 知识侧：读 `knowledge/` 里规则与故障库的原文，供解释层引用
-  （`get_rule` / `get_fault` / `list_faults` / `list_checks`）。
+- 知识侧：读 `knowledge/` 规则与故障库原文（`get_rule` / `get_fault` / `list_faults` / `list_checks`）。
 
-stdout 是协议线。本模块与其依赖在 import 期与运行期都不许往 stdout 写东西，
-引擎装配入口（`knowledge/engine/loader.py`）为此刻意不依赖 `tools/_logging.py`。
-所以本地冒烟测试用 `Client(mcp)` 进程内调用，不要用 `python -c "...print..."` 那种写法去测协议。
-
-内核是知识库的编译产物，不是本文件：阈值 / 建议 / 适用条件都在 `knowledge/`，
-改经验只改那里（`server/` 一行不动）。本文件只做「取数 → 交给引擎 → 摆成契约形状」。
+stdout 是协议线：本模块与其依赖在 import 期与运行期都不许往 stdout 写。本地冒烟测试用
+`Client(mcp)` 进程内调用，不要用 `python -c "...print..."` 去测协议。
+阈值 / 建议 / 适用条件都在 `knowledge/`，改经验只改那里（`server/` 一行不动）；本文件只做
+「取数 → 交给引擎 → 摆成契约形状」。
 """
 
 from __future__ import annotations
@@ -64,8 +60,7 @@ mcp = MCPServer(
     ),
 )
 
-# 同一份日志会被多个工具连续问（先 summarize 再 analyze 再取曲线）。
-# 装配一次要读 5+ 个源文件再 exec，所以按 (路径, mtime) 缓存命名空间；文件被换掉即失效。
+# 同一份日志会被多个工具连续问；装配一次要读 5+ 个源文件再 exec，故按 (路径, mtime) 缓存，文件被换掉即失效。
 _NAMESPACES: dict[str, tuple[float, dict]] = {}
 
 
@@ -176,7 +171,7 @@ async def query_timeseries(
 ) -> TimeseriesResult:
     """取一条时序曲线（走数据层的 LTTB 保形降采样，与网页端同一份实现）。
 
-    先用 list_events/log_summary 定位问题，再用本工具看具体波形。
+    先用 list_events/log_summary 定位问题，再用本工具看波形。
     `fullCount` 是降采样前的原始点数，两者差很大时说明曲线被抽稀了。
 
     Args:
@@ -197,9 +192,8 @@ async def query_timeseries(
     for f in fields:
         one = {"instance": instance, "ydata": [{"kind": "field", "fields": [f"{message_type}.{f}"]}]}
         r = loader.call(ns, f"np_series({_json_str(one)}, {max_points})")
-        # np_series 取不到数时返回 {"error": …}（topic/字段不存在、没有时间戳列等，
-        # 见 engine.py），那是写给人看的提示，不检查就 r["t"] 只会变成 KeyError 内部崩溃，
-        # 把已经写好的原因丢掉。AI 客户端传错字段名是必经路径，要转成可读错误。
+        # np_series 取不到数时返回 {"error": …}（topic/字段不存在等，见 engine.py）；不检查就
+        # r["t"] 会变成 KeyError 内部崩溃，把写好的原因丢掉。客户端传错字段名是必经路径。
         if "error" in r:
             raise ValueError(f"取 {message_type}.{f} 失败：{r['error']}")
         if not time:

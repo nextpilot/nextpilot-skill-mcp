@@ -1,23 +1,11 @@
 """MCP 工具的输出契约（日志侧）。
 
-字段名原样沿用引擎（`ruleId` / `docUrl` / `guardTags` / `checksRun`），这层只声明
-形状，不做翻译。翻译会造出"这个字段到底叫什么"的第二份真源，而 web 端报告已经在用这
-套名字；同一份日志在两个消费方那里叫法不同，是最难查的那类 bug。
-
-为什么用 Pydantic 而不是直接回 dict：输出 schema 由模型自动生成，客户端在调用前就
-知道会拿到什么形状；dict 只有内容、没有形状。
-
-参考实现（github.com/furkanisikay/ardupilot-mcp）是本层的对照，采纳三点：
-1. severity 是可排序的档位，它的 `Severity.rank`。我们的引擎在 `run_all()` 里已经按
-   `critical → warning → info` 排好（`order = {...}`），本层如实透出，不重排：重排就是
-   同一件事两处实现。
-2. `guidance`：把"这份报告该怎么用"写进数据里，而不是指望客户端记得去读 README。
-3. "没跑成的检查"是一等公民，它的 `CheckStatus.SKIPPED`，我们的 `checksSkipped` 同义，
-   并且连"为什么没跑"的理由一起带上。
-
-没采纳它的 `Evidence` 时间窗（`time_start_s` / `time_end_s` / `message_types`）：我们的
-evidence 是单点（field / value / threshold / unit）。补时间窗要动 knowledge/engine/ 的 finding 结构，
-那是知识模型变更，不在本次范围，差距记在 server/README.md。
+字段名原样沿用引擎（`ruleId` / `docUrl` / `guardTags` / `checksRun`），本层只声明形状、
+不做翻译：翻成第二套名字会造出"这字段到底叫什么"的第二份真源，而 web 端报告已在用原名。
+用 Pydantic 而非回 dict，是为了让客户端在调用前就拿到输出 schema。
+severity 引擎已在 `run_all()` 排好序，本层如实透出不重排；`checksSkipped` 是「没跑成的
+检查」一等公民，连原因一起带上。未采纳参考实现的 Evidence 时间窗（要动引擎 finding 结构，
+不在本次范围，差距记在 server/README.md）。
 """
 
 from __future__ import annotations
@@ -26,12 +14,12 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-# 引擎里 evidence.value 来自表达式求值结果：写变量得原值、写 f"{x:.3f}" 得格式化后的串。
+# evidence.value 来自表达式求值：写变量得原值、写 f"{x:.3f}" 得格式化后的串。
 EvidenceValue = str | float | int | None
 
 
 class Evidence(BaseModel):
-    """一条 finding 的证据，引擎给的四个字段，逐字保留。"""
+    """一条 finding 的证据，引擎给的四个字段逐字保留。"""
 
     field: str = Field(description="证据取自哪个字段，如 `vehicle_imu_status.accel_vibration_metric(均值)`。")
     value: EvidenceValue = Field(default=None, description="实测值。规则里写的是表达式，所以这里可能是格式化后的串。")
@@ -62,7 +50,7 @@ class MetricEntry(BaseModel):
 
 
 class SkippedCheck(BaseModel):
-    """ "这条没跑"以及原因。报告里要能看出为什么，而不是让读者以为它跑过了。"""
+    """ "这条没跑"及原因。报告要能看出为什么，别让读者以为它跑过了。"""
 
     ruleId: str = Field(description="规则 ID。")
     reason: str = Field(description="自动生成的文案：固件不满足 / 机架不适用 / 缺 topic / 数据不足…")
@@ -94,9 +82,7 @@ class LogReport(BaseModel):
     )
 
 
-# 以下为其余工具的返回契约
-#
-# 与 LogReport 同一原则：字段名沿引擎 / 数据层的原名，本层只声明形状、不做翻译。
+# 以下为其余工具的返回契约，同一原则：字段名沿引擎 / 数据层原名，本层只声明形状不翻译。
 
 
 class LogSummary(BaseModel):
@@ -120,7 +106,7 @@ class LogEvent(BaseModel):
     """一条日志消息 / 事件。"""
 
     # APM 的 MSG/ERR 行可能没有 TimeUS（providers/ardupilot.py 明确给 None）：
-    # 不允许 None 的话，不带时间窗的 list_events 会在 pydantic 校验时炸掉整条响应。
+    # 若不允许 None，不带时间窗的 list_events 会在 pydantic 校验时炸掉整条响应。
     tSec: float | None = Field(default=None, description="相对日志起点的秒数；源日志缺时间戳（如部分 APM MSG 行）时为 None。")
     level: int
     levelStr: str

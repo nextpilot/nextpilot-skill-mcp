@@ -2,7 +2,7 @@
 
 加载方式：engine/ 不是包，用 importlib 按路径加载 operators.py 真实源码，
 避免"在测试里重写一份逻辑"造成的假绿。operators.py 顶层无外部依赖
-（numpy 在算子内部局部 import），exec_module 即可，无需改动 engine/ 结构。
+（numpy 在算子内部局部 import），exec_module 即可。
 """
 
 from __future__ import annotations

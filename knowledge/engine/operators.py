@@ -345,7 +345,7 @@ def op_head_tail_median_drop(x, vts, intervals, skip_first_s=5, min_seg=20, head
 
 
 # ─────────────────────────── 多实例传感器（分组取数）───────────────────────────
-# 这类算子的输入是「每个传感器实例一组数据」的列表（规则里用 ref(..., instance=-1) 取）。
+# 输入是「每个传感器实例一组数据」的列表（规则里用 ref(..., instance=-1) 取）；
 # 数组字段（如 float32[3]）每组是「每元素一列」的列表。
 # 全部通用：不认识任何具体 topic/字段，只做跨实例归约，取「最差实例」并回传其序号。
 
@@ -357,8 +357,8 @@ def _groups(groups):
 def _as_group_list(x):
     """分组取数（instance=-1）→ 列表，保留 None 占位。
 
-    实例序号（标题里的 “IMU #1”、estimator #2）要与原始 dataset 顺序一致，
-    所以这里不能过滤 None，过滤会让后面的实例序号整体前移。
+    实例序号（标题里的 "IMU #1"、estimator #2）要与原始 dataset 顺序一致，
+    所以不能过滤 None，过滤会让后面的实例序号整体前移。
     """
     if x is None:
         return []
@@ -677,12 +677,11 @@ def op_hypot(a, b, **kw):
     return np.sqrt(np.asarray(a, dtype=float) ** 2 + np.asarray(b, dtype=float) ** 2)
 
 
-# 四元数先归一化再转欧拉角：日志里的四元数可能因插值/截断略偏离单位长度，
-# 不归一化会放大 atan2 误差。2026-09-17 之前这里有一个同名的第二个定义（不归一化、带
-# 一个从未被调用方用过的 degrees 开关）静默覆盖了本实现，两个消费者（plot/attitude.yml
-# 的图表换算与 vtol-transition 规则）实际拿到的都是那个不归一化的版本，已删除。
-# 教训：OPERATORS[name] = fn 是赋值，算子名重复注册不报错、后者静默胜出；
-# 用 ruff 的 F811 在提交前拦住（见仓库根 pyproject.toml）。
+# 四元数先归一化再转欧拉角：日志里的四元数可能因插值/截断略偏离单位长度，不归一化会放大
+# atan2 误差。踩过：这里曾有一个同名的第二个定义（不归一化）静默覆盖本实现，两个消费者
+# （plot/attitude.yml 与 vtol-transition 规则）实际都用错了版本，已删除。
+# 教训：OPERATORS[name] = fn 是赋值，算子名重复注册不报错、后者静默胜出；用 ruff 的
+# F811 在提交前拦住（见仓库根 pyproject.toml）。
 @operator(
     "quat_to_euler",
     in_arity=[1, 4],  # 两种写法都认：一个四列数组，或四列分开给
@@ -703,7 +702,7 @@ def op_quat_to_euler(w, x=None, y=None, z=None, **kw):
     if w is None or x is None or y is None or z is None:
         return None, None, None
     w, x, y, z = (np.asarray(v, dtype=float) for v in (w, x, y, z))
-    # 归一化：日志里的四元数可能因插值/截断略偏离单位长度，不归一化会放大 atan2 误差
+    # 归一化：同上，不归一化会放大 atan2 误差
     n = np.sqrt(w * w + x * x + y * y + z * z)
     n = np.where(n > 0, n, np.nan)
     w, x, y, z = w / n, x / n, y / n, z / n
@@ -759,7 +758,7 @@ def op_require_true(cond, **kw):
 
 # ─────────────────────────── 事件（一个规则 → 多条 finding）───────────────────────────
 # 返回「事件列表」（每项一个 dict）。配合规则级 `foreach:`：框架对每个事件按同一套
-# trigger 模板发一条 finding，因此文案仍写在经验文件里，算子只负责找事件。
+# trigger 模板发一条 finding，文案仍写在经验文件里，算子只负责找事件。
 
 
 @operator(
@@ -1426,9 +1425,9 @@ def op_zero_cross_hz(values, sample_rate=50.0, **kw):
 
 
 # ─────────────────────────── 复合算子：整段分析（多入多出）───────────────────────────
-# 说明：多个小节点串起来的链条读起来太长（姿态那条曾是 30 个节点）。这类「取数 → 对齐 →
-# 掩码 → 统计」的固定套路可以收成一个算子：输入仍是 YAML 里写明的字段引用（算子不认识
-# 具体 topic/字段），参数（阈值/最少样本/采样率）也来自 YAML。
+# 多个小节点串起来的链条读起来太长（姿态那条曾是 30 个节点）。这类「取数 → 对齐 → 掩码 →
+# 统计」的固定套路可以收成一个算子：输入仍是 YAML 里写明的字段引用（算子不认识具体
+# topic/字段），参数（阈值/最少样本/采样率）也来自 YAML。
 
 
 @operator(
@@ -1469,8 +1468,8 @@ def op_att_tracking_stats(
     roll = np.arctan2(2 * (w * x + y * z), 1 - 2 * (x**2 + y**2))  # 弧度
     pitch = np.arcsin(np.clip(2 * (w * y - z * x), -1, 1))
 
-    # 指令源：有 q_d 就用 q_d（新版只记它），没有才用 roll/pitch_body（旧版口径，弧度）。
-    # 两路都给了也优先 q_d，顺序写在算子里，规则只管把存在的递进来。
+    # 指令源：有 q_d 就用（新版只记它），没有才用 roll/pitch_body（旧版口径，弧度）。
+    # 两路都给也优先 q_d——顺序写在算子里，规则只管把存在的递进来。
     qd = _as_columns(sp_q)
     has_qd = len(qd) >= 4
     use_q = has_qd
