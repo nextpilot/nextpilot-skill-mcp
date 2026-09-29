@@ -38,7 +38,7 @@ def main() -> int:
     cmd = [sys.executable, script, "--stage", ",".join(stages)]
     # --with-e2e is orthogonal to the stage list: it toggles steps *inside* the ci
     # stage. Deriving it from `"ci" not in stages` would silently drop it in every
-    # case that matters -- the E2E steps live in ci, so any run that wants them
+    # case that matters: the E2E steps live in ci, so any run that wants them
     # already has ci in the list.
     if with_e2e:
         cmd.append("--with-e2e")

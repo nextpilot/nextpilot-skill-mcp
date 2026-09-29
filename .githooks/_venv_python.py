@@ -37,7 +37,7 @@ from pathlib import Path
 
 # .venv 的位置是仓库级约定，不是某台机器的偏好：tools/setup 用 uv 建它，
 # pyrightconfig.json 也按同一个路径找它（venvPath "." + venv ".venv"）。
-# 所以这里直接从仓库根推出来，不在 PATH 上"找"——一旦允许找，就得回答
+# 所以这里直接从仓库根推出来，不在 PATH 上"找"：一旦允许找，就得回答
 # "两个候选都有 ruff 时算谁的"，而那个答案迟早因两台机器装的版本不同而打架。
 _ROOT = Path(__file__).resolve().parents[1]
 VENV_PYTHON = str(_ROOT / (".venv/Scripts/python.exe" if os.name == "nt" else ".venv/bin/python"))
