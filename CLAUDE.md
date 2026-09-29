@@ -628,342 +628,41 @@ const PYODIDE_INDEX_URL = process.env.NEXT_PUBLIC_PYODIDE_URL || "https://cdn...
 
 ### 6.4 文件命名规范
 
-统一约定（新建文件务必遵循，命名不清时先查本节）：
+新建文件先查后缀选型表与「望文生义」六条判据，两者都在
+[`docs/develop/code-style.md`](docs/develop/code-style.md) §1.1。
 
-| 类型                                      | 规则                                                                                                | 示例                                                                           |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| React 组件                                | PascalCase + `.tsx`                                                                                 | `LogAnalyzer.tsx`、`SkillCard.tsx`                                             |
-| 分析页 tab 组件                           | 一个 tab 一个文件：`Log<用途>Msg.tsx`                                                               | `LogEventsMsg.tsx`、`LogParamsMsg.tsx`、`LogSystemMsg.tsx`、`LogFlightMap.tsx` |
-| 库 / 类型 / 常量                          | kebab-case + `.ts`                                                                                  | `chart-presets.ts`、`types.ts`、`constants.ts`                                 |
-| **两侧共用**的库（浏览器 + 边缘函数都引） | kebab-case + `.js`（例外：边缘那 22 个文件全是 `.js`，`.ts` 能否被 EdgeOne 打包器吃下本地验证不了） | `lib/error-policy.js`                                                          |
-| Web Worker 入口                           | kebab-case + `-worker.ts`                                                                           | `analysis-worker.ts`                                                           |
-| Worker 内嵌脚本 /helper                   | kebab-case + `-script.ts` / `-engine.ts` / `-data.ts`                                               | 现由 `build-knowledge.mjs` **生成**，不手改                                    |
-| Next.js 路由                              | `page.tsx` / `route.ts` / `layout.tsx`（目录即路由）                                                | `app/analyze/page.tsx`、`app/api/explain/route.ts`                             |
-| Python 模块                               | snake_case + `.py`                                                                                  | `knowledge/engine/engine.py`、`knowledge/engine/operators.py`                  |
-| 知识 / 经验文件                           | 见 `knowledge/README.md`；规则 `rules/*.yaml`、故障库 `fault-kb.yaml`                               | `rules/vibration.yaml`、`fault-kb.yaml`                                        |
-| 文档                                      | kebab-case + `.md`                                                                                  | `llm/gjb841-system-prompt.md`                                                  |
-| 边缘函数（`web/functions/`）              | kebab-case + `.js`，**文件名即路由**（`functions/api/x.js` → `/api/x`）                             | `api/me.js`、`api/issues.js`、`_lib/issue-filer.js`                            |
+本节只记一条不在这两类里、且**只有本仓才成立**的约束：
 
-**名字要能望文生义**（只满足上面那张表的 "类型规则" 不够 —— 它只告诉你后缀是 `.ts` 还是 `.tsx`，看不出这个文件干什么）：
+> **Worker 相关文件统一用连字符**：`analysis-worker.ts` 对，❌`pyodide-px4log.worker.ts` 不行。
+> 后缀选型表给的是 `-worker.ts`，点号写成 `xxx.worker.ts` 会让文件看起来像 `xxx` 的扩展，
+> 而不是一个 Worker 入口。
 
-1. **一条功能链上，每个文件占一个不重复的角色词**，名字连起来要能读成一句 "谁采 → 谁收 → 谁建单"。
+---
 
-   例：`lib/issue-bridge.ts`（浏览器采集 + 投递）→ `functions/api/issues.js`（边缘入口，只接收）
+### 6.4.1 知识层单一事实源
 
-   → `functions/_lib/issue-filer.js`（边缘，判定 + 建单）。
+**日志分析的人工经验（阈值 / 故障树 / 检查逻辑 / LLM 范式 / 事实层绑定与码表）单一事实源在仓库根
+`knowledge/<固件族>/`**（= `rules/*.yaml` + `fault-kb.yaml` + `facts.yaml` + `llm/*.md`）；
+引擎机制在 `knowledge/engine/`，同样不含业务数据。
 
-2. **禁止只差词序 / 单复数 / 一两个字母的孪生名**：`error-reporter` 与 `report-error` 这样的名字真的并排出现过，
+web 与未来 MCP 服务都只消费其派生产物：
 
-   读的人分不出哪个是模块、哪个是路由。同理不要 `foo-bar` / `bar-foo` 并存。
+| 派生产物                           | 谁生成              | 谁消费         |
+| ---------------------------------- | ------------------- | -------------- |
+| `web/workers/*`                    | `pnpm web:build:kb` | 端侧 Worker    |
+| `web/lib/knowledge/*.generated.js` | `pnpm web:build:kb` | 站点与边缘函数 |
+| `web/.generated/guide/*.md`        | `pnpm web:build:kb` | 指南页         |
 
-   **更要防 "读起来有上下级、其实是并列" 的一对**：`GuideMarkdown` / `GuideMdx` 只差一个字母，
+**这三样都是产物，一律手改无效。** 改经验只改 `knowledge/`，然后 `pnpm web:build:kb`；
+只比对不写入用 `pnpm web:build:kb -- --check`（CI 跑的就是这一条）。
 
-   而 `Markdown ⊂ MDX` 让人以为前者是后者的基础版 —— 于是 "删掉基础版" 看起来是简化，实际会把带
+`web/.generated/guide/*.md` **必须按普通 markdown 渲染** —— `web/components/GuideBody.tsx`
+按扩展名分流，`.md` 走 react-markdown。那些文档里有 `{占位符}` 与 `meta/<tag>.json` 字样，
+交给 MDX 会被当 JSX 表达式解析。
 
-   `{占位符}` 的文档交给 JSX 解析器（2026-09-18 已合并成 `GuideBody.tsx`，守卫 §\[14] 钉住）。
-
-   **名字读出来的关系必须与真实关系一致**：不一致的名字比难读更坏，它会指错方向。
-
-3. **领域词先查有没有被占用**：本仓库 `report` 已指 "飞行分析报告"（`/api/reports`、`lib/report-history.ts`），
-
-   所以 "线上报错自动建单" 这条链统一用 `issue` 词根，不用 `report`。
-
-   （也曾试过 `telemetry`：它不撞任何词根，但**语义比实际宽**—— 这条链只装错误上报这一件事，
-
-   叫 "遥测" 是名不副实，读者会以为里面还有性能 / 使用统计。**泛词当避让词用，终究要还债。**）
-
-4. **运行时由目录表达**，不要在文件名里重复编码侧别：`web/lib/`＝浏览器、`web/functions/`＝边缘。
-
-   也别用 `-edge` / `-route` 这类**位置后缀**去补区分 ——`functions/` 整个目录就是边缘、
-
-   `api/x.js` 的文件名本身就是路由，再写一遍纯属冗余；而且位置是这堆东西里**最会变的一维**，
-
-   文件一挪后缀就开始撒谎（职责不会挪）。
-
-   分工靠这个组合：一条链共用**同一个领域词根**，每个文件各占一个**不重复的角色词**
-
-   （`issue-bridge` 桥接 → `issues` 入口 → `issue-filer` 建单）。
-
-   **词根认亲，角色词分工**—— 少了词根，看不出三个文件是一条链上的；少了角色词，
-
-   就只能靠位置后缀硬分，又回到上面那句。
-
-5. **同一目录里不许出现 "开头一样、意思不同" 的名字**（`/api/reports` 与 `/api/report-error` 前缀相同、
-
-   一个名词一个动词，并列在 `functions/api/` 里）。
-
-6. **词根要读出一族文件的共同不变量，不能只图好看**。`web/components/` 的 `Log*` 家族定义是
-
-   " 渲染**某一份**日志的分析结果 "——**不是**"手里有日志字节"（从历史打开时字节可能已被淘汰，
-
-   这些组件各自处理了那条路：`isHistory` / `manifest?` / `storedPanels` / 存档轨迹）。据此：
-
-- 单份的组件一律 `Log*`。`LogReport.tsx` 是那六个 tab 组件的父壳，2026-09-18 由 `AnalyzeReport`
-
-  改来 ——`Analyze` 是**路由**的词（`app/analyze/` + `Analyze*Client` + `useLogAnalyzer` 已占着），
-
-  给 `components/` 里的共享组件再挂一次，读者看不出它在 `Log*` 家族里占哪一格。
-
-- **集合类不在此列**：一次列很多份的，用**数据模型**的词。`ReportHistoryList.tsx`
-
-  （2026-09-18 由 `HistoryList` 改来）列的是 `SavedReport` / `HistoryItem`，与
-
-  `lib/report-history.ts` 认亲。
-
-- 判据：**这条记录能不能比它依赖的东西活得久**。报告能 —— 字节被 `REPORT_DATA_KEEP` 淘汰、
-
-  或报告本来就来自别的设备（`source: "cloud"`），此时只剩结论；日志字节不能。所以给列表挂
-
-  `Log` 词根是在承诺 "日志在这"，而那张表里恰恰经常没有。名字读出的承诺必须是数据模型能兑现的。
-
-1. **被并列的多类内容共用的组件，不许挂其中任何一类的名字**。站内「Skill 技能」与「MCP 服务」
-
-   是并列的两类，详情页共用 `EntryContentTabs` / `EntrySidebar` / `EntryComments` /
-
-   `EntryHeaderMeta` —— 家族名取两类共有的上位词 "收录条目"，两类差异全部走参数：`kind`
-
-   决定统计接口与文案口径，`skillMdRaw` / `editUrls.skillMd` 这类可选参数决定 " 有没有
-
-   SKILL.md 那一格 "（MCP 走 server.json，没有这一格），所以组件本身不含任何 `if (是 Skill)`
-
-   的分支。**不带 **`kind`** 的那个（**`EntryContentTabs`**）不是漏了，是它压根不需要知道类别**
-
-   —— 按 "有没有这份文件" 分就够了。
-
-   它们曾叫 `SkillContentTabs` 等：MCP 页面用着 `Skill*` 组件，名字在读的人眼里就是说
-
-   "这个组件只服务 Skill"，而照名字去 "修正" 的正解是复制一份 `McpContentTabs`—— 于是长出
-
-   一对只差前缀的孪生组件，改一边漏一边（2026-09-20 已改，守卫 §\[17] 钉住）。
-
-   判据：**这个名字出现在另一类内容的页面上时，读起来是不是假的**。
-
-   同理反向也成立：只服务一类的（列表页 `SkillExplorer` / `McpGrid`）**不要**为了 "统一"
-
-   改成中立名 —— 那会让 "这是哪一类的列表" 从名字里消失。
-
-> 注意：Worker 相关文件统一用连字符（
->
-> `analysis-worker.ts`
->
-> ），不要用点号（❌
->
-> `pyodide-px4log.worker.ts`
->
-> ）。
-> **日志分析的人工经验（阈值 / 故障树 / 检查逻辑 / LLM 范式 / 事实层绑定与码表）单一事实源在仓库根**
-> `knowledge/px4/`
->
-> （=
->
-> `rules/*.yaml`
->
-> \+
->
-> `fault-kb.yaml`
->
-> \+
->
-> `facts.yaml`
->
-> \+
->
-> `llm/*.md`
->
-> ；
-> 引擎机制在
->
-> `knowledge/engine/`
->
-> ，同样不含业务数据），web 与未来 MCP 服务都只消费其派生产物（
->
-> `web/workers/*`
->
-> 、
-> `web/lib/knowledge/*.generated.js`
->
-> 、
->
-> `web/.generated/guide/*.md`
->
-> **后者必须按普通 markdown 渲染**
-> ——
->
-> `web/components/GuideBody.tsx`
->
-> 按扩展名分流，
->
-> `.md`
->
-> 走 react-markdown；那些文档里有
->
-> `{占位符}`
->
-> 、
-> `meta/<tag>.json`
->
-> ，交给 MDX 会被当 JSX 表达式解析。改经验只改
-> `knowledge/`
->
-> ，然后
->
-> `pnpm web:build:kb`
->
-> （只比对不写入：
->
-> `pnpm web:build:kb -- --check`
->
-> ）。
-> 改
->
-> `knowledge/px4/`
->
-> 下的规则、算子或引擎前，先读同目录的
->
-> `knowledge/px4/CLAUDE.md`
->
-> ：
-> 那里记着每条设计决策的动机、与最初设计的落地差异（有意为之，别当 bug 改回去）和已知缺口；
-> 它是给 AI 与维护者的上下文，不发布到网站。
->
-> **报告页数据层**
->
-> （
->
-> `knowledge/engine/engine.py`
->
-> ）的硬规则
-> 也在那一份里（时间基准、事件解码、多值信息拼接、参数默认值怎么来、派生数据版本）。
-> **Python（**
->
-> `knowledge/engine/`
->
-> **与**
->
-> `tools/`
->
-> **）的风格约定**
->
-> ：格式化的唯一权威是
->
-> `ruff format`
->
-> ，配置在仓库根
-> `pyproject.toml`
->
-> （行长 100、双引号），工具版本钉在
->
-> `requirements-dev.txt`
->
-> 。改完自查
-> `python -m ruff format --check . && python -m ruff check .`
->
-> 。
->
-> **别跑**
->
-> `ruff check --fix`
->
-> **、别开编辑器**
-> **的 "保存时自动修复"**
->
-> ：
->
-> `knowledge/engine/`
->
-> 下的文件是拼接片段，那样会误删东西（清单见
->
-> `knowledge/engine/README.md`
->
-> ）。
-> 这条约定的由来：在它之前每个编辑器各按自己的默认格式化器改文件，有一轮提交里混进了 500 行纯格式改动。
-> **校验入口与 CI**
->
-> ：所有校验收在
->
-> `python tools/ci/check_all.py`
->
-> 一处 —— 云端 CI
-> （
->
-> `.github/workflows/ci.yml`
->
-> ）与
->
-> `.githooks/pre-push`
->
-> 都只调它，要加校验只改这一处。
-> 校验按「是否需要真实
->
-> `.ulg`
->
-> 日志」分两组：
->
-> **不需要日志的**
->
-> （ruff /
->
-> `web:build:kb --check`
->
-> /
-> 指南页算子表是否跟上
->
-> `knowledge/engine/`
->
-> 源码 / 产物是否为合法 Python /
->
-> `tsc`
->
-> /
->
-> `next build`
->
-> ）云 CI
-> 每次提交都跑；
->
-> **需要日志的**
->
-> （6 条冻结基线逐字段比对、适配器契约测试、数据层 probe）
-> **云 CI 跑不了**
->
-> —— 原始日志含 GPS 轨迹、按隐私规则不入库，CI 的 checkout 里没有这些文件，
-> 它们只在开发机跑（
->
-> `git config core.hooksPath .githooks`
->
-> 启用，每台机器做一次）。
-> 所以
->
-> **CI 全绿不等于回归过了**
->
-> ：改规则、算子或
->
-> `knowledge/engine/`
->
-> 之后必须在本机跑一次。
-> 派生数据版本（
->
-> `web/lib/knowledge/derived-version.generated.ts`
->
-> ，构建期算的引擎源文件哈希）：
-> 改了
->
-> `knowledge/engine/engine.py`
->
-> /
->
-> `facts.yaml`
->
-> /
->
-> `plot/*.yml`
->
-> ，用户本机存档
-> 会在打开时
->
-> **自动重解析一次**
->
-> （facts /findings 一并刷新，AI 报告保留），不用挨个提醒重新上传。
+改 `knowledge/px4/` 下的规则、算子或引擎前，先读同目录的 `knowledge/px4/CLAUDE.md`：
+那里记着每条设计决策的动机、与最初设计的落地差异（有意为之，别当 bug 改回去）和已知缺口；
+它是给 AI 与维护者的上下文，不发布到网站。
 
 ---
 

@@ -12,12 +12,12 @@
 2. **写"代码说不出来的信息"。** 命名、类型、结构能表达的，就不再用注释重复一遍。
    注释的额度全留给"后人会踩的坑"。
 
-| 主题                                 | 权威落点                                                         |
-| ------------------------------------ | ---------------------------------------------------------------- |
-| 格式化 / lint / 类型检查（机器判的） | `ruff.toml`、`.prettierrc`、`eslint.config.mjs`、`pyrightconfig` |
-| 注释与打印（人判的）                 | 本文 §2、§3                                                      |
-| 提交消息格式                         | `.githooks/commit-msg`（真身），本文 §4 只讲怎么用               |
-| 分层架构、外部数据读写边界、报错文案 | [`CLAUDE.md`](../../CLAUDE.md) §6.5 / §6.8                       |
+| 主题                                               | 权威落点                                                                   |
+| -------------------------------------------------- | -------------------------------------------------------------------------- |
+| 格式化 / lint / 类型检查（机器判的）               | `pyproject.toml`、`.prettierrc`、`eslint.config.mjs`、`pyrightconfig.json` |
+| 注释与打印（人判的）                               | 本文 §2、§3                                                                |
+| 提交消息格式                                       | `.githooks/commit-msg`（真身），本文 §4 只讲怎么用                         |
+| 分层架构、路由与数据流（**不属于风格，只是边界**） | `CLAUDE.md` 的编号节                                                       |
 
 ---
 
@@ -25,27 +25,58 @@
 
 ### 1.1 命名
 
-| 位置                        | 规则                        | 示例                             |
-| --------------------------- | --------------------------- | -------------------------------- |
-| Python 模块 / 函数 / 变量   | `snake_case`                | `run_engine.py`、`normalize_log` |
-| Python 常量                 | `UPPER_SNAKE_CASE`          | `MAX_ATTEMPTS`                   |
-| React 组件                  | `PascalCase` + `.tsx`       | `LogFlightMap.tsx`               |
-| 库 / 类型 / 常量            | `kebab-case` + `.ts`        | `chart-presets.ts`               |
-| 两侧共用库（浏览器 + 边缘） | `kebab-case` + `.js`        | `lib/error-policy.js`            |
-| Worker 入口                 | `kebab-case` + `-worker.ts` | `analysis-worker.ts`             |
+**文件名后缀选型**（新建文件务必照此，命名不清时先查这里）：
 
-文件名后缀选型的完整表格在 [`CLAUDE.md`](../../CLAUDE.md) §6.4，这里不抄。
+| 类型                                      | 规则                                                                                                | 示例                                                                           |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| React 组件                                | PascalCase + `.tsx`                                                                                 | `LogAnalyzer.tsx`、`SkillCard.tsx`                                             |
+| 分析页 tab 组件                           | 一个 tab 一个文件：`Log<用途>Msg.tsx`                                                               | `LogEventsMsg.tsx`、`LogParamsMsg.tsx`、`LogSystemMsg.tsx`、`LogFlightMap.tsx` |
+| 库 / 类型 / 常量                          | kebab-case + `.ts`                                                                                  | `chart-presets.ts`、`types.ts`、`constants.ts`                                 |
+| **两侧共用**的库（浏览器 + 边缘函数都引） | kebab-case + `.js`（例外：边缘那 22 个文件全是 `.js`，`.ts` 能否被 EdgeOne 打包器吃下本地验证不了） | `lib/error-policy.js`                                                          |
+| Web Worker 入口                           | kebab-case + `-worker.ts`                                                                           | `analysis-worker.ts`                                                           |
+| Worker 内嵌脚本 /helper                   | kebab-case + `-script.ts` / `-engine.ts` / `-data.ts`                                               | 现由 `build-knowledge.mjs` **生成**，不手改                                    |
+| Next.js 路由                              | `page.tsx` / `route.ts` / `layout.tsx`（目录即路由）                                                | `app/analyze/page.tsx`、`app/api/explain/route.ts`                             |
+| Python 模块                               | snake_case + `.py`                                                                                  | `knowledge/engine/engine.py`、`knowledge/engine/operators.py`                  |
+| 知识 / 经验文件                           | 见 `knowledge/README.md`；规则 `rules/*.yaml`、故障库 `fault-kb.yaml`                               | `rules/vibration.yaml`、`fault-kb.yaml`                                        |
+| 文档                                      | kebab-case + `.md`                                                                                  | `llm/gjb841-system-prompt.md`                                                  |
+| 边缘函数（`web/functions/`）              | kebab-case + `.js`，**文件名即路由**（`functions/api/x.js` → `/api/x`）                             | `api/me.js`、`api/issues.js`、`_lib/issue-filer.js`                            |
 
-**跨文件命名还有一条硬要求：一条功能链上每个文件占一个不重复的角色词。**
+**名字要能望文生义。** 只满足上表的"类型规则"不够——它只告诉你后缀是 `.ts` 还是 `.tsx`，
+看不出这个文件干什么。
 
-```
-lib/issue-bridge.ts（采集 + 投递）→ functions/api/issues.js（边缘入口，只接收）
-                                  → functions/_lib/issue-filer.js（判定 + 建单）
-```
+1. **一条功能链上每个文件占一个不重复的角色词**，名字连起来要读成一句"谁采 → 谁收 → 谁建单"。
 
-禁止只差词序 / 单复数 / 一两个字母的孪生名（`error-reporter` 与 `report-error` 真的并排出现过）。
+   ```
+   lib/issue-bridge.ts（采集 + 投递）→ functions/api/issues.js（边缘入口，只接收）
+                                     → functions/_lib/issue-filer.js（判定 + 建单）
+   ```
+
+2. **禁止只差词序 / 单复数 / 一两个字母的孪生名**：`error-reporter` 与 `report-error` 真的并排出现过，
+   读的人分不出哪个是模块、哪个是路由。同理不要 `foo-bar` / `bar-foo` 并存。
+3. **更要防"读起来有上下级、其实是并列"的一对**：`GuideMarkdown` / `GuideMdx` 只差一个字母，
+   看着像"前者是后者的封装"，实际是两个并列的渲染入口。
+
+**代码内的标识符**：
+
+| 位置                      | 规则                             | 示例                                   |
+| ------------------------- | -------------------------------- | -------------------------------------- |
+| Python 模块 / 函数 / 变量 | `snake_case`                     | `run_engine.py`、`normalize_log`       |
+| Python 常量               | `UPPER_SNAKE_CASE`               | `MAX_ATTEMPTS`                         |
+| React 组件                | `PascalCase`                     | `LogFlightMap`                         |
+| 库 / 类型 / 常量          | `kebab-case` 文件名 + 导出名照常 | `chart-presets.ts` 导出 `chartPresets` |
 
 ### 1.2 格式化
+
+Python 格式化的唯一权威是 `ruff format`，配置在仓库根 `pyproject.toml`，
+工具版本钉在 `requirements-dev.txt`。改完自查：
+
+```bash
+python -m ruff format --check . && python -m ruff check .
+```
+
+**别跑 `ruff check --fix`，也别开编辑器的"保存时自动修复"**：`knowledge/engine/` 下的文件是
+拼接片段（清单见 `knowledge/engine/README.md`），那样会误删东西。在这条约定之前，
+每个编辑器各按自己的默认格式化器改文件，有一轮提交里混进了 500 行纯格式改动。
 
 | 语言     | 格式化器      | 关键取值                                              |
 | -------- | ------------- | ----------------------------------------------------- |
@@ -55,14 +86,20 @@ lib/issue-bridge.ts（采集 + 投递）→ functions/api/issues.js（边缘入�
 
 格式化器说了算，人不与它争论。局部不一致时以 `ruff format` / `prettier` 的输出为准。
 
+前端侧**待落地**的部分（prettier 写入、`eslint --fix`）见
+[`checks-by-stage.md`](checks-by-stage.md) 第 4–5 节，本文不重复。
+
 ### 1.3 类型
 
 - **TS 侧**：`strict` 打开。不用 `any` 兜底，边界处写 `unknown`。
 - **Python 侧**：`pyright` 跑 `standard` 模式，只覆盖 `knowledge/engine/`（`tools/` 在 exclude 里）。
   新增 Python 代码带类型标注，不加也能过，但下游解析产物时类型漂移只有产物看得见。
-- **禁止 `as T` 强转**。判据见 [`CLAUDE.md`](../../CLAUDE.md) §6.5：外部数据写入方与读取方
-  可能不是同一版本，强转把编译期检查关掉，缺字段的值会一路走到 UI 才炸。
-  归一函数写 `normalizeXxx(raw: unknown): T | null`，入参就是 `unknown`。
+- **禁止 `as T` 强转。** 外部数据的写入方与读取方可能不是同一版本（静态站与边缘函数分开部署、
+  KV 记录能跨版本存活、IndexedDB 里躺着几个月前老代码写的记录），类型是编译期的、JSON 是运行期的，
+  强转把检查关掉，缺字段的值会一路走到 UI 才炸——炸在入口有文件名和行号，炸在 UI 只有一句
+  `Cannot read properties of undefined`。
+  归一函数写 `normalizeXxx(raw: unknown): T | null`，入参就是 `unknown`；只做三件事：
+  补默认值、收窄类型（`typeof x === "number"`）、丢掉坏记录（返回 `null` 或过滤）。不抛错、不校验业务。
 
 ---
 
@@ -204,9 +241,14 @@ _REDACT_RULES = [...]
 1. **首词定级**：失败以 `FAIL` 起，跳过以 `SKIP` 起，异常退回以 `ERROR` 起，成功一律 `OK`；
    首词后跟一个空格再写正文。守卫按首词判"这个脚本会不会打出失败"（`check_hygiene.py`），
    字面量挪进不带该词的出口会让守卫静默失效。
-2. **讲缺什么，不讲"出错了"**：一条失败路径有几种原因就交出几条，逐条带上是哪个 topic /
-   哪个字段 / 多少采样。见 [`CLAUDE.md`](../../CLAUDE.md) §6.8。
-3. **不写时间戳、不写 emoji、不写颜色转义**：颜色由 logger 在 TTY 下加，重定向到文件时自动去掉。
+2. **讲缺什么，不讲"出错了"**：一句概括只有在"它恰好是唯一原因"时才是对的；有 N 种原因时，
+   它就是 N 分之一，而且常常指向一个不存在的事实。一条失败路径有几种原因就交出几条，
+   逐条带上是哪个 topic / 哪个字段 / 多少采样。概括句只许当标题、且由具体那条拼出来。
+   例：不要写"这段日志里没有可用的定位轨迹"，要写清是"没有 GPS 相关 topic"还是"有 topic
+   但缺坐标字段"，并附一句实际有什么（"这份日志里带经纬度字段的 topic 有：…"）。
+3. **给不出原因本身要报成解析器缺陷**，不许伪装成"你的数据里没有这项"——否则我们自己的 bug
+   会被当成用户的数据问题，用户不会反馈，我们也永远不知道。
+4. **不写时间戳、不写 emoji、不写颜色转义**：颜色由 logger 在 TTY 下加，重定向到文件时自动去掉。
 
 ---
 
