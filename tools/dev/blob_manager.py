@@ -1,22 +1,15 @@
-"""EdgeOne Blob 管理工具（xcopy 风格，source → target）。
-
-用法：
-  python tools/dev/blob_manager.py push   <source> <target> [--skip-existing]
-  python tools/dev/blob_manager.py pull   <source> [target]
-  python tools/dev/blob_manager.py list   [source]
-  python tools/dev/blob_manager.py remove <source> [--confirm]
-
-示例：
-  push .cache/pyodide-dist/pyodide/  pyodide/            # 上传目录（覆盖）
-  push .cache/pyodide-dist/pyodide/  pyodide/ --skip-existing  # 只传新文件
-  push .cache/pyodide-dist/wheels/x.whl  wheels/x.whl    # 上传单个文件
-  pull pyodide/v0.27.7/full/pyodide.js   ./local/        # 下载单文件
-  pull pyodide/v0.27.7/full/             ./local/        # 下载文件夹
-  list  /  list pyodide/                                 # 全部 / 按前缀列出
-  remove wheels/x.whl  /  remove pyodide/v0.27.7/full/ --confirm
-
-全局选项：-w/--workspace（默认 runtime）、-s/--site（默认连接生产环境）。
-"""
+# EdgeOne Blob 管理工具（xcopy 风格，source → target）。
+#
+# 用法：
+#   python tools/dev/blob_manager.py push   <source> <target> [--skip-existing]
+#   python tools/dev/blob_manager.py pull   <source> [target]
+#   python tools/dev/blob_manager.py list   [source]
+#   python tools/dev/blob_manager.py remove <source> [--confirm]
+#
+# 坑：push 会覆盖同名 key，且源与目标是两个独立的寻址空间（source 是本地路径、target 是 Blob key），
+# 写错 target 不会报错，只会把文件传到另一个前缀下。删目录要显式 --confirm，否则只列不动。
+# 契约：端点 /api/blob 由 web/functions/api/blob.js 提供，未部署时 404 会返回 HTML，
+# _http_err 认这个特征并给出部署提示。
 
 from __future__ import annotations
 
@@ -26,10 +19,15 @@ import sys
 import urllib.parse
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger("blob")
+
 try:
     import requests
 except ImportError:
-    print("缺少 requests，请先安装：pip install requests")
+    log.err("缺少 requests，请先安装：pip install requests")
     raise SystemExit(1)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -73,7 +71,7 @@ def _api_url(site: str, workspace: str, params: dict) -> str:
 def _auth_headers() -> dict:
     token = _load_secret()
     if not token:
-        print("警告：未设置 AUTH_EDGE_SECRET，请求可能被 403 拒绝")
+        log.warning("SKIP 未设置 AUTH_EDGE_SECRET，请求可能被 403 拒绝")
     return {"x-internal-secret": token}
 
 
@@ -93,7 +91,7 @@ def cmd_push(args: argparse.Namespace) -> int:
     site = _resolve_site(args)
     src = Path(args.source)
     if not src.exists():
-        print(f"错误：{args.source} 不存在")
+        log.err(f"FAIL 源路径不存在：{args.source}")
         return 1
 
     if src.is_file():
@@ -106,13 +104,13 @@ def cmd_push(args: argparse.Namespace) -> int:
                 rel = str(f.relative_to(src)).replace("\\", "/")
                 files.append((f"{prefix}/{rel}", f))
         if not files:
-            print(f"目录为空: {args.source}")
+            log.err(f"FAIL 目录为空：{args.source}")
             return 1
 
     total = len(files)
     total_size = sum(f[1].stat().st_size for f in files)
-    print(f"{args.source}  →  {site}  workspace={args.workspace}")
-    print(f"{total} 个文件（{total_size / 1024:.1f} KB）\n")
+    log.info(f"{args.source}  →  {site}  workspace={args.workspace}")
+    log.info(f"{total} 个文件（{total_size / 1024:.1f} KB）\n")
 
     ok = fail = skip = 0
     for key, fp in files:
@@ -131,12 +129,12 @@ def cmd_push(args: argparse.Namespace) -> int:
             pass
 
         if exists and args.skip_existing:
-            print(f"  [{ok + fail + skip + 1}/{total}] 跳过 {key} ({sz / 1024:.1f} KB)")
+            log.info(f"  [{ok + fail + skip + 1}/{total}] SKIP {key} ({sz / 1024:.1f} KB)")
             skip += 1
             continue
 
         label = "覆盖" if exists else "新增"
-        print(f"  [{ok + fail + skip + 1}/{total}] {label} {key} ({sz / 1024:.1f} KB) ", end="", flush=True)
+        log.write(f"  [{ok + fail + skip + 1}/{total}] {label} {key} ({sz / 1024:.1f} KB) ")
         try:
             resp = requests.post(
                 _api_url(site, args.workspace, {"key": key}),
@@ -145,16 +143,16 @@ def cmd_push(args: argparse.Namespace) -> int:
                 timeout=120,
             )
             if resp.status_code == 200 and resp.json().get("ok"):
-                print("\u2713")
+                log.write_line("\u2713")
                 ok += 1
             else:
-                print(f"\u2717 {_http_err(resp)}")
+                log.err(f"\u2717 {_http_err(resp)}")
                 fail += 1
         except requests.RequestException as e:
-            print(f"\u2717 {e}")
+            log.err(f"\u2717 {e}")
             fail += 1
 
-    print(f"\n完成: \u2713 {ok}  \u2717 {fail}" + (f"  跳过 {skip}" if skip else ""))
+    log.info(f"\n完成: \u2713 {ok}  \u2717 {fail}" + (f"  跳过 {skip}" if skip else ""))
     return 0 if fail == 0 else 1
 
 
@@ -170,55 +168,55 @@ def cmd_pull(args: argparse.Namespace) -> int:
 
         resp = requests.get(_api_url(site, args.workspace, {"prefix": args.source}), headers=_auth_headers())
         if resp.status_code != 200:
-            print(f"列出失败: {_http_err(resp)}")
+            log.err(f"FAIL 列出失败：{_http_err(resp)}")
             return 1
         blobs = resp.json().get("blobs", [])
         keys = [b["key"] if isinstance(b, dict) else str(b) for b in blobs]
         if not keys:
-            print("(空)")
+            log.info("(空)")
             return 0
 
         prefix = args.source
         total = len(keys)
-        print(f"{args.source}  →  {target_dir}/  ({total} 个文件)\n")
+        log.info(f"{args.source}  →  {target_dir}/  ({total} 个文件)\n")
 
         ok = fail = 0
         for i, k in enumerate(keys):
             rel = k[len(prefix) :] if k.startswith(prefix) else k
             fp = target_dir / rel
             fp.parent.mkdir(parents=True, exist_ok=True)
-            print(f"  [{i + 1}/{total}] {k}  →  {fp} ", end="", flush=True)
+            log.write(f"  [{i + 1}/{total}] {k}  →  {fp} ")
             try:
                 r = requests.get(_api_url(site, args.workspace, {"key": k}), headers=_auth_headers(), timeout=120)
                 if r.status_code == 200:
                     fp.write_bytes(r.content)
-                    print(f"\u2713 ({len(r.content) / 1024:.1f} KB)")
+                    log.write_line(f"\u2713 ({len(r.content) / 1024:.1f} KB)")
                     ok += 1
                 else:
-                    print(f"\u2717 {_http_err(r)}")
+                    log.err(f"\u2717 {_http_err(r)}")
                     fail += 1
             except requests.RequestException as e:
-                print(f"\u2717 {e}")
+                log.err(f"\u2717 {e}")
                 fail += 1
 
-        print(f"\n完成: \u2713 {ok}  \u2717 {fail}")
+        log.info(f"\n完成: \u2713 {ok}  \u2717 {fail}")
         return 0 if fail == 0 else 1
 
     # 单文件拉取
     target = Path(args.target or (args.source.rsplit("/", 1)[-1] if "/" in args.source else args.source))
     target.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"{args.source}  →  {target} ... ", end="", flush=True)
+    log.write(f"{args.source}  →  {target} ... ")
     try:
         resp = requests.get(_api_url(site, args.workspace, {"key": args.source}), headers=_auth_headers(), timeout=120)
         if resp.status_code == 200:
             target.write_bytes(resp.content)
-            print(f"\u2713 ({len(resp.content) / 1024:.1f} KB)")
+            log.write_line(f"\u2713 ({len(resp.content) / 1024:.1f} KB)")
             return 0
-        print(f"\u2717 {_http_err(resp)}")
+        log.err(f"\u2717 {_http_err(resp)}")
         return 1
     except requests.RequestException as e:
-        print(f"\u2717 {e}")
+        log.err(f"\u2717 {e}")
         return 1
 
 
@@ -227,29 +225,29 @@ def cmd_list(args: argparse.Namespace) -> int:
     site = _resolve_site(args)
     params = {"prefix": args.source} if args.source else {}
     url = _api_url(site, args.workspace, params)
-    print(f"GET {url}\n")
+    log.info(f"GET {url}\n")
     resp = requests.get(url, headers=_auth_headers())
     if resp.status_code != 200:
-        print(f"错误: {_http_err(resp)}")
+        log.err(f"FAIL {_http_err(resp)}")
         return 1
 
     data = resp.json()
     if data.get("error"):
-        print(f"错误: {data['error']}")
+        log.err(f"FAIL {data['error']}")
         return 1
 
     blobs, dirs = data.get("blobs", []), data.get("directories", [])
     if not blobs and not dirs:
-        print("(空)")
+        log.info("(空)")
         return 0
     for d in dirs:
-        print(f"  \N{OPEN FILE FOLDER}  {d}/")
+        log.info(f"  \N{OPEN FILE FOLDER}  {d}/")
     if dirs:
-        print()
+        log.info("")
     for b in blobs:
         k = b.get("key", "") if isinstance(b, dict) else str(b)
-        print(f"  \N{PAGE FACING UP}  {k}")
-    print(f"\n{len(blobs)} 个文件")
+        log.info(f"  \N{PAGE FACING UP}  {k}")
+    log.info(f"\n{len(blobs)} 个文件")
     return 0
 
 
@@ -263,65 +261,68 @@ def cmd_remove(args: argparse.Namespace) -> int:
         if not args.confirm:
             resp = requests.get(_api_url(site, args.workspace, {"prefix": args.source}), headers=_auth_headers())
             if resp.status_code != 200:
-                print(f"错误: {_http_err(resp)}")
+                log.err(f"FAIL {_http_err(resp)}")
                 return 1
             blobs = resp.json().get("blobs", [])
             if not blobs:
-                print(f"{args.source}  (空)")
+                log.info(f"{args.source}  (空)")
                 return 0
-            print(f"将删除 {len(blobs)} 个文件，加 --confirm 确认执行")
+            log.warning(f"将删除 {len(blobs)} 个文件，加 --confirm 确认执行")
             for b in blobs[:10]:
                 k = b["key"] if isinstance(b, dict) else str(b)
-                print(f"  - {k}")
+                log.info(f"  - {k}")
             if len(blobs) > 10:
-                print(f"  ... 还有 {len(blobs) - 10} 个")
+                log.info(f"  ... 还有 {len(blobs) - 10} 个")
             return 0
 
         resp = requests.get(_api_url(site, args.workspace, {"prefix": args.source}), headers=_auth_headers())
         if resp.status_code != 200:
-            print(f"错误: {_http_err(resp)}")
+            log.err(f"FAIL {_http_err(resp)}")
             return 1
         blobs = resp.json().get("blobs", [])
         if not blobs:
-            print(f"{args.source}  (空)")
+            log.info(f"{args.source}  (空)")
             return 0
         keys = [b["key"] if isinstance(b, dict) else str(b) for b in blobs]
-        print(f"删除 {args.source} ({len(keys)} 个文件)\n")
+        log.info(f"删除 {args.source} ({len(keys)} 个文件)\n")
 
         ok = fail = 0
         for k in keys:
-            print(f"  {k} ... ", end="", flush=True)
+            log.write(f"  {k} ... ")
             try:
                 r = requests.delete(_api_url(site, args.workspace, {"key": k}), headers=_auth_headers())
                 if r.status_code == 200:
-                    print("\u2713")
+                    log.write_line("\u2713")
                     ok += 1
                 else:
-                    print("\u2717")
+                    log.err("\u2717")
                     fail += 1
             except requests.RequestException as e:
-                print(f"\u2717 {e}")
+                log.err(f"\u2717 {e}")
                 fail += 1
-        print(f"\n完成: \u2713 {ok}  \u2717 {fail}")
+        log.info(f"\n完成: \u2713 {ok}  \u2717 {fail}")
         return 0 if fail == 0 else 1
 
     # 单个文件
-    print(f"删除 {args.source} ... ", end="", flush=True)
+    log.write(f"删除 {args.source} ... ")
     try:
         resp = requests.delete(_api_url(site, args.workspace, {"key": args.source}), headers=_auth_headers())
         if resp.status_code == 200 and resp.json().get("ok"):
-            print("\u2713")
+            log.write_line("\u2713")
             return 0
-        print(f"\u2717 {_http_err(resp)}")
+        log.err(f"\u2717 {_http_err(resp)}")
         return 1
     except requests.RequestException as e:
-        print(f"\u2717 {e}")
+        log.err(f"\u2717 {e}")
         return 1
 
 
 # --------------------------------------------------------------------------- main
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description="EdgeOne Blob 管理工具（push/pull/list/remove，source → target）",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     ap.add_argument("-w", "--workspace", default="runtime", help="Blob 命名空间（默认 runtime）")
     ap.add_argument("-s", "--site", help="站点 URL（默认 https://skill.nextpilot.org）")
 
