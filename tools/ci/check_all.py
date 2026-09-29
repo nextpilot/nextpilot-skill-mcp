@@ -1,26 +1,22 @@
-"""Repository validation -- single entry point for CI, pre-push hook, and local runs .
+"""Repository validation -- single entry point for CI, pre-push hook, and local runs.
 
 All checks live in tools/ci/checklist.yml; hooks and workflows only call this script.
 
-Stages (see checklist.yml; each is selectable with --stage):
-  dev/commit/deploy -- not here: `pnpm dev` / tsc --watch / .githooks/pre-commit /
-                       deploy.yml's live E2E
-  build   -- next build (slow; CI always, locally on demand)
-  push    -- fast static checks + the log regression (local; the logs never reach CI)
-  ci      -- artifact parity, guard self-test, dependency audit, E2E smoke
+Seven equal switches (any combination):
+  build / commit / push / ci / e2e / mutate / audit
 
-Output is phased, sequentially numbered across all phases, and ASCII-only
+Output is phased, sequentially numbered, and ASCII-only
 (never garbles on a GBK console).
 
 Usage:
-  python tools/ci/check_all.py                 # stages 1-6 (everything selectable)
-  python tools/ci/check_all.py --stage push    # local pre-push fast path
-  python tools/ci/check_all.py --stage ci      # cloud path
-  python tools/ci/check_all.py --stage build   # next build only (explicit, never implied)
-  python tools/ci/check_all.py --with-mutate   # also guard self-proof mutation tests (modifies files temporarily)
-  python tools/ci/check_all.py --list-stages   # print stages and their steps, run nothing
-
-The legacy flags (--pre-push / --with-build / --with-e2e) are kept as aliases.
+  python tools/ci/check_all.py                         # build + commit + push + ci
+  python tools/ci/check_all.py --push                  # local pre-push fast path
+  python tools/ci/check_all.py --ci                    # cloud path
+  python tools/ci/check_all.py --build                 # next build only
+  python tools/ci/check_all.py --ci --e2e              # CI including E2E
+  python tools/ci/check_all.py --mutate                # guard self-proof only
+  python tools/ci/check_all.py --audit                 # dependency audit only
+  python tools/ci/check_all.py --list                  # print checklist, run nothing
 
 To add a new check: edit tools/ci/checklist.yml, that's it.
 """
@@ -50,10 +46,6 @@ WEB = ROOT / "web"
 
 CHECKLIST_PATH = Path(__file__).resolve().parent / "checklist.yml"
 
-# Parsed CLI arguments, filled in by main(). Module level because checklist.yml's
-# `when` expressions are evaluated with `args` in scope.
-_ARGS: argparse.Namespace = argparse.Namespace()
-
 # ── helpers ──────────────────────────────────────────────────────────
 
 
@@ -71,9 +63,6 @@ class _TimeoutProc:
 def capture(
     cmd: list, workdir: Path, *, timeout: int | None = None, extra_env: dict | None = None
 ) -> subprocess.CompletedProcess:
-    """Run *cmd* in *workdir*; supports optional *timeout* (seconds) and *extra_env*
-    (per-step env vars merged on top of the current process environment).
-    """
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     if extra_env:
         env.update(extra_env)
@@ -103,9 +92,6 @@ def run_step(
     timeout: int | None = None,
     extra_env: dict | None = None,
 ) -> tuple[str, str]:
-    """Run one step, print its status, return (name, "ok"|"fail").
-    Optional *timeout* / *extra_env* are forwarded to ``capture()``.
-    """
     proc = capture(command, workdir, timeout=timeout, extra_env=extra_env)
     cmd_display = " ".join(str(c) for c in command)
     log.print_step(step_num, total, name, cmd_display, proc.returncode, proc.stdout)
@@ -115,14 +101,10 @@ def run_step(
 
 
 def _resolve(val: str | list, placeholders: dict[str, str | list]) -> str | list:
-    """Replace {PYTHON}, {ROOT}, {LOGS}, {ARGS.xxx}, {ENV.XXX} in a string or list.
-    List-valued placeholders (e.g. {LOGS}) expand inline when the input is a list.
-    """
     if isinstance(val, str):
         for key, value in placeholders.items():
             if isinstance(value, str):
                 val = val.replace(f"{{{key}}}", value)
-        # Handle {ENV.XXX} placeholders dynamically
         for match in re.finditer(r"\{ENV\.([^}]+)\}", val):
             env_name = match.group(1)
             env_value = os.environ.get(env_name, "")
@@ -131,7 +113,6 @@ def _resolve(val: str | list, placeholders: dict[str, str | list]) -> str | list
     if isinstance(val, list):
         resolved: list[str] = []
         for item in val:
-            # Check if item is exactly a list-valued placeholder like "{LOGS}"
             if isinstance(item, str) and item.startswith("{") and item.endswith("}"):
                 key = item[1:-1]
                 if key in placeholders and isinstance(placeholders[key], list):
@@ -147,146 +128,97 @@ def _resolve(val: str | list, placeholders: dict[str, str | list]) -> str | list
 
 
 def _build_placeholders(log_paths: list[str]) -> dict[str, str | list]:
-    """Build the placeholder dict for _resolve(): {PYTHON}, {NODE}, {PNPM}, {ROOT},
-    {WEB}, {LOGS}, {ARGS.xxx} (dash to underscore), {ENV.XXX} (resolved lazily).
-    """
-    placeholders: dict[str, str | list] = {
+    return {
         "PYTHON": PY,
         "NODE": NODE or "node",
-        # pnpm is a global tool, not a dependency of web/ -- it has no path under
-        # web/node_modules, so it must come from PATH like NODE; hardcoding a path
-        # would make the audit step fail on every machine.
         "PNPM": PNPM or "pnpm",
         "ROOT": str(ROOT),
         "WEB": str(WEB),
         "LOGS": log_paths,
     }
 
-    # {ARGS.xxx} -> "--xxx" if True, "" if False/None, else str(value)
-    for attr in dir(_ARGS):
-        if attr.startswith("_"):
-            continue
-        value = getattr(_ARGS, attr)
-        flag_name = attr.replace("_", "-")
-        placeholders[f"ARGS.{attr}"] = (
-            f"--{flag_name}" if value is True else str(value) if value is not None and value is not False else ""
-        )
 
-    # {ENV.XXX} -> os.environ.get("XXX", ""); resolved lazily in _resolve
-    return placeholders
+# ── when evaluation ──────────────────────────────────────────────────
 
 
-def _eval_when(when: str | list | None, has_logs: bool) -> bool:
-    """Evaluate a step's 'when' condition. A list means AND (all must be true);
-    None means always enabled. Expression scope: `args`, `has_logs`.
-    """
-    if when is None:
+def _check_when(when: list[str], active: set[str]) -> bool:
+    """A job is enabled when ANY of its ``when`` conditions is in *active*."""
+    if not when:
         return True
-    if isinstance(when, list):
-        return all(_eval_when(w, has_logs) for w in when)
-
-    context = {"args": _ARGS, "has_logs": has_logs}
-    return eval(when, {"__builtins__": {}}, context)
+    return bool(set(when) & active)
 
 
-def _load_checklist(
-    has_logs: bool,
-    log_paths: list[str],
-) -> list[dict]:
-    """Load checklist.yml, resolve placeholders and conditions. Returns stage
-    dicts {id, name, description, critical, steps}, each step {id, name, command,
-    workdir, hint, enabled, timeout, extra_env}. Stages with no steps are dropped
-    -- the dev / commit / deploy placeholders exist to be readable in the YAML.
+# ── checklist loading ────────────────────────────────────────────────
+
+
+def _load_checklist(active: set[str], log_paths: list[str]) -> list[dict]:
+    """Load multi-document checklist.yml, resolve placeholders and conditions.
+    Returns a flat list of step dicts.
     """
     placeholders = _build_placeholders(log_paths)
 
     with open(CHECKLIST_PATH, encoding="utf-8") as f:
-        raw = yaml.safe_load(f)
+        raw_jobs = list(yaml.safe_load_all(f))
 
-    stages: list[dict] = []
-    for stage in raw["jobs"]:
-        steps: list[dict] = []
-        for step in stage["steps"]:
-            enabled = _eval_when(step.get("when"), has_logs)
-            command = _resolve(step["command"], placeholders)
-            workdir_str = _resolve(step["workdir"], placeholders)
+    steps: list[dict] = []
+    for job in raw_jobs:
+        if not job:
+            continue
+        when = job.get("when", [])
+        if isinstance(when, str):
+            when = [when]
 
-            steps.append(
-                {
-                    "id": step["id"],
-                    "name": step["name"],
-                    "command": command,
-                    "workdir": Path(workdir_str),
-                    "hint": step.get("hint", ""),
-                    "timeout": step.get("timeout"),
-                    "extra_env": step.get("env"),
-                    "enabled": enabled,
-                }
-            )
-        if steps:
-            stages.append(
-                {
-                    "id": stage.get("id", ""),
-                    "name": stage["stage"],
-                    "description": stage.get("description", ""),
-                    "critical": stage.get("critical", False),
-                    "steps": steps,
-                }
-            )
-    return stages
+        enabled = _check_when(when, active)
+        command = _resolve(job["command"], placeholders)
+        workdir_str = _resolve(job["workdir"], placeholders)
+
+        steps.append(
+            {
+                "id": job["id"],
+                "name": job["name"],
+                "command": command,
+                "workdir": Path(workdir_str),
+                "hint": job.get("hint", ""),
+                "timeout": job.get("timeout"),
+                "extra_env": job.get("env"),
+                "enabled": enabled,
+            }
+        )
+    return steps
 
 
 # ── main ─────────────────────────────────────────────────────────────
 
 
-def _print_stages(stages: list[dict]) -> None:
-    """Print the stage map (for --list-stages): stage -> steps, nothing executed."""
-    for stage in stages:
-        log.info(f"# {stage['id']:<8} {stage['name']} \u2014 {stage['description']}")
-        for step in stage["steps"]:
-            state = "" if step["enabled"] else "  [off]"
-            log.info(f"    - {step['id']:<20} {step['name']}{state}")
+def _print_checklist(steps: list[dict]) -> None:
+    for step in steps:
+        state = "" if step["enabled"] else "  [off]"
+        log.info(f"    - {step['id']:<30} {step['name']}{state}")
 
 
 def main(argv: list[str]) -> int:
-    global _ARGS
-
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(line_buffering=True)
 
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--build", action="store_true", help="enable build checks (next build)")
+    ap.add_argument("--commit", action="store_true", help="enable commit checks (staged files)")
+    ap.add_argument("--push", action="store_true", help="enable pre-push checks")
+    ap.add_argument("--ci", action="store_true", help="enable CI checks")
+    ap.add_argument("--e2e", action="store_true", help="enable E2E checks")
     ap.add_argument(
-        "--stage",
-        action="append",
-        choices=["push", "ci", "build"],
-        help="run only this stage (repeatable). Omit to run every stage.",
+        "--mutate", action="store_true", help="enable guard self-proof mutation tests (slow, modifies files temporarily)"
     )
-    ap.add_argument("--list-stages", action="store_true", help="print stages and their steps, run nothing")
-    ap.add_argument("--with-build", action="store_true", help="alias for --stage build")
-    ap.add_argument(
-        "--with-e2e",
-        action="store_true",
-        help="enable the E2E steps in the CI stage (smoke + the analyze flow)",
-    )
-    ap.add_argument(
-        "--with-mutate", action="store_true", help="enable guard self-proof mutation tests (modifies files temporarily; slow)"
-    )
+    ap.add_argument("--audit", action="store_true", help="enable pip-audit / pnpm-audit (manual trigger only)")
+    ap.add_argument("--list", dest="list_checks", action="store_true", help="print checklist, run nothing")
     ap.add_argument("--skip-logs", action="store_true", help="skip the log-dependent steps")
-    ap.add_argument("--pre-push", action="store_true", help="alias for --stage push")
     args = ap.parse_args(argv[1:])
 
-    # --pre-push is the old name for --stage push. Normalise here so exactly one
-    # mechanism decides which stages run: keeping both would let them disagree.
-    if args.pre_push:
-        args.stage = ["push"]
-    if args.with_build:
-        stages_wanted = list(args.stage or [])
-        if "build" not in stages_wanted:
-            stages_wanted.append("build")
-        args.stage = stages_wanted
-    # --with-e2e / --with-mutate stay flags: they toggle a step inside the ci stage
-    # rather than selecting a stage (mutate-guards would duplicate the checks job).
-    _ARGS = args
+    # ── Active conditions ──
+    SWITCHES = ("build", "commit", "push", "ci", "e2e", "mutate", "audit")
+    active = {name for name in SWITCHES if getattr(args, name)}
+    if not active:
+        active = {"build", "commit", "push", "ci"}
 
     log_dir = ROOT / "tools" / "testdata" / "logs"
     logs = (
@@ -300,55 +232,43 @@ def main(argv: list[str]) -> int:
         "skipped via --skip-logs" if args.skip_logs else f"no .ulg/.BIN under {log_dir.relative_to(ROOT)} (expected in CI)"
     )
 
-    stages = _load_checklist(has_logs, log_paths)
-    selected = args.stage or [s["id"] for s in stages]
-    unknown = [s for s in selected if s not in {st["id"] for st in stages}]
-    if unknown:
-        # Only reachable if a YAML stage id differs from the --stage choices.
-        log.error(f"unknown stage id(s): {', '.join(unknown)}")
-        return 2
-    stages = [s for s in stages if s["id"] in selected]
+    if has_logs:
+        active.add("logs")
 
-    if args.list_stages:
-        log.print_header("Repository validation -- stage map", " ".join(selected))
-        _print_stages([s for s in _load_checklist(has_logs, log_paths)])
+    steps = _load_checklist(active, log_paths)
+
+    if args.list_checks:
+        log.print_header("Repository validation -- checklist", " ".join(f"--{s}" for s in sorted(active) if s != "logs"))
+        _print_checklist(steps)
         return 0
 
-    # ---- Header ----
-    cmd_parts = ["python tools/ci/check_all.py", "--stage", ",".join(selected)]
-    if args.with_e2e:
-        cmd_parts.append("--with-e2e")
-    if args.with_mutate:
-        cmd_parts.append("--with-mutate")
+    # ── Header ──
+    cmd_parts = ["python tools/ci/check_all.py"]
+    for f in SWITCHES:
+        if getattr(args, f):
+            cmd_parts.append(f"--{f}")
     if args.skip_logs:
         cmd_parts.append("--skip-logs")
-    log.print_header("Repository validation -- CI / pre-push / local", " ".join(cmd_parts))
+    log.print_header("Repository validation", " ".join(cmd_parts))
 
-    # ====================================================================
-    # Flatten (stage, step_dict) for ordered execution
-    # ====================================================================
-
-    all_steps: list[tuple[dict, dict]] = [(stage, step) for stage in stages for step in stage["steps"]]
-    grand_total = sum(1 for _, s in all_steps if s["enabled"])
+    # ── Execute ──
+    enabled_steps = [s for s in steps if s["enabled"]]
+    grand_total = len(enabled_steps)
 
     all_results: list[tuple[str, str]] = []
-    all_skipped: list[str] = []
+    all_skipped = [s["id"] for s in steps if not s["enabled"]]
     step_num = 0
-    current_stage: str | None = None
 
-    for stage, step in all_steps:
-        # 进入新 stage 时打印它的描述
-        if stage["name"] != current_stage:
-            current_stage = stage["name"]
-            if stage["description"]:
-                log.info(f"# {stage['name']} \u2014 {stage['description']}")
+    if all_skipped:
+        if has_logs:
+            log.info(f"[logs] {len(logs)} log file(s) detected")
+        else:
+            log.info(f"[logs] {logs_skip_reason}")
+        log.info(f"[skip] {', '.join(all_skipped)}")
 
-        if not step["enabled"]:
-            all_skipped.append(f"{step['name']} -- skipped")
-            continue
-
+    for step in enabled_steps:
         step_num += 1
-        name, status = run_step(
+        result_name, status = run_step(
             step["name"],
             step["command"],
             step["workdir"],
@@ -358,20 +278,18 @@ def main(argv: list[str]) -> int:
             timeout=step["timeout"],
             extra_env=step["extra_env"],
         )
-        all_results.append((name, status))
+        all_results.append((result_name, status))
 
-        # Critical stage failure -> exit immediately (toolchain missing, nothing else will work)
-        if stage["critical"] and status == "fail":
-            log.error(f"\nFAIL: critical stage '{stage['name']}' failed. See output above.")
-            return 1
+    # ── Summary ──
+    failures = [(name, status) for name, status in all_results if status == "fail"]
+    if failures:
+        log.error(f"\n--- {len(failures)} FAILURE(S) ---")
+        for name, _ in failures:
+            log.error(f"  FAIL: {name}")
+        return 1
 
-    if not has_logs:
-        log.warning(f"SKIP  ({logs_skip_reason})")
-        log.info("NOTE: these are hard gates for rule/engine changes.")
-        log.info("      A green CI does NOT mean regression-tested.")
-        log.info("      Run locally: python tools/ci/check_all.py --stage push")
-
-    return log.print_summary(all_results, all_skipped)
+    log.info(f"\nAll {len(all_results)} check(s) passed.")
+    return 0
 
 
 if __name__ == "__main__":

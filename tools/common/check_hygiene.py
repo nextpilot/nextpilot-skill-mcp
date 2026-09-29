@@ -13,8 +13,8 @@
    退出码还是 0。JS 侧：打了 FAIL/ERROR 的脚本要设非零 process.exitCode 或 process.exit(n)。
 5. 第 4 项是静态的，再配动态探针：拿必然失败的输入真跑一次，断言退出码非零且输出里有失败标记
    ——只要非零不够，加载依赖失败、路径写错也都非零。
-6. `--with-*` 开关不许从阶段列表反推。开关控制阶段内的步骤，与"跑哪些阶段"正交，要各自独立传给
-   check_all.py；写成 `if with_e2e and "ci" not in stages` 而目标步骤住在 ci 里时条件不成立，
+6. 开关不许从其他条件推导。开关之间正交，要各自独立传给
+   check_all.py`；一旦写成 `"ci" in flags: flags.append("--e2e")`，同批传递 --ci --push 时 e2e 不会打开，
    命令照常拼出、退出码照常 0，只是那一步从没跑。
 7. 前端不许裸 `console`。这条没有"坏掉时没输出"的裂缝，它是把 §6.8.3 / code-style §3 那条规范
    固化成守卫：Python 侧禁裸 print 已有 §6.6 之外的检查，前端侧原本只有 ESLint 不报 console，
@@ -570,41 +570,33 @@ def check_bad_input_exit() -> list[str]:
 # ---------------------------------------------------------------------------
 # 5. 开关不许被"再推导一次"
 #
-# 原形：`.githooks/pre-push` 写成 `if with_e2e and "ci" not in stages` 想打开 E2E，而 E2E 那两步
-# 住在 ci 里，于是"想要 E2E"的每条路径都恰好 `"ci" in stages`，`append` 一次都不执行：打印出
-# `--stage push,ci`，看着像要跑，实则跳过。这类错没有输出——命令拼得出来、退出码 0、日志正常。
+# 原形：`.githooks/pre-push` 里 `"ci" in flags: flags.append("--e2e")`，
+# 把 e2e 开关"住"在 ci 开关的条件分支里。开关之间正交，
+# 要各自独立传给 check_all.py。靠反推来隐式打开的习惯性写法会让 e2e 在需要它时反而不成立。
 #
-# 判据：hooks 里出现"把某个 `--with-*` 开关与阶段表达式绑在一起"即违规。开关控制阶段内的步骤
-# （`when: args.with_e2e`），与"跑哪些阶段"正交，要各自独立传给 check_all.py。
+# 判据：hooks 里出现 flags.append(flag) 即违规——开关之间正交，要各自显式传递。
 # ---------------------------------------------------------------------------
 
-# 字符类要含数字：开关名是 `with_e2e`，`[a-z_]+` 匹配不到 `e2e` 里的 `2`，写成 `with_[a-z_]+`
-# 这条守卫会在真 bug 上恒绿（一直不红的守卫比没有守卫更坏）。
-REFLAG_GUARD_RE = re.compile(
-    r"""(?:if|elif)\b[^\n]*\bwith_[a-z0-9_]+\b[^\n]*\b(?:in|not\s+in)\b[^\n]*\bstages\b"""
-    r"""|\bwith_[a-z0-9_]+\b\s+and\b[^\n]*\bstages\b"""
-)
+FLAG_REDERIVE_RE = re.compile(r"""flags\s*\.\s*append\s*\(\s*["'][^"']*["']\s*\)""")
 
 
 def check_hook_flags_not_rederived() -> list[str]:
-    """hook 不许从阶段列表反推 `--with-*` 开关，那样开关开不着（见上面那段）。"""
+    """hook 不许从其他开关推导 flag——开关之间正交，要各自显式传递。"""
     problems: list[str] = []
     for hook in sorted((ROOT / ".githooks").glob("*")):
         if not hook.is_file() or hook.suffix in (".ps1", ".md"):
             continue
         code = _code_only(hook)
-        for m in REFLAG_GUARD_RE.finditer(code):
+        for m in FLAG_REDERIVE_RE.finditer(code):
             snippet = re.sub(r"\s+", " ", code[max(0, m.start() - 40) : m.end() + 80]).strip()
             problems.append(
-                f"{_rel(hook)} 把 --with-* 开关与阶段条件绑在一起 —— …{snippet}…"
-                "\n        开关控制的是阶段**内的步骤**，与「跑哪些阶段」正交："
-                "从 stages 反推会让它在每条真实路径上都不成立，于是静默跳过"
+                f"{_rel(hook)} 从其他条件推导 flag —— …{snippet}…\n        开关之间正交，要各自显式传给 check_all.py"
             )
     return problems
 
 
 # ---------------------------------------------------------------------------
-# 5. 前端不许裸 console
+# 6. 前端不许裸 console
 #
 # 与 Python 侧"不许裸 print"是同一条规范的两种语言。没有守卫的话，这次清零过几个月
 # 就会被新代码写回去，而且写回去时不会有任何东西报错。
@@ -643,7 +635,7 @@ CHECKS: list[tuple[str, object]] = [
     ("产物新鲜度门还在", check_freshness_gate_alive),
     ("打了 FAIL/ERROR 就要能非零退出", check_failure_visible),
     ("坏输入必须非零退出", check_bad_input_exit),
-    ("hook 不从阶段列表反推开关", check_hook_flags_not_rederived),
+    ("hook 不从其他开关推导 flag", check_hook_flags_not_rederived),
     ("前端不许裸 console", check_no_raw_console),
 ]
 

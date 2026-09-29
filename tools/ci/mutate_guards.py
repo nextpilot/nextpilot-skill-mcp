@@ -297,16 +297,16 @@ MUTATIONS: list[Mutation] = [
         note="静态规则看不见这一半：ERROR 照打、fail 照记，最后 return 0——退出码还是 0",
     ),
     Mutation(
-        name="pre-push 从阶段列表反推 --with-e2e",
+        name="pre-push 不能从其他开关推导 flag",
         path=".githooks/pre-push",
         # 锚点必须单行：_apply 按字节读写，工作区里这文件是 CRLF，锚点里写 `\n` 一个都匹配不到。
-        old="    if with_e2e:",
-        new='    if with_e2e and "ci" not in stages:',
+        old='    cmd = [sys.executable, script, "--push"]',
+        new='    cmd = [sys.executable, script, "--push"]\n    flags.append("--e2e")',
         guard="hygiene",
-        expect="hook 不从阶段列表反推开关",
+        expect="hook 不从其他开关推导 flag",
         # 说明里的引号是给读者看的字面量，不是字符串语法。
-        note='原形：E2E 步骤住在 ci 阶段里，所以 `"ci" not in stages` 在每条想要 E2E 的路径上都不成立——'
-        "WITH_E2E=1 打印出 --stage push,ci，看着像要跑，其实两步都被静默跳过",
+        note="e2e 必须显式传，不能靠 hook 隐式推导\n"
+        "原形：在 hook 里用 flags.append 偷偷加开关，看着像 push 就开了 e2e，实则绕过显式传递",
     ),
     # ---- 引擎侧：knowledge/engine/ 是三处共用的纯 Python ----
     #

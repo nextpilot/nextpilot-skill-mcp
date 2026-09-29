@@ -4,11 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  '@typescript-eslint/parser>typescript': ^6
-  '@typescript-eslint/eslint-plugin>typescript': ^6
-  typescript-eslint>typescript: ^6
-
 packageExtensionsChecksum: sha256-yVwNwVp90h1towiaI2TQB6E3hk1yhRlrAwD+LV5jVZ8=
 
 pnpmfileChecksum: sha256-aq+bBaJ6IfgQRsVy1TDdrJ4JWAVPdqmgmyI0oa0aCT4=

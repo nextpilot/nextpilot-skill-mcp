@@ -1,13 +1,8 @@
-# 仓库校验（CI 侧）—— 只做**质量门禁**，不做部署（部署在 deploy.yml）。
+# Repository validation — quality gate (build + lint + typecheck + guards).
+# E2E is in e2e.yml, guard self-proof in mutate.yml — parallel, no mutual blocking.
 #
-# 校验命令**不写在这里**——只调 tools/ci/check_all.py，与本地、pre-push hook 共用同一份
-# 清单。理由：命令抄成两份后必然漂移，然后"本地绿、CI 红"会变成常态，两边都开始被忽略。
-# 要加一项校验，改 tools/ci/check_all.py 一处即可，CI 自动跟着变。
-#
-# ⚠ **CI 全绿 ≠ 回归过了**：需要真实 .ulg 的那组校验（6 条冻结基线逐字段比对、适配器契约
-# 测试、数据层 probe、字段引用 lint）在这里必然被跳过——原始日志含 GPS 轨迹，按项目隐私
-# 规则不入库（见 .gitignore 的 tools/testdata/logs/*.ulg），checkout 里根本没有这些文件。
-# 那几项挂在 .githooks/pre-push 上，只在开发机跑。详情见 tools/ci/check_all.py 的文档。
+# No check commands here — just calls tools/ci/check_all.py, same as local pre-push.
+# To add a check: edit tools/ci/check_all.py; CI picks it up automatically.
 name: CI
 
 on:
@@ -28,8 +23,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
-      # 上报的 issue 里带版本号（web/lib/issue-bridge.ts 读它），否则线上报错无法定位到
-      # 具体提交。产物只用于诊断，不影响 build:kb --check 的产物比对（版本不在产物里）。
+      # Version string embedded in filed issues (read by web/lib/issue-bridge.ts).
+      # Without it, production errors cannot be traced to a specific commit.
+      # The artifact itself is diagnostic only — does not affect build:kb --check parity.
       NEXT_PUBLIC_APP_VERSION: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
@@ -37,11 +33,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          # 与 requirements-dev.txt 绑定：改了依赖文件，缓存自动失效
           cache: pip
           cache-dependency-path: requirements-dev.txt
 
-      # 版本对齐开发机（node 22 / pnpm 12），本地过不了的这里也不该过
       - uses: pnpm/action-setup@v4
         with:
           version: 12.4.1
@@ -50,73 +44,17 @@ jobs:
         with:
           node-version: "22"
           cache: pnpm
-          # pnpm workspace 的 lockfile 在仓库根（见 .gitignore 依赖段注释）
           cache-dependency-path: pnpm-lock.yaml
 
-      # ruff 版本钉死在 requirements-dev.txt（风格约定只有所有人跑同一版才成立）
-      - name: 装 Python 校验工具
-        run: python -m pip install -r requirements-dev.txt
+      - name: Install deps (--ci mode: pip install + pnpm --frozen-lockfile + playwright)
+        run: ./tools/setup/setup.sh
 
-      - name: 装 web 依赖
-        working-directory: web
-        run: pnpm install --frozen-lockfile
+      - name: Validate
+        run: python tools/ci/check_all.py --build --ci
 
-      # E2E 只在云端跑：「上传 .ulg 完成分析」自带 420s 超时，挂本地 pre-push 会让每次 push
-      # 堵几分钟。
-      - name: 装 Playwright 浏览器
-        working-directory: web
-        run: pnpm exec playwright install --with-deps chromium
-
-      # --stage 可重复传（不支持逗号多值）；build 必须显式列出：--stage ci 不含 build，
-      # 否则每次 CI 会少跑真编译。
-      # --with-e2e 是步骤级开关而非阶段开关——它同时控制两条 E2E：
-      #   playwright-smoke（@smoke，约 1~2 分钟）与 playwright-analyze（日志分析全流程，约 5~7 分钟）。
-      # 后者上传的是入库的 web/e2e/fixtures/sample.ulg，不依赖本机日志，云端能真跑。
-      # 不传这个 flag 两步都会静默跳过（--list-stages 里标 [off] 就是这个意思）。
-      - name: 仓库校验（含 E2E 冒烟 + 日志分析全流程）
-        run: python tools/ci/check_all.py --stage build --stage ci --with-e2e
-
-      # 日志类那组在 CI 里必然 SKIP，把这句话顶到汇总最上面，免得"全绿"被误读成回归通过
-      - name: 提醒：日志类回归未跑
+      # Log-dependent steps always SKIP in CI. Show a reminder so "all green"
+      # is not misinterpreted as a full regression pass.
+      - name: "Reminder: log-dependent regressions not run"
         if: always()
         run: |
-          echo "::notice::CI 全绿不等于回归过了 —— 需要真实 .ulg 的 4 项（冻结基线比对 / 适配器契约 / probe-data / lint_rules --strict）在本机 pre-push 才跑：python tools/ci/check_all.py"
-
-  # 守卫自证：每条守卫都要能先红一次（CLAUDE.md §6.6）。
-  # 单独成 job 是时长决定的：42 条变异各要完整跑一遍对应守卫，全套约 20 分钟，
-  # 与主 job 并行才各有独立超时预算。
-  guard-self-proof:
-    name: 守卫自证（mutate_guards）
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: requirements-dev.txt
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 12.4.1
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: pnpm
-          # pnpm workspace 的 lockfile 在仓库根（见 .gitignore 依赖段注释）
-          cache-dependency-path: pnpm-lock.yaml
-
-      - name: 装 Python 校验工具
-        run: python -m pip install -r requirements-dev.txt
-
-      - name: 装 web 依赖
-        working-directory: web
-        run: pnpm install --frozen-lockfile
-
-      # 产物侧那几条变异要真执行编译产物（缺 numpy / pyulog 会 ModuleNotFoundError），
-      # 且 CI 里没有真实 .ulg —— 那几条会自己 SKIP，不会伪装成通过。
-      - name: 每条守卫都要先红一次
-        run: python tools/ci/check_all.py --with-mutate
+          echo "::notice::CI all-green != full regression passed — 4 log-dependent checks (frozen baseline diff / adapter contract / probe-data / lint_rules --strict) only run locally with real .ulg files: python tools/ci/check_all.py"

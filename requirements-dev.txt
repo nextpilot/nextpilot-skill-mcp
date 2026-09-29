@@ -27,7 +27,7 @@ numpy==2.1.3
 #   python -m pip install pip-audit==2.10.1 --index-url https://pypi.org/simple
 pip-audit==2.10.1
 
-# 需要真实日志的那组校验（冻结基线比对 / 契约测试 / probe-data）另外还要 pyulog，
-# 装在 requirements-logs.txt（那份为什么不并进来、版本为什么不钉，都写在它自己的注释里）。
-# 它们跑不了 CI——原始 .ulg 含 GPS 轨迹、按隐私规则不入库——故不列在这里强制安装。
-# 日志回归因此归 push 阶段而非 ci 阶段（tools/ci/checklist.yml）。
+# 日志解析（ULog 读取 / 冻结基线比对 / 契约测试 / probe-data）。
+# 版本与浏览器侧 site-config.ts 的 NEXT_PUBLIC_PYULOG_WHEEL 一致。
+# 升级后重冻基线：python tools/engine/dump_baseline.py
+pyulog==1.2.4

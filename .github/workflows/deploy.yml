@@ -1,24 +1,30 @@
-# 部署到 EdgeOne Pages（Next.js 全栈模式）。
+# Deploy to EdgeOne Pages (Next.js full-stack mode).
 #
-# 与 CI 的关系：CI 只判质量，这里只管发布。挂在 workflow_run 上等 CI 跑完，失败不发布——
-# 避免"校验红了但已经上线"。workflow_dispatch 留给回滚与补发。
+# Relationship with CI: CI only judges quality; this only handles publishing.
+# Hooks into workflow_run to wait for CI to finish — deploy only if CI passed,
+# avoiding "validation failed but already live". workflow_dispatch is for rollbacks
+# and manual redeploys.
 #
-# 为什么不让 CI 传构建产物：本项目是全栈模式（边缘函数在 web/functions/，运行时要读
-# package.json 与 functions/），不是静态导出。EdgeOne CLI 的推荐路径是从源码目录 deploy、
-# 由 CLI 自己构建——所以这里不 pnpm install、不传 .next：少一层产物组装风险，也不用传
-# node_modules。若改成 output: 'export' 静态导出，再改为先 build 再 deploy ./out。
+# Why not pass build artifacts from CI: this project is full-stack mode (edge
+# functions in web/functions/, runtime reads package.json + functions/), not static
+# export. EdgeOne CLI's recommended path is to deploy from source and let the CLI
+# build — so no pnpm install or .next artifact passing here: less artifact assembly
+# risk, no need to transfer node_modules. If switching to output: 'export' static
+# export, change to build first then deploy ./out.
 #
-# 仓库配置（Settings → Secrets and variables → Actions）：
-#   Secrets:   EDGEONE_API_TOKEN   EdgeOne 控制台生成的 CI/CD 令牌
-#   Variables: EDGEONE_PROJECT     项目名（-n 参数；填错会自动新建一个空项目）
-#              SMOKE_BASE_URL      可选，生产站点源站；不配则跳过部署后冒烟
+# Repository config (Settings → Secrets and variables → Actions):
+#   Secrets:   EDGEONE_API_TOKEN   CI/CD token from EdgeOne console
+#   Variables: EDGEONE_PROJECT     Project name (-n flag; wrong value auto-creates an empty project)
+#              SMOKE_BASE_URL      Optional, production origin; skip post-deploy smoke if unset
 #
-# 环境变量（AUTH_SECRET / DEEPSEEK_API_KEY / SMTP_* / ISSUE_* 等）不在这里注入，配在 EdgeOne
-# 控制台的项目环境变量里（见 docs/operations/README.md 第 3 节）：密钥不进仓库、不进 CI 日志。
+# Environment variables (AUTH_SECRET / DEEPSEEK_API_KEY / SMTP_* / ISSUE_* etc.)
+# are NOT injected here — configure them in EdgeOne console project env vars
+# (see docs/operations/README.md section 3): secrets stay out of repo and CI logs.
 name: Deploy
 
 on:
-  # CI 跑完才部署。conclusion 在 job 的 if 里判——workflow_run 无法在 on 里过滤结果
+  # Deploy only after CI passes. conclusion is checked in job if — workflow_run
+  # cannot filter by result at the event level.
   workflow_run:
     workflows: ["CI"]
     types: [completed]
@@ -26,17 +32,19 @@ on:
   workflow_dispatch:
     inputs:
       env:
-        description: 部署目标环境
+        description: Deployment target environment
         required: true
         default: production
         type: choice
         options: [production, preview]
-  # 同仓 PR → 预览环境。fork 的 PR 拿不到 secret，下面用 if 显式跳过而不是让它红
+  # Same-repo PR → preview environment. Fork PRs cannot access secrets;
+  # explicitly skip via if rather than letting it fail.
   pull_request:
     branches: [master]
 
 concurrency:
-  # 生产串行、预览按 PR 隔离；cancel-in-progress: false —— 部署中途取消会留下半份产物
+  # Production: serial; preview: per-PR isolation.
+  # cancel-in-progress: false — cancelling mid-deploy leaves half-baked artifacts.
   group: deploy-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || 'production' }}
   cancel-in-progress: false
 
@@ -45,8 +53,8 @@ permissions:
 
 jobs:
   deploy:
-    name: 部署（${{ github.event_name == 'pull_request' && 'preview' || github.event.inputs.env || 'production' }}）
-    # workflow_run 时只认 CI 成功；手动触发无条件放行（回滚 / 补发要走这条路）
+    name: Deploy (${{ github.event_name == 'pull_request' && 'preview' || github.event.inputs.env || 'production' }})
+    # workflow_run: only proceed on CI success. workflow_dispatch: always allow (rollback / manual deploy path).
     if: >
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
       || github.event_name == 'workflow_dispatch'
@@ -54,8 +62,8 @@ jobs:
     timeout-minutes: 45
     env:
       DEPLOY_ENV: ${{ github.event.inputs.env || 'production' }}
-      # workflow_run 的 checkout 默认落在 master 上，而不是触发它的那次提交；
-      # 必须显式 head_sha，否则会发布一份与 CI 验过的不同的代码
+      # workflow_run checkout defaults to master, not the triggering commit.
+      # Must explicitly use head_sha, otherwise we deploy code CI never validated.
       DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
@@ -66,25 +74,26 @@ jobs:
         with:
           node-version: "22"
 
-      - name: 校验部署配置
+      - name: Verify deployment config
         env:
           TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
           PROJECT: ${{ vars.EDGEONE_PROJECT }}
         run: |
           set -euo pipefail
           [ -n "${TOKEN}" ] || {
-            echo "::error::缺 secret EDGEONE_API_TOKEN（EdgeOne 控制台 → API Token）"
+            echo "::error::Missing secret EDGEONE_API_TOKEN (EdgeOne console → API Token)"
             exit 1
           }
           [ -n "${PROJECT}" ] || {
-            echo "::error::缺 variable EDGEONE_PROJECT（EdgeOne Pages 项目名，填错会自动新建空项目）"
+            echo "::error::Missing variable EDGEONE_PROJECT (EdgeOne Pages project name; wrong value auto-creates an empty project)"
             exit 1
           }
-          echo "OK 配置齐全，目标项目 ${PROJECT}"
+          echo "OK config ready, target project ${PROJECT}"
 
-      # 不 pin 版本：EdgeOne CLI 仍在快速迭代。**首次跑通后请把它钉死**（看日志里的
-      # edgeone 版本号，改成 edgeone@x.y.z）——理由同 requirements-dev.txt 钉 ruff。
-      - name: 部署到 EdgeOne Pages
+      # Not pinning version: EdgeOne CLI is still in rapid iteration.
+      # **After first successful run, pin it** (check edgeone version in logs,
+      # change to edgeone@x.y.z) — same reasoning as pinning ruff in requirements-dev.txt.
+      - name: Deploy to EdgeOne Pages
         id: deploy
         working-directory: web
         env:
@@ -92,17 +101,18 @@ jobs:
           PROJECT: ${{ vars.EDGEONE_PROJECT }}
         run: npx --yes edgeone pages deploy -n "$PROJECT" -t "$TOKEN" -e "$DEPLOY_ENV"
 
-      # 部署后**全套 E2E**（真实 Playwright，打线上站点 SMOKE_BASE_URL）。
-      # 替代原来只 curl /ping 的弱冒烟：端到端验证线上构建产物——
-      # 含真实上传 .ulg → Pyodide 解析 → 显示，因此也是「升级后的部署后冒烟」。
-      # 仅生产环境且配置了 SMOKE_BASE_URL 时跑；跑挂了说明线上有问题，部署被视为失败。
-      - name: 装 pnpm + Playwright 浏览器
+      # Full E2E after deploy: real Playwright hitting the live site SMOKE_BASE_URL.
+      # Replaces the old weak curl /ping smoke test — validates the full pipeline
+      # end-to-end: upload .ulg → Pyodide parse → render on the live build.
+      # Only runs for production when SMOKE_BASE_URL is configured.
+      # Failure means the live site is broken — deploy is considered failed.
+      - name: Install pnpm + Playwright browsers
         if: vars.SMOKE_BASE_URL != '' && env.DEPLOY_ENV == 'production'
         uses: pnpm/action-setup@v4
         with:
           version: 12.4.1
 
-      - name: 部署后全套 E2E（真实 Playwright，打线上站点）
+      - name: Post-deploy full E2E (real Playwright, live site)
         if: vars.SMOKE_BASE_URL != '' && env.DEPLOY_ENV == 'production'
         working-directory: web
         env:
@@ -113,14 +123,14 @@ jobs:
           pnpm exec playwright install --with-deps chromium
           pnpm exec playwright test --config playwright.live.config.ts
 
-      - name: 摘要
+      - name: Summary
         if: always()
         run: |
-          echo "环境=${DEPLOY_ENV} 提交=${DEPLOY_SHA} 触发=${{ github.event_name }}"
-          echo "部署后自检顺序：/issue-probe → /issue-probe?write=1（需 ISSUE_DEBUG=1），见 docs/operations/README.md 第 7 节"
+          echo "env=${DEPLOY_ENV} commit=${DEPLOY_SHA} trigger=${{ github.event_name }}"
+          echo "Post-deploy self-check order: /issue-probe → /issue-probe?write=1 (requires ISSUE_DEBUG=1), see docs/operations/README.md section 7"
 
   preview:
-    name: 预览（PR #${{ github.event.pull_request.number }}）
+    name: Preview (PR #${{ github.event.pull_request.number }})
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -133,16 +143,16 @@ jobs:
         with:
           node-version: "22"
 
-      - name: 校验部署配置
+      - name: Verify deployment config
         env:
           TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
           PROJECT: ${{ vars.EDGEONE_PROJECT }}
         run: |
           set -euo pipefail
-          [ -n "${TOKEN}" ] || { echo "::error::缺 secret EDGEONE_API_TOKEN"; exit 1; }
-          [ -n "${PROJECT}" ] || { echo "::error::缺 variable EDGEONE_PROJECT"; exit 1; }
+          [ -n "${TOKEN}" ] || { echo "::error::Missing secret EDGEONE_API_TOKEN"; exit 1; }
+          [ -n "${PROJECT}" ] || { echo "::error::Missing variable EDGEONE_PROJECT"; exit 1; }
 
-      - name: 部署到预览环境
+      - name: Deploy to preview environment
         working-directory: web
         env:
           TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}

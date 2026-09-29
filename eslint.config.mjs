@@ -17,6 +17,10 @@ export default tseslint.config(
             // Pyodide 运行时与 wheel（第三方产物，由 tools/dev/fetch_pyodide_assets.py 抓取）。
             // 不排除的话 eslint 会去解析 pyodide.js / pyodide.asm.js，报出上万条 no-undef。
             "**/public/pyodide/**",
+            ".venv/**",
+            ".claude/**",
+            ".workbuddy/**",
+            ".cache/**",
         ],
     },
     js.configs.recommended,
@@ -36,7 +40,10 @@ export default tseslint.config(
     }),
     {
         plugins: { "@next/next": nextPlugin, "react-hooks": reactHooks },
-        rules: { ...nextPlugin.configs.recommended.rules },
+        rules: {
+            ...nextPlugin.configs.recommended.rules,
+            "@next/next/no-html-link-for-pages": "off",
+        },
     },
     {
         files: ["**/*.ts", "**/*.tsx"],
@@ -83,6 +90,18 @@ export default tseslint.config(
                 clearTimeout: "readonly",
                 console: "readonly",
             },
+        },
+        rules: {
+            "no-undef": "error",
+            "no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+        },
+    },
+    {
+        files: ["tools/**/*.mjs"],
+        languageOptions: {
+            ecmaVersion: "latest",
+            sourceType: "module",
+            globals: { ...globals.node },
         },
         rules: {
             "no-undef": "error",

@@ -2,7 +2,7 @@
   "venvPath": ".",
   "venv": ".venv",
   "extraPaths": ["knowledge/engine"],
-  "exclude": ["**/node_modules", "**/__pycache__", ".venv", "tools"],
+  "exclude": ["**/node_modules", "**/__pycache__", ".venv", ".claude", ".workbuddy", ".cache", "tools"],
   "typeCheckingMode": "standard",
   "reportMissingTypeStubs": false,
   "reportUnknownMemberType": false,

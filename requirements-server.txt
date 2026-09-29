@@ -1,12 +1,11 @@
 # 本地 MCP 服务（server/）的 Python 依赖 —— 不进 Pyodide、不影响 web 运行期
 #
-# 装（三份一起：服务还要用前两份里的 PyYAML / pyulog / numpy）：
+# 装（两份一起：服务还要用 dev 里的 PyYAML / pyulog / numpy）：
 #   uv pip install --python .venv/Scripts/python.exe \
-#     -r requirements-dev.txt -r requirements-logs.txt -r requirements-server.txt
+#     -r requirements-dev.txt -r requirements-server.txt
 #
 # 为什么单独一份，而不是塞进 requirements-dev.txt：这份只有"要跑本地 MCP 服务"的机器
-# 才需要；并进 dev 那份等于让每台开发机都装 MCP SDK。并进 requirements-logs.txt 更不对 ——
-# 那份的语义是"校验用的 pyulog"，与"跑服务"无关。
+# 才需要；并进 dev 那份等于让每台开发机都装 MCP SDK。
 #
 # 为什么钉版本：同 requirements-dev.txt —— 结论只有在所有人跑同一版时才可比。
 #

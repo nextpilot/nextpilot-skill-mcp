@@ -1,345 +1,336 @@
-# tools/ci/checklist.yml -- 阶段地图：读这个文件就能看出"哪个阶段跑哪些检查"。
+# tools/ci/checklist.yml
+# Repository validation checklist -- multi-document YAML.
 #
-# 只放"一次执行、退出码表示成败"的项（check_all.py 能驱动的）；常驻进程不在这里：
-#   dev    `pnpm dev` 与 `tsc --noEmit --watch`
-#   commit .githooks/pre-commit（对 staged 文件跑 ruff / prettier）
-#   deploy .github/workflows/deploy.yml 的 live E2E
+# 每个 `---` 分隔的 YAML 文档是一个 job。
+# `when` 是触发条件数组，任意条件命中该 job 就会运行。
 #
-# Stage 字段：id / stage(显示名) / description / critical(失败是否立刻中断) / steps
-# Step 字段：
-#   id      - 稳定标识，Python 侧按它匹配，不许改
-#   name    - 短描述（步骤标题，可自由改）
-#   when    - 可选 Python 表达式，省略即总跑
-#   workdir - {ROOT} 或 {WEB}
-#   command - YAML 字符串数组
-#   hint    - 失败时打印，省略即无
-#   timeout - 可选超时秒数
-#   env     - 可选额外环境变量
+# 条件（7 个平等开关 + 1 个自动检测）：
+#   build / commit / push / ci / e2e / mutate / audit -- 通过同名 --flag 启用
+#   logs                                      -- 本地存在 .ulg/.bin 时自动启用
 #
-# 占位符（运行期替换）：{PYTHON} / {NODE} / {PNPM}（全局工具，须走 PATH）/ {ROOT} / {WEB} /
-# {LOGS} / {ARGS.xxx}（flag 为真则 "--xxx"，否则空）/ {ENV.XXX}（未设则空）
+# Each job has:
+#   id          - stable identifier (used by Python code for matching; never change)
+#   name        - short description (printed in step header; can be changed freely)
+#   when        - trigger conditions: [build, push, ci, e2e, mutate, logs]
+#   workdir     - working directory ({ROOT} or {WEB})
+#   command     - command list (YAML array of strings)
+#   hint        - printed on failure ("" or omit = no hint)
+#   timeout     - optional timeout in seconds (omit = no timeout)
+#   env         - optional dict of extra environment variables for this step
 #
-# when 用 args（argparse.Namespace）与 has_logs 求值，只表达"什么条件下跑"，不表达阶段归属
-# （那是 --stage 的职责）：
-#   "True"                              - 总跑（等同省略）
-#   "args.with_build"                   - 仅 --with-build
-#   "args.with_build or args.with_e2e"  - 复合条件
+# Placeholders (resolved at runtime):
+#   {PYTHON}   - Python interpreter path (sys.executable)
+#   {NODE}     - Node.js executable (shutil.which("node"))
+#   {PNPM}     - pnpm executable (shutil.which("pnpm"))
+#   {ROOT}     - repository root directory
+#   {WEB}      - ROOT / "web"
+#   {LOGS}     - log file paths (space-separated, for log-dependent steps)
 #
-# 加检查：在 steps 里加一条即可。
+# To add a new check: insert a `---` block with the fields above.
 
-jobs:
-  - id: dev
-    stage: "Development"
-    description: "常驻进程，不在本清单里 —— `pnpm dev` 与 `tsc --noEmit --watch`（另开终端）"
-    steps: []
+# ═══════════════════════════════════════════════════════════════════════
+# build — Site build
+# ═══════════════════════════════════════════════════════════════════════
 
-  - id: commit
-    stage: "Commit"
-    description: "对 staged 文件格式化 —— 在 .githooks/pre-commit 里，不调 check_all.py"
-    steps: []
+---
+id: "next-build"
+name: "Site build (next build)"
+when: [build]
+timeout: 300
+workdir: "{WEB}"
+command: ["{NODE}", "node_modules/next/dist/bin/next", "build"]
+hint: "Review the Next.js build errors above. Run `npx next build` locally for detailed output."
 
-  - id: build
-    stage: "Site build"
-    description: "Full Next.js production build (slow; CI always, locally on demand)"
-    steps:
-      - id: "next-build"
-        name: "Site build (next build)"
-        timeout: 300
-        workdir: "{WEB}"
-        command: ["{NODE}", "node_modules/next/dist/bin/next", "build"]
-        hint: "Review the Next.js build errors above. Run `npx next build` locally for detailed output."
+# ═══════════════════════════════════════════════════════════════════════
+# commit — Staged-file checks (read-only, no modification)
+# ═══════════════════════════════════════════════════════════════════════
 
-  - id: push
-    stage: "Push"
-    description: "Local pre-push: fast static checks plus the log regression (seconds each)"
-    steps:
-      # ── 基本检查：格式 → lint → 类型 ──
-      - id: "ruff-format"
-        name: "Python style (ruff format --check)"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "-m", "ruff", "format", "--check", "."]
-        hint: "Run `python -m ruff format .` to auto-format all files."
+---
+id: "check-staged"
+name: "Format/lint on staged files (check_staged)"
+when: [commit]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "tools/ci/check_staged.py"]
+hint: "Staged files have formatting or lint issues. Fix them before committing."
 
-      - id: "ruff-lint"
-        name: "Python lint (ruff check)"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "-m", "ruff", "check", "."]
-        hint: "Run `python -m ruff check --fix .` to auto-fix fixable issues, then review remaining items manually."
+# ═══════════════════════════════════════════════════════════════════════
+# push — Local pre-push checks
+# ═══════════════════════════════════════════════════════════════════════
 
-      - id: "prettier-check"
-        name: "Code style (prettier --check)"
-        workdir: "{ROOT}"
-        # 不传 --config：仓库根已经有 .prettierrc，prettier 从被扫描的文件向上找就能命中。
-        # 显式传 --config 只在这里生效，编辑器/手工命令仍会落回默认 2 空格/80 宽，
-        # 于是 web/ 之外的文件被改坏 —— 配置放在根才能两头一致。
-        command: ["{NODE}", "node_modules/prettier/bin/prettier.cjs", "--check", "."]
-        hint: "Run `npx prettier --write .` to auto-format all files. Auto-generated files are excluded via .prettierignore."
+---
+id: "ruff-format"
+name: "Python style (ruff format --check)"
+when: [push, ci]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "-m", "ruff", "format", "--check", "."]
+hint: "Run `python -m ruff format .` to auto-format all files."
 
-      - id: "markdownlint"
-        name: "Markdown lint (markdownlint-cli2)"
-        workdir: "{ROOT}"
-        # markdownlint-cli2 自动寻找 .markdownlint-cli2.jsonc，ignores 直接写在配置里，
-        # VS Code 扩展同样优先读 .markdownlint-cli2.jsonc —— CI 与编辑器完全一致。
-        command: ["{NODE}", "node_modules/markdownlint-cli2/markdownlint-cli2-bin.mjs", "**/*.md", "**/*.mdx"]
-        hint: "Fix the Markdown lint errors listed above. Ignored paths are configured in .markdownlint-cli2.jsonc."
+---
+id: "ruff-lint"
+name: "Python lint (ruff check)"
+when: [push, ci]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "-m", "ruff", "check", "."]
+hint: "Run `python -m ruff check --fix .` to auto-fix fixable issues, then review remaining items manually."
 
-      - id: "pyright"
-        name: "Python type checking (pyright)"
-        workdir: "{ROOT}"
-        command: ["{NODE}", "node_modules/pyright/index.js", "knowledge/engine"]
-        hint: "Fix the Python type errors listed above. Run `npx pyright knowledge/engine` locally for detailed output."
+---
+id: "pyright"
+name: "Python type checking (pyright)"
+when: [push, ci]
+workdir: "{ROOT}"
+command: ["{NODE}", "node_modules/pyright/index.js", "knowledge/engine"]
+hint: "Fix the Python type errors listed above. Run `npx pyright knowledge/engine` locally for detailed output."
 
-      - id: "eslint"
-        name: "TypeScript lint (eslint)"
-        workdir: "{ROOT}"
-        command: ["{NODE}", "node_modules/eslint/bin/eslint.js", "web"]
-        hint: "Fix the ESLint errors listed above. Run `npx eslint web --fix` from repo root to auto-fix where possible."
+---
+id: "prettier-check"
+name: "Code style for ts/md/json/yml (prettier --check)"
+when: [push, ci]
+workdir: "{ROOT}"
+command: ["{NODE}", "node_modules/prettier/bin/prettier.cjs", "--check", "."]
+hint: "Run `npx prettier --write .` to auto-format all files. Auto-generated files are excluded via .prettierignore."
 
-      - id: "tsc"
-        name: "TypeScript type checking (tsc --noEmit)"
-        workdir: "{WEB}"
-        command: ["{NODE}", "node_modules/typescript/bin/tsc", "--noEmit"]
-        hint: "Fix the TypeScript errors listed above. Run `npx tsc --noEmit --pretty` locally for detailed output."
+---
+id: "markdownlint"
+name: "Markdown lint (markdownlint-cli2)"
+when: [push, ci]
+workdir: "{ROOT}"
+command: ["{NODE}", "node_modules/markdownlint-cli2/markdownlint-cli2-bin.mjs", "**/*.md", "**/*.mdx"]
+hint: "Fix the Markdown lint errors listed above. Ignored paths are configured in .markdownlint-cli2.jsonc."
 
-      # ── 密钥检查 ──
-      - id: "check-secrets"
-        name: "No committed credentials (check_secrets)"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/common/check_secrets.py"]
-        hint: "A credential-shaped value was found in a tracked file. Move it to an environment variable; if it is a legitimate placeholder, add it to the allowlist in tools/common/check_secrets.py."
+---
+id: "eslint"
+name: "TypeScript lint (eslint)"
+when: [push, ci]
+workdir: "{ROOT}"
+command: ["{NODE}", "node_modules/eslint/bin/eslint.js", "web"]
+hint: "Fix the ESLint errors listed above. Run `npx eslint web --fix` from repo root to auto-fix where possible."
 
-      # 面板解析器：实例怎么数、区间引用怎么展开。只跑纯函数（内置假 manifest），
-      # 无浏览器无日志，实测不到 1s。这些规矩改坏时前端不会崩、只会**少画几张图**——
-      # 没有任何运行时信号，只能靠这一道门。
-      - id: "check-panel-resolver"
-        name: "Panel resolver rules (check-panel-resolver)"
-        workdir: "{WEB}"
-        # --experimental-strip-types：断言直接 import 真的 lib/panel-resolver.ts。
-        # 断言写在副本上就守不住真身了（Node 22 起自带类型擦除，不需要构建步骤）
-        command: ["{NODE}", "--experimental-strip-types", "scripts/check-panel-resolver.mjs"]
-        hint: "面板解析器的规矩被改坏了（数实例 / 区间展开 / 并集告警）。看上面 FAIL 那一行，改回 lib/panel-resolver.ts。"
+---
+id: "tsc"
+name: "TypeScript type checking (tsc --noEmit)"
+when: [push, ci]
+workdir: "{WEB}"
+command: ["{NODE}", "node_modules/typescript/bin/tsc", "--noEmit"]
+hint: "Fix the TypeScript errors listed above. Run `npx tsc --noEmit --pretty` locally for detailed output."
 
-      # ── 单元测试 ──
-      - id: "pytest-engine"
-        name: "Operator / CEL sandbox unit tests (pytest)"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "-m", "pytest", "knowledge/engine/tests"]
-        hint: "Review the pytest output above. Run `python -m pytest knowledge/engine/tests -v` locally for detailed failure info."
+---
+id: "check-secrets"
+name: "No committed credentials (check_secrets)"
+when: [push, ci]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "tools/common/check_secrets.py"]
+hint: "A credential-shaped value was found in a tracked file. Move it to an environment variable; if it is a legitimate placeholder, add it to the allowlist in tools/common/check_secrets.py."
 
-      # ── 其它测试 ──
-      - id: "check-artifact"
-        name: "Artifact is valid Python (check_engine_pyodide)"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/engine/check_engine_pyodide.py"]
-        hint: "The artifact file contains invalid Python syntax. Check the error output above for the exact location."
+---
+id: "check-panel-resolver"
+name: "Panel resolver rules (check-panel-resolver)"
+when: [push, ci]
+workdir: "{WEB}"
+command: ["{NODE}", "--experimental-strip-types", "scripts/check-panel-resolver.mjs"]
+hint: "Panel resolver rules are broken (instance counting / range expansion / union warnings). See the FAIL line above; fix lib/panel-resolver.ts."
 
-      - id: "check-engine-purity"
-        name: "knowledge/engine/ stays pure Python (check_engine_purity)"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/engine/check_engine_purity.py"]
-        hint: "The knowledge/engine/ directory contains non-Pyodide-safe code. Review the violations above; knowledge/engine/ must work in both browser (Pyodide) and native CPython."
+---
+id: "pytest-engine"
+name: "Operator / CEL sandbox unit tests (pytest)"
+when: [push, ci]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "-m", "pytest", "knowledge/engine/tests"]
+hint: "Review the pytest output above. Run `python -m pytest knowledge/engine/tests -v` locally for detailed failure info."
 
-      # APM 侧解析器是自研的，版本串是**手维护常量**（不像 pyulog 那样随环境变）——
-      # 跨机器稳定的代价是：改了解析行为不升版本号，报告头与冻结基线都看不出来。
-      # 这条把「解析逻辑的 AST 指纹」与 parserVersion 绑在一起：变了不升就红。
-      - id: "guard-apm-parser-version"
-        name: "APM parser version follows parse logic (guard_apm_parser_version)"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/engine/guard_apm_parser_version.py"]
-        hint: "The ArduPilot parser changed but parser_version() did not. Bump the version string in knowledge/engine/providers/ardupilot.py, then re-freeze with `python tools/engine/guard_apm_parser_version.py --update`."
+---
+id: "check-artifact"
+name: "Artifact is valid Python (check_engine_pyodide)"
+when: [push, ci]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "tools/engine/check_engine_pyodide.py"]
+hint: "The artifact file contains invalid Python syntax. Check the error output above for the exact location."
 
-      # APM 那条链路的端到端冒烟：合成 .bin 走完「认格式 → 取这一族的知识 → 读参数 → 跑规则」。
-      # 为什么必须有：knowledge/ardupilot/ 那批规则曾经"写了但没人跑"（构建脚本硬编码
-      # knowledge/px4/），而这件事**没有任何运行时信号**——改回硬编码照样全绿、只是规则
-      # 又变成装饰品。参数那一半同理：少挂一次 PARAMS 的表现是规则静默不发射。
-      - id: "check-apm-e2e"
-        name: "APM pipeline end-to-end smoke (check_apm_e2e)"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/engine/check_apm_e2e.py"]
-        hint: "The ArduPilot pipeline regressed: either the APM rules are no longer in the artifact (knowledge/ is scanned by family — do not hard-code knowledge/px4/), or param() no longer reaches them. Run `python tools/engine/check_apm_e2e.py` for details."
+---
+id: "check-engine-purity"
+name: "knowledge/engine/ stays pure Python (check_engine_purity)"
+when: [push, ci]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "tools/engine/check_engine_purity.py"]
+hint: "The knowledge/engine/ directory contains non-Pyodide-safe code. Review the violations above; knowledge/engine/ must work in both browser (Pyodide) and native CPython."
 
-      # knowledge/engine/ 下的片段被拼成**一份**脚本（同一命名空间）：两个片段顶层同名 = 后者静默
-      # 覆盖前者，不报错不告警。`_MAGIC` 就这么被踩过一次。provider 靠扫目录纳入，
-      # 加第三个格式时这条会自动覆盖到它。
-      - id: "guard-engine-names"
-        name: "knowledge/engine/ splice namespace has no name clash (guard_engine_names)"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/engine/guard_engine_names.py"]
-        hint: "Two knowledge/engine/ fragments define the same top-level name. Rename it with a format prefix (e.g. _APM_MAGIC) so the spliced script stops silently overwriting the earlier one."
+---
+id: "guard-apm-parser-version"
+name: "APM parser version follows parse logic (guard_apm_parser_version)"
+when: [push, ci]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "tools/engine/guard_apm_parser_version.py"]
+hint: "The ArduPilot parser changed but parser_version() did not. Bump the version string in knowledge/engine/providers/ardupilot.py, then re-freeze with `python tools/engine/guard_apm_parser_version.py --update`."
 
-      # pnpm 的 --filter 匹配不到项目时**静默成功**（rc=0、无输出），
-      # 2026-09-23 让 11 个转发脚本全空跑（含 typecheck / test）—— 没有任何运行时信号，只能静态拦。
-      - id: "check-pnpm-filter"
-        name: "pnpm --filter targets exist (check_pnpm_filter)"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/common/check_pnpm_filter.py"]
-        hint: "A `pnpm --filter <value>` matched nothing. pnpm exits 0 with no output in that case, so the script silently does nothing. Use --filter ./web (directory match) or a real workspace package name."
+---
+id: "check-apm-e2e"
+name: "APM pipeline end-to-end smoke (check_apm_e2e)"
+when: [push, ci]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "tools/engine/check_apm_e2e.py"]
+hint: "The ArduPilot pipeline regressed. Run `python tools/engine/check_apm_e2e.py` for details."
 
-      - id: "check-hygiene"
-        name: "Validator hygiene (check_hygiene)"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/common/check_hygiene.py"]
-        hint: "Review the hygiene violations listed above and fix them. Common issues: dangling section references, silent failures, stale freshness gates."
+---
+id: "guard-engine-names"
+name: "knowledge/engine/ splice namespace has no name clash (guard_engine_names)"
+when: [push, ci]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "tools/engine/guard_engine_names.py"]
+hint: "Two knowledge/engine/ fragments define the same top-level name. Rename it with a format prefix (e.g. _APM_MAGIC) so the spliced script stops silently overwriting the earlier one."
 
-      # 以下三项原本住在 ci 阶段跑。它们都只读源码、不碰日志、各不到 1s
-      # （实测 build:kb --check 0.63s / check-skill-spec 0.32s / check-mcp-spec 0.34s），
-      # 与 push 阶段里已有的秒级项同一量级，所以放在本地 pre-push 拦更早 ——
-      # 等云端 CI 才发现"产物忘了重新生成"要多等一个来回。
-      - id: "build-kb-parity"
-        name: "Build contract vs artifact parity (build:kb --check)"
-        workdir: "{WEB}"
-        # check_hygiene 的「产物新鲜度门还在」判据在扫这一行的字样，改名会让那道门恒红。
-        command: ["{NODE}", "scripts/build-knowledge.mjs", "--check"]
-        hint: "The built knowledge base differs from the committed artifact. Run `node scripts/build-knowledge.mjs` locally and commit the updated artifact."
+---
+id: "check-pnpm-filter"
+name: "pnpm --filter targets exist (check_pnpm_filter)"
+when: [push, ci]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "tools/common/check_pnpm_filter.py"]
+hint: "A `pnpm --filter <value>` matched nothing. pnpm exits 0 with no output in that case, so the script silently does nothing. Use --filter ./web (directory match) or a real workspace package name."
 
-      # build-kb-parity 的盲区补丁：它比的是「重算 vs 磁盘」，而本机磁盘常被 dev/build
-      # 刷成重算值，比对永远自洽 —— 「HEAD 里提交的产物 vs knowledge/ 真源」脱节它测不出。
-      # 这里真跑一次 build（写模式）再和 HEAD 比产物区：工作区里未提交的 knowledge/ 改动
-      # 也会被算进重算，diff 非零就拦 —— push 出去的 HEAD 必须「源 + 产物」一起自洽。
-      # hook 只拦截不代改：让 pre-push 自动 amend / 补提交等于改写历史，危险得多。产物区
-      # 用 pathspec 模式，与 .prettierignore 的自动生成清单同源，新增产物沿用命名惯例即自动覆盖。
-      - id: "build-kb-fresh"
-        name: "Artifact freshness vs HEAD (build:kb + git diff)"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/common/check_kb_fresh.py"]
-        hint: "Rebuilt artifacts differ from HEAD — the committed artifacts lag behind knowledge/. Commit the artifact changes together with the knowledge/ source changes, then push again."
+---
+id: "check-hygiene"
+name: "Validator hygiene (check_hygiene)"
+when: [push, ci]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "tools/common/check_hygiene.py"]
+hint: "Review the hygiene violations listed above and fix them. Common issues: dangling section references, silent failures, stale freshness gates."
 
-      # 内容规范。两个脚本各自带反例自检。
-      - id: "check-skill-spec"
-        name: "Skill directory spec (check-skill-spec)"
-        workdir: "{WEB}"
-        command: ["{NODE}", "scripts/check-skill-spec.mjs"]
-        hint: "web/content/skills/ 下有目录不合规范（缺 SKILL.md / README.md / CHANGELOG.md，或字段不合规）。按上面的输出补齐对应目录。"
+---
+id: "build-kb-parity"
+name: "Build contract vs artifact parity (build:kb --check)"
+when: [push, ci]
+workdir: "{WEB}"
+command: ["{NODE}", "scripts/build-knowledge.mjs", "--check"]
+hint: "The built knowledge base differs from the committed artifact. Run `node scripts/build-knowledge.mjs` locally and commit the updated artifact."
 
-      - id: "check-mcp-spec"
-        name: "MCP directory spec (check-mcp-spec)"
-        workdir: "{WEB}"
-        command: ["{NODE}", "scripts/check-mcp-spec.mjs"]
-        hint: "web/content/mcp/ 下有目录不合 server.json（MCP Registry）规范。按上面的输出补齐；upstream_status: pending 的条目是 SKIP 不是放行，核实后要补 server.json 并删掉该字段。"
+---
+id: "build-kb-fresh"
+name: "Artifact freshness vs HEAD (build:kb + git diff)"
+when: [push, ci]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "tools/common/check_kb_fresh.py"]
+hint: "Rebuilt artifacts differ from HEAD -- the committed artifacts lag behind knowledge/. Commit the artifact changes together with the knowledge/ source changes, then push again."
 
-      # guide 页正文由 next-mdx-remote 在请求期才编译：next build 不碰它、markdownlint 只管
-      # 写法风格、build:kb --check 只比对生成产物——正文混进裸 `{` 会一路绿到用户打开页面
-      # 才 500。这一条在本地真编译一遍，手写页与生成页都受检。
-      - id: "check-guide-mdx"
-        name: "Guide MDX compiles (check-guide-mdx)"
-        workdir: "{WEB}"
-        command: ["{NODE}", "scripts/check-guide-mdx.mjs"]
-        hint: "content/guide/ 下有 mdx 编译不过（多半是裸 { 未转义）。生成页改 build-knowledge.mjs 的 escMdxText 注入点后重新 build:kb；手写页用反斜杠转义或挪进反引号。"
+---
+id: "check-skill-spec"
+name: "Skill directory spec (check-skill-spec)"
+when: [push, ci]
+workdir: "{WEB}"
+command: ["{NODE}", "scripts/check-skill-spec.mjs"]
+hint: "web/content/skills/ has directories that don't meet spec (missing SKILL.md / README.md / CHANGELOG.md, or fields non-compliant). Fix per the output above."
 
-      # 后台站点设置：这套「三层取值（KV > env > 代码地板）+ 字段表驱动」的机制里，
-      # **没有任何一处会在运行时报错**——字段表两侧对不上是"存了读不到"、页脚写死是
-      # "后台改了没反应"、metadata 退回静态常量是"烙进构建产物"、密钥名进客户端组件是
-      # 明文被序列化进 SSR HTML、密钥没人读是"轮换静默失效"。五种都是全绿通过、只是悄悄
-      # 失效，只能静态拦。只扫源码文本，无依赖无网络，约 1s。
-      - id: "check-site-settings"
-        name: "Admin site settings wiring (check-site-settings)"
-        workdir: "{WEB}"
-        command: ["{NODE}", "scripts/check-site-settings.mjs"]
-        hint: "站点设置的机制被改坏了。看上面 FAIL 那一行对应的规则 id：settings-schema = 两侧字段表不一致；settings-footer-* = 页脚写死；settings-static-metadata = 根 layout 用了 generateMetadata（首页退回动态渲染）；settings-render-path = 渲染路径读了运行期设置；settings-static-locale = next-intl 忘调 setRequestLocale（整棵子树动态化）；settings-site-url-fallback = SITE_URL 缺生产兜底（漏配变量会指向 localhost）；settings-secret-client = 密钥名进了客户端组件；settings-secret-wiring = 密钥没有消费点。"
+---
+id: "check-mcp-spec"
+name: "MCP directory spec (check-mcp-spec)"
+when: [push, ci]
+workdir: "{WEB}"
+command: ["{NODE}", "scripts/check-mcp-spec.mjs"]
+hint: "web/content/mcp/ has directories that don't meet server.json (MCP Registry) spec. Fix per the output above."
 
-      # 需要真实日志的回归。日志不入仓库（CLAUDE.md 第 9 节：原始日志不上传服务器），
-      # 所以 CI 上这四项必然 SKIP —— 这就是它们归 push 而不是 ci 的原因。
-      - id: "compare-baseline"
-        name: "Frozen baseline field-by-field diff (compare_baseline)"
-        when: "has_logs"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/engine/compare_baseline.py"]
-        hint: "The baseline has changed unexpectedly. Review the diff output above. If the change is intentional, re-baseline by running the comparison tool."
+---
+id: "check-guide-mdx"
+name: "Guide MDX compiles (check-guide-mdx)"
+when: [push, ci]
+workdir: "{WEB}"
+command: ["{NODE}", "scripts/check-guide-mdx.mjs"]
+hint: "content/guide/ has mdx that fails to compile (likely bare { not escaped). Fix the MDX files listed above."
 
-      - id: "check-provider"
-        name: "Adapter contract test (guard_provider_contract)"
-        when: "has_logs"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/engine/guard_provider_contract.py", "{LOGS}"]
-        hint: "One or more log files failed the adapter contract test. Check the output above for which adapter and what contract was violated."
+---
+id: "check-site-settings"
+name: "Admin site settings wiring (check-site-settings)"
+when: [push, ci]
+workdir: "{WEB}"
+command: ["{NODE}", "scripts/check-site-settings.mjs"]
+hint: "Site settings wiring is broken. See the FAIL line above for the specific rule id."
 
-      - id: "probe-data"
-        name: "Data-layer structure self-check (--probe-data)"
-        when: "has_logs"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/engine/run_engine.py", "--probe-data", "{LOGS}"]
-        hint: "The data layer structure is inconsistent. Review the probe output above for details."
+---
+id: "compare-baseline"
+name: "Frozen baseline field-by-field diff (compare_baseline)"
+when: [push, ci, logs]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "tools/engine/compare_baseline.py"]
+hint: "The baseline has changed unexpectedly. Review the diff output above. If the change is intentional, re-baseline by running the comparison tool."
 
-      - id: "lint-rules"
-        name: "Field-reference lint (check_rules_fields --strict)"
-        when: "has_logs"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/engine/check_rules_fields.py", "--strict"]
-        hint: "Field reference linting found violations. Review the output above and fix the referenced fields."
+---
+id: "check-provider"
+name: "Adapter contract test (guard_provider_contract)"
+when: [push, ci, logs]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "tools/engine/guard_provider_contract.py", "{LOGS}"]
+hint: "One or more log files failed the adapter contract test. Check the output above for which adapter and what contract was violated."
 
-  - id: ci
-    stage: "CI"
-    description: "Cloud-only checks: artifact parity on clean checkout, guard self-test, guard self-proof, dependency audit"
-    steps:
-      # 与 push 阶段的 build-kb-parity 同命令，职责却不同，缺了它就是一道盲区：
-      # 那条在本机跑，磁盘常被 dev / build 刷成「重算值」，「重算 vs 磁盘」永远自洽，
-      # 测不出「提交的产物 vs knowledge/」脱节：derived-version.generated.ts 落后于真源，
-      # 一路绿进主干，只有干净 clone 才会红。CI 的 checkout 恰好就是干净检出：磁盘 == HEAD，
-      # 「重算 vs 磁盘」在这里才第一次真正等于「重算 vs HEAD」。
-      # 命令字样别改：check_hygiene 的「产物新鲜度门还在」判据按字样扫描（GENERATOR_CHECK_RE），
-      # 这条同时是 push 侧那条被误改时的兜底。
-      - id: "build-kb-parity-clean"
-        name: "Committed artifact parity on clean checkout (build:kb --check)"
-        workdir: "{WEB}"
-        command: ["{NODE}", "scripts/build-knowledge.mjs", "--check"]
-        hint: "The committed artifact diverges from knowledge/. Locally build:kb --check stays green because dev/build keeps rewriting the artifact to the recomputed value. Reproduce on a clean checkout: run `node scripts/build-knowledge.mjs`, then commit the artifact it writes."
+---
+id: "probe-data"
+name: "Data-layer structure self-check (--probe-data)"
+when: [push, ci, logs]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "tools/engine/run_engine.py", "--probe-data", "{LOGS}"]
+hint: "The data layer structure is inconsistent. Review the probe output above for details."
 
-      - id: "test-issue-filer"
-        name: "Issue-filer self-test (fingerprint / scrub / allowlist / guards)"
-        workdir: "{WEB}"
-        command: ["{NODE}", "scripts/test-issue-filer.mjs"]
-        hint: "Review the test output above for specific failures in fingerprint / scrub / allowlist / guard logic."
+---
+id: "lint-rules"
+name: "Field-reference lint (check_rules_fields --strict)"
+when: [push, ci, logs]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "tools/engine/check_rules_fields.py", "--strict"]
+hint: "Field reference linting found violations. Review the output above and fix the referenced fields."
 
-      - id: "pip-audit"
-        name: "Python dependency audit (pip-audit)"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "-m", "pip_audit", "-r", "requirements-dev.txt", "--strict"]
-        hint: "A pinned Python dependency has a known vulnerability. Upgrade it and pin the new version, or document why it must stay."
+# ═══════════════════════════════════════════════════════════════════════
+# ci / e2e / audit / mutate — Cloud-only checks
+# ═══════════════════════════════════════════════════════════════════════
 
-      # 必须带 --registry：本机 ~/.npmrc 指向 npmmirror，该镜像没实现 audit 端点。
-      # 不带的话本机必红而 CI 绿 —— 最坏的一种不一致。
-      # 用 {PNPM} 而非 {NODE} + node_modules/pnpm/...：pnpm 是全局工具，不是 web/ 的依赖，
-      # 那条路径根本不存在（曾经的写法让这一步在任何机器上都恒红）。
-      - id: "pnpm-audit"
-        name: "Frontend dependency audit (pnpm audit)"
-        workdir: "{ROOT}"
-        command: ["{PNPM}", "--registry=https://registry.npmjs.org/", "audit", "--audit-level=high"]
-        hint: "A frontend dependency has a known vulnerability. Run `pnpm --registry=https://registry.npmjs.org/ audit` for details, then upgrade."
+---
+id: "build-kb-parity-clean"
+name: "Committed artifact parity on clean checkout (build:kb --check)"
+when: [ci]
+workdir: "{WEB}"
+command: ["{NODE}", "scripts/build-knowledge.mjs", "--check"]
+hint: "The committed artifact diverges from knowledge/. Locally build:kb --check stays green because dev/build keeps rewriting the artifact to the recomputed value. Reproduce on a clean checkout: run `node scripts/build-knowledge.mjs`, then commit the artifact it writes."
 
-      # 变异自证约 20 分钟，单独一个 job 跑（--with-mutate），不并进 --stage ci 的默认集合。
-      # 条数以 `mutate_guards.py --list` 为准（别把这个数字当事实源，加了变异就过期）。
-      - id: "mutate-guards"
-        name: "Guard self-proof -- each guard must fail once"
-        when: "args.with_mutate"
-        workdir: "{ROOT}"
-        command: ["{PYTHON}", "tools/ci/mutate_guards.py"]
-        hint: "Not all guards triggered as expected. Each registered mutation must cause exactly one guard to fail. Review the mutation test output above."
+---
+id: "test-issue-filer"
+name: "Issue-filer self-test (fingerprint / scrub / allowlist / guards)"
+when: [ci]
+workdir: "{WEB}"
+command: ["{NODE}", "scripts/test-issue-filer.mjs"]
+hint: "Review the test output above for specific failures in fingerprint / scrub / allowlist / guard logic."
 
-      - id: "playwright-smoke"
-        name: "E2E smoke (Playwright @smoke)"
-        when: "args.with_e2e"
-        timeout: 300
-        workdir: "{WEB}"
-        command: ["{NODE}", "node_modules/@playwright/test/cli.js", "test", "--grep", "@smoke"]
-        hint: "Review the Playwright test output above. Run `npx playwright test --grep @smoke` locally to reproduce."
+---
+id: "pip-audit"
+name: "Python dependency audit (pip-audit)"
+when: [audit]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "-m", "pip_audit", "-r", "requirements-dev.txt", "--strict"]
+hint: "A pinned Python dependency has a known vulnerability. Upgrade it and pin the new version, or document why it must stay."
 
-      # 「上传 .ulg → Pyodide 解析 → 显示」这条全流程。它曾经是 @smoke 的一员，
-      # 后因单次要 7 分钟而被移出冒烟，于是**没有任何自动环节再跑它**——从"CI 时守"
-      # 退成"上线时守"。这一步把它接回 CI：上传/解析/渲染整条链路一旦断，CI 就红，
-      # 而不是等部署后才发现。代价约 5~7 分钟，故与冒烟分开、各自独立超时。
-      #
-      # 与冒烟的关键差别：这条**不依赖 has_logs**。它上传的是仓库里的
-      # `web/e2e/fixtures/sample.ulg`（已入库），不是 `tools/testdata/logs/` 下的
-      # 真实日志——所以云端 checkout 里也有，能真跑而不是 SKIP。
-      - id: "playwright-analyze"
-        name: "E2E analyze flow (Playwright 日志分析流程)"
-        when: "args.with_e2e"
-        timeout: 900
-        workdir: "{WEB}"
-        command: ["{NODE}", "node_modules/@playwright/test/cli.js", "test", "--grep", "日志分析流程"]
-        hint: "The upload -> Pyodide parse -> render chain is broken. Run `pnpm test:e2e:log` locally to reproduce; the full flow needs ~7 minutes (Pyodide downloads WASM + numpy + pyulog on first run)."
+---
+id: "pnpm-audit"
+name: "Frontend dependency audit (pnpm audit)"
+when: [audit]
+workdir: "{ROOT}"
+command: ["{PNPM}", "--registry=https://registry.npmjs.org/", "audit", "--audit-level=high"]
+hint: "A frontend dependency has a known vulnerability. Run `pnpm --registry=https://registry.npmjs.org/ audit` for details, then upgrade."
 
-  - id: deploy
-    stage: "Deploy"
-    description: "部署后打线上的全量 E2E —— 在 .github/workflows/deploy.yml 里"
-    steps: []
+---
+id: "mutate-guards"
+name: "Guard self-proof -- each guard must fail once"
+when: [mutate]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "tools/ci/mutate_guards.py"]
+hint: "Not all guards triggered as expected. Each registered mutation must cause exactly one guard to fail. Review the mutation test output above."
+
+---
+id: "playwright-smoke"
+name: "E2E smoke (Playwright @smoke)"
+when: [ci, e2e]
+timeout: 300
+workdir: "{WEB}"
+command: ["{NODE}", "node_modules/@playwright/test/cli.js", "test", "--grep", "@smoke"]
+hint: "Review the Playwright test output above. Run `npx playwright test --grep @smoke` locally to reproduce."
+
+---
+id: "playwright-analyze"
+name: "E2E analyze flow (Playwright log analysis)"
+when: [e2e]
+timeout: 900
+workdir: "{WEB}"
+command: ["{NODE}", "node_modules/@playwright/test/cli.js", "test", "--grep", "log analysis"]
+hint: "The upload -> Pyodide parse -> render chain is broken. Run `pnpm test:e2e:log` locally to reproduce; the full flow needs ~7 minutes (Pyodide downloads WASM + numpy + pyulog on first run)."

@@ -1,0 +1,46 @@
+# Guard self-proof: each guard must fail at least once (CLAUDE.md §6.6).
+# 42 mutations, each runs the corresponding guard — ~20 min total.
+# Only runs on merge to master; does not block PRs.
+name: Mutate
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+concurrency:
+  group: mutate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  guard-self-proof:
+    name: Guard self-proof (mutate_guards)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install deps
+        run: ./tools/setup/setup.sh
+
+      - name: Run mutation tests (each guard must fail once)
+        run: python tools/ci/check_all.py --mutate

@@ -1,0 +1,47 @@
+# E2E: upload .ulg, full analysis pipeline (~420s timeout).
+# Running this in local pre-push would block every push for minutes,
+# so it only runs in the cloud. Independent from ci.yml, parallel.
+name: E2E
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_APP_VERSION: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install deps
+        run: ./tools/setup/setup.sh
+
+      - name: Run E2E
+        run: python tools/ci/check_all.py --build --e2e

@@ -183,16 +183,16 @@ pnpm web:dev
 
 ```bash
 # 本地快速检查（秒级，pre-push hook 跑的也是这个）
-python tools/ci/check_all.py --stage push
+python tools/ci/check_all.py --push
 
 # 云端 CI 级别检查（含产物比对、守卫自测、依赖审计）
-python tools/ci/check_all.py --stage ci
+python tools/ci/check_all.py --ci
 
 # CI 级别 + Next.js 构建（本地跑比较慢）
-python tools/ci/check_all.py --stage build,ci
+python tools/ci/check_all.py --build --ci
 
-# 查看所有阶段说明
-python tools/ci/check_all.py --list-stages
+# 查看所有检查项
+python tools/ci/check_all.py --list
 ```
 
 ### 两组校验
@@ -208,11 +208,11 @@ python tools/ci/check_all.py --list-stages
 
 项目提供了三个 Git Hook，位于 `.githooks/` 目录：
 
-| Hook         | 触发时机               | 作用                                      |
-| ------------ | ---------------------- | ----------------------------------------- |
-| `pre-commit` | `git commit` 前        | Python 代码风格与 lint 检查（ruff）       |
-| `commit-msg` | 保存 commit message 时 | 校验提交信息格式                          |
-| `pre-push`   | `git push` 前          | 运行 `check_all.py --stage push` 快速检查 |
+| Hook         | 触发时机               | 作用                                |
+| ------------ | ---------------------- | ----------------------------------- |
+| `pre-commit` | `git commit` 前        | Python 代码风格与 lint 检查（ruff） |
+| `commit-msg` | 保存 commit message 时 | 校验提交信息格式                    |
+| `pre-push`   | `git push` 前          | 运行 `check_all.py --push` 快速检查 |
 
 启用方式（每台机器执行一次，不随仓库同步）：
 

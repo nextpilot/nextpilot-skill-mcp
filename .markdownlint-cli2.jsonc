@@ -54,6 +54,7 @@
     // AI 工具自动生成
     ".workbuddy/",
     ".claude/",
+    ".cache/",
   ],
   // 刻意**不**整目录排除 knowledge/px4/meta/：里面那个 README 是手写的设计说明
   // （它开头写"生成物，一 tag 一份"是在介绍目录用途，不是说它自己被生成），该被 lint。
