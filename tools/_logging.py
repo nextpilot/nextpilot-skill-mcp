@@ -48,13 +48,12 @@ def _write_raw(text: str, end: str = "") -> None:
 
 
 def _print_header(logger: logging.Logger, title: str, command: str = "") -> None:
-    """Print a section header."""
+    """一段的抬头：只留上边一条线，下边不再画——紧接着就是第一步，两条线夹着标题是浪费。"""
     logger.info("")
     logger.info(_SEP1)
     logger.info("Function: " + title)
     if command:
         logger.info("Command:  " + command)
-    logger.info(_SEP1)
 
 
 def _print_step(
@@ -64,31 +63,48 @@ def _print_step(
     name: str,
     command: str,
     returncode: int,
-    stdout: str,
+    stdout: str = "",
+    stderr: str = "",
+    hint: str = "",
 ) -> None:
-    """Print a single step result: [k/N] name, then command / result / subprocess output."""
+    """一步的完整记录：序号、跑了什么、跑出什么、成了没、不成该怎么改。
+
+    stderr 与 stdout 分开收：失败原因常常只在 stderr 里，混进 stdout 就分不清哪句是报错。
+    hint 只在失败时打，成功时给提示是噪声。
+
+    输出块统一 `| ` 前缀——mutate_guards 按 `FAIL <名字>` 数"这轮红了几条"，
+    前缀动了那条自证会集体失效。
+    """
     tag = f"[{step:>2}/{total:<2}]"
-    status = "OK" if returncode == 0 else f"FAIL (exit {returncode})"
+    ok = returncode == 0
+    status = "OK" if ok else f"FAIL (exit {returncode})"
 
     logger.info("")
     logger.info(_SEP2)
     logger.info(_c(CYAN, f"{tag}  {name}"))
-    logger.info(_SEP2)
     logger.info(f"| Command: {command}")
-    result_color = GREEN if returncode == 0 else RED
-    logger.info(_c(result_color, f"| Result:  {status}"))
-    logger.info(_SEP2)
-    if stdout.strip():
-        for line in stdout.strip().splitlines():
+    logger.info(_c(GREEN if ok else RED, f"| Result:  {status}"))
+
+    out_lines = [line for line in (stdout or "").strip().splitlines() if line.strip()]
+    err_lines = [line for line in (stderr or "").strip().splitlines() if line.strip()]
+    if out_lines or err_lines:
+        logger.info(_SEP2)
+        for line in out_lines:
             logger.info("| " + line)
-    logger.info(_SEP2)
+        # stderr 单独标出来：与 stdout 混在一起时，报错行看起来只是普通输出。
+        for line in err_lines:
+            logger.info(_c(RED, "| [stderr] " + line))
+    if hint and not ok:
+        logger.info(_SEP2)
+        logger.info(_c(CYAN, f"| Hint: {hint}"))
 
 
 def _print_hint(logger: logging.Logger, hint: str) -> None:
-    """Print a fix hint after a failed step."""
-    logger.info(_c(CYAN, f"| {'─' * 80}"))
+    """失败原因单独成行，接在一步之后。
+
+    优先用 `_print_step(hint=...)`：那才是"这一步"的提示，调用方不必记得再补一行。
+    """
     logger.info(_c(CYAN, f"| Hint: {hint}"))
-    logger.info(_c(CYAN, f"| {'─' * 80}"))
 
 
 def _print_check(
@@ -110,7 +126,6 @@ def _print_check(
     logger.info("")
     logger.info(_SEP2)
     logger.info(_c(CYAN, f"{tag}  {name}"))
-    logger.info(_SEP2)
     logger.info(_c(color, f"| Result:  {status}"))
     if detail:
         for i, line in enumerate(detail.splitlines()):
@@ -120,7 +135,6 @@ def _print_check(
         logger.info(_SEP2)
         for line in err.splitlines():
             logger.info("| " + line)
-    logger.info(_SEP2)
 
 
 def _print_summary(logger: logging.Logger, results: list[tuple[str, str]], skipped: list[str]) -> int:
@@ -191,8 +205,10 @@ class _CheckLogger(logging.Logger):
         command: str,
         returncode: int,
         stdout: str = "",
+        stderr: str = "",
+        hint: str = "",
     ) -> None:
-        _print_step(self, step, total, name, command, returncode, stdout)
+        _print_step(self, step, total, name, command, returncode, stdout, stderr, hint)
 
     def print_check(
         self,

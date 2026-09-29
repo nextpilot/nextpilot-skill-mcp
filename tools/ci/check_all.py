@@ -94,9 +94,17 @@ def run_step(
 ) -> tuple[str, str]:
     proc = capture(command, workdir, timeout=timeout, extra_env=extra_env)
     cmd_display = " ".join(str(c) for c in command)
-    log.print_step(step_num, total, name, cmd_display, proc.returncode, proc.stdout)
-    if proc.returncode != 0 and hint:
-        log.print_hint(hint)
+    log.print_step(
+        step_num,
+        total,
+        name,
+        cmd_display,
+        proc.returncode,
+        stdout=proc.stdout,
+        stderr=proc.stderr,
+        # 成功时给提示是噪声：hint 只在失败那一步出现。
+        hint=hint if proc.returncode != 0 else "",
+    )
     return name, ("ok" if proc.returncode == 0 else "fail")
 
 
