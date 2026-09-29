@@ -85,6 +85,17 @@ FORBIDDEN: list[tuple[str, str]] = [
     (r"(?<![\w.])document\s*\.", "浏览器全局 document"),
     (r"\blocalStorage\b", "浏览器全局 localStorage"),
     (r"\bsessionStorage\b", "浏览器全局 sessionStorage"),
+    # --- 文件 / 网络 / 子进程 IO（审计 M14）---
+    # 引擎的终局是跑进浏览器 WASM：Pyodide 里没有本地文件系统与套接字，这些调用
+    # 只会"本机能跑、上线必炸"——正是这条守卫要拦的「只在一个运行时里成立」。
+    # open 前面排除引号：CEL 沙箱测试里 'open("x")' 是字符串字面量（负向用例），
+    # 不是真的调用。open_log( 这类长名字不匹配（_ 是词字符，open 后无边界）。
+    (r"(?<![\w.'\"])\bopen\s*\(", "文件 IO（open()）——Pyodide 无本地文件系统"),
+    (
+        r"\b(?:import|from)\s+(?:requests|socket|urllib|http|httpx|ftplib|smtplib|shutil|subprocess|asyncio)\b",
+        "网络 / 子进程 / 文件系统 / 事件循环模块——Pyodide 里不可用或无意义",
+    ),
+    (r"__import__", "动态 import（绕过上面 import 守卫的通道）"),
 ]
 
 # 至少得扫到这么多 .py，少一个说明目录被搬空了（`knowledge/engine/` 现有 6 个文件）
@@ -92,7 +103,10 @@ MIN_SCANNED = 3
 
 
 def _engine_files() -> list[Path]:
-    return sorted(p for p in ENGINE.rglob("*.py") if p.is_file() and "__pycache__" not in p.parts)
+    # tests/ 只在本机 pytest 里跑，不属于「三处共用」的运行时面，且其用例会合法地
+    # 以字符串字面量形式出现 open("x") / "import os" 这类被禁形态（CEL 沙箱的负向
+    # 用例）——不排除的话，守卫扩到 IO 那一刻它就是第一批假阳性。
+    return sorted(p for p in ENGINE.rglob("*.py") if p.is_file() and "__pycache__" not in p.parts and "tests" not in p.parts)
 
 
 def _rel(path: Path) -> str:

@@ -41,6 +41,25 @@ def main() -> int:
     py_files = [f for f in staged if f.endswith(PY_FILES)]
     fe_files = [f for f in staged if f.endswith(FRONTEND_FILES)]
     ts_files = [f for f in staged if f.endswith((".ts", ".tsx"))]
+    touched = py_files + fe_files
+
+    # 部分暂存检测必须**先于任何格式化动作**：格式化一跑，"用户的未暂存改动"和"格式化
+    # 造成的改动"在工作区里就再也无法区分。此刻 git diff 反映的纯粹是用户自己的改动。
+    # 下面这些文件若既有暂存又有未暂存内容，结尾的整文件 re-stage 会把未暂存部分
+    # （多半是用户正在编辑的半成品）一并带进提交（审计 M12）。
+    # hook 只拦不代改——自动分离两种 diff 需要备份 index + write-tree + commit-tree
+    # 那一整套（lint-staged 的做法），错一步丢的是用户的工作区，不如把处置权交还。
+    if touched:
+        partial = run(["git", "diff", "--name-only", "--", *touched])
+        blocked = [f for f in partial.stdout.splitlines() if f.strip()]
+        if blocked:
+            print("[pre-commit] 以下文件既有暂存又有未暂存改动，格式化后整文件 re-stage 会把未暂存部分带进提交：")
+            for f in blocked:
+                print(f"  {f}")
+            print("  处置（任选其一）后重新提交：")
+            print("    git add <file>                # 未暂存部分也想一起提交")
+            print("    git stash push --keep-index   # 未暂存部分先存起来，提交完 stash pop")
+            return 1
 
     if not py_files and not fe_files:
         return 0
@@ -93,7 +112,6 @@ def main() -> int:
             print("[pre-commit] eslint not installed in web/ -- skipping TS lint.")
 
     # Re-stage anything the formatters rewrote, so the commit matches the working tree.
-    touched = py_files + fe_files
     add = run(["git", "add", "--"] + touched)
     if add.returncode != 0:
         print(add.stderr, file=sys.stderr)
