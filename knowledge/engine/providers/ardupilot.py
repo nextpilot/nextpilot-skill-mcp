@@ -1,11 +1,11 @@
-# ArduPilot .bin（AP_Logger）适配器 —— **本项目唯一认识 ArduPilot 的地方**
+# ArduPilot .bin（AP_Logger）适配器，本项目唯一认识 ArduPilot 的地方
 #
-# 契约见 providers/api.py。格式是**自描述**的：文件开头是一串 FMT 消息，声明每种消息的
-# 名字、长度、字段与格式字符——所以解析器按 FMT 表通解，不逐消息类型硬编码；
-# MSG/PARM/EV/MODE/GPS 一律按 **FMT 名字**查表，不写死消息 ID（不同固件版本的 ID 会变）。
+# 契约见 providers/api.py。格式是自描述的：文件开头是一串 FMT 消息，声明每种消息的
+# 名字、长度、字段与格式字符，所以解析器按 FMT 表通解，不逐消息类型硬编码；
+# MSG/PARM/EV/MODE/GPS 一律按 FMT 名字查表，不写死消息 ID（不同固件版本的 ID 会变）。
 #
 # 分工（与 px4.py 同一条纪律）：
-#   · 本文件：怎么从 AP_Logger 字节流里把数据取出来——FMT 解析、格式字符缩放、消息名定位
+#   · 本文件：怎么从 AP_Logger 字节流里把数据取出来，FMT 解析、格式字符缩放、消息名定位
 #   · engine/*.py：与格式无关的机制；契约常量在 api.py
 #
 # 与 PX4 适配器的两个约定差异（消费方要知情）：
@@ -16,20 +16,20 @@
 # 数据源核对情况（2026-09-24，36 份 autotest SITL 日志对账，Copter/Plane/Rover）：
 #   · EV 事件码 10=ARMED / 11=DISARMED：经 AP_Logger.h 官方源码核对无误
 #     （真实 Copter 日志里的 [25, 62] = SET_HOME / EKF_YAW_RESET）；但 autotest Copter
-#     日志**不写** ARMED/DISARMED 事件且无 ARM topic → armed 还要回退 STAT.Armed 状态沿
-#   · ⚠️ FORMAT_VERSION 参数是 **DataFlash 日志格式版本**（Copter 120 / Plane 13），
-#     不是固件版本——绝不可当固件版本回退（踩过，已删）；固件版本从 MSG 横幅 / VER 消息取
+#     日志不写 ARMED/DISARMED 事件且无 ARM topic，所以 armed 还要回退 STAT.Armed 状态沿
+#   · FORMAT_VERSION 参数是 DataFlash 日志格式版本（Copter 120 / Plane 13），
+#     不是固件版本，不能当固件版本回退（踩过，已删）；固件版本从 MSG 横幅 / VER 消息取
 #   · 仍未逐字段验证（v1 只解析不应用，应用了才是猜数）：
 #     格式字符缩放、FRAME_CLASS 全表（且 Copter/Rover 语境同码不同义）、FMTU 乘子
-#   · 消息 Length 字段是否含 3 字节头——已做自校准（见 _calibrate_len_hdr），但兜底逻辑本身要样本验
+#   · 消息 Length 字段是否含 3 字节头，已做自校准（见 _calibrate_len_hdr），但兜底逻辑本身要样本验
 
 import struct as _struct
 
 import numpy as np
 
 # 文件头 magic 与 FMT 消息（保留 ID：所有版本都一样，这两个可以写死）。
-# 命名带 _APM_ 前缀：构建期各 provider 拼进**同一个命名空间**，顶层名字撞了就是
-# 静默互踩（_MAGIC 曾被 px4.py 的同名常量覆盖，探测永远 False）——有守卫拦同名。
+# 命名带 _APM_ 前缀：构建期各 provider 拼进同一个命名空间，顶层名字撞了就是
+# 静默互踩（_MAGIC 曾被 px4.py 的同名常量覆盖，探测一直 False），有守卫拦同名。
 _APM_MAGIC = b"\xa3\x95"
 _FMT_TYPE = 128
 # FMT 消息自身的 payload 恒为 86 字节：Type(1) + Length(1) + Name(4) + Format(16) + Columns(64)
@@ -87,7 +87,7 @@ _FMT_DTYPES = {
 # PX4 的 level_name 来自 facts.yaml（那份码表是 PX4 的），APM 不借用别人的码表
 _LEVEL_NAMES = {3: "ERROR", 4: "WARNING", 6: "INFO"}
 
-# FRAME_CLASS → 机型。**上游权威源码**（AP_Motors / AP_Parameters）：
+# FRAME_CLASS → 机型。上游权威源码（AP_Motors / AP_Parameters）：
 #  1=Quad 2=Tri 3=Octa 4=Coax 5=Hexa 6=Y6 7=Heli 8=OctaQuad
 #  9=Single 10=HeliDual 11=Dodeca 12=Deca
 # Plane / Rover 没有 FRAME_CLASS 参数，由 _read_vehicle_type() 按固件名识别。
@@ -131,10 +131,10 @@ class ApmProvider:
     vehicle_categories = _VEHICLE_CATEGORIES
 
     def __init__(self, raw, facts_cfg):
-        # facts_cfg 是 PX4 的数据配置（构建期只有一份 facts.yaml）——本适配器**不读它**，
+        # facts_cfg 是 PX4 的数据配置（构建期只有一份 facts.yaml），本适配器不读它，
         # 码表都在本文件里（待迁 knowledge/ardupilot/）。参数保留只为与工厂签名一致。
         # 迁移未完成的原因不是懒：动这里的任何一条常量都会让
-        # tools/engine/guard_apm_parser_version.py 的 AST 指纹变红，必须同步升
+        # tools/engine/guard_apm_parser_version.py 的 AST 指纹变红，得同步升
         # parser_version() 并重冻基线。等接线改动一起做，别单独动。
         self._cfg = facts_cfg or {}
         self.raw = bytes(raw)
@@ -300,7 +300,7 @@ class ApmProvider:
                 if len(chunk) < size:
                     return None
                 # _FMT_CHARS 的 sf 已带字节序前缀（"<Q"）；字符串格式（"16s"）无需前缀。
-                # 别再拼一个 "<"——会变成 "<<Q"，struct 直接报 bad char（静默吞掉后整行解不出）
+                # 别再拼一个 "<"，会变成 "<<Q"，struct 直接报 bad char（静默吞掉后整行解不出）
                 (v,) = _struct.unpack(sf, chunk)
                 off += size
                 if sf.endswith("s"):
@@ -335,8 +335,8 @@ class ApmProvider:
     def _read_version(self):
         """固件版本：MSG 横幅 / VER 消息。
 
-        真实横幅长这样：`ArduCopter V4.8.0-dev (665c0dee)`——正则要兼容 `-dev` 之类的
-        后缀与可选哈希。**绝不回退 FORMAT_VERSION 参数**：那是 DataFlash 日志格式版本
+        真实横幅长这样：`ArduCopter V4.8.0-dev (665c0dee)`，正则要兼容 `-dev` 之类的
+        后缀与可选哈希。别回退 FORMAT_VERSION 参数：那是 DataFlash 日志格式版本
         （Copter 120 / Plane 13），不是固件版本，拿它当版本号是把"容器格式"读成"固件"。
         """
         import re as _re
@@ -402,7 +402,7 @@ class ApmProvider:
     def _read_armed(self):
         """armed 区间：EV 事件的 10/11（码值经 AP_Logger.h 核对）→ STAT.Armed 状态沿回退。
 
-        autotest Copter 日志不写 ARMED/DISARMED 事件、也无 ARM/STAT——那就如实给空，
+        autotest Copter 日志不写 ARMED/DISARMED 事件、也无 ARM/STAT，那就如实给空，
         不编造；Plane 有低频 STAT.Armed（0/1 状态量），取跳变沿切区间。
         """
         intervals = []
@@ -549,7 +549,7 @@ class ApmProvider:
     def get_logged_events(self, t_start=None, t_end=None, level=None, pattern=None):
         """MSG 文本 + ERR 错误合成的时间轴。MSG 无级别给 INFO；ERR 给 ERROR（子系统和码值原样进文本）。
 
-        TimeUS 缺失的消息 tSec 给 None——如实说"不知道几点"，不编 0。
+        TimeUS 缺失的消息 tSec 给 None，如实说"不知道几点"，不编 0。
         """
         out = []
         for row in self._iter_named("MSG"):
@@ -588,7 +588,7 @@ class ApmProvider:
         return out
 
     def builtin_variables(self):
-        """内置变量表。**每次返回新 dict**（引擎会往里写 compute 的输出）。
+        """内置变量表。每次返回新 dict（引擎会往里写 compute 的输出）。
 
         键一律大写；APM 给不出的值给 None / 空串（不编值）。"""
         home = self.home_position or {}

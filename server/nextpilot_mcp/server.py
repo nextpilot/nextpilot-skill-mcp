@@ -2,16 +2,16 @@
 
 工具分两类，全部只读（`ToolAnnotations(read_only_hint=True, open_world_hint=False)`）：
 
-- **日志侧**：把 PX4 `.ulg` 喂给知识库编译出的引擎，返回**确定性**结果
+- 日志侧：把 PX4 `.ulg` 喂给知识库编译出的引擎，返回确定性结果
   （`analyze_log` / `log_summary` / `list_events` / `query_timeseries` / `get_params`）。
-- **知识侧**：读 `knowledge/` 里规则与故障库的**原文**，供解释层引用
+- 知识侧：读 `knowledge/` 里规则与故障库的原文，供解释层引用
   （`get_rule` / `get_fault` / `list_faults` / `list_checks`）。
 
-**stdout 是协议线。** 本模块与其依赖在 import 期与运行期都不许往 stdout 写东西 ——
+stdout 是协议线。本模块与其依赖在 import 期与运行期都不许往 stdout 写东西，
 引擎装配入口（`knowledge/engine/loader.py`）为此刻意不依赖 `tools/_logging.py`。
-所以本地冒烟测试用 `Client(mcp)` **进程内**调用，不要用 `python -c "...print..."` 那种写法去测协议。
+所以本地冒烟测试用 `Client(mcp)` 进程内调用，不要用 `python -c "...print..."` 那种写法去测协议。
 
-**内核是知识库的编译产物，不是本文件**：阈值 / 建议 / 适用条件都在 `knowledge/`，
+内核是知识库的编译产物，不是本文件：阈值 / 建议 / 适用条件都在 `knowledge/`，
 改经验只改那里（`server/` 一行不动）。本文件只做「取数 → 交给引擎 → 摆成契约形状」。
 """
 
@@ -39,7 +39,7 @@ from .models import (
     TimeseriesResult,
 )
 
-# 引擎装配入口住在 knowledge/engine/ —— 产品只依赖本体，**不依赖 tools/**（那是开发工具）
+# 引擎装配入口住在 knowledge/engine/，产品只依赖本体，不依赖 tools/（那是开发工具）
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _ENGINE_DIR = _REPO_ROOT / "knowledge" / "engine"
 if str(_ENGINE_DIR) not in sys.path:
@@ -57,7 +57,7 @@ mcp = MCPServer(
     "nextpilot",
     version=__version__,
     instructions=(
-        "NextPilot 的 PX4 日志分析与知识库服务。日志侧工具返回**确定性**结论（引擎按知识库里的"
+        "NextPilot 的 PX4 日志分析与知识库服务。日志侧工具返回确定性结论（引擎按知识库里的"
         "规则算出，不是模型推断）；知识侧工具给出规则与故障库的原文与出处。"
         "解释时请引用 docUrl / 规则原文，不要自己发明根因；"
         "先调 log_summary 看清固件与机型（同一参数在不同固件版本含义可能不同），再调 analyze_log。"
@@ -84,15 +84,15 @@ def _namespace(path: str) -> dict:
     return ns
 
 
-# ———————————————— 日志侧 ————————————————
+# 日志侧
 
 
 @mcp.tool(annotations=_READONLY)
 async def analyze_log(path: str) -> LogReport:
     """跑完整判定：返回 findings（按 severity 已排序）+ 关键数字 + 标签 + 跳过的检查。
 
-    这是**权威结论**：每条 finding 都带 ruleId（可拿去 get_rule 读原文）与 docUrl。
-    checksSkipped 说明哪些规则因数据不足没跑 —— 别把"没跑"当成"没问题"。
+    这是权威结论：每条 finding 都带 ruleId（可拿去 get_rule 读原文）与 docUrl。
+    checksSkipped 说明哪些规则因数据不足没跑，别把"没跑"当成"没问题"。
 
     Args:
         path: 本地 PX4 `.ulg` 日志路径。
@@ -105,7 +105,7 @@ async def analyze_log(path: str) -> LogReport:
 async def log_summary(path: str) -> LogSummary:
     """日志概览：固件与硬件身份、飞行阶段、消息/参数计数、参数改动数。
 
-    不含任何判定 —— 它是"读判定之前先看清前提"用的（机型与固件版本会改变参数含义）。
+    不含任何判定，它是"读判定之前先看清前提"用的（机型与固件版本会改变参数含义）。
 
     Args:
         path: 本地 PX4 `.ulg` 日志路径。
@@ -153,7 +153,7 @@ async def list_events(
     if kinds:
         events = [e for e in events if e.get("kind") in kinds]
     # tSec 可能为 None（APM 的 MSG/ERR 行缺 TimeUS，见 providers/ardupilot.py）：
-    # 直接比较会 TypeError，带时间窗的查询必须先把没有时间戳的行排掉。
+    # 直接比较会 TypeError，带时间窗的查询要先把没有时间戳的行排掉。
     if start_s is not None:
         events = [e for e in events if e.get("tSec") is not None and e["tSec"] >= start_s]
     if end_s is not None:
@@ -174,10 +174,10 @@ async def query_timeseries(
     instance: int = 0,
     max_points: int = 1000,
 ) -> TimeseriesResult:
-    """取一条时序曲线（走数据层的 LTTB **保形**降采样，与网页端同一份实现）。
+    """取一条时序曲线（走数据层的 LTTB 保形降采样，与网页端同一份实现）。
 
     先用 list_events/log_summary 定位问题，再用本工具看具体波形。
-    `fullCount` 是降采样前的原始点数 —— 两者差很大时说明曲线被抽稀了。
+    `fullCount` 是降采样前的原始点数，两者差很大时说明曲线被抽稀了。
 
     Args:
         path: 本地 PX4 `.ulg` 日志路径。
@@ -198,8 +198,8 @@ async def query_timeseries(
         one = {"instance": instance, "ydata": [{"kind": "field", "fields": [f"{message_type}.{f}"]}]}
         r = loader.call(ns, f"np_series({_json_str(one)}, {max_points})")
         # np_series 取不到数时返回 {"error": …}（topic/字段不存在、没有时间戳列等，
-        # 见 engine.py）——那是写给人看的提示，不检查就 r["t"] 只会变成 KeyError 内部崩溃，
-        # 把已经写好的原因丢掉。AI 客户端传错字段名是必经路径，必须转成可读错误。
+        # 见 engine.py），那是写给人看的提示，不检查就 r["t"] 只会变成 KeyError 内部崩溃，
+        # 把已经写好的原因丢掉。AI 客户端传错字段名是必经路径，要转成可读错误。
         if "error" in r:
             raise ValueError(f"取 {message_type}.{f} 失败：{r['error']}")
         if not time:
@@ -247,7 +247,7 @@ async def get_params(path: str, name_glob: str | None = None) -> ParamResult:
     )
 
 
-# ———————————————— 知识侧 ————————————————
+# 知识侧
 
 
 def _load_yaml(path: Path) -> Any:
@@ -258,7 +258,7 @@ def _load_yaml(path: Path) -> Any:
 async def list_checks() -> CheckCatalog:
     """列出知识库里全部规则（自描述目录）。
 
-    调用前先用它看清有哪些规则 —— 规则的 id 可直接传给 get_rule 读原文。
+    调用前先用它看清有哪些规则，规则的 id 可直接传给 get_rule 读原文。
     """
     rules = loader.load_rules()
     entries = []
@@ -308,7 +308,7 @@ async def get_rule(rule_id: str) -> dict[str, Any]:
 async def get_fault(name: str) -> dict[str, Any]:
     """按故障名称读故障库条目（描述 + 根因清单 + 排查步骤 + 风险等级）。
 
-    **禁止**用条目以外的故障模式推断根因 —— 这是知识库的硬边界。
+    不要用条目以外的故障模式推断根因，这是知识库的硬边界。
 
     Args:
         name: 故障名称（如 `high_vibration`），来自 analyze_log 的 matchedFaults[].name。

@@ -135,7 +135,7 @@ compute:
 | `T0_US` | int | 日志起点时间戳（us），事件类算子算相对时刻的基准 |
 | `DROPOUT_MS` | int | 全日志丢包累计（毫秒） |
 | `SYS_UUID` | str | 系统唯一 ID。这份日志没写就给空串 |
-| `AIRFRAME_ID` | int\|None | 机架编号（PX4: SYS_AUTOSTART；APM: FRAME_CLASS）。没有就 None——与 AIRFRAME（机型字符串）是两个东西 |
+| `AIRFRAME_ID` | int\|None | 机架编号（PX4: SYS_AUTOSTART；APM: FRAME_CLASS）。没有就 None，与 AIRFRAME（机型字符串）是两个东西 |
 | `HOME_LAT` | float\|None | Home 点纬度（度）。给不出定位就 None |
 | `HOME_LON` | float\|None | Home 点经度（度） |
 | `HOME_ALT` | float\|None | Home 点高度（米） |

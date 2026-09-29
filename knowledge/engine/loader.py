@@ -1,8 +1,8 @@
 """engine 的装配入口（本地工具与 server/ 共用的一份）。
 
-把本目录下的片段按固定顺序拼成**一份**脚本，替换占位符后 `exec`，得到引擎命名空间。
+把本目录下的片段按固定顺序拼成一份脚本，替换占位符后 `exec`，得到引擎命名空间。
 
-**为什么是"拼文本 + exec"而不是正常 import**：本目录的 .py 是**片段**——`provider` /
+为什么是"拼文本 + exec"而不是正常 import：本目录的 .py 是片段，`provider` /
 `run_all` / `OPERATORS` / `FORMATS` 这类名字来自别处，单文件视角下就是未定义
 （`pyproject.toml` 专门为 `engine.py` / `providers/px4.py` 等片段关掉了
 F821）。所以它们不是完整模块，只能按顺序拼接后一次性执行。拼接顺序的单一事实源见本目录
@@ -10,16 +10,16 @@ README「拼接顺序与桥接名字」：
 
     operators.py → providers/api.py → providers/*.py → engine.py
 
-**本模块绝不写 sys.stdout。** 它给 `server/` 的 stdio MCP 服务用，stdout 是协议线，
-任何多余输出都会让握手静默失败。也因此**不依赖 `tools/_logging.py`**——那份把 handler
+本模块不会写 sys.stdout。它给 `server/` 的 stdio MCP 服务用，stdout 是协议线，
+任何多余输出都会让握手静默失败。也因此不依赖 `tools/_logging.py`：那份把 handler
 挂在 `sys.stdout` 上且 `propagate=False`，是专门给命令行看的，不能出现在产品依赖里。
 
-**规则与数据只从构建产物读**：compute 的老节点写法要在构建期编译成表达式，而那个编译器
-只有 JS 一份（`web/scripts/lib/rule-expr.mjs`）——Python 侧再实现一份必然漂移，所以不重复
-实现。代价是改了 `knowledge/<族>/rules/` 必须先 `pnpm web:build:kb`；本模块会检查产物
+规则与数据只从构建产物读：compute 的老节点写法要在构建期编译成表达式，而那个编译器
+只有 JS 一份（`web/scripts/lib/rule-expr.mjs`），Python 侧再实现一份必然漂移，所以不重复
+实现。代价是改了 `knowledge/<族>/rules/` 要先 `pnpm web:build:kb`；本模块会检查产物
 是否陈旧并当场报错（每一族的规则都查）。
 
-**接口签名是兼容契约**：`build_namespace(path)` / `call(ns, code)` / `run_one(path)` /
+接口签名是兼容契约：`build_namespace(path)` / `call(ns, code)` / `run_one(path)` /
 `load_facts_payload()` 被 `tools/` 下多处脚本依赖，改名或换参等于同时改多个调用点。
 """
 
@@ -36,14 +36,14 @@ KN_ROOT = REPO_ROOT / "knowledge"
 
 OPERATORS_PY = ENGINE / "operators.py"
 PROVIDER_API_PY = ENGINE / "providers" / "api.py"  # provider 契约（常量表 + 自检）
-# 适配器目录**自动扫描**，与 web/scripts/build-knowledge.mjs 同一规则：除 api.py 外全部拼接、
-# 按文件名排序。加一种日志格式这里零改动——别再回到硬编码单文件（那样新适配器本地永远测不到）
+# 适配器目录自动扫描，与 web/scripts/build-knowledge.mjs 同一规则：除 api.py 外全部拼接、
+# 按文件名排序。加一种日志格式这里零改动，别再回到硬编码单文件（那样新适配器本地测不到）
 PROVIDER_DIR = ENGINE / "providers"
 PROVIDER_FILES = sorted(p for p in PROVIDER_DIR.glob("*.py") if p.name != "api.py")
 ENGINE_PY = ENGINE / "engine.py"  # 引擎本体（规则框架 + 报告数据层，原 rule_engine/report_data）
 
-# 固件族：knowledge/<族名>/ 下的一套知识，与 providers/<族名>.py 那个**同名**适配器配对。
-# 配对规则与 web/scripts/build-knowledge.mjs 的 FAMILIES 完全一致（同一条约定，两处实现）——
+# 固件族：knowledge/<族名>/ 下的一套知识，与 providers/<族名>.py 那个同名适配器配对。
+# 配对规则与 web/scripts/build-knowledge.mjs 的 FAMILIES 完全一致（同一条约定，两处实现），
 # 引擎侧用它判断"产物是不是比规则旧"。
 FAMILY_DIRS = sorted(
     d for d in KN_ROOT.iterdir() if d.is_dir() and (d / "rules").is_dir() and (PROVIDER_DIR / (d.name + ".py")).exists()
@@ -56,11 +56,11 @@ def _product_text() -> str:
     """构建产物的正文（规则 / 字段单位 / 数据配置都在里面）。
 
     产物缺失、或比规则陈旧，都当场报错：静默使用旧产物会让"改了规则却看到旧结论"成为
-    最难查的那类问题——报告看着正常，只是没反映改动。
+    最难查的那类问题，报告看着正常，只是没反映改动。
     """
     if not CHECK_SCRIPT.exists():
         raise RuntimeError("还没有构建产物，先 pnpm web:build:kb")
-    # **每一族**的规则都要查（以前只查 px4：改了 APM 规则会一直用旧产物，且没人报错）
+    # 每一族的规则都要查（以前只查 px4：改了 APM 规则会一直用旧产物，且没人报错）
     stale = [
         f"{d.name}/{f.name}"
         for d in FAMILY_DIRS
@@ -83,30 +83,30 @@ def _product_const(name: str) -> object:
 def load_rules() -> list:
     """规则清单（compute 已是表达式形态，老节点写法在构建期被编译掉了）。
 
-    **各族合并**：产物里是 `{log_type: [...]}`（引擎按格式取自己那一套），而字段校验、
-    工作台这类"遍历全部规则"的调用方要的是扁平一份——这里按族顺序拼起来。
+    各族合并：产物里是 `{log_type: [...]}`（引擎按格式取自己那一套），而字段校验、
+    工作台这类"遍历全部规则"的调用方要的是扁平一份，这里按族顺序拼起来。
     """
     by_type: dict = _product_const("rules")  # type: ignore[assignment]
     return [r for fam in by_type.values() for r in fam]
 
 
 def load_facts_payload() -> dict:
-    """provider 拿到的那份数据配置（`const facts = {...}`）——**按 log_type 分组**。
+    """provider 拿到的那份数据配置（`const facts = {...}`），按 log_type 分组。
 
-    必须从产物取、不能本地重新装配：`facts.yaml` 与 `plot/` 下的地图声明是**构建期**合流的
+    要从产物取、不能本地重新装配：`facts.yaml` 与 `plot/` 下的地图声明是构建期合流的
     （预设编译成候选组、单位查表）。本地再装配一遍就是"同一份规则两处实现"，一旦不一致，
-    本地的表现是"轨迹声明丢了"（`get_flight_track()` 返回 error）而浏览器没事——
+    本地的表现是"轨迹声明丢了"（`get_flight_track()` 返回 error）而浏览器没事，
     2026-09-17 与 09-18 各踩过一次，所以只认产物。
     """
     return _product_const("facts")  # type: ignore[return-value]
 
 
 def load_field_units() -> dict:
-    """字段单位表（`ref(..., unit=)` 的源单位），**按 log_type 分组**。
+    """字段单位表（`ref(..., unit=)` 的源单位），按 log_type 分组。
 
     它是构建期按 `meta/<tag>.json` + `meta/topic-overrides.yaml` 查好的；本地不重算
     （那要再实现一遍查表逻辑），直接读产物，保证与浏览器一致。
-    没有 `meta/` 的族（APM）那份是空的——不换算，取到什么就是什么。
+    没有 `meta/` 的族（APM）那份是空的，不换算，取到什么就是什么。
     """
     return _product_const("fieldUnits")  # type: ignore[return-value]
 
@@ -148,7 +148,7 @@ def assemble(log_bytes: bytes) -> dict:
 
 
 def build_namespace(path: Path) -> dict:
-    """`assemble` 的路径版（**签名受 8 处调用点约束，别改**）。"""
+    """`assemble` 的路径版（签名受 8 处调用点约束，别改）。"""
     return assemble(path.read_bytes())
 
 

@@ -1,9 +1,9 @@
-"""预定函数（算子）注册表 —— 经验文件里的 `op:` 只能引用这里注册的算子。
+"""预定函数（算子）注册表：经验文件里的 `op:` 只能引用这里注册的算子。
 
 约定：
 - 算子签名用 @operator 声明 in_arity / out_arity / out_names，
   构建期按签名校验规则文件里 in/out 的数量（多输入/多输出不靠约定，靠校验）。
-  `in_arity` 也可以给**列表**（如 `[1, 4]`），表示同一种运算接受两种写法——
+  `in_arity` 也可以给列表（如 `[1, 4]`），表示同一种运算接受两种写法，
   目前只有 `quat_to_euler`（收一组四列，或收 w/x/y/z 四列）这么用。
 - 调用形式 fn(*args, **opts)：args 是按 `in` 顺序取到的值（numpy 数组或标量），
   opts 是节点上的其他键（unit / instance 等），算子用 **kw 吸收不关心的项。
@@ -266,7 +266,7 @@ def _as_columns(matrix):
 @operator(
     "stack_columns",
     in_arity=[2, 3, 4, 5, 6, 7, 8],
-    doc="把 2 到 8 个**独立字段**拼成矩阵（每字段一列，缺失的列跳过），供 column_spread_stats 等"
+    doc="把 2 到 8 个独立字段拼成矩阵（每字段一列，缺失的列跳过），供 column_spread_stats 等"
     "矩阵算子使用。DataFlash 里 RCOU 的 C1 至 C8 就是八个独立字段而非数组字段，靠它才能进矩阵算子",
 )
 def op_stack_columns(c1, c2, c3=None, c4=None, c5=None, c6=None, c7=None, c8=None, **kw):
@@ -355,10 +355,10 @@ def _groups(groups):
 
 
 def _as_group_list(x):
-    """分组取数（instance=-1）→ 列表，**保留 None 占位**。
+    """分组取数（instance=-1）→ 列表，保留 None 占位。
 
-    实例序号（标题里的 “IMU #1”、estimator #2）必须与原始 dataset 顺序一致，
-    所以这里不能过滤 None——过滤会让后面的实例序号整体前移。
+    实例序号（标题里的 “IMU #1”、estimator #2）要与原始 dataset 顺序一致，
+    所以这里不能过滤 None，过滤会让后面的实例序号整体前移。
     """
     if x is None:
         return []
@@ -531,7 +531,7 @@ def op_worst_reject_ratio(
             if bad < int(primary_min):
                 continue
             union = 0
-            for v in np.asarray(g):  # 不转 float：位掩码必须按位精确
+            for v in np.asarray(g):  # 不转 float：位掩码要按位精确
                 union |= int(v)
             fired = "、".join(bit_names[b] for b in range(len(bit_names)) if union & (1 << b))
             frac = bad / float(len(g))
@@ -645,7 +645,7 @@ def op_scale_series(values, factor=1.0, **kw):
     "adjacent_speed_mps",
     in_arity=3,
     doc="经纬度与时间戳（us）→ 相邻样本地面速度序列（m/s）；等距柱状近似。"
-    '**入参是度**（口径由规则在 ref(..., unit="deg") 上统一好）——算子不认识固件版本、'
+    '入参是度（口径由规则在 ref(..., unit="deg") 上统一好），算子不认识固件版本、'
     "也不认识 degE7 这种老口径。",
 )
 def op_adjacent_speed_mps(lat_in, lon_in, ts_us, **kw):
@@ -677,15 +677,15 @@ def op_hypot(a, b, **kw):
     return np.sqrt(np.asarray(a, dtype=float) ** 2 + np.asarray(b, dtype=float) ** 2)
 
 
-# 四元数先**归一化**再转欧拉角：日志里的四元数可能因插值/截断略偏离单位长度，
+# 四元数先归一化再转欧拉角：日志里的四元数可能因插值/截断略偏离单位长度，
 # 不归一化会放大 atan2 误差。2026-09-17 之前这里有一个同名的第二个定义（不归一化、带
 # 一个从未被调用方用过的 degrees 开关）静默覆盖了本实现，两个消费者（plot/attitude.yml
-# 的图表换算与 vtol-transition 规则）实际拿到的都是那个不归一化的版本——已删除。
-# 教训：OPERATORS[name] = fn 是赋值，**算子名重复注册不报错、后者静默胜出**；
+# 的图表换算与 vtol-transition 规则）实际拿到的都是那个不归一化的版本，已删除。
+# 教训：OPERATORS[name] = fn 是赋值，算子名重复注册不报错、后者静默胜出；
 # 用 ruff 的 F811 在提交前拦住（见仓库根 pyproject.toml）。
 @operator(
     "quat_to_euler",
-    in_arity=[1, 4],  # 两种写法都认：**一个**四列数组，或**四列**分开给
+    in_arity=[1, 4],  # 两种写法都认：一个四列数组，或四列分开给
     out_arity=3,
     out_names=["roll", "pitch", "yaw"],
     doc="四元数 → 欧拉角（度，先归一化）。"
@@ -896,7 +896,7 @@ def op_excursion_events(values, ts_us, t0_us, threshold=0.0, mode="above", min_d
     "longest_true_run",
     in_arity=2,
     doc="布尔掩码里连续为真的最长时长（秒）：把「持续了多久」变成一个标量判据。"
-    "掩码全假返回 0——那是有结论（从未满足），不是数据缺失",
+    "掩码全假返回 0，那是有结论（从未满足），不是数据缺失",
 )
 def op_longest_true_run(mask, ts_us, **kw):
     import numpy as np
@@ -962,7 +962,7 @@ def op_gap_events(ts_us, t0_us, abs_floor_s=0.5, rel_factor=10.0, limit=3, **kw)
     "step_drop_events",
     in_arity=3,
     doc="相邻样本之间的快速跌落事件：间隔在 0 到 max_dt_s 之间、且跌幅超过 min_drop 才算一处；"
-    "每处再判恢复——跌后 recovery_s 秒内若回升到「跌前值 - 跌幅 × recovery_frac」以上，recovered 为真"
+    "每处再判恢复：跌后 recovery_s 秒内若回升到「跌前值 - 跌幅 × recovery_frac」以上，recovered 为真"
     "（瞬时毛刺会自己弹回，真掉电不会）。返回 [{drop, dt_s, start_s, end_s, recovered}, ...] 按跌幅降序，"
     "最多 limit 条（默认 1，只报最严重那处）",
 )
@@ -1213,7 +1213,7 @@ def op_count_columns(matrix, **kw):
     in_arity=2,
     doc="掩码内逐通道均值，只保留均值 > min_mean 的通道（未接/未用通道均值≈0，排除）；"
     "返回 [{index, mean}, ...]；列长与掩码不一致时退化为前 N 个样本。"
-    "mask 传 None 表示**不筛时段**（整条序列都算，如电机平衡看的是全程均值）",
+    "mask 传 None 表示不筛时段（整条序列都算，如电机平衡看的是全程均值）",
 )
 def op_active_column_means(matrix, mask, min_mean=0.01, **kw):
     import numpy as np
@@ -1438,8 +1438,8 @@ def op_zero_cross_hz(values, sample_rate=50.0, **kw):
     out_names=["p99", "osc_hz", "seg_n"],
     doc="姿态跟踪统计：把姿态与姿态指令在时间轴上对齐（取较短长度、指令线性插值到姿态时间轴），"
     "只在 armed 且非悬停（指令倾角 > tilt_min_deg）样本上算跟踪误差，输出 p99（度）、"
-    "误差过零频率（Hz）、参与统计的样本数。指令源**有 q_d 就用 q_d**（新版只记它），"
-    "没有才回退 roll/pitch_body（旧版口径，弧度）——**算子不认识固件版本**，规则把两路都"
+    "误差过零频率（Hz）、参与统计的样本数。指令源有 q_d 就用 q_d（新版只记它），"
+    "没有才回退 roll/pitch_body（旧版口径，弧度），算子不认识固件版本，规则把两路都"
     "递给它、顺序在这里定。核心数据缺失返回 None。",
 )
 def op_att_tracking_stats(
@@ -1469,8 +1469,8 @@ def op_att_tracking_stats(
     roll = np.arctan2(2 * (w * x + y * z), 1 - 2 * (x**2 + y**2))  # 弧度
     pitch = np.arcsin(np.clip(2 * (w * y - z * x), -1, 1))
 
-    # 指令源：**有 q_d 就用 q_d**（新版只记它），没有才用 roll/pitch_body（旧版口径，弧度）。
-    # 两路都给了也优先 q_d——顺序写在算子里，规则只管把存在的递进来。
+    # 指令源：有 q_d 就用 q_d（新版只记它），没有才用 roll/pitch_body（旧版口径，弧度）。
+    # 两路都给了也优先 q_d，顺序写在算子里，规则只管把存在的递进来。
     qd = _as_columns(sp_q)
     has_qd = len(qd) >= 4
     use_q = has_qd
@@ -1517,11 +1517,11 @@ def op_att_tracking_stats(
     in_arity=6,
     out_arity=5,
     out_names=["bx", "by", "bz", "bts", "src_text"],
-    doc="零偏取源：**谁有数据用谁**（直读列 → 状态槽 A → 状态槽 B），输入都是「数组字段的多列」"
-    "或 None。**算子不认识固件版本**——挑来源只看数据本身：样本数 >= min_count、且至少一处非零"
+    doc="零偏取源：谁有数据用谁（直读列 → 状态槽 A → 状态槽 B），输入都是「数组字段的多列」"
+    "或 None。算子不认识固件版本，挑来源只看数据本身：样本数 >= min_count、且至少一处非零"
     "（字段存在但没被填过的情形：实测 1.11 的直读列只有 7 个样本，状态槽才有值）。"
     "返回 三轴序列 + 时间戳 + 数据来源说明（用于 evidence.field）；全都没有返回 None。"
-    "来源说明是**展示文案**，由调用方用 sources=[直读, 槽A, 槽B] 给出——算子不认识字段名。",
+    "来源说明是展示文案，由调用方用 sources=[直读, 槽A, 槽B] 给出，算子不认识字段名。",
 )
 def op_gyro_bias_series(
     new_cols,
@@ -1551,8 +1551,8 @@ def op_gyro_bias_series(
     def usable3(cols):
         """够样本、且至少一处非零才算"有数据"。
 
-        "字段存在但没被填过"有两种表现，都要挡住：整段全零（真正的 0 不可能三轴同时
-        恒为 0），以及只有零星几个样本（实测 1.11 的直读列 7 个 vs 状态槽 636 个）——
+        "字段存在但没被填过"有两种表现，都要挡住：整段全零（真实的 0 不可能三轴同时
+        恒为 0），以及只有零星几个样本（实测 1.11 的直读列 7 个 vs 状态槽 636 个）。
         这种放过去，下游 `gyro_bias_worst` 会因样本不足判成"没有零偏数据"，
         指标就凭空消失了。
         """

@@ -1,4 +1,4 @@
-"""operators.py 的单元测试 —— 不需要真实日志，纯算子求值。
+"""operators.py 的单元测试，不需要真实日志，纯算子求值。
 
 加载方式：engine/ 不是包，用 importlib 按路径加载 operators.py 真实源码，
 避免"在测试里重写一份逻辑"造成的假绿。operators.py 顶层无外部依赖
@@ -103,7 +103,7 @@ def test_columns_aggregate():
     assert _op("columns_aggregate")([np.array([0.0, 0.0])], gt=0) is None
 
 
-# ───────────────────── 以下覆盖 2026-09 补的那批算子 ─────────────────────
+# 以下覆盖 2026-09 补的那批算子
 
 
 def test_std_cv_median_sum():

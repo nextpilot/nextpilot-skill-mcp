@@ -1,17 +1,17 @@
-# PX4 .ulg（ULog）适配器 —— **本项目唯一认识 PX4 的地方**
+# PX4 .ulg（ULog）适配器：本项目唯一认识 PX4 的地方
 #
 # 契约见 providers/api.py。引擎（engine.py / operators.py）不认识
 # topic 名、字段名、info 键名、码值，只认这份契约给的东西；要加一种日志格式（ArduPilot .bin）
 # 就是再加一个这样的文件，引擎一行不改。
 #
 # 分工（别混）：
-#   · 本文件：怎么从 PX4 日志里把数据取出来——字段名、位解码、版本候选、异常回退、载具身份……
-#   · knowledge/px4/facts.yaml：随上游变的**纯数据**（码表、文案、展示口径、规则元数据）
+#   · 本文件：怎么从 PX4 日志里把数据取出来，字段名、位解码、版本候选、异常回退、载具身份……
+#   · knowledge/px4/facts.yaml：随上游变的纯数据（码表、文案、展示口径、规则元数据）
 #   · engine/*.py：与格式无关的机制
 #
-# 注意本文件是**文本拼接**进产物里的（没有 import 机制）：直接用 api.py 的
+# 注意本文件是文本拼接进产物里的（没有 import 机制）：直接用 api.py 的
 # FORMATS / check_provider，以及 engine.py 注入的那份数据配置（FACTS，由 open_log 传进来）。
-# 这里**别写出构建期那四个哨兵名**（两下划线夹的名字，如 rules/facts/单位表/KB 的占位符原文）：
+# 这里别写出构建期那四个哨兵名（两下划线夹的名字，如 rules/facts/单位表/KB 的占位符原文）：
 # 拼接后 JS 的 replace 只换第一处，注释里先出现一次就会把真正的赋值漏掉、浏览器直接报 NameError
 # （构建期有"每个哨兵恰好一次"的护栏，写进去就构建失败）。
 
@@ -30,19 +30,19 @@ _ARMING_STATE_ARMED = 2
 _MAGIC = b"ULog"
 
 # 软件版本展示的类型码后缀（对齐 Flight Review 的 `_format_sw_version`）。
-# **别凭直觉改**：只有类型码 0（未打标签的开发版）才附 git 短哈希，alpha/beta/RC 不附。
+# 别凭直觉改：只有类型码 0（未打标签的开发版）才附 git 短哈希，alpha/beta/RC 不附。
 _RELEASE_TYPE_SUFFIX = {64: "-alpha", 128: "-beta", 192: "-rc", 255: ""}
 
-# 地图轨迹的取数**声明**（读哪个 topic 的哪几列、各按什么量纲换算）在
-# knowledge/px4/plot/track.yml —— 它按「要画什么、从哪几列画」归在 plot/ 下，
+# 地图轨迹的取数声明（读哪个 topic 的哪几列、各按什么量纲换算）在
+# knowledge/px4/plot/track.yml，它按「要画什么、从哪几列画」归在 plot/ 下，
 # 构建期并进引擎内联的那份数据配置（FACTS，见 engine.py），这里从 `self._cfg["track"]` 读。
-# **解析逻辑留在本文件**（get_flight_track()）：按顺序取第一个存在的候选、剔未定位点、等距抽样——
+# 解析逻辑留在本文件（get_flight_track()）：按顺序取第一个存在的候选、剔未定位点、等距抽样，
 # 这些是分支，写进 YAML 只能再造一门小语言（见 track.yml 的说明）。
 
-# 列名里像经纬度／高度的：**关键词必须独立成段**（`^` / `.` / `_` 起，`.` / `_` / `$` 止）。
-# 不能用裸子串——`relative_test_ratio`、`accelerometer_timestamp_relative` 里都含 "lat"，
+# 列名里像经纬度／高度的：关键词要独立成段（`^` / `.` / `_` 起，`.` / `_` / `$` 止）。
+# 不能用裸子串：`relative_test_ratio`、`accelerometer_timestamp_relative` 里都含 "lat"，
 # 于是 `estimator_selector_status` / `sensor_combined` 会被列成"带经纬度字段的 topic"，
-# 而它们跟坐标毫无关系。`alt` 同理：`mode_req_local_alt`、`fd_alt` 是**布尔标志**，不是高度。
+# 而它们跟坐标毫无关系。`alt` 同理：`mode_req_local_alt`、`fd_alt` 是布尔标志，不是高度。
 # 这类"听起来合理但是错的"输出正是本节要消灭的东西（见 CLAUDE.md §6.8）。
 # 分隔符带上 `.`：嵌套字段写成 `previous.lat` / `current.lon`（position_setpoint_triplet）。
 _LATLON_FIELD_RE = _re.compile(r"(^|[._])(latitude|longitude|lng|lat|lon)([._]|$)")
@@ -50,7 +50,7 @@ _ALT_FIELD_RE = _re.compile(r"(^|[._])(altitude|alt)([._]|$)")
 
 
 def _latlon_fields(columns):
-    """列名里像**经纬度**的。
+    """列名里像经纬度的。
 
     「这份日志到底有没有坐标」只该看经纬度：高度到处都有（气压计、EKF、失效保护标志位），
     把它们算进来会让对照物里混进一堆与轨迹无关的 topic，反而看不出真答案。
@@ -59,7 +59,7 @@ def _latlon_fields(columns):
 
 
 def _coord_like_fields(columns):
-    """经纬度或高度——「这个 topic 能不能给出坐标」的宽判据（`_one_track` 的缺字段文案用）。
+    """经纬度或高度：「这个 topic 能不能给出坐标」的宽判据（`_one_track` 的缺字段文案用）。
 
     那里说的是"这个 topic 的坐标相关字段实际叫什么"，高度是轨迹三轴之一，该算。
     """
@@ -87,9 +87,9 @@ class Px4Provider:
         # 取数时"要的实例超出日志里有的"这类说明，由 `take_inst_notes()` 取走（见 get_series）
         self.inst_notes = []
 
-        # 按 pyulog 的**数据来源**分组读：各段只读自己那一种来源，都只往 self 上放结果、
-        # 不碰 facts。顺序有一处硬约束——`_read_logged_messages()` 要用 `_read_data_list()` 算出的
-        # `t0_us` 把消息时间换成**相对日志起点**的秒数，所以它必须排最后；其余互不依赖。
+        # 按 pyulog 的数据来源分组读：各段只读自己那一种来源，都只往 self 上放结果、
+        # 不碰 facts。顺序有一处硬约束：`_read_logged_messages()` 要用 `_read_data_list()` 算出的
+        # `t0_us` 把消息时间换成相对日志起点的秒数，所以它要排最后；其余互不依赖。
         #   ulog.msg_info_dict      → `_read_msg_info_dict()`：版本、载具身份
         #   ulog.initial_parameters → `_read_initial_parameters()`：参数里的事实（累计飞行、机架编号）
         #   ulog.data_list          → `_read_data_list()`：基准 topic（机型/模式/armed/阶段）
@@ -130,9 +130,9 @@ class Px4Provider:
         return out
 
     def get_dataset(self, topic, instance=0):
-        """某个 topic 某个实例的**原样列**：{列名: 数组}（含 'field[0]' 这种数组列）。
+        """某个 topic 某个实例的原样列：{列名: 数组}（含 'field[0]' 这种数组列）。
 
-        原 get_topic_data（2026-09-24 迁移到文档 API 名）。取不到返回 None（不抛异常——契约要求）。
+        原 get_topic_data（2026-09-24 迁移到文档 API 名）。取不到返回 None（不抛异常，契约要求）。
         """
         d = self._find_topic(topic, instance)
         return d.data if d is not None else None
@@ -140,18 +140,18 @@ class Px4Provider:
     def get_series(self, ref, instance=slice(None, None), alias=None):
         """按 `"topic.field"` 取一条序列（与规则里写的引用形一致）。
 
-        **取不到或字段不存在一律返回 None，不抛异常。** 形态：
-          · instance=slice（规则里写 `topic[:].field` / `topic[a:b].field`，区间**含两端**）
-            —— 区间内的实例。多实例时返回「每实例一组」的列表；**只有一个实例时返回那
-            一条序列本身**（否则单实例字段就得处处写 `[0]`，而且 `q` 这种"每元素一列"
+        取不到或字段不存在一律返回 None，不抛异常。形态：
+          · instance=slice（规则里写 `topic[:].field` / `topic[a:b].field`，区间含两端）
+            区间内的实例。多实例时返回「每实例一组」的列表；只有一个实例时返回那
+            一条序列本身（否则单实例字段就得处处写 `[0]`，而且 `q` 这种"每元素一列"
             的数组字段会被多包一层而读不出来）
-          · instance=N（规则里写 `topic[N].field`，**不写下标就是 0**，N 可为负，
-            按 Python 语义从末尾数）—— 只取第 N 个实例
-          · alias —— 该字段的备用命名（旧固件改过名），可给字符串或字符串列表
+          · instance=N（规则里写 `topic[N].field`，不写下标就是 0，N 可为负，
+            按 Python 语义从末尾数），只取第 N 个实例
+          · alias：该字段的备用命名（旧固件改过名），可给字符串或字符串列表
         定长数组字段（如 float32[3] accel_clipping）：pyulog 按 'field[i]' 暴露，
-        这里返回**每元素一列的列表**，缺的元素位置为 None。
+        这里返回每元素一列的列表，缺的元素位置为 None。
 
-        **没有"把所有实例拼成一条"这个形态**（曾经有，默认就是它）：一条曲线里混着几个
+        没有"把所有实例拼成一条"这个形态（曾经有，默认就是它）：一条曲线里混着几个
         传感器的数据，读的人看不出来。要哪个实例就写哪个；多实例归约用 `[:]`
         交给会分组的算子。
         """
@@ -177,11 +177,11 @@ class Px4Provider:
     def _note_inst_range(self, ref, instance, n):
         """区间要的实例超出了日志里实际有的 → 记一条说明（取数照截断走，不报错）。
 
-        只提示不报错：区间写宽了通常是作者对**这份日志**有几路传感器估错了，按能取到的
+        只提示不报错：区间写宽了通常是作者对这份日志有几路传感器估错了，按能取到的
         画出来仍然是对的结论，但得让人看见"少了几路"，否则会当成全部实例都查过了。
         """
         last = n - 1
-        # 文案里报**作者写的那个数**（可能是负的，表示从末尾数），判越界才换算成非负下标
+        # 文案里报作者写的那个数（可能是负的，表示从末尾数），判越界才换算成非负下标
         lo_w = 0 if instance.start is None else instance.start
         # slice 的上界是闭区间 +1（见 _parse_inst），减回来才是作者写的那个数；None = 到末尾
         hi_w = last if instance.stop is None else instance.stop - 1
@@ -201,7 +201,7 @@ class Px4Provider:
         return notes
 
     def get_first_existing_column(self, topic, names):
-        """只取第一个实例、按候选名取第一个存在的**原样列**（概览指标兜底取数用）。"""
+        """只取第一个实例、按候选名取第一个存在的原样列（概览指标兜底取数用）。"""
         cols = self.get_dataset(topic, 0)
         if not cols:
             return None
@@ -218,8 +218,8 @@ class Px4Provider:
         """固件约束串：any / ">=1.15" / "<1.15" / ">=1.15,<=1.16"（逗号=与）。
 
         语法解释在 `match_version_spec`（api.py，与 ArduPilot 适配器共用同一份）：
-        规则级的适用范围轴与节点级 `ref(..., when_fw=)` **共用这一个**（同一个概念、
-        同一套语法）。版本未知（老日志没写版本号）时不因版本排除——与迁移前
+        规则级的适用范围轴与节点级 `ref(..., when_fw=)` 共用这一个（同一个概念、
+        同一套语法）。版本未知（老日志没写版本号）时不因版本排除，与迁移前
         "按字段存在性判定"一致；写错的约束串先抛出来，不被"版本未知"盖过去。
         """
         if self.fw_minor is None:
@@ -231,7 +231,7 @@ class Px4Provider:
     def get_info_dict(self):
         """(info, info_multi) 二元组：Information Message 键值对 + 多值信息（'M' 消息）。
 
-        原 get_logged_information（迁移到文档 API 名，并把多值信息一起交出——
+        原 get_logged_information（迁移到文档 API 名，并把多值信息一起交出：
         报告页的 messagesMulti 从这里取，不再直读 self.ulog，同一份数据不写两条路）。
         """
         return (
@@ -247,9 +247,9 @@ class Px4Provider:
 
         原 get_logged_messages（2026-09-24 迁移到文档 API 名），并按契约补四个可选过滤：
         t_start/t_end 是相对秒，level 给单个值或列表，pattern 是大小写不敏感的子串；
-        全省 = 全量。过滤条件自相矛盾时返回空列表——"没有满足条件的消息"是个正常答案。
+        全省 = 全量。过滤条件自相矛盾时返回空列表，"没有满足条件的消息"是个正常答案。
 
-        内容在构造时由 `_read_logged_messages()` 算好一次——`builtin_variables()` 每条规则都要它，
+        内容在构造时由 `_read_logged_messages()` 算好一次，`builtin_variables()` 每条规则都要它，
         每次重建纯属白干。这里返回逐条复制的新 dict：调用方拿到的不能是内部状态。
         """
         out = [dict(m) for m in self._logged_messages]
@@ -278,16 +278,16 @@ class Px4Provider:
         return {
             "start_us": int(self.t0_us),
             "end_us": int(self.t_max_us),
-            # 从返回的 bounds 推导，不用 self.duration_s——那是显示口径（数据首末、0.1s 精度），
+            # 从返回的 bounds 推导，不用 self.duration_s：那是显示口径（数据首末、0.1s 精度），
             # 而这里 start_us 是日志头部起点（数据开始前），两个口径差可以超过 0.3s，
-            # 查询 API 内部必须自洽（guard step 9 就是这条）
+            # 查询 API 内部要自洽（guard step 9 就是这条）
             "duration_s": round((int(self.t_max_us) - int(self.t0_us)) / 1e6, 3),
             # 与 RESTART_DETECTED 同一判据（_read_data_list 扫全局数出来的回退 topic 数）
             "has_wraparound": self.restart_topics > 0,
         }
 
     def get_dataset_description(self, topic=None):
-        """消息格式声明（pyulog 的 message_formats）：**含这份日志没录到的消息**——
+        """消息格式声明（pyulog 的 message_formats）：含这份日志没录到的消息。
         它答"这种格式长什么样"，与 get_topic_meta() 答"这份日志录到了什么"互补。"""
         formats = getattr(self.ulog, "message_formats", None) or {}
 
@@ -334,8 +334,8 @@ class Px4Provider:
         return None
 
     def get_field_unit(self, topic, field):
-        """源单位（规范名）。表是构建期按"规则/图里写了 unit= 的引用"收录的——
-        **只含收录过的字段**，没收录的返回 None（不是没有单位，是本站不知道）。"""
+        """源单位（规范名）。表是构建期按"规则/图里写了 unit= 的引用"收录的，
+        只含收录过的字段，没收录的返回 None（不是没有单位，是本站不知道）。"""
         return (FIELD_UNITS or {}).get("%s.%s" % (topic, field))
 
     def get_changed_parameters(self):
@@ -370,7 +370,7 @@ class Px4Provider:
         return list(self.modes) if self.modes else []
 
     def get_armed_changed(self):
-        """解锁/上锁的连续区间（µs）。end 不会是 None——日志截止就用最后时间戳封口，
+        """解锁/上锁的连续区间（µs）。end 不会是 None：日志截止就用最后时间戳封口，
         时序算子用的 ARMED_INTERVALS 才保留 None 的开口语义，两份形态各按各的用途来。"""
         return [{"t_start_us": int(s), "t_end_us": int(e if e is not None else self.t_max_us)} for s, e in self.armed_intervals]
 
@@ -386,7 +386,7 @@ class Px4Provider:
         return self.fw_display
 
     def get_vehicle_identity(self):
-        """载具身份。**形态稳定**：没有的键给空串（None），让消费方按键取而不用探键。"""
+        """载具身份。形态稳定：没有的键给空串（None），让消费方按键取而不用探键。"""
         return {
             "vehicle_type": self.vehicle_type,
             "uid": self.uuid or None,
@@ -419,7 +419,7 @@ class Px4Provider:
         return not self.has_file_corruption() and bool(walked_to_end)
 
     def builtin_variables(self):
-        """内置变量表。**每次返回新 dict**（引擎会往里写 compute 的输出）。
+        """内置变量表。每次返回新 dict（引擎会往里写 compute 的输出）。
 
         键一律大写（见 api.py 的 BUILTIN_VARIABLES）：规则里自己赋的变量是小写。
         """
@@ -453,8 +453,8 @@ class Px4Provider:
         return bool(getattr(self.ulog, "has_data_appended", False))
 
     def get_parameter_description(self, name=None):
-        """参数说明。**v1 返回 None**：参数字典（min/max/desc）是构建期从 meta 摘出来的
-        静态 JSON，由前端在「飞控参数」tab 按需拉取，没进引擎——这里没有数据源，
+        """参数说明。v1 返回 None：参数字典（min/max/desc）是构建期从 meta 摘出来的
+        静态 JSON，由前端在「飞控参数」tab 按需拉取，没进引擎，这里没有数据源，
         返回 None 如实说"给不出"，不冒充查过。"""
         return None
 
@@ -468,8 +468,8 @@ class Px4Provider:
         """逐条走 ULog 的 [uint16 消息长度][uint8 消息类型] 序列，统计每类消息的条数。
 
         刻意不走 pyulog 的解析结果：pyulog 只留它认得的东西（把 M 的续行并进同一组、
-        按话题聚合 D…），这里要回答的是"文件里究竟有多少条"，顺带当"文件是否被截断"的旁证
-        ——走到尾部长度对不上就停下并标记，不硬猜。
+        按话题聚合 D…），这里要回答的是"文件里究竟有多少条"，顺带当"文件是否被截断"的旁证。
+        走到尾部长度对不上就停下并标记，不硬猜。
         """
         raw, n = self.raw, len(self.raw)
         counts = {}
@@ -486,7 +486,7 @@ class Px4Provider:
     def get_decoded_events(self, t_start=None, t_end=None, level=None, pattern=None):
         """PX4 事件（`event` topic）解码。解不出返回 None。
 
-        pyulog 的 PX4Events 用**日志自带**的 metadata_events（那个 xz blob 就是这份固件的
+        pyulog 的 PX4Events 用日志自带的 metadata_events（那个 xz blob 就是这份固件的
         事件定义），所以不联网、与固件版本严格对应；定义里没有的 ID 显示
         [Unknown event with ID N]。Flight Review 的 Logged Messages 表就是
         "解码事件 + 文本消息"两路合并，这里对齐它。过滤参数与 get_logged_events 同义
@@ -528,7 +528,7 @@ class Px4Provider:
         return out
 
     def get_flight_track(self, max_points=None):
-        """地图轨迹（**可以多条**）：每条轨道按声明取数、换算、剔除未定位采样、等距抽样。
+        """地图轨迹（可以多条）：每条轨道按声明取数、换算、剔除未定位采样、等距抽样。
 
         声明来自 `knowledge/px4/plot/` 里 `container: map` 的那个预设（构建期编译进数据配置）：
 
@@ -538,20 +538,20 @@ class Px4Provider:
                 lat: {cands: ["sensor_gps[0].latitude_deg", …], unit: "deg"}
                 lon / alt 同形
 
-        坐标取数走引擎的 `_pick_ref`（候选组按存在性挑、单位换算）——与规则、曲线**同一套**。
+        坐标取数走引擎的 `_pick_ref`（候选组按存在性挑、单位换算），与规则、曲线同一套。
         单条轨道取不到就跳过它；一条都没有才返回 `error`（保留 `tracks: []`，形状稳定）。
 
-        **取不到时必须说清"缺什么"**（`errorReasons` 逐条列出：哪个 topic 不在、缺哪个字段、
+        取不到时要说清"缺什么"（`errorReasons` 逐条列出：哪个 topic 不在、缺哪个字段、
         还是"有采样但全程未定位"）。以前这里只给一句"声明里的坐标候选都不在日志里"，
-        而那只对应其中一种原因——日志里有 `vehicle_gps_position` 但全程没拿到 3D 定位时，
-        这句话是**错的**，用户还拿不到任何能自己判断的线索。见 CLAUDE.md §6.8。
+        而那只对应其中一种原因，日志里有 `vehicle_gps_position` 但全程没拿到 3D 定位时，
+        这句话是错的，用户还拿不到任何能自己判断的线索。见 CLAUDE.md §6.8。
         """
         cfg = self._cfg.get("track")
         if not cfg or not cfg.get("children"):
             return {"error": "这份格式没有声明轨迹取数来源（knowledge/px4/plot/track.yml）"}
         # ① 先过声明里的闸门（`conditions.topics`，构建期从预设搬到 facts.track）：一个都不在
-        #    日志里时，这份预设**本就不适用**，该说的是"缺哪个 topic"而不是"坐标候选取不到"。
-        #    文案复用 `engine._missing_topics`——规则与绘图预设共用这一处，别在这儿再写
+        #    日志里时，这份预设本就不适用，该说的是"缺哪个 topic"而不是"坐标候选取不到"。
+        #    文案复用 `engine._missing_topics`，规则与绘图预设共用这一处，别在这儿再写
         #    第二份（它给的正是缺什么：`sensor_gps / vehicle_gps_position not in log`）。
         missing = _missing_topics((cfg.get("conditions") or {}).get("topics"))
         if missing:
@@ -577,9 +577,9 @@ class Px4Provider:
     def _track_failure(self, cfg, reasons):
         """轨迹取不到的返回体。
 
-        `error` 带上**最后一条**原因（给"只看一行"的消费方：日志、非界面接口），完整清单在
-        `errorReasons`（界面按列表渲染）。为什么是最后一条：候选按优先级依次试，**最后试的
-        那个才是把整串试完的那一个**，它前面几条只是"为什么跳过了它"——把第一条当结论，
+        `error` 带上最后一条原因（给"只看一行"的消费方：日志、非界面接口），完整清单在
+        `errorReasons`（界面按列表渲染）。为什么是最后一条：候选按优先级依次试，最后试的
+        那个才是把整串试完的那一个，它前面几条只是"为什么跳过了它"。把第一条当结论，
         会指着"日志里没有 sensor_gps"去解释"有 GPS 但全程没定位"。
         """
         headline = reasons[-1]
@@ -590,7 +590,7 @@ class Px4Provider:
             for c in (ch.get(ax) or {}).get("cands", [])
         }
         # 声明的 topic 一个都不在日志里时，补一句"日志里实际有什么"：只说"缺了东西"用户
-        # 无从下手——有对照物才看得出是固件版本不同，还是字段改了名
+        # 无从下手，有对照物才看得出是固件版本不同，还是字段改了名
         if declared and not any(self.has_topic(t) for t in declared):
             reasons = reasons + [self._coord_field_topics_note()]
         return {
@@ -604,13 +604,13 @@ class Px4Provider:
     def _coord_field_topics_note(self):
         """日志里"带经纬度字段"的 topic 一句话清单（给 `errorReasons` 当对照物）。
 
-        挑判据用**字段**而不是 topic 名：用户真正要问的是"这份日志里到底有没有坐标"，
+        挑判据用字段而不是 topic 名：用户真正要问的是"这份日志里到底有没有坐标"，
         只列 `vehicle_local_position` 这种名字看不出它只有参考原点 `ref_lat/ref_lon`、
-        没有逐点经纬度——而那恰恰是"为什么画不出轨迹"的答案。
+        没有逐点经纬度，而那恰恰是"为什么画不出轨迹"的答案。
 
-        判据见 `_latlon_fields`（关键词独立成段、只看经纬度不看高度）。**写成裸子串 `"lat" in name`
-        会让 `relative_test_ratio` 里的 "lat" 混进来**，列出 `estimator_selector_status` 这种
-        与坐标无关的 topic——比不给对照物更糟，因为它听起来很具体。
+        判据见 `_latlon_fields`（关键词独立成段、只看经纬度不看高度）。写成裸子串 `"lat" in name`
+        会让 `relative_test_ratio` 里的 "lat" 混进来，列出 `estimator_selector_status` 这种
+        与坐标无关的 topic，比不给对照物更糟，因为它听起来很具体。
         """
         hits = []
         for m in self.get_topic_meta():
@@ -625,13 +625,13 @@ class Px4Provider:
     def _one_track(self, child, max_points=None):
         """一条轨道 → `(轨道, [])`；取不到返回 `(None, [原因…])`。
 
-        **三个坐标与时间戳必须来自同一个 topic 的同一个实例**：候选顺序即优先级，取第一个
+        三个坐标与时间戳得来自同一个 topic 的同一个实例：候选顺序即优先级，取第一个
         "lat / lon / alt 三样都能给齐"的 topic 生效。不这么定的话，三路的采样率不同、数组
         长度不同，`lat[i]` 与 `alt[i]` 根本不是同一时刻，画出来是错的。
 
-        失败原因是要**给用户看**的，所以每一句都得落到具体的 topic / 字段上：
+        失败原因是要给用户看的，所以每一句都得落到具体的 topic / 字段上：
         "缺字段"要说缺哪个、这个 topic 的坐标字段实际叫什么；"全是未定位"要说清几个采样、
-        几个有效——用户据此才能判断是固件版本不同、字段改了名，还是这次飞行压根没上星。
+        几个有效，用户据此才能判断是固件版本不同、字段改了名，还是这次飞行压根没上星。
         """
         limit = int(max_points or child.get("max_points") or 1500)
         why = []
@@ -694,8 +694,8 @@ class Px4Provider:
                 continue  # 同 topic 同实例却长度不同：宁可这条不画，也不硬凑坐标
 
             lat, lon, alt = series["lat"], series["lon"], series["alt"]
-            # GPS 没定位时的采样必须剔掉：PX4 在拿到定位前会连着记 lat=lon=0（几内亚湾那个"空岛"），
-            # 一条直线就从那儿连到真正的航迹上——地图上看着完全不对（实测用户日志就是这样）。
+            # GPS 没定位时的采样要剔掉：PX4 在拿到定位前会连着记 lat=lon=0（几内亚湾那个"空岛"），
+            # 一条直线就从那儿连到真正的航迹上，地图上看着完全不对（实测用户日志就是这样）。
             # 判据：坐标在合法范围、不是 (0,0)、且（有 fix_type 时）fix_type ≥ 3 才算 3D 定位。
             valid = np.isfinite(lat) & np.isfinite(lon) & np.isfinite(alt)
             valid &= (np.abs(lat) <= 90.0) & (np.abs(lon) <= 180.0)
@@ -736,13 +736,13 @@ class Px4Provider:
         return None, why
 
     def report_materials(self):
-        """报告页要的几块原料（**不是某一个 tab 的 payload**，四个 tab 各取所需）。
+        """报告页要的几块原料（不是某一个 tab 的 payload，四个 tab 各取所需）。
 
         系统消息取 infoDict / msgTypeStats / msgTypeWalkOk；事件消息取 messages / messagesMulti；
         飞控参数取 params / defaultParams / changedParams；阶段条取 phases。
 
         所以这个方法的边界是「该格式能提供哪些原料」，由前端按 tab 取用。为什么不由数据层拼：
-        原料的形态是格式专有的——'I' 信息字典、'L' 文本消息与 event 解码结果合并成一条时间轴、
+        原料的形态是格式专有的：'I' 信息字典、'L' 文本消息与 event 解码结果合并成一条时间轴、
         'M' 多值信息怎么拼回文本、'Q' 默认值怎么推、逐字节的消息类型统计……换一种日志格式
         就是另一套。
         """
@@ -769,7 +769,7 @@ class Px4Provider:
                 }
             )
 
-        # Logged String Message（'L'）。PX4 对**事件**会同时写两样：一条事件（二进制，进
+        # Logged String Message（'L'）。PX4 对事件会同时写两样：一条事件（二进制，进
         # `event` topic）和一条等价的旧格式文本（以 \t 结尾）。先分开收，等解码出事件后再决定
         # 要不要留那份重复文本。
         messages, legacy_dupes = [], []
@@ -807,16 +807,16 @@ class Px4Provider:
         messages_tagged.sort(key=lambda m: m["tSec"])
 
         # 解码出事件了：那些 \t 结尾的旧格式文本就是同一件事的另一种说法，丢掉（FR 也如此）。
-        # 没有解码结果（固件没带事件定义）就保留——否则 armed / takeoff 这类关键节点会凭空消失。
+        # 没有解码结果（固件没带事件定义）就保留，否则 armed / takeoff 这类关键节点会凭空消失。
         if not events:
             messages += legacy_dupes
         all_messages = sorted(messages + events + messages_tagged, key=lambda m: m["tSec"])
 
-        # Multi Information：键 → 多组值，没有时间戳。组内怎么拼回文本要看**形态**：
-        #   · 逐行型（perf_counter / perf_top…）：每段是一行完整文本，PX4 不给行尾换行
-        #     —— 段之间补 \n，否则所有行黏成一行；
-        #   · 流式型（boot_console_output）：一整段控制台文本按定长切片，换行在段**内部**，
-        #     一行还可能跨段 —— 只能直接拼接，补 \n 会凭空断行。
+        # Multi Information：键 → 多组值，没有时间戳。组内怎么拼回文本要看形态：
+        #   · 逐行型（perf_counter / perf_top…）：每段是一行完整文本，PX4 不给行尾换行，
+        #     段之间补 \n，否则所有行黏成一行；
+        #   · 流式型（boot_console_output）：一整段控制台文本按定长切片，换行在段内部，
+        #     一行还可能跨段，只能直接拼接，补 \n 会凭空断行。
         # 判据：任一段自带换行 → 流式；否则逐行。实机日志两种键都出现过，别按一种写死。
         multi_src = info_multi
         multi_types = getattr(self.ulog, "msg_info_multiple_dict_types", None) or {}
@@ -851,8 +851,8 @@ class Px4Provider:
         }
 
         # Parameter Default（ULog 的 'Q' 消息）。PX4 的 logger 逐参数比较「当前值 / 机架默认 /
-        # 固件默认」三者，**只写与当前值不同的那个**（logger.cpp: write_parameter_defaults）
-        # —— 于是「有记录」等价于「该参数被改过」，且记录里的默认值必然与当前值不同；
+        # 固件默认」三者，只写与当前值不同的那个（logger.cpp: write_parameter_defaults），
+        # 于是「有记录」等价于「该参数被改过」，且记录里的默认值必然与当前值不同；
         # 反过来「没记录」表示当前值与两个默认都相同。
         # 位含义见 ulog_parameter_default_type_t：bit0 = system（固件出厂默认），
         # bit1 = current_setup（机架配置 + 自定义默认文件）。
@@ -909,7 +909,7 @@ class Px4Provider:
             # 「与默认一致」，前端要区别对待，不能替它下结论。
             "defaultParamsKnown": bool(getattr(self.ulog, "has_default_parameters", False)),
             "changedParams": changed,
-            # 阶段条：从 get_mode_changed() 的 µs 形态换算成秒——切段只有 _read_data_list 一处
+            # 阶段条：从 get_mode_changed() 的 µs 形态换算成秒，切段只有 _read_data_list 一处
             "phases": [
                 {
                     "startSec": round(seg["t_start_us"] / 1e6, 2),
@@ -932,15 +932,15 @@ class Px4Provider:
         return None
 
     def _find_topic_all(self, topic):
-        """该 topic 的**全部实例**（多实例拼接用）。"""
+        """该 topic 的全部实例（多实例拼接用）。"""
         return [d for d in self.ulog.data_list if d.name == topic]
 
     @staticmethod
     def _first_field(ds, *names):
-        """按 names 的顺序取**第一个存在**的字段（旧固件改过名时靠它回退）。
+        """按 names 的顺序取第一个存在的字段（旧固件改过名时靠它回退）。
 
-        取不到（名字不在这份日志里）返回 None，不抛异常——契约要求"取不到一律 None"，
-        引擎按"数据不足"处理。**只咽 KeyError**：静默留给"数据缺失"，不留给编程错误
+        取不到（名字不在这份日志里）返回 None，不抛异常，契约要求"取不到一律 None"，
+        引擎按"数据不足"处理。只咽 KeyError：静默留给"数据缺失"，不留给编程错误
         （传了个 None 的 dataset 之类该当场炸，否则表现成"这条经验静默不生效"，最难查）。
         """
         for n in names:
@@ -956,7 +956,7 @@ class Px4Provider:
         """'topic.field' → 「每个 topic 实例一组」的列表；topic 不存在返回 None。
 
         实例顺序 = `_find_topic_all()` 的顺序（与 topic meta 一致），所以 `instance=N` 的
-        N 就是标题里那个实例序号。缺字段的实例留一个 None 占位，**不剔除**——剔了会让
+        N 就是标题里那个实例序号。缺字段的实例留一个 None 占位，不剔除，剔了会让
         后面的实例序号整体前移。
         """
         topic, _, field = ref.partition(".")
@@ -970,7 +970,7 @@ class Px4Provider:
             if direct is not None and len(direct):
                 groups.append(np.asarray(direct, dtype=float))
                 continue
-            # `field[K]` 且日志里没有 `field[K]` 这一列 → 这是**标量序列取第 K 个采样**
+            # `field[K]` 且日志里没有 `field[K]` 这一列 → 这是标量序列取第 K 个采样
             # （数组字段走上面的 direct：`q[0]` 是 pyulog 的 'q[0]' 列，一整条序列）
             elem = self._element_at(d, field, *aliases)
             if elem is not None:
@@ -994,14 +994,14 @@ class Px4Provider:
     def _element_at(ds, field, *aliases):
         """`name[K]` / `name[i,j]` 取不出来 → None（K 越界、列不存在、name 根本不存在都算）。
 
-        `topic.field[K]` 是"取第 K 个元素"，**元素是什么取决于字段本身**：
-          · 数组字段（`q`、`accel_clipping`）—— pyulog 直接给了 `q[K]` 这一列，是一整条
-            序列，**走不到这里**（`_read_grouped` 前面的 direct 就命中了）
-          · 标量序列（`ref_alt`、`z`）—— 日志里没有 `ref_alt[K]` 列，这里按**第 K 个采样**
+        `topic.field[K]` 是"取第 K 个元素"，元素是什么取决于字段本身：
+          · 数组字段（`q`、`accel_clipping`）：pyulog 直接给了 `q[K]` 这一列，是一整条
+            序列，走不到这里（`_read_grouped` 前面的 direct 就命中了）
+          · 标量序列（`ref_alt`、`z`）：日志里没有 `ref_alt[K]` 列，这里按第 K 个采样
             取一个标量。相对高度那类"拿首值当基准"的算式靠它：`ref_alt[0] - ref_alt`
 
-        `field[i,j]` 是**二维下标**：i 是行、j 是列。数组字段在 pyulog 里存成"每列一条序列"
-        （`q[0]`、`q[1]`…），所以**行 = 第几个采样（随时间递进）、列 = 第几路信号**——
+        `field[i,j]` 是二维下标：i 是行、j 是列。数组字段在 pyulog 里存成"每列一条序列"
+        （`q[0]`、`q[1]`…），所以行 = 第几个采样（随时间递进）、列 = 第几路信号，
         `q[10,2]` 就是"第 10 个采样时刻、第 2 列"那个值。
         """
         m2 = _re.match(r"^(.+)\[(\d+),(\d+)\]$", field)
@@ -1107,8 +1107,8 @@ class Px4Provider:
                 disp += " (%s)" % short_sw
             self.fw_display = disp
 
-        # 载具身份：与判定无关，但历史卡片与报告概况要用，且必须**随 report 存档**
-        # （派生数据 info 不进存档）。用**分支/标签**（如 damiao_dm-fc01_v1.15.0）比 commit
+        # 载具身份：与判定无关，但历史卡片与报告概况要用，且得随 report 存档
+        # （派生数据 info 不进存档）。用分支/标签（如 damiao_dm-fc01_v1.15.0）比 commit
         # 号可读；新固件才有这个键
         self.uuid = str(info.get("sys_uuid", ""))
         self.ver_sw_branch = str(info.get("ver_sw_branch", ""))
@@ -1124,16 +1124,16 @@ class Px4Provider:
             if hi is not None and lo is not None
             else None
         )
-        # 机架编号（SYS_AUTOSTART，如 4040）——机型之外再给一个可查的标识
+        # 机架编号（SYS_AUTOSTART，如 4040），机型之外再给一个可查的标识
         af = p.get("SYS_AUTOSTART")
         self.airframe_id = int(af) if af is not None else None
 
     def _read_data_list(self):
         """读 `ulog.data_list`（各 topic 的时序）与 `ulog.dropouts`，得出报告头的离散量。
 
-        分两部分：先读**基准 topic** `vehicle_status`（机型 / 模式 / armed 区间 / 飞行阶段），
-        再**扫全局**（总时长与时间基准、记录起始 UTC、数据质量）。这个 topic 只读这一处，
-        需要切段的都在同一批数组上算完——模式切段（`get_mode_changed()` 与报告页阶段条同源）在这里一次做完。
+        分两部分：先读基准 topic `vehicle_status`（机型 / 模式 / armed 区间 / 飞行阶段），
+        再扫全局（总时长与时间基准、记录起始 UTC、数据质量）。这个 topic 只读这一处，
+        需要切段的都在同一批数组上算完，模式切段（`get_mode_changed()` 与报告页阶段条同源）在这里一次做完。
         条件值（这份日志没有的）统一用 None / "" 表示，由 `_collect_facts()` 决定给不给键。
         """
         ulog = self.ulog
@@ -1155,7 +1155,7 @@ class Px4Provider:
 
         # ---- 飞行模式 ----
         # 这次日志里出现过的 nav_state 模式，按占样本数从多到少（名字取 facts.yaml 的
-        # nav_state_names）——列表的"飞行模式"列按 Flight Review 的口径列出**全部**模式。
+        # nav_state_names），列表的"飞行模式"列按 Flight Review 的口径列出全部模式。
         self.modes = None
         if vs is not None:
             nav = self._first_field(vs, "nav_state")
@@ -1240,7 +1240,7 @@ class Px4Provider:
         self.mode_runs_us = mode_runs_us
 
         # ---- 扫全局：总时长与时间基准 ----
-        # 时间基准是**开机以来的秒数**（PX4 时间戳本身就是开机起的微秒），这里不换算，
+        # 时间基准是开机以来的秒数（PX4 时间戳本身就是开机起的微秒），这里不换算，
         # 只记录起点供事件类算子算相对时刻。
         t_min, t_max = None, None
         for d in ulog.data_list:
@@ -1256,8 +1256,8 @@ class Px4Provider:
 
         # ---- 扫全局：记录起始的 UTC 时刻 ----
         # 取 GPS 首次给出有效时间的那一刻（比 boot_time_utc_us 可靠，后者要飞控对过时）。
-        # topic 按 plot/ 里地图声明的**候选顺序**取第一个存在的（构建期已按声明编译好 topics），
-        # 与 get_flight_track() 同一优先级——两处别各挑各的。
+        # topic 按 plot/ 里地图声明的候选顺序取第一个存在的（构建期已按声明编译好 topics），
+        # 与 get_flight_track() 同一优先级，两处别各挑各的。
         self.start_utc = None
         for topic, inst in (self._cfg.get("track") or {}).get("children", [{}])[0].get("topics", []):
             gps = self._find_topic(topic, int(inst))
@@ -1283,12 +1283,12 @@ class Px4Provider:
         self.dropout_total_ms = int(sum(getattr(d, "duration", 0) for d in getattr(ulog, "dropouts", [])))
 
     def _read_positions(self):
-        """读 Home 点与参考原点——**两个不同概念，别混**：
+        """读 Home 点与参考原点。两个不同概念，别混：
 
           · ref（参考原点）：局部 NED 坐标的原点，`vehicle_local_position` 的
             `ref_lat/ref_lon/ref_alt`（EKF 对齐后的第一组非零值）。
           · home（Home 点）：解锁/起飞的位置，取 `vehicle_global_position` 的首个有效
-            定位——armed 起点之后的第一个优先，全程没解锁就退回全程第一个。
+            定位，armed 起点之后的第一个优先，全程没解锁就退回全程第一个。
             与轨迹取数同一套合法性判据（非 0 非 NaN、范围合法），没有 fix_type 可看。
 
         两份结果都缓存（builtin_variables 每条规则都取 HOME_*），构造期算一次。
@@ -1346,11 +1346,11 @@ class Px4Provider:
     def _read_logged_messages(self):
         """读 `ulog.logged_messages`：日志消息（PX4 的 `[模块] 文案`，含警告 / 错误级别）。
 
-        **必须排在 `_read_data_list()` 之后**：tSec 是相对日志起点的秒数，要用它算出的 `t0_us`。
+        得排在 `_read_data_list()` 之后：tSec 是相对日志起点的秒数，要用它算出的 `t0_us`。
         为什么在构造期算而不是每次现算：`builtin_variables()` 里就有 `messages`，而 `builtin_variables()`
-        被 `_rule_env()` **每条规则各调一次**——不缓存就是每条规则重建一遍同一份列表。
+        被 `_rule_env()` 每条规则各调一次，不缓存就是每条规则重建一遍同一份列表。
 
-        level 是 ULog 里的原始字节，PX4 填的是 **ASCII 数字**（'3'=51 才是 ERROR），
+        level 是 ULog 里的原始字节，PX4 填的是 ASCII 数字（'3'=51 才是 ERROR），
         与 pyulog 的 Message.log_level_str() 一致；因此经验文件按 level_name 判定，
         不要直接和 3/4 这种数字比（迁移前就是这么比错的，导致消息类经验从不命中）。
         """
@@ -1360,7 +1360,7 @@ class Px4Provider:
                 ts_s = round((int(m.timestamp) - self.t0_us) / 1e6, 2)
             except (AttributeError, TypeError, ValueError):
                 # 这条消息没有可用的 timestamp（pyulog 各版本给的东西不一致）：只丢相对时刻，
-                # 消息本身照留。**不写 except Exception**——`t0_us` 要是设错了，那是 bug，
+                # 消息本身照留。不写 except Exception：`t0_us` 要是设错了，那是 bug，
                 # 应该炸出来，而不是让全部消息悄悄变成 tSec=None。
                 ts_s = None
             lvl = int(getattr(m, "log_level", ord("6")))
@@ -1377,7 +1377,7 @@ class Px4Provider:
     def _collect_facts(self):
         """把三段读到的量汇成报告头的离散事实。
 
-        **facts 的键名只在这一个地方出现**：三段各管"从日志里读什么"（只往 self 上放），
+        facts 的键名只在这一个地方出现：三段各管"从日志里读什么"（只往 self 上放），
         这里管"报告头叫什么名字"（含"有才给"的条件键）。分开的好处是改键名不必翻三段代码，
         也能一眼看全报告头到底有哪些字段。
         """
