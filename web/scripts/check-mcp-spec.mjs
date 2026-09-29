@@ -14,6 +14,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import matter from "gray-matter";
 
+import { log } from "./lib/log.mjs";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
 const MCP_DIR = join(webRoot, "content", "mcp");
@@ -327,12 +329,12 @@ function selfTest() {
         if (!problems.some((p) => p.rule === cx.rule)) notRed.push(cx.rule);
     }
     if (notRed.length > 0) {
-        console.error(
+        log.err(
             `  FAIL self-test/guards-fired -> ${notRed.length} 条规则对反例无反应（守卫恒绿）：${notRed.join(", ")}`,
         );
         return 1;
     }
-    console.log(`OK 反例自检：${COUNTEREXAMPLES.length} 条规则每条都会被自己的反例打红`);
+    log.ok(`OK 反例自检：${COUNTEREXAMPLES.length} 条规则每条都会被自己的反例打红`);
     return 0;
 }
 
@@ -346,7 +348,7 @@ function main() {
     let code = selfTest();
 
     if (!existsSync(MCP_DIR)) {
-        console.error(`  FAIL mcp/missing-dir -> 内容源不存在：${MCP_DIR}`);
+        log.err(`  FAIL mcp/missing-dir -> 内容源不存在：${MCP_DIR}`);
         process.exitCode = 1;
         return;
     }
@@ -354,7 +356,7 @@ function main() {
         .filter((d) => d.isDirectory())
         .map((d) => d.name);
     if (slugs.length === 0) {
-        console.error("  FAIL mcp/empty -> web/content/mcp/ 下没有任何 MCP 目录");
+        log.err("  FAIL mcp/empty -> web/content/mcp/ 下没有任何 MCP 目录");
         process.exitCode = 1;
         return;
     }
@@ -376,19 +378,17 @@ function main() {
 
     // 待补不是"通过"，是挂在明处的一次例外：每次校验都列出来，免得长成永久状态
     for (const slug of pending) {
-        console.log(
-            `SKIP ${slug} 上游未确认（upstream_status: "pending"），暂缺 server.json —— 核实后补上并删掉该字段`,
-        );
+        log.warn(`SKIP ${slug} 上游未确认（upstream_status: "pending"），暂缺 server.json —— 核实后补上并删掉该字段`);
     }
 
     if (problems.length) {
-        console.error(`MCP 规范校验失败（${slugs.length} 个目录下 ${problems.length} 处问题）：`);
-        for (const p of problems) console.error(`  FAIL ${p.rule} -> [${p.slug}] ${p.msg}`);
-        console.error(`RESULT: ${problems.length} 处未过`);
+        log.err(`MCP 规范校验失败（${slugs.length} 个目录下 ${problems.length} 处问题）：`);
+        for (const p of problems) log.err(`  FAIL ${p.rule} -> [${p.slug}] ${p.msg}`);
+        log.err(`RESULT: ${problems.length} 处未过`);
         process.exitCode = 1;
         return;
     }
-    console.log(`MCP 规范校验通过：${slugs.length} 个目录（其中 ${pending.length} 个待补 server.json）`);
+    log.ok(`MCP 规范校验通过：${slugs.length} 个目录（其中 ${pending.length} 个待补 server.json）`);
     if (code !== 0) process.exitCode = code;
 }
 

@@ -13,6 +13,7 @@ import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { log } from "./lib/log.mjs";
 
 // 本文件在 web/scripts/ 下，向上两级到仓库根（web/scripts/ -> web/ -> 仓库根）。
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -135,12 +136,12 @@ for (const size of icoSizes) {
 const ico = buildIco(icoImages);
 const icoPath = join(root, "web", "app", "favicon.ico");
 writeFileSync(icoPath, ico);
-console.log(`favicon.ico  ${ico.length} B  (${icoSizes.join("/")})`);
+log.info(`favicon.ico  ${ico.length} B  (${icoSizes.join("/")})`);
 
 const apple = await raster(appleSource, appleSize);
 const applePath = join(root, "web", "app", "apple-icon.png");
 writeFileSync(applePath, apple);
-console.log(`apple-icon.png  ${apple.length} B  (${appleSize})`);
+log.info(`apple-icon.png  ${apple.length} B  (${appleSize})`);
 
 ws.close();
 process.exit(0);

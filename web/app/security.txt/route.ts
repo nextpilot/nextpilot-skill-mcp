@@ -1,4 +1,5 @@
 import { SITE_URL } from "@/lib/site-config";
+import { log } from "@/lib/log";
 
 export function GET() {
     try {
@@ -20,7 +21,7 @@ export function GET() {
             },
         });
     } catch (error) {
-        console.error("[security.txt] Failed to generate response:", error);
+        log.err("[security.txt] Failed to generate response:", error);
         const fallback = [
             "Contact: mailto:latercomer@qq.com",
             "Expires: Sat, 27 Sep 2026 00:00:00 GMT",

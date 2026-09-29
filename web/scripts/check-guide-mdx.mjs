@@ -14,6 +14,8 @@ import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { log } from "./lib/log.mjs";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
 const GUIDE_DIR = join(webRoot, "content", "guide");
@@ -42,20 +44,20 @@ let failures = 0;
 const BAD = "描述里有 {invalid_frac:.0%} 样本";
 const GOOD = "描述里有 \\{invalid_frac:.0%\\} 样本";
 if ((await compileSource(BAD)) === null) {
-    console.log("  FAIL self-test -> 裸花括号反例没有被拒收，守卫恒绿");
+    log.err("  FAIL self-test -> 裸花括号反例没有被拒收，守卫恒绿");
     failures++;
 } else {
-    console.log("  ok    self-test 反例确实被拒收");
+    log.ok("  ok    self-test 反例确实被拒收");
 }
 if ((await compileSource(GOOD)) !== null) {
-    console.log("  FAIL self-test -> 反斜杠转义的正例被误杀");
+    log.err("  FAIL self-test -> 反斜杠转义的正例被误杀");
     failures++;
 }
 
 // ---- 门还在：这份检查必须挂在统一入口上。check_all.py 只按清单转发，checklist.yml 里没这步就没人执行 ----
 const CHECKLIST = resolve(webRoot, "..", "tools", "ci", "checklist.yml");
 if (!readFileSync(CHECKLIST, "utf8").includes('- id: "check-guide-mdx"')) {
-    console.log("  FAIL mdx-wiring -> 这道门挂在统一入口上（checklist.yml 里没有 check-guide-mdx）");
+    log.err("  FAIL mdx-wiring -> 这道门挂在统一入口上（checklist.yml 里没有 check-guide-mdx）");
     failures++;
 }
 
@@ -65,7 +67,7 @@ if (!process.argv.includes("--self-test")) {
         .filter((f) => f.endsWith(".mdx"))
         .sort();
     if (files.length === 0) {
-        console.log(`  FAIL ${RULE_COVERAGE} -> content/guide 里一个 .mdx 都没有，守卫空转`);
+        log.err(`  FAIL ${RULE_COVERAGE} -> content/guide 里一个 .mdx 都没有，守卫空转`);
         failures++;
     }
     let okCount = 0;
@@ -76,10 +78,10 @@ if (!process.argv.includes("--self-test")) {
             continue;
         }
         failures++;
-        console.log(`  FAIL ${RULE_COMPILE} -> content/guide/${f}:${err.pos} ${err.message}`);
-        console.log("         生成器注入的自由文本要过 escMdxText；手写页用反斜杠转义或挪进反引号");
+        log.err(`  FAIL ${RULE_COMPILE} -> content/guide/${f}:${err.pos} ${err.message}`);
+        log.err("         生成器注入的自由文本要过 escMdxText；手写页用反斜杠转义或挪进反引号");
     }
-    console.log(`RESULT: ${okCount}/${files.length} 份 guide mdx 编译通过`);
+    log.info(`RESULT: ${okCount}/${files.length} 份 guide mdx 编译通过`);
 }
 
 process.exit(failures ? 1 : 0);

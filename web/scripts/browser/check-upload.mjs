@@ -4,10 +4,11 @@
 // 默认清掉该源 localStorage（报告去重存这里），否则同一日志走“此前已分析过”捷径，
 // 不启动 Pyodide，e2e 就测不到引擎。第 5 个参数传 keep-history 可保留。
 import { writeFileSync } from "node:fs";
+import { log } from "../lib/log.mjs";
 
 const [logPath, out, base = "http://localhost:3000", theme = "light", keepHistory = ""] = process.argv.slice(2);
 if (!logPath || !out) {
-    console.error("用法: node check-upload.mjs <ulog 路径> <out.png> [baseUrl] [light|dark] [keep-history]");
+    log.err("用法: node check-upload.mjs <ulog 路径> <out.png> [baseUrl] [light|dark] [keep-history]");
     process.exit(1);
 }
 
@@ -22,7 +23,7 @@ const page = await (
     })
 ).json();
 if (!page.webSocketDebuggerUrl) throw new Error("无法创建新标签页：" + JSON.stringify(page));
-console.log("新标签页:", page.id);
+log.info("新标签页:", page.id);
 
 const ws = new WebSocket(page.webSocketDebuggerUrl);
 let id = 0;
@@ -109,14 +110,14 @@ for (let i = 0; i < 40; i++) {
   })()`);
     if (ready) {
         hydrated = true;
-        console.log(`页面已 hydrate（等待 ${i * 0.5}s）`);
+        log.info(`页面已 hydrate（等待 ${i * 0.5}s）`);
         break;
     }
     await sleep(500);
 }
-if (!hydrated) console.log("⚠ 未检测到 hydration，仍继续尝试（可能是生产构建或被缓存）");
+if (!hydrated) log.warn("⚠ 未检测到 hydration，仍继续尝试（可能是生产构建或被缓存）");
 
-console.log("页面:", await evalIn("location.pathname"));
+log.info("页面:", await evalIn("location.pathname"));
 
 // 清掉去重历史（localStorage 报告存档 + IndexedDB 原始日志缓存），强制走一次完整解析，
 // 否则只载入历史结论，Pyodide/规则引擎完全不启动，e2e 失去意义。
@@ -134,7 +135,7 @@ if (keepHistory !== "keep-history") {
     })));
   })()`,
     });
-    console.log("已清空本机历史（强制重新解析）；加 keep-history 参数可保留");
+    log.info("已清空本机历史（强制重新解析）；加 keep-history 参数可保留");
 }
 
 /** 把文件塞进 input 并派发 change；返回页面是否开始响应 */
@@ -164,7 +165,7 @@ async function tryUpload() {
 for (let attempt = 1; attempt <= 4; attempt++) {
     const r = await tryUpload();
     if (r.reacted) break;
-    console.log(`  第 ${attempt} 次上传未触发解析（input.files=${r.files}），重试…`);
+    log.info(`  第 ${attempt} 次上传未触发解析（input.files=${r.files}），重试…`);
 }
 
 let state = "(none)";
@@ -197,12 +198,12 @@ for (let i = 0; i < 120; i++) {
     }
     state = stateRaw;
     if (state === "__HANG__" || String(state).startsWith("__HANG__")) {
-        console.log(`t=${i * 4}s 标签页无响应（${state}），终止`);
+        log.info(`t=${i * 4}s 标签页无响应（${state}），终止`);
         state = "ERR:renderer-hang";
         break;
     }
     if (i % 3 === 0 || state === "READY" || String(state).startsWith("ERR")) {
-        console.log(`t=${i * 4}s ${state}`);
+        log.info(`t=${i * 4}s ${state}`);
     }
     if (state === "READY" || String(state).startsWith("ERR")) break;
 }
@@ -213,9 +214,9 @@ await sleep(500);
 // 并把该 target 的 CDP 命令队列一起堵死（后续 Runtime.evaluate 全部超时，表现像“页面卡死”）。
 const shot = await send("Page.captureScreenshot", { format: "png" });
 writeFileSync(out, Buffer.from(shot.data, "base64"));
-console.log("最终状态:", state);
-console.log("saved", out);
-console.log("--- 控制台/异常 ---\n" + (events.slice(0, 15).join("\n") || "(none)"));
+log.info("最终状态:", state);
+log.info("saved", out);
+log.info("--- 控制台/异常 ---\n" + (events.slice(0, 15).join("\n") || "(none)"));
 ws.close();
 await fetch(`http://127.0.0.1:9222/json/close/${encodeURIComponent(page.id)}`).catch(() => {});
 process.exit(state === "READY" ? 0 : 2);

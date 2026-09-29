@@ -1,6 +1,7 @@
 // 用 CDP 打开目标页，等渲染完，抓整页截图 + 正文 outerHTML（用于对照版式）
 // 用法: node grab-page.mjs <url> <outPrefix> [waitMs]
 import { writeFileSync } from "node:fs";
+import { log } from "../lib/log.mjs";
 
 const [url, prefix = "/tmp/page", waitMs = "6000"] = process.argv.slice(2);
 
@@ -73,5 +74,5 @@ const shot = await send("Page.captureScreenshot", {
 });
 writeFileSync(`${prefix}.png`, Buffer.from(shot.data, "base64"));
 
-console.log("saved", prefix + ".png/.html/.txt");
+log.info("saved", prefix + ".png/.html/.txt");
 ws.close();

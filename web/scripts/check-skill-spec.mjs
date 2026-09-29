@@ -13,6 +13,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import matter from "gray-matter";
 
+import { log } from "./lib/log.mjs";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
 const SKILLS_DIR = join(webRoot, "content", "skills");
@@ -314,12 +316,12 @@ function selfTest(categories) {
     }
     if (notRed.length > 0) {
         // 这一条走的是同一套 collectProblems，所以到不了这里本身就说明门被删了或判据写反了
-        console.error(
+        log.err(
             `  FAIL self-test/guards-fired -> ${notRed.length} 条规则对反例无反应（守卫恒绿）：${notRed.join(", ")}`,
         );
         return 1;
     }
-    console.log(`OK 反例自检：${COUNTEREXAMPLES.length} 条规则每条都会被自己的反例打红`);
+    log.ok(`OK 反例自检：${COUNTEREXAMPLES.length} 条规则每条都会被自己的反例打红`);
     return 0;
 }
 
@@ -335,7 +337,7 @@ function main() {
     let code = selfTest(categories);
 
     if (!existsSync(SKILLS_DIR)) {
-        console.error(`  FAIL skills/missing-dir -> 内容源不存在：${SKILLS_DIR}`);
+        log.err(`  FAIL skills/missing-dir -> 内容源不存在：${SKILLS_DIR}`);
         process.exitCode = 1;
         return;
     }
@@ -344,7 +346,7 @@ function main() {
         .map((d) => d.name);
 
     if (slugs.length === 0) {
-        console.error("  FAIL skills/empty -> web/content/skills/ 下没有任何 Skill 目录");
+        log.err("  FAIL skills/empty -> web/content/skills/ 下没有任何 Skill 目录");
         process.exitCode = 1;
         return;
     }
@@ -364,13 +366,13 @@ function main() {
     }
 
     if (problems.length) {
-        console.error(`Skill 规范校验失败（${slugs.length} 个目录下 ${problems.length} 处问题）：`);
-        for (const p of problems) console.error(`  FAIL ${p.rule} -> [${p.slug}] ${p.msg}`);
-        console.error(`RESULT: ${problems.length} 处未过`);
+        log.err(`Skill 规范校验失败（${slugs.length} 个目录下 ${problems.length} 处问题）：`);
+        for (const p of problems) log.err(`  FAIL ${p.rule} -> [${p.slug}] ${p.msg}`);
+        log.err(`RESULT: ${problems.length} 处未过`);
         process.exitCode = 1;
         return;
     }
-    console.log(`Skill 规范校验通过：${slugs.length} 个目录，分类白名单 ${categories.length} 项`);
+    log.ok(`Skill 规范校验通过：${slugs.length} 个目录，分类白名单 ${categories.length} 项`);
     if (code !== 0) process.exitCode = code;
 }
 

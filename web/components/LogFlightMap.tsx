@@ -7,6 +7,7 @@ import { FileUp, Loader2, MapPin } from "lucide-react";
 import { wgs84ToGcj02 } from "@/lib/coord";
 import { SERIES_COLORS_DARK, SERIES_COLORS_LIGHT } from "@/lib/chart-presets";
 import { DEFAULT_PROVIDER, getProvider, MAP_PROVIDERS, type MapProvider, type MapProviderId } from "@/lib/map-tiles";
+import { log } from "@/lib/log";
 import "leaflet/dist/leaflet.css";
 
 interface GpsPoint {
@@ -163,7 +164,7 @@ export function LogFlightMap({
                 buildMap(LModule, drawn, provider);
                 setState("ready");
             } catch (err) {
-                console.error("LogFlightMap 加载失败:", err);
+                log.err("LogFlightMap 加载失败:", err);
                 if (!cancelled) setState("error");
             }
         }

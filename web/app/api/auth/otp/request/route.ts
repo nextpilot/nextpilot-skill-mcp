@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requestEmailOtp } from "@/lib/internal-kv";
 import { isMailConfigured, sendOtpEmail } from "@/lib/mailer";
+import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
 
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
     const ip = req.headers.get("x-real-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined;
 
     const result = await requestEmailOtp(email, ip).catch((err: unknown) => {
-        console.error("requestEmailOtp failed", err);
+        log.err("requestEmailOtp failed", err);
         return null;
     });
     if (!result) {
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
     try {
         await sendOtpEmail(email, result.code);
     } catch (err) {
-        console.error("sendOtpEmail failed", err);
+        log.err("sendOtpEmail failed", err);
         return NextResponse.json({ ok: false, error: "邮件发送失败，请稍后再试" }, { status: 502 });
     }
 

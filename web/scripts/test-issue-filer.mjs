@@ -19,14 +19,15 @@ import { fileURLToPath } from "node:url";
 // 脱敏/截断是两侧共用的一份（浏览器侧 lib/issue-bridge.ts 也引它），
 // 直接对共享模块验证：它错了两边一起错，这一节要守住。
 import { scrub, SCRUB_RULES } from "../lib/error-policy.js";
+import { log } from "./lib/log.mjs";
 
 let failed = 0;
 function check(name, cond, extra = "") {
     if (cond) {
-        console.log(`  OK    ${name}`);
+        log.ok(`  OK    ${name}`);
     } else {
         failed += 1;
-        console.log(`  FAIL  ${name}${extra ? `  → ${extra}` : ""}`);
+        log.err(`  FAIL  ${name}${extra ? `  → ${extra}` : ""}`);
     }
 }
 
@@ -74,7 +75,7 @@ const walkSourceFiles = (root, sub = "", out = []) => {
     return out;
 };
 
-console.log("\n[1] 指纹归一化（决定去重成不成立）");
+log.info("\n[1] 指纹归一化（决定去重成不成立）");
 {
     const a = await fingerprintOf(
         sanitizePayload({
@@ -101,7 +102,7 @@ console.log("\n[1] 指纹归一化（决定去重成不成立）");
     check("只差级别 → 不同指纹", c !== d);
 }
 
-console.log("\n[2] 脱敏（决定公开 issue 会不会泄露用户信息）");
+log.info("\n[2] 脱敏（决定公开 issue 会不会泄露用户信息）");
 {
     const s = scrub(
         "mail zhang@example.com jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abcdefghijk " +
@@ -132,7 +133,7 @@ console.log("\n[2] 脱敏（决定公开 issue 会不会泄露用户信息）");
     check("替换产物不再被任何规则匹配（结构性幂等）", unstable.length === 0, unstable.join("; "));
 }
 
-console.log("\n[3] 白名单（决定第三方能不能往 issue 里塞东西）");
+log.info("\n[3] 白名单（决定第三方能不能往 issue 里塞东西）");
 {
     const p = sanitizePayload({
         kind: "client-error",
@@ -156,7 +157,7 @@ console.log("\n[3] 白名单（决定第三方能不能往 issue 里塞东西）
     check("非法 kind 兜底为 client-error", sanitizePayload({ kind: "evil" }).kind === "client-error");
 }
 
-console.log("\n[4] 超长文本截断（Python traceback 的关键行在末尾）");
+log.info("\n[4] 超长文本截断（Python traceback 的关键行在末尾）");
 {
     const tail = "NameError: name '__FACTS__' is not defined";
     const p = sanitizePayload({ message: `${"z".repeat(3000)}\n${tail}` });
@@ -165,7 +166,7 @@ console.log("\n[4] 超长文本截断（Python traceback 的关键行在末尾�
     check("总长受控", p.message.length < 1200, `长度 ${p.message.length}`);
 }
 
-console.log("\n[5] 未配置时完全 no-op（本地开发不该往库里写东西）");
+log.info("\n[5] 未配置时完全 no-op（本地开发不该往库里写东西）");
 {
     const r1 = await reportIssue({}, { level: "fatal", type: "X", message: "y" });
     check("未开 ISSUE_ENABLED → disabled", r1.skipped === "disabled", JSON.stringify(r1));
@@ -178,7 +179,7 @@ console.log("\n[5] 未配置时完全 no-op（本地开发不该往库里写东�
     check("repo 格式不对 → bad-repo", r3.skipped === "bad-repo", JSON.stringify(r3));
 }
 
-console.log("\n[6] 建单链路（stub fetch，不联网）");
+log.info("\n[6] 建单链路（stub fetch，不联网）");
 {
     const calls = [];
     const realFetch = globalThis.fetch;
@@ -228,7 +229,7 @@ console.log("\n[6] 建单链路（stub fetch，不联网）");
     }
 }
 
-console.log("\n[7] 去重与评论节流（stub fetch + 假 KV）");
+log.info("\n[7] 去重与评论节流（stub fetch + 假 KV）");
 {
     const store = new Map();
     const fakeKv = {
@@ -287,7 +288,7 @@ console.log("\n[7] 去重与评论节流（stub fetch + 假 KV）");
     }
 }
 
-console.log("\n[8] 人工上报 payload");
+log.info("\n[8] 人工上报 payload");
 {
     const p = sanitizePayload({
         kind: "manual-report",
@@ -307,7 +308,7 @@ console.log("\n[8] 人工上报 payload");
     check("kind 识别为 manual-report", p.kind === "manual-report");
 }
 
-console.log("\n[9] 两侧共用同一份政策（防止再长出第二份实现）");
+log.info("\n[9] 两侧共用同一份政策（防止再长出第二份实现）");
 {
     const browserSrc = read("../lib/issue-bridge.ts");
     const edgeSrc = read("../functions/_lib/issue-filer.js");
@@ -326,7 +327,7 @@ console.log("\n[9] 两侧共用同一份政策（防止再长出第二份实现�
     check("边缘侧引用共享政策", edgeSrc.includes('"../../lib/error-policy.js"'));
 }
 
-console.log("\n[10] 外部数据的读取边界（网络响应与存档一律过归一，不许强转）");
+log.info("\n[10] 外部数据的读取边界（网络响应与存档一律过归一，不许强转）");
 {
     const fs = await import("node:fs");
     const nodePath = await import("node:path");
@@ -402,7 +403,7 @@ console.log("\n[10] 外部数据的读取边界（网络响应与存档一律过
     );
 }
 
-console.log("\n[11] 派生数据必须按报告身份清理（切了日志就不许再用上一份的曲线/轨迹）");
+log.info("\n[11] 派生数据必须按报告身份清理（切了日志就不许再用上一份的曲线/轨迹）");
 {
     // 曲线的键是 `presetId#面板序号`，与日志无关（预设是静态的）：storedPlots 跨报告存活时
     // LogCharts 会命中上一份的序列——图形完全正常、数据是别人的；轨迹同理。Worker 那条链上
@@ -435,7 +436,7 @@ console.log("\n[11] 派生数据必须按报告身份清理（切了日志就不
     check("reportIdRef 只在两个换报告入口赋值", idWrites === 2, `实际 ${idWrites} 处`);
 }
 
-console.log('\n[12] 取数据前先让 Worker 装上这份日志（共享 Worker 的"装着谁"要能自愈）');
+log.info('\n[12] 取数据前先让 Worker 装上这份日志（共享 Worker 的"装着谁"要能自愈）');
 {
     // Worker 共享且常驻（跨路由存活，见 hooks/useLogAnalyzer.ts 文件头），可能正装着另一份日志：
     // track/series 请求被闸门挡下，界面只能叫用户"重新选择该 .ulg"，而字节往往就在手里。
@@ -518,7 +519,7 @@ console.log('\n[12] 取数据前先让 Worker 装上这份日志（共享 Worker
     );
 }
 
-console.log("\n[13] functions/ 下的端点在本地 dev 垫片里必须可达（漏一个 = 整条功能在本地静默 404）");
+log.info("\n[13] functions/ 下的端点在本地 dev 垫片里必须可达（漏一个 = 整条功能在本地静默 404）");
 {
     // 本地只有 Next 自身，跑不了 EdgeOne 的 Edge 函数：`/api/*` 与 `/internal/*` 靠 next.config.ts
     // 的 afterFiles rewrite 转进 app/edge-dev，再由一张白名单按路径动态 import 处理器。
@@ -579,7 +580,7 @@ console.log("\n[13] functions/ 下的端点在本地 dev 垫片里必须可达�
     );
 }
 
-console.log("\n[14] 指南正文只有一个渲染入口（防止再裂成一对近音文件名 + 两份分叉的 textOf）");
+log.info("\n[14] 指南正文只有一个渲染入口（防止再裂成一对近音文件名 + 两份分叉的 textOf）");
 {
     // 由来：`GuideMarkdown.tsx` / `GuideMdx.tsx` 曾并排存在，读起来像「基础版/升级版」，
     // 看似 MDX 那份是超集——恰好相反：knowledge/ 派生的 .md 里有 `{invalid_frac:.0%}` 这类
@@ -647,7 +648,7 @@ console.log("\n[14] 指南正文只有一个渲染入口（防止再裂成一对
     check("lib/guide.ts 仍按扩展名决定 renderer", guide.includes('fileName.endsWith(".mdx") ? "mdx" : "md"'));
 }
 
-console.log("\n[15] 组件名跟着家族不变量走（`Log*` = 某一份日志；一次列很多份的用数据模型的词）");
+log.info("\n[15] 组件名跟着家族不变量走（`Log*` = 某一份日志；一次列很多份的用数据模型的词）");
 {
     // 两个名字各错一半、方向相反：`AnalyzeReport.tsx`（六个 `Log*` tab 的父壳）挂的是路由的词
     // （`Analyze` 已被 app/log/ + Log*Client + useLogAnalyzer 占用），看不出它在 Log* 家族里占哪格；
@@ -676,7 +677,7 @@ console.log("\n[15] 组件名跟着家族不变量走（`Log*` = 某一份日志
     check("报告历史列表没被挂上 Log 词根", logNamedList.length === 0, logNamedList.join(", "));
 }
 
-console.log("\n[16] 轨迹取不到要说清缺什么（不许再退回一句空洞的概括）");
+log.info("\n[16] 轨迹取不到要说清缺什么（不许再退回一句空洞的概括）");
 {
     // 那句空洞概括只对应六种原因里的一种（缺 topic / 缺字段 / 字段改名 / 有采样但全程没定位 /
     // 采样数对不上 / 没 timestamp），其余五种下它是错的。引擎侧那半（返回体带 errorReasons）
@@ -691,7 +692,7 @@ console.log("\n[16] 轨迹取不到要说清缺什么（不许再退回一句空
     check("引擎没给原因时明说是解析器缺陷", /引擎没有返回任何轨道，也没给出原因/.test(map));
 }
 
-console.log("\n[17] 两类条目共用的详情页组件不许带某一类的前缀（Skill* / Mcp* 都在说谎）");
+log.info("\n[17] 两类条目共用的详情页组件不许带某一类的前缀（Skill* / Mcp* 都在说谎）");
 {
     // `/skills/[slug]` 与 `/mcp/[slug]` 共用一组详情页组件，原名 Skill*；MCP 页面用 `Skill*`
     // 名字就在说谎，而下一个人的合理"修正"是复制一份 `McpSidebar`，长出只差前缀的孪生组件、
@@ -721,7 +722,7 @@ console.log("\n[17] 两类条目共用的详情页组件不许带某一类的前
     );
 }
 
-console.log("\n[18] 站点版本只有一个读取口（footer 的「版本 + 日期」不许各处各读一次）");
+log.info("\n[18] 站点版本只有一个读取口（footer 的「版本 + 日期」不许各处各读一次）");
 {
     // 版本与日期在构建期由 `next.config.ts` 注入 `NEXT_PUBLIC_APP_*`。风险同 §[9]/§[10]：
     // 同一件事两条路径只有一条接得上真源——issue-bridge 曾读一个没人赋值的变量，上报的 version 恒为空串。
@@ -768,7 +769,7 @@ console.log("\n[18] 站点版本只有一个读取口（footer 的「版本 + �
     check("footer 把版本串渲染出来", footer.includes("{versionLabel}"));
 }
 
-console.log("\n[19] 指南页栏宽跟随内容、栏间距不许回到 40px");
+log.info("\n[19] 指南页栏宽跟随内容、栏间距不许回到 40px");
 {
     // 指南页三栏挤在 page-shell 的 1120px 内容宽里：左导航写死 `w-48` 时侧栏内部凭空空出
     // 27~54px；两道各 40px 的间距 + 224px 右目录把正文从 max-w-3xl(768px) 压到 624px。
@@ -815,7 +816,7 @@ console.log("\n[19] 指南页栏宽跟随内容、栏间距不许回到 40px");
     check("正文与右目录的间距收到 gap-8", innerRow.includes("gap-8") && !innerRow.includes("gap-10"));
 }
 
-console.log("\n[20] 两句固定文案只有一个出处（措辞不许各写各的）");
+log.info("\n[20] 两句固定文案只有一个出处（措辞不许各写各的）");
 {
     // 隐私承诺与免责声明收进 lib/log-analysis-notes.ts，且只在上传卡渲染（页脚品牌区与底栏
     // 不重复）。守三件事：出处里两句都在、上传卡真取真渲染、别处不许手写字面量。
@@ -852,7 +853,7 @@ console.log("\n[20] 两句固定文案只有一个出处（措辞不许各写各
     );
 }
 
-console.log("\n[21] 次数上限不在前端显示（上限由后台配置，前端不许先报一个写死的数）");
+log.info("\n[21] 次数上限不在前端显示（上限由后台配置，前端不许先报一个写死的数）");
 {
     // 次数上限曾在前端三处各露一次（上传卡、AI 解读区、「我的」页），默认值各写各的（3 / 10），
     // 后台一改就三处不一致；现决定上限由后台配置，前端一处都不许显示。
@@ -906,7 +907,7 @@ console.log("\n[21] 次数上限不在前端显示（上限由后台配置，前
     );
 }
 
-console.log("\n[22] 地图左上角三个图标是一条按钮，高度色带贴着它往下铺（不留空档）");
+log.info("\n[22] 地图左上角三个图标是一条按钮，高度色带贴着它往下铺（不留空档）");
 {
     // 复位按钮曾独立成 L.Control，但 Leaflet 给每个 .leaflet-control 加 margin-top 10px，
     // 两组之间必有空档；两个 .leaflet-bar 各 1px 边框，贴住也是 2px 双线。只有 append 进
@@ -955,7 +956,7 @@ console.log("\n[22] 地图左上角三个图标是一条按钮，高度色带贴
     );
 }
 
-console.log("\n[23] 静态守卫引用的源码路径都存在（路径失效不许把后面整段带走）");
+log.info("\n[23] 静态守卫引用的源码路径都存在（路径失效不许把后面整段带走）");
 {
     // 见文件头 read / readWeb 的说明：坏路径只让那一节自己红。这里是兜底汇总，把"到底哪几个
     // 路径不存在"单独说清楚，免得表现为若干节同时红、根因却只有一个。
@@ -967,5 +968,7 @@ console.log("\n[23] 静态守卫引用的源码路径都存在（路径失效不
     );
 }
 
-console.log(failed === 0 ? "\n=== issue-filer 测试全部通过 ===" : `\n=== ${failed} 项失败 ===`);
+const summary = failed === 0 ? "\n=== issue-filer 测试全部通过 ===" : `\n=== ${failed} 项失败 ===`;
+if (failed === 0) log.ok(summary);
+else log.err(summary);
 process.exit(failed === 0 ? 0 : 1);

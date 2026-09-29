@@ -14,6 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { log } from "./lib/log.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const NM = path.join(ROOT, "node_modules");
@@ -214,13 +215,13 @@ for (const rawName of Object.keys({ ...pkgJson.dependencies, ...pkgJson.devDepen
 
 if (CHECK_ONLY) {
     if (repairable.length > 0) {
-        console.error(`${repairable.length} 处空链接（.pnpm 里有实体但没链上）：`);
-        for (const r of repairable) console.error(`  - ${r}`);
+        log.err(`${repairable.length} 处空链接（.pnpm 里有实体但没链上）：`);
+        for (const r of repairable) log.err(`  - ${r}`);
         process.exitCode = 1;
     } else {
-        console.log("链接完好");
+        log.ok("链接完好");
     }
 } else {
-    console.log(`填补空链接 ${repairable.length} 处`);
-    console.log(`跳过 ${skipped.length} 处（.pnpm 无实体，属跨平台可选依赖）`);
+    log.info(`填补空链接 ${repairable.length} 处`);
+    log.info(`跳过 ${skipped.length} 处（.pnpm 无实体，属跨平台可选依赖）`);
 }

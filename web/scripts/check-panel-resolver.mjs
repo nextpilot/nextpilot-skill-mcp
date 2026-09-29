@@ -13,6 +13,8 @@ import { dirname, join } from "node:path";
 import { resolveAxes, topicInstances, parseFieldRef } from "../lib/panel-resolver.ts";
 import { splitFieldRef } from "./lib/rule-expr.mjs";
 
+import { log } from "./lib/log.mjs";
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const NO_HLINE = { hlineColor: () => "#000" };
 
@@ -197,10 +199,10 @@ for (const [name, fn] of checks) {
     }
     if (why) {
         failed += 1;
-        console.log(`  FAIL  ${name}  → ${why}`);
+        log.err(`  FAIL  ${name}  → ${why}`);
     } else {
-        console.log(`  ok    ${name}`);
+        log.ok(`  ok    ${name}`);
     }
 }
-console.log(failed === 0 ? `panel-resolver: ${checks.length} 项全过` : `${failed} 项未过`);
+log.info(failed === 0 ? `panel-resolver: ${checks.length} 项全过` : `${failed} 项未过`);
 process.exit(failed === 0 ? 0 : 1);

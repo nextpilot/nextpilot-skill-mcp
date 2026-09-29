@@ -14,6 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { log } from "./lib/log.mjs";
 
 // e2e 用 `python3` 跑脚本，pyulog 装在仓库 .venv 里：把 .venv/bin 提到 PATH 最前，让解释器不取决于谁在跑。
 // 没建 .venv 时原样放行（缺 pyulog 会明确报 ImportError，比静默用错解释器好排查）。
@@ -204,18 +205,18 @@ function listSkill(slug) {
 }
 
 async function runSkill(s) {
-    console.log(`\n▶ ${s.slug}  (${s.cases.length} 个用例)\n`);
+    log.info(`\n▶ ${s.slug}  (${s.cases.length} 个用例)\n`);
     if (!RUN) {
         for (const c of s.cases) {
             const tags = [];
             if (c.expect_trigger === false) tags.push(`负例→${c.route_to ?? "不触发"}`);
             if (c.weight > 1) tags.push(`权重×${c.weight}`);
             if (c.judge) tags.push("judge");
-            console.log(`  ${c.id}`);
-            console.log(`     ${c.desc}`);
-            if (tags.length) console.log(`     [${tags.join(" | ")}]`);
+            log.info(`  ${c.id}`);
+            log.info(`     ${c.desc}`);
+            if (tags.length) log.info(`     [${tags.join(" | ")}]`);
         }
-        console.log(`\n  dry-run 完毕。加 --run 才真正调用模型。`);
+        log.info(`\n  dry-run 完毕。加 --run 才真正调用模型。`);
         return { pass: 0, total: 0 };
     }
 
@@ -235,13 +236,13 @@ async function runSkill(s) {
         const ok = mech.length === 0 && (judge ? judge.score >= 7 : true);
         if (ok) pass++;
         results.push({ id: c.id, ok, mech, judge });
-        console.log(`  ${ok ? "✅" : "❌"} ${c.id}`);
-        for (const f of mech) console.log(`       ${f}`);
-        if (judge) console.log(`       judge: ${judge.score}/10 — ${judge.reason}`);
+        log.info(`  ${ok ? "✅" : "❌"} ${c.id}`);
+        for (const f of mech) log.info(`       ${f}`);
+        if (judge) log.info(`       judge: ${judge.score}/10 — ${judge.reason}`);
     }
 
     const pct = results.length ? Math.round((pass / results.length) * 100) : 0;
-    console.log(`\n  通过 ${pass}/${results.length}（${pct}%）`);
+    log.info(`\n  通过 ${pass}/${results.length}（${pct}%）`);
     return { pass, total: results.length, pct };
 }
 
@@ -305,7 +306,7 @@ async function runE2E(slug) {
     if (!fs.existsSync(p)) return { pass: 0, total: 0 };
 
     const cases = parseCases(fs.readFileSync(p, "utf8"));
-    console.log(`\n▶ ${slug} 端到端  (${cases.length} 个用例)\n`);
+    log.info(`\n▶ ${slug} 端到端  (${cases.length} 个用例)\n`);
 
     let pass = 0;
     for (const c of cases) {
@@ -329,11 +330,11 @@ async function runE2E(slug) {
         }
         const fail = checkE2E(c, stdout, stderr, exit);
         if (fail.length === 0) pass++;
-        console.log(`  ${fail.length ? "❌" : "✅"} ${c.id}`);
-        if (c.desc) console.log(`      ${c.desc}`);
-        for (const f of fail) console.log(`      ${f}`);
+        log.info(`  ${fail.length ? "❌" : "✅"} ${c.id}`);
+        if (c.desc) log.info(`      ${c.desc}`);
+        for (const f of fail) log.info(`      ${f}`);
     }
-    console.log(`\n  通过 ${pass}/${cases.length}`);
+    log.info(`\n  通过 ${pass}/${cases.length}`);
     return { pass, total: cases.length };
 }
 
@@ -349,12 +350,12 @@ if (process.argv.includes("--selftest")) {
 
     const fails = checkMechanical(bad, demo);
     const passes = checkMechanical(ok, demo);
-    console.log("自检：");
-    console.log(`  坏输出应被抓到 ${fails.length} 条 →`, fails.join(" / "));
-    console.log(`  好输出应无报错 →`, passes.length === 0 ? "✅ 干净" : `❌ ${passes.join(" / ")}`);
+    log.info("自检：");
+    log.info(`  坏输出应被抓到 ${fails.length} 条 →`, fails.join(" / "));
+    log.info(`  好输出应无报错 →`, passes.length === 0 ? "✅ 干净" : `❌ ${passes.join(" / ")}`);
     // 坏输出至少要命中一条（实际是 3：缺 2 个必需要素 + 出现 1 个禁止词）
     const ok1 = fails.length >= 2 && passes.length === 0;
-    console.log(ok1 ? "\n✅ 判据有效" : "\n❌ 判据有问题");
+    log.info(ok1 ? "\n✅ 判据有效" : "\n❌ 判据有问题");
     process.exit(ok1 ? 0 : 1);
 }
 
@@ -364,7 +365,7 @@ if (E2E) {
         ? [target]
         : fs.readdirSync(SKILLS_DIR).filter((d) => fs.existsSync(path.join(SKILLS_DIR, d, "evals", "e2e.yaml")));
     if (!slugs.length) {
-        console.log("没有任何 evals/e2e.yaml");
+        log.info("没有任何 evals/e2e.yaml");
         process.exit(0);
     }
     let pass = 0,
@@ -375,7 +376,7 @@ if (E2E) {
         n += r.total;
     }
     if (n) {
-        console.log(`\n合计 ${pass}/${n}`);
+        log.info(`\n合计 ${pass}/${n}`);
         process.exit(pass === n ? 0 : 1);
     }
 }
@@ -392,15 +393,15 @@ if (!RUN) {
                 fs.statSync(path.join(SKILLS_DIR, d)).isDirectory() &&
                 !fs.existsSync(path.join(SKILLS_DIR, d, "evals", "cases.yaml")),
         );
-    if (slugs.length === 0) console.log("还没有任何 evals/cases.yaml");
-    if (noEval.length) console.log(`尚未写测试用例: ${noEval.join("、")}`);
+    if (slugs.length === 0) log.warn("还没有任何 evals/cases.yaml");
+    if (noEval.length) log.warn(`尚未写测试用例: ${noEval.join("、")}`);
 }
 
 let total = { pass: 0, total: 0 };
 for (const slug of slugs) {
     const s = listSkill(slug);
     if (!s) {
-        console.error(`❌ ${slug} 没有 evals/cases.yaml`);
+        log.err(`❌ ${slug} 没有 evals/cases.yaml`);
         process.exit(1);
     }
     const r = await runSkill(s);
@@ -409,6 +410,6 @@ for (const slug of slugs) {
 }
 
 if (RUN && total.total) {
-    console.log(`\n合计 ${total.pass}/${total.total}`);
+    log.info(`\n合计 ${total.pass}/${total.total}`);
     process.exit(total.pass === total.total ? 0 : 1);
 }

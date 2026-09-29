@@ -1,10 +1,11 @@
 // 历史回看/完整数据恢复的自检：上传 → 观察去重与缓存 → 点「解析完整数据」→ 验证 tab 可用。
 // 用法: node check-restore.mjs <ulog 路径> [baseUrl]
 import { writeFileSync } from "node:fs";
+import { log } from "../lib/log.mjs";
 
 const [logPath, base = "http://localhost:3000"] = process.argv.slice(2);
 if (!logPath) {
-    console.error("用法: node check-restore.mjs <ulog 路径> [baseUrl]");
+    log.err("用法: node check-restore.mjs <ulog 路径> [baseUrl]");
     process.exit(1);
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -85,20 +86,20 @@ for (let i = 0; i < 30; i++) {
     await sleep(3000);
     const s = JSON.parse(await ev(state));
     if (s.hasDedupe || s.charts !== "missing") {
-        console.log(`上传后 ${i * 3}s:`, s);
+        log.info(`上传后 ${i * 3}s:`, s);
         break;
     }
 }
 
 // 若命中去重，点「解析完整数据」补全
 if (await ev(`document.body.innerText.includes("解析完整数据")`)) {
-    console.log("命中去重 → 点击「解析完整数据」");
+    log.info("命中去重 → 点击「解析完整数据」");
     await ev(`[...document.querySelectorAll('button')].find(b=>b.textContent.includes('解析完整数据')).click()`);
     for (let i = 0; i < 40; i++) {
         await sleep(3000);
         const s = JSON.parse(await ev(state));
         if (s.charts === "enabled") {
-            console.log(`补全完成 ${i * 3}s:`, s);
+            log.info(`补全完成 ${i * 3}s:`, s);
             break;
         }
     }
@@ -107,13 +108,13 @@ if (await ev(`document.body.innerText.includes("解析完整数据")`)) {
 // 再回看一次历史条目，确认图表仍可用（历史条目应带「完整数据」入口）
 await sleep(1000);
 const final = JSON.parse(await ev(state));
-console.log("最终:", final);
-console.log("缓存足迹:", await ev(`document.body.innerText.match(/本机缓存了[^。]*。/)?.[0] ?? "(无)"`));
+log.info("最终:", final);
+log.info("缓存足迹:", await ev(`document.body.innerText.match(/本机缓存了[^。]*。/)?.[0] ?? "(无)"`));
 const shot = await send("Page.captureScreenshot", {
     format: "png",
     captureBeyondViewport: false,
 });
 writeFileSync(process.env.OUT ?? "/tmp/restore.png", Buffer.from(shot.data, "base64"));
-console.log("saved", process.env.OUT ?? "/tmp/restore.png");
+log.info("saved", process.env.OUT ?? "/tmp/restore.png");
 ws.close();
 process.exit(0);

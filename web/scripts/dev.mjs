@@ -10,6 +10,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import net from "node:net";
+import { log } from "./lib/log.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
@@ -27,7 +28,7 @@ function run(args, label) {
     child.on("exit", (code, signal) => {
         if (shuttingDown) return;
         // 任一子进程非正常退出就整体退出：留着另一半没意义，还会让「dev 正在跑」的假象持续
-        console.log(`\n[dev] ${label} 退出（code=${code} signal=${signal}），全部停止`);
+        log.info(`\n[dev] ${label} 退出（code=${code} signal=${signal}），全部停止`);
         shutdown(typeof code === "number" ? code : 1);
     });
     children.push(child);
@@ -53,7 +54,7 @@ function checkPort(port) {
             server.close();
 
             if (process.platform !== "win32") {
-                console.error(`\n[dev] 端口 ${port} 被占用，请手动释放后重试（如 lsof -ti:${port} | xargs kill）。`);
+                log.err(`\n[dev] 端口 ${port} 被占用，请手动释放后重试（如 lsof -ti:${port} | xargs kill）。`);
                 process.exit(1);
             }
 
@@ -71,20 +72,20 @@ function checkPort(port) {
             }
 
             if (!pid) {
-                console.error(`\n[dev] 端口 ${port} 被占用但未查到进程，可能是系统保留端口。`);
+                log.err(`\n[dev] 端口 ${port} 被占用但未查到进程，可能是系统保留端口。`);
                 process.exit(1);
             }
 
-            console.log(`[dev] 端口 ${port} 被 PID ${pid} 占用，尝试清理…`);
+            log.info(`[dev] 端口 ${port} 被 PID ${pid} 占用，尝试清理…`);
             const kill = spawnSync("taskkill", ["/PID", pid, "/F"], {
                 stdio: "pipe",
             });
             if (kill.status !== 0) {
                 const errMsg = kill.stderr.toString().trim();
-                console.error(`\n[dev] 清理 PID ${pid} 失败：${errMsg}\n请手动执行 taskkill /PID ${pid} /F 后重试。`);
+                log.err(`\n[dev] 清理 PID ${pid} 失败：${errMsg}\n请手动执行 taskkill /PID ${pid} /F 后重试。`);
                 process.exit(1);
             }
-            console.log(`[dev] PID ${pid} 已终止，继续启动。`);
+            log.info(`[dev] PID ${pid} 已终止，继续启动。`);
             resolve();
         });
         server.once("listening", () => {
@@ -98,17 +99,17 @@ function checkPort(port) {
 // Ctrl+C：转发给两个子进程，别让 Next 变成孤儿进程继续占着端口
 for (const sig of ["SIGINT", "SIGTERM"]) {
     process.on(sig, () => {
-        console.log(`\n[dev] 收到 ${sig}，停止…`);
+        log.info(`\n[dev] 收到 ${sig}，停止…`);
         shutdown(0);
     });
 }
 
 // 先构建（阻塞直到成功）。失败就直接退出，别让 Next 起在陈旧知识库上。
 for (const [args, label] of [[["scripts/build-knowledge.mjs"], "知识构建"]]) {
-    console.log(`[dev] ${label}…`);
+    log.info(`[dev] ${label}…`);
     const r = spawnSync(NODE, args, { cwd: webRoot, stdio: "inherit" });
     if (r.status !== 0) {
-        console.error(`[dev] ${label}失败（code=${r.status}），未启动。先修掉上面的报错。`);
+        log.err(`[dev] ${label}失败（code=${r.status}），未启动。先修掉上面的报错。`);
         process.exit(r.status ?? 1);
     }
 }
@@ -119,7 +120,7 @@ await checkPort(DEV_PORT);
 
 run(["scripts/build-knowledge.mjs", "--watch"], "build-knowledge --watch");
 run(["node_modules/next/dist/bin/next", "dev"], "next dev");
-console.log("[dev] 已启动：知识热重建 + Next 开发服务器（Ctrl+C 一起停）");
+log.info("[dev] 已启动：知识热重建 + Next 开发服务器（Ctrl+C 一起停）");
 
 // 预热首页：Turbopack 懒编译，第一个请求才走编译器。等 Next 就绪后自动 GET / 预热，
 // 用户打开浏览器时首页已是热的。试 3 次，间隔 2s → 4s → 6s，任一次成功就停。
@@ -132,13 +133,13 @@ const warm = async () => {
         try {
             const res = await fetch(`http://localhost:${DEV_PORT}/`);
             if (res.ok) {
-                console.log("[dev] 预热完成（首页已编译）");
+                log.info("[dev] 预热完成（首页已编译）");
                 return;
             }
         } catch {
             // Next 可能还没完全就绪，等下一轮
         }
     }
-    console.log("[dev] 预热跳过（超时，手动打开首页即可）");
+    log.info("[dev] 预热跳过（超时，手动打开首页即可）");
 };
 warm();

@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { log } from "../lib/log.mjs";
 
 const [svgPath, out] = process.argv.slice(2);
 // 去掉 XML 声明，内联进 HTML
@@ -64,6 +65,6 @@ await send("Page.navigate", { url: pathToFileURL(file).href });
 await new Promise((r) => setTimeout(r, 900));
 const shot = await send("Page.captureScreenshot", { format: "png" });
 writeFileSync(out, Buffer.from(shot.data, "base64"));
-console.log("saved", out);
+log.info("saved", out);
 ws.close();
 process.exit(0);

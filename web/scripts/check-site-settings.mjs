@@ -18,6 +18,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { log } from "./lib/log.mjs";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
 const repoRoot = resolve(webRoot, "..");
@@ -48,11 +50,11 @@ let failures = 0;
 
 function fail(rule, detail) {
     failures++;
-    console.log(`  FAIL ${rule} -> ${detail}`);
+    log.err(`  FAIL ${rule} -> ${detail}`);
 }
 
 function ok(rule, detail) {
-    console.log(`  ok    ${rule} ${detail}`);
+    log.ok(`  ok    ${rule} ${detail}`);
 }
 
 function read(relOrAbs) {
@@ -351,5 +353,5 @@ function parseFields(src, label) {
     }
 }
 
-console.log(`RESULT: ${failures === 0 ? "站点设置守卫全部通过" : `${failures} 条未通过`}`);
+log.info(`RESULT: ${failures === 0 ? "站点设置守卫全部通过" : `${failures} 条未通过`}`);
 process.exit(failures ? 1 : 0);

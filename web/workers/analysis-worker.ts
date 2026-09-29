@@ -12,6 +12,7 @@ import { PY_ULG_ENGINE } from "./analysis-engine.generated";
 import type { LogInfo, TopicManifest } from "@/lib/types";
 import type { SeriesRequest } from "@/lib/chart-presets";
 import { PYODIDE_INDEX_PATH, PYULOG_WHEEL_PATH } from "@/lib/site-config";
+import { log } from "@/lib/log";
 
 /**
  * 把「可能是相对路径」的索引目录转成绝对 URL。
@@ -104,13 +105,13 @@ async function preloadOne(url: string): Promise<boolean> {
         // 达不到"把响应写进 SW 缓存"的目的。用默认模式交给 SW 正常拦截。
         const resp = await fetch(url, { signal: controller.signal });
         if (!resp.ok) {
-            console.warn(`[pyodide] 预热返回 HTTP ${resp.status}：${url}`);
+            log.warn(`[pyodide] 预热返回 HTTP ${resp.status}：${url}`);
             return false;
         }
         await resp.arrayBuffer();
         return true;
     } catch (err) {
-        console.warn(`[pyodide] 预热失败：${url}`, err);
+        log.warn(`[pyodide] 预热失败：${url}`, err);
         return false;
     } finally {
         clearTimeout(timer);
@@ -218,7 +219,7 @@ async function getPyodide(): Promise<Pyodide> {
         try {
             await pyodide!.loadPackage(["lzma"]);
         } catch (err) {
-            console.warn("lzma 加载失败，PX4 事件将不解码：", err);
+            log.warn("lzma 加载失败，PX4 事件将不解码：", err);
         }
 
         const micropip = pyodide!.pyimport("micropip");

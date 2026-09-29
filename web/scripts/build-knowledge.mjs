@@ -30,6 +30,7 @@ import {
     splitFieldRef,
 } from "./lib/rule-expr.mjs";
 import { buildRuleSchema } from "./lib/gen-rule-schema.mjs";
+import { log } from "./lib/log.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
@@ -655,7 +656,7 @@ function resolveFieldUnits(refs, metaDir) {
         out[fld] = src;
     }
     if (unknown.length) {
-        console.warn(
+        log.warn(
             `  ! 这些字段在 meta 里查不到单位，unit= 不做换算：${unknown.join("、")}\n` +
                 `    补法：在 knowledge/px4/meta/topic-overrides.yaml 的 units 里加一行（字段名 → 真实单位）`,
         );
@@ -1900,21 +1901,21 @@ function build() {
 
     if (CHECK) {
         if (drifted.length > 0) {
-            console.error("FAIL 以下产物与 knowledge/ 不一致，重跑 pnpm build:kb");
-            for (const d of drifted) console.error(`  · ${d}`);
+            log.err("FAIL 以下产物与 knowledge/ 不一致，重跑 pnpm build:kb");
+            for (const d of drifted) log.err(`  · ${d}`);
             process.exitCode = 1;
         } else {
-            console.log("OK 全部产物与 knowledge/ 一致");
+            log.ok("OK 全部产物与 knowledge/ 一致");
         }
     } else {
         const kbTotal = Object.values(kbByLogType).reduce((n, x) => n + x.length, 0);
         const perFamily = FAMILIES.map((f) => `${f.key} ${rulesByLogType[f.logType].length}`).join(" + ");
-        console.log(
+        log.info(
             `knowledge built: ${kbTotal} fault entries, ${allRules.length} rules（${perFamily}）, ` +
                 `${Object.keys(signatures).length} operators; ` +
                 "ulog-check-script.ts, prompts.generated.js",
         );
-        console.log("guide built: rule-catalogue.md, rule-schema.md");
+        log.info("guide built: rule-catalogue.md, rule-schema.md");
     }
 }
 
@@ -1953,7 +1954,7 @@ if (!process.argv.includes("--watch")) {
             build();
         } catch (err) {
             // 写 YAML 到一半必然语法错；挂着继续，改对了下一次变更会重建
-            console.error(`[kb] 构建失败：${err.message}`);
+            log.err(`[kb] 构建失败：${err.message}`);
         } finally {
             running = false;
         }
@@ -1971,6 +1972,6 @@ if (!process.argv.includes("--watch")) {
     };
     for (const d of WATCH_DIRS) watch(d, { recursive: true }, schedule(d));
     for (const d of WATCH_DIR_LOOSE) watch(d, { recursive: true }, schedule(d));
-    console.log("watching " + [...WATCH_DIRS, ...WATCH_DIR_LOOSE].map((d) => relative(webRoot, d)).join(" ") + " …");
+    log.info("watching " + [...WATCH_DIRS, ...WATCH_DIR_LOOSE].map((d) => relative(webRoot, d)).join(" ") + " …");
     build();
 }

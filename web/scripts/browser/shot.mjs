@@ -2,6 +2,7 @@
 // 用法: node shot.mjs <url> <out.png> <light|dark> [width] [height] [full]
 // 依赖: 已用 --remote-debugging-port=9222 启动的 Chrome，Node >= 22（自带 WebSocket）
 import { writeFileSync } from "node:fs";
+import { log } from "../lib/log.mjs";
 
 const [url, out, theme = "light", w = "1440", h = "900", full = "0"] = process.argv.slice(2);
 
@@ -53,6 +54,6 @@ const shot = await send("Page.captureScreenshot", {
     captureBeyondViewport: full === "1",
 });
 writeFileSync(out, Buffer.from(shot.data, "base64"));
-console.log("saved", out);
+log.info("saved", out);
 ws.close();
 process.exit(0);
