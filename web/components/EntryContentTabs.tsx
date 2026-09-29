@@ -22,16 +22,12 @@ type TabKey = "overview" | "files" | "changelog" | "comments";
 /**
  * 详情页内容区 Tab。Skill 与 MCP 两类条目共用（`/skills/[slug]` 与 `/mcp/[slug]`）。
  *
- * 不叫 `Skill*`：`Skill` 只是其中一类内容。叫 `SkillContentTabs` 就等于宣称它只服务
- * Skill，给 MCP 页面用的时候要么说谎，要么复制一份 `McpContentTabs`（长出一对只差前缀的
- * 孪生组件，改一边漏一边）。家族名取的是两类共有的上位词"收录条目"。
+ * 叫 `Entry*` 而不是 `Skill*`：叫 `SkillContentTabs` 等于宣称只服务 Skill，MCP 页面要用就得复制
+ * 一份只差前缀的孪生组件，改一边漏一边。
  *
- * Skill 的内容 Tab 各对应 `web/content/skills/<slug>/` 下的文件，所以每个 Tab 都能给出
- * 那一份文件的仓库编辑入口。「文件」Tab 是整个 Skill 目录的文件浏览器，SKILL.md 打开后
- * 带一段说明和一键复制（复制的是能直接放进 `.claude/skills/` 的那份内容）。
- *
- * MCP 条目走的是另一份规范（server.json，不是 SKILL.md），只给 readme / changelog
- * 两个编辑入口，不传 `files` 就没有「文件」Tab。
+ * Skill 的 Tab 各对应 `web/content/skills/<slug>/` 下的文件，故每个 Tab 都能给出仓库编辑入口；
+ * 「文件」Tab 是整个 Skill 目录的浏览器，SKILL.md 打开后带一键复制。MCP 走的是另一份规范
+ * （server.json），只给 readme / changelog 两个入口，不传 `files` 就没有「文件」Tab。
  */
 
 /* ---------- 「文件」Tab：目录树 + 点击打开（参考 skillhub.cn 的文件浏览器） ---------- */

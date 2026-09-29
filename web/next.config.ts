@@ -63,23 +63,19 @@ const nextConfig: NextConfig = {
     },
     // /api、/internal 未命中真实 Next route 时转给边缘函数垫片（app/edge-dev）。
     //
-    // 要用 beforeFiles、不能用 afterFiles：EdgeOne 平台路由层会先匹配动态页面路由再处理
-    // afterFiles rewrite，线上 /api/me 会被 app/[locale]/me 截胡返回 HTML；beforeFiles 在
-    // 一切文件系统（含动态）路由之前执行，两端行为一致。
+    // 用 beforeFiles 不用 afterFiles：EdgeOne 平台路由层会先匹配动态页面路由再处理 afterFiles
+    // rewrite，线上 /api/me 会被 app/[locale]/me 截胡返回 HTML；beforeFiles 在一切文件系统
+    // （含动态）路由之前执行，两端行为一致。
     //
-    // 排除清单 = 需要真实 Next route 的前缀：auth/（NextAuth）、skills/（zip 打包要 node:fs
-    // + jszip，边缘运行时没有完整文件系统）、ping（冒烟探针，走垫片就失去"真实 route 可达"的对照）。
-    // beforeFiles 优先级最高，漏排一个前缀 = 该真实 route 永远到不了（被转进垫片、静默 404），
-    // 新增真实 API route 时要同步加进这里。
-    //
-    // API 响应禁止 CDN 缓存：EdgeOne CDN 会缓存 404 等 HTML 错误页（缓存键忽略 query string），
-    // 导致部署后最长几分钟内该路径所有请求都吃到旧错误响应。opennext 适配器实测忽略本配置，
-    // 线上现状是默认 TTL 约 5 分钟自然过期；要根治需在 EdgeOne 控制台给 /api/*、/internal/*
-    // 配不缓存规则（middleware matcher 刻意排除 api|internal，不宜为加固去动它）。
-    // 本配置保留：对本地 next start 与自托管生效，同时作为预期缓存策略的声明。
+    // 排除清单 = 需要真实 Next route 的前缀：auth/（NextAuth）、skills/（zip 打包要 node:fs +
+    // jszip，边缘运行时没有完整文件系统）、ping（冒烟探针）。漏排一个前缀 = 该真实 route 永远
+    // 被转进垫片、静默 404，新增真实 API route 时要同步加进这里。
     async headers() {
         return [
-            // API / 内部端点：禁止一切缓存
+            // API / 内部端点禁止一切缓存：EdgeOne CDN 会缓存 404 等 HTML 错误页（缓存键忽略
+            // query string），部署后最长几分钟内该路径都吃到旧错误响应。opennext 适配器实测忽略
+            // 本配置，线上靠默认 TTL 约 5 分钟自然过期；要根治需在 EdgeOne 控制台配不缓存规则。
+            // 本配置对本地 next start 与自托管生效，并作为预期缓存策略的声明。
             { source: "/api/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
             { source: "/internal/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
             // 首页（含 /、/en、/zh）：CDN 缓存 60 秒，过期后用旧内容撑 5 分钟

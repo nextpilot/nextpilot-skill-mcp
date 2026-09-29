@@ -306,13 +306,13 @@ let loadedLogId: string | null = null;
  * 这次请求要的日志，现在答得了吗？答不了就返回给人看的理由。两件事同时成立才算能答：
  *
  * 1. 引擎命名空间装载了没有。没跑过分析就调 `np_track()` / `np_series()` 会是 NameError。
- *    探的名字要和 bootstrap 真建的一致（产物里是 `provider = open_log(...)`，所以查 `provider`），
+ *    探的名字要和 bootstrap 真建的一致（产物里是 `provider = open_log(...)`），
  *    `tools/engine/check_engine_pyodide.py` 会真执行产物核对这里查的名字。
  * 2. 装的就是这一份。探到 provider 就发数据的话，装着日志 A、用户打开报告 B 时会把 A 的轨迹
- *    画成 B 的记录，错得静悄悄。系列曲线同理。指纹对不上不算异常：前端取数据前会先补一次解析
- *    （见 hooks/useLogAnalyzer.ts 的 ensureLogLoaded），正常走不到这里。能走到的情况只剩字节
- *    已不在用户手里（历史记录 + 本机缓存被淘汰／记录来自别的设备），界面给"重新选择该 .ulg
- *    文件"即可恢复。不要在这里给"能自己解决"的出路：Worker 手里没有字节。
+ *    画成 B 的记录，错得静悄悄。指纹对不上不算异常：前端取数据前会先补一次解析（见
+ *    hooks/useLogAnalyzer.ts 的 ensureLogLoaded）。能走到这里只剩字节已不在用户手里（历史记录
+ *    + 本机缓存被淘汰／记录来自别的设备），界面给"重新选择该 .ulg 文件"即可恢复。不要在这里给
+ *    "能自己解决"的出路：Worker 手里没有字节。
  */
 function logNotLoadedReason(pyodide: Pyodide, logId: string): string | null {
     if (!pyodide.globals.get("provider")) {
