@@ -14,8 +14,8 @@ test.describe("日志分析流程", () => {
         expect(body).not.toContain("[next-mdx-remote] error");
     });
 
-    // 这条跑一次要 7 分钟（Pyodide 下载 WASM + numpy + pyulog），移出 @smoke 后由
-    // pnpm test:e2e:log 或部署后的全量 E2E 守住。timeout 保留，它是真实耗时需要，不是冒烟预算。
+    // 这条跑一次要 7 分钟（Pyodide 下载 WASM + numpy + pyulog），移出 @smoke、由 pnpm test:e2e:log
+    // 或部署后的全量 E2E 守住。timeout 是真实耗时需要，不是冒烟预算。
     test("上传 .ulg 并完成分析（解析→显示断言）", { timeout: 420_000 }, async ({ page }) => {
         await page.goto("/log", { waitUntil: "networkidle" });
 
@@ -26,8 +26,7 @@ test.describe("日志分析流程", () => {
         // 上传 .ulg 文件
         await fileInput.setInputFiles(SAMPLE_ULG);
 
-        // 等待分析完成：状态从 "加载 Pyodide" → "安装 pyulog" → "解析" → "完成"
-        // Pyodide 首次启动较慢（下载 WASM + numpy + pyulog），预留充足时间
+        // 等待分析完成：加载 Pyodide → 安装 pyulog → 解析 → 完成（首次启动慢，预留充足时间）
         const doneIndicator = page.locator("text=完成").first();
         await expect(doneIndicator).toBeVisible({ timeout: 240_000 });
 
@@ -39,8 +38,7 @@ test.describe("日志分析流程", () => {
         const metricsHeading = page.getByText("关键数据（确定性引擎实测）", { exact: true });
         await expect(metricsHeading).toBeVisible({ timeout: 30_000 });
 
-        // 关键数据区要么有实测行（data-testid=metrics-table）、要么有「没有记录关键数据」
-        // 的兜底文案，二者都证明「解析 → 显示」链路把数据真的渲染出来了
+        // 要么有实测行（data-testid=metrics-table）、要么有「没有记录关键数据」兜底文案，二者都证明链路通
         const hasRows = await page.locator('[data-testid="metrics-table"] tbody tr').count();
         const hasMetricsFallback = await page.getByText("这份报告没有记录关键数据").count();
         expect(hasRows > 0 || hasMetricsFallback > 0).toBeTruthy();
@@ -163,7 +161,7 @@ test.describe("日志分析流程", () => {
         await historyTab.click();
         await page.waitForTimeout(1000);
 
-        // 空状态应该有提示文案（如"暂无"、"无"、"空"等），或历史列表区域存在
+        // 空状态应有提示文案（"暂无"/"空"/"无"），或历史列表区域存在
         const emptyOrList = page
             .locator("text=暂无")
             .or(page.locator("text=空"))

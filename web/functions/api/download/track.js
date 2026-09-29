@@ -1,10 +1,8 @@
 // POST /api/download/track：Skill/MCP "获取"计数（防刷：设备+IP 每日只计一次）。
-// GET  /api/download/track：排行榜（实时从 KV 唯一键聚合，seed 基值见 body 外的 stats 接口）。
+// GET  同路径：排行榜（实时从 KV 唯一键聚合，seed 基值见 body 外的 stats 接口）。
 //
-// KV 计数键（key 只能含字母数字下划线）：
-//   dle_{kind}_{slugKey}_{day}_{deviceHash}   设备日唯一事件（计数用）
-//   dip_{ipHash}_{day}_{...}                  无设备 ID 时的 IP 兜底
-// slug → slugKey 映射存 dst_{kind}_{slugKey} = 原始 slug（首次事件时写入）。
+// KV 计数键（key 只能含字母数字下划线）：dle_{kind}_{slugKey}_{day}_{deviceHash} 设备日唯一事件（计数用）；
+// dip_{ipHash}_{day}_{...} 无设备 ID 时的 IP 兜底；slug → slugKey 映射存 dst_{kind}_{slugKey} = 原始 slug。
 import { getKv, listAll, sha256Hex, dateStamp, sanitizeId, clientIp } from "../../_lib/kv.js";
 import { jsonResponse, readJson } from "../../_lib/http.js";
 

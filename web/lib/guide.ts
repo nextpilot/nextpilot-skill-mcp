@@ -24,11 +24,8 @@ export interface GuideDoc {
     order: number;
     body: string;
     headings: GuideHeading[];
-    /**
-     * 正文渲染器。手写页面是 `.mdx`（走 MDX，可用 <Callout> 等组件）；
-     * `knowledge/` 派生过来的 `.md` 走普通 markdown，那些文档里有 `{占位符}`、
-     * `meta/<tag>.json` 这类内容，MDX 会当成 JSX 表达式解析。
-     */
+    /** 正文渲染器：手写页是 .mdx（可用 <Callout> 等组件）；knowledge/ 派生的 .md 走普通
+     *  markdown——那些文档里有 {占位符}、meta/<tag>.json，MDX 会当成 JSX 表达式解析 */
     renderer: "mdx" | "md";
 }
 
@@ -44,10 +41,7 @@ export interface GuideNavGroup {
     items: GuideNavItem[];
 }
 
-/**
- * 抽取目录用的标题。
- * 只认正文里的 `##` / `###`，且要跳过围栏代码块，提示词示例里出现 `# 注释` 是常态。
- */
+/** 抽取目录用的标题：只认正文 `##` / `###`，且跳过围栏代码块（提示词示例里出现 `# 注释` 是常态） */
 function extractHeadings(body: string): GuideHeading[] {
     const headings: GuideHeading[] = [];
     let inFence = false;
@@ -114,10 +108,7 @@ export function getGuideDoc(slug: string): GuideDoc | undefined {
     return getAllGuideDocs().find((doc) => doc.slug === slug);
 }
 
-/**
- * 左侧导航。分组不单独维护，按组内最小 order 排序，
- * 新增一页只需写 frontmatter，不用再回来改导航数组。
- */
+/** 左侧导航：分组不单独维护，按组内最小 order 排序，新增一页只写 frontmatter */
 export function getGuideNav(): GuideNavGroup[] {
     const groups = new Map<string, { groupEn: string; minOrder: number; items: GuideNavItem[] }>();
 

@@ -1,14 +1,7 @@
 /**
- * 飞行模式（PX4 `vehicle_status.nav_state`）的配色与中文名，报告页两处都用它：
- * 「飞行阶段条」（LogPhaseStrip）与「数据图表」里每条曲线的阶段底色（LogCharts）。
- *
- * 为什么是模式而不是阶段：模式的取值就是引擎 `np_materials().phases[].mode` 给的
- * PX4 原始模式名（Manual / Position / Mission…），而 facts.yaml 里的 `nav_groups` 是
- * 给规则用的固定翼口径分组（`fw_cruise = [Mission, AltitudeCruise]`，多旋翼在 Mission
- * 下并不算"固巡"）。界面要的是"这段在干嘛"的直观区分，所以按模式上色、另配中文名。
- *
- * 曾经的坑：PhaseStrip 用阶段名（hover/landing）当键去查颜色，而引擎给的是模式名，
- * 交集为空，整条都是兜底灰。加模式时要同时加进这张表（颜色 + 中文名）。
+ * 飞行模式（PX4 nav_state）的配色与中文名，报告页两处共用（阶段条与图表曲线的阶段底色）。
+ * 按模式而非阶段上色：引擎给的就是 PX4 原始模式名（facts.yaml 的 nav_groups 是规则用的固定翼口径分组）。
+ * 陷阱：键是模式名不是阶段名（曾经交集为空整条兜底灰）；加模式要同时加这张表（颜色 + 中文名）。
  */
 export interface ModeStyle {
     /** 色带/方块的颜色（浅色主题） */

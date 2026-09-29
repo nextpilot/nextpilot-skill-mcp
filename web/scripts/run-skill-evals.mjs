@@ -1,39 +1,22 @@
 #!/usr/bin/env node
 /**
  * Skill 效果回归测试
- *
- *   node scripts/run-skill-evals.mjs <slug>              # dry-run：只列出用例，不打分
- *   node scripts/run-skill-evals.mjs                     # 列出所有 Skill 的用例概况
- *   node scripts/run-skill-evals.mjs <slug> --run        # 真跑 cases.yaml（需要配 LLM API）
- *   node scripts/run-skill-evals.mjs <slug> --e2e        # 跑 evals/e2e.yaml（确定性，不需要 API key）
- *
- * 为什么需要这个：
- *   scripts/check-skill-spec.mjs 只校验格式，字段齐不齐、枚举对不对。
- *   但 SKILL.md 本质是 prompt，改一句话可能就让召回率崩掉，
- *   而格式校验会告诉你"一切正常"。这是两套完全不同的失效。
- *
- * e2e 模式的定位（不需要 API key，可在 CI 里跑）：
- *   evals/e2e.yaml 断言的是 scripts/ 里那些确定性工具的行为，不经过模型。
- *   它守的是"工具对给定输入输出确定的结论"，判据可以直接查字符串、
- *   查退出码，所以跑一次几百毫秒、结果可复现。
- *
- * 为什么不比对精确输出：
- *   模型输出是自然语言，逐字比对必然全红。这里判的是要素：
- *   must_mention / must_not_mention 用正则机械查，
- *   judge 交给 LLM-as-judge（用于"有没有拒绝回答"这类没法正则的判据）。
- *
- * 环境变量（--run 时需要）：
- *   ANTHROPIC_API_KEY 或 OPENAI_API_KEY / OPENAI_BASE_URL
+ *   node scripts/run-skill-evals.mjs <slug>         # dry-run：只列用例不打分
+ *   node scripts/run-skill-evals.mjs                # 列出所有 Skill 的用例概况
+ *   node scripts/run-skill-evals.mjs <slug> --run   # 真跑 cases.yaml（需配 LLM API）
+ *   node scripts/run-skill-evals.mjs <slug> --e2e   # 跑 evals/e2e.yaml（确定性，无需 API key）
+ * check-skill-spec.mjs 只校验格式；SKILL.md 本质是 prompt，改一句话可能让召回率崩掉而格式照样正常。
+ * --run 判要素不比对精确输出（自然语言逐字比对必然全红）：must_mention / must_not_mention 正则机械查，
+ * judge 交给 LLM-as-judge；--e2e 断言 scripts/ 里确定性工具的行为（查字符串/退出码，可复现、几百毫秒）。
+ * 环境变量（--run 时需要）：ANTHROPIC_API_KEY 或 OPENAI_API_KEY / OPENAI_BASE_URL
  */
 
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
-// e2e 用 `python3` 跑脚本，而 pyulog 装在仓库的 .venv 里。把 .venv/bin 提到 PATH
-// 最前，让"哪个 python3"这件事不再取决于谁在跑、从哪个 shell 跑。
-// 没建 .venv 时原样放行（那时会拿到系统 python3，缺 pyulog 会明确报 ImportError，
-// 比静默用一个不对的解释器好排查）。
+// e2e 用 `python3` 跑脚本，pyulog 装在仓库 .venv 里：把 .venv/bin 提到 PATH 最前，让解释器不取决于谁在跑。
+// 没建 .venv 时原样放行（缺 pyulog 会明确报 ImportError，比静默用错解释器好排查）。
 const REPO_ROOT = path.resolve(import.meta.dirname, "..", "..");
 const VENV_BIN = path.join(REPO_ROOT, ".venv", "bin");
 const E2E_ENV = { ...process.env };
@@ -43,23 +26,16 @@ if (fs.existsSync(path.join(VENV_BIN, "python3"))) {
 
 // 位置参数先滤掉 flag，否则 --e2e 会被当成 skills 目录
 const argv = process.argv.slice(2).filter((a) => !a.startsWith("--"));
-// 默认相对脚本自身定位，不依赖 cwd，从仓库根或 web/ 跑结果都一样。
-// 传第二个位置参数可覆盖（想在临时目录里试改过的 skill 时用）。
+// 默认相对脚本自身定位，不依赖 cwd；传第二个位置参数可覆盖（想在临时目录里试改过的 skill）
 const SKILLS_DIR = path.resolve(argv[1] ?? path.join(import.meta.dirname, "..", "content", "skills"));
 const target = argv[0];
 const RUN = process.argv.includes("--run");
 const E2E = process.argv.includes("--e2e");
 
 // ---------- 极简 YAML 解析（只支持 cases.yaml 用到的子集） ----------
-// 不引依赖是为了让脚本能在任何 CI 里跑。如果 cases.yaml 变复杂，
-// 换成 js-yaml 即可。
-//
-// 关键是区分「块标量」和「块序列」，两者都是 key 后面什么都不写，
-// 只能靠下一行的缩进内容判断：
-//     judge: |          → 块标量
-//       文本
-//     must_mention:     → 块序列
-//       - foo
+// 不引依赖，让脚本能在任何 CI 里跑；cases.yaml 变复杂就换 js-yaml。
+// 关键是区分「块标量」和「块序列」——都是 key 后面什么都不写，只能靠下一行缩进内容判断：
+//     judge: | → 块标量（文本）；must_mention: → 块序列（- foo）
 function parseCases(text) {
     const lines = text.split("\n").filter((l) => !/^\s*#/.test(l));
     const cases = [];
@@ -342,11 +318,8 @@ async function runE2E(slug) {
                 shell: "/bin/sh",
                 encoding: "utf8",
                 stdio: ["ignore", "pipe", "pipe"],
-                // e2e.yaml 里的 run 写的是 `python3`，那到底是哪个 python3 取决于 PATH。
-                // 装 pyulog 的是仓库的 .venv，系统解释器里未必有，于是同一份用例
-                // 在开发者机器上全绿、在干净 CI 上因为 ImportError 全红，而红的原因是
-                // "环境"，不是"脚本坏了"。这里把 .venv/bin 提到 PATH 最前面，与
-                // .githooks/_venv_python.py 的做法保持一致：钩子、CI、本脚本认同一个解释器。
+                // e2e.yaml 的 run 写的是 `python3`，哪个 python3 取决于 PATH：pyulog 在仓库 .venv，
+                // 不提 PATH 则同一份用例开发者机器全绿、干净 CI 上 ImportError 全红（环境问题，不是脚本坏了）
                 env: E2E_ENV,
             });
         } catch (e) {

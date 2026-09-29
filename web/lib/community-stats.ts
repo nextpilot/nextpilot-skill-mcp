@@ -27,11 +27,9 @@ export interface FavoriteStats {
     favorited: boolean;
 }
 
-/* ── 外部 JSON → 内部类型的唯一闸门（见 CLAUDE.md §6.5）─────────────────────────────
- * 这几个响应由边缘函数（`functions/api/*.js`）产生，而静态站与边缘函数是分开部署的：
- * 页面更新到新版本时，请求可能还落在旧版本函数上（反之亦然）。直接 `as FavoriteStats`
- * 只是把类型检查关掉，缺字段的响应会一路走到 UI 才现形（"undefined 收藏"、NaN 评分）。
- * 所以边界处一律过归一，函数内部信任类型。 */
+/* ── 外部 JSON → 内部类型的唯一闸门（CLAUDE.md §6.5）──
+ * 响应由边缘函数产生且与静态页分开部署，页面更新后请求可能落在旧版本函数上；直接 as 只是关掉检查，
+ * 缺字段到 UI 才现形（undefined 收藏、NaN 评分）。边界处一律过归一，函数内部信任类型。 */
 
 /** `/api/favorite` → `{count, favorited}`；形状不对返回 null（调用方按"取不到"处理） */
 function normalizeFavoriteStats(raw: unknown): FavoriteStats | null {

@@ -2,20 +2,9 @@ import type { Finding, LogFacts, LogInfo, MatchedFault, MetricEntry, TrackData, 
 import type { StoredPlotPanel, StoredPlotSeries } from "./chart-presets";
 
 /**
- * 报告存档（IndexedDB）。
- *
- * 为什么从 localStorage 搬到这里：
- * - localStorage 一个键装整个数组，每次保存全量序列化，只留 20 条，5MB 配额、隐私模式写不进；
- * - "命中即看"要求把派生数据（参数 / 消息 / 曲线降采样）也存下来，才能不再等一次解析，
- *   这些是大对象，只有 IndexedDB 装得下。
- *
- * 三个 store 分工（不同库，互不干扰）：
- *   reports      这里：结论记录（findings / metrics / facts / aiMarkdown / 元信息），列表页直接读
- *   reportData   这里：派生数据（info = 参数/消息/阶段/系统信息；plotData = 曲线），按键取
- *   logs         log-cache.ts：原始 .ulg 字节（LRU 300MB/10 份），用于"重新分析"而非展示
- *
- * 内存镜像：列表接口保持同步（UI 多处同步调用），启动时把 reports 载入内存镜像，
- * 之后的读写都先落镜像、再异步写库。
+ * 报告存档（IndexedDB）。localStorage 装不下派生数据（曲线/参数等大对象），且有 5MB 配额、
+ * 隐私模式写不进。三个 store：reports=结论记录（列表页直接读）；reportData=派生数据（按键取）；
+ * logs=log-cache.ts 的原始 .ulg 字节。内存镜像：启动载入 reports，读写先落镜像再异步写库。
  */
 
 const DB_NAME = "nextpilot";
@@ -26,13 +15,10 @@ const VERSION = 2;
 /** 老版本用的 localStorage 键：首次启动迁移进 IndexedDB，然后删掉 */
 const LEGACY_KEY = "nextpilot:reports";
 
-/** 结论记录条数上限（每条约几十 KB，100 条 ≈ 几 MB，IndexedDB 完全放得下） */
+/** 结论记录条数上限（每条约几十 KB） */
 export const REPORT_MAX_ENTRIES = 100;
 
-/**
- * 派生数据只保留最近这么多个报告：曲线一份约 0.66MB（1500 点/线），
- * 不设上限的话 100 份就是 68MB。更老的报告仍能看结论 + AI，只是要重新选文件才能看图。
- */
+/** 派生数据只留最近 N 个报告：曲线一份约 0.66MB，100 份就是 68MB；更老的报告看结论仍可，看图要重新选文件 */
 export const REPORT_DATA_KEEP = 20;
 
 export interface SavedReport {
@@ -62,17 +48,13 @@ export interface SavedReport {
     trackThumb?: TrackThumb;
 }
 
-/**
- * 轨迹缩略图：降采样后的经纬点（约 40 个），只够画出形状。
- * 为什么不直接读派生数据里的轨迹：那份记录里还塞着曲线（每份约 0.66MB），
- * 列表里逐条读会把几十 MB 拉进内存；缩略图跟着结论记录走，读列表时顺手就拿到了。
- */
+/** 轨迹缩略图：降采样后的经纬点（约 40 个），只够画形状。不直接读派生数据里的轨迹，
+ *  是因为那份记录还塞着曲线（每份约 0.66MB），读列表会整批拉进内存 */
 export type TrackThumb = [number, number][];
 
 /** 与结论分开存的派生数据：命中时直接给「消息 / 参数 / 图表」用，不必再解析原始日志 */
 export interface ReportData {
-    /** 产出这份派生数据的引擎版本（build 期算的源文件哈希）。
-     *  与当前版本不一致 = 旧引擎生成的（比如多值信息的分行规则变了），打开时重解析一次。 */
+    /** 产出该数据的引擎版本（源文件哈希）；与当前不一致 = 旧引擎生成，打开时重解析一次 */
     derivedVersion?: string;
     /** np_materials() 的产物：系统信息 / 消息 / 丢包 / 参数 / 变更参数 / 阶段 */
     info?: LogInfo;
@@ -87,24 +69,12 @@ export interface ReportData {
 
 type StoredReport = SavedReport & { savedAt?: number };
 
-/** 老版本写入的记录可能缺字段（如早期没有 findings）；在读取边界补默认值，
- *  避免 UI 里 r.findings.length 之类直接抛错（真机上出现过 crash）。
- *
- * 这是所有外部来源进入 `SavedReport` 的唯一闸门，不只是索引库的：
- *    · 索引库里躺着上上个版本写下的记录（早期没有 findings 字段），
- *      还有从 localStorage 迁移进来的更老的记录；
- *    · 云端 KV 里的记录也一样，`explain.js` 保证新写的带 findings，
- *      但 TTL 是 7 天，旧版本部署写下的记录仍在有效期内，取回来照样是缺字段的 JSON。
- *    两者到了前端都只是 JSON，TypeScript 拦不住，只有过这道函数才安全。
- *
- * 所以：新增读取入口都要过这里，不要再写 `xxx as SavedReport`。
- * 那句强转把类型检查关掉了，缺字段要到渲染时才炸（`GeneralInfo` 的 `findings.filter` 就这么炸过）。
- *
- * 名字刻意不叫 `normalize`：`lib/error-policy.js` 已经有一个 `normalize`（正则替换，
- * 给错误消息脱敏用的），两者同名不同义就是 §6.4 第⑤条禁的那种迷惑。 */
+/** 读取边界补默认值（老记录可能缺字段，真机上 crash 过）。这是所有外部来源进 SavedReport 的
+ *  唯一闸门（索引库旧记录、localStorage 迁移、云端 KV TTL 内的旧部署记录），到前端都是无类型
+ *  JSON，必须过这里；不要写 `xxx as SavedReport`（强转关掉检查，缺字段渲染时才炸）。
+ *  名字刻意不叫 normalize：error-policy.js 已有一个 normalize（脱敏正则），同名不同义是 §6.4 禁的。 */
 export function normalizeSavedReport(raw: unknown): SavedReport {
-    // 入参刻意是 unknown 而不是 Partial<SavedReport>：边界上拿到的本来就是"没有类型的东西"，
-    // 写成 Partial 只会让调用方以为字段已经对上了（§6.5）。强转集中在这一行。
+    // 入参用 unknown 而非 Partial<SavedReport>：边界上拿到的就是无类型数据（§6.5），强转集中在这一行
     const r = (raw ?? {}) as Partial<SavedReport>;
     return {
         id: String(r.id ?? ""),
@@ -269,14 +239,8 @@ async function migrateFromLocalStorage(): Promise<void> {
     }
 }
 
-/**
- * 打开库、迁移旧记录、把结论记录载入内存镜像。
- *
- * 要共享同一个 Promise，不能只用 `initialized` 布尔量做"进过一次就返回"：
- * 同一个页面上有两个调用方（`useLogAnalyzer` 的挂载 effect 先跑，报告页自己的 effect 紧随其后），
- * 前者刚开始 await、后者就返回了，于是报告页紧接着 `getReport(id)` 查的是还没载入的镜像，
- * 结果就是"刷新 /log/<id> 说未找到该分析报告"（站内点进详情却正常，因为镜像早就在了）。
- */
+/** 打开库、迁移旧记录、载入内存镜像。必须共享同一个 Promise 而非 initialized 布尔量：
+ *  两个调用方先后到达时，后者会查到还没载入的镜像，表现为"刷新 /log/<id> 说未找到" */
 let initPromise: Promise<void> | null = null;
 
 export function initReportStore(): Promise<void> {
@@ -333,13 +297,8 @@ export function deleteReport(id: string): void {
     void removeMany([id]);
 }
 
-/** 清空本机的历史记录：只删 `reports` + `reportData` 两个 store。
- *
- *  刻意不碰另两处缓存：
- *    · `nextpilot-cache/logs`（原始 .ulg 字节），留着才能"恢复完整数据"；
- *    · Service Worker 的 `nextpilot-runtime-*`（Pyodide + numpy + pyulog，约 16MB，见 public/sw.js），
- *      清个历史不该让下次分析重新下载一遍运行时。
- *  想连它们一起清，得显式调 clearCachedLogs() / caches.delete()，别在这里顺手加。 */
+/** 清空历史：只删 reports + reportData 两个 store。刻意不碰 nextpilot-cache/logs（留着恢复完整数据）
+ *  和 SW 的 nextpilot-runtime-*（Pyodide 运行时，清历史不该重新下载）；要清得显式调 clearCachedLogs()/caches.delete() */
 export function clearReports(): void {
     const ids = mirror.map((r) => r.id);
     mirror = [];
@@ -376,9 +335,8 @@ async function pruneReportData(): Promise<void> {
     }
 }
 
-/** 存派生数据（参数/消息/曲线）：分析完成或首次画图后调，之后命中就能直接渲染。
- *  按字段合并而不是整条覆盖：两处调用各带一部分数据（分析完成只有 info，抽完曲线才有
- *  plotPanels/track），谁后到都不该把对方写没了。 */
+/** 存派生数据：分析完成或首次画图后调。按字段合并而非整条覆盖——两处调用各带一部分
+ *  （分析完成只有 info，抽完曲线才有 plotPanels/track），谁后到都不能把对方写没了 */
 export async function saveReportData(id: string, data: ReportData): Promise<void> {
     if (typeof window === "undefined" || !id) return;
     try {

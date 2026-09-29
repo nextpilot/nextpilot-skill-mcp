@@ -1,18 +1,11 @@
 import type { TopicManifest } from "./types";
 
 /**
- * 绘图预设的解析器：把「预设声明 + 日志 manifest」解析成可画的面板。
- *
- * 这里只有一份实现：字段引用的写法、实例怎么数、区间引用怎么展开成多条线。
- * 两个消费方都从这里取：`lib/chart-presets.ts`（构建期编译好的 `knowledge/px4/plot/*.yml`）
- * 与 `lib/tools/compile-yaml-preset.ts`（工具页里现贴现编译的 YAML）。这两处曾经各自抄了
- * 一份同样的逻辑，改一处漏一处，所以合并到这里。
- *
- * 引用写法（与 `knowledge/px4/CLAUDE.md` 同一套，改那边也要改这里）：
- *   `topic.field`      不写下标，只取第 0 个实例，与 `topic[0].field` 同义
- *   `topic[N].field`   第 N 个实例（N 可为负，从末尾数）
- *   `topic[a:b].field` 实例 a~b 的闭区间（含 b）；`[:]` 是全部
- *   `topic.field[K]`   数组字段的第 K 个元素（`q[0]`）；`field[i,j]` 是第 i 行第 j 列
+ * 绘图预设的解析器：把「预设声明 + 日志 manifest」解析成可画的面板。唯一实现，两个消费方
+ * （chart-presets.ts 构建期编译、tools/compile-yaml-preset.ts 工具页现编译）都从这里取。
+ * 引用写法（与 knowledge/px4/CLAUDE.md 同一套，改那边也要改这里）：
+ *   topic.field / topic[N].field（N 负数从末尾数）/ topic[a:b].field 闭区间、[:] 全部 /
+ *   topic.field[K] 数组字段第 K 个元素、field[i,j] 第 i 行第 j 列
  */
 
 /** 一条线的数据来源：字段引用（可带候选组）或预设 compute 节点的输出 */
@@ -82,9 +75,8 @@ export function instToString(spec: InstSpec): string {
 
 // ─────────────────────────── manifest 查询 ───────────────────────────
 
-/** 这个 topic 在日志里有哪几个实例。只看 manifest 里有没有这一行。
- *  这里曾经还判了 `t.n > 1`，但 `n` 是采样点数不是实例数：只采到一个点的实例会被
- *  静默丢掉，全是单点时整张预设直接消失。判"有没有这个实例"用不着看点数。 */
+/** 这个 topic 在日志里有哪几个实例，只看 manifest 有没有这一行。
+ *  不能再判 t.n>1：n 是采样点数不是实例数，单点实例会被静默丢掉（全单点时整张预设消失）。 */
 export function topicInstances(m: TopicManifest, topic: string): number[] {
     return m.topics
         .filter((t) => t.topic === topic)
@@ -101,9 +93,8 @@ export function hasFieldAnyInstance(m: TopicManifest, topic: string, field: stri
     return m.topics.some((t) => t.topic === topic && t.fields.some((f) => f.name === field));
 }
 
-/** 闭区间 → 实例号列表。负数从末尾数，越界截断；越界的完整说法（"要 1~9 只有 0~2"）
- *  只有引擎那边才说得出来，那边的提示走 SeriesResponse.warnings，这里不重复喊。
- *  `all` 要已按实例号升序；返回的也是升序。 */
+/** 闭区间 → 实例号列表。负数从末尾数，越界截断；越界的完整说法由引擎走 SeriesResponse.warnings，
+ *  这里不重复喊。`all` 已按实例号升序，返回同升序。 */
 export function instancesInRange(all: number[], spec: InstSpec): number[] {
     if (spec.kind !== "range" || all.length === 0) return all;
     const n = all.length;
@@ -177,9 +168,8 @@ type PendingLine = {
     spread: { topic: string; field: string; unit: string | null; instances: number[] } | null;
 };
 
-/** 一个 child 里所有区间线能落到哪些实例上，取并集。
- *  多条线来自不同 topic、实例数不一样时（比如 `a[:].x` 有 3 个、`b[:].z` 只有 2 个），
- *  少的那边在缺的实例上画不出来：按并集留位置并给一句告警，而不是把多的那边砍掉。 */
+/** 一个 child 里所有区间线能落到的实例，取并集。多条线来自不同 topic、实例数不一样时，
+ *  少的那边在缺的实例上画不出来：按并集留位置并给告警，而不是砍掉多的那边。 */
 function unionOfSpread(pendings: PendingLine[]): number[] | null {
     const all = new Set<number>();
     for (const p of pendings) {
@@ -188,9 +178,8 @@ function unionOfSpread(pendings: PendingLine[]): number[] | null {
     return all.size === 0 ? null : [...all].sort((a, b) => a - b);
 }
 
-/** `spread` = 区间引用是不是要展开成多条线。
- *  拆图模式（split_by_instance）下不展开：那时要的是"每张图一个实例"，区间引用按面板
- *  的实例号取。引擎 `_pick_ref` 收到 `instance=` 会盖掉引用里的区间，所以原样发出去就行。 */
+/** `spread` = 区间引用是否展开成多条线。拆图模式（split_by_instance）下不展开：
+ *  那时要的是每张图一个实例，引擎 `_pick_ref` 收到 instance= 会盖掉引用里的区间。 */
 function planChild(child: UnifiedChild, m: TopicManifest, instance: number, spread: boolean): PendingLine[] {
     const out: PendingLine[] = [];
     child.ydata.forEach((desc, i) => {
@@ -236,8 +225,7 @@ function planChild(child: UnifiedChild, m: TopicManifest, instance: number, spre
             });
             return;
         }
-        // 单条线按作者写的原文发出去，不重写成 `topic[0].field`：引擎对"不写下标"与
-        // "写 [0]"给的是同一个结果，而报错文案里打出来的要是他认得的那串
+        // 单条线按作者写的原文发出，不重写成 `topic[0].field`：报错文案里要打他认得的那串
         out.push({ label, style, color, desc: { kind: "field", fields: [hitRaw], unit }, spread: null });
     });
     return out;
@@ -254,8 +242,7 @@ export function resolveAxes(out: UnifiedAxes, m: TopicManifest, opts: ResolveOpt
     if (out.split_by_instance) {
         const topic = firstRangeTopic(out);
         if (!topic) {
-            // 声明了要拆、却没有任何区间引用可依据，按哪一个 topic 的实例拆无从判断。
-            // 这时不拆而不是让整组图消失：图先画出来，再加一句提示说明声明没生效
+            // 声明了拆图却没有区间引用可依据：不拆而不是让整组图消失，画出来并提示声明没生效
             warnings.push(
                 `${out.title ?? "这张图"} 写了 split_by_instance，但引用里没有区间（[:] / [a:b]）——按一张图渲染`,
             );
@@ -288,8 +275,7 @@ export function resolveAxes(out: UnifiedAxes, m: TopicManifest, opts: ResolveOpt
                         );
                         continue;
                     }
-                    // 展开出来的每条线把实例写死：`a[:].b` 变成 `a[0].b`、`a[1].b`…
-                    // 名字就用这个串，多实例同图时，光看 `X` 分不清是哪一路 IMU
+                    // 展开线把实例写死（`a[:].b` → `a[0].b`…），名字用这个串：多实例同图光看 X 分不清哪一路
                     const ref = `${p.spread.topic}[${k}].${p.spread.field}`;
                     ydata.push({ kind: "field", fields: [ref], unit: p.spread.unit });
                     series.push({ label: ref, style: p.style, color: p.color });

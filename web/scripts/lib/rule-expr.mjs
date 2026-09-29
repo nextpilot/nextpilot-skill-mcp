@@ -1,29 +1,17 @@
 /**
- * rules/*.yaml 的 compute 表达式：构建期解析与校验。
+ * rules/*.yaml 的 compute 表达式：构建期解析与校验。产物里存的是作者写的原文，
+ * 运行期由 `knowledge/engine/rule_engine.py` 的 `_eval_compute` 用 Python ast 求值，
+ * 所以构建期必须自己看得懂这段表达式（「写错的经验根本进不了浏览器」这条不变量）。
+ * 这里只校验不降级：不拆节点、不生成运行期产物。
  *
- * 为什么要有这个文件：compute 从"算子节点链"改成"Python 子集表达式"后，
- * 产物里存的就是作者写的原文，运行期由 `knowledge/engine/rule_engine.py` 的 `_eval_compute`
- * 用 Python `ast` 求值。于是构建期得自己看得懂这段表达式，否则
- * 「写错的经验根本进不了浏览器」这条不变量就断了（knowledge/px4/CLAUDE.md 的设计原则）。
+ * 语法（Python 真子集，与 triggers.expr 同一套写法）：
+ *   a, b, c = f(x, kw=1)  多左值赋值   pct = frac * 100  算术 + - * / % **
+ *   p99 if seg_n > 50 else None  三元   a and b / a or b / not a  逻辑
+ *   x in S / x is None  比较   topic.field  裸字段引用
+ *   ref("topic[:].field", alias="x", unit="deg")；ref("新名", "旧名") = 候选组取第一个存在的
+ *   _try(expr) 容错（内层出错或得 None 时结果为 None）；param("NAME"[, 兜底]) 读飞控参数；算子调用
  *
- * 这里只做校验，不做降级：不把一条表达式拆成多个节点，也不生成任何运行期产物。
- * 于是没有临时变量、没有求值顺序、没有公共子表达式消除，那些都是降级方案的负担。
- *
- * 语法（Python 的真子集，与 triggers.expr 同一套写法）：
- *   a, b, c = f(x, kw=1)              赋值（多左值解包）
- *   pct = frac * 100                  算术 + - * / % **
- *   p99 if seg_n > 50 else None       三元
- *   a and b / a or b / not a          逻辑
- *   x in S / x is None                比较
- *   topic.field                       裸字段引用
- *   ref("topic[:].field", alias="x", unit="deg")
- *   ref("新名", "旧名")               候选组：取第一个存在的（同义改名用它）
- *   _try(expr)                        容错：内层出错或得 None 时结果为 None
- *   param("NAME")                     读飞控参数（provider 的 PARAMS 表；缺失返回 None）
- *   param("NAME", 0.0)                同上但缺失时兜底为 0.0
- *   worst_mean_stats(...)             算子调用
- *
- * 不依赖任何第三方包（构建脚本只用 Node 内置 + yaml）。
+ * 不依赖第三方包（构建脚本只用 Node 内置 + yaml）。
  */
 
 const PUNCT = [
@@ -138,26 +126,22 @@ export function isVehicleSpec(v) {
 }
 
 /**
- * `triggers[].severity` 的合法取值。
- *
- * 放在这里是为了只有一份真源：构建期校验与编辑器用的 JSON Schema 都取这一份。
- * 抄成两份的后果不是"两边不一致"这么轻，IDE 会拿着旧词表去纠正新写法
- * （飘红建议改成已经不合法的值），比完全没有提示更糟。
+ * `triggers[].severity` 的合法取值。放这里是为了只有一份真源：构建期校验与编辑器的
+ * JSON Schema 都取这份。抄成两份，IDE 会拿旧词表去纠正新写法，比没有提示更糟。
  */
 export const SEVERITIES = new Set(["critical", "warning", "info", "guard"]);
 
 /**
- * 日志 topic / 消息名。风格的约定属于各个格式（PX4 的 uORB 是小写 snake_case，
- * ArduPilot 的 DataFlash 是大写短名如 ATT / GPS / PARM），构建期只挡明显的出格字符，
- * 拿某一族的风格去卡另一族，结果是那一族的规则一条都进不了产物。
+ * 日志 topic / 消息名。风格约定属于各个格式（PX4 uORB 小写 snake_case、ArduPilot DataFlash
+ * 大写短名如 ATT / GPS），构建期只挡明显出格的字符——拿一族风格去卡另一族，
+ * 那一族的规则一条都进不了产物。
  */
 const TOPIC_NAME = /^[A-Za-z][A-Za-z0-9_]*$/;
 
 /**
  * `conditions.message` 的一项：`vehicle_status` ｜ `vehicle_gps_position || sensor_gps` ｜ `ATT`。
- *
- * `||` 表示其中任意一个在日志里就够（两个都不在才跳过）；返回候选名列表，
- * 运行期由引擎按这个语义判。这里只拆写法、校验名字，不认识语义。
+ * `||` = 其中任意一个在日志里就够（两个都不在才跳过）。返回候选名列表；
+ * 这里只拆写法、校验名字，不认识语义。
  */
 export function parseTopicReq(v) {
     if (typeof v !== "string") {
@@ -181,10 +165,8 @@ export function parseTopicReq(v) {
 
 /**
  * 单位词表：`unit=` 能写的规范名，以及 meta/<tag>.json 里那些自由文本（`metres` /
- * `radians` / `us`…）怎么归到规范名上。
- *
- * 规范名要与 `knowledge/engine/rule_engine.py` 的 `_UNIT_FACTORS` 键完全一致（那边存的是
- * 到族基准的因子），构建期会比对这两份，对不上直接构建失败，免得各改各的。
+ * `radians` / `us`…）怎么归到规范名上。规范名要与 `knowledge/engine/rule_engine.py`
+ * 的 `_UNIT_FACTORS` 键完全一致，构建期比对这两份，对不上直接构建失败。
  */
 export const UNIT_ALIASES = {
     // 长度（基准 m）
@@ -254,13 +236,11 @@ const REF_KEYS = new Set(["alias", "unit"]);
 
 /**
  * 字段引用：`topic.field`，两段各自可以带一个下标。
- *   · `topic[:]` / `topic[N]` / `topic[A:B]`，以及什么都不写：实例写法。
- *      `[A:B]` 是闭区间（含两端，与 Python 切片相反）；`[:]` = 所有实例；
- *      不写 = 第 0 个实例（与 `[0]` 同义，要"所有实例"得写 `[:]`）
+ *   · `topic[:]` / `topic[N]` / `topic[A:B]` / 不写 = 实例写法。`[A:B]` 是闭区间（与 Python 切片
+ *     相反）；`[:]` = 所有实例；不写 = 第 0 个实例（要"所有实例"得写 `[:]`）
  *   · `topic.field[N]`：数组字段的元素下标（如 `vehicle_attitude.q[0]`）
- *   · `topic.field[i,j]`：二维下标，i 是行（第几个采样，随时间递进）、j 是列（第几路
- *      信号）。数组字段在日志里存成"每列一条序列"（`q[0]`、`q[1]`…），所以 `q[10,2]` 是
- *      "第 10 个采样时刻、第 2 列"
+ *   · `topic.field[i,j]`：二维下标，i 是行（第几个采样，随时间递进）、j 是列（第几路信号）。
+ *     数组字段按"每列一条序列"存，`q[10,2]` = 第 10 个采样、第 2 列
  * 两个下标位置不同、含义不同，别混。
  */
 const FIELD_REF =
@@ -268,8 +248,7 @@ const FIELD_REF =
 
 /** 拆开字段引用 → {topic, inst, field}（inst 是 int 或 slice；不写 = 第 0 个实例） */
 export function splitFieldRef(s) {
-    // 大小写都收（与 TOPIC_NAME 同理）：`ATT.timestamp`（APM）与
-    // `vehicle_attitude.timestamp`（PX4）是同一件事在不同格式里的写法。
+    // 大小写都收（与 TOPIC_NAME 同理）：`ATT.timestamp`（APM）与 `vehicle_attitude.timestamp`（PX4）同一件事
     const NAME = "[A-Za-z][A-Za-z0-9_]*";
     const m = new RegExp(
         `^(${NAME})(?:\\[([-]?\\d*(?::-?\\d*)?)\\])?\\.((?:${NAME}\\.)*${NAME})(?:\\[(\\d+(?:,\\d+)?)\\])?$`,
@@ -319,8 +298,7 @@ function tokenize(src) {
             continue;
         }
         if (c === "#") {
-            // 行尾注释：跳到行尾继续（不是结束整个表达式，YAML 块标量里换行会被保留，
-            // 因此一条表达式可能跨多行、每行都可能挂注释）
+            // 行尾注释跳到行尾（YAML 块标量里换行被保留，一条表达式可能跨多行、每行都可能挂注释）
             while (i < src.length && src[i] !== "\n") i++;
             continue;
         }
@@ -366,11 +344,8 @@ function tokenize(src) {
 // ─────────────────────────── 语法 ───────────────────────────
 //
 // 表达式 AST 用普通对象（带 pos，报错时能指到列）：
-//   {k:"num"|"str", v}  {k:"const", v}  {k:"list", items}  {k:"dict", entries}
-//   {k:"name", name}    {k:"attr", topic, field}
-//   {k:"call", fn, args, kwargs:{name:expr}}
-//   {k:"bin", op, l, r} {k:"un", op, x}  {k:"bool", op, items}
-//   {k:"cmp", op, l, r} {k:"tern", cond, yes, no}
+//   num/str/const/list/dict/name/attr，call{fn,args,kwargs}，
+//   bin{op,l,r} / un{op,x} / bool{op,items} / cmp{op,l,r} / tern{cond,yes,no}
 
 function Parser(src, toks) {
     let p = 0;
@@ -659,8 +634,7 @@ export function parseCompute(src) {
     return Parser(text, tokenize(text)).statement();
 }
 
-/** 解析一串裸表达式（`a, b, c`），预设里的字段/样式串用它。按同一套词法切，
- *  所以 `ref("a.b", "c.d", unit="deg"), x` 里的逗号不会被切错。 */
+/** 解析一串裸表达式（`a, b, c`），预设里的字段/样式串用它；同一套词法切，ref(...) 里的逗号不会被切错 */
 function parseExprList(src) {
     const text = String(src).trim();
     if (!text) throw new Error("表达式串是空的");
@@ -686,10 +660,8 @@ function sub(node, ctx) {
     return infer(node, { ...ctx, tryAllowed: false });
 }
 
-/**
- * 分组取数（`topic[:]`）是「每实例一组」的列表，只在算子的直接输入位置有意义；
- * 参与四则/比较/三元一定是写错了。
- */
+// 分组取数（`topic[:]`）是「每实例一组」的列表，只在算子的直接输入位置有意义；
+// 参与四则/比较/三元一定是写错了。
 function noGroups(type, ctx, node, what) {
     if (type === T_GROUPS) {
         fail(`${what}不能用分组取数（topic[:] 的结果是每实例一组的列表）`, ctx.src, node.pos);
@@ -715,10 +687,9 @@ function infer(node, ctx) {
             return T_UNKNOWN;
         }
         case "attr": {
-            // 形状校验：topic 与字段都要是小写 snake_case、且只有一段点号。
+            // 形状校验：topic 与字段都要是小写 snake_case、只有一段点号。
             // 存在性（这个名字在本固件里到底有没有）不在这里查：那是 check_rules_fields.py 的活，
-            // 它按「规则 firmware ∩ 引用级 when_fw」圈定版本范围去比回归日志实测字段与上游字典，
-            // 而 requires 管的是 skip 语义、并不列举规则读到的全部 topic（如 imu-bias.yaml 一个都没列）。
+            // 它按「规则 firmware ∩ 引用级 when_fw」圈版本范围去比回归日志实测字段；requires 管 skip 语义，不列举全部 topic。
             if (typeof node.topic === "string") {
                 const full = `${node.topic}.${node.field}`;
                 if (!FIELD_REF.test(full)) {
@@ -761,8 +732,7 @@ function infer(node, ctx) {
             return T_SCALAR;
         }
         case "bool": {
-            // `_try(...) or []` 的语义是在求值失败时兜底，`or` 的第一个操作数要是
-            // 能被 `_try` 包住的顶层调用；`and`/`not` 同理。
+            // `_try(...) or []` 的语义是求值失败兜底；`or` 第一个操作数要能被 `_try` 包住，`and`/`not` 同理
             node.items.forEach((x) => {
                 const isTry = x.k === "call" && x.fn === "_try";
                 noGroups(isTry ? infer(x, { ...ctx, tryAllowed: true }) : sub(x, ctx), ctx, x, "逻辑运算");
@@ -805,8 +775,8 @@ function inferCall(node, ctx) {
     }
 
     if (fn === "_cfg") {
-        // 读飞控参数：引擎内置（provider 的 CFG 字典），不查算子表。
-        // 第一个实参是参数名（得是字符串字面量），第二个可选是缺失时的兜底值（字面量）。
+        // 读飞控参数：引擎内置（provider 的 CFG 字典），不查算子表。第一参是参数名字面量，
+        // 第二参可选，是缺失时的兜底值（字面量）。
         if (args.length < 1 || args.length > 2 || args[0].k !== "str") {
             fail("_cfg() 的第一个参数必须是参数名字面量，如 _cfg('ARMING_CHECK')", ctx.src, node.pos);
         }
@@ -820,8 +790,7 @@ function inferCall(node, ctx) {
     if (fn === "_try") {
         if (!ctx.tryAllowed) fail("_try() 只能出现在赋值右侧的最外层（它的语义是求值器层面的）", ctx.src, node.pos);
         if (args.length !== 1 || Object.keys(kwargs).length) fail("_try() 只接受一个参数", ctx.src, node.pos);
-        // _try(...) 包住的算子仍算「顶层调用」：多输出算子写在 _try 里是合法的
-        // （老节点 optional: true + 多输出就会编译成这个形态）
+        // _try(...) 包住的算子仍算「顶层调用」：老节点 optional: true + 多输出就编译成这个形态
         infer(args[0], { ...ctx, tryAllowed: false, topCall: args[0] });
         return T_UNKNOWN;
     }
@@ -842,10 +811,9 @@ function inferCall(node, ctx) {
         );
     }
 
-    // 入参分两类：形参表的前 in_arity 个是输入（可以是任意表达式，按位置或按名字给），
-    // 其余是命名选项（如 codes= / min_mean= / p=，只能是字面量，它们在运行期是
-    // `**` 直通给算子的 Python 值，老节点写法本来就是这个约束）。
-    // `in_arity` 可以是列表（同一个算子的两种写法，如 quat_to_euler 收一组或收四列）
+    // 入参分两类：形参表的前 in_arity 个是输入（任意表达式，按位置或名字给），其余是命名选项
+    // （如 codes= / min_mean= / p=，只能字面量，运行期 `**` 直通给算子）。
+    // `in_arity` 可以是列表（同一算子的两种写法，如 quat_to_euler 收一组或收四列）
     const params = sig.params ?? [];
     const arities = Array.isArray(sig.in_arity) ? sig.in_arity : [sig.in_arity];
     const maxIn = Math.max(...arities);
@@ -866,8 +834,7 @@ function inferCall(node, ctx) {
                 v.pos,
             );
         }
-        // 一元正负号作用在数字字面量上仍是字面量（`-1.0` 在 Python 里也是），
-        // 不放行的话"取负"这种最朴素的写法只能在规则里绕道实现（见 rcin.yaml 的注记）
+        // 一元正负号作用在数字字面量上仍是字面量（`-1.0` 在 Python 里也是），不放行则"取负"只能在规则里绕道
         const bare = v.k === "un" && (v.op === "-" || v.op === "+") ? v.x : v;
         if (!["num", "str", "const", "list", "dict"].includes(bare.k)) {
             fail(`算子 ${fn} 的选项 ${k}= 只能是字面量（数字/字符串/布尔/None/列表/字典）`, ctx.src, v.pos);
@@ -904,8 +871,8 @@ function inferCall(node, ctx) {
 function checkRef(node, ctx) {
     const { args, kwargs } = node;
     if (args.length < 1) fail("ref() 至少要给一个字段名", ctx.src, node.pos);
-    // 位置参数可以给多个：按顺序取第一个在日志里存在的（同义改名的候选组）。
-    // 候选组要同实例：实例写法写在字段名里（`topic[2].field` / `topic[:].field`）。
+    // 位置参数可给多个：按顺序取第一个在日志里存在的（同义改名候选组）；
+    // 实例写法写在字段名里（`topic[2].field` / `topic[:].field`），候选组要同实例。
     const given = new Set();
     const instForms = new Set();
     let inst = 0;
@@ -971,16 +938,11 @@ function unwrapTry(node) {
 const FW_VERSION_VARS = new Set(["FW_MAJOR"]);
 
 /**
- * 固件版本号要先判 None 才能做大小比较。
- *
- * 为什么：`ver_sw_release` 只有较新的 PX4 才写进日志，老日志这一项是空的、`FW_MINOR` 就是 None，
- * 而 `None >= 15` 在 Python 里会抛异常 → 整条规则被判成"算不出来" → 那条经验在这类日志上
- * 静默失效（不报错、也不出结论，是最难发现的一种坏）。
- *
- * 所以 `a if FW_MINOR >= 15 else b` 这种写法构建期就拦下，逼你补上另一半：
- *     a if (FW_MINOR is None or FW_MINOR >= 15) else b
- * （"版本未知当作新版"与引擎 `_match_firmware` 的口径一致；老写法里的 ref(..., when_fw=)
- * 由引擎内部处理这档，不需要外部补。）
+ * 固件版本号要先判 None 才能做大小比较：`ver_sw_release` 只有较新的 PX4 才写进日志，老日志上
+ * `FW_MINOR` 是 None，`None >= 15` 在 Python 里抛异常 → 整条规则被判"算不出来"→ 静默失效。
+ * 所以 `a if FW_MINOR >= 15 else b` 构建期就拦下，逼你补上
+ * `a if (FW_MINOR is None or FW_MINOR >= 15) else b`
+ * （"版本未知当作新版"与引擎 `_match_firmware` 口径一致；ref(..., when_fw=) 由引擎内部处理）。
  */
 function checkFirmwareGuards(root, ctx) {
     const ordered = new Map(); // 变量 -> 第一次做大小比较的位置
@@ -1031,9 +993,7 @@ function checkFirmwareGuards(root, ctx) {
 
 /**
  * 校验一条 compute 表达式。
- *
- * @param {string} src   表达式原文
- * @param {object} ctx   { signatures, builtinVars, declaredVars }
+ * @param {string} src   表达式原文；@param {object} ctx { signatures, builtinVars, declaredVars }
  * @returns {{targets: string[], value: object, type: string}}
  */
 export function validateCompute(src, ctx) {
@@ -1125,10 +1085,8 @@ export function validateComputeList(list, ctx) {
 
 /**
  * 抽出表达式里的字段引用（`ref(...)` 与裸写的 `topic.field`），供构建期做字段级查表
- * （目前是 `unit=` 的源单位解析）。
- *
- * 返回 `[{fields: ["topic.field", …], instance?, alias?, when_fw?, unit?}, …]`：
- * 一条 ref 就是一项，`fields` 是它的候选组（按书写顺序）。
+ * （目前是 `unit=` 的源单位解析）。返回 `[{fields: ["topic.field", …], instance?, alias?, when_fw?, unit?}, …]`，
+ * 一条 ref 一项，`fields` 是它的候选组（按书写顺序）。
  */
 export function collectRefs(src) {
     const { value } = parseCompute(String(src).trim());
@@ -1158,15 +1116,11 @@ export function collectRefs(src) {
 }
 
 /**
- * 预设（`plot/*.yml`）里的一个取数声明串 → 结构化描述。
- *
- * 只认三种形态（图上要算术请写进预设的 `compute` 节点，别在这里藏表达式）：
- *   · 裸写字段引用 `topic.field`（要实例 / 单位 / 候选组就得包 ref）
- *   · `ref("新名", "旧名", unit="deg")`：与规则同一套候选组与单位语法
- *   · `compute` 里赋过值的变量名
- *
- * 一项就是一条线：多条写成 YAML 列表（一行一项，或 `[甲, 乙]`），别在这里塞逗号，
- * 逗号串那套（连同类）已经退役，见 CLAUDE.md。
+ * 预设（`plot/*.yml`）里的一个取数声明串 → 结构化描述。只认三种形态
+ * （图上要算术请写进预设的 `compute` 节点，别在这里藏表达式）：
+ * 裸字段引用 `topic.field`（要实例 / 单位 / 候选组就得包 ref）、
+ * `ref("新名", "旧名", unit="deg")`（与规则同一套候选组与单位语法）、
+ * `compute` 里赋过值的变量名。一项就是一条线：多条写成 YAML 列表，别塞逗号（逗号串已退役）。
  *
  * @param {object} opts { signatures, builtinVars, declaredVars }
  * @returns {{kind:"field",fields:string[],unit?:string,alias?:string[]}|{kind:"var",name:string}}
@@ -1217,10 +1171,10 @@ export function checkFieldItem(src, opts = {}) {
         }
         return { kind: "var", name: node.name };
     }
-    // 下标节点：topic[1].field[0] 这类带实例/索引的裸字段引用
+    // 下标节点：topic[1].field[0] 这类带实例/索引的裸字段引用。
+    // v 是 attr 节点（sub 下标在 attr 外层：vehicle_torque_setpoint[1].xyz[0]
+    // → sub(v=attr(topic=sub(name="vehicle_torque_setpoint")[1], field="xyz"))[0]）
     if (node.k === "sub") {
-        // v 是 attr 节点（sub 下标在 attr 外层：vehicle_torque_setpoint[1].xyz[0]
-        // → sub(v=attr(topic=sub(name="vehicle_torque_setpoint")[1], field="xyz"))[0]）
         const attrNode = node.v?.k === "attr" ? node.v : null;
         if (attrNode) {
             const topicName = typeof attrNode.topic === "string" ? attrNode.topic : collectTopicName(attrNode.topic);
@@ -1284,11 +1238,9 @@ function collectNames(node, out = new Set()) {
 // ─────────────────────────── 入口 ───────────────────────────
 
 /**
- * compute 的每一项都得是字符串表达式。
- *
- * 早先还支持"算子节点"写法（`- {out: x, from: a.b, op: max}`），由构建期编译成等价表达式；
- * 2026-09-17 全部规则迁移完之后就把那条路删了，同一个意思只留一种写法（两套并存的代价是
- * 规则文件分成两派风格、读者要同时认两套，而收益只是迁移期的一点过渡便利）。
+ * compute 的每一项都得是字符串表达式。早先还支持"算子节点"写法（`- {out: x, from: a.b, op: max}`），
+ * 由构建期编译成等价表达式；全部规则迁移完后删掉那条路——同一个意思只留一种写法，
+ * 两套并存的代价是读者要同时认两套，收益只是迁移期的过渡便利。
  */
 export function normalizeCompute(raw, where) {
     if (typeof raw !== "string") {

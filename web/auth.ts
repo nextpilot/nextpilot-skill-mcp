@@ -4,19 +4,16 @@ import Credentials from "next-auth/providers/credentials";
 import { consumeEmailOtp, upsertEmailUser, upsertGithubUser } from "@/lib/internal-kv";
 
 /**
- * 冲刺 2 认证（CLAUDE.md 6.1）：
- * - JWT 会话策略，无数据库；边缘函数用同一 AUTH_SESSION_SECRET 解密（见 functions/_lib/auth.js）
- * - GitHub OAuth + 邮箱验证码（Credentials 承载 OTP 校验）
- * - 用户资料存 EdgeOne KV，经 /internal/* 边缘函数中转
+ * 认证（CLAUDE.md 6.1）：JWT 会话策略、无数据库；边缘函数用同一 AUTH_SESSION_SECRET 解密
+ * （见 functions/_lib/auth.js）。GitHub OAuth + 邮箱验证码（Credentials 承载 OTP 校验），
+ * 用户资料存 EdgeOne KV、经 /internal/* 边缘函数中转。
  */
 const githubId = process.env.AUTH_GITHUB_ID;
 const githubSecret = process.env.AUTH_GITHUB_SECRET;
 
 /**
- * 后台（/admin/settings）管理员白名单。
- *
- * 没配 AUTH_ADMIN_EMAILS 时任何人都不算管理员，宁可后台进不去，也不要让
- * "没配 = 全放行"这种默认成立。邮箱比对大小写不敏感，逗号分隔。
+ * 后台（/admin/settings）管理员白名单。没配 AUTH_ADMIN_EMAILS 时任何人都不算管理员：
+ * 宁可后台进不去，也不要让"没配 = 全放行"成立。邮箱比对大小写不敏感，逗号分隔。
  */
 function isAdminEmail(email: string): boolean {
     const list = (process.env.AUTH_ADMIN_EMAILS ?? "")
@@ -90,9 +87,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 if (record) {
                     token.uid = record.uid;
                     token.plan = record.plan;
-                    // GitHub 个人设置里邮箱可能为私密，OAuth profile 拿不到；
-                    // 但 KV upsert 时如果能从之前的登录记录里取回邮箱，就写回 token，
-                    // 否则管理员白名单依赖 email 就会一直判 false。
+                    // GitHub 个人设置里邮箱可能为私密，OAuth profile 拿不到；KV upsert 时若能从上一次登录记录
+                    // 取回邮箱就写回 token，否则依赖 email 的管理员白名单会一直判 false。
                     if (record.email) token.email = record.email;
                 }
                 token.loginType = "github";
@@ -101,8 +97,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 token.plan = (user as { plan?: string }).plan ?? "free";
                 token.loginType = "email";
             }
-            // 管理员身份每次刷新 token 时重算：AUTH_ADMIN_EMAILS 改了，老会话下一次刷新即生效，
-            // 不用逼用户重新登录。GitHub 登录可能拿不到邮箱，那就不是管理员。
+            // 管理员身份每次刷新 token 时重算：改了 AUTH_ADMIN_EMAILS，老会话下次刷新即生效、不用重新登录。
+            // GitHub 登录可能拿不到邮箱，那就不是管理员。
             const email = (typeof token.email === "string" ? token.email : (user?.email ?? "")).toLowerCase().trim();
             token.isAdmin = email ? isAdminEmail(email) : false;
             return token;

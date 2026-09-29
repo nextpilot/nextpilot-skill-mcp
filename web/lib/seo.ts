@@ -54,19 +54,10 @@ export interface PageMeta {
 }
 
 /**
- * 为任一页面生成标准化 Metadata。
- *
- * 用法：
- *   export function generateMetadata() { return makePageMeta({ ... }); }
- *
- * 为什么是同步的：域名 / 站名 / 短名全部来自 `@/lib/site-config` 的构建期常量
- * （环境变量 + 默认值）。曾经这里是 `async` + `await getSiteSettings()` 读 KV，
- * 为的是「后台改域名后 canonical 立即生效」。代价是每一个调用它的页面都成了动态渲染，
- * CDN 一个字节都缓存不了，首页 TTFB 为此多花 ~1 秒。
- *
- * 站点信息现在改为「改环境变量 + 重新部署」，所以这里可以是纯同步的，
- * 调用方可以直接 `export const metadata = makePageMeta(...)` 静态导出。
- * 详见 CLAUDE.md「首页静态化」一节。
+ * 为任一页面生成标准化 Metadata。用法：generateMetadata() { return makePageMeta({...}) }。
+ * 刻意纯同步：域名/站名来自 site-config 的构建期常量。曾经 async 读 KV「后台改域名立即生效」，
+ * 代价是每个调用页变动态渲染、CDN 缓存失效，首页 TTFB +~1s；现在站点信息走改环境变量+重新部署，
+ * 调用方可静态导出 `export const metadata = makePageMeta(...)`。详见 CLAUDE.md「首页静态化」。
  */
 export function makePageMeta({
     title,
@@ -145,11 +136,7 @@ export function makePageMeta({
 
 /* ========== JSON-LD 结构化数据 ========== */
 
-/**
- * 站点级结构化数据（Organization + WebSite）。
- *
- * 同步的理由同 `makePageMeta`：域名来自构建期常量。首页因此可以整页静态化。
- */
+/** 站点级结构化数据（Organization + WebSite）。同步理由同 makePageMeta：域名来自构建期常量，首页可整页静态化 */
 export function siteJsonLd(): object {
     return {
         "@context": "https://schema.org",
@@ -240,10 +227,7 @@ export interface FaqItem {
     answer: string;
 }
 
-/**
- * 从 MDX body 中提取 FAQ Q&A 对。
- * 匹配模式：### 标题（问题）→ 后续到下一个 ### 或 ## 之前为答案。
- */
+/** 从 MDX body 提取 FAQ Q&A 对：### 标题为问题，到下一个 ### 或 ## 之前为答案 */
 export function extractFaqItems(body: string): FaqItem[] {
     const items: FaqItem[] = [];
     // 按 ### 切割，但保留分隔符
@@ -296,10 +280,7 @@ export function productJsonLd(): object {
 
 /* ========== Speakable 语音搜索标记 ========== */
 
-/**
- * 生成 Speakable 结构化数据（Google Assistant / Siri 语音搜索用）。
- * 指定页面中哪些文本适合朗读。每页限定 2-3 段。
- */
+/** Speakable 结构化数据（Google Assistant / Siri 语音搜索用），指定适合朗读的文本段，每页限 2-3 段 */
 export function speakableJsonLd(xpathSections: string[]): object {
     return {
         "@context": "https://schema.org",

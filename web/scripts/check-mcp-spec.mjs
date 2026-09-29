@@ -1,33 +1,13 @@
 /**
- * MCP 条目合规校验：`web/content/mcp/<slug>/` 是否满足 MCP Registry 规范与本站的字段约定。
- *
- * 与 `check-skill-spec.mjs` 是一对，但规范不同源，别当成同一套：
- * Skill 走 Agent Skills 规范（SKILL.md，name 是 kebab 且要等于目录名）；
- * MCP 走 MCP Registry 规范的 `server.json`（name 是反向 DNS `io.github.owner/repo`）。
- * 两条命名规则互斥，所以这两个守卫只能分开写，合成一个必然有一边是错的。
- *
- * 规范依据（2026-09-20 核对）：
- *   - registry.modelcontextprotocol.io 的 server.json schema
- *     必填 `$schema` / `name` / `description` / `version` / `packages[]`
- *     `name` = 反向 DNS，大小写敏感；`description` ≤ 100 字符
- *     `packages[]`：registryType / identifier / version / transport.type（stdio | streamable-http | sse）
- *     可选 repository{url,source} / title / websiteUrl / remotes[]
- *
- * ## 输出契约（被 mutate_guards.py 解析，改格式前先看那边）
- *
- * 失败行必须是 `  FAIL <规则id> -> <详情>`；总结行不许写成 `FAIL <名字>`（会被当成一条
- * 检查名，于是每条变异都误报"牵连"），用 `RESULT: N 处未过`。只用 ASCII。
- *
- * ## 上游未确认的条目
- *
- * `README.md` frontmatter 写 `upstream_status: "pending"` 的条目允许暂时没有
- * `server.json`（本站收录 MSFS 那条时没记 sourceUrl，工具名也对不上任何公开项目，
- * 硬填 manifest 就是编造）。这种条目会被显式打印成 `SKIP` 而不是悄悄放过，
- * 每次校验都看得见"还有几条待补"。
- *
- * 用法（在 web/ 下）：
- *   node scripts/check-mcp-spec.mjs               # 反例自检 + 真目录
- *   node scripts/check-mcp-spec.mjs --self-test   # 只跑反例自检
+ * MCP 条目合规校验：web/content/mcp/<slug>/ 是否满足 MCP Registry 规范与本站字段约定。
+ * 与 check-skill-spec.mjs 是一对但规范不同源：Skill 走 Agent Skills（name 是 kebab 且等于目录名），
+ * MCP 走 MCP Registry 的 `server.json`（name 是反向 DNS `io.github.owner/repo`）；两条命名规则互斥，守卫只能分开写。
+ * 依据 registry.modelcontextprotocol.io 的 schema：必填 $schema/name/description/version/packages[]，
+ * description ≤100，packages[].transport.type ∈ stdio|streamable-http|sse。
+ * 输出契约（mutate_guards.py 解析）：失败行 `  FAIL <规则id> -> <详情>`；总结用 `RESULT: N 处未过`；只用 ASCII。
+ * README frontmatter 写 `upstream_status: "pending"` 的条目允许暂缺 server.json（硬填 manifest 就是编造），
+ * 这种条目打印成 SKIP 而非悄悄放过。
+ * 用法（web/ 下）：node scripts/check-mcp-spec.mjs [--self-test]
  */
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -50,9 +30,8 @@ const PENDING = "pending";
 const VERSION_HEADING = /^##\s+(\S+)(?:\s*[—–-]\s*(\S+))?\s*$/;
 
 /**
- * 单个 MCP 目录的全部问题。纯函数（不碰文件系统），反例自检要拿内存里的假目录
- * 走同一套判据，否则自检测的是另一份逻辑，等于没测。
- *
+ * 单个 MCP 目录的全部问题。纯函数（不碰文件系统）：反例自检要拿内存里的假目录走同一套判据，
+ * 否则自检测的是另一份逻辑，等于没测。
  * @param {{slug: string, files: string[], readme?: string, changelog?: string, serverJson?: object}} input
  * @returns {{rule: string, msg: string, pending?: boolean}[]}
  */
@@ -179,10 +158,8 @@ export function collectProblems(input) {
 }
 
 // ---------------------------------------------------------------------------
-// 反例自检：每条规则一个故意违规的假目录，断言它真会红。
-//
-// 存在的唯一理由是防「守卫恒绿」。真目录数量少且多数合法，任何一条判据被写反都表现为
-// 空输出 + exit 0，只有反例会失声。
+// 反例自检：每条规则一个故意违规的假目录，断言它真会红。唯一目的是防「守卫恒绿」：
+// 真目录数量少且多数合法，判据写反就表现为空输出 + exit 0，只有反例会失声。
 // ---------------------------------------------------------------------------
 
 const GOOD_README = `---

@@ -1,45 +1,24 @@
-// 报错上报的自测：不联网、不起服务，直接验证最容易写错的四件事：
-//   1. 指纹是否真的归一化（否则去重形同虚设，一个 bug 刷出几百个 issue）
-//   2. 脱敏是否真生效（否则公开的 Gitee 仓库会泄露用户信息）
-//   3. 白名单是否真挡住额外字段（前端或第三方可以随便往 payload 里塞东西）
-//   4. 超长文本截断后，末尾的关键行是否还在（Python traceback 的异常行在最后）
+// 报错上报的自测：不联网、不起服务，验证最容易写错的四件事——
+//   1. 指纹真的归一化（否则去重形同虚设）2. 脱敏真生效（否则公开仓库泄露用户信息）
+//   3. 白名单真挡住额外字段 4. 超长截断后末尾关键行还在（traceback 异常行在最后）
 //
-// 末尾十二节（§[9]~§[20]）性质不同：它们不测行为，而是扫源码防架构回潮。
-//   §[9]  两侧共用的政策只许有一份实现（防止再长出第二份，悄悄分叉）；
-//   §[10] 外部 JSON 进内部类型要过归一、不许 `as` 强转（线上白屏过一次）；
-//   §[11] 派生数据（曲线/轨迹）要按报告身份清理（切了日志还在用上一份的，静默错数据）；
-//   §[12] 取数据前要先让 Worker 装上当前这份日志（共享常驻 Worker 的"装着谁"要能自愈）；
-//   §[13] `functions/` 下每个端点都要在本地 dev 垫片的映射表里（漏一个 = 本地整条静默 404）；
-//   §[14] 指南正文只许有一个渲染入口（曾裂成 `GuideMarkdown` / `GuideMdx` 一对近音名 +
-//         两份分叉的 `textOf`，`{占位符}` 文档差点被 MDX 解析），且两条路要共用同一份
-//         remark 插件，MDX 侧漏了 `remark-gfm`，GFM 表格会静默退化成纯文本（线上 5 张表）；
-//   §[15] 组件名跟着家族不变量走（`Log*` = 某一份日志；一次列很多份的用数据模型的词）；
-//   §[16] 轨迹取不到时界面要把引擎给的逐条原因显示出来（一句概括只对六种原因里的一种，
-//         另外五种下它是错的，"空洞"的代价是用户拿不到任何能自己判断的线索）；
-//   §[17] 两类条目共用的详情页组件不许带某一类的前缀（`Skill*` 出现在 `/mcp/[slug]` 里就是
-//         名字在说谎，而照名字去"修正"会复制出 `Mcp*` 孪生组件，改一边漏一边）；
-//   §[18] 站点版本（footer 的「版本 + 日期」）只许有一个读取口：next.config.ts 注入、
-//         lib/site-version.ts 读、别人不许再直接读环境变量（issue-bridge 曾经读了两年
-//         一个从来没人赋值的变量，上报里的版本恒为空串）；
-//   §[19] 指南页左右两栏的宽度都不许写死（写死 `w-48` 时侧栏内部凭空多出 27~54px 死白，
-//         写死 `w-56` 时右目录列内空 126px），两道栏间距不许回到 40px，右目录要在 lg
-//         就显示（xl 断点被滚动条吃掉 17px 后踩不准，目录整列消失再留 176px 死白，
-//         都是没人会主动去查的静默退化）；
-//   §[20] 隐私承诺与免责声明这两句固定文案只有一个出处（lib/log-analysis-notes.ts），
-//         且只在上传卡渲染（页脚品牌区与底栏都不再重复，用户交日志的地方就是它们的落点）；
-//   §[21] 次数上限不在前端显示（上限以后由后台配置）。曾经同一个 3 次/天在上传卡、
-//         AI 解读区、「我的」页各露一次，而后台还没把配置口开出来，前端先替它报一个
-//         写死的数字，等于替后台做了个还没做的决定。
-// 这几类问题都属于"同一件事有两条路径、只有一条被校验"，本仓库已经因此出过几次事故，
-// 光靠人记没用，所以做成机器能拦的守卫。
+// 末尾 §[9]~§[23] 不测行为，而是扫源码防架构回潮：
+//   §[9] 共用政策只许一份实现；§[10] 外部 JSON 进内部类型要过归一、不许 `as` 强转（线上白屏过）；
+//   §[11] 派生数据（曲线/轨迹）按报告身份清理；§[12] 取数前先让 Worker 装上当前日志（自愈）；
+//   §[13] functions/ 每个端点都要在本地 dev 垫片映射表里（漏一个 = 本地静默 404）；
+//   §[14] 指南正文只许一个渲染入口（MDX 侧漏 remark-gfm 表格会静默退化）；
+//   §[15] 组件名跟家族不变量走（`Log*` = 某一份日志）；§[16] 轨迹取不到要显示引擎给的逐条原因；
+//   §[17] 共用详情页组件不带某一类的前缀；§[18] 站点版本只许一个读取口；
+//   §[19] 指南页栏宽不许写死；§[20] 固定文案只有一个出处；§[21] 次数上限不在前端显示。
+// 这些都是"同一件事有两条路径、只有一条被校验"，光靠人记没用，做成机器能拦的守卫。
 //
 // 跑法：node web/scripts/test-issue-filer.mjs
 import { sanitizePayload, fingerprintOf, reportIssue } from "../functions/_lib/issue-filer.js";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-// 脱敏/截断是两侧共用的那一份（浏览器侧 lib/issue-bridge.ts 也引它），
-// 所以直接对共享模块验证：它错了，两边一起错，这一节要守住。
+// 脱敏/截断是两侧共用的一份（浏览器侧 lib/issue-bridge.ts 也引它），
+// 直接对共享模块验证：它错了两边一起错，这一节要守住。
 import { scrub, SCRUB_RULES } from "../lib/error-policy.js";
 
 let failed = 0;
@@ -56,14 +35,9 @@ function check(name, cond, extra = "") {
 const WEB = fileURLToPath(new URL("..", import.meta.url));
 /**
  * 静态守卫引用的源码路径要登记，不许直接 readFileSync。
- *
- * 由来（2026-09-23 实测）：i18n 给所有页面套了一层 `[locale]`，脚本里写死的
- * `app/skills/[slug]/page.tsx` 之类集体失效；readFileSync 直接抛 ENOENT，脚本在
- * §[17] 就死掉，§[18]~§[22] 一条都没跑，而 CI 只看得见"进程非零退出"，
- * 分不清是"路径坏了"还是"守卫真红了"。这是最坏的一种失败：守卫失效的同时还伪装成通过。
- *
- * 所以这两个函数在路径不存在时登记下来并返回空串，让那一节的断言自己红（缺什么说清楚），
- * 而不是把后面的节全部带走。末尾 §[23] 汇总"有没有引用到不存在的路径"。
+ * i18n 套 `[locale]` 后写死路径会集体失效，readFileSync 抛 ENOENT 让脚本在 §[17] 就死掉、
+ * 后面的节一条没跑，而 CI 只看见非零退出，分不清"路径坏了"还是"守卫真红了"。
+ * 所以路径不存在时登记进 MISSING_PATHS 并返回空串，让那一节的断言自己红；§[23] 汇总。
  */
 const MISSING_PATHS = [];
 /** 读 web/ 下的源码（末尾几节的静态守卫用；路径相对本文件，即 web/scripts/） */
@@ -84,18 +58,12 @@ const readWeb = (...parts) => {
     }
     return readFileSync(join(WEB, rel), "utf8");
 };
-/**
- * 剥掉注释再扫。静态守卫要先过这一步：本仓库的习惯是把"为什么"写进注释，注释里
- * 会原样出现标识符（`node.type === "code"`、`react-markdown`…），裸子串检查于是被注释
- * 喂饱，把真代码删掉它照样绿。2026-09-18 连着踩了两次，才明白该修的是检查方式本身。
- */
+// 剥掉注释再扫：本仓库习惯把"为什么"写进注释，注释里会原样出现标识符（`node.type === "code"`…），
+// 裸子串检查会被注释喂饱，把真代码删掉照样绿。
 const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/[^\n]*/g, "$1");
 
-/**
- * 列出 web/ 下所有要看的前端源码，路径相对 web/（`.ts` / `.tsx`）。
- * 末尾几节的"全站扫"守卫共用它，排除清单只此一份，否则某个守卫忘了排除 `.next`
- * 就会扫到几千个构建产物里的副本，报一堆假失败，然后被人把守卫注释掉。
- */
+// 列出 web/ 下所有要看的前端源码（`.ts` / `.tsx`，路径相对 web/），末尾几节的"全站扫"共用。
+// 排除清单只此一份：某个守卫忘了排除 `.next` 就会扫到几千个构建产物副本，报假失败后被注释掉。
 const walkSourceFiles = (root, sub = "", out = []) => {
     for (const e of readdirSync(join(root, sub), { withFileTypes: true })) {
         if (["node_modules", ".next", "content/skills", "content/mcp", "e2e", "playwright-report"].includes(e.name))
@@ -147,15 +115,13 @@ console.log("\n[2] 脱敏（决定公开 issue 会不会泄露用户信息）");
     check("内网 IP", !s.includes("192.168.1.10"), s);
     check("长 hex（可能是密钥/指纹）", !s.includes("9f86d081884c7d65"), s);
 
-    // 客户端先脱 + 边缘再脱，这条链要求 scrub 幂等，否则第二遍会把第一遍的
-    // 占位符再加工一次，两侧对同一份输入的结果就分道扬镳（JWT 变半截 hex 那类）。
+    // 客户端先脱 + 边缘再脱要求 scrub 幂等，否则第二遍会把占位符再加工、两侧结果分叉
     check("二次脱敏幂等（客户端先脱 + 边缘再脱 = 只脱一次）", scrub(s) === s, scrub(s).slice(0, 160));
     check("JWT 在整条链里保持 jwt 占位符（没被宽泛的长 hex 规则先咬掉）", s.includes("<jwt>"), s);
 }
 
-// 幂等的结构证明：任何一条规则的替换产物，都不该被（含它自己在内的）任何规则
-// 再匹配一次。这条成立，"客户端先脱 + 边缘再脱"就恒等于"只脱一次"，
-// 而不是只对上面那一条样例成立。
+// 幂等的结构证明：任何一条规则的替换产物，都不该被（含它自己在内的）任何规则再匹配一次。
+// 这条成立，"客户端先脱 + 边缘再脱"就恒等于"只脱一次"，而不是只对上面那条样例成立。
 {
     const unstable = [];
     for (const [, rep] of SCRUB_RULES) {
@@ -367,21 +333,13 @@ console.log("\n[10] 外部数据的读取边界（网络响应与存档一律过
     const nodePath = await import("node:path");
     const webDir = fileURLToPath(new URL("..", import.meta.url));
 
-    // 背景（线上真炸过）：SavedReport 有一半来自外部 JSON：
-    //   · 索引库里的老记录（早期版本没有 findings 字段，还有从 localStorage 迁移来的）
-    //   · /api/reports/:id 取回的云端 KV 记录（TTL 7 天，里面可能是任意历史版本写的）
-    // 这些 JSON 到了前端，TypeScript 一点用都没有。以前靠 `as SavedReport` 强转接住，
-    // 缺字段的报告就一路走到 LogReport 的 `report.findings.filter` 才崩（GeneralInfo 白屏）。
-    // 同一个坑在 lib/community-stats.ts（`(await resp.json()) as RatingStats`）和
-    // lib/internal-kv.ts（`r.user as InternalUser`）各有一份。规则写在 CLAUDE.md §6.5，
-    // 这里把它变成机器能查的两条：
-    //   ① 读边界的同一行不许出现 `as <具名类型>`。读边界的标记见 BOUNDARY_READS。
-    //      漏网形态：`const r = await callInternal(...)` 之后再过一行 `r.user as InternalUser`，
-    //      那种靠 ② 兜。
-    //   ② 有唯一闸门的内部形状（GATED_TYPES），任何位置的 `as <类型>` 都违规。
-    //      新增一条链时把类型名加进这张表；没进表的形状只能靠 ① 抓，能不能抓到取决于写法。
-    // `as unknown` / `as Record<…>` 放行，但它们只该活在归一函数内部。
-    // 已知局限：两条都按行匹配，把 `as` 换行写就查不出来，那是刻意绕过，不是手滑。
+    // 线上真炸过：SavedReport 一半来自外部 JSON——索引库老记录、云端 KV 里任意历史版本写的记录，
+    // TypeScript 在这里没用。以前靠 `as SavedReport` 强转接住，缺字段的报告一路走到
+    // `report.findings.filter` 才崩（白屏）。规则见 CLAUDE.md §6.5，机器化成两条：
+    //   ① 读边界的同一行不许 `as <具名类型>`（读边界标记见 BOUNDARY_READS）；漏网形态靠 ② 兜。
+    //   ② GATED_TYPES 里有唯一闸门的形状，任何位置的 `as <类型>` 都违规（新增链要登记类型名）。
+    // `as unknown` / `as Record<…>` 放行，但只该活在归一函数内部。
+    // 已知局限：按行匹配，`as` 换行写查不出来——那是刻意绕过，不是手滑。
     const UNTYPED_CAST = /as\s+(?:Record\s*<|unknown\b|any\b)/;
     const NAMED_CAST = /\bas\s+[A-Za-z_$][\w$]*/;
     const BOUNDARY_READS = [".json()", "callInternal("];
@@ -447,11 +405,9 @@ console.log("\n[10] 外部数据的读取边界（网络响应与存档一律过
 
 console.log("\n[11] 派生数据必须按报告身份清理（切了日志就不许再用上一份的曲线/轨迹）");
 {
-    // 曲线的键是 `presetId#面板序号`，与日志无关（预设是静态的），所以 state 里的
-    // storedPlots 一旦跨报告存活，LogCharts 会直接命中上一份的序列画出来：图形完全正常、
-    // 数据是别人的。轨迹更直白，画出来就是另一份日志的航线。工具轨迹地图那条链上，
-    // 「工作区里装着哪份日志」由 worker 的 logId 比对兜住（见 §logNotLoadedReason）；
-    // 这里是前端这一半：切报告时要把上一份的派生数据丢掉。
+    // 曲线的键是 `presetId#面板序号`，与日志无关（预设是静态的）：storedPlots 跨报告存活时
+    // LogCharts 会命中上一份的序列——图形完全正常、数据是别人的；轨迹同理。Worker 那条链上
+    // 「装着谁」由 logId 比对兜住（见 §logNotLoadedReason），这里是前端这一半：切报告时丢掉派生数据。
     const hook = read("../hooks/useLogAnalyzer.ts");
 
     // 清理由唯一的函数负责，两个 state 都要清到
@@ -463,8 +419,7 @@ console.log("\n[11] 派生数据必须按报告身份清理（切了日志就不
     check("清理函数按报告 id 判据（同一份就地复解析时不清）", helper.includes("reportIdRef.current === nextId"));
 
     // 两个"换报告"的入口都要调它。
-    // 取函数体用"到下一个同级声明为止"，不用固定字符窗口，窗口会因为注释变长而失效
-    // （2026-09-18 踩过：parseBytes 加了几行注释，检查就掉到窗口外，报了个假的失败）
+    // 取函数体用"到下一个同级声明为止"，不用固定字符窗口：窗口会因注释变长而失效，报假失败
     for (const [entry, anchor] of [
         ["viewSaved（切报告）", "const viewSaved = useCallback"],
         // 锚点要写成 `= useCallback`：光写 `const parseBytes` 会命中 `parseBytesRef`（声明顺序上它更靠前）
@@ -483,11 +438,9 @@ console.log("\n[11] 派生数据必须按报告身份清理（切了日志就不
 
 console.log('\n[12] 取数据前先让 Worker 装上这份日志（共享 Worker 的"装着谁"要能自愈）');
 {
-    // 背景：Worker 共享且常驻（跨路由存活，见 hooks/useLogAnalyzer.ts 文件头）。它可能正装着
-    // 另一份日志，于是 track/series 请求被 Worker 的闸门挡下，界面只能叫用户"重新选择该 .ulg
-    // 文件"，而字节往往就在手里（刚选过的那份、或本机缓存里的）。2026-09-18 用户连着报了三轮
-    // "还是这个问题"，就是这么来的：每一步看起来都对，但没有人负责"把这份日志装进 Worker"。
-    // 现在这个责任归前端：取数前先 ensureLogLoaded。下面几条把结构钉住。
+    // Worker 共享且常驻（跨路由存活，见 hooks/useLogAnalyzer.ts 文件头），可能正装着另一份日志：
+    // track/series 请求被闸门挡下，界面只能叫用户"重新选择该 .ulg"，而字节往往就在手里。
+    // 责任归前端：取数前先 ensureLogLoaded。下面几条把结构钉住。
     const worker = read("../workers/analysis-worker.ts");
     const hook = read("../hooks/useLogAnalyzer.ts");
 
@@ -525,20 +478,17 @@ console.log('\n[12] 取数据前先让 Worker 装上这份日志（共享 Worker
     check("字节必须与指纹配对（不许拿 A 的字节补 B）", ensure.includes("pendingBytesHashRef.current === hash"));
     check("同一份日志的并发补解析去重", ensure.includes("analyzeInFlight"));
 
-    // 补解析是"页面已经把报告渲染出来之后"才发起的：Pyodide 首次初始化要十几秒，用户完全
-    // 可能在这中间回列表打开另一份报告。于是 done 要认领自己的结果，判据用 worker 回传的
-    // logId（= 这份数据属于哪份日志），而不是"我发过 analyze"（analyze 会失败，推断出来的
-    // "就是它"会让上面这条竞态被误判成正常路径）。少了这一条，页面就会"头部显示 C、结论是 B"，
-    // liveAnalysis 还会被记成「C 的 id + B 的 manifest」。
+    // 补解析是"页面已经把报告渲染出来之后"才发起的（Pyodide 首次初始化要十几秒，期间用户完全
+    // 可能回列表换报告）：done 要认领自己的结果，判据用 worker 回传的 logId，而不是"我发过
+    // analyze"。少了这条，页面会"头部显示 C、结论是 B"，liveAnalysis 被记成「C 的 id + B 的 manifest」。
     check(
         "done 只把结果写进它自己要的那份报告（补解析的结果不许盖住已经换过的页面）",
         /if \(logId !== pendingHashRef\.current\) return;/.test(doneHandler),
         "done 里没看到 logId 与当前页面对照",
     );
 
-    // 补解析要沿用当前显示的报告那份 AI 解读。用 pendingAiRef（"上次解析那份日志的 priorAi"）
-    // 会把这份报告的 AI 报告覆盖成空/别的，而且 done 紧跟着就 persist，落盘一并改掉：
-    // 这不是显示问题，是把用户花额度换来的解读永久删掉。
+    // 补解析要沿用当前报告的 AI 解读。用 pendingAiRef（"上次解析那份日志的 priorAi"）会把
+    // 这份报告的 AI 报告覆盖成空/别的，且 done 紧跟着 persist 落盘——是把用户花额度换来的解读永久删掉。
     check(
         "补解析沿用当前报告的 AI 解读（aiMarkdownRef，不是 pendingAiRef）",
         ensure.includes("priorAi: aiMarkdownRef.current"),
@@ -559,8 +509,8 @@ console.log('\n[12] 取数据前先让 Worker 装上这份日志（共享 Worker
         parseFn.includes("failPendingAnalyze(meta.hash)"),
     );
 
-    // 最后一个没人校验的入口：worker 的 done 直接进 report state。它缺 findings 时
-    // GeneralInfo 的 `findings.filter` 会把整页打白，所以 done 要过归一，而不是塞进去算数。
+    // 最后一个没人校验的入口：worker 的 done 直接进 report state，缺 findings 时
+    // GeneralInfo 的 `findings.filter` 会把整页打白，所以 done 要过归一。
     check(
         "done 边界过了归一（不许把 worker 的报告直接塞进 state）",
         hook.includes("normalizeWorkerReport(m.report)") &&
@@ -571,16 +521,10 @@ console.log('\n[12] 取数据前先让 Worker 装上这份日志（共享 Worker
 
 console.log("\n[13] functions/ 下的端点在本地 dev 垫片里必须可达（漏一个 = 整条功能在本地静默 404）");
 {
-    // 本地只有 Next 自身，跑不了 EdgeOne 的 Edge 函数：`/api/*` 与 `/internal/*` 靠
-    // next.config.ts 的 afterFiles rewrite 转进 app/edge-dev，再由那里的一张白名单
-    // 按路径动态 import 处理器。
-    //
-    // 白名单漏项的失败形态是最难认的一种：不抛错、不进日志、也没有类型错误，就是一个 404，
-    // 与"这个功能还没做"长得一模一样。2026-09-18 实际漏了 `api/issues`：它由
-    // `lib/issue-bridge.ts:51` 的 `ENDPOINT` 唯一引用，于是本机所有 `reportError()`
-    // 全部静默丢掉（桥接层按设计吞掉失败），排查缺字段那类问题时等于没有证据。
-    // 三个根级探针（ping / kv-probe / issue-probe）同样没接上：它们是"发布前手工验一遍"
-    // 的工具，本地访问不了就只能等上线后再发现。
+    // 本地只有 Next 自身，跑不了 EdgeOne 的 Edge 函数：`/api/*` 与 `/internal/*` 靠 next.config.ts
+    // 的 afterFiles rewrite 转进 app/edge-dev，再由一张白名单按路径动态 import 处理器。
+    // 白名单漏项最难认：不抛错、不进日志，就是一个 404，与"功能还没做"一模一样
+    // （曾漏 api/issues：本机所有 reportError 静默丢掉；根级探针 ping / kv-probe / issue-probe 同理）。
     const route = readWeb("app/edge-dev/[[...path]]/route.ts");
     const config = readWeb("next.config.ts");
 
@@ -588,10 +532,9 @@ console.log("\n[13] functions/ 下的端点在本地 dev 垫片里必须可达�
     const mapEnd = route.indexOf("\n};", mapAt);
     const mapBody = mapAt >= 0 && mapEnd > mapAt ? route.slice(mapAt, mapEnd) : "";
     check("垫片里有显式处理器映射表", mapBody.length > 0);
-    // 键可能带引号（"api/reports/[id]"）也可能不带（ping）
-    //
-    // 还包含映射表之后的条件注册（如 `if (NODE_ENV === "development") { handlers["api/blob"] = ... }`）：
-    // 那类端点只在特定环境下可达，但仍要在垫片里注册，不能算漏项。
+    // 键可能带引号（"api/reports/[id]"）也可能不带（ping）；还包括映射表之后的条件注册
+    // （如 `if (NODE_ENV === "development") { handlers["api/blob"] = ... }`）：那类端点只在
+    // 特定环境下可达，但已在垫片里注册，不能算漏项。
     const mapped = new Set([
         ...[...route.matchAll(/^\s*"?([A-Za-z0-9\-_/[\]]+)"?\s*:\s*\(\s*\)\s*=>/gm)].map((m) => m[1]),
         // 条件注册写法：handlers["api/blob"] = () => import(...)
@@ -610,11 +553,9 @@ console.log("\n[13] functions/ 下的端点在本地 dev 垫片里必须可达�
     walk(join(WEB, "functions"), "");
     check("扫到了端点清单", endpoints.length > 0, `实际 ${endpoints.length} 个`);
 
-    // `[[default]].js`（EdgeOne 兜底动态路由）不含动态段字面值：它在垫片映射表里
-    // 以所在目录的 [id] 代表名出现（如 functions/api/reports/[[default]].js ↔
-    // "api/reports/[id]"）。按目录前缀判定映射，避免要求字面键。
-    // `index.js` 是目录自身的入口（functions/api/reports/index.js ↔ "/api/reports"），
-    // 映射表里以去掉 /index 的目录键出现。
+    // `[[default]].js`（EdgeOne 兜底动态路由）在映射表里以所在目录的 [id] 代表名出现
+    // （functions/api/reports/[[default]].js ↔ "api/reports/[id]"），按目录前缀判定映射，不要求字面键。
+    // `index.js` 是目录自身的入口（api/reports/index.js ↔ "api/reports"），以去掉 /index 的目录键出现。
     const isMapped = (e) => {
         if (mapped.has(e)) return true;
         if (e.endsWith("/index")) return mapped.has(e.slice(0, -"/index".length));
@@ -629,7 +570,7 @@ console.log("\n[13] functions/ 下的端点在本地 dev 垫片里必须可达�
         missing.length ? `未映射：${missing.join(", ")} —— 本地访问会 404` : "",
     );
 
-    // 根级端点（不带 /api、/internal 前缀）还得在 next.config.ts 里有一条显式 rewrite：
+    // 根级端点（不带 /api、/internal 前缀）还得在 next.config.ts 里有显式 rewrite：
     // 那两条通用 rewrite 只覆盖前缀，根级的不会自动被转发
     const missingRewrite = endpoints.filter((e) => !e.includes("/")).filter((e) => !config.includes(`source: "/${e}"`));
     check(
@@ -641,18 +582,11 @@ console.log("\n[13] functions/ 下的端点在本地 dev 垫片里必须可达�
 
 console.log("\n[14] 指南正文只有一个渲染入口（防止再裂成一对近音文件名 + 两份分叉的 textOf）");
 {
-    // 由来：`GuideMarkdown.tsx` / `GuideMdx.tsx` 曾并排存在，两个名字只差一个字母、
-    // 读起来像「基础版 / 升级版」，于是看起来 MDX 那份是超集，可以把另一份删掉。
-    // 恰好相反：`knowledge/px4/` 派生过来的 .md 里有 `{invalid_frac:.0%}`、`meta/<tag>.json`，
-    // MDX 会把花括号当 JSX 表达式解析，所以普通 markdown 那份是不能删的那份。
-    //
-    // 更要命的是两个文件各抄了一份 `textOf`（把标题子节点还原成原始 markdown 文本）。
-    // 右侧目录是从原始 markdown 抽标题的（`lib/guide.ts` 的 extractHeadings），两边要算出
-    // 同一个锚点；而两份 textOf 已经分叉，只有普通 markdown 那份会补回反引号，于是
-    // `.mdx` 标题里的行内代码会从锚点里消失（`### 用 \`foo\`` 点不动）。当时没发作只是因为
-    // 六个 `.mdx` 里恰好没有含内联代码的标题，属于侥幸。
-    //
-    // 2026-09-18 合并成 GuideBody.tsx，本节把"不许再裂开"钉住。
+    // 由来：`GuideMarkdown.tsx` / `GuideMdx.tsx` 曾并排存在，读起来像「基础版/升级版」，
+    // 看似 MDX 那份是超集——恰好相反：knowledge/ 派生的 .md 里有 `{invalid_frac:.0%}` 这类
+    // 占位符，MDX 会把花括号当 JSX 表达式，所以普通 markdown 那份是不能删的那份。
+    // 两份 `textOf` 分叉后，只有 .md 那份会补回反引号，.mdx 标题里的行内代码就从锚点里消失。
+    // 现已合并成 GuideBody.tsx，本节把"不许再裂开"钉住。
     const COMP = join(WEB, "components");
     const names = readdirSync(COMP);
     check("GuideBody.tsx 存在", names.includes("GuideBody.tsx"));
@@ -671,20 +605,16 @@ console.log("\n[14] 指南正文只有一个渲染入口（防止再裂成一对
     check("算标题文本的 textOf 只有一份", textOfCount === 1, `实际 ${textOfCount} 份`);
 
     const body = stripComments(readFileSync(join(COMP, "GuideBody.tsx"), "utf8"));
-    // 两个解析器都得在：删掉普通 markdown 那份就是坏名字诱导的方向。
-    // 判据要认导入语句 + 实际使用，不能是裸子串，文档注释里也写着 "react-markdown"，
-    // 裸子串的检查删掉解析器照样绿（2026-09-18 自证时实测到的假绿）。
+    // 判据要认导入语句 + 实际使用，不能是裸子串：文档注释里也写着 "react-markdown"，
+    // 裸子串的检查删掉解析器照样绿（假绿）。
     check("导入并使用了普通 markdown 解析器", /from "react-markdown"/.test(body) && body.includes("<ReactMarkdown"));
     check("导入并使用了 MDX 解析器", /from "next-mdx-remote\/rsc"/.test(body) && body.includes("<MDXRemote"));
     check("按 renderer 分发", /renderer === "md"/.test(body));
 
-    // MDX 侧要真的启用 GFM。`@mdx-js/mdx@3` 的默认管线只有 CommonMark，管道表格属于
-    // GFM 扩展，漏传 `remark-gfm` 时整张表会退化成"一段带竖线的普通段落"：不报错、
-    // 不抛异常，页面上只是"排版有点怪"（2026-09-19 线上：/guide/rule-schema 的 5 张表
-    // 全渲染成了 `| 参数 | 说明 | |------|------| …` 原文）。
-    //
-    // 判据要落在 `<MDXRemote` 那个调用里面，不能写成"文件里出现过 remarkGfm"：
-    // 后者在 `.md` 分支里也成立，把 MDX 侧的插件删空照样绿，这就是本文件反复踩的裸子串陷阱。
+    // MDX 侧要真的启用 GFM：@mdx-js/mdx@3 的默认管线只有 CommonMark，漏传 `remark-gfm` 时
+    // 管道表格静默退化成"一段带竖线的普通段落"——不报错、只是排版怪（线上 5 张表全成原文）。
+    // 判据要落在 `<MDXRemote` 调用里，不能是"文件里出现过 remarkGfm"：后者在 .md 分支也成立，
+    // 把 MDX 侧插件删空照样绿（本文件反复踩的裸子串陷阱）。
     const mdxAt = body.indexOf("<MDXRemote");
     const mdxCall = mdxAt < 0 ? "" : body.slice(mdxAt, body.indexOf("/>", mdxAt) + 2);
     check("MDX 调用点找得到（判据有落点）", mdxCall.includes("<MDXRemote"));
@@ -694,45 +624,38 @@ console.log("\n[14] 指南正文只有一个渲染入口（防止再裂成一对
         "MDXRemote 的调用里没带上 remark-gfm",
     );
 
-    // 同一处的姊妹缺陷：`.md` 侧有 `table: Table` 覆写（横向滚动外框），`.mdx` 侧漏了就会
-    // 把十几列的字段表直接撑破窄屏，不会报错，只是"页面上多出一条横向滚动条"。
+    // 姊妹缺陷：`.md` 侧有 `table: Table` 覆写（横向滚动外框），`.mdx` 侧漏了会把十几列的
+    // 字段表撑破窄屏——不报错，只是页面上多出一条横向滚动条。
     const compsAt = body.indexOf("const mdxComponents");
     const mdxComps = compsAt < 0 ? "" : body.slice(compsAt, body.indexOf(";", compsAt) + 1);
     check("MDX 侧也覆写了 table（否则宽表撑破窄屏）", /\btable:\s*Table\b/.test(mdxComps));
-    // 1 是正确性约束：`H2`/`H3` 渲染的就是 textOf 的返回串，不递归进元素就等于把
-    //   标题里的行内代码整段丢掉（老 GuideMdx 的 3 行 stub 就是这样），id 和显示一起错。
+    // 1 是正确性约束：`H2`/`H3` 渲染的就是 textOf 的返回串，不递归进元素等于把标题里的
+    // 行内代码整段丢掉（老 GuideMdx 的 3 行 stub 就是这样），id 和显示一起错。
     check(
         "textOf 递归进元素捞出文本（少了它标题会丢内容）",
         body.includes("React.isValidElement(node)") && body.includes("node.props as { children"),
     );
-    // 2 只是显示保真（让标题渲染出原始 markdown 的 `代码` 记号）。注意它不影响锚点 id：
-    //   headingId 把所有非字母数字折叠成 `-`，`` `foreach` `` 与 `foreach` 归一成同一个。
-    //   两条分开断言，免得将来有人以为删掉反引号只是"少个记号"而顺手删了上面那条。
+    // 2 只是显示保真（渲染出原始 markdown 的 `代码` 记号），不影响锚点 id：headingId 把
+    // 非字母数字折叠成 `-`，`` `foreach` `` 与 `foreach` 归一成同一个。两条分开断言，免得被顺手删。
     check(
         "textOf 给行内代码补回反引号（显示保真）",
         body.includes('node.type === "code"') && body.includes("${inner}"),
     );
 
     // 扩展名 → renderer 是"哪个文档走哪条路"的唯一判据；翻了它等于把 knowledge 派生的
-    // `.md` 交给 MDX 解析（上面那些 `{占位符}` 立刻变成 JSX 表达式）
+    // `.md` 交给 MDX 解析（`{占位符}` 立刻变成 JSX 表达式）
     const guide = stripComments(read("../lib/guide.ts"));
     check("lib/guide.ts 仍按扩展名决定 renderer", guide.includes('fileName.endsWith(".mdx") ? "mdx" : "md"'));
 }
 
 console.log("\n[15] 组件名跟着家族不变量走（`Log*` = 某一份日志；一次列很多份的用数据模型的词）");
 {
-    // 由来：两个名字各错一半，错的方向恰好相反（2026-09-18）。
-    //  · `AnalyzeReport.tsx`（841 行，六个 `Log*` tab 组件的父壳）挂的是路由的词：
-    //    `Analyze` 已经被 `app/log/` + `Log*Client` + `useLogAnalyzer` 占着，
-    //    读者看不出这个共享组件在 `Log*` 家族里占哪一格。
-    //  · `HistoryList.tsx`（列 `SavedReport` / `HistoryItem`，含云端报告）一个词根都没有，
-    //    看不出它的数据来自 `lib/report-history.ts`。
-    // 两个都改成跟着家族/数据模型走：`LogReport.tsx` / `ReportHistoryList.tsx`。
-    //
-    // 关键在于 `Log*` 家族的定义：它指"渲染某一份日志的分析结果"，不是
-    // "手里有日志字节"（从历史打开时字节可能已被淘汰，子组件各自处理了那条路）。
-    // 所以单份的挂 `Log`、集合类不挂。`LogHistoryList` 那种写法是在承诺"日志在这"，
-    // 而那张表里经常没有（`REPORT_DATA_KEEP` 淘汰字节、`source: "cloud"` 来自别的设备）。
+    // 两个名字各错一半、方向相反：`AnalyzeReport.tsx`（六个 `Log*` tab 的父壳）挂的是路由的词
+    // （`Analyze` 已被 app/log/ + Log*Client + useLogAnalyzer 占用），看不出它在 Log* 家族里占哪格；
+    // `HistoryList.tsx`（列 SavedReport / HistoryItem，含云端报告）没有词根，看不出数据来自
+    // lib/report-history.ts。已改成 `LogReport.tsx` / `ReportHistoryList.tsx`。
+    // `Log*` 家族指"渲染某一份日志的分析结果"，不是"手里有日志字节"（字节可能已被
+    // REPORT_DATA_KEEP 淘汰、cloud 来源本就没有）：单份的挂 Log、集合类不挂。
     const COMP = join(WEB, "components");
     const names = readdirSync(COMP);
 
@@ -741,8 +664,7 @@ console.log("\n[15] 组件名跟着家族不变量走（`Log*` = 某一份日志
     check("ReportHistoryList.tsx 存在", names.includes("ReportHistoryList.tsx"));
     check("HistoryList.tsx 没有回来", !names.includes("HistoryList.tsx"));
 
-    // 比"文件叫什么"更实质的一条：父壳引的子组件都要在 `Log*` 家族里。
-    // 将来新加一个 tab 组件时用了别的词根（`MetricsPanel.tsx` 之类），当场被拦，
+    // 比"文件叫什么"更实质：父壳引的子组件都要在 `Log*` 家族里，新 tab 组件用别的词根当场被拦，
     // 否则家族会一格一格被拆散，而每个单看都"挺合理"。
     const shell = stripComments(readFileSync(join(COMP, "LogReport.tsx"), "utf8"));
     const kids = [...shell.matchAll(/from "\.\/([A-Za-z0-9_]+)"/g)].map((m) => m[1]);
@@ -757,35 +679,25 @@ console.log("\n[15] 组件名跟着家族不变量走（`Log*` = 某一份日志
 
 console.log("\n[16] 轨迹取不到要说清缺什么（不许再退回一句空洞的概括）");
 {
-    // 用户的原话："这段日志里没有可用的定位轨迹 直接告诉用户缺少什么字段，不要这么空洞的提示"。
-    // 空洞只是表象：那句概括只对应六种原因里的一种（缺 topic / 缺字段 / 字段改名 / 有采样但
-    // 全程没定位 / 采样数对不上 / 没 timestamp），另外五种下它是错的。
-    // 引擎侧那半（返回体要带 errorReasons）由 tools/engine/check_engine_pyodide.py 动态核；
-    // 这里管界面这半：失败分支真的填、列表真的渲染、切了日志清空。
-    // 只留 `tsc` 看不见的那几条：`TrackData` 的字段声明、state 声明、setter 调用，少一环
-    // tsc 都会当场报错，再给它们配守卫就是"恒绿的守卫"（§6.6 那条"守卫自己也要被校验"，
-    // 第一次写就有一条被另外两条蕴含，变异怎么打都不红）。真正会静默退化的是行为：
-    // 填了不渲染、渲染了不在失败分支填、切了日志不清空、引擎违约时拿一句谎话顶上。
+    // 那句空洞概括只对应六种原因里的一种（缺 topic / 缺字段 / 字段改名 / 有采样但全程没定位 /
+    // 采样数对不上 / 没 timestamp），其余五种下它是错的。引擎侧那半（返回体带 errorReasons）
+    // 由 tools/engine/check_engine_pyodide.py 核；这里管界面这半：失败分支真填、列表真渲染、切日志清空。
+    // 只留 `tsc` 看不见的几条：字段/state 声明与 setter 调用少一环 tsc 都会报，配上守卫就是恒绿
+    // （守卫自己也要被校验）；真正静默退化的是行为。
     const map = stripComments(readWeb("components", "LogFlightMap.tsx"));
     check("失败分支收下引擎给的全部原因", /setErrorReasons\(\s*track\.errorReasons/.test(map));
     check("界面把逐条原因渲染成列表", /errorReasons\.map\(/.test(map));
     check("重新取数时清空上一轮的原因", /setErrorReasons\(\[\]\)/.test(map));
-    // 引擎违约（有 error 却不给原因）时不许伪装成"日志里没有轨迹"，那会让解析器缺陷
-    // 看起来像用户的数据问题，用户既不会反馈、我们也不会知道
+    // 引擎违约（有 error 却不给原因）时不许伪装成"日志里没有轨迹"：那会让解析器缺陷看起来像用户的数据问题
     check("引擎没给原因时明说是解析器缺陷", /引擎没有返回任何轨道，也没给出原因/.test(map));
 }
 
 console.log("\n[17] 两类条目共用的详情页组件不许带某一类的前缀（Skill* / Mcp* 都在说谎）");
 {
-    // 背景：`/skills/[slug]` 与 `/mcp/[slug]` 共用一组详情页组件。它们原名叫 SkillContentTabs /
-    // SkillSidebar / SkillComments / SkillHeaderMeta，而导航里「Skill 技能」与「MCP 服务」是
-    // 并列的两类内容，MCP 页面用 `Skill*` 组件，名字就在说谎。
-    //
-    // 说谎的代价不是观感：下一个人看见 `SkillSidebar` 出现在 MCP 页面，合理的"修正"是复制一份
-    // `McpSidebar`，于是长出一对只差前缀的孪生组件，改一边漏一边（本仓库栽过五次的就是这个形状）。
-    // 所以共用组件统一走中立家族 `Entry*`（"收录条目"是两类共有的上位词），类间差异全走参数。
-    //
-    // 判据只看 import，且要 `stripComments`：注释里会原样出现这些标识符，裸扫会被注释喂饱。
+    // `/skills/[slug]` 与 `/mcp/[slug]` 共用一组详情页组件，原名 Skill*；MCP 页面用 `Skill*`
+    // 名字就在说谎，而下一个人的合理"修正"是复制一份 `McpSidebar`，长出只差前缀的孪生组件、
+    // 改一边漏一边。所以共用组件统一走中立家族 `Entry*`，类间差异全走参数。
+    // 判据只看 import，且要 `stripComments`：注释里会原样出现这些标识符。
     const imports = (rel) =>
         [...stripComments(readWeb(rel)).matchAll(/from "@\/components\/([A-Za-z0-9_]+)"/g)].map((m) => m[1]);
 
@@ -793,8 +705,8 @@ console.log("\n[17] 两类条目共用的详情页组件不许带某一类的前
     const mcpDeps = imports("app/[locale]/mcp/[slug]/page.tsx");
     const shared = skillDeps.filter((n) => mcpDeps.includes(n));
 
-    // 先判"共用集合非空"：若哪天两个页面被彻底拆开，下面两条会变成空集上的恒真判定，
-    // 那时该删掉的是这两条规则本身，而不是让它们继续绿着。
+    // 先判"共用集合非空"：若哪天两页被彻底拆开，下面两条会变成空集上的恒真判定，
+    // 那时该删的是这两条规则本身，而不是让它们继续绿着。
     check("两个详情页确实共用组件（判据自身不能是空的）", shared.length >= 4, `实际 ${shared.length} 个`);
     const prefixed = shared.filter((n) => /^(Skill|Mcp)/.test(n));
     check(
@@ -812,15 +724,9 @@ console.log("\n[17] 两类条目共用的详情页组件不许带某一类的前
 
 console.log("\n[18] 站点版本只有一个读取口（footer 的「版本 + 日期」不许各处各读一次）");
 {
-    // 由来：footer 要显示站点版本与日期。两样都在构建期由 `next.config.ts` 注入
-    // `NEXT_PUBLIC_APP_*`（版本号来自 web/package.json，日期与短哈希来自构建时的 git HEAD）。
-    // 风险形态与 §[9] / §[10] 同源：同一件事有两条路径，只有一条接得上真源。
-    // 仓库里已经有过一次现成的裂缝：`lib/issue-bridge.ts` 一直在读 `NEXT_PUBLIC_APP_VERSION`，
-    // 而全仓库从来没人给它赋值，于是错误上报里的 version 恒为空串（版本那栏直接不打印，
-    // "哪个版本出的问题"一直查不到，而且它不报错，谁也没发现）。
-    //
-    // 这里守的是三件事：注入方真的注入了三个值、只有一个文件读它们、footer 取到并且渲染出来。
-    // 少任何一条，footer 上的版本号都会变成"看起来一直正常、其实早就过期"的那类错。
+    // 版本与日期在构建期由 `next.config.ts` 注入 `NEXT_PUBLIC_APP_*`。风险同 §[9]/§[10]：
+    // 同一件事两条路径只有一条接得上真源——issue-bridge 曾读一个没人赋值的变量，上报的 version 恒为空串。
+    // 守三件事：注入方真的注入了三个值、只有一个文件读它们、footer 取到并渲染出来。
     const config = stripComments(readWeb("next.config.ts"));
     const footer = stripComments(readWeb("components", "SiteFooter.tsx"));
     const versionMod = stripComments(read("../lib/site-version.ts"));
@@ -831,11 +737,10 @@ console.log("\n[18] 站点版本只有一个读取口（footer 的「版本 + �
     }
     // 注入的值要真的被读走（next.config 里写了、但没人读 = 白写）
     check("读取口在 lib/site-version.ts", versionMod.includes("process.env.NEXT_PUBLIC_APP_VERSION"));
-    // 提交时间精确到秒：只到天的日期在一天内多次构建时分不清谁新谁旧（2026-09-21 要求）
+    // 提交时间精确到秒：只到天的日期在一天内多次构建时分不清谁新谁旧
     check("提交时间精确到秒（format-local 带时分秒）", config.includes("%Y-%m-%d %H:%M:%S"));
 
-    // 全站扫：除注入方与唯一读取口，不许再有第三处直接读 NEXT_PUBLIC_APP_*。
-    // 已剥注释，说明文字里原样出现的变量名不会把这条喂成恒绿。
+    // 全站扫：除注入方与唯一读取口，不许有第三处直接读 NEXT_PUBLIC_APP_*（已剥注释，说明文字不会喂成恒绿）
     const allowed = new Set(["next.config.ts", join("lib", "site-version.ts")]);
     const offenders = [];
     const walk = (dir) => {
@@ -866,13 +771,9 @@ console.log("\n[18] 站点版本只有一个读取口（footer 的「版本 + �
 
 console.log("\n[19] 指南页栏宽跟随内容、栏间距不许回到 40px");
 {
-    // 由来：指南页三栏（左导航 / 正文 / 右本页目录）挤在 page-shell 的 1120px 内容宽里。
-    // 原先左导航写死 `w-48`(192px)，而实测中文条目最宽 124px、英文 151px，侧栏内部
-    // 就空出 27~54px，再叠上 40px 间距，中文下「侧栏文字右边缘 → 正文左边缘」量到 94px。
-    // 同时两道各 40px 的间距 + 224px 右目录，把正文从 max-w-3xl(768px) 压到只有 624px。
-    //
-    // 这类错不报错、不白屏，只会"看起来有点空"，属于没人会主动去查的静默退化，
-    // 所以做成机器能拦的守卫：宽度要跟内容走，且上下限都要有兜底。
+    // 指南页三栏挤在 page-shell 的 1120px 内容宽里：左导航写死 `w-48` 时侧栏内部凭空空出
+    // 27~54px；两道各 40px 的间距 + 224px 右目录把正文从 max-w-3xl(768px) 压到 624px。
+    // 这类错不报错、只是"看起来有点空"的静默退化，所以做成守卫：宽度跟内容走，上下限都要有兜底。
     const sidebar = stripComments(readWeb("components", "GuideSidebar.tsx"));
     const layout = stripComments(read("../app/[locale]/guide/layout.tsx"));
     const article = stripComments(readWeb("components", "GuideArticle.tsx"));
@@ -890,9 +791,8 @@ console.log("\n[19] 指南页栏宽跟随内容、栏间距不许回到 40px");
         asideCls.some((c) => /^min-w-/.test(c)),
     );
 
-    // 右目录同一套规矩。血泪数字：写死 `w-56` 时目录文字只占 ~85px，列内右侧常年空 126px；
-    // 断点写 xl(1280) 在真实浏览器踩不准：1280 的窗口扣掉滚动条只剩 ~1263，目录整列消失，
-    // 1152/1200/1240/1263 视口下正文右缘到内容区右缘全部量出 176px 死白（2026-09-22 用户圈的就是它）。
+    // 右目录同一套规矩。写死 `w-56` 时目录列内右侧常年空 126px；断点写 xl(1280) 在真实浏览器
+    // 踩不准：窗口扣掉滚动条后踩不到 1280，目录整列消失、留 176px 死白。
     const outlineAside = (/<aside className="([^"]*)"/.exec(outlineSrc)?.[1] ?? "").split(/\s+/);
     check("右目录宽度跟标题文字走（w-max，不许写死）", outlineAside.includes("w-max"));
     check(
@@ -918,12 +818,9 @@ console.log("\n[19] 指南页栏宽跟随内容、栏间距不许回到 40px");
 
 console.log("\n[20] 两句固定文案只有一个出处（措辞不许各写各的）");
 {
-    // 由来：「日志只在本地解析」的隐私承诺原来写在页脚品牌区，而用户真正交出日志的上传卡上
-    // 只有另一句近似措辞（"检查在本地浏览器完成…"），同一件事两份文案，各自演化。
+    // 隐私承诺原来写在页脚品牌区，上传卡上只有另一句近似措辞，同一件事两份文案各自演化。
     // 现在两句（隐私承诺 + 免责声明）收进 lib/log-analysis-notes.ts，且只在上传卡渲染
-    // （2026-09-21 用户拍板：页脚的品牌区与底栏都不再重复这两句）。
-    // 这里守三件事：出处里两句都在、上传卡真的从出处取并渲染、全站任何别的文件不许手写
-    // 这两句的字面量（否则下次有人往别的页面贴，措辞又会各长各的）。
+    // （页脚品牌区与底栏不再重复）。守三件事：出处里两句都在、上传卡真取真渲染、别处不许手写字面量。
     const notes = stripComments(read("../lib/log-analysis-notes.ts"));
     const upload = stripComments(readWeb("app", "[locale]", "log", "LogEntryClient.tsx"));
 
@@ -941,8 +838,7 @@ console.log("\n[20] 两句固定文案只有一个出处（措辞不许各写各
         upload.includes("LOG_PRIVACY_NOTE.zh") && upload.includes("ANALYSIS_DISCLAIMER.zh"),
     );
 
-    // 全站扫：除唯一出处本体，不许任何文件手写这两句的字面量。已剥注释，说明文字里
-    // 原样出现这两句不会把这条喂成恒绿（本节注释就刻意用了转述而非原文）。
+    // 全站扫：除唯一出处本体，不许任何文件手写这两句的字面量（已剥注释；本节注释刻意用转述而非原文）
     const literals = [zhPrivacy, zhDisclaimer];
     const notesRel = join("lib", "log-analysis-notes.ts");
     const offenders = [];
@@ -960,19 +856,13 @@ console.log("\n[20] 两句固定文案只有一个出处（措辞不许各写各
 
 console.log("\n[21] 次数上限不在前端显示（上限由后台配置，前端不许先报一个写死的数）");
 {
-    // 由来：匿名/登录用户"每天能白嫖几次 AI 解读"这件事，前端三处各露一次：
-    //   上传卡「匿名试用 3/3 次」、AI 解读区「今日免费 10 次，剩余 N 次」、
-    //   「我的」页一条额度进度条。三处都从同一份取数（/api/me 的 quota）来，但默认值
-    //   各写各的（3 / 10），后台上限一改就三处不一致。
-    // 2026-09-21 用户拍板：次数上限以后由后台配置，前端一处都不许显示。
-    //
+    // 次数上限曾在前端三处各露一次（上传卡、AI 解读区、「我的」页），默认值各写各的（3 / 10），
+    // 后台一改就三处不一致；现决定上限由后台配置，前端一处都不许显示。
     // 守两层，缺一层都拦不住回潮：
-    //   ① 那几句专属次数文案的字面量在全站删干净了（"次/天"、"匿名试用"、"今日免费"…）。
-    //      这些词只服务于"报次数"，正常文案里不会出现，可以硬查。
-    //   ② 直接扫写了 quota 的文件里还有没有数字对（`/ ${…limit}`）或进度条（`width: ${…used…}%`），
-    //      再钉住消费 quota 的文件清单。为什么不能只查 `used`/`limit`/`quota` 这些词：
-    //      hooks/useLogAnalyzer.ts 的数据层有意保留 quota（后台配好后 UI 直接取用），
-    //      词级扫描会连数据层一起误伤，那就只能注释掉守卫，等于没有守卫。
+    //   ① 专属次数文案的字面量全站删干净（这些词只服务于"报次数"，正常文案不会出现，可硬查）；
+    //   ② 扫写了 quota 的文件里的数字对（`/ …limit 次`）或进度条（`width: …used…%`），并钉住消费清单。
+    // 不能只查 used/limit/quota 这些词：useLogAnalyzer 数据层有意保留 quota（后台配好后 UI 直接取用），
+    // 词级扫描会连数据层一起误伤，那就只能注释掉守卫。
     // 想看"原本长什么样"：`git show HEAD:web/<文件>`。
     const CN_QUOTA_COPY = ["匿名试用", "次/天", "今日免费", "今日 AI 解读额度", "额度信息暂不可用"];
     const renderedQuota = []; // 还在把 quota 渲染成数字/进度条的地方
@@ -989,9 +879,8 @@ console.log("\n[21] 次数上限不在前端显示（上限由后台配置，前
         if (left.length) reasons.push(`文案：${left.join("、")}`);
         if (slashPair) reasons.push("数字对：/ …limit 次");
         if (progressBar) reasons.push("进度条：width … used%");
-        // hooks/useLogAnalyzer.ts 是取数层：它自己既不渲染也不写次数文案，只把
-        // /api/me、explain 响应的 quota 存进 state。它命中上面任何一条都是误报，
-        // 说明判据写歪了，所以这里只跳过它的"渲染类"判据，文案判据照查。
+        // hooks/useLogAnalyzer.ts 是取数层：不渲染也不写次数文案，命中渲染类判据都是误报
+        // （判据写歪了），所以只跳过它的渲染类判据，文案判据照查。
         const dataLayer = rel.endsWith(join("hooks", "useLogAnalyzer.ts"));
         if (dataLayer && (slashPair || progressBar)) {
             reasons.splice(reasons.indexOf("数字对：/ …limit 次"), 1);
@@ -1001,9 +890,8 @@ console.log("\n[21] 次数上限不在前端显示（上限由后台配置，前
     }
     check("全站没有把额度渲染成数字/进度条的地方", renderedQuota.length === 0, renderedQuota.join("，"));
 
-    // 清单与实现精确一致：多一个文件 = 有新的界面在显示次数（回潮）；
-    // 少一个文件不报错（撤掉显示本来就该变少），但取数层不许被删，
-    // 它是后台配好上限之后唯一不用返工的地方。
+    // 清单与实现精确一致：多一个文件 = 有新界面在显示次数（回潮）；少一个不报错（撤掉显示本该变少），
+    // 但取数层不许被删——它是后台配好上限后唯一不用返工的地方。
     const EXPECTED = [
         join("app", "log", "[id]", "LogResultClient.tsx"),
         join("app", "log", "LogEntryClient.tsx"),
@@ -1022,20 +910,12 @@ console.log("\n[21] 次数上限不在前端显示（上限由后台配置，前
 
 console.log("\n[22] 地图左上角三个图标是一条按钮，高度色带贴着它往下铺（不留空档）");
 {
-    // 由来：复位按钮最早是另一个 L.Control（position topleft + controlOrder 1000），
-    // 排到缩放条下面。但 Leaflet 的 CSS 给每个 .leaflet-control 都加了 margin-top 10px，
-    // 两组之间必然留一道空档；而且两个 .leaflet-bar 各有 1px 边框，就算把 margin 抹掉，
-    // 贴在一起也是 2px 双线。用户看到的就是"缩小按钮和复位图标之间一大块空白"。
-    // 只有 append 进同一个 .leaflet-bar 才会共享一条边框、由 .leaflet-bar a 的
-    // border-bottom 自动分隔。
-    //
-    // 连带：按钮列底边因此上移（118 → 104），色带的 top-[110px] 是量出来的、跟着这个
-    // 形态走。只写 bottom-0 不写 top 就没有上边界，2026-09-23 实测过：top-[124px]
-    // 没进 CSS 时容器被内容高度挤成 2px，整条色带看不见。
-    //
-    // 为什么只能静态锁写法、锁不住 104 这个数：那是浏览器布局的结果，要验就得起服务跑
-    // Playwright（分钟级），进不了秒级检查。这里锁住的是"会不会回潮成两个 bar"，
-    // 以及"色带有没有上下边界"，这两条一旦回潮，现象和这次完全一样。
+    // 复位按钮曾独立成 L.Control，但 Leaflet 给每个 .leaflet-control 加 margin-top 10px，
+    // 两组之间必有空档；两个 .leaflet-bar 各 1px 边框，贴住也是 2px 双线。只有 append 进
+    // 同一个 .leaflet-bar 才共享一条边框、由 border-bottom 自动分隔。
+    // 连带：按钮列底边因此上移（118 → 104），色带的 top-[110px] 是量出来的、跟着这个形态走；
+    // 只写 bottom-0 不写 top 没有上边界，容器会被内容高度挤成 2px、整条色带看不见。
+    // 104 这个数是浏览器布局结果，锁不住（要验得起 Playwright）；这里锁"会不会回潮成两个 bar"。
     const src = stripComments(read("../components/LogFlightMap.tsx"));
     // 色带容器的 className：靠 top-[…px] 这个特征值从全组件的 className 里认出来
     const barCls = [...src.matchAll(/className="([^"]+)"/g)].map((m) => m[1]).find((c) => /top-\[\d+px\]/.test(c));
@@ -1052,8 +932,7 @@ console.log("\n[22] 地图左上角三个图标是一条按钮，高度色带贴
         src.includes("zoomControl") && /getContainer\(\)[\s\S]{0,1200}appendChild\(/.test(src),
         "没找到「取缩放条容器 → appendChild」这条链，复位按钮大概率又变成独立控件了",
     );
-    // 三个按钮要横排：竖排时它们吃掉 ~94px 高，色带只能从 104 往下铺。
-    // 这条锁的是"横排"这个事实，不是某个像素值（像素值得起浏览器量，进不了秒级检查）。
+    // 三个按钮要横排：竖排时吃掉 ~94px 高，色带只能从 104 往下铺。锁"横排"这个事实，不是像素值。
     check(
         "按钮行是横排的（给缩放条设了 display:flex，分隔线改成 border-right）",
         /display\s*=\s*"flex"/.test(src) && src.includes("borderRight"),
@@ -1080,13 +959,8 @@ console.log("\n[22] 地图左上角三个图标是一条按钮，高度色带贴
 
 console.log("\n[23] 静态守卫引用的源码路径都存在（路径失效不许把后面整段带走）");
 {
-    // 见文件头 read / readWeb 的说明：这些路径是写死在脚本里的，路由一改就集体失效，
-    // 而失效的表现曾经是"抛 ENOENT 把后面所有节带走"，既没红在该红的地方，也让人
-    // 分不清是"路径坏了"还是"守卫真红了"。
-    //
-    // 这一节是兜底汇总：read / readWeb 已经保证坏路径只让那一节自己红，这里再把
-    // "到底哪几个路径不存在"单独说清楚，免得表现为若干节同时红、根因却只有一个。
-    //
+    // 见文件头 read / readWeb 的说明：坏路径只让那一节自己红。这里是兜底汇总，把"到底哪几个
+    // 路径不存在"单独说清楚，免得表现为若干节同时红、根因却只有一个。
     // 想证明它会红：把 read / readWeb 里任一路径改成一个不存在的文件名再跑本脚本。
     check(
         "静态守卫引用的路径都指向真实文件",

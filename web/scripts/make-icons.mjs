@@ -1,23 +1,20 @@
-// 由 app/icon.svg 生成一套位图图标：favicon.ico（16/32/48）与 apple-icon.png（180）。
+// 由 app/icon.svg 生成位图图标：favicon.ico（16/32/48）与 apple-icon.png（180）。
 //
-// 为什么自带光栅化：仓库没有任何图像依赖，而 favicon 需要 .ico 兜底，因为 Safari 16
-// 以前不认 SVG 图标，只抓 /favicon.ico；iOS 加到主屏则要 apple-touch-icon。两条都不能靠 SVG。
-// 这里借已跑着的 headless Chrome 出 PNG（抗锯齿由浏览器负责），再用 Node 内置 zlib 之外的
-// 纯拼装写 ICO：ICO 允许条目直接内嵌 PNG，不需要 BMP 编码。
+// 自带光栅化：仓库没有图像依赖，而 Safari 16 以前不认 SVG 图标、只抓 /favicon.ico，
+// iOS 加主屏要 apple-touch-icon，两条都不能靠 SVG。借已在跑的 headless Chrome 出 PNG，
+// 再用纯拼装写 ICO（ICO 允许条目直接内嵌 PNG，不需要 BMP 编码）。
 //
 // 用法: 先以 --remote-debugging-port=9222 启动 Chrome，再 node web/scripts/make-icons.mjs
 //
-// 为什么住在 web/scripts/ 根、而不是跟另 5 个 CDP 脚本一起放 browser/ 子目录：它是
-// 产物要提交的构建脚本
-// （读 app/icon.svg、写回 app/favicon.ico 与 apple-icon.png），跟 build-knowledge.mjs
-// 同类；只是恰好借 Chrome 做光栅化，不需要 Next、也不打开任何页面。
+// 住在 web/scripts/ 根而非 browser/ 子目录：它是产物要提交的构建脚本（读 app/icon.svg、
+// 写回 app/favicon.ico 与 apple-icon.png），与 build-knowledge.mjs 同类，只是借 Chrome 光栅化。
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// 本文件在 web/scripts/ 下，故需向上两级才到仓库根（web/scripts/ -> web/ -> 仓库根）。
+// 本文件在 web/scripts/ 下，向上两级到仓库根（web/scripts/ -> web/ -> 仓库根）。
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const ICON_SVG = join(root, "web", "app", "icon.svg");
 
@@ -29,7 +26,7 @@ const appleSize = 180;
 const svgSource = readFileSync(ICON_SVG, "utf8").replace(/<\?xml[^>]*\?>/, "");
 
 /**
- * iOS 的 apple-touch-icon 不要透明、不要自带圆角：系统自己会套圆角蒙版，
+ * iOS 的 apple-touch-icon 不要透明、不要自带圆角：系统会自己套圆角蒙版，
  * 我们留的透明圆角会被合成成黑边。
  */
 const appleSource = svgSource.replace(/<rect width="64" height="64" rx="14"/, '<rect width="64" height="64"');
@@ -65,16 +62,15 @@ ws.addEventListener("message", (e) => {
 await new Promise((r) => ws.addEventListener("open", r, { once: true }));
 
 await send("Page.enable");
-// 强制透明底：否则 Chrome 看到页面背景不透明就只输出 RGB（无 alpha 通道）的
-// PNG，Next 的 ICO 解码器会直接报 "The PNG is not in RGBA format"。显式给一个 alpha=0
-// 的底色覆盖，输出才会是 colorType 6（RGBA）。
+// 强制透明底：否则 Chrome 见页面背景不透明就只输出 RGB（无 alpha）PNG，Next 的 ICO 解码器
+// 会报 "The PNG is not in RGBA format"。显式给 alpha=0 底色覆盖，输出才会是 colorType 6（RGBA）。
 await send("Emulation.setDefaultBackgroundColorOverride", {
     color: { r: 0, g: 0, b: 0, a: 0 },
 });
 
 /**
- * 每个尺寸单独写一个页面、单独导航、等加载完再截。
- * 试过「一个页面反复改 innerHTML 再按 clip 截」，首帧之后的截图会偶发拿到空白
+ * 每个尺寸单独写页面、单独导航、等加载完再截。
+ * 试过「一个页面反复改 innerHTML 再按 clip 截」，首帧之后的截图偶发拿到空白
  * （合成器对同一目标尺寸变化的处理不稳定）；每尺寸全新导航最稳。
  */
 async function raster(source, size) {

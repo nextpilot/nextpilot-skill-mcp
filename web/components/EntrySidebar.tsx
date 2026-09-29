@@ -7,13 +7,11 @@ import { getFavorite, toggleFavorite, trackDownload, type FavoriteStats, type Ki
 import { contentHostLabel } from "@/lib/constants";
 
 /**
- * 详情页右栏（版式参照腾讯 SkillHub 的侧栏收窄到 320px；宽度由页面的 grid 轨道给，
- * 这里不写死，skill / mcp 两个详情页共用本组件，轨道各改各的就会像当年那样
- * 一边 320px 一边 390px，卡比轨道宽的 70px 会向右溢出、贴出内容区）：
- * 安装卡（复制/下载/收藏）→ 相关推荐；元信息在左栏分组表内。
+ * 详情页右栏：安装卡（复制/下载/收藏）→ 相关推荐；元信息在左栏分组表内。
+ * 宽度由页面的 grid 轨道给，这里不写死（两页各写各的就会一边 320px 一边 390px，
+ * 卡比轨道宽的部分会向右溢出）。
  *
- * Skill 与 MCP 两类条目共用，所以家族名是 `Entry*` 而不是 `Skill*`：叫 `SkillSidebar`
- * 会宣称它只服务 Skill 一类，而 `/mcp/[slug]` 也在用（详见 `EntryContentTabs.tsx` 顶部）。
+ * 家族名是 `Entry*` 而不是 `Skill*`：`/mcp/[slug]` 也在用本组件（详见 EntryContentTabs.tsx）。
  * 两类差异全部走参数（`kind` 决定统计接口，`installTitle` / `installHint` 决定文案）。
  */
 export function EntrySidebar({
@@ -23,11 +21,8 @@ export function EntrySidebar({
     installHint,
     /** 下面这个默认值是 Skill 的文案；MCP 由详情页另传一份（"该 MCP 服务"） */
     installTitle = "把这个 Skill 交给你的 AI，即可使用",
-    /**
-     * 内容在仓库里的编辑入口。只有 Skill 传（指向 `SKILL.md`）；
-     * MCP 的编辑入口放在 `EntryContentTabs` 的每个 Tab 上（三份文件各指各的，
-     * 侧栏一个入口指不清是哪份），所以这里不传就不渲染。
-     */
+    /** 内容在仓库里的编辑入口。只有 Skill 传；MCP 的入口放在 EntryContentTabs 的每个 Tab 上
+     *  （三份文件各指各的，侧栏一个入口指不清是哪份），不传就不渲染 */
     editUrl,
     related,
 }: {
@@ -46,11 +41,9 @@ export function EntrySidebar({
     const [copied, setCopied] = useState(false);
     const [downloaded, setDownloaded] = useState(false);
     const [delta, setDelta] = useState(0);
-    // 相关推荐的路径段跟 kind 走：mcp 页的相关推荐是其他 MCP 条目，写死 /skills/
-    // 会把它们链到不存在的 skill 页
+    // 相关推荐的路径段跟 kind 走：写死 /skills/ 会把 MCP 页的推荐链到不存在的 skill 页
     const relatedBase = kind === "mcp" ? "mcp" : "skills";
-    // 复制按钮文案跟 kind 走：Skill 复制的是给 AI 的提示词原文（SKILL.md），
-    // MCP 复制的是接入配置（JSON 配置块），后者叫「Skill 内容」是撒谎
+    // 复制按钮文案跟 kind 走：MCP 复制的是接入配置（JSON），叫「Skill 内容」是撒谎
     const copyLabel = kind === "mcp" ? "复制接入配置" : "复制 SKILL 提示词";
 
     useEffect(() => {
@@ -77,9 +70,8 @@ export function EntrySidebar({
     }
 
     function download() {
-        // 安装包走 /api/skills/<slug>/download：整个 Skill 目录打成 zip（含 assets
-        // 里的示例 .ulg、evals、scripts），解压出来就是一个能直接拷进 .claude/skills/
-        // 的目录。只下载 SKILL.md 单文件的话，这些伴生文件就丢了。
+        // 安装包走 /api/skills/<slug>/download：整个 Skill 目录打成 zip（含 assets 里的示例
+        // .ulg、evals、scripts）。只下载 SKILL.md 单文件的话，这些伴生文件就丢了。
         const a = document.createElement("a");
         a.href = `/api/skills/${slug}/download`;
         a.download = `${slug}.zip`;
@@ -102,9 +94,7 @@ export function EntrySidebar({
                     {copied ? <Check className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
                     {copied ? "已复制，粘贴给 AI 即可" : copyLabel}
                 </button>
-                {/* 安装包下载只有 Skill 有：MCP 的「安装」就是复制配置接进客户端，
-                    没有可下载的包；旧版给 MCP 也挂「下载 SKILL.md」，实际下载的是
-                    接入配置文本存成 SKILL.md，是个坏按钮，撤掉。 */}
+                {/* 安装包下载只有 Skill 有：MCP 的「安装」就是复制配置接进客户端，没有可下载的包 */}
                 {kind === "skill" && (
                     <button type="button" onClick={download} className="btn-ghost mt-2 w-full py-2.5 text-muted">
                         {downloaded ? <Check className="h-4 w-4 text-ok" /> : <Download className="h-4 w-4" />}
@@ -145,9 +135,8 @@ export function EntrySidebar({
                     <ul className="divide-y divide-border/60">
                         {related.map((r) => (
                             <li key={r.slug} className="py-1 first:pt-0 last:pb-0">
-                                {/* 悬停反馈三件套（习语取自 SkillHub 的卡片）：整条浮起（负 margin
-                                    让高亮块比文字宽、文字仍与标题对齐）→ 标题变主色 → 箭头从左滑入；
-                                    箭头常驻占位（只动透明度/位移），悬停时文字不回流。 */}
+                                {/* 悬停反馈三件套：整条浮起（负 margin 让高亮块比文字宽）→ 标题变主色
+                                    → 箭头从左滑入；箭头常驻占位（只动透明度/位移），悬停时文字不回流 */}
                                 <Link
                                     href={`/${relatedBase}/${r.slug}`}
                                     className="group -mx-2 flex items-start gap-2.5 rounded-lg px-2 py-1.5 transition-colors duration-200 hover:bg-surface-2"

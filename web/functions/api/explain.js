@@ -1,7 +1,5 @@
-// POST /api/explain：登录用户把端侧确定性引擎产出的 findings 上送，
-// 边缘函数做配额校验后转发 DeepSeek 生成中文报告，并写 usage 计数与报告记录。
-// 架构铁律（CLAUDE.md 4.1/9）：LLM 只翻译 findings，不做任何数值判断。
-// 冲刺 2：本逻辑由 Next.js Node 路由迁移到 Edge Function（KV 只能在边缘运行时访问）。
+// POST /api/explain：登录用户上送端侧确定性引擎产出的 findings，边缘函数配额校验后转发 DeepSeek
+// 生成中文报告，并写 usage 计数与报告记录。架构铁律（CLAUDE.md 4.1/9）：LLM 只翻译 findings，不做数值判断。
 import {
     getKv,
     listAll,
@@ -31,8 +29,7 @@ import {
 const DEEPSEEK_ENDPOINT = "https://api.deepseek.com/chat/completions";
 
 export async function onRequestPost({ request, env, waitUntil }) {
-    // 冲刺 2：日志分析对所有用户免费。登录 10 次/天，匿名设备 3 次/天（KV 只用于防滥用）。
-    // 会员体系/无限额度是冲刺 3。
+    // 日志分析对所有用户免费：登录 10 次/天，匿名设备 3 次/天（KV 只用于防滥用）
     const session = await getSessionUser(request, env);
 
     const body = await readJson(request);
@@ -46,9 +43,8 @@ export async function onRequestPost({ request, env, waitUntil }) {
         return jsonResponse({ markdown: EMPTY_FINDINGS_MARKDOWN, quotaFree: true });
     }
 
-    // 本地联调：显式开启 LLM_MOCK=1（或 key 填 mock）时，用模板报告替代真实调用，
-    // 让配额/限流/报告落盘等链路可在没有 API key 的情况下完整验证。
-    // 后台（KV）优先于环境变量：轮换密钥不必再动控制台 + 重新部署
+    // 本地联调：显式开启 LLM_MOCK=1（或 key 填 mock）时用模板报告替代真实调用，让配额/限流/落盘
+    // 等链路在没有 API key 时也能完整验证。后台（KV）优先于环境变量：轮换密钥不必再动控制台 + 重新部署
     const apiKey = await getSecret(env, "deepseekApiKey", "DEEPSEEK_API_KEY");
     const mockMode = env?.LLM_MOCK === "1" || apiKey === "mock";
     if (!apiKey && !mockMode) {
@@ -201,8 +197,8 @@ ${JSON.stringify(body.matchedFaults ?? [], null, 2)}
             });
             if (!resp.ok) {
                 const detail = await resp.text().catch(() => "");
-                // 上游抖动属高频可恢复错误：只报状态码，不要把上游响应体（detail 里可能夹带
-                // 本次请求的 findings，等同用户数据）带进公开 issue
+                // 上游抖动属高频可恢复错误：只报状态码，不要把上游响应体（detail 里可能夹带本次
+                // 请求的 findings，等同用户数据）带进公开 issue
                 waitUntil?.(
                     reportIssue(env, {
                         kind: "server-error",
@@ -258,7 +254,7 @@ ${markdown}`;
         const now = Date.now();
         const reportId = sanitizeId(body.reportId || crypto.randomUUID());
         // 配额事件键每次调用都要唯一：同一份报告重复生成（历史里再点生成）也要计一次，
-        // 否则可以通过复用 reportId 绕过额度。报告记录仍按 reportId 覆盖。
+        // 否则可通过复用 reportId 绕过额度。报告记录仍按 reportId 覆盖。
         const eventId = `${now}_${Math.random().toString(36).slice(2, 8)}`;
         if (session) {
             const usageKey = `${usagePrefix(session.uid, day)}${eventId}`;
@@ -299,9 +295,8 @@ ${markdown}`;
     return jsonResponse({ markdown, reportId: body.reportId, quota });
 }
 
-// GET 不拦截就会穿透回源（opennext 不应用 rewrites），落到 [locale] 得 404 HTML、
-// 还会被 EdgeOne CDN 缓存约 5 分钟（2026-09-28 线上实测）。照 issues.js 的模式
-// 显式 405，让请求在边缘层被接住。
+// GET 不拦截就会穿透回源（opennext 不应用 rewrites），落到 [locale] 得 404 HTML、还会被 EdgeOne CDN
+// 缓存约 5 分钟。照 issues.js 的模式显式 405，让请求在边缘层被接住。
 export function onRequestGet() {
     return jsonResponse({ ok: false, error: "请用 POST 上送 findings" }, 405);
 }

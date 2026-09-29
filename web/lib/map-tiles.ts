@@ -1,9 +1,6 @@
 /**
- * 瓦片图层配置，报告页大地图（LogFlightMap）与历史列表缩略图（ReportHistoryList）
- * 共用一份，免得两处各写一遍。
- *
- * 支持多个底图提供商，默认 Esri（全球 WGS-84，无需 API key）。
- * 另两个都是国内底图（GCJ-02，仅中国大陆）：高德、天地图。境外飞行只能用 Esri。
+ * 瓦片图层配置，报告页大地图与历史列表缩略图共用一份。多提供商：默认 Esri（全球 WGS-84，无需 key）；
+ * 高德、天地图为国内底图（GCJ-02，仅中国大陆），境外飞行只能用 Esri。
  */
 
 // ===================== 提供商类型 =====================
@@ -14,7 +11,6 @@ export interface MapProvider {
     id: MapProviderId;
     /** 下拉菜单里的显示名 */
     name: string;
-    /** 坐标系 */
     crs: "wgs84" | "gcj02";
     /** 卫星影像图层 URL 模板 */
     satellite: string;
@@ -22,7 +18,6 @@ export interface MapProvider {
     street: string;
     /** 卫星图上的路名/地名叠加层（仅高德有这个独立图层） */
     satelliteLabels?: string;
-    /** 版权标注 */
     attribution: string;
     /** 子域名（高德轮询用，多域名并行加载更快） */
     subdomains?: string[];
@@ -30,15 +25,13 @@ export interface MapProvider {
     maxNativeZoom: number;
     /** 视野缩放上限 */
     fitMaxZoom: number;
-    /** 在外部地图打开起点的入口（坐标系与当前底图一致）。
-     *  天地图没有稳定的带坐标深链，整块留空时报告页就不显示这个入口。
-     *  链接与文案合成一个对象，省得将来只填一半、点出去的图和写的名字不是一家 */
+    /** 在外部地图打开起点的入口（坐标系与当前底图一致）；整块留空则报告页不显示入口
+     *  （天地图没有稳定带坐标深链）。链接与文案合成一个对象，省得只填一半。 */
     external?: {
         label: string;
         url: (lat: number, lon: number) => string;
     };
-    /** 是否需要 Key：天地图没配 Key 时瓦片直接 403，没配就不在下拉里出现
-     *  （免得选了以后整片灰，界面说不清是网不通还是没钥匙） */
+    /** 天地图没配 Key 时瓦片直接 403，没配就不在下拉里出现（免得选了整片灰，说不清是网不通还是没钥匙） */
     enabled: boolean;
 }
 
@@ -63,11 +56,7 @@ export const ESRI_ATTRIBUTION =
 
 // ===================== 天地图（仅中国大陆，需带 Key） =====================
 
-/**
- * 天地图 WMTS 强制带 Key：官方《地图服务》页写明"使用本组服务之前，需要申请 Key"
- * （lbs.tianditu.gov.cn/server/MapService.html），没有 tk 时瓦片直接 403。
- * Key 走环境变量，不入库。
- */
+/** 天地图 WMTS 强制带 Key（官方《地图服务》页写明，没 tk 瓦片直接 403）；Key 走环境变量，不入库 */
 const TIANDITU_TK = process.env.NEXT_PUBLIC_TIANDITU_TK ?? "";
 
 /** 子域名 t0~t7，轮询着取能并行加载 */

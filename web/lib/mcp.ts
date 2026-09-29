@@ -5,12 +5,8 @@ import type { McpServerMeta } from "./types";
 import { parseChangelogFromMarkdown } from "./changelog";
 import { MCP_DIR } from "./content-dir";
 
-/**
- * MCP Registry 规范里我们真正用到的那几个字段（`server.json`）。
- *
- * 只声明站点要读的字段，没有把整份 schema 搬进来：搬了就得跟着 schema 版本走，
- * 而站点只关心"上游在哪、怎么装、走什么传输"。完整合规由 `check-mcp-spec.mjs` 校验。
- */
+/** MCP Registry 规范（server.json）里站点真正用到的字段。只声明要读的（搬整份 schema 就得跟着版本走），
+ *  完整合规由 check-mcp-spec.mjs 校验。 */
 export interface McpManifest {
     /** 反向 DNS，如 io.github.furkanisikay/ardupilot-mcp */
     name: string;
@@ -32,12 +28,8 @@ export interface McpServer extends McpServerMeta {
     manifest?: McpManifest;
 }
 
-/**
- * 传输方式的唯一真源是 `server.json` 的 `packages[0].transport.type`。
- *
- * 上游未确认的条目没有 server.json，只能退回 README frontmatter 的过渡值；
- * 两份同时存在就是双真源，由 `check-mcp-spec.mjs` 判红，这里只管读。
- */
+/** 传输方式的唯一真源是 server.json 的 packages[0].transport.type；上游未确认的条目没有 server.json，
+ *  退回 README frontmatter 过渡值。两份并存即双真源，由 check-mcp-spec.mjs 判红，这里只管读。 */
 function resolveTransport(manifest: McpManifest | undefined, fallback: unknown): string {
     const fromManifest = manifest?.packages?.[0]?.transport?.type;
     if (fromManifest) return String(fromManifest);

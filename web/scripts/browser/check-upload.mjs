@@ -1,8 +1,8 @@
 // 浏览器端日志分析链路自检：开全新标签页 → 清历史去重 → 塞入 .ulg → 等报告 → 截图。
 // 用法: node check-upload.mjs <ulog 路径> <out.png> [baseUrl] [light|dark] [keep-history]
 // 依赖: 已用 --remote-debugging-port=9222 启动的 Chrome。
-// 默认清掉该源 localStorage（报告去重存这里），否则同一日志会走“此前已分析过”捷径，
-// 根本不启动 Pyodide，e2e 就测不到引擎。第 5 个参数传 keep-history 可保留。
+// 默认清掉该源 localStorage（报告去重存这里），否则同一日志走“此前已分析过”捷径，
+// 不启动 Pyodide，e2e 就测不到引擎。第 5 个参数传 keep-history 可保留。
 import { writeFileSync } from "node:fs";
 
 const [logPath, out, base = "http://localhost:3000", theme = "light", keepHistory = ""] = process.argv.slice(2);
@@ -12,12 +12,10 @@ if (!logPath || !out) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-// 每次开“全新标签页”：复用用户当前标签会被其上残留的调试状态/未关闭的 CDP 会话
-// 拖死（实测标签会永久不响应 Runtime.evaluate），新开的标签页无此问题。
-// 从 about:blank 起步，再用 Page.navigate 单次加载 /log。
-// 不能让新标签直接开 /log 再 navigate 一次：双次加载下实测页面在派发 change
-// 之后数秒主线程失去响应（Runtime.evaluate 永不回包），原因在 DevTools/加载竞态，
-// 单次导航稳定复现不了该问题。
+// 必须开“全新标签页”：复用当前标签会被其上残留的调试状态/未关闭 CDP 会话拖死
+// （实测标签永久不响应 Runtime.evaluate）。
+// 从 about:blank 起步再用 Page.navigate 单次加载 /log：若新标签直接开 /log 再 navigate 一次，
+// 双次加载下页面派发 change 后数秒主线程失去响应（DevTools/加载竞态）。
 const page = await (
     await fetch("http://127.0.0.1:9222/json/new?about:blank", {
         method: "PUT",
@@ -51,7 +49,7 @@ ws.addEventListener("message", (e) => {
         else res(msg.result);
         return;
     }
-    // 只记录，不抛：事件监听里抛错会让整个脚本崩掉，掩盖真正的失败原因
+    // 只记录不抛：事件监听里抛错会崩掉整个脚本，掩盖真正的失败原因
     try {
         if (msg.method === "Runtime.exceptionThrown") {
             events.push(
@@ -98,10 +96,9 @@ const evalIn = async (expr) => {
 };
 
 /**
- * 等 React 完成 hydration 再动手。
- * 之前偶发"文件塞进去了、页面却毫无反应"，根因是 dev server 刚重编译完，
- * 4 秒后 DOM 在、事件处理器还没挂上，派发的 change 落到未 hydrate 的节点上。
- * React 会在 DOM 节点上留下 __reactProps$xxx，用它判断处理器是否已就绪。
+ * 等 React 完成 hydration 再动手。否则偶发“文件塞进去了、页面却毫无反应”：
+ * dev server 刚重编译完，DOM 在、事件处理器还没挂上。用 DOM 节点上的
+ * __reactProps$xxx 判断处理器是否已就绪。
  */
 let hydrated = false;
 for (let i = 0; i < 40; i++) {
@@ -122,7 +119,7 @@ if (!hydrated) console.log("⚠ 未检测到 hydration，仍继续尝试（可�
 console.log("页面:", await evalIn("location.pathname"));
 
 // 清掉去重历史（localStorage 报告存档 + IndexedDB 原始日志缓存），强制走一次完整解析，
-// 否则同一日志只载入历史结论，Pyodide/规则引擎完全不启动，e2e 失去意义。
+// 否则只载入历史结论，Pyodide/规则引擎完全不启动，e2e 失去意义。
 if (keepHistory !== "keep-history") {
     await evalIn("localStorage.clear(); sessionStorage.clear(); 'cleared'");
     // awaitPromise：等 IndexedDB 删除真正结束再上传，避免删库与页面打开数据库竞态
@@ -154,7 +151,7 @@ async function tryUpload() {
     });
     const n = await evalIn("document.querySelector('input[type=file]').files.length");
     // setFileInputFiles 只把文件塞进 input，不保证触发事件（Chrome 版本间行为不一致），
-    // 需要显式派发；若 React 仍未接住则重试（见下方的响应判定）
+    // 需显式派发；若 React 仍未接住则重试（见下方响应判定）
     await evalIn("document.querySelector('input[type=file]').dispatchEvent(new Event('change',{bubbles:true}))");
     await sleep(2500);
     const reacted = await evalIn(`(() => {
@@ -171,7 +168,7 @@ for (let attempt = 1; attempt <= 4; attempt++) {
 }
 
 let state = "(none)";
-// 冷启 Pyodide（下载运行时 + micropip 装 pyulog）在慢网下可能要 5 分钟以上，给到 8 分钟
+// 冷启 Pyodide（下载运行时 + micropip 装 pyulog）慢网下可能超 5 分钟，给到 8 分钟
 for (let i = 0; i < 120; i++) {
     await sleep(4000);
     // 心跳：eval 8 秒不回说明标签页主线程卡死，别无限等
@@ -212,9 +209,8 @@ for (let i = 0; i < 120; i++) {
 
 await evalIn(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}`);
 await sleep(500);
-// 只截视口：captureBeyondViewport 要做整页布局，长报告 + plotly 图表下会让截图
-// 请求永不返回，并把该 target 的 CDP 命令队列一起堵死（后续 Runtime.evaluate 全部超时，
-// 表现像“页面卡死”）。视口截图与已 emulate 的 1440x1300 一致即可。
+// 只截视口：captureBeyondViewport 要做整页布局，长报告 + plotly 图表下会让截图请求永不返回，
+// 并把该 target 的 CDP 命令队列一起堵死（后续 Runtime.evaluate 全部超时，表现像“页面卡死”）。
 const shot = await send("Page.captureScreenshot", { format: "png" });
 writeFileSync(out, Buffer.from(shot.data, "base64"));
 console.log("最终状态:", state);

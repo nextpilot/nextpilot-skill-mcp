@@ -6,24 +6,19 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { reportManual } from "@/lib/issue-bridge";
 
 /**
- * 站内的「提交 issue」表单。不直接碰任何 issue API，
- * 走的是报告页「反馈问题」已经是同一条链：
+ * 站内的「提交 issue」表单。不直接碰任何 issue API，走的是报告页「反馈问题」同一条链：
  *   reportManual() → POST /api/issues（边缘入口）→ _lib/issue-filer.js（建单）
- * token 只在边缘函数，浏览器拿不到写权限（见 functions/api/issues.js 头注释）。
- *
- * 与报告页那个入口的区别只有一处：那边带着"命中的规则 / 结论条数"，
- * 这里是站外通用反馈，那些结构性字段给空值（sanitizePayload 有默认值，不会炸）。
+ * token 只在边缘函数，浏览器拿不到写权限。与报告页那个入口的区别只有一处：那边带着
+ * "命中的规则 / 结论条数"，这里是站外通用反馈，那些结构性字段给空值。
  */
 
 /** 与 SiteHeader 的源代码外链同源；ISSUE_PROVIDER 若换平台，这里要跟着改。 */
 const REPO_ISSUES_URL = "https://gitee.com/nextpilot/nextpilot-skill-mcp/issues";
 
 /**
- * 分类只作为文本前缀拼进 note（`[bug] …`），不新增结构化字段。
- *
- * 为什么不加一个 category 字段：那要动 ALLOWED_KINDS / sanitizePayload / 建单模板
- * 和它的一整套自测；而分类对 triage 的价值，一个稳定标签就够了。
- * 标签刻意用 ascii：issue 落到仓库里是给所有人看的，不该跟着界面语言变。
+ * 分类只作为文本前缀拼进 note（`[bug] …`），不新增结构化字段：加一个 category 要动
+ * ALLOWED_KINDS / sanitizePayload / 建单模板和它的一整套自测，而分类对 triage 一个稳定
+ * 标签就够了。标签刻意用 ascii：issue 落到仓库里是给所有人看的，不该跟着界面语言变。
  */
 const CATEGORIES = [
     { tag: "bug", zh: "页面出错 / 功能异常", en: "Something is broken" },
@@ -63,9 +58,8 @@ export function IssueForm() {
             note: `[${tag}] ${text}`,
         });
         // 注意：reportManual 是 fire-and-forget（内部不 await、失败也静默），
-        // 所以这里只能说"已提交"，不能说"已建单"。
-        // 线上若没配 ISSUE_ENABLED，整条上报层是 no-op（见 .env.example），
-        // 那种情况下这条反馈会静默消失，用 /issue-probe 才能查出来。
+        // 所以这里只能说"已提交"，不能说"已建单"。线上若没配 ISSUE_ENABLED，
+        // 整条上报层是 no-op，这条反馈会静默消失，用 /issue-probe 才能查出来。
         setSent(true);
     }
 

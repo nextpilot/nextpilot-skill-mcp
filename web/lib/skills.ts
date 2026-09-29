@@ -14,19 +14,10 @@ export interface Skill extends SkillMeta {
 }
 
 /**
- * 一个 Skill = 一个目录，目录名即 slug，里面三份文件各管一件事：
- *
- *   <slug>/SKILL.md       给 AI 看。frontmatter 只放 Agent Skills 规范字段
- *                         （name / description / license / metadata），站点卡片
- *                         需要的额外字段一律收进 `metadata`（规范规定 metadata 是
- *                         string→string 映射，所以列表写成逗号分隔、数字写成字符串）。
- *                         好处：整个目录拷进 `.claude/skills/` 就能被 Claude 直接用。
- *   <slug>/README.md      给人看，站点「概述」Tab。
- *   <slug>/CHANGELOG.md   给人看，站点「版本历史」Tab，同时是 version / updatedAt
- *                         的唯一真源（frontmatter 里不再存，避免两份分叉）。
- *
- * 以前是 `knowledge/skills/*.mdx` 平铺、给人看与给 AI 看混在一份正文里；
- * 2026-09-20 改成上面的结构。
+ * 一个 Skill = 一个目录，目录名即 slug，三份文件各管一件事：
+ *   SKILL.md 给 AI 看，frontmatter 只放 Agent Skills 规范字段，站点额外字段一律收进 metadata
+ *   （规范限定 metadata 是 string→string 映射，列表写成逗号分隔、数字写成字符串），整个目录拷进 .claude/skills/ 即可用；
+ *   README.md 给人看（「概述」Tab）；CHANGELOG.md 给人看（「版本历史」Tab），同时是 version/updatedAt 唯一真源，frontmatter 不存以免分叉。
  */
 function readFileOrThrow(dir: string, name: string): string {
     const full = path.join(dir, name);
@@ -116,13 +107,8 @@ export function getSkillBySlug(slug: string): Skill | undefined {
 /** 站点当文本展示的扩展名白名单，不在名单里（.ulg 等）就不进「文件」Tab */
 const TEXT_EXTS = new Set([".md", ".markdown", ".yaml", ".yml", ".json", ".py", ".txt", ".toml", ".sh", ".js", ".ts"]);
 
-/**
- * 列出一个 Skill 目录下的全部文本文件（含内容），供详情页「文件」Tab 展示。
- * 一个 Skill = 一个可整体拷进 `.claude/skills/` 的目录，目录里有什么这里就列什么，
- * 参考 skillhub.cn 的文件浏览器：树形列表 + 点击打开。
- *
- * 只在详情页调用；`getAllSkills()` 不带文件内容，列表页/索引保持轻量。
- */
+/** 列出 Skill 目录下全部文本文件（含内容），供详情页「文件」Tab。只在详情页调用：
+ *  getAllSkills() 不带文件内容，列表页/索引保持轻量。 */
 export function getSkillFiles(slug: string): SkillFile[] {
     const dir = path.join(SKILLS_DIR, slug);
     if (!fs.existsSync(dir)) return [];

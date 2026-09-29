@@ -1,18 +1,11 @@
 #!/usr/bin/env node
 /*
- * 为什么需要这个脚本：
- * 本机 pnpm 在虚拟store 里创建嵌套符号链接时会失败，特别是 `@scope/name`
- * 形式的包（`node_modules/.pnpm/<entry>/node_modules/@scope/name`）。失败形态是
- * 留下一个空的真实目录而不是链接。pnpm 自己不认为这是错误：`pnpm install`
- * 秒退并声称依赖树已就绪，直到运行期 `require` 抛 MODULE_NOT_FOUND。
+ * 修 pnpm 虚拟 store 里退化成空目录的嵌套符号链接（含 `@scope/name`）。
+ * pnpm install 认为依赖树已就绪，直到运行期 require 抛 MODULE_NOT_FOUND。
  *
- * 注意区分两类空目录：
- *   - 跨平台可选依赖（sharp / next-swc / tailwind-oxide 的其它平台二进制）：
- *     pnpm 本来就不安装，留空目录是正常形态，不要动。
- *   - 当前平台真正需要的包：这里才是要修的目标。
- *
- * 所以判据不是「是不是空目录」，而是「.pnpm 里有没有对应版本的可读实体」。
- * 找不到实体就跳过（那是可选依赖），找得到就说明链接本该存在。
+ * 判据是「.pnpm 里有没有对应版本的可读实体」而非「是不是空目录」：
+ * 跨平台可选依赖（sharp / next-swc / tailwind-oxide 其它平台二进制）本就留空目录，不动；
+ * 找不到实体就跳过。
  *
  * 用法：node scripts/fix-node-links.mjs [--check]
  *   --check  只报告，不修改；有可修项时退出码 1
@@ -38,8 +31,7 @@ function hasPackage(dir) {
 
 /**
  * 收集 .pnpm 中每个包名的所有实体位置。
- * 目录名超长时会被 pnpm 截断成 `<prefix>_<hash>`，所以只能靠目录内的真实结构判断，
- * 不能靠目录名匹配。
+ * 目录名超长会被截断成 `<prefix>_<hash>`，只能靠目录内真实结构判断，不能靠目录名匹配。
  */
 function indexEntities() {
     const index = new Map();
@@ -98,12 +90,9 @@ function majorOf(spec) {
 }
 
 /**
- * 同一个包在 .pnpm 里可能有多份实体（不同 peer 组合、不同版本各一份）。
- *
- * 挑选顺序：
- *   1. 与 owner 同条目，跨组链接会让 peer 上下文整体错位，优先避开；
- *   2. 主版本与声明一致，`.pnpm` 里可能同时躺着旧版残留（如 TS6 时代留下的
- *      typescript@6.0.3），挑错会让 tsc 静默跑成另一个大版本；
+ * 同一包在 .pnpm 里可能有多份实体（不同 peer 组合 / 版本各一份）。挑选顺序：
+ *   1. 与 owner 同条目（跨组链接会让 peer 上下文整体错位）；
+ *   2. 主版本与声明一致（可能存在旧版残留，挑错会让 tsc 静默跑成另一个大版本）；
  *   3. 兜底取第一个。
  */
 function pickEntity(candidates, ownerEntry, wantMajor) {
@@ -183,8 +172,8 @@ for (const entry of fs.readdirSync(PNPM)) {
 }
 
 /*
- * 顶层 node_modules/<pkg> 同样会退化成空目录（症状一致）。这里按 package.json
- * 声明的直接依赖逐个核对，顶层只链直接依赖，不要试图遍历 .pnpm 全部条目。
+ * 顶层 node_modules/<pkg> 也会退化成空目录（症状一致）。按 package.json 声明的直接依赖
+ * 逐个核对；顶层只链直接依赖，不要遍历 .pnpm 全部条目。
  */
 const pkgJson = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
 for (const rawName of Object.keys({ ...pkgJson.dependencies, ...pkgJson.devDependencies })) {
@@ -209,7 +198,7 @@ for (const rawName of Object.keys({ ...pkgJson.dependencies, ...pkgJson.devDepen
         continue;
     }
 
-    // 顶层要处理三种坏形态：完全不存在、空目录、断链，比 .pnpm 内部多一种"不存在"。
+    // 顶层要处理三种坏形态：不存在、空目录、断链（比 .pnpm 内部多一种"不存在"）。
     // 断链也一并重建：指向实体比保留一个指不到东西的链接可信。
     let isLink = false;
     try {

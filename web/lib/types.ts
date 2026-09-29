@@ -36,24 +36,15 @@ export interface ChangelogEntry {
     notes: string[];
 }
 
-/**
- * Skill 详情页「文件」Tab 里可打开的一个文件（参考 skillhub.cn 的文件浏览器）。
- * 只收文本文件，`.ulg` 等二进制不该被站点当文本展示，也不会进这个列表。
- */
+/** Skill 详情页「文件」Tab 可打开的一个文件；只收文本，二进制（.ulg 等）不进列表 */
 export interface SkillFile {
     /** 相对 skill 目录的路径，如 `evals/cases.yaml`、`SKILL.md` */
     path: string;
-    /** 字节数（列表里展示大小用） */
     size: number;
-    /** 文件全文（UTF-8） */
     content: string;
 }
 
-/**
- * MCP 服务元数据。
- * 与 Skill 并列而非其子类：Skill 是模型读到的提示词与约定，MCP 服务是客户端
- * 能真正调用的工具集，两者的字段、评估方式和安全要求都不同。
- */
+/** MCP 服务元数据。与 Skill 并列而非其子类：Skill 是模型读的提示词约定，MCP 是客户端可调用的工具集 */
 export interface McpServerMeta {
     slug: string;
     name: string;
@@ -81,8 +72,8 @@ export interface McpServerMeta {
     updatedAt: string;
 }
 
-/** findings 检查结果（日志分析三层架构的层间契约，见 CLAUDE.md 4.2） */ export type Severity =
-    "critical" | "warning" | "info" | "guard";
+/** findings 检查结果的严重度（三层架构层间契约，见 CLAUDE.md 4.2） */
+export type Severity = "critical" | "warning" | "info" | "guard";
 
 export interface Finding {
     id: string;
@@ -151,8 +142,7 @@ export interface LogFacts {
     modes?: string[];
     /** 软件版本的展示串（FR 口径：`v1.16.0` / `v1.17.0-alpha` / `v1.14.3 (08310a)` / 无发布号时给短哈希） */
     firmwareDisplay?: string;
-    /** ver_sw_release 的类型码（64 alpha / 128 beta / 192 rc / 255 正式 / 0 未打标签；无发布号则 null）。
-     *  另存一份是为了以后调口径时前端能重算，不必重新解析日志 */
+    /** ver_sw_release 类型码（64 alpha / 128 beta / 192 rc / 255 正式 / 0 未打标签；null=无发布号），前端可据比重算展示 */
     fwReleaseType?: number | null;
 }
 
@@ -186,8 +176,7 @@ export interface LogReportData {
     guardTags?: string[];
     checksRun?: string[];
     checksSkipped?: { ruleId: string; reason: string }[];
-    /** 规则取数时的实例提示（区间越界被截断等），不是判定结论，是"这份日志没有你写的那么
-     *  多路数据"。与图上的 `SeriesResponse.warnings` 同源，界面上一起进告警栏 */
+    /** 规则取数时的实例提示（区间越界被截断等），非判定结论；与 SeriesResponse.warnings 同源，进告警栏 */
     instanceNotes?: string[];
     /** 第三层故障知识库命中条目 */
     matchedFaults?: MatchedFault[];
@@ -214,10 +203,7 @@ export interface TopicManifest {
 }
 
 /** np_series() 的返回：LTTB 降采样后的时序，NaN 已转为 null。
- *
- *  `series` 与请求里的 `ydata` 同序等长（取不到的那条是 null），前端按预设里
- *  逐项写好的 label / color 对齐即可，不用靠字段名反查（一条线画什么由预设定，
- *  引擎只负责把数取出来、把单位换算掉）。 */
+ *  `series` 与请求的 `ydata` 同序等长（取不到的是 null），前端按预设的 label / color 对齐。 */
 export interface SeriesResponse {
     /** 时间基准：开机以来的秒数（与 Flight Review 一致） */
     t: number[];
@@ -225,14 +211,12 @@ export interface SeriesResponse {
     x: (number | null)[] | null;
     series: ((number | null)[] | null)[];
     fullCount: number;
-    /** 取数过程中的提示（如"要实例 1~9，这份日志只有 0~2，按 1~2 取"）。
-     *  不是错误：图还是画出来了，只是取到的和写的不完全一样，界面上要给出来 */
+    /** 取数提示（如要实例 1~9 但日志只有 0~2，按 1~2 取）；不是错误，图已画出，界面要给出 */
     warnings?: string[];
     error?: string;
 }
 
-/** 地图上的一条轨道（`container: map` 的一个 child）。
- *  坐标已按固件换算成度/米（候选组按存在性挑、unit= 在引擎侧换算）。 */
+/** 地图上的一条轨道（`container: map` 的 child）；坐标已按固件换算成度/米 */
 export interface TrackSeries {
     /** 图例名（预设里的 label） */
     label: string;
@@ -254,25 +238,12 @@ export interface TrackData {
     legend?: boolean;
     tracks: TrackSeries[];
     error?: string;
-    /** 取不到轨迹的逐条原因（有 error 时才有，界面按列表渲染）。
-     *
-     *  为什么要有它：`error` 只有一句话，而"画不出轨迹"有六种原因，各说各的实话：
-     *    ① 日志里没有声明要的 topic（`sensor_gps` / `vehicle_gps_position` 一个都不在）
-     *    ② 那个 topic 在，但没有声明里找的坐标字段（字段改了名）
-     *    ③ 字段名对得上却取不出值（`ref()` 解析失败）
-     *    ④ 那个 topic 没有 `timestamp` 列（轨迹的时间轴取自它）
-     *    ⑤ `timestamp` 与 lat/lon/alt 的采样数不一致（同 topic 同实例却长度不同）
-     *    ⑥ 有采样但有效定位不足 2 个（坐标全 0 / NaN，或 `fix_type` 一直 < 3）
-     *  只给一句概括时，用户拿到的是听起来合理但可能是错的提示；曾经一律说"声明里的坐标
-     *  候选都不在日志里"，可实测有两份日志是 ①、另有一份是 ⑥，界面上长得一模一样。
-     *  见 CLAUDE.md §6.8。 */
+    /** 取不到轨迹的逐条原因（有 error 时才有，界面按列表渲染）。error 只有一句话，
+     *  而画不出轨迹有六种：topic 缺失 / 坐标字段缺失 / ref() 取值失败 / 无 timestamp 列 /
+     *  timestamp 与坐标采样数不一致 / 有效定位不足 2 个；只给一句概括易误导。见 CLAUDE.md §6.8 */
     errorReasons?: string[];
-    /** 出错的种类（有 error 时才有）。
-     *  `log-not-loaded` = 这个 Worker 里没装着这份日志（从没解析过，或装的是另一份），
-     *  重新选择该 .ulg 文件解析一次就能恢复，界面据此给出「重新选择 .ulg 文件」按钮；
-     *  其它错误（日志里本来就没有 GPS 等）重选也没用，不给按钮。
-     *  名字说的是 Worker 的状态，不是这份日志的历史：报告页上的轨迹缺了，往往是
-     *  "轨迹没进存档 + 本页没解析过"，而不是"这份日志没被解析过"。 */
+    /** 出错种类（有 error 时才有）。log-not-loaded = 该 Worker 没装这份日志，
+     *  重选 .ulg 重新解析即恢复（界面给重选按钮）；其它错误重选无用，不给按钮 */
     code?: "log-not-loaded";
 }
 
@@ -304,8 +275,7 @@ export interface ChangedParam {
     value: number | string | null;
 }
 
-/** ULog 的 Parameter Default（'Q' 消息）。PX4 只记录与当前值不同的默认值：
- *  某个键缺失 = 当前值与该默认相同；整条记录存在 = 该参数被改过。 */
+/** ULog Parameter Default（'Q' 消息）：PX4 只记录与当前值不同的默认值，键缺失 = 与该默认相同 */
 export interface ParamDefault {
     /** current_setup：机架配置 + 自定义默认文件算出来的默认值 */
     setup?: number | string | null;
@@ -318,8 +288,7 @@ export interface LogInfoEntry {
     key: string;
     /** 变量名的中文名（来自 facts.yaml 的 info_key_docs）；表里没有的键为空串 */
     name?: string;
-    /** 该键在 ULog 里的类型（`char[40]` / `uint32_t`…），空串表示上游没给。
-     *  表格里不展示（列太多），留给报告接口 / 未来的 MCP 用 */
+    /** 该键在 ULog 里的类型（`char[40]` 等）；表格不展示，留给报告接口 / MCP 用 */
     type?: string;
     value: string;
     /** 这个键是什么意思（同上）；表里没有的键为空串 */

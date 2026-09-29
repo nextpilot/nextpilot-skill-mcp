@@ -4,13 +4,11 @@ import { useState } from "react";
 import { AlertCircle, Check, Loader2, Save } from "lucide-react";
 
 /**
- * 后台站点设置表单。
+ * 后台站点设置表单。字段是服务端按 `lib/site-settings.ts` 的字段表传进来的，
+ * 这里不认得任何具体配置项，加一项配置不用改这个组件。
  *
- * 字段是服务端按 `lib/site-settings.ts` 的字段表传进来的，这里不认得任何具体配置项，
- * 加一项配置不用改这个组件。
- *
- * 保存走 POST /api/admin/settings（边缘函数直接写 KV）。用 POST 不是 PUT：
- * 本地 edge-dev 垫片只把 GET/POST/DELETE 映射到 onRequest*，PUT 会静默走不通。
+ * 保存走 POST 不是 PUT：本地 edge-dev 垫片只把 GET/POST/DELETE 映射到 onRequest*，
+ * PUT 会静默走不通。
  */
 
 export interface SettingFieldView {

@@ -1,45 +1,14 @@
 /**
- * 后台站点设置守卫：这套「三层取值 + 字段表驱动」的机制里，没有任何一处会在运行时报错。
- *
- * 每条规则各自对应一种「不报错、只是悄悄失效」的回归：
- *
- * - `settings-schema`：字段表在 Node 侧（`lib/site-settings.ts`）与边缘侧
- *   （`functions/_lib/settings-schema.js`）各有一份。边缘按自己那份校验落库，Node 按自己
- *   那份回落渲染，两侧 key 或 kind 对不上就是「后台存进去了、前台读不出来」，
- *   API 回 ok、页面也不报错，只有管理员改了没反应。
- * - `settings-footer-props`：页脚四项（版权行 / 品牌介绍 / 源码链接 / 备案号）要 props 传入。
- *   `SiteFooter` 是客户端组件，读不到 KV；一旦有人把值写回组件里（或 import `site-config`
- *   自己取），后台改完页脚不会变，而代码看着完全正常。
- * - `settings-static-metadata`：根 layout 的 metadata 得是静态常量
- *   （`export const metadata`），且不要导出 `generateMetadata()`。
- *   这是首页速度的命门：只要根 layout 导出 `generateMetadata`（异步），Next.js 会把
- *   整棵路由树判为动态渲染，首页无法静态化、CDN 零缓存、每次请求实时 SSR。
- *   2026-09-27 的「后台站点设置」踩了这个坑（首页 TTFB 从 ~0.05s 退化到 ~1.5s），
- *   2026-09-28 改回静态后恢复。本规则的极性是反的：它保护的是「静态」，不是「可改」。
- * - `settings-render-path`：渲染路径（`app/**` 的页面/元数据路由 + `lib/seo.ts`）不要
- *   读 `getSiteSettings()`。站点名/域名/描述现在来自构建期常量（环境变量 +
- *   重新部署），任何渲染期读 KV 都会把那一页拽回动态渲染，首页静态化前功尽弃。
- *   运行期仍可读的只有纯请求期的 API 路由（如 `api/auth/otp/request` → `lib/mailer.ts`
- *   读 SMTP 授权码），`ALLOWED_RUNTIME_READERS` 里列明。
- * - `settings-static-locale`：`app/[locale]/layout.tsx` 与 `page.tsx` 都要调
- *   `setRequestLocale(locale)`。next-intl 默认从请求头取 locale，不登记就整棵子树动态化。
- *   这个回归构建照样过、页面照样开，只是 `● (SSG)` 悄悄变回 `ƒ (Dynamic)`，
- *   不写成守卫就没人察觉得到。
- * - `settings-site-url-fallback`：`SITE_URL` 要有非 localhost 的生产兜底。
- *   它是唯一一个「默认值 ≠ 线上值」的站点字段：漏配 `NEXT_PUBLIC_SITE_URL` 时，
- *   站名/描述/页脚完全看不出来，而 `SITE_URL` 变成 `localhost:3000`，页面上毫无异常，
- *   只有 sitemap / robots / canonical / og:url / JSON-LD 的域名全错，等于主动提交死链。
- *   2026-09-28 真实发生（首页静态化改读常量后暴露）。
- * - `settings-secret-client`：密钥字段名不得出现在任何客户端组件里。字段名进了客户端组件，
- *   意味着那份明文正被序列化进 SSR 的 HTML（查看源代码即可拿走）。
- * - `settings-secret-wiring`：三个密钥各自至少有一个消费点在读它。后台存了却没人读，
- *   管理员以为换了密钥，实际还在用旧的那份，同样是静默的。
- *
- * ## 输出契约（被 tools/ci/mutate_guards.py 解析，改格式前先看那边）
- *
- * 失败行必须是 `  FAIL <规则id> -> <详情>`：自证机按 `<规则id>` 判「恰好这一条红」，
- * 规则 id 是稳定契约。总结行不许写成 `FAIL <名字>`（会被当成一条检查名，变异自证报
- * "牵连"），用 `RESULT:`。只用 ASCII 符号（Windows 控制台默认 GBK，`✗ ✓` 会崩）。
+ * 后台站点设置守卫：机制里没有任何运行时报错，每条规则对应一种「悄悄失效」——
+ * settings-schema 两侧字段表 key/kind 对不上（存了读不到）；settings-footer-props SiteFooter
+ * 是客户端组件读不到 KV、页脚四项要 props 传入；settings-static-metadata 根 layout 要静态
+ * const metadata（generateMetadata 会把整棵路由树判动态、首页无法静态化）；settings-render-path
+ * 渲染路径不许读 getSiteSettings()（白名单 ALLOWED_RUNTIME_READERS）；settings-static-locale
+ * [locale] 要调 setRequestLocale（不登记整棵子树动态化、构建照样过）；settings-site-url-fallback
+ * SITE_URL 要有非 localhost 兜底（漏配时页面无异常、只有 sitemap/canonical/og:url 全错）；
+ * settings-secret-client 密钥字段名进客户端组件 = 明文进 SSR HTML；settings-secret-wiring 密钥要有消费点。
+ * 输出契约（被 tools/ci/mutate_guards.py 解析，改格式前先看那边）：失败行 `  FAIL <规则id> -> <详情>`，
+ * 规则 id 是稳定契约；总结行用 RESULT:（写成 FAIL 会被当成检查名）；只用 ASCII（Windows 控制台 GBK，✗ ✓ 会崩）。
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -66,9 +35,8 @@ const DECLARATION_ONLY = ["lib/site-settings.ts", "functions/_lib/settings-schem
 
 /**
  * 允许在运行期读 `getSiteSettings()` 的文件（渲染路径之外的白名单）。
- *
- * 只有纯请求期的接口才配出现在这里：它们不进静态化判定，读 KV 不产生副作用。
- * 渲染路径（`app/**` 里的页面与元数据路由）都不许读，那是首页静态化的命门。
+ * 只有纯请求期接口才配进来（不进静态化判定，读 KV 无副作用）；
+ * 渲染路径（`app/**` 页面与元数据路由）都不许读，那是首页静态化的命门。
  */
 const ALLOWED_RUNTIME_READERS = ["lib/mailer.ts"];
 
@@ -107,34 +75,27 @@ function walk(dir, out = []) {
 const rel = (p) => p.slice(webRoot.length + 1).replace(/\\/g, "/");
 
 /**
- * 源码里是否出现了某个 key 名。
- *
- * 要整词匹配：`includes("deepseekApiKey")` 会把 `deepseekApiKeyV2` 也算成"有人在读"，
- * 而那恰是最典型的坏法，后台字段没改名、消费点改了名，于是存的是 A、读的是 B，
- * 管理员以为轮换过了，实际还在用旧的那份。整词匹配才抓得到。
+ * 源码里是否出现了某个 key 名。要整词匹配：`includes("deepseekApiKey")` 会把 deepseekApiKeyV2
+ * 也算成"有人在读"，而那恰是最典型的坏法（后台字段没改名、消费点改了名，存的是 A 读的是 B，
+ * 管理员以为轮换过、实际还在用旧的）。整词匹配才抓得到。
  */
 function mentions(src, key) {
     return new RegExp(`\\b${key}\\b`).test(src);
 }
 
 /**
- * 去掉注释后再判「有没有真的读运行期设置」。
- *
- * 注释里出现 `getSiteSettings()` 是在说明历史（"曾经这里是 async + await …"），
- * 不是真的在读 KV。守卫只认代码，所以先把块注释与行注释摘掉，否则任何一段解释性的
- * 头注都会把规则判红，守卫就变成了「不许在注释里提这个名字」的荒谬规定。
+ * 去掉注释后再判「有没有真的读运行期设置」。注释里出现 `getSiteSettings()` 是在讲历史，
+ * 不是真的在读 KV；不剥的话任何解释性头注都会把规则判红，守卫变成
+ * 「不许在注释里提这个名字」的荒谬规定。
  */
 function stripComments(src) {
     return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 }
 
 /**
- * 从字段表源码里抽出 `[{key, kind}, ...]`。
- *
- * 按「对象块」匹配而不是按行：`kind` 常常和 `key` 不在同一行（字段表为了可读性会分行），
- * 按行配对必然漏。块内不含嵌套花括号，所以 `\{[^{}]*\}` 足够。若哪天字段表里出现嵌套
- * 对象，这里解析出的字段数会变少，`settings-schema` 会以「解析出 N 个字段」的形式红，
- * 不会静默通过。
+ * 从字段表源码里抽出 `[{key, kind}, ...]`。按「对象块」匹配而非按行：`kind` 常与 `key`
+ * 不在同一行（字段表为可读性会分行），按行配对必然漏；块内不含嵌套花括号，`\{[^{}]*\}` 足够。
+ * 哪天出现嵌套对象，解析出的字段数会变少，settings-schema 以「解析出 N 个字段」的形式红，不会静默通过。
  */
 function parseFields(src, label) {
     const anchor = src.indexOf("export const SETTINGS_FIELDS");
@@ -201,8 +162,7 @@ function parseFields(src, label) {
 // ---- 2. 页脚四项走 props，不在客户端组件里写死 ----
 {
     const src = read(FOOTER);
-    // 只看组件签名的解构，不看全文：interface 里留着名字、签名里没接，值照样进不来。
-    // 反过来全文匹配的话，任何一个名字只要在注释里出现过就算过，守卫会安静地绿着。
+    // 只看组件签名的解构，不看全文：interface 里留着名字、签名没接，值照样进不来；全文匹配则注释里出现就算过
     const sig = src.match(/export function SiteFooter\(\{([^}]*)\}/);
     const taken = sig ? sig[1] : "";
     const missing = FOOTER_PROPS.filter((p) => !taken.includes(p));
@@ -248,8 +208,7 @@ function parseFields(src, label) {
 
 // ---- 3b. 渲染路径不得读运行期设置（任何一处都会把那一页拽回动态渲染） ----
 {
-    // 渲染路径 = app/** 全部（页面 + sitemap/robots/manifest/opengraph-image 等元数据路由）
-    // + lib/seo.ts（元数据工厂）。它们都被 Next.js 纳入静态化判定。
+    // 渲染路径 = app/** 全部（页面 + sitemap/robots/manifest 等元数据路由）+ lib/seo.ts（元数据工厂），都纳入静态化判定
     const renderPath = [...walk(join(webRoot, "app")), join(webRoot, "lib", "seo.ts")].filter(
         (p) => !ALLOWED_RUNTIME_READERS.includes(rel(p)),
     );
@@ -265,12 +224,9 @@ function parseFields(src, label) {
 }
 
 // ---- 3c. next-intl 静态化开关：setRequestLocale 要与 generateStaticParams 成对 ----
-// next-intl 默认从请求头取 locale；不登记 locale 就会读请求头 → 整棵子树退回动态渲染。
-// 这个回归构建照样成功、页面照样能打开，只是 `○/●` 悄悄变回 `ƒ`，CI 里没人看得出来。
-//
-// 判据要看调用（`setRequestLocale(...)`），不能只看名字出现：`import { … setRequestLocale }`
-// 这一行本身就是代码，只匹配名字的话「导入但没调用」也会被判绿，那正是最像样的坏法
-// （删掉调用却忘了删 import，TypeScript 也不报错，因为 import 仍被"使用"的假象不会触发 noUnusedLocals）。
+// next-intl 默认从请求头取 locale；不登记就整棵子树动态化——构建照样过、页面照样开，
+// 只是 `○/●` 悄悄变回 `ƒ`，CI 里没人看得出来。
+// 判据要看调用（`setRequestLocale(...)`）不能只看名字：删掉调用忘了删 import 也不报错，只匹配名字会判绿。
 {
     const localeRoot = join(webRoot, "app", "[locale]");
     const targets = [join(localeRoot, "layout.tsx"), join(localeRoot, "page.tsx")];
@@ -287,11 +243,9 @@ function parseFields(src, label) {
 }
 
 // ---- 3d. SITE_URL 要有生产兜底（不能落到 localhost） ----
-// `SITE_URL` 是唯一一个默认值 ≠ 线上值的字段：站名/描述/页脚的默认值恰好就是
-// 想要的线上值，漏配 NEXT_PUBLIC_SITE_URL 也看不出来；而 SITE_URL 一漏配就变
-// localhost:3000，页面上却毫无异常，只有 sitemap / robots / canonical / og:url /
-// JSON-LD 里的域名全错，等于主动把死链提交给搜索引擎。2026-09-28 真实发生。
-// 判据：SITE_URL 的表达式里要出现非 localhost 的生产兜底，否则这道门就该红。
+// `SITE_URL` 是唯一「默认值 ≠ 线上值」的字段：其余字段默认值恰好就是想要的线上值，漏配看不出来；
+// SITE_URL 一漏配就变 localhost:3000，页面毫无异常，只有 sitemap / robots / canonical / og:url /
+// JSON-LD 域名全错，等于主动提交死链。判据：SITE_URL 的表达式里要出现非 localhost 的生产兜底。
 {
     const src = read(join(webRoot, "lib", "site-config.ts"));
     const m = src.match(/export\s+const\s+SITE_URL\s*=\s*([\s\S]*?);/);
@@ -311,9 +265,8 @@ function parseFields(src, label) {
 }
 
 // ---- 3e. 环境变量文件里的站点域名变量名要带 NEXT_PUBLIC_ 前缀 ----
-// 代码读的是 `process.env.NEXT_PUBLIC_SITE_URL`（见 lib/site-config.ts）。若在 .env 里
-// 写成裸名 `SITE_URL=x`，它会是个孤儿变量：编辑器/控制台看着"配了"，代码却读不到，
-// 于是落到默认值，又是一个"改了没反应"的静默失败。2026-09-28 真实存在（.env.local）。
+// 代码读的是 `process.env.NEXT_PUBLIC_SITE_URL`。在 .env 里写成裸名 `SITE_URL=x` 会是孤儿变量：
+// 看着"配了"代码却读不到，落到默认值，又是一个"改了没反应"的静默失败。
 {
     const envFiles = [".env.local", ".env.example", ".env"];
     const problems = [];

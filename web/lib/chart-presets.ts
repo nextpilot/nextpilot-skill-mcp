@@ -13,17 +13,10 @@ import {
 type CompiledOutput = (UnifiedAxes & { container: "axes" }) | { container: "map" };
 
 /**
- * 绘图预设的入口：声明在 `knowledge/px4/plot/*.yml`（构建期编译成 plots.generated.ts，
- * 字段引用已经过校验、单位已经查过表），这里只负责把编译产物接上 manifest。加/改图请改
- * YAML，不要改这个文件。
- *
- * 怎么解析不在这里，实例怎么数、区间引用怎么展开成多条线，全在 `panel-resolver.ts`
- * 那一份里（工具页现贴 YAML 的 `tools/compile-yaml-preset.ts` 用的也是同一份）。
- *
- * 与改造前（panels/topic/instance/fields 那套）的区别：
- * - 取数声明是与规则同一套的 `ref(...)` 候选组 + `unit=`（字段换代、量纲换算都在引擎侧）
- * - 容器（container）决定这是"一张图"还是"地图"；children 是图上的线 / 地图上的轨道
- * - 一条线画什么由预设写死，引擎按 ydata 顺序回一组序列同序等长（取不到的项是 null）
+ * 绘图预设的入口：声明在 knowledge/px4/plot/*.yml（构建期编译成 plots.generated.ts，字段引用已校验、
+ * 单位已查表），加/改图改 YAML 不改这个文件。解析全在 panel-resolver.ts（工具页 compile-yaml-preset.ts 共用）。
+ * 取数声明与规则同一套 ref(...) 候选组 + unit=（字段换代、量纲换算在引擎侧）；container 决定一张图还是地图；
+ * 一条线画什么由预设写死，引擎按 ydata 顺序回一组同序等长序列（取不到的项是 null）。
  */
 export type { FieldDesc, PanelSpec, SeriesRequest };
 

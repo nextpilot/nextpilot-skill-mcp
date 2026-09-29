@@ -8,9 +8,8 @@ import { formatLogTime } from "@/lib/format";
 const inputCls =
     "w-56 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-sm text-text placeholder:text-muted focus:border-primary focus:outline-none";
 
-/** 参数范围与说明的静态字典（构建期从 knowledge/px4/meta/main.json 生成）：
- *  参数名 → [min, max, desc]。版本注意：目前只有 PX4 main 分支产出过 parameters.json，
- *  release tag 没有，所以这份是最新分支的快照，与老固件可能有出入，界面如实标注来源。 */
+/** 参数范围与说明的静态字典（构建期从 knowledge/px4/meta/main.json 生成）：参数名 → [min, max, desc]。
+ *  目前只有 PX4 main 分支产出过 parameters.json，所以这是最新分支的快照，与老固件可能有出入。 */
 const PARAM_META_URL = "/params/px4-main.json";
 type ParamMeta = Record<string, [number | null, number | null, string]>;
 interface ParamMetaFile {
@@ -66,10 +65,8 @@ interface ParamRow {
 }
 
 /**
- * 一行的默认值怎么来（PX4 的 'Q' 消息只记录与当前值不同的默认值，这条语义是全部依据）：
- *   · 记了机架默认（current_setup）→ 用它（机架配置算出来的值，通常就是"本该是多少"）
- *   · 只记了固件默认（system）→ 用它
- *   · 一条没记 → 当前值就是默认值（日志里没分歧，不编）
+ * 一行的默认值怎么来（PX4 的 'Q' 消息只记录与当前值不同的默认值，这是全部依据）：
+ * 机架默认（current_setup）> 固件默认（system）> 当前值（日志里没分歧，不编）。
  * 所以这一列总是一个具体数字，不需要"一致 / 已改"这种标记文字。
  */
 function defaultValue(
@@ -90,12 +87,8 @@ function defaultValue(
 
 /**
  * 飞控参数 tab：六列「参数 / 当前值 / 默认值 / 最小值 / 最大值 / 说明」。
- *
- * - 默认值：PX4 只记录与当前值不同的默认值（PX4 logger.cpp: write_parameter_defaults），
- *   「没记录」= 当前值与两个默认都相同，所以这一列对每一行都能给出具体数字；
- * - 当前值与默认值不一致时当前值标红（这就是"被改过"的全部表达，不再另加标记文字）；
- * - 最小值 / 最大值 / 说明：来自 PX4 参数元数据快照（见 PARAM_META_URL），可能与你这份固件的
- *   版本有出入，缺失的留空。
+ * 当前值与默认值不一致时当前值标红（这就是"被改过"的全部表达，不另加标记文字）。
+ * 最小值 / 最大值 / 说明来自 PX4 参数元数据快照（可能与本份固件版本有出入），缺失的留空。
  */
 export function LogParamsMsg({ info }: { info: LogInfo }) {
     const [paramQuery, setParamQuery] = useState("");
@@ -139,7 +132,7 @@ export function LogParamsMsg({ info }: { info: LogInfo }) {
     const isModified = (r: ParamRow) => r.def !== null && !sameValue(r.value, r.def);
 
     // 默认就停在"与默认不同"：打开这个 tab 的人多半就是想知道"哪些参数被改过"。
-    // 老固件判不了默认值、或这份日志一条都没改，才退回"全部"（否则一进来是空表）。
+    // 老固件判不了默认值、或这份日志一条都没改，才退回"全部"。
     const [scope, setScope] = useState<ParamScope>(() => (defaultsKnown && rows.some(isModified) ? "modified" : "all"));
     const modifiedCount = useMemo(() => rows.filter(isModified).length, [rows]);
     const changedCount = useMemo(() => rows.filter((r) => r.changes.length > 0).length, [rows]);

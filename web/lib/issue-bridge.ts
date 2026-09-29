@@ -1,24 +1,10 @@
-// 浏览器侧「错误 → issue」的桥：挂全局兜底钩子 → 组装 → 去抖 → 脱敏 → POST 到自家 /api/issues。
-//
-// 这条链三个文件共用 `issue` 词根、各占一个不重复的角色词（改名前先读这段，见 CLAUDE.md §6.4）：
-//   lib/issue-bridge.ts（bridge：浏览器采集 + 投递，就是本文件）
-//   → functions/api/issues.js（入口：只接收与限流，不做判定）
-//   → functions/_lib/issue-filer.js（filer：判定 + 去重 + 提交）
-// 词根认亲（一眼看出是一条链），角色词分工（一眼看出各站哪一段）。
-//
-// 为什么不叫 telemetry（曾经用过）：它不撞任何词根，但语义比实际宽，这条链只装
-// "错误自动建单"这一件事，叫"遥测"会让人以为里面还有性能/使用统计。
-// 泛词当避让词用，终究要还债。
-// 也不叫 report（更早用过 report-error）：`report` 在本仓库已指"飞行分析报告"
-// （/api/reports、lib/report-history.ts），名词与动词混用会造出同前缀反义的孪生名。
-//
-// 这里没有也不该有 issue token，token 只在边缘函数。本模块只负责"把错误交出去"。
-//
-// 三条约束（改动前先读）：
-//   1. 不影响用户：全量 try/catch，发送不 await，失败静默。上报坏掉不能连累分析。
-//   2. 同一错误不重复发：内存按指纹去抖（默认 5 分钟一次）。
-//   3. 脱敏、截断、归一化都走 lib/error-policy.js，与边缘侧同一份实现。
-//      客户端先脱一层只是"少传一点东西出浏览器"，权威判定在边缘侧。
+// 浏览器侧「错误 → issue」的桥：挂全局兜底钩子 → 组装 → 去抖 → 脱敏 → POST 到 /api/issues。
+// 链路三文件共用 `issue` 词根、各占一个角色词（改名前先读，见 CLAUDE.md §6.4）：
+//   issue-bridge.ts（bridge：浏览器采集+投递）→ functions/api/issues.js（入口：接收+限流）
+//   → functions/_lib/issue-filer.js（filer：判定+去重+提交）。
+// 不叫 telemetry/report：前者语义过宽，后者与本仓库"飞行分析报告"（/api/reports）撞名。
+// 没有 issue token，token 只在边缘函数。三条约束：不影响用户（全 try/catch、发送不 await、失败静默）；
+// 同一指纹默认 5 分钟只发一次；脱敏/截断/归一化走 lib/error-policy.js，与边缘侧同一份实现。
 
 import { MAX_MESSAGE, MAX_STACK, MAX_TYPE, clip, normalize, scrub } from "./error-policy.js";
 import { SITE_VERSION } from "./site-version";
@@ -64,14 +50,11 @@ export function setBridgeSession(isLoggedIn: boolean) {
     loggedIn = isLoggedIn === true;
 }
 
-// 脱敏与截断已挪到 lib/error-policy.js：这两件事边缘侧也在做，要逐字一致。
-// （客户端只留头部的话，Pyodide traceback 末尾的异常行在边缘侧已经没了，
-//   兜底再截也救不回来，所以两边得是同一个函数，而不是两份相同的代码。）
+// 脱敏与截断已挪到 lib/error-policy.js：边缘侧也在做，两侧必须逐字一致（同一个函数而非两份相同代码）。
 
 function softFingerprint(input: ReportInput): string {
     const frame = String(input.stack ?? "").split("\n")[1] ?? "";
-    // 与边缘侧同一套归一化：不抹平数字的话，`file 17.ulg` 与 `file 18.ulg` 在本地
-    // 就被当成两个错误各发一次，边缘最终会去重，但那一趟网络是白花的。
+    // 与边缘侧同一套归一化：不抹平数字则 `file 17.ulg`/`file 18.ulg` 本地就当两个错误各发一次，白花一趟网络
     return [input.level, input.type, normalize(input.message ?? ""), normalize(frame)].join("|").slice(0, 400);
 }
 
@@ -105,8 +88,7 @@ function basePayload() {
         route: typeof location !== "undefined" ? location.pathname : "",
         ua: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 120) : "",
         loggedIn,
-        // 站点版本的唯一读取口（构建期由 next.config.ts 注入）。以前这里直接读环境变量，
-        // 而全仓库没人给它赋值，于是 version 恒为空串、上报里那栏直接不打印。
+        // 站点版本的唯一读取口（构建期由 next.config.ts 注入）；直接读环境变量则没人赋值，version 恒空串
         version: SITE_VERSION.version,
     };
 }

@@ -75,7 +75,7 @@ export function LogCharts({
         );
     }, [manifest, storedPanels]);
 
-    // 告警栏的两批来源：解析时就知道的（面板上带着），和取数后引擎回来才知道的（PanelChart 回调）。
+    // 告警栏的两批来源：解析时就知道的（面板上带着）和取数后引擎回来才知道的（PanelChart 回调）。
     // 后者要在多个面板并发取数时去重，同一条提示会被每张图重复报一次
     const [runtimeWarnings, setRuntimeWarnings] = useState<string[]>([]);
     const seenRef = useRef<Set<string>>(new Set());
@@ -267,7 +267,6 @@ function PanelChart({
         localRangeRef.current = null;
         onXRangeChange(null);
         // 全屏时操作的是全屏图：内联图此刻被浮层盖住，relayout 它用户看不到任何变化
-        // （「点了没效果」的由来）；全屏图是独立 newPlot 的另一份 graph，得单独 relayout
         const target = (fullscreen ? fullscreenRef.current : null) ?? elRef.current;
         if (!target) return;
         void getPlotly()
@@ -326,8 +325,8 @@ function PanelChart({
         };
 
         let cancelled = false;
-        // unmount 时 React 先把 ref 置 null 再跑 cleanup，cleanup 里要 purge 的话，
-        // 得用这里捕获的引用，到时再读 fullscreenRef.current 拿到的是 null，purge 会被跳过
+        // unmount 时 React 先把 ref 置 null 再跑 cleanup，cleanup 里要 purge 的话
+        // 得用这里捕获的引用，到时再读 fullscreenRef.current 拿到的是 null
         const el = fullscreenRef.current;
         (async () => {
             const Plotly = await getPlotly();
@@ -378,15 +377,14 @@ function PanelChart({
 
     useEffect(() => {
         let cancelled = false;
-        // cleanup 里要 purge（见文件内其他 effect 的说明）：unmount 时 React 已把 ref 置 null，
+        // cleanup 里要 purge（见其他 effect 的说明）：unmount 时 React 已把 ref 置 null，
         // 得在 effect 同步段捕获元素引用
         const el = elRef.current;
         if (!el) return;
         (async () => {
             try {
-                // 存档可能是旧版格式（取数声明从"topic + 列名"改成 ref 之后，`ydata` 才存在）：
-                // 派生版本一变就会触发重解析，但本机原始日志已被淘汰时只能拿旧数据渲染，
-                // 那种情况说清楚，别让 Plotly 拿着半截请求去画
+                // 存档可能是旧版格式（`ydata` 是取数声明改版后才有的）：那种情况说清楚，
+                // 别让 Plotly 拿着半截请求去画
                 const stale = panel.requests.find((r) => !Array.isArray(r.ydata) || r.ydata.length === 0 || !r.series);
                 if (stale) {
                     setError("这份存档的曲线是旧版格式，重新选择该日志文件解析一次即可恢复");
@@ -514,9 +512,8 @@ function PanelChart({
         })();
         return () => {
             cancelled = true;
-            // responsive:true 会挂 window resize 监听并持有图数据；同时 newPlot 反复在同一个
-            // div 上重建 graph 也会累积旧事件绑定，不 purge 的话切 tab / 换报告反复挂载
-            // 就持续泄漏内存
+            // responsive:true 会挂 window resize 监听并持有图数据；newPlot 反复在同一个 div 上
+            // 重建 graph 也会累积旧事件绑定，不 purge 的话切 tab / 换报告反复挂载就持续泄漏内存
             void getPlotly()
                 .then((P) => P.purge(el))
                 .catch(() => {});
@@ -541,8 +538,7 @@ function PanelChart({
                     <div ref={elRef} className="w-full" style={{ minHeight: "300px" }} />
                 </div>
                 {/* 工具栏：浮在图的右上角、落在那圈留给刻度标签的白边里（layout 的 margin.r = 34），
-            所以既不压曲线也不离图远，中间那版把它放在容器外面，34+ 的空档看着就远。
-            竖排一列、固定间距，不存在互相重叠。 */}
+            所以既不压曲线也不离图远；竖排一列不存在互相重叠。 */}
                 {state === "done" && (
                     <div className="absolute top-1 right-1 flex w-7 flex-col items-center gap-1 rounded-md bg-surface-1/85 py-1 backdrop-blur-sm">
                         <button
@@ -573,9 +569,8 @@ function PanelChart({
             </div>
 
             {/*
-        全屏浮层用 portal 挂到 body：面板可能落在任何祖先里，`position: fixed` 一旦遇上带
-        transform / filter / contain 的祖先，就会以那个祖先（而不是视口）为基准，浮层整体偏出去，
-        表现就是"全屏之后按钮跑到屏幕外面"。挂到 body 下就没有这层依赖了。
+        全屏浮层用 portal 挂到 body：`position: fixed` 遇上带 transform / filter / contain 的祖先
+        会以那个祖先（而不是视口）为基准，浮层整体偏出去、按钮跑到屏幕外。挂到 body 就没这层依赖。
       */}
             {fullscreen &&
                 mounted &&
@@ -626,9 +621,8 @@ function buildLayout(panel: PanelSpec, phases: FlightPhase[], dark: boolean): Re
     const muted = dark ? "#93a397" : "#5c665e";
     const grid = dark ? "rgba(230,238,232,0.08)" : "rgba(23,32,25,0.08)";
     const axisLine = dark ? "#2f3d34" : "#ced4c6";
-    // 图表落在白色画布（surface）内，故绘图区取面板内的「凹陷块」surface-2
-    // （浅 #eef1ee / 深 #232e27，与画布 1.14:1），再用 mirror 轴框住四边。
-    // 这两个值是 globals.css 里 --app-surface-2 的拷贝，改配色时一并改。
+    // 图表落在白色画布（surface）内，故绘图区取面板内的「凹陷块」surface-2，
+    // 再用 mirror 轴框住四边。这两个值是 globals.css 里 --app-surface-2 的拷贝，改配色时一并改。
     const plotBg = dark ? "#232e27" : "#eef1ee";
     const shapes: unknown[] = [];
     // 阶段背景带：用低透明度中性色，模式颜色由报告页顶部那条飞行阶段条承载
@@ -680,7 +674,7 @@ function buildLayout(panel: PanelSpec, phases: FlightPhase[], dark: boolean): Re
         // r=34：既容得下最后一个刻度标签，也正好给右上角那列工具栏当落脚处
         margin: { l: 44, r: 34, t: 0, b: 40 },
         modebar: {
-            orientation: "h", // 横排（原来 "v" 竖排，按钮叠在面板标题那一行上）
+            orientation: "h", // 横排（原来 "v" 竖排时按钮叠在面板标题那一行上）
             bgcolor: "rgba(0,0,0,0)",
             color: muted,
             activecolor: text,

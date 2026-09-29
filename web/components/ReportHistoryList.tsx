@@ -68,25 +68,19 @@ function fmtSize(bytes?: number): string {
 }
 
 /**
- * 轨迹缩略图：瓦片当底 + 轨迹折线（对齐 Flight Review browse 页的 Overview 那张地图）。
- *
- * 与报告页那张大地图的区别：这里不起 Leaflet 实例（列表里几十行，每行一个地图实例又慢又费内存），
- * 改成自己算墨卡托像素：挑一个能把轨迹装进一张瓦片的层级 → 铺 1~4 张 <img> 瓦片 → 上面叠 SVG 折线。
- * 瓦片与折线用同一套像素换算，所以对齐；SVG 是矢量的，悬停放大不糊。
- * 缩略图用 Esri 卫星（WGS-84），与日志坐标系一致，无需 GCJ-02 换算。
+ * 轨迹缩略图：瓦片当底 + 轨迹折线（对齐 Flight Review browse 页的 Overview 地图）。
+ * 不起 Leaflet 实例（列表里几十行，每行一个地图实例又慢又费内存），改成自己算墨卡托像素：
+ * 挑一个能把轨迹装进一张瓦片的层级 → 铺 1~4 张 <img> 瓦片 → 上面叠 SVG 折线，同一套换算所以对齐。
+ * 用 Esri 卫星（WGS-84），与日志坐标系一致，无需 GCJ-02 换算。
  */
 function TrackThumb({ points }: { points?: [number, number][] }) {
-    // 宽度跟着列走（w-full + 4:3 比例）：写成固定 64×48 的话，列比它宽一截时两侧就留白，
-    // 比例仍按 4:3 保持：viewBox 是 100×75，且 preserveAspectRatio="none"，比例一歪轨迹就拉伸变形。
+    // 宽度跟着列走：写死 64×48 的话列比它宽时两侧留白。比例仍按 4:3（viewBox 100×75 +
+    // preserveAspectRatio="none"），比例一歪轨迹就拉伸变形。
     const box = "block w-full aspect-[4/3] shrink-0 overflow-hidden rounded-md border border-border bg-surface-2";
     const view = useMemo(() => buildThumbView(points), [points]);
 
-    // 悬停放大用固定定位的浮层，而不是给这个盒子加 CSS scale：
-    //   1. 列表在 `max-h-[560px] overflow-auto` 里，scale 撑出去的部分会被滚动容器裁掉
-    //      （首行顶部、末行底部、右边界都会缺一块）；
-    //   2. 表格单元格按行序绘制，后面的行天然盖在前面行的内容之上，scale 出来的那层要跟
-    //      一格格的 td 抢绘制顺序（试过给 td 加 relative + z-30，仍然受裁剪）；
-    //   `position: fixed` 直接脱离滚动容器与堆叠上下文，位置按缩略图的屏幕坐标算，稳。
+    // 悬停放大用固定定位的浮层，而不是给盒子加 CSS scale：列表在 overflow-auto 里，
+    // scale 撑出去的部分会被裁掉；position: fixed 直接脱离滚动容器与堆叠上下文，位置最稳。
     const ref = useRef<HTMLSpanElement>(null);
     const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null);
 
@@ -278,14 +272,10 @@ function shortName(fileName: string): string {
 /**
  * 报告历史列表：本机 IndexedDB 与云端 `/api/reports` 两张表合并成一张。
  *
- * 列的是报告（`SavedReport` / `HistoryItem`），不是日志。这个区别是实质的：
- * 一条报告可以比它的日志活得久：字节被淘汰（`REPORT_DATA_KEEP` 只留最近 20 份的
- * 曲线/轨迹），或这份报告本来就来自别的设备（`source: "cloud"`，本地根本没有它的 `.ulg`）。
- * 那种时候只有结论在，曲线与轨迹要重新选文件才补齐。
- *
- * 所以它不能叫 `LogHistoryList`：`Log*` 是"某一份日志"家族的词根（见 `LogReport.tsx`），
- * 挂上去等于承诺"日志在这"，而这张表里经常没有。`Report` 是与
- * `lib/report-history.ts`（`SavedReport` / `listReports` / `normalizeSavedReport`）认亲的那个词。
+ * 列的是报告（`SavedReport` / `HistoryItem`），不是日志：一条报告可以比它的日志活得久
+ * （字节被淘汰，或这份报告来自别的设备、本地根本没有它的 `.ulg`），那种时候只有结论在，
+ * 曲线与轨迹要重新选文件才补齐。所以不能叫 `LogHistoryList` —— `Log*` 是"某一份日志"
+ * 家族的词根，挂上去等于承诺"日志在这"，而这张表里经常没有。
  */
 export function ReportHistoryList({
     items,
@@ -516,17 +506,10 @@ export function ReportHistoryList({
                     <table className="w-full table-fixed text-sm">
                         <thead>
                             <tr className="text-center text-[11px] text-muted">
-                                {/* 全部用百分比（不用 px 列）且合计正好 100%：table-fixed 下只要合计不是 100%，
-                    多出来的宽度会被按比例摊回各列，轨迹那列本来只有缩略图宽，一摊就宽出一大截，
-                    于是缩略图两侧留白。顺带让缩略图随列宽伸缩（见 TrackThumb），一点空白都不留。
-                    宽度按实测内容定（列序：缩略图/上传时间/日志文件/启动时间/飞行时长/机型机架/硬件版本/软件版本/飞行模式/结论）：
-                      上传时间 / 启动时间 8%、日志文件 8%（用户指定），注意 8% 在 1200px 宽的表格里
-                      只有 ~96px，装不下 19 字符的时间戳（~160px），会从中间折成两行；
-                      飞行时长 8%（`00:07:00` 八字符等宽 ~67px）、机型机架 8%（`旋翼` / `4040` 两行）；
-                      软件版本 13%：FR 口径的 `v1.15.0 (479ee0)` 要 ~134px；
-                      飞行模式 16%：`悬停、手动、返回、定高、定点、起飞` 一行 ~154px；
-                      机型机架 8%：两行都只有 `旋翼` / `4040`；硬件 10%、缩略图 8%、结论 10%。
-                      「来源」列（云端/本机图标）已按要求删掉，那 5% 补给了缩略图 / 软件版本 / 飞行模式 / 结论。 */}
+                                {/* 全部用百分比且合计正好 100%：table-fixed 下合计不是 100% 时，
+                    多出来的宽度会被按比例摊回各列，轨迹那列本来只有缩略图宽，一摊就宽出一大截。
+                    宽度按实测内容定（上传/启动时间 8% 在 1200px 下约 96px，装不下 19 字符时间戳，
+                    会折成两行；软件版本 13%、飞行模式 16% 是长值那两列）。 */}
                                 <th className="w-[8%] pb-2 pr-2 font-normal">缩略图</th>
                                 <th className="w-[8%] pb-2 pr-2 font-normal">上传时间</th>
                                 <th className="w-[8%] pb-2 pr-2 font-normal">日志文件</th>
@@ -541,8 +524,8 @@ export function ReportHistoryList({
                         </thead>
                         <tbody>
                             {filtered.map((r) => {
-                                // 双保险：cloud item 用 findingCount，local item 用 findings 数组；
-                                // 两者都缺失时（极旧的本地记录）按 0 处理，不渲染崩页面
+                                // cloud item 用 findingCount，local item 用 findings 数组；
+                                // 两者都缺（极旧的本地记录）时按 0 处理，不渲染崩页面
                                 const findings = Array.isArray(r.findings) ? r.findings : [];
                                 const total = typeof r.findingCount === "number" ? r.findingCount : findings.length;
                                 const hasSeverityCounts = typeof r.findingCount !== "number";
@@ -575,9 +558,8 @@ export function ReportHistoryList({
                                         <td className="py-2 align-middle pr-2 text-center font-mono break-words text-text">
                                             {formatDateTime(r.analyzedAt)}
                                         </td>
-                                        {/* 日志文件 + 大小挤在一格（分上下两行）：文件名只显示第一段（按 '-' 切，如 ce302d3b），
-                        全名在悬停提示里；大小跟着走，省出一整列的宽度给别的字段。
-                        大小那行字号小一号、颜色不变（表内不搞灰字），靠字号与字重区分主次。 */}
+                                        {/* 日志文件 + 大小挤在一格（分上下两行）：文件名只显示第一段，
+                        全名在悬停提示里，省出一整列的宽度给别的字段。 */}
                                         <td className="py-2 align-middle pr-2 text-center">
                                             <Link
                                                 href={href}
@@ -586,8 +568,8 @@ export function ReportHistoryList({
                                             >
                                                 {shortName(r.fileName)}
                                             </Link>
-                                            {/* 大小前面挂来源图标，两种都画：不然只有云端的行才有标记时，
-                          全是本机记录的话整张表一个图标都没有，"没图标"反而要靠猜 */}
+                                            {/* 大小前面挂来源图标，两种都画：只画云端的话，
+                          全是本机记录时整张表一个图标都没有，"没图标"反而要靠猜 */}
                                             <span className="flex items-center justify-center gap-1 text-[11px] leading-4 text-text">
                                                 {r.source === "cloud" ? (
                                                     <span
@@ -663,9 +645,8 @@ export function ReportHistoryList({
                                                   ? modeStyle(r.facts.mainMode).label
                                                   : "—"}
                                         </td>
-                                        {/* 结论格兼作操作位（不再单开一列）：整行悬停时右端浮出删除按钮；
-                        点一下把三档计数换成「确认删除 / 取消」，整行可点进报告，误删代价大。
-                        stopPropagation 免得点击穿到行的 onClick 跳走 */}
+                                        {/* 结论格兼作操作位（不再单开一列）：整行悬停时右端浮出删除按钮，
+                        点一下把三档计数换成「确认删除 / 取消」。stopPropagation 免得点击穿到行的 onClick */}
                                         <td
                                             className="relative py-2 pr-6 align-middle text-center whitespace-nowrap"
                                             onClick={(e) => e.stopPropagation()}

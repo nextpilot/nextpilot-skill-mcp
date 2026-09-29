@@ -8,10 +8,8 @@ import { hasSiteVersion, siteVersionLabel, siteVersionTitle } from "@/lib/site-v
 /**
  * 页脚的可变文案由服务端（`app/[locale]/layout.tsx`）传进来。
  *
- * 本组件是 `"use client"`，自己没法 async 读 KV：客户端组件里没有 KV 绑定，也没有
- * 服务端环境变量。所以版权行 / 品牌介绍 / 源码链接 / 备案号一律 props 传入，
- * 不要在组件里写死（写死的那份在后台改完之后一直不变，且看代码看不出问题）。
- *
+ * 本组件是 `"use client"`，自己没法 async 读 KV：客户端组件里没有 KV 绑定，也没有服务端
+ * 环境变量。所以版权行 / 品牌介绍 / 源码链接 / 备案号一律 props 传入，不要在组件里写死。
  * 空串的语义是「后台没配，用内置的双语文案」，不是「这一行空着」。
  */
 export interface SiteFooterProps {
@@ -54,13 +52,11 @@ function FooterLinkItem({ link }: { link: FooterLink }) {
 /**
  * 站点页脚：分组导航 + 版本徽标。
  *
- * 版本号与日期只从 `lib/site-version.ts` 取（构建期注入），这里不写死任何字面量，
+ * 版本号与日期只从 `lib/site-version.ts` 取（构建期注入），这里不写死任何字面量；
  * 写死的版本号不会报错，只会安静地过期。取不到时按那边的话说"版本未知"，不编一个。
  *
- * 布局有两份 DOM，用断点切换而不是用 JS 测屏宽：桌面是「品牌 + 4 栏」，
- * 手机是「品牌 + 分组 2×2 平铺」（参考阿木实验室移动端页脚：标题加粗亮色、
- * 链接灰色宽行距、全部展开不折叠，就 11 条链接，折叠反而多一步点击）。
- * display:none 的那份不进无障碍树，两份 DOM 不会读两遍。
+ * 布局有两份 DOM，用断点切换而不是用 JS 测屏宽：display:none 的那份不进无障碍树，
+ * 不会读两遍。手机端全部展开不折叠（就 11 条链接，折叠反而多一步点击）。
  */
 export function SiteFooter({ footerCopyright, footerTagline, sourceUrl, icp }: SiteFooterProps) {
     const { t } = useLanguage();
@@ -85,7 +81,7 @@ export function SiteFooter({ footerCopyright, footerTagline, sourceUrl, icp }: S
         {
             title: t("社区", "Community"),
             links: [
-                // 报告页里还有一个「反馈问题」，那个带着命中的规则与结论条数，是另一回事，
+                // 报告页里那个「反馈问题」带着命中的规则与结论条数，是另一回事，
                 // 两者都走 /api/issues，别把入口合并掉。
                 { href: "/issue", label: t("提交反馈", "Report an issue") },
                 { href: "/me", label: t("个人中心", "My account") },
@@ -93,7 +89,7 @@ export function SiteFooter({ footerCopyright, footerTagline, sourceUrl, icp }: S
         },
         {
             title: t("媒体", "Media"),
-            // 外站链接：新标签页打开 + 标尾的 ExternalLink 小图标告诉用户"这步会离开本站"。
+            // 外站链接：新标签页打开 + 标尾的 ExternalLink 小图标。
             // 这三个地址是官方账号入口，不是站内路由，别换成 <Link>（会走客户端路由然后 404）。
             links: [
                 {
@@ -107,13 +103,12 @@ export function SiteFooter({ footerCopyright, footerTagline, sourceUrl, icp }: S
         },
     ];
 
-    // 缺版本信息时如实说"未知"，编一个看起来正常的串，比空着更坏（它会一直过期、且没人发现）
+    // 缺版本信息时如实说"未知"：编一个看起来正常的串会一直过期、且没人发现
     const versionLabel = hasSiteVersion() ? siteVersionLabel() : t("版本未知", "Version unknown");
     const year = versionLabel.match(/\d{4}/)?.[0] ?? "";
 
-    // 品牌区两份布局共用：手机放平铺网格上方，桌面是网格第一栏。
-    // 不设 max-w-*：描述语要在窄屏水平铺满（框住会折成三行窄条，用户点过名），
-    // 桌面栏宽由网格决定，本来就不到 xs，去掉了也不变。
+    // 品牌区两份布局共用：手机放平铺网格上方，桌面是网格第一栏。不设 max-w-*：
+    // 描述语要在窄屏水平铺满（框住会折成三行窄条）。
     const brand = (
         <div>
             <Link href="/" className="flex items-center gap-2 text-[15px] font-semibold">
@@ -129,8 +124,7 @@ export function SiteFooter({ footerCopyright, footerTagline, sourceUrl, icp }: S
                         "A flight-control AI Skill & MCP hub across perception, decision, control and toolchain, with deterministic PX4 / ArduPilot log analysis built in.",
                     )}
             </p>
-            {/* 隐私承诺那句原来也写在这里，2026-09-21 挪去了上传卡（用户交日志的地方，
-                那才是它该在的位置），页脚不再重复，措辞见 lib/log-analysis-notes.ts。 */}
+            {/* 隐私承诺那句挪去了上传卡（用户交日志的地方），页脚不再重复 */}
         </div>
     );
 
@@ -175,8 +169,7 @@ export function SiteFooter({ footerCopyright, footerTagline, sourceUrl, icp }: S
                     </div>
                 </div>
 
-                {/* 底栏：版权 + 版本（免责那句在分析页上传卡上，见 lib/log-analysis-notes.ts）。
-                    手机上整条居中（左对齐的堆叠块看着歪，用户点过名）；sm 起恢复两端对齐。 */}
+                {/* 底栏：版权 + 版本。手机上整条居中（左对齐的堆叠块看着歪），sm 起恢复两端对齐。 */}
                 <div className="mt-9 flex flex-col items-center gap-4 border-t border-border pt-5 text-center text-xs text-muted sm:flex-row sm:justify-between sm:text-left">
                     <div>
                         <p>
@@ -198,7 +191,7 @@ export function SiteFooter({ footerCopyright, footerTagline, sourceUrl, icp }: S
                             <span>{t("源代码", "Source")}</span>
                         </a>
                         <span className="h-3.5 w-px bg-border" aria-hidden />
-                        {/* 版本徽标：版本号 + 日期，悬停给构建提交号。取不到时如实说未知，不编一个。 */}
+                        {/* 版本徽标：版本号 + 日期，悬停给构建提交号 */}
                         <span
                             className="chip font-medium tabular-nums"
                             title={

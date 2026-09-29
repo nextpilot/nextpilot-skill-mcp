@@ -1,32 +1,20 @@
 /**
  * `rules/*.yaml` 的编辑器用 JSON Schema（给 yaml-language-server 消费）。
  *
- * 为什么要有它：规则的键名、`group` / `vehicle` / `severity` 词表都不是随手写的字符串，
- * 拼错要等 `pnpm build:kb` 才报。给编辑器一份 schema，敲键名就有补全、写错当场飘红。
- *
- * 这份 schema 是生成出来的，不是手写的：词表全部从 `facts.yaml`、
- * `knowledge/engine/operators.py`、`knowledge/engine/providers/api.py` 派生（由 build-knowledge.mjs 调用）。
- * 手抄一份词表等于立刻造出第二份真源：改了 `facts.yaml` 而这里没跟上时，IDE 会拿着旧
- * 词表去纠正新写法，那种错误比没有提示更糟。所以它跟其它产物一样走 `writeArtifact`，
- * `--check` 会比对它是否与源一致。
- *
- * 它不替代构建期校验，只是把"纯形状"的那部分提前到打字时：
+ * 生成而非手写：词表全部从 `facts.yaml`、`knowledge/engine/operators.py`、
+ * `knowledge/engine/providers/api.py` 派生（由 build-knowledge.mjs 调用）。手抄等于造第二份真源，
+ * 源改了而这里没跟上时 IDE 会拿旧词表纠正新写法，比没有提示更糟。故与其它产物一样走
+ * `writeArtifact`，`--check` 比对是否与源一致。不替代构建期校验，只是把"纯形状"提前到打字时：
  *   · 能抓：键名拼错（`additionalProperties: false`）、枚举值不在词表里、类型写错
- *   · 抓不了：`compute` 表达式内部的语法 / 算子 / 字段，那些在字符串里，
- *     JSON Schema 只看得到"这是个字符串"，仍然只有 `rule-expr.mjs` 查得到
+ *   · 抓不了：`compute` 表达式内部的语法 / 算子 / 字段（字符串，只有 `rule-expr.mjs` 查得到）
  *
- *
- * enum 只给「构建期本来就强制校验」的词表（group / severity / vehicle）。
- * 反过来（schema 比构建期更严）会在合法写法上飘红，而假红比没有提示更糟：
- * 作者会以为自己写错了，去改一个本来对的值。`category` 就是活例子：
- * 构建期允许它们偏离派生值。
- * 所以这两处只能给 `examples` 提示，不能给 enum。
- *
+ * enum 只给「构建期本来就强制校验」的词表（group / severity / vehicle）。schema 比构建期更严会在
+ * 合法写法上飘红，假红比没有提示更糟（`category` 就允许偏离派生值，只能给 `examples`）。
  * 不依赖任何第三方包（构建脚本只用 Node 内置 + yaml）。
  */
 import { SEVERITIES, UNIT_ALIASES } from "./rule-expr.mjs";
 
-/** 排序后去重：产物要可复现（同样的输入 → 逐字节相同的输出），别依赖对象遍历顺序 */
+/** 排序后去重：产物要可复现（同输入 → 逐字节相同输出），别依赖对象遍历顺序 */
 const uniqSorted = (xs) => [...new Set(xs)].filter((x) => typeof x === "string" && x).sort();
 
 const FW_PATTERN = "^(any|\\s*(>=|<=|==|>|<)?\\s*\\d+(\\.\\d+)?(\\s*,\\s*(>=|<=|==|>|<)?\\s*\\d+(\\.\\d+)?\\s*)*)$";
@@ -68,7 +56,7 @@ export function buildRuleSchema({ signatures, facts, vehicles, builtinVars }) {
         type: "object",
         // 身份三件套是所有经验都要填的
         required: ["id", "group", "name"],
-        // 关掉它是这份 schema 最大的收益之一：键名拼错会当场飘红，而不是等构建
+        // 关掉它收益很大：键名拼错当场飘红，而不是等构建
         additionalProperties: false,
         properties: {
             id: { type: "string", description: "finding.ruleId，全局唯一；故障库与报告都引用它" },
@@ -247,8 +235,8 @@ export function buildRuleSchema({ signatures, facts, vehicles, builtinVars }) {
         },
         // guard 类经验通过 triggers.severity: guard 表达，与普通经验同一形态
         anyOf: [{ required: ["trigger"], title: "所有经验都要有 trigger" }],
-        // 机器可读的派生词表（`x-` 前缀是 JSON Schema 允许的自定义字段）。
-        // 编辑器不消费，但脚本与其它工具可以查，省得再去解析 knowledge/engine/ 源码
+        // 机器可读的派生词表（`x-` 是 JSON Schema 允许的自定义前缀）。编辑器不消费，
+        // 但脚本与其它工具可以查，省得再解析 knowledge/engine/ 源码
         "x-operators": uniqSorted(Object.keys(signatures ?? {})),
         "x-units": uniqSorted(Object.keys(UNIT_ALIASES)),
         "x-builtin-vars": uniqSorted([...(builtinVars ?? [])]),

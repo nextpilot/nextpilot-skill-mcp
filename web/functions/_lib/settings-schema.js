@@ -1,9 +1,8 @@
 // 站点设置的字段定义与校验，边缘侧（写 KV）与 Node 侧（读取兜底）共用同一份形状。
 //
-// 这份字段清单在 `web/lib/site-settings.ts` 里还有一份（那边多带 `fallback`，
-// 指向 site-config.ts 的静态默认值）。两边要同 key、同 kind：
-// 边缘函数按这里校验并落库，Node 侧按那边回落并渲染，key 对不上就是"存了读不到"。
-// 一致性由步骤 5 的守卫 `check-settings-schema` 检查（本期还没接）。
+// 字段清单在 `web/lib/site-settings.ts` 里还有一份（那边多带 `fallback`，指向 site-config.ts 的
+// 静态默认值）。两边要同 key、同 kind：边缘按这里校验并落库，Node 按那边回落并渲染，key 对不上
+// 就是"存了读不到"。一致性由 `check-settings-schema` 守卫检查（本期还没接）。
 
 /** KV 主键：一个 JSON 装全部站点信息 */
 export const SETTINGS_KEY = "settings_site";
@@ -12,12 +11,8 @@ export const SETTINGS_KEY = "settings_site";
 export const SETTINGS_LOG_PREFIX = "settings_log_";
 
 /**
- * kind 决定校验规则与表单输入框形态：
- *   text    普通单行文本，必填（除非 optional）
- *   textarea 多行文本，必填（除非 optional）
- *   domain  站点域名，要 http(s):// 开头的合法 URL，且不带路径
- *   url     外链，要 http(s):// 开头的合法 URL
- *   secret  密钥（第 4 步用）：只回显尾 4 位，不会返回完整值
+ * kind 决定校验规则与表单输入框形态：text 单行必填 / textarea 多行必填 / domain 站点域名(要
+ * http(s):// 且不带路径) / url 外链 / secret 密钥（只回显尾 4 位，不返回完整值）。
  */
 export const SETTINGS_FIELDS = [
     { key: "siteName", label: "网站标题（全称）", kind: "text" },
@@ -37,10 +32,8 @@ export const SETTINGS_FIELDS = [
 const FIELD_KEYS = new Set(SETTINGS_FIELDS.map((f) => f.key));
 
 /**
- * 密钥类字段：读取只回显尾 4 位、审计不落明文。
- *
- * 两个约束要一起守住：只做前者不做后者，密钥会以明文写进 `settings_log_*`，
- * 而那条日志的存在意义就是"谁改过什么"，一旦写成明文，能看到 KV 的人就等于拿到了密钥。
+ * 密钥类字段：读取只回显尾 4 位、审计不落明文。两者缺一不可：只回显不脱敏审计，
+ * 密钥会以明文写进 `settings_log_*`，而那条日志意义就是"谁改过什么"，写明文等于泄露密钥。
  */
 export const SECRET_KEYS = new Set(SETTINGS_FIELDS.filter((f) => f.kind === "secret").map((f) => f.key));
 
@@ -62,24 +55,20 @@ export function validateSettings(input) {
     const src = input && typeof input === "object" ? input : {};
 
     for (const field of SETTINGS_FIELDS) {
-        // 「没提交」和「提交为空」是两回事，要分开：
-        //   没提交：表单只发改动过的字段，这项原样保留；
-        //   提交为空：管理员在后台清空了它，要删掉覆盖、回落默认值。
-        // 混为一谈的话，改一个备案号会把标题、域名一起清掉（那才是真正的灾难）。
+        // 「没提交」和「提交为空」是两回事：没提交（表单只发改动过的字段）原样保留；提交为空
+        // 是管理员清空了它，要删掉覆盖、回落默认值。混为一谈的话，改一个备案号会把标题、域名一起清掉。
         if (!(field.key in src)) continue;
 
         const raw = src[field.key];
         const value = typeof raw === "string" ? raw.trim() : "";
 
         if (!value) {
-            // 空串 = 「删掉这一项的覆盖、回落到 site-config.ts 的默认值」，不报错。
-            // 三层优先级里代码常量是地板，任何一项空了都有值顶上，所以"非空"在这层没有
-            // 意义；而报错会和后台输入框的提示（"留空则用回默认值"）直接打架。
-            // 校验要守的是格式（域名是不是 http(s)、有没有误带路径），不是"有没有填"。
+            // 空串 = 删掉该项覆盖、回落 site-config.ts 默认值，不报错：代码常量是三层优先级的
+            // 地板，任何一项空了都有值顶上，"非空"在这层没意义，报错还会和输入框提示打架。
+            // 校验守的是格式（域名是否 http(s)、有无误带路径），不是"有没有填"。
             //
-            // 空串也要进 values：落库那段靠 `values` 里的空串把键从覆盖里删掉。
-            // 这里 continue 掉的话"清空"就变成静默无效，API 回 ok，changed 是空数组，
-            // 页面上显示"已保存"，而 KV 里那个值一动没动。
+            // 空串也要进 values：落库靠它把键从覆盖里删掉。这里 continue 的话"清空"会静默无效，
+            // API 回 ok、changed 空数组、页面显示"已保存"，而 KV 里那个值一动没动。
             values[field.key] = "";
             continue;
         }
@@ -102,8 +91,8 @@ export function validateSettings(input) {
 }
 
 /**
- * 域名/链接校验：要 http(s) 开头且能被 URL 解析。
- * 域名额外要求没有路径（站点根地址才有意义，带 /xxx 多半是复制错了）。
+ * 域名/链接校验：要 http(s) 开头且能被 URL 解析；域名额外要求没有路径
+ * （站点根地址才有意义，带 /xxx 多半是复制错了）。
  */
 function checkHttpUrl(value, field) {
     let parsed;

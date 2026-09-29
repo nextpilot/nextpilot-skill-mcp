@@ -1,24 +1,12 @@
 /**
- * 站点配置 — 所有值通过环境变量覆盖，不写死在代码中。
- *
- * 线上部署时在 EdgeOne 控制台 → 项目 → 环境变量中配置；
- * 本地开发时在 .env 中配置（未配置时使用下方默认值）。
+ * 站点配置 — 所有值通过环境变量覆盖，不写死在代码。
+ * 线上在 EdgeOne 控制台配，本地在 .env 配，未配置时用下方默认值。
  */
 
 /**
- * 站点完整域名（不含末尾斜杠）。
- *
- * 这里的生产兜底值不是可选的：`NEXT_PUBLIC_SITE_URL` 只在 EdgeOne 控制台配了才有值，
- * 一旦漏配，`SITE_URL` 就会落到 `localhost:3000`，而它是唯一一个默认值 ≠ 线上值的
- * 字段（站名/描述/页脚的默认值恰好就是想要的线上值，漏配也看不出来）。漏配的后果是
- * 静默的：页面照常打开，只有 sitemap.xml、robots.txt、canonical、og:url、JSON-LD
- * 里的域名全变成 localhost，等于主动把一批死链提交给搜索引擎。
- *
- * 2026-09-28 真实发生：首页静态化（改读构建期常量）之前，sitemap 走 KV 取值恰好掩盖了
- * 这个漏配；改成读常量后隐患立刻暴露。所以这里加一层生产兜底，把「记得去控制台配」
- * 从必要条件降级为可选优化。
- *
- * 兜底口径与 `REPO_URL` / `SOCIAL_*` 一致：域名换了要改代码，但不会因为忘配变量而坏站。
+ * 站点完整域名（不含末尾斜杠）。生产兜底值是必须的：NEXT_PUBLIC_SITE_URL 只在 EdgeOne 控制台配了才有，
+ * 漏配会静默落到 localhost——页面照常打开，但 sitemap/robots/canonical/og:url 里的域名全是 localhost，
+ * 等于把一批死链提交给搜索引擎。兜底口径与 REPO_URL / SOCIAL_* 一致：域名换了要改代码，忘配变量不坏站。
  */
 export const SITE_URL = (
     process.env.NEXT_PUBLIC_SITE_URL ||
@@ -57,22 +45,15 @@ export const TWITTER_HANDLE = process.env.NEXT_PUBLIC_TWITTER_HANDLE || "";
 /** 百度统计 ID */
 export const BAIDU_STAT_ID = process.env.NEXT_PUBLIC_BAIDU_STAT_ID || "";
 
-/* ── 页脚文案（后台 /admin/settings 可覆盖；这里是"没配过"时的地板）────────────
- * 空串在这里的语义是"不覆盖"：页脚现在内置的是中英双语文案，后台存的是单值，
- * 留空 = 双语照旧，填了 = 中英都用这一个值（本期不做 i18n，方案第 9 节已声明）。 */
+/* ── 页脚文案（后台 /admin/settings 可覆盖，这里是没配过的地板）──
+ * 空串 = 不覆盖：页脚内置中英双语文案，后台存单值，填了 = 中英都用这一个值。 */
 export const FOOTER_COPYRIGHT =
     process.env.NEXT_PUBLIC_FOOTER_COPYRIGHT || "NextPilot Skill · 让无人机更智能，让数据开口说话";
 
 /** 页脚品牌介绍：留空表示沿用页脚内置的双语介绍 */
 export const FOOTER_TAGLINE = process.env.NEXT_PUBLIC_FOOTER_TAGLINE || "";
 
-/**
- * 页脚"源代码"链接。
- *
- * 名字用 REPO_URL 而不是 GITEE_URL：这个字段填的是仓库地址，而实际填进来的
- * 完全可能是 GitHub（SKILL.md 里就有 `https://github.com/robotto-xyz` 这种）。
- * 叫 gitee 会把一个中性字段变成"名不副实"，改托管平台时还得连带改名。
- */
+/** 页脚"源代码"链接。名字用 REPO_URL 不用 GITEE_URL：字段填的实际可能是 GitHub，中性名避免名不副实与连带改名 */
 export const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL || "https://gitee.com/nextpilot/nextpilot-skill-mcp";
 
 /** 备案号：留空则页脚不显示这一行 */
@@ -88,12 +69,7 @@ export const SOCIAL_TWITTER = process.env.NEXT_PUBLIC_SOCIAL_TWITTER || "";
 /** Pyodide 运行时索引目录（相对路径）。换版本或指向外部 Blob 时用环境变量覆盖。 */
 export const PYODIDE_INDEX_PATH = process.env.NEXT_PUBLIC_PYODIDE_URL || "/pyodide/v0.27.7/full/";
 
-/**
- * pyulog 的 wheel 地址（相对路径）。
- *
- * 给了自托管 wheel 就直接装这个文件：跳过 PyPI 索引查询（那一步每次都要联网、
- * 且不受缓存保护）。换版本时重跑 fetch_pyodide_assets.py，改这里的文件名即可。
- * 路径变了 SW 缓存会自动失效重下。
- */
+/** pyulog 的 wheel 地址。给了自托管 wheel 直接装：跳过 PyPI 索引查询（每次联网且不受缓存保护）；
+ *  换版本重跑 fetch_pyodide_assets.py 改文件名，路径变了 SW 缓存自动失效重下。 */
 export const PYULOG_WHEEL_PATH =
     process.env.NEXT_PUBLIC_PYULOG_WHEEL || "/pyodide/wheels/pyulog-1.2.4-py3-none-any.whl";

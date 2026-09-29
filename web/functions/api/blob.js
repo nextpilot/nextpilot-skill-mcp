@@ -1,5 +1,4 @@
 // GET/POST/DELETE /api/blob：EdgeOne Blob 存储管理（本地工具通过此端点操作）。
-//
 // 鉴权：要携带 `x-internal-secret`，值与 AUTH_EDGE_SECRET 一致。
 //
 // 操作：
@@ -10,11 +9,7 @@
 //   POST ?store=X&key=Y           上传，body 为文件原始字节
 //   POST ?store=X&key=Y&json=1    上传 JSON 对象（自动序列化）
 //   DELETE ?store=X&key=Y         删除
-//
-// 可选参数：
-//   consistency=strong            强一致性读取/列举
-//   onlyIfNew=1                   仅在 Key 不存在时写入（条件写入）
-//
+// 可选参数：consistency=strong 强一致性读取/列举；onlyIfNew=1 仅在 Key 不存在时写入。
 // 依赖：@edgeone/pages-blob（EdgeOne Pages 边缘运行时内置）
 
 import { getStore, listStores } from "@edgeone/pages-blob";

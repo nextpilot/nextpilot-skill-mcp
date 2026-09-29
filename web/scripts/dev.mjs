@@ -1,18 +1,10 @@
 /**
  * Dev 启动器：一次 `pnpm dev` 同时起「知识热重建」与「Next 开发服务器」。
- *
- * 为什么需要它：知识库是编译型内容，缺这段就会出现「改了规则没反应」的情况：
- *   1. Next 自己热更新 `web/` 里的代码；
- *   2. `build-knowledge.mjs --watch` 重编译 `knowledge/{px4,engine}`（产物是
- *      `web/workers/analysis-engine.generated.ts` 等入库文件），Next 才会看到。
- * 站点内容（guide/skills/mcp）真源就在 `web/content/` 下、运行期直接读盘，
- * 不需要拷贝；以前那段 `sync-content --watch` 已随真源唯一化退役。
- *
- * 为什么不装 concurrently / npm-run-all：两个子进程 + 一次信号转发不值得多一个依赖，
- * 而依赖一旦在链上，就得跟着锁文件与依赖审计一起维护。
- *
- * 用法（在 web/ 下）：
- *   node scripts/dev.mjs
+ * 知识库是编译型内容，缺这段就会「改了规则没反应」：Next 热更新 web/ 的代码，
+ * `build-knowledge.mjs --watch` 重编译 knowledge/（产物是入库的 generated 文件），Next 才看得到。
+ * 站点内容（guide/skills/mcp）真源就在 web/content/ 下、运行期直接读盘，不需要拷贝。
+ * 不装 concurrently / npm-run-all：两个子进程 + 一次信号转发不值得多一个要跟着锁文件维护的依赖。
+ * 用法（web/ 下）：node scripts/dev.mjs
  */
 import { spawn, spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
@@ -30,13 +22,11 @@ const children = [];
 let shuttingDown = false;
 
 function run(args, label) {
-    // stdio: "inherit"，两个子进程的输出都直通终端，不额外加前缀。
-    // 加了前缀会打乱 Next 自己的进度条与 sync 的 [sync] 行。
+    // stdio: "inherit" 让两个子进程输出直通终端，不加前缀（加了会打乱 Next 的进度条与 [sync] 行）
     const child = spawn(NODE, args, { cwd: webRoot, stdio: "inherit" });
     child.on("exit", (code, signal) => {
         if (shuttingDown) return;
-        // 任一子进程非正常退出，就整体退出：留着另一半没有意义，
-        // 且会让「dev 正在跑」的假象持续下去。
+        // 任一子进程非正常退出就整体退出：留着另一半没意义，还会让「dev 正在跑」的假象持续
         console.log(`\n[dev] ${label} 退出（code=${code} signal=${signal}），全部停止`);
         shutdown(typeof code === "number" ? code : 1);
     });
@@ -54,10 +44,7 @@ function shutdown(exitCode) {
     setTimeout(() => process.exit(exitCode), 300);
 }
 
-/**
- * 检测 DEV_PORT 是否被占用。如果被占且平台是 Windows，尝试杀掉占用进程；
- * 非 Windows 平台直接报错退出。
- */
+/** 检测 DEV_PORT 是否被占用：Windows 上尝试杀掉占用进程，非 Windows 直接报错退出 */
 function checkPort(port) {
     return new Promise((resolve, reject) => {
         const server = net.createServer();
@@ -108,7 +95,7 @@ function checkPort(port) {
     });
 }
 
-// Ctrl+C：转发给两个子进程，别让 Next 变成孤儿进程继续占着 3000 端口
+// Ctrl+C：转发给两个子进程，别让 Next 变成孤儿进程继续占着端口
 for (const sig of ["SIGINT", "SIGTERM"]) {
     process.on(sig, () => {
         console.log(`\n[dev] 收到 ${sig}，停止…`);
@@ -126,17 +113,16 @@ for (const [args, label] of [[["scripts/build-knowledge.mjs"], "知识构建"]])
     }
 }
 
-// 启动前检测端口占用：Windows 上 Ctrl+C 后 Next.js 容易残留为孤儿进程。
-// 拿 net.createServer 试端口比 netstat 解析更轻量，发现占用就用 taskkill 清理。
+// 启动前检测端口占用：Windows 上 Ctrl+C 后 Next.js 容易残留为孤儿进程；
+// net.createServer 试端口比解析 netstat 轻量，占用就 taskkill 清理。
 await checkPort(DEV_PORT);
 
 run(["scripts/build-knowledge.mjs", "--watch"], "build-knowledge --watch");
 run(["node_modules/next/dist/bin/next", "dev"], "next dev");
 console.log("[dev] 已启动：知识热重建 + Next 开发服务器（Ctrl+C 一起停）");
 
-// 预热首页：Turbopack 懒编译，第一个请求才走编译器。等 Next 完全就绪后自动发一个
-// GET / 让编译器预热，用户打开浏览器时首页已是热的（2.5s → <200ms）。
-// 试 3 次，间隔 2s → 4s → 6s，任一次成功就停。
+// 预热首页：Turbopack 懒编译，第一个请求才走编译器。等 Next 就绪后自动 GET / 预热，
+// 用户打开浏览器时首页已是热的。试 3 次，间隔 2s → 4s → 6s，任一次成功就停。
 let warmAttempt = 0;
 const warmMaxAttempts = 3;
 const warm = async () => {
