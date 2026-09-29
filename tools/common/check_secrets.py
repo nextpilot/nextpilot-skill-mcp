@@ -26,6 +26,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger("secrets")
+
 ROOT = Path(__file__).resolve().parents[2]
 ERROR_POLICY = ROOT / "web" / "lib" / "error-policy.js"
 
@@ -201,18 +206,18 @@ def fixture_values() -> set[str]:
 
 def main(argv: list[str]) -> int:
     if "--list" in argv:
-        print("credential key names:")
+        log.info("credential key names:")
         for k in CREDENTIAL_KEYS:
-            print(f"  {k}")
-        print("\nvalue must also match one of the SCRUB_RULES shapes (jwt / bearer):")
+            log.info(f"  {k}")
+        log.info("\nvalue must also match one of the SCRUB_RULES shapes (jwt / bearer):")
         for name, rule in SCRUB_EQUIVALENT:
-            print(f"  {name}: {rule.pattern}")
+            log.info(f"  {name}: {rule.pattern}")
         return 0
 
     if not ERROR_POLICY.exists():
-        print(f"FAIL  missing {ERROR_POLICY.relative_to(ROOT)}")
-        print("      The scanner borrows its rule vocabulary from that file,")
-        print("      so it cannot run without it.")
+        log.err(f"FAIL  missing {ERROR_POLICY.relative_to(ROOT)}")
+        log.err("      The scanner borrows its rule vocabulary from that file,")
+        log.err("      so it cannot run without it.")
         return 1
 
     files = [p for p in tracked_files() if scannable(p)]
@@ -234,14 +239,14 @@ def main(argv: list[str]) -> int:
     findings = [f for f in findings if f[0] != str(Path(__file__).relative_to(ROOT)).replace("\\", "/")]
 
     if not findings:
-        print(f"OK    no committed credentials in {len(files)} tracked files")
+        log.info(f"OK    no committed credentials in {len(files)} tracked files")
         return 0
 
-    print(f"FAIL  {len(findings)} credential-shaped value(s) in tracked files:\n")
+    log.err(f"FAIL  {len(findings)} credential-shaped value(s) in tracked files:\n")
     for path, lineno, key, value in findings:
-        print(f"  {path}:{lineno}  [{key}]  {value}")
-    print("\nMove the value to an environment variable. If it is a legitimate")
-    print("placeholder, extend PLACEHOLDER_SHAPE (or the key list) in this file.")
+        log.err(f"  {path}:{lineno}  [{key}]  {value}")
+    log.err("\nMove the value to an environment variable. If it is a legitimate")
+    log.err("placeholder, extend PLACEHOLDER_SHAPE (or the key list) in this file.")
     return 1
 
 
