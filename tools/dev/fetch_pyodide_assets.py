@@ -39,6 +39,11 @@ import time
 import urllib.parse
 import urllib.request
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from _logging import get_logger  # noqa: E402
+
+log = get_logger("pyodide-assets")
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 PUBLIC_OUT = REPO_ROOT / "web" / "public" / "pyodide"
 CACHE_OUT = REPO_ROOT / ".cache" / "pyodide-dist"
@@ -93,7 +98,7 @@ def fetch(url: str, timeout: int = 120) -> bytes:
             last = e
         if attempt < MAX_ATTEMPTS:
             wait = 2**attempt
-            print(f"    …… 第 {attempt} 次失败（{type(last).__name__}），{wait}s 后重试", file=sys.stderr)
+            log.warning(f"    …… 第 {attempt} 次失败（{type(last).__name__}），{wait}s 后重试")
             time.sleep(wait)
     raise RuntimeError(f"下载失败（已重试 {MAX_ATTEMPTS} 次）：{url}\n  最后一次：{last}")
 
@@ -130,7 +135,7 @@ def fetch_cross_checked(relpath: str, ver: str) -> bytes:
         try:
             data = fetch(url)
         except Exception as e:  # noqa: BLE001
-            print(f"    …… 交叉源不可用（{type(e).__name__}），换下一个", file=sys.stderr)
+            log.warning(f"    …… 交叉源不可用（{type(e).__name__}），换下一个")
             continue
         digest = hashlib.sha256(data).hexdigest()
         if first is None:
@@ -146,7 +151,7 @@ def fetch_cross_checked(relpath: str, ver: str) -> bytes:
         return first[1]
     if first is not None:
         # 只有一个源可达：退化处理，明说"没交叉校验过"而不是假装校验过
-        print(f"  !! {relpath} 只有单源可拉，本轮跳过交叉校验（内容未经第二源确认）", file=sys.stderr)
+        log.warning(f"  !! {relpath} 只有单源可拉，本轮跳过交叉校验（内容未经第二源确认）")
         return first[1]
     raise RuntimeError(f"交叉校验失败：没有任何源能拉到 {relpath}")
 
@@ -160,7 +165,7 @@ def save(path: pathlib.Path, data: bytes, want_sha256: str | None = None) -> Non
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
     mark = " ✓" if want_sha256 else ""
-    print("  %-48s %8.1f KB%s" % (path.name, len(data) / 1024, mark))
+    log.info("  %-48s %8.1f KB%s" % (path.name, len(data) / 1024, mark))
 
 
 def lock_sha(lock: dict, relpath: str) -> str | None:
@@ -200,16 +205,16 @@ def fetch_pyulog_wheel(expected: str) -> tuple[bytes, str, str]:
         try:
             info = json.loads(fetch(src).decode("utf-8"))
         except Exception as e:  # noqa: BLE001
-            print(f"  …… {src} 失败：{type(e).__name__}", file=sys.stderr)
+            log.warning(f"  …… {src} 失败：{type(e).__name__}")
             continue
         wheel = next((u for u in info["urls"] if u["filename"] == expected), None)
         if wheel:
             return fetch(wheel["url"]), wheel["filename"], wheel.get("digests", {}).get("sha256", "")
         available = sorted({u["filename"] for u in info["urls"] if u["filename"].endswith("-py3-none-any.whl")})
-        print(f"  …… {src} 上没有 {expected}；现有：{available}", file=sys.stderr)
+        log.warning(f"  …… {src} 上没有 {expected}；现有：{available}")
 
     # 2) 阿里云 simple 索引（PEP 503 HTML，sha256 在 URL 的 #sha256= 里）
-    print(f"  …… 回退 {ALIYUN_SIMPLE}", file=sys.stderr)
+    log.warning(f"  …… 回退 {ALIYUN_SIMPLE}")
     html = fetch(ALIYUN_SIMPLE, timeout=60).decode("utf-8", "replace")
     hrefs = re.findall(r'href="([^"]+)"', html)
     cands = [h for h in hrefs if h.split("#")[0].endswith("/" + expected) or h.split("#")[0].endswith(expected)]
@@ -251,7 +256,7 @@ def main(argv: list[str]) -> int:
         index_dir = root / "pyodide" / args.pyodide / "full"
         wheel_dir = root / "wheels"
 
-    print(f"Pyodide {args.pyodide}  →  {index_dir.relative_to(REPO_ROOT)}")
+    log.info(f"Pyodide {args.pyodide}  →  {index_dir.relative_to(REPO_ROOT)}")
 
     # 先取 lock：它记录各 wheel 的 sha256，是后面校验的依据（lock 本身先过双源交叉校验）
     lock = json.loads(fetch_any("pyodide-lock.json", args.pyodide).decode("utf-8"))
@@ -265,27 +270,27 @@ def main(argv: list[str]) -> int:
     for pkg in PACKAGES:
         meta = (lock.get("packages") or {}).get(pkg)
         if not meta or not meta.get("file_name"):
-            print(f"  !! lock 里没有 {pkg}，跳过", file=sys.stderr)
+            log.warning(f"  !! lock 里没有 {pkg}，跳过")
             continue
         fname = meta["file_name"]
         save(index_dir / fname, fetch_any(fname, args.pyodide), meta.get("sha256"))
 
     # pyulog：只取代码侧（site-config.ts）锁定的版本，自托管后不走索引查询
-    print("pyulog wheel（PyPI 官方 → 阿里云镜像，仅锁定版本）")
+    log.info("pyulog wheel（PyPI 官方 → 阿里云镜像，仅锁定版本）")
     try:
         expected = expected_pyulog_wheel()
         data, fname, want_sha = fetch_pyulog_wheel(expected)
     except Exception as e:  # noqa: BLE001
-        print(f"  !! pyulog 获取失败：{e}", file=sys.stderr)
+        log.err(f"FAIL pyulog 获取失败：{e}")
         return 1
     save(wheel_dir / fname, data, want_sha or None)
 
     total = sum(f.stat().st_size for f in index_dir.iterdir() if f.is_file())
     total += sum(f.stat().st_size for f in wheel_dir.iterdir() if f.is_file())
-    print(f"\n合计 {total / 1048576:.1f} MB")
+    log.info(f"\n合计 {total / 1048576:.1f} MB")
 
     if args.out == "public":
-        print(
+        log.info(
             f"\n已就位，随站点构建自动分发。代码默认值即：\n"
             f"  NEXT_PUBLIC_PYODIDE_URL 未设 → /pyodide/{args.pyodide}/full/\n"
             f"  NEXT_PUBLIC_PYULOG_WHEEL 未设 → /pyodide/wheels/{fname}\n"
@@ -293,7 +298,7 @@ def main(argv: list[str]) -> int:
             f"  RuntimeCacheRegistrar.tsx / sw.js 里写死的 wheel 文件名）"
         )
     else:
-        print(
+        log.info(
             "\n上传与配置：\n"
             f"  1) 把 `pyodide/{args.pyodide}/full/` 整个目录传到 Blob，\n"
             f"     NEXT_PUBLIC_PYODIDE_URL=https://<blob域名>/pyodide/{args.pyodide}/full/\n"
