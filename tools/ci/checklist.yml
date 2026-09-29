@@ -1,52 +1,33 @@
 # tools/ci/checklist.yml
 # Repository validation checklist -- organised by stage.
+# 读这个文件就能看出"哪个阶段跑哪些检查"。
 #
-# 清单即阶段地图：读这个文件就能看出"哪个阶段跑哪些检查"。
-# 三个阶段（dev / commit / deploy）以空阶段占位，因为它们各自的检查不住在这里：
-#   dev    -- `pnpm dev` 与 `tsc --noEmit --watch`（常驻进程，无退出码）
-#   commit -- .githooks/pre-commit（对 staged 文件跑 ruff / prettier，独立脚本）
-#   deploy -- .github/workflows/deploy.yml 的 live E2E（在 workflow 里）
-# 这里只放"一次执行、退出码表示成败"的项，也就是 check_all.py 能驱动的那部分。
+# 只放"一次执行、退出码表示成败"的项（check_all.py 能驱动的）；常驻进程不在这里：
+#   dev    -- `pnpm dev` 与 `tsc --noEmit --watch`
+#   commit -- .githooks/pre-commit（对 staged 文件跑 ruff / prettier）
+#   deploy -- .github/workflows/deploy.yml 的 live E2E
 #
-# Each stage has:
-#   id          - stage id, matched by `check_all.py --stage <id>` (never change)
-#   stage       - stage display name
-#   description - optional stage description
-#   critical    - if true, stage failure stops execution immediately
-#   steps       - list of check steps
+# Stage: id / stage(显示名) / description / critical(失败是否立刻中断) / steps
+# Step:
+#   id          - 稳定标识，Python 侧按它匹配，不许改
+#   name        - 短描述（步骤标题，可自由改）
+#   when        - 可选 Python 表达式，省略即总跑
+#   workdir     - {ROOT} 或 {WEB}
+#   command     - YAML 字符串数组
+#   hint        - 失败时打印，省略即无
+#   timeout     - 可选超时秒数
+#   env         - 可选额外环境变量
 #
-# Each step has:
-#   id          - stable identifier (used by Python code for matching; never change)
-#   name        - short description (printed in step header; can be changed freely)
-#   when        - optional Python expression (see below; omit = always run)
-#   workdir     - working directory ({ROOT} or {WEB})
-#   command     - command list (YAML array of strings)
-#   hint        - printed on failure ("" or omit = no hint)
-#   timeout     - optional timeout in seconds (omit = no timeout)
-#   env         - optional dict of extra environment variables for this step
+# 占位符（运行期替换）：{PYTHON} / {NODE} / {PNPM}（全局工具，须走 PATH）/
+# {ROOT} / {WEB} / {LOGS} / {ARGS.xxx}（flag 为真则 "--xxx"，否则空）/ {ENV.XXX}（未设则空）
 #
-# Placeholders (resolved at runtime):
-#   {PYTHON}   - Python interpreter path (sys.executable)
-#   {NODE}     - Node.js executable (shutil.which("node"))
-#   {PNPM}     - pnpm executable (shutil.which("pnpm")); pnpm is a global tool with no
-#                path under web/node_modules, so it must go through PATH
-#   {ROOT}     - repository root directory
-#   {WEB}      - ROOT / "web"
-#   {LOGS}     - log file paths (space-separated, for log-dependent steps)
-#   {ARGS.xxx} - CLI argument placeholder: "--xxx" if flag is True, else ""
-#   {ENV.XXX}  - Environment variable placeholder (empty string if unset)
+# when 用 args（argparse.Namespace）与 has_logs 求值，只表达"什么条件下跑"，不表达阶段归属
+# （那是 --stage 的职责）：
+#   "True"                              - 总跑（等同省略）
+#   "args.with_build"                   - 仅 --with-build
+#   "args.with_build or args.with_e2e"  - 复合条件
 #
-# `when` values: Python expressions evaluated with `args` (argparse.Namespace) and `has_logs` (bool)
-#   Examples:
-#     "True"                              - always run (same as omitting when)
-#     "args.with_build"                   - only with --with-build
-#     "args.with_mutate"                  - only with --with-mutate
-#     "args.with_build or args.with_e2e"  - compound condition (OR)
-#
-# 阶段归属由 stage 决定，不再靠 `when` 表达"哪个阶段跑"（那是 --stage 的职责）。
-# `when` 只表达"这一步在什么条件下跑"，如 `has_logs`（日志在不在本机）。
-#
-# To add a new check: add a step entry here, that's it.
+# 加检查：在 steps 里加一条即可。
 
 jobs:
   - id: dev

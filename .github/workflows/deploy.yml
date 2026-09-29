@@ -1,24 +1,20 @@
 # 部署到 EdgeOne Pages（Next.js 全栈模式）。
 #
-# 与 CI 的关系：**CI 只判质量，这里只管发布**。部署挂在 workflow_run 上等 CI 跑完，
-# 失败就不发布——避免"校验红了但已经上线"。手动触发（workflow_dispatch）留给回滚与补发。
+# 与 CI 的关系：CI 只判质量，这里只管发布。挂在 workflow_run 上等 CI 跑完，失败不发布——
+# 避免"校验红了但已经上线"。workflow_dispatch 留给回滚与补发。
 #
-# ## 为什么不让 CI 直接传构建产物
-# 本项目是 Next.js **全栈**模式（边缘函数在 web/functions/，运行时要读 package.json 与
-# functions/），不是静态导出。EdgeOne CLI 对 Next.js 的推荐路径是**从项目源码目录执行
-# deploy、由 CLI 自己完成构建**——所以这里刻意不 pnpm install、不手动传 .next：
-# 少一层"产物组装"的伪造风险，也不用把几百 MB node_modules 打包上传。
-# （若哪天改成 output: 'export' 静态导出，再改为先 build 再 deploy ./out。）
+# 为什么不让 CI 传构建产物：本项目是全栈模式（边缘函数在 web/functions/，运行时要读
+# package.json 与 functions/），不是静态导出。EdgeOne CLI 的推荐路径是从源码目录 deploy、
+# 由 CLI 自己构建——所以这里不 pnpm install、不传 .next：少一层产物组装风险，也不用传
+# node_modules。若改成 output: 'export' 静态导出，再改为先 build 再 deploy ./out。
 #
-# ## 需要的仓库配置（Settings → Secrets and variables → Actions）
-#   Secrets:   EDGEONE_API_TOKEN   EdgeOne 控制台 → API Token 生成的 CI/CD 令牌
-#   Variables: EDGEONE_PROJECT     EdgeOne Pages 项目名（-n 参数；**填错会自动新建一个空项目**）
-#              SMOKE_BASE_URL      可选，生产站点公网源站，如 https://skill.nextpilot.org
-#                                  不配则跳过部署后冒烟
+# 仓库配置（Settings → Secrets and variables → Actions）：
+#   Secrets:   EDGEONE_API_TOKEN   EdgeOne 控制台生成的 CI/CD 令牌
+#   Variables: EDGEONE_PROJECT     项目名（-n 参数；填错会自动新建一个空项目）
+#              SMOKE_BASE_URL      可选，生产站点源站；不配则跳过部署后冒烟
 #
-# 环境变量（AUTH_SECRET / DEEPSEEK_API_KEY / SMTP_* / ISSUE_* 等）**不在这里注入**——
-# 它们配在 EdgeOne 控制台的项目环境变量里（见 docs/operations/README.md 第 3 节）。
-# 密钥不进仓库、不进 CI 日志，这条与项目"token 只在边缘函数"的约定一致。
+# 环境变量（AUTH_SECRET / DEEPSEEK_API_KEY / SMTP_* / ISSUE_* 等）不在这里注入，配在 EdgeOne
+# 控制台的项目环境变量里（见 docs/operations/README.md 第 3 节）：密钥不进仓库、不进 CI 日志。
 name: Deploy
 
 on:

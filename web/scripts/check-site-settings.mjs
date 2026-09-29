@@ -1,14 +1,18 @@
 /**
- * 后台站点设置守卫：机制里没有任何运行时报错，每条规则对应一种「悄悄失效」——
- * settings-schema 两侧字段表 key/kind 对不上（存了读不到）；settings-footer-props SiteFooter
- * 是客户端组件读不到 KV、页脚四项要 props 传入；settings-static-metadata 根 layout 要静态
- * const metadata（generateMetadata 会把整棵路由树判动态、首页无法静态化）；settings-render-path
- * 渲染路径不许读 getSiteSettings()（白名单 ALLOWED_RUNTIME_READERS）；settings-static-locale
- * [locale] 要调 setRequestLocale（不登记整棵子树动态化、构建照样过）；settings-site-url-fallback
- * SITE_URL 要有非 localhost 兜底（漏配时页面无异常、只有 sitemap/canonical/og:url 全错）；
- * settings-secret-client 密钥字段名进客户端组件 = 明文进 SSR HTML；settings-secret-wiring 密钥要有消费点。
+ * 后台站点设置守卫：机制里没有任何运行时报错，每条规则对应一种「悄悄失效」：
+ *   settings-schema          两侧字段表 key/kind 对不上（存了读不到）
+ *   settings-footer-props    SiteFooter 是客户端组件读不到 KV，页脚四项要 props 传入
+ *   settings-static-metadata 根 layout 要静态 const metadata（generateMetadata 会把整棵路由树
+ *                            判动态、首页无法静态化）
+ *   settings-render-path     渲染路径不许读 getSiteSettings()（白名单 ALLOWED_RUNTIME_READERS）
+ *   settings-static-locale   [locale] 要调 setRequestLocale（不登记则整棵子树动态化）
+ *   settings-site-url-fallback SITE_URL 要有非 localhost 兜底（漏配时页面无异常、只有
+ *                            sitemap/canonical/og:url 全错）
+ *   settings-secret-client   密钥字段名进客户端组件 = 明文进 SSR HTML
+ *   settings-secret-wiring   密钥要有消费点
+ *
  * 输出契约（被 tools/ci/mutate_guards.py 解析，改格式前先看那边）：失败行 `  FAIL <规则id> -> <详情>`，
- * 规则 id 是稳定契约；总结行用 RESULT:（写成 FAIL 会被当成检查名）；只用 ASCII（Windows 控制台 GBK，✗ ✓ 会崩）。
+ * 规则 id 是稳定契约；总结行用 RESULT:（写成 FAIL 会被当成检查名）；只用 ASCII（Windows 控制台 GBK）。
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";

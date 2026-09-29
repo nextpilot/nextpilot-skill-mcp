@@ -2,11 +2,9 @@
 //
 // 命名（改名前先读）：这条链三个文件共用 `issue` 词根、各占一个角色词，读成"谁采、谁收、谁建单"
 // （见 CLAUDE.md §6.4）：lib/issue-bridge.ts（bridge：浏览器采集）→ api/issues.js（入口：本文件）
-// → _lib/issue-filer.js（filer：建单）。文件名即路由，不用再写 `-route` 这类位置后缀。
-// 早先叫过 `report-error`（与 /api/reports 同前缀反义、与浏览器侧模块名只差词序）、`telemetry`
-// （语义比实际做的事宽，这条链只装错误自动建单），都不用。
+// → _lib/issue-filer.js（filer：建单）。文件名即路由。
 //
-// 为什么不让浏览器直接调 issue API：那等于把 issue token 发给全世界（任何人开 DevTools 就能拿到写权限），
+// 不让浏览器直接调 issue API：那等于把 issue token 发给全世界（开 DevTools 就能拿到写权限），
 // 所以浏览器只 POST 到这里，token 始终留在边缘函数。
 //
 // 这个端点公开（未登录用户也要能报错），因此：按 IP 日限流超了直接 429，不给 KV 被刷的机会；

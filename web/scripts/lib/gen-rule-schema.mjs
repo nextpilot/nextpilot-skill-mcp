@@ -3,13 +3,12 @@
  *
  * 生成而非手写：词表全部从 `facts.yaml`、`knowledge/engine/operators.py`、
  * `knowledge/engine/providers/api.py` 派生（由 build-knowledge.mjs 调用）。手抄等于造第二份真源，
- * 源改了而这里没跟上时 IDE 会拿旧词表纠正新写法，比没有提示更糟。故与其它产物一样走
- * `writeArtifact`，`--check` 比对是否与源一致。不替代构建期校验，只是把"纯形状"提前到打字时：
- *   · 能抓：键名拼错（`additionalProperties: false`）、枚举值不在词表里、类型写错
- *   · 抓不了：`compute` 表达式内部的语法 / 算子 / 字段（字符串，只有 `rule-expr.mjs` 查得到）
+ * 源改了这里没跟上时 IDE 会拿旧词表纠正新写法。与其它产物一样走 `writeArtifact`，`--check` 比对。
+ * 只把"纯形状"提前到打字时：能抓键名拼错（`additionalProperties: false`）、枚举值不在词表里、
+ * 类型写错；抓不了 `compute` 表达式内部（字符串，只有 `rule-expr.mjs` 查得到）。
  *
- * enum 只给「构建期本来就强制校验」的词表（group / severity / vehicle）。schema 比构建期更严会在
- * 合法写法上飘红，假红比没有提示更糟（`category` 就允许偏离派生值，只能给 `examples`）。
+ * enum 只给构建期本来就强制校验的词表（group / severity / vehicle）。schema 比构建期更严会在合法
+ * 写法上飘红，假红比没提示更糟（`category` 允许偏离派生值，只能给 `examples`）。
  * 不依赖任何第三方包（构建脚本只用 Node 内置 + yaml）。
  */
 import { SEVERITIES, UNIT_ALIASES } from "./rule-expr.mjs";
