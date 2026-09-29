@@ -3,21 +3,20 @@
 # 为什么要有这个脚本：这套步骤以前散在 README 与各处注释里，新机器要照着敲五六条命令，
 # 而漏一步的表现不是报错，是"某个校验永远红、且看不出跟环境有关"——比如 .venv 里没装
 # PyYAML，check_all 的产物检查会假失败；pyright 靠 .venv 找 numpy / pyulog，缺包就报
-# 几十个 import 解析不了。把步骤收进一个脚本，末尾再跑一次已有的 check_prereq.py，
-# "装没装对"才有机器来判定。
+# 几十个 import 解析不了。把步骤收进一个脚本，末尾的自检是自闭环的：探测逻辑直接
+# 写在脚本里，不调用仓库其他脚本、不读清单文件，"装没装对"才有机器来判定。
 #
 # 装什么由两份 requirements 文件决定（requirements-dev.txt / requirements-logs.txt），
 # 这个脚本只决定"装到哪、装完怎么验"——依赖清单不在这里复制第二份。
 #
 # 用法：
-#   .\tools\setup\setup.ps1                  # 全套：安装 + prereq 自检 + 工具链校验
+#   .\tools\setup\setup.ps1                  # 全套：Python + Node + git hook + 自检
 #   .\tools\setup\setup.ps1 -SkipNode        # 只装 Python（Node 依赖已装好时）
 #   .\tools\setup\setup.ps1 -SkipLogs        # 不装 pyulog（本机没有真实 .ulg 日志时）
 #   .\tools\setup\setup.ps1 -SkipHooks       # 不动 git 的 core.hooksPath
 #   .\tools\setup\setup.ps1 -Recreate        # 删掉现有 .venv 重建（依赖装乱了才用）
 #   .\tools\setup\setup.ps1 -InstallUv       # 允许本脚本联网装 uv（默认只打印命令）
-#   .\tools\setup\setup.ps1 -SkipCheck       # 装完不跑工具链校验（第 7 步）
-#   .\tools\setup\setup.ps1 -CheckOnly       # 不装任何东西，只跑 prereq 自检 + 工具链校验
+#   .\tools\setup\setup.ps1 -CheckOnly       # 不装任何东西，只跑自检
 #   .\tools\setup\setup.ps1 -IndexUrl https://mirrors.aliyun.com/pypi/simple/
 param(
     [switch]$SkipNode,
@@ -25,7 +24,6 @@ param(
     [switch]$SkipLogs,
     [switch]$Recreate,
     [switch]$InstallUv,
-    [switch]$SkipCheck,
     [switch]$CheckOnly,
     [string]$Python = "3.11",
     [string]$IndexUrl = "https://pypi.org/simple"
@@ -67,15 +65,15 @@ function Invoke-Native {
 
 Push-Location $ROOT
 try {
-    # -CheckOnly：跳过安装类步骤（1-5），直接进自检与校验——日常"验证工具链"一条命令。
+    # -CheckOnly：跳过安装类步骤（1-5），直接进自检——日常"验证工具链"一条命令。
     # PowerShell 的 if 块内不要求缩进，步骤块原样保留，只在前后加开关。
     if ($CheckOnly) {
-        Write-Host "-CheckOnly：跳过安装步骤（uv / venv / 依赖 / Node / hook），直接自检 + 校验"
+        Write-Host "-CheckOnly：跳过安装步骤（uv / venv / 依赖 / Node / hook），直接自检"
     }
     else {
 
     # ── 1. uv ────────────────────────────────────────────────────────
-    Write-Step "1/7 uv（Python 侧一律由它装）"
+    Write-Step "1/6 uv（Python 侧一律由它装）"
     $uv = Get-Command uv -ErrorAction SilentlyContinue
     if (-not $uv) {
         if ($InstallUv) {
@@ -99,7 +97,7 @@ try {
     & $uvExe --version
 
     # ── 2. 虚拟环境 ──────────────────────────────────────────────────
-    Write-Step "2/7 Python 虚拟环境（$VENV）"
+    Write-Step "2/6 Python 虚拟环境（$VENV）"
     if ((Test-Path $VENV) -and $Recreate) {
         Write-Host "  -Recreate：删除已有 .venv"
         Remove-Item -Recurse -Force $VENV
@@ -117,7 +115,7 @@ try {
     }
 
     # ── 3. Python 依赖 ───────────────────────────────────────────────
-    Write-Step "3/7 Python 依赖（uv pip install）"
+    Write-Step "3/6 Python 依赖（uv pip install）"
     $reqs = @("requirements-dev.txt")
     if ($SkipLogs) {
         Write-Host "  -SkipLogs：跳过 requirements-logs.txt（不装 pyulog）"
@@ -132,7 +130,7 @@ try {
     Invoke-Native $uvExe @pipArgs
 
     # ── 4. Node 依赖 ─────────────────────────────────────────────────
-    Write-Step "4/7 Node 依赖（pnpm install）"
+    Write-Step "4/6 Node 依赖（pnpm install）"
     if ($SkipNode) {
         Write-Host "  -SkipNode：跳过"
     }
@@ -146,7 +144,7 @@ try {
     }
 
     # ── 5. Git hook ──────────────────────────────────────────────────
-    Write-Step "5/7 Git hook 指向 .githooks"
+    Write-Step "5/6 Git hook 指向 .githooks"
     if ($SkipHooks) {
         Write-Host "  -SkipHooks：跳过"
     }
@@ -203,36 +201,68 @@ sys.exit(m.ensure_venv_python(body))
 
     }  # -CheckOnly 跳过安装步骤（1-5）
 
-    # ── 6. 自检 ──────────────────────────────────────────────────────
-    # 装完必须验：check_prereq.py 是仓库既有的工具链自查，用它而不是在这里再写一遍
-    # "ruff 在不在" 之类的判断——同一件事两处判定，必然有一处先烂。
-    Write-Step "6/7 自检（tools/common/check_prereq.py）"
-    $chkArgs = @("tools/common/check_prereq.py")
-    if (-not $SkipLogs) { $chkArgs += "--with-logs" }
-    Invoke-Native $VENV_PY @chkArgs
-
-    # ── 7. 工具链校验 ────────────────────────────────────────────────
-    # 装什么就验什么：工具链是本脚本装的，装完当场用 .venv 的解释器真跑一遍工具链检查
-    # （ruff / prettier / markdownlint / pyright / eslint / tsc，checklist.yml 里
-    # group=toolchain 的那组），"装好了"由退出码说话，不再只打印一行提示让用户自己跑。
-    # 必须显式传 $VENV_PY：check_all.py 的 {PYTHON} 取 sys.executable，用系统 python 跑
-    # 会在缺包项上假失败（pyulog 不在系统环境）——真实踩过的坑。
-    if ($SkipCheck) {
-        Write-Host "  -SkipCheck：跳过"
+    # ── 6. 自检（自闭环）─────────────────────────────────────────────
+    # 装什么就验什么：探测逻辑直接写在这里——不调 check_prereq.py / check_all.py，
+    # 不读 checklist.yml，setup 不拖外部脚本。探的是"工具能不能跑起来"，不是全量
+    # 校验：全量清单（ruff/prettier/tsc/pytest/守卫……）归 check_all.py，装完想验
+    # 就手动跑，见末尾提示。
+    Write-Step "6/6 自检（装好的工具能不能用）"
+    $PRE_FAIL = 0
+    function Test-Probe {
+        param([string]$Name, [scriptblock]$Body)
+        # 探测的输出（stdout + stderr）合流转成字符串：`-m ruff --version` 这类会把版本
+        # 打出来，失败时也要把前几行截出来看，所以两种都不丢。
+        try {
+            $out = (& $Body) 2>&1 | Out-String
+            $ok = $LASTEXITCODE -eq 0
+        }
+        catch {
+            $out = $_.Exception.Message
+            $ok = $false
+        }
+        if ($ok) {
+            Write-Host "  [OK]   $Name"
+        }
+        else {
+            Write-Host "  [FAIL] $Name"
+            foreach ($line in (($out -split "`n") | Select-Object -First 3)) {
+                if ($line.Trim()) { Write-Host "         $line" }
+            }
+            $script:PRE_FAIL++
+        }
+    }
+    Test-Probe "ruff" { & $VENV_PY -m ruff --version }
+    Test-Probe "pytest" { & $VENV_PY -m pytest --version }
+    Test-Probe "numpy" { & $VENV_PY -c "import numpy" }
+    if (-not $SkipLogs) {
+        Test-Probe "pyulog" { & $VENV_PY -c "import pyulog" }
+        Test-Probe "yaml" { & $VENV_PY -c "import yaml" }
+    }
+    $node = Get-Command node -ErrorAction SilentlyContinue
+    if ($node) {
+        Write-Host "  [OK]   node  $($node.Source)"
     }
     else {
-        Write-Step "7/7 工具链校验（tools/ci/check_all.py --group toolchain）"
-        Invoke-Native $VENV_PY "tools/ci/check_all.py" "--group" "toolchain"
+        Write-Host "  [FAIL] node 不在 PATH 上（装 Node.js 22+ 后重跑）"
+        $PRE_FAIL++
+    }
+    Test-Probe "typescript" {
+        # tsc 是 Node 包，用 .venv 的 python 探不了，直接交给 node 跑它的 bin。
+        & node (Join-Path $ROOT "web/node_modules/typescript/bin/tsc") --version
+    }
+    Test-Probe "next" { if (-not (Test-Path (Join-Path $ROOT "web/node_modules/next/package.json"))) { throw "web/node_modules/next 不在" } }
+    if ($PRE_FAIL -gt 0) {
+        throw "自检 $PRE_FAIL 项失败。Python 侧缺包：uv pip install --python `"$VENV_PY`" -r requirements-dev.txt；Node 侧缺包：pnpm install"
     }
 
     Write-Host ""
     Write-Host "环境就绪。接下来：" -ForegroundColor Green
     Write-Host "  1) 复制环境变量模板：cp web/.env.example web/.env.local（填 DEEPSEEK_API_KEY）"
     Write-Host "  2) 起开发服务器：    pnpm web:dev"
-    Write-Host "  3) 全量校验：        $VENV_PY tools/ci/check_all.py（不带参数跑全部 stage）"
+    Write-Host "  3) 全量校验：        $VENV_PY tools/ci/check_all.py --stage push"
     Write-Host ""
-    Write-Host "  第 7 步已用 .venv 的 python 跑过工具链校验；手动跑时同样要用 .venv 的 python ——"
-    Write-Host "  check_all.py 走 sys.executable -m ruff，裸 python 在这台机器上解析到没有 ruff 的托管 3.13。激活方式："
+    Write-Host "  校验必须用 .venv 里的 python：check_all.py 走 sys.executable -m ruff，而裸 python"
+    Write-Host "  在这台机器上解析到没有 ruff 的托管 3.13（第 6 步的探测都是用 .venv 的解释器跑的）。激活方式："
     Write-Host "    . .\.venv\Scripts\Activate.ps1    （或直接用上面的绝对路径）"
     if (-not $SkipLogs) {
         Write-Host ""

@@ -1,6 +1,6 @@
 # 开发环境安装（tools/setup）
 
-新机器上一条命令把开发环境装好：Python 侧一律用 **uv**，Node 侧用 `pnpm`，装完跑一次仓库既有的工具链自查。
+新机器上一条命令把开发环境装好：Python 侧一律用 **uv**，Node 侧用 `pnpm`，装完脚本自己探一遍工具链能不能跑起来。
 
 ```powershell
 # Windows（PowerShell 5.1+）
@@ -16,14 +16,16 @@
 
 ## 装什么
 
-| 步骤 | 做什么                                                              | 落点                            |
-| ---- | ------------------------------------------------------------------- | ------------------------------- |
-| 1    | 找 `uv`（缺失时给出安装命令，`-InstallUv` / `--install-uv` 可代装） | PATH                            |
-| 2    | `uv venv .venv --python 3.11`（已存在则复用）                       | 仓库根 `.venv`                  |
-| 3    | `uv pip install -r requirements-dev.txt [-r requirements-logs.txt]` | `.venv`                         |
-| 4    | `pnpm install`                                                      | 仓库根（workspace 会装 `web/`） |
-| 5    | `git config core.hooksPath .githooks`                               | 本仓库 `.git/config`            |
-| 6    | 跑 `tools/common/check_prereq.py` 自检                              | —                               |
+| 步骤 | 做什么                                                                          | 落点                            |
+| ---- | ------------------------------------------------------------------------------- | ------------------------------- |
+| 1    | 找 `uv`（缺失时给出安装命令，`-InstallUv` / `--install-uv` 可代装）             | PATH                            |
+| 2    | `uv venv .venv --python 3.11`（已存在则复用）                                   | 仓库根 `.venv`                  |
+| 3    | `uv pip install -r requirements-dev.txt [-r requirements-logs.txt]`             | `.venv`                         |
+| 4    | `pnpm install`                                                                  | 仓库根（workspace 会装 `web/`） |
+| 5    | `git config core.hooksPath .githooks`                                           | 本仓库 `.git/config`            |
+| 6    | 自检：脚本内置探测（ruff / pytest / numpy / pyulog / yaml / node / tsc / next） | —                               |
+
+第 6 步是**自闭环**的：探测逻辑直接写在脚本里，不调用仓库其他脚本、不读清单文件。它只回答"装下去的工具能不能跑起来"，**不是全量校验**——全量清单（prettier / eslint / markdownlint / pyright / pytest / 各类守卫……）归 `tools/ci/check_all.py`，装完想验就手动跑，见下方「装完之后」。
 
 常用开关（两个平台同名，Windows 用 PascalCase、POSIX 用 kebab-case）：
 
@@ -33,6 +35,7 @@
 | `-SkipLogs` / `--skip-logs`   | 不装 pyulog（本机没有真实 `.ulg` 日志时）  |
 | `-SkipHooks` / `--skip-hooks` | 不动 git 的 `core.hooksPath`               |
 | `-Recreate` / `--recreate`    | 删掉现有 `.venv` 重建（依赖装乱了才用）    |
+| `-CheckOnly` / `--check-only` | 不装任何东西，只跑第 6 步自检              |
 | `-IndexUrl` / `--index-url`   | 换 PyPI 源，默认 `https://pypi.org/simple` |
 
 ## 手动跑钩子

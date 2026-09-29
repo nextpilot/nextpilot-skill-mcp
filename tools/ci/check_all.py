@@ -18,7 +18,6 @@ Usage:
   python tools/ci/check_all.py --stage push    # local pre-push fast path
   python tools/ci/check_all.py --stage ci      # cloud path
   python tools/ci/check_all.py --stage build   # next build only (explicit, never implied)
-  python tools/ci/check_all.py --group toolchain  # only steps tagged group=toolchain (across stages)
   python tools/ci/check_all.py --with-mutate   # also guard self-proof mutation tests (modifies files temporarily)
   python tools/ci/check_all.py --list-stages   # print stages and their steps, run nothing
 
@@ -238,7 +237,6 @@ def _load_checklist(
                 {
                     "id": step["id"],
                     "name": step["name"],
-                    "group": step.get("group"),
                     "command": command,
                     "workdir": Path(workdir_str),
                     "hint": step.get("hint", ""),
@@ -272,20 +270,6 @@ def _print_stages(stages: list[dict]) -> None:
             log.info(f"    - {step['id']:<20} {step['name']}{state}")
 
 
-def _filter_stages_by_group(stages: list[dict], group: str | None) -> list[dict]:
-    """Keep only steps tagged with *group* (checklist.yml ``group:`` field); drop emptied stages.
-
-    ``group=None`` returns the input unchanged -- no --group, no behaviour change.
-    Steps live in per-call dicts (see _load_checklist), so rewriting ``steps`` here
-    never aliases the caller's copy.
-    """
-    if not group:
-        return stages
-    for stage in stages:
-        stage["steps"] = [step for step in stage["steps"] if step.get("group") == group]
-    return [stage for stage in stages if stage["steps"]]
-
-
 def main(argv: list[str]) -> int:
     global _ARGS
 
@@ -298,13 +282,6 @@ def main(argv: list[str]) -> int:
         action="append",
         choices=["push", "ci", "build"],
         help="run only this stage (repeatable). Omit to run every stage.",
-    )
-    ap.add_argument(
-        "--group",
-        help=(
-            "run only the steps tagged with this group in checklist.yml "
-            "(e.g. toolchain), across stages. Omit to run every step."
-        ),
     )
     ap.add_argument("--list-stages", action="store_true", help="print stages and their steps, run nothing")
     ap.add_argument("--with-build", action="store_true", help="alias for --stage build")
@@ -353,20 +330,15 @@ def main(argv: list[str]) -> int:
         # Only reachable if a stage id in the YAML differs from the --stage choices.
         log.error(f"unknown stage id(s): {', '.join(unknown)}")
         return 2
-    stages = _filter_stages_by_group([s for s in stages if s["id"] in selected], args.group)
-    if args.group and not stages:
-        log.error(f"no steps tagged group={args.group!r} in {CHECKLIST_PATH.name}")
-        return 2
+    stages = [s for s in stages if s["id"] in selected]
 
     if args.list_stages:
         log.print_header("Repository validation -- stage map", " ".join(selected))
-        _print_stages(_filter_stages_by_group(_load_checklist(has_logs, log_paths), args.group))
+        _print_stages([s for s in _load_checklist(has_logs, log_paths)])
         return 0
 
     # ---- Header ----
     cmd_parts = ["python tools/ci/check_all.py", "--stage", ",".join(selected)]
-    if args.group:
-        cmd_parts.extend(["--group", args.group])
     if args.with_e2e:
         cmd_parts.append("--with-e2e")
     if args.with_mutate:

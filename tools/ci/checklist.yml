@@ -18,8 +18,6 @@
 # Each step has:
 #   id          - stable identifier (used by Python code for matching; never change)
 #   name        - short description (printed in step header; can be changed freely)
-#   group       - optional logical tag (e.g. "toolchain"); `check_all.py --group <name>`
-#                 runs only the steps carrying this tag, regardless of stage
 #   when        - optional Python expression (see below; omit = always run)
 #   workdir     - working directory ({ROOT} or {WEB})
 #   command     - command list (YAML array of strings)
@@ -79,21 +77,18 @@ jobs:
       # ── 基本检查：格式 → lint → 类型 ──
       - id: "ruff-format"
         name: "Python style (ruff format --check)"
-        group: "toolchain"
         workdir: "{ROOT}"
         command: ["{PYTHON}", "-m", "ruff", "format", "--check", "."]
         hint: "Run `python -m ruff format .` to auto-format all files."
 
       - id: "ruff-lint"
         name: "Python lint (ruff check)"
-        group: "toolchain"
         workdir: "{ROOT}"
         command: ["{PYTHON}", "-m", "ruff", "check", "."]
         hint: "Run `python -m ruff check --fix .` to auto-fix fixable issues, then review remaining items manually."
 
       - id: "prettier-check"
         name: "Code style (prettier --check)"
-        group: "toolchain"
         workdir: "{ROOT}"
         # 不传 --config：仓库根已经有 .prettierrc，prettier 从被扫描的文件向上找就能命中。
         # 显式传 --config 只在这里生效，编辑器/手工命令仍会落回默认 2 空格/80 宽，
@@ -103,7 +98,6 @@ jobs:
 
       - id: "markdownlint"
         name: "Markdown lint (markdownlint-cli2)"
-        group: "toolchain"
         workdir: "{ROOT}"
         # markdownlint-cli2 自动寻找 .markdownlint-cli2.jsonc，ignores 直接写在配置里，
         # VS Code 扩展同样优先读 .markdownlint-cli2.jsonc —— CI 与编辑器完全一致。
@@ -112,21 +106,18 @@ jobs:
 
       - id: "pyright"
         name: "Python type checking (pyright)"
-        group: "toolchain"
         workdir: "{ROOT}"
         command: ["{NODE}", "node_modules/pyright/index.js", "knowledge/engine"]
         hint: "Fix the Python type errors listed above. Run `npx pyright knowledge/engine` locally for detailed output."
 
       - id: "eslint"
         name: "TypeScript lint (eslint)"
-        group: "toolchain"
         workdir: "{ROOT}"
         command: ["{NODE}", "node_modules/eslint/bin/eslint.js", "web"]
         hint: "Fix the ESLint errors listed above. Run `npx eslint web --fix` from repo root to auto-fix where possible."
 
       - id: "tsc"
         name: "TypeScript type checking (tsc --noEmit)"
-        group: "toolchain"
         workdir: "{WEB}"
         command: ["{NODE}", "node_modules/typescript/bin/tsc", "--noEmit"]
         hint: "Fix the TypeScript errors listed above. Run `npx tsc --noEmit --pretty` locally for detailed output."
