@@ -53,8 +53,7 @@ lib/issue-bridge.ts（采集 + 投递）→ functions/api/issues.js（边缘入�
 | 前端     | `prettier`    | 缩进 4（json/yaml 2）、行长 120、双引号、语句结尾分号 |
 | Markdown | `prettier`    | 缩进 2、`proseWrap: preserve`（不硬折行）             |
 
-**Python 一律用 %-格式化，不用 f-string**（`ruff` 的 `UP031` 刻意没开）。
-例外是日志：见 §3 第 4 条。
+格式化器说了算，人不与它争论。局部不一致时以 `ruff format` / `prettier` 的输出为准。
 
 ### 1.3 类型
 
@@ -208,8 +207,6 @@ _REDACT_RULES = [...]
 2. **讲缺什么，不讲"出错了"**：一条失败路径有几种原因就交出几条，逐条带上是哪个 topic /
    哪个字段 / 多少采样。见 [`CLAUDE.md`](../../CLAUDE.md) §6.8。
 3. **不写时间戳、不写 emoji、不写颜色转义**：颜色由 logger 在 TTY 下加，重定向到文件时自动去掉。
-4. **占位符用 `%s` 而非 f-string**：日志级别过滤救得回 `%s`，救不回已求值的 f-string。
-   例外：要拼的就是结构化块（`print_step` 等）时照常用 f-string。
 
 ---
 
