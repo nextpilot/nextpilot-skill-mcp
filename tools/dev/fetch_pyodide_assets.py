@@ -1,10 +1,10 @@
 """把端侧解析所需的运行时资产抓到本地，供自托管（`web/public/pyodide/` 或 EdgeOne Blob）。
 
-**为什么要自托管**：解析跑在浏览器里的 Pyodide，每次要取三样东西——
+为什么要自托管：解析跑在浏览器里的 Pyodide，每次要取三样东西：
   1) Pyodide 运行时（约 10MB）+ 标准库，默认从 jsdelivr 拉；
   2) numpy / micropip 的 wheel，也从同一个目录拉；
-  3) pyulog 的 wheel，`micropip.install("pyulog")` 会**先查 PyPI 索引**再下载。
-国内访问 jsdelivr 与 PyPI 都不稳，索引查询还不受缓存保护——自托管后这三样都在自己的
+  3) pyulog 的 wheel，`micropip.install("pyulog")` 会先查 PyPI 索引再下载。
+国内访问 jsdelivr 与 PyPI 都不稳，索引查询还不受缓存保护。自托管后这三样都在自己的
 CDN 上，一次下载、长期缓存（配合 NEXT_PUBLIC_PYULOG_WHEEL 连索引查询也省掉）。
 
 用法：
@@ -24,14 +24,14 @@ CDN 上，一次下载、长期缓存（配合 NEXT_PUBLIC_PYULOG_WHEEL 连索�
   web/public/pyodide/wheels/
     pyulog-*.whl                     ← 即 NEXT_PUBLIC_PYULOG_WHEEL 的默认值
 
-**为什么要重试**：jsdelivr 从境内访问会出现随机 TLS 断连（`SSL: UNEXPECTED_EOF_WHILE_READING`），
+为什么要重试：jsdelivr 从境内访问会出现随机 TLS 断连（`SSL: UNEXPECTED_EOF_WHILE_READING`），
 实测单文件成功率约 50%。没有重试的话脚本会随机失败，看起来像"某个文件不存在"，实则是网络抖动。
 
-**完整性校验分两类**（半截文件/坏代理都可能把坏字节当成资产，坏 wasm 的症状是浏览器里玄学报错）：
-  - wheel（numpy 等）：`pyodide-lock.json` 里记录了官方 sha256，逐个核对；
+完整性校验分两类（半截文件/坏代理都可能把坏字节当成资产，坏 wasm 的症状是浏览器里玄学报错）：
+  - wheel(如 numpy)：`pyodide-lock.json` 里记录了官方 sha256，逐个核对；
   - 核心文件（asm.js/wasm/stdlib 等）：lock 不覆盖、GitHub release 又只发打包的 tar.bz2
-    （没有单文件 SHA256SUMS，且 github 从境内不稳），改用**两个不同源各拉一次、
-    sha256 一致才落盘**的交叉校验——`pyodide-lock.json` 本身排在最前面先过这道校验，
+    （没有单文件 SHA256SUMS，且 github 从境内不稳），改用两个不同源各拉一次、
+    sha256 一致才落盘的交叉校验。`pyodide-lock.json` 本身排在最前面先过这道校验，
     后面 wheel 的校验根基才成立。
 
 依赖：仅标准库。
@@ -55,7 +55,7 @@ CACHE_OUT = REPO_ROOT / ".cache" / "pyodide-dist"
 SITE_CONFIG = REPO_ROOT / "web" / "lib" / "site-config.ts"
 
 CDN = "https://cdn.jsdelivr.net/pyodide/{ver}/full/"
-# 备用源：主源被墙/抖动时按顺序回退。unpkg 与 npmmirror **不含 wheel**，只能当核文件的备选。
+# 备用源：主源被墙/抖动时按顺序回退。unpkg 与 npmmirror 不含 wheel，只能当核文件的备选。
 CDN_FALLBACKS = [
     "https://cdn.jsdelivr.net/pyodide/{ver}/full/",
     "https://gcore.jsdelivr.net/pyodide/{ver}/full/",
@@ -63,8 +63,8 @@ CDN_FALLBACKS = [
 ]
 PYPI_JSON = "https://pypi.org/pypi/pyulog/json"
 PYPI_JSON_FALLBACK = "https://pypi.tuna.tsinghua.edu.cn/pypi/pyulog/json"
-# 阿里云 simple 索引：**唯一在实测中稳定可达的 pyulog 源**。
-# 注意它返回的是 HTML 索引页（PEP 503），不是 PyPI 的 JSON API，解析方式不同——
+# 阿里云 simple 索引：唯一在实测中稳定可达的 pyulog 源。
+# 注意它返回的是 HTML 索引页（PEP 503），不是 PyPI 的 JSON API，解析方式不同，
 # 详见 fetch_pyulog_wheel()。清华镜像与 files.pythonhosted.org 实测均被 TLS 断连挡住。
 ALIYUN_SIMPLE = "https://mirrors.aliyun.com/pypi/simple/pyulog/"
 
@@ -158,7 +158,7 @@ def fetch_cross_checked(relpath: str, ver: str) -> bytes:
             )
         return first[1]
     if first is not None:
-        # 只有一个源可达：退化处理——没有交叉就不算校验过，明说而不是假装校验过
+        # 只有一个源可达：退化处理。没有交叉就不算校验过，明说而不是假装校验过
         print(f"  !! {relpath} 只有单源可拉，本轮跳过交叉校验（内容未经第二源确认）", file=sys.stderr)
         return first[1]
     raise RuntimeError(f"交叉校验失败：没有任何源能拉到 {relpath}")
@@ -208,7 +208,7 @@ def fetch_pyulog_wheel(expected: str) -> tuple[bytes, str, str]:
     阿里云那条是实测唯一稳定的路径——PyPI 官方与 files.pythonhosted.org 从境内
     都会被 TLS 断连掐掉，清华镜像同样过不去。
     """
-    # 1) PyPI 官方 JSON API：只认锁定版本，绝不静默换版本
+    # 1) PyPI 官方 JSON API：只认锁定版本，不静默换版本
     for src in (PYPI_JSON, PYPI_JSON_FALLBACK):
         try:
             info = json.loads(fetch(src).decode("utf-8"))

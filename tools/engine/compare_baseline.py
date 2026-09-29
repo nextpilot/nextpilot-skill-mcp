@@ -1,6 +1,6 @@
-"""比对当前引擎输出与冻结基线（规则重构每一步都必须通过）。
+"""比对当前引擎输出与冻结基线（规则重构每一步都要通过）。
 
-对每个 baseline/<slug>.json，重新跑同一份日志并**逐字段深度比较**：
+对每个 baseline/<slug>.json，重新跑同一份日志并逐字段深度比较：
 任何 finding 的 id/ruleId/severity/tag/title/evidence/docUrl/suggestion，以及 stats、tags、
 guardTags、phases、checksRun/checksSkipped、matchedFaults 不一致都算回归。
 
@@ -30,16 +30,16 @@ import loader as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 # 两份数据都住在 tools/testdata/，不跟着本文件走：它们是要入库/自备的"数据"，
-# 而本文件是"校验数据的工具"——两者分属不同目录，靠相对自身路径只会随搬家一起断。
+# 而本文件是"校验数据的工具"，两者分属不同目录，靠相对自身路径只会随搬家一起断。
 TESTDATA = REPO_ROOT / "tools" / "testdata"
 LOG_DIR = TESTDATA / "logs"  # 校准用真实日志（不入库，需自备）
 BASELINE_DIR = TESTDATA / "baseline"
 
-# 这些顶层字段**反映的是跑这次比对的环境，不是解析结果**。把它们算进差异，只会把
-# "换了台机器 / 升了个包"报成"解析结果变了"——而真正能报出解析行为变化的，是其余字段的
+# 这些顶层字段反映的是跑这次比对的环境，不是解析结果。把它们算进差异，只会把
+# "换了台机器 / 升了个包"报成"解析结果变了"，而真正能报出解析行为变化的，是其余字段的
 # 逐字段比对。当前只有 parserVersion：基线是拿 pyulog 1.1.0 冻的，换 1.2.x 后它必然不同，
 # 但已实测确认其余字段零差异，即它 100% 是噪音而非回归信号。
-# 不删这个字段——它仍随结果输出、下面会打印出来，只是不参与判定。
+# 不删这个字段，它仍随结果输出、下面会打印出来，只是不参与判定。
 IGNORED_TOP_KEYS: set[str] = {"parserVersion"}
 
 
@@ -62,7 +62,7 @@ def normalize(value):
 def compare_one(baseline_path: Path) -> tuple[list[str], str, str]:
     """返回 (差异列表, 基线记录的解析器版本, 本次用的解析器版本)。
 
-    两个版本串单列出来供调用方打印——它们不参与判定，但必须保持可见。
+    两个版本串单列出来供调用方打印，它们不参与判定，但要保持可见。
     """
     frozen = json.loads(baseline_path.read_text(encoding="utf-8"))
     log_path = find_log(frozen["log"])
@@ -120,7 +120,7 @@ def main(argv: list[str]) -> int:
             log.print_check(i, len(paths), slug, True)
             results.append((slug, "ok"))
 
-    # parserVersion 不参与判定（见 IGNORED_TOP_KEYS），但不许它就此消失——它回答的是
+    # parserVersion 不参与判定（见 IGNORED_TOP_KEYS），但不许它就此消失：它回答的是
     # "这份日志是哪版解析器读的"，真出问题时第一个要问的就是它。并排打出来，好坏自现。
     if current_pvs:
         base_pv = "、".join(sorted(baseline_pvs))

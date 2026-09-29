@@ -1,16 +1,16 @@
-"""日志适配器（provider）契约测试 —— 对**每一个** provider 跑同一套断言。
+"""日志适配器（provider）契约测试，对每一个 provider 跑同一套断言。
 
 为什么需要它（构建期与运行期不是已经各查过一道了吗）：
-  · 构建期只查"方法有没有定义、builtin_variables() 的键齐不齐"——看不进方法体
-  · 运行期自检只查"名字取不舍得出、类型对不对"——看不了值
-  这一道查的是**语义**：失败语义（取不到必须返回 None 而不是抛）、get_topic_meta() 与 get_series()
+  · 构建期只查"方法有没有定义、builtin_variables() 的键齐不齐"，看不进方法体
+  · 运行期自检只查"名字取不舍得出、类型对不对"，看不了值
+  这一道查的是语义：失败语义（取不到要返回 None 而不是抛）、get_topic_meta() 与 get_series()
   是否自洽、armed_intervals 的形状、get_report_facts() 与 builtin_variables() 是否互相矛盾……
   这三道合起来 = 契约可执行；加一种新格式（ArduPilot .bin）时，跑通这里就不用重读引擎。
 
 用法：
   python tools/engine/guard_provider_contract.py <log.ulg> [more.ulg ...]
   python tools/engine/guard_provider_contract.py --list          # 列出已注册的格式
-日志文件的格式由**文件头**判定（适配器自己探测），所以不用告诉它用哪个 provider。
+日志文件的格式由文件头判定（适配器自己探测），所以不用告诉它用哪个 provider。
 """
 
 from __future__ import annotations
@@ -36,8 +36,7 @@ def check_provider(ns: dict, path: Path) -> list[tuple[str, str]]:
     results: list[tuple[str, str]] = []
     step = 0
 
-    # ── 1. 失败语义：取不到一律 None，不抛异常 ──────────────────────
-    step += 1
+    # ── 1. 失败语义：取不到一律 None，不抛异常 ──────────────────────    step += 1
     rule_name = f"[{path.name}] 失败语义（取不到必返 None，不抛异常）"
     failed: list[str] = []
     for name, call in (
@@ -78,8 +77,8 @@ def check_provider(ns: dict, path: Path) -> list[tuple[str, str]]:
             if cols is None:
                 failed.append(f"{where}: dataset({t}, {inst}) 取不到")
                 continue
-            # timestamp 断言是**条件的**：只有 FMT 声明了时间字段才要求改名后的 timestamp 列。
-            # AP_Logger 的内部传输消息（FILE 等）没有 TimeUS 字段——PX4 时代"所有 topic
+            # timestamp 断言是带条件的：只有 FMT 声明了时间字段才要求改名后的 timestamp 列。
+            # AP_Logger 的内部传输消息（FILE 等）没有 TimeUS 字段，PX4 时代"所有 topic
             # 都有 timestamp"的假设在跨格式下不成立（12 份真实 APM 日志踩过）。
             declared_ts = any(f["name"] in ("TimeUS", "timestamp") for f in m["fields"])
             if declared_ts and "timestamp" not in cols:
@@ -205,8 +204,8 @@ def check_provider(ns: dict, path: Path) -> list[tuple[str, str]]:
     results.append((rule_name, "ok" if ok else "fail"))
 
     # ── 7. 模式区间 + 可选能力：定义了就要能用 ────────────────────────
-    # 2026-09-24 修复一处恒绿：原先写的是 hasattr(p, "phases") / "dropouts"——
-    # 那两个**属性名根本不存在**（方法是 get_flight_phases / get_logged_dropouts），
+    # 2026-09-24 修复一处恒绿：原先写的是 hasattr(p, "phases") / "dropouts"，
+    # 那两个属性名根本不存在（方法是 get_flight_phases / get_logged_dropouts），
     # 于是可选能力检查从来只走"跳过"分支，什么都没检过。
     step += 1
     rule_name = f"[{path.name}] get_mode_changed 形状 + 可选能力（dropouts/track）"
@@ -278,8 +277,8 @@ def check_provider(ns: dict, path: Path) -> list[tuple[str, str]]:
     results.append((rule_name, "ok" if ok else "fail"))
 
     # ── 9. 知识引擎查询 API：新方法互相之间不许矛盾 ──────────────────
-    # 单看每个方法"能给东西"不够——它们是同一份日志的同一批事实的不同入口，
-    # 互相之间必须对得上（对不上 = 其中一条路在编数）。
+    # 单看每个方法"能给东西"不够，它们是同一份日志的同一批事实的不同入口，
+    # 互相之间得对得上（对不上 = 其中一条路在编数）。
     step += 1
     rule_name = f"[{path.name}] 查询 API 语义自洽（时间/完整性/armed/版本/身份/事件）"
     failed = []
@@ -363,14 +362,14 @@ def main(argv: list[str]) -> int:
         sys.stdout.reconfigure(line_buffering=True)
 
     # --apm：合成一份最小 .bin 夹具一起测（仓库里还没有真实 ArduPilot 样本；
-    # 合成样本自证"解析器与契约自洽"，对真实日志的正确性仍待样本——见适配器文件头的待验证清单）
+    # 合成样本自证"解析器与契约自洽"，对真实日志的正确性仍待样本，见适配器文件头的待验证清单）
     apm_only = "--apm" in args
     if apm_only:
         args = [a for a in args if a != "--apm"]
         import tempfile
 
         # 夹具生成器在 tools/dev/（合成样本是给人用的开发工具，不是门禁的一部分）；
-        # 本文件在 tools/engine/，sys.path 不覆盖那里，这里显式补上——同目录也查，
+        # 本文件在 tools/engine/，sys.path 不覆盖那里，这里显式补上；同目录也查，
         # 将来夹具搬来同住也能找到
         for _p in (Path(__file__).resolve().parent, Path(__file__).resolve().parents[1] / "dev"):
             if _p.is_dir() and str(_p) not in sys.path:

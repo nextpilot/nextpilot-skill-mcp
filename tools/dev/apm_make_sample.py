@@ -55,11 +55,11 @@ def _msg(mtype, fmt, values, scaled):
     return MAGIC + bytes([mtype]) + payload
 
 
-# 消息类型 ID：解析器按**名字**查表，ID 本身随便给（这正是要自证的点之一）
+# 消息类型 ID：解析器按名字查表，ID 本身随便给（这正是要自证的点之一）
 IDS = {"FMT": 128, "PARM": 132, "MSG": 133, "EV": 134, "MODE": 135, "GPS": 136}
 
 # (名字, 格式串, 列名)。长度 = 3 + 各字段字节数之和（Length 含 3 字节头，与主流固件一致；
-# 解析器有自校准，就算约定反了也该解对——这本身就是被测行为）
+# 解析器有自校准，就算约定反了也该解对，这本身就是被测行为）
 STRUCTS = {
     "PARM": ("QNf", "TimeUS,Name,Value"),
     "MSG": ("QZ", "TimeUS,Message"),
@@ -76,16 +76,16 @@ def _fmt_len(fmt):
 
 def build_sample_bytes() -> bytes:
     out = bytearray()
-    # FMT 声明先写（含 FMT 自己的声明——真实日志也是如此，解析器的长度约定校准靠它）
+    # FMT 声明先写（含 FMT 自己的声明，真实日志也是如此，解析器的长度约定校准靠它）
     out += _fmt_row(128, 89, "FMT", "BBnNZ", "Type,Length,Name,Format,Columns")
     for name, (fmt, columns) in STRUCTS.items():
         out += _fmt_row(IDS[name], _fmt_len(fmt), name, fmt, columns)
 
     # 参数：版本 + 机架 + 一批"会被规则读"的配置项。
-    # 后四个是**故意挑的值**：前三个取 0（禁用）让 config_safety 那三条真的发射一次
-    # ——参数类规则在 2026-09 之前一直是"provider 读不到参数"而占位，没有这份夹具它们
+    # 后四个是故意挑的值：前三个取 0（禁用）让 config_safety 那三条真的发射一次。
+    # 参数类规则在 2026-09 之前一直是"provider 读不到参数"而占位，没有这份夹具它们
     # 没有端到端证据；RNGFND1_TYPE=1 而日志里没有 RFND/RNGFND 消息，是"配置与数据对不上"
-    # 那条的正例；GPS_TYPE=1 且下面真有 GPS 消息，是同一条的**反例**（不该报）。
+    # 那条的正例；GPS_TYPE=1 且下面真有 GPS 消息，是同一条的反例（不该报）。
     for i, (name, value) in enumerate(
         [
             ("FORMAT_VERSION", 4.5),
@@ -122,7 +122,7 @@ def build_sample_bytes() -> bytes:
             ((2_000_000 + i * 1_000_000, 3, 14, 39.90 + i * 0.0001, 116.40 + i * 0.0001, 50.0 + i)),
             scaled=set(),
         )
-    # 一个未定位样本（Status=0、坐标 0）：必须被轨迹与 Home 剔掉
+    # 一个未定位样本（Status=0、坐标 0）：要被轨迹与 Home 剔掉
     out += _msg(IDS["GPS"], "QBHLLf", (7_500_000, 0, 0, 0, 0, 0.0), scaled=set())
 
     return bytes(out)

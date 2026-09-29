@@ -1,13 +1,13 @@
 ﻿# 一键装好本机开发环境（Python 走 uv，Node 走 pnpm）。
 #
 # 为什么要有这个脚本：这套步骤以前散在 README 与各处注释里，新机器要照着敲五六条命令，
-# 而漏一步的表现不是报错，是"某个校验永远红、且看不出跟环境有关"——比如 .venv 里没装
+# 而漏一步的表现不是报错，是"某个校验一直红、且看不出跟环境有关"，比如 .venv 里没装
 # PyYAML，check_all 的产物检查会假失败；pyright 靠 .venv 找 numpy / pyulog，缺包就报
 # 几十个 import 解析不了。把步骤收进一个脚本，末尾的自检是自闭环的：探测逻辑直接
 # 写在脚本里，不调用仓库其他脚本、不读清单文件，"装没装对"才有机器来判定。
 #
 # 装什么由两份 requirements 文件决定（requirements-dev.txt / requirements-logs.txt），
-# 这个脚本只决定"装到哪、装完怎么验"——依赖清单不在这里复制第二份。
+# 这个脚本只决定"装到哪、装完怎么验"，依赖清单不在这里复制第二份。
 #
 # 用法：
 #   .\tools\setup\setup.ps1                  # 全套：Python + Node + git hook + 自检
@@ -31,12 +31,12 @@ param(
 
 # Continue 而不是 Stop：uv / pnpm 这类外部命令把进度信息写在 stderr 上，Stop 会把
 # "写了 stderr" 判成失败（实测：uv venv 打印一行 "Using CPython 3.11.5" 就让脚本退出）。
-# 所以每一步自己看 $LASTEXITCODE —— 失败与否由我们判定，不由 stderr 有没有输出判定。
+# 所以每一步自己看 $LASTEXITCODE：失败与否由我们判定，不由 stderr 有没有输出判定。
 $ErrorActionPreference = "Continue"
 
 # 本脚本住在 tools/setup/ 下，仓库根要往上两级（tools/setup -> tools -> 仓库根）。
 $ROOT = (Get-Item $PSScriptRoot).Parent.Parent.FullName
-# .venv 必须在仓库根：pyrightconfig.json 写的是 venvPath "." + venv ".venv"，
+# .venv 要放在仓库根：pyrightconfig.json 写的是 venvPath "." + venv ".venv"，
 # 换地方就要改那份配置，而它一旦指错，knowledge/engine/ 的类型检查会集体报 import 解析不了。
 $VENV = Join-Path $ROOT ".venv"
 $VENV_PY = Join-Path $VENV "Scripts\python.exe"
@@ -65,7 +65,7 @@ function Invoke-Native {
 
 Push-Location $ROOT
 try {
-    # -CheckOnly：跳过安装类步骤（1-5），直接进自检——日常"验证工具链"一条命令。
+    # -CheckOnly：跳过安装类步骤（1-5），直接进自检，日常"验证工具链"一条命令。
     # PowerShell 的 if 块内不要求缩进，步骤块原样保留，只在前后加开关。
     if ($CheckOnly) {
         Write-Host "-CheckOnly：跳过安装步骤（uv / venv / 依赖 / Node / hook），直接自检"
@@ -125,7 +125,7 @@ try {
     }
     $pipArgs = @("pip", "install", "--python", $VENV_PY, "--index-url", $IndexUrl)
     foreach ($r in $reqs) { $pipArgs += @("-r", $r) }
-    # 显式给 --index-url 而不靠默认值：本机 pip 配的是 aliyun 的 **HTTP** 镜像
+    # 显式给 --index-url 而不靠默认值：本机 pip 配的是 aliyun 的 HTTP 镜像
     # （pip 判它不安全），uv 现在不读 pip.ini，但把源写死在命令里，换台机器也是同一结果。
     Invoke-Native $uvExe @pipArgs
 
@@ -150,12 +150,12 @@ try {
     }
     else {
         # 每台机器做一次即可，重复执行是幂等的。放在脚本里的理由：漏了它，pre-commit /
-        # pre-push 永远不会跑，而"没跑"和"跑了全绿"在 git 这边长得一模一样。
+        # pre-push 一直不跑，而"没跑"和"跑了全绿"在 git 这边长得一模一样。
         Invoke-Native "git" config core.hooksPath .githooks
         Write-Host "  core.hooksPath = $(git config core.hooksPath)"
 
         # 钩子由 git 用 PATH 上的 python 启动，再靠 .githooks/_venv_python.py 切到 .venv。
-        # 这里照 git 的方式真跑一次那个切换，把最终落在哪个解释器上打印出来核对——
+        # 这里照 git 的方式真跑一次那个切换，把最终落在哪个解释器上打印出来核对，
         # "钩子悄悄用了另一个 Python"不报错也不失败，只能这样拦。
         $probe = @'
 import sys
@@ -172,7 +172,7 @@ def body():
 sys.exit(m.ensure_venv_python(body))
 '@
         if (Get-Command python -ErrorAction SilentlyContinue) {
-            # 必须落成文件再跑，不能用 `python -c`：-c 模式下 sys.argv 只有 ['-c']，
+            # 要落成文件再跑，不能用 `python -c`：-c 模式下 sys.argv 只有 ['-c']，
             # 而切换解释器就是把整个 argv 交给 .venv 的 python 重跑一遍，
             # 代码本身不在 argv 里，切完就没了（实测：探测静默无输出）。
             $probeFile = Join-Path $ROOT ".workbuddy/tmp/hook_probe.py"
@@ -202,7 +202,7 @@ sys.exit(m.ensure_venv_python(body))
     }  # -CheckOnly 跳过安装步骤（1-5）
 
     # ── 6. 自检（自闭环）─────────────────────────────────────────────
-    # 装什么就验什么：探测逻辑直接写在这里——不调 check_prereq.py / check_all.py，
+    # 装什么就验什么：探测逻辑直接写在这里，不调 check_prereq.py / check_all.py，
     # 不读 checklist.yml，setup 不拖外部脚本。探的是"工具能不能跑起来"，不是全量
     # 校验：全量清单（ruff/prettier/tsc/pytest/守卫……）归 check_all.py，装完想验
     # 就手动跑，见末尾提示。

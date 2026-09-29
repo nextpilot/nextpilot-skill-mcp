@@ -3,28 +3,28 @@
 ## 为什么要有它
 
 `CLAUDE.md` §6.6 要求每条静态守卫都附一次「会红」的证明。而这份证明以前每次都写在
-`%TEMP%` 下的一次性脚本里——跑完就丢。后果是双重的：
+`%TEMP%` 下的一次性脚本里，跑完就丢。后果是双重的：
 
 1. 同一件事反复重写（2026-09-18 一天里写了三个）；
-2. **下次改动之后没有人能重跑它**。守卫悄悄退化成恒绿（被别的守卫蕴含、夹具到不了
+2. 下次改动之后没有人能重跑它。守卫悄悄退化成恒绿（被别的守卫蕴含、夹具到不了
    那条分支、打印 ERROR 却 `return 0`），没有任何东西会告诉我们。
 
-这份脚本把那些一次性脚本收拢成一张**注册表**：每条 = 改哪个文件的哪句话 → 改成什么、
-由哪条守卫来抓、抓住时它该打印哪句话。跑法就是逐条应用变异、跑守卫、断言「**恰好**
+这份脚本把那些一次性脚本收拢成一张注册表：每条 = 改哪个文件的哪句话 → 改成什么、
+由哪条守卫来抓、抓住时它该打印哪句话。跑法就是逐条应用变异、跑守卫、断言「恰好
 这一条红」，再无条件还原。
 
 ## 判据（缺一不可）
 
-1. **基线必须全绿** —— 否则分不清是谁红的；
-2. 变异后**退出码非零**；
-3. 该条守卫的**预期失败文案**真的出现在输出里（不然「红了」可能是别的原因）；
-4. **别的注册变异预期的文案一条都没出现** —— 断言「恰好一条」而不是「预期那条在里面」，
+1. 基线要全绿，否则分不清是谁红的；
+2. 变异后退出码非零；
+3. 该条守卫的预期失败文案真的出现在输出里（不然「红了」可能是别的原因）；
+4. 别的注册变异预期的文案一条都没出现，断言「恰好一条」而不是「预期那条在里面」，
    否则守卫之间的牵连会在"看起来通过"的绿色里长出来。
 
 ## 为什么改产物而不改引擎源码
 
 产物侧守卫（`check_engine_pyodide.py`）读的是编译产物 `web/workers/analysis-engine.generated.ts`，
-不是 `knowledge/engine/providers/px4.py`。所以变异要打在**产物**上——打源码的话守卫根本看不到，
+不是 `knowledge/engine/providers/px4.py`。所以变异要打在产物上，打源码的话守卫根本看不到，
 自证会得出"守卫红不起来"的假结论。产物与源码一致由另一道门（`build:kb --check`）保证，
 两层各管各的，这才是它们各自的职责边界。
 
@@ -34,7 +34,7 @@
     python tools/ci/mutate_guards.py --list       # 只看注册表
     python tools/ci/mutate_guards.py --only 轨迹   # 只跑名字里含"轨迹"的
 
-**必须用装了 numpy / pyulog 的解释器**（产物侧守卫要真执行编译产物）。本机是
+要用装了 numpy / pyulog 的解释器（产物侧守卫要真执行编译产物）。本机是
 `C:\\Users\\zhanfuyu\\anaconda3\\python.exe`；托管 Python 3.13.12 没有科学栈，会在
 "产物执行"那步 `ModuleNotFoundError`。没有日志时产物侧那几条自动 SKIP（见下）。
 
@@ -67,7 +67,7 @@ def _safe(text: str) -> str:
     避免 print 时 UnicodeEncodeError 直接崩脚本。
 
     守卫输出是从子进程按 utf-8 读来的、可能夹带坏字节（解码时 errors="replace" 会把坏字节
-    变成 U+FFFD）。**只用于打印**：同一份原始 out 仍拿去和注册表的 expect 文案做匹配，不受
+    变成 U+FFFD）。只用于打印：同一份原始 out 仍拿去和注册表的 expect 文案做匹配，不受
     影响。
     """
     enc = getattr(sys.stdout, "encoding", None) or "utf-8"
@@ -96,8 +96,8 @@ FLIGHT_MAP = "web/components/LogFlightMap.tsx"
 # 守卫的两种"层"：产物侧真执行编译产物（慢、要科学栈、要真实日志），
 # 界面侧只扫源码（快、无依赖）。
 #
-# 第三个字段是**怎么从输出里数出"红了几条"**——这一步必须按各守卫自己的格式来，
-# 不能统一用"标记在不在输出里"：`test-issue-filer.mjs` 把**通过的**检查名也打印出来
+# 第三个字段是怎么从输出里数出"红了几条"，这一步要按各守卫自己的格式来，
+# 不能统一用"标记在不在输出里"：`test-issue-filer.mjs` 把通过的检查名也打印出来
 # （`  ok    <名字>`），于是"别的守卫的那句话也在输出里"会把全绿的那几条误判成牵连
 # （第一版就是这么写的，四条界面侧变异全部误报"牵连 3 条"）。
 GUARDS = {
@@ -109,25 +109,25 @@ GUARDS = {
     ),
     "ui": ([NODE, "scripts/test-issue-filer.mjs"], WEB, "界面侧（test-issue-filer）", "fail-lines"),
     "hygiene": ([PY, "tools/common/check_hygiene.py"], ROOT, "卫生检查（check_hygiene）", "fail-lines"),
-    # 引擎纯度：只扫 knowledge/engine/ 的源码文本，无依赖、无网络、不需要日志 —— 快，所以每次都跑
+    # 引擎纯度：只扫 knowledge/engine/ 的源码文本，无依赖、无网络、不需要日志，快，所以每次都跑
     "engine": ([PY, "tools/engine/check_engine_purity.py"], ROOT, "引擎纯度（check_engine_purity）", "fail-lines"),
-    # pnpm 转发脚本：只扫 package.json 的 scripts 文本 —— 快、无依赖、不需要日志
+    # pnpm 转发脚本：只扫 package.json 的 scripts 文本，快、无依赖、不需要日志
     "pnpm-filter": ([PY, "tools/common/check_pnpm_filter.py"], ROOT, "pnpm 转发脚本（check_pnpm_filter）", "fail-lines"),
-    # 面板解析器：只跑纯函数（内置假 manifest），无浏览器无日志 —— 快
+    # 面板解析器：只跑纯函数（内置假 manifest），无浏览器无日志，快
     "panel-resolver": (
         [NODE, "--experimental-strip-types", "scripts/check-panel-resolver.mjs"],
         WEB,
         "面板解析器（check-panel-resolver）",
         "fail-lines",
     ),
-    # APM 解析器版本：解析逻辑的 AST 指纹 vs 手维护的 parserVersion —— 快、无依赖、不需要日志
+    # APM 解析器版本：解析逻辑的 AST 指纹 vs 手维护的 parserVersion，快、无依赖、不需要日志
     "apm": (
         [PY, "tools/engine/guard_apm_parser_version.py"],
         ROOT,
         "APM 解析器版本（guard_apm_parser_version）",
         "fail-lines",
     ),
-    # 拼接命名：knowledge/engine/ 的片段顶层名字撞车 —— 只做 AST 遍历，快、无依赖
+    # 拼接命名：knowledge/engine/ 的片段顶层名字撞车，只做 AST 遍历，快、无依赖
     "engine-names": (
         [PY, "tools/engine/guard_engine_names.py"],
         ROOT,
@@ -135,10 +135,10 @@ GUARDS = {
         "fail-lines",
     ),
     # 指南 MDX 可编译：guide 页正文请求期才编译，next build / markdownlint / build:kb
-    # --check 三道门都看不见它 —— 快、无依赖、不需要日志
+    # --check 三道门都看不见它，快、无依赖、不需要日志
     "guide-mdx": ([NODE, "scripts/check-guide-mdx.mjs"], WEB, "指南 MDX 可编译（check-guide-mdx）", "fail-lines"),
     # 后台站点设置：三层取值（KV > env > 代码地板）与字段表驱动这套机制里，
-    # **五种回归都不报错、只是悄悄失效**（两侧字段表不一致 = 存了读不到／页脚写死 = 改了
+    # 五种回归都不报错、只是悄悄失效（两侧字段表不一致 = 存了读不到／页脚写死 = 改了
     # 没反应／metadata 退回静态常量 = 烙进构建产物／密钥名进客户端组件 = 明文进 SSR HTML／
     # 密钥没有消费点 = 轮换失效）。只扫源码文本，无依赖无网络，约 1s。
     "site-settings": (
@@ -166,8 +166,8 @@ class Mutation:
 # ---------------------------------------------------------------------------
 # 注册表
 #
-# 每一条对应 §6.6 意义上的一次"先红"证明。`expect` 必须是从守卫源码里**抄来的**
-# 那句话（不是猜的）——猜错会把"红了"误报成"没红"，而那正是这套东西要防的错。
+# 每一条对应 §6.6 意义上的一次"先红"证明。`expect` 要是从守卫源码里抄来的
+# 那句话（不是猜的），猜错会把"红了"误报成"没红"，而那也正是这套东西要防的错。
 # ---------------------------------------------------------------------------
 
 MUTATIONS: list[Mutation] = [
@@ -261,10 +261,10 @@ MUTATIONS: list[Mutation] = [
         expect="引擎没给原因时明说是解析器缺陷",
         note="伪装成「日志里没有轨迹」会让解析器缺陷看起来像用户的数据问题",
     ),
-    # ---- 界面侧：MDX 指南必须真的启用 GFM（2026-09-19） ----
+    # ---- 界面侧：MDX 指南要真的启用 GFM（2026-09-19） ----
     #
-    # 这条的失败形态是**静默降级**：漏传 remark-gfm 时 GFM 表格不是"报错"，而是退回成
-    # 一段带竖线的普通段落——页面照样出得来，只是表格没了。跟上面几条"功能说谎"是同一类。
+    # 这条的失败形态是静默降级：漏传 remark-gfm 时 GFM 表格不是"报错"，而是退回成
+    # 一段带竖线的普通段落，页面照样出得来，只是表格没了。跟上面几条"功能说谎"是同一类。
     Mutation(
         name="MDX 分支不再启用 GFM（表格会退化成纯文本）",
         path="web/components/GuideBody.tsx",
@@ -276,8 +276,8 @@ MUTATIONS: list[Mutation] = [
     ),
     # ---- 卫生检查：引用落点 / 判据可重跑 / 失败可见（2026-09-18 的第二批） ----
     #
-    # 这六条与上面十条性质不同：上面守的是"功能有没有说谎"，这里守的是"**校验本身**有没有说谎"。
-    # 它们坏掉时都没有输出——引用悬空要人读到才发现、误报会让人去改没坏的东西、吞掉的失败连
+    # 这六条与上面十条性质不同：上面守的是"功能有没有说谎"，这里守的是"校验本身有没有说谎"。
+    # 它们坏掉时都没有输出，引用悬空要人读到才发现、误报会让人去改没坏的东西、吞掉的失败连
     # "有人在看"这个前提都不成立。所以每一条都得当场证明它会红。
     Mutation(
         name="某一节丢了编号（引用它的人当场暴露）",
@@ -327,8 +327,8 @@ MUTATIONS: list[Mutation] = [
     Mutation(
         name="坏输入不再让校验脚本非零退出",
         path="tools/engine/run_engine.py",
-        # 锚点必须在**探针真走到的那条路**上：探针跑的是 `--probe-data`，进的是 `_main_probe`，
-        # 而 `_main_run` 的 `return 1 if failed else 0` 它一次都不会经过——打在那里等于
+        # 锚点要在探针真走到的那条路上：探针跑的是 `--probe-data`，进的是 `_main_probe`，
+        # 而 `_main_run` 的 `return 1 if failed else 0` 它一次都不会经过，打在那里等于
         # 什么都没测（第一版就这么写的，自证因此报"守卫恒绿"）。
         old="return log.print_summary(all_results, [])",
         new="return 0",
@@ -339,7 +339,7 @@ MUTATIONS: list[Mutation] = [
     Mutation(
         name="pre-push 从阶段列表反推 --with-e2e",
         path=".githooks/pre-push",
-        # 锚点必须是**单行**：_apply 按字节读写，工作区里这个文件是 CRLF，
+        # 锚点要是单行：_apply 按字节读写，工作区里这个文件是 CRLF，
         # 锚点里写 `\n` 会一个都匹配不到（多行锚点在这里天然失效）。
         old="    if with_e2e:",
         new='    if with_e2e and "ci" not in stages:',
@@ -351,8 +351,8 @@ MUTATIONS: list[Mutation] = [
     ),
     # ---- 引擎侧：knowledge/engine/ 是三处共用的纯 Python（2026-09-19） ----
     #
-    # 这两条守的不是"某段代码在不在"，而是**一份源码能同时跑在三个运行时里**这个前提。
-    # 第 1 条是正向的（不许出现只在一处成立的东西），第 2、3 条是"前提还在"——
+    # 这两条守的不是"某段代码在不在"，而是一份源码能同时跑在三个运行时里这个前提。
+    # 第 1 条是正向的（不许出现只在一处成立的东西），第 2、3 条是"前提还在"，
     # 消费者只剩一个时，这条约束就失去意义了，而它会安静地绿着。
     Mutation(
         name="knowledge/engine/ 里写一行 js 桥接",
@@ -375,7 +375,7 @@ MUTATIONS: list[Mutation] = [
     Mutation(
         name="本机装配入口不再指到 knowledge/engine/",
         path="knowledge/engine/loader.py",
-        # 守卫按"锚点子串在不在"判红，所以新串不得包含锚点——parents[1] 里藏着
+        # 守卫按"锚点子串在不在"判红，所以新串不得包含锚点，parents[1] 里藏着
         # "parent" 子串这种看似指走了、实则还含着锚点的写法，自证会报 always-green。
         old="ENGINE = Path(__file__).resolve().parent",
         new='ENGINE_MOVED = Path(__file__).resolve().parents[1] / "knowledge"\nENGINE = ENGINE_MOVED',
@@ -387,7 +387,7 @@ MUTATIONS: list[Mutation] = [
     # ---- 界面侧：站点版本只有一个读取口（2026-09-21） ----
     #
     # footer 显示「版本 + 日期」，两样都是构建期注入。这类"看不见的常量"最典型的坏法不是报错，
-    # 而是**安静地过期**：手写在组件里的版本号永远绿、永远不刷新。同一形状在仓库里已经发生过
+    # 而是安静地过期：手写在组件里的版本号一直绿、一直不刷新。同一形状在仓库里已经发生过
     # 一次（issue-bridge 读了一个从来没人赋值的环境变量），所以四条路各自都要证明会红。
     Mutation(
         name="构建期不再注入提交日期（footer 的日期会静默空掉）",
@@ -484,7 +484,7 @@ MUTATIONS: list[Mutation] = [
         expect="正文与右目录的间距收到 gap-8",
         note="同上：省下的 8px 归正文，正文越接近 max-w-3xl，右列目录越不像在空转",
     ),
-    # 右目录的回潮有四种单点形态，各拆一条变异——合在一条里会同时打红四条检查，
+    # 右目录的回潮有四种单点形态，各拆一条变异，合在一条里会同时打红四条检查，
     # 「恰好一条红」的判据就没法用了（第一版就是这么写的，自证直接 FAIL）。
     Mutation(
         name="右目录宽度又写死 w-56",
@@ -526,7 +526,7 @@ MUTATIONS: list[Mutation] = [
     #
     # 隐私承诺与免责声明原来各写各的：页脚一句、上传卡一句近似的，同一件事两份措辞。
     # 收进 lib/log-analysis-notes.ts 并统一只在上传卡渲染（页脚品牌区/底栏都已拿掉），
-    # 要防的回归是"有人嫌绕远、在组件里就地手写"——那不会报错，只会让措辞悄悄分叉。
+    # 要防的回归是"有人嫌绕远、在组件里就地手写"，那不会报错，只会让措辞悄悄分叉。
     # 四条路各自都要证明会红。
     Mutation(
         name="唯一出处的措辞被人就地改了",
@@ -566,7 +566,7 @@ MUTATIONS: list[Mutation] = [
     ),
     # ---- 界面侧：次数上限不在前端显示（2026-09-21） ----
     #
-    # 上游是"匿名 3 次/天、登录 10 次/天"这几个写死的数字——上传卡、AI 解读区、
+    # 上游是"匿名 3 次/天、登录 10 次/天"这几个写死的数字，上传卡、AI 解读区、
     # 「我的」页各显一次，而后台还没有配置入口。用户拍板：次数以后由后台配，前端一处都不报。
     # 要防的回归有三种形态（文案 / 数字对 / 进度条），三条路各自都要证明会红。
     Mutation(
@@ -612,9 +612,9 @@ MUTATIONS: list[Mutation] = [
     ),
     # ---- 转发脚本：pnpm --filter 匹配不到项目时静默成功（2026-09-23） ----
     #
-    # 这条的失败形态是**没有任何信号**：pnpm 匹配 0 个项目时不报错、不红、不写日志，
+    # 这条的失败形态是没有任何信号：pnpm 匹配 0 个项目时不报错、不红、不写日志，
     # 退出码 0。11 个转发脚本（含 typecheck 与 test）就这样空跑了一段时间，
-    # 于是「`pnpm typecheck` 全绿」是假绿。三条自保分支各自都要证明会红 ——
+    # 于是「`pnpm typecheck` 全绿」是假绿。三条自保分支各自都要证明会红，
     # 第四条（找不到根 package.json）要删文件，脚本做不到，只能留给代码审查。
     Mutation(
         name="转发脚本的 filter 又退回裸目录名 web（静默空跑的原形）",
@@ -646,8 +646,8 @@ MUTATIONS: list[Mutation] = [
     ),
     # ---- 界面侧：地图左上角「一条按钮 + 一条色带」的形态（2026-09-23） ----
     #
-    # 这一节守的是**布局形态**而不是像素值：像素值得起浏览器量（分钟级），进不了秒级检查。
-    # 能静态锁的是"会不会回潮"——复位按钮另起 .leaflet-bar 就与缩放条之间 10px 空档 +
+    # 这一节守的是布局形态而不是像素值：像素值得起浏览器量（分钟级），进不了秒级检查。
+    # 能静态锁的是"会不会回潮"，复位按钮另起 .leaflet-bar 就与缩放条之间 10px 空档 +
     # 2px 双边框；按钮竖排会把色带顶端往下压 ~60px；色带容器少了边界就会被内容挤成 2px。
     Mutation(
         name="复位按钮又裂成第二个 .leaflet-bar（与缩放条之间留 10px 空档）",
@@ -706,9 +706,9 @@ MUTATIONS: list[Mutation] = [
         expect="两个高度标签挂在色带右侧（left-full，不遮渐变）",
         note="只改两个里的一个就足够红——判据数的是 left-full 的个数；条只有 12px 宽，数字压上去就盖住渐变",
     ),
-    # ---- 界面侧：静态守卫引用的路径必须真的存在（2026-09-23） ----
+    # ---- 界面侧：静态守卫引用的路径要真的存在（2026-09-23） ----
     #
-    # 失效形态不是"报错"，而是**守卫集体失效还伪装成通过**：i18n 给所有页面套了一层
+    # 失效形态不是"报错"，而是守卫集体失效还伪装成通过：i18n 给所有页面套了一层
     # [locale]，写死的路径一次性全废，readFileSync 抛 ENOENT 让脚本死在 §[17]，
     # 后面几节一条没跑，CI 只看得见"进程非零退出"。
     #
@@ -718,7 +718,7 @@ MUTATIONS: list[Mutation] = [
     Mutation(
         name="新增一节时把路径写错（兜底汇总要抓到）",
         path="web/scripts/test-issue-filer.mjs",
-        # 插在节标题那行之后（顶层语句），不能插进 check( 的实参列表——那会先撞上 SyntaxError，
+        # 插在节标题那行之后（顶层语句），不能插进 check( 的实参列表，那会先撞上 SyntaxError，
         # 脚本连一条检查都跑不到（第一版就是这么写的，表现为"红了但理由不对"）。
         old=r'console.log("\n[23] 静态守卫引用的源码路径都存在（路径失效不许把后面整段带走）");',
         new=(
@@ -730,7 +730,7 @@ MUTATIONS: list[Mutation] = [
         note="read / readWeb 把坏路径登记进 MISSING_PATHS 而不是抛异常；末节负责把「哪几个不存在」说清楚",
     ),
     # ---- 面板解析器：实例数与区间展开（2026-09-24） ----
-    # 这几条改坏时**前端不会崩**——只是少画几张图、或者图例分不清是哪一路传感器。
+    # 这几条改坏时前端不会崩，只是少画几张图、或者图例分不清是哪一路传感器。
     # 没有任何运行时信号，所以每条都要有一个"先红"的证明。
     Mutation(
         name="数实例时又拿采样点数筛一遍",
@@ -791,8 +791,8 @@ MUTATIONS: list[Mutation] = [
     ),
     # ---- APM 解析器版本：解析逻辑变了就要升 parserVersion（2026-09-24） ----
     #
-    # `.bin` 侧的解析器是自研的，报告头的 parserVersion 是一个**手维护常量** —— 它不像
-    # pyulog 那个随环境变，所以也**不会**因为换机器而自己动。坏法不是报错，而是"报告头写着
+    # `.bin` 侧的解析器是自研的，报告头的 parserVersion 是一个手维护常量，它不像
+    # pyulog 那个随环境变，所以也不会因为换机器而自己动。坏法不是报错，而是"报告头写着
     # 同一个版本号，两次解析出来的数含义已经不同"：冻结基线只会说"结论变了"，分不清是规则
     # 改了还是解析器改了。三条路各自都要证明会红。
     Mutation(
@@ -824,7 +824,7 @@ MUTATIONS: list[Mutation] = [
     ),
     # ---- knowledge/engine/ 拼接命名空间：顶层名字撞车 = 后者静默覆盖前者（2026-09-24） ----
     #
-    # 片段被拼成**一份**脚本，所以"两个文件各写一个 `_MAGIC`"不是风格问题，是运行期
+    # 片段被拼成一份脚本，所以"两个文件各写一个 `_MAGIC`"不是风格问题，是运行期
     # 静默覆盖。`_MAGIC` 真被踩过一次。三条：撞名本体、判空、门还在。
     Mutation(
         name="新 provider 顶层忘了带格式前缀（那次 _MAGIC 事故的原形）",
@@ -853,11 +853,11 @@ MUTATIONS: list[Mutation] = [
         expect="这道门挂在统一入口上",
         note="check_all.py 只按清单转发 —— 清单里没它，这份检查就再也不会被执行",
     ),
-    # ---- 内容侧：guide 页正文必须能过 MDX 编译（2026-09-26） ----
+    # ---- 内容侧：guide 页正文要能过 MDX 编译（2026-09-26） ----
     #
-    # 正文由 next-mdx-remote 在**请求期**编译：next build 不碰它、markdownlint 只管风格、
+    # 正文由 next-mdx-remote 在请求期编译：next build 不碰它、markdownlint 只管风格、
     # build:kb --check 只比对生成产物。知识源描述里的格式占位符（{invalid_frac:.0%}）
-    # 一旦没转义就混进正文，会一路绿到用户打开页面才 500 —— 2026-09-26 实际发生。
+    # 一旦没转义就混进正文，会一路绿到用户打开页面才 500，2026-09-26 实际发生。
     # 反例打在手写的 index.mdx 上：生成文件的一致性另有 build:kb --check 管，两层各管各的。
     Mutation(
         name="指南正文混进裸花括号（生成器转义被绕过的原形）",
@@ -879,10 +879,10 @@ MUTATIONS: list[Mutation] = [
     ),
     # ---- 后台站点设置：五种「不报错、只是悄悄失效」的回归（2026-09-27） ----
     #
-    # 这套机制的坏法有一个共同点：**构建照过、页面照开，只有管理员改了没反应**。
+    # 这套机制的坏法有一个共同点：构建照过、页面照开，只有管理员改了没反应。
     # 字段表两侧对不上（存了读不到）、页脚写死（改了不变）、metadata 退回静态常量
     # （烙进构建产物）、密钥名进客户端组件（明文进 SSR HTML）、密钥没有消费点
-    # （轮换失效）——没有一条会抛异常，所以只能静态拦。
+    # （轮换失效），没有一条会抛异常，所以只能静态拦。
     Mutation(
         name="边缘侧字段表的 kind 与 Node 侧对不上（存进去了读不出来）",
         path="web/functions/_lib/settings-schema.js",
@@ -1005,10 +1005,10 @@ MUTATIONS: list[Mutation] = [
 
 
 class AnchorError(RuntimeError):
-    """锚点对不上——脚本写坏了，不是守卫坏了。"""
+    """锚点对不上，脚本写坏了，不是守卫坏了。"""
 
 
-# 当前**已被变异、还没还原**的那个文件。信号兜底要用它，所以放在模块级而不是闭包里。
+# 当前已被变异、还没还原的那个文件。信号兜底要用它，所以放在模块级而不是闭包里。
 _PENDING: tuple[Path, bytes] | None = None
 
 
@@ -1027,11 +1027,11 @@ def _restore_pending() -> None:
 
 
 def _install_signal_guard() -> None:
-    """被中断时也要还原 —— `finally` 挡不住 SIGTERM / Ctrl-C。
+    """被中断时也要还原，`finally` 挡不住 SIGTERM / Ctrl-C。
 
-    `finally` 只在异常/正常返回时执行；SIGTERM 的默认处理是**立刻终止进程**，不走 finally。
+    `finally` 只在异常/正常返回时执行；SIGTERM 的默认处理是立刻终止进程，不走 finally。
     2026-09-19 真踩到了：全量自证跑到第 17 条被超时杀掉，`run_engine.py` 的
-    `return 1 if failed else 0` 就留在了 `return 0` 的状态——下一次跑**任何**守卫，
+    `return 1 if failed else 0` 就留在了 `return 0` 的状态，下一次跑任何守卫，
     看到的都是一条假的基线失败（而且提示指向的方向完全不对）。
     """
 
@@ -1044,23 +1044,23 @@ def _install_signal_guard() -> None:
         try:
             _signal.signal(sig, handler)
         except (ValueError, OSError):
-            pass  # 非主线程等场景装不上 —— 尽力而为，不值得为此失败
+            pass  # 非主线程等场景装不上，尽力而为，不值得为此失败
 
 
 def _apply(path: Path, old: str, new: str) -> bytes:
     """按字节快照 → 文本变异，返回变异前的字节。
 
     走 `read_bytes` / `write_bytes`（二进制）而不是 `read_text` / `write_text`：
-    后者会把 `\\r\\n` 归一成 `\\n` 再写回，混合行尾的文件被写回后就变了样——既让
+    后者会把 `\\r\\n` 归一成 `\\n` 再写回，混合行尾的文件被写回后就变了样，既让
     "还原是否逐字节一致"误报，也真的动了没打算动的行。
 
-    要求锚点**恰好出现一次**（不是"出现过")：一处也找不到时脚本会"成功地什么都没测"，
+    要求锚点恰好出现一次（不是"出现过"）：一处也找不到时脚本会"成功地什么都没测"，
     出现多次时全量替换会顺手改到别处。两种都要当场报错。
 
-    第三种失败模式：**目标文件不存在**（注册表里的路径过期）。为什么也要当场报错而不是
+    第三种失败模式：目标文件不存在（注册表里的路径过期）。为什么也要当场报错而不是
     让 `read_bytes` 抛 `FileNotFoundError`：那个异常不会命中调用点的 `except AnchorError`，
     整轮直接崩，而崩掉的位置离真正的原因（某条变异的路径漏了一段，如 `[locale]`）很远。
-    更糟的是它在"没跑到那层"时完全不显形——注册表可以安静地烂很久。
+    更糟的是它在"没跑到那层"时完全不显形，注册表可以安静地烂很久。
     """
     if not path.is_file():
         raise AnchorError(f"变异目标不存在：{path}（路径过期后这条变异无法自证，它自称证明的那条守卫其实一次都没被验过）")
@@ -1077,8 +1077,8 @@ def _run_guard(key: str) -> tuple[int, str]:
     """跑守卫，返回 (退出码, stdout+stderr)。
 
     显式 `encoding="utf-8"`：不写的话按 locale 解码（Windows 上是 GBK），而守卫的输出
-    是 UTF-8 —— 碰到 GBK 里没有的字节会在读线程里抛 UnicodeDecodeError，`stdout` 直接
-    变成 `None`，于是**最该看的那段输出什么都不打印**。同一个坑在 `check_all.py` 踩过。
+    是 UTF-8，碰到 GBK 里没有的字节会在读线程里抛 UnicodeDecodeError，`stdout` 直接
+    变成 `None`，于是最该看的那段输出什么都不打印。同一个坑在 `check_all.py` 踩过。
 
     `PYTHONIOENCODING=utf-8` 确保子进程的 Python 也用 UTF-8 写 stdout/stderr，而不是
     Windows 默认的 GBK。否则子进程写 GBK、父进程用 UTF-8 读 = 满屏乱码。
@@ -1119,35 +1119,35 @@ def _missing_tools() -> dict[str, str]:
 
 
 def _failed_names(key: str, out: str) -> set[str]:
-    """从守卫输出里数出**红了的**那几条（不是"输出了哪些字"）。
+    """从守卫输出里数出红了的那几条（不是"输出了哪些字"）。
 
     两种格式：
     - `fail-lines`（test-issue-filer.mjs / check_hygiene.py）：`  FAIL  <名字>` 或 `  FAIL  <名字>  → <补充>`。
-      解析只能"凡 FAIL 行就取名字"——不能要求带箭头：`test-issue-filer.mjs` 在补充文本为空时
-      **不打印箭头**（`` `FAIL ${name}${extra ? ` → ${extra}` : ""}` ``），要求带箭头会漏掉那些检查，
+      解析只能"凡 FAIL 行就取名字"，不能要求带箭头：`test-issue-filer.mjs` 在补充文本为空时
+      不打印箭头（`` `FAIL ${name}${extra ? ` → ${extra}` : ""}` ``），要求带箭头会漏掉那些检查，
       而漏掉表现为"红的不是它"，比误报更难查。
       两个箭头都收（`→` 与 `->`）：仓库的 ASCII/GBK 约定让有的脚本用 `->`。
-      **Python 侧走 `_logging.print_check` 的那几层**（check_hygiene / check_engine_purity /
+      Python 侧走 `_logging.print_check` 的那几层（check_hygiene / check_engine_purity /
       check_pnpm_filter / guard_apm_parser_version）每行都以 `| ` 起头，形态是
-      `| Detail: FAIL <名字>  -> <补充>` 与汇总里的 `|   [FAIL ] <名字>` —— 正则一并认，
+      `| Detail: FAIL <名字>  -> <补充>` 与汇总里的 `|   [FAIL ] <名字>`，正则一并认，
       别把前缀支持删掉（2026-09-24 漏了它，四层 Python 守卫的自证集体失效了）。
-      **因此被解析的守卫有一条格式契约**：它的总结行不要写成 `FAIL <名字>`（第一版 check_hygiene
+      因此被解析的守卫有一条格式契约：它的总结行不要写成 `FAIL <名字>`（第一版 check_hygiene
       的 `FAIL 1 项卫生检查未过` 就被当成了检查名，六条变异全报"牵连 1 条"）。写成 `N 项未过` 这种。
-    - `prose`（check_engine_pyodide.py）：失败时打印一段人话再 `return 1`，没有统一前缀——
-      只能拿注册表里的文案去对，但**产物侧的文案只在失败时才打印**，所以这么对是准的。
+    - `prose`（check_engine_pyodide.py）：失败时打印一段人话再 `return 1`，没有统一前缀，
+      只能拿注册表里的文案去对，但产物侧的文案只在失败时才打印，所以这么对是准的。
     """
     kind = GUARDS[key][3]
     if kind == "fail-lines":
         names = set()
         # 三种行形态都要认（2026-09-24 修）：
-        #   `  FAIL  <名字>  -> <补充>`           -- JS 守卫（test-issue-filer.mjs）直接打印
-        #   `| Detail: FAIL <名字>  -> <补充>`    -- Python 守卫走 _logging.print_check
-        #   `|   [FAIL ] <名字>`                  -- _logging.print_summary 的汇总行
+        #   `  FAIL  <名字>  -> <补充>`           JS 守卫（test-issue-filer.mjs）直接打印
+        #   `| Detail: FAIL <名字>  -> <补充>`    Python 守卫走 _logging.print_check
+        #   `|   [FAIL ] <名字>`                  _logging.print_summary 的汇总行
         #
-        # 后两种此前**一条都数不出来**：`_logging.print_check` 的每行都以 `| ` 起头，
+        # 后两种此前一条都数不出来：`_logging.print_check` 的每行都以 `| ` 起头，
         # 而这里的正则要求 FAIL 紧贴行首（只认第一种形态）。后果不是报错，而是四层
         # Python 守卫（hygiene / engine / pnpm-filter / apm）的每条变异都报
-        # "red but wrong reason: red=['(unable to count)']" —— 自证集体失效却看着在跑。
+        # "red but wrong reason: red=['(unable to count)']"，自证集体失效却看着在跑。
         # `Result:  FAIL` 那一行刻意识别不到：它没有名字，算进来只会变成一条假牵连。
         for line in out.splitlines():
             m = _re.match(r"\s*(?:\|\s*)?(?:Detail:\s*)?(?:\[FAIL\s*\]|FAIL)\s+(.*?)(?:\s+(?:->|→)\s+.*)?$", line)
@@ -1160,8 +1160,8 @@ def _failed_names(key: str, out: str) -> set[str]:
 def _porcelain(paths: list[str]) -> dict[str, str]:
     """这些路径当前的 git 状态（`{路径: XY}`）。
 
-    用途是**证明自证没把仓库写脏**（技能里的"顺手看一眼"）。但判据不能是"这些文件脏不脏"——
-    仓库里经常挂着别人没提交的改动，那样天天误报。要比的是**跑前 vs 跑后有没有多出脏**：
+    用途是证明自证没把仓库写脏（技能里的"顺手看一眼"）。但判据不能是"这些文件脏不脏"，
+    仓库里经常挂着别人没提交的改动，那样天天误报。要比的是跑前 vs 跑后有没有多出脏，
     只有自证自己改出来的脏才算。
     """
     proc = subprocess.run(
@@ -1173,7 +1173,7 @@ def _porcelain(paths: list[str]) -> dict[str, str]:
         errors="replace",
     )
     if proc.returncode != 0:
-        return {}  # 没有 git（或不是仓库）—— 这项检查跳过，不影响别的断言
+        return {}  # 没有 git（或不是仓库），这项检查跳过，不影响别的断言
     state: dict[str, str] = {}
     for line in (proc.stdout or "").splitlines():
         code, _, rest = line.partition(" ")
@@ -1186,7 +1186,7 @@ def main(argv: list[str]) -> int:
     global _PENDING
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(line_buffering=True)
-    _install_signal_guard()  # 跑之前先装上：变异一旦落盘，中断也必须还原
+    _install_signal_guard()  # 跑之前先装上：变异一旦落盘，中断也要还原
 
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--list", action="store_true", help="print registry only")
@@ -1303,8 +1303,8 @@ def main(argv: list[str]) -> int:
         log.info("OK restored (byte-identical to snapshot)")
 
     # 自证不该在仓库里留下任何痕迹。逐字节还原只证明"变异过的那个文件"复原了；万一守卫
-    # 自己写了**别的**文件（生成器、缓存、产物），只有这一步看得见。
-    # 注意比的是"跑前 vs 跑后"，不是"脏不脏"——仓库里经常挂着别人没提交的改动。
+    # 自己写了别的文件（生成器、缓存、产物），只有这一步看得见。
+    # 注意比的是"跑前 vs 跑后"，不是"脏不脏"，仓库里经常挂着别人没提交的改动。
     for path, code in sorted(_porcelain(touched).items()):
         if dirty_before.get(path) != code:
             log.error(f"FAIL self-proof left changes in repo: {path}  {dirty_before.get(path, '  ')} -> {code}")

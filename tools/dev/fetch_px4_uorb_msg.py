@@ -108,7 +108,7 @@ def fetch_params(url: str, cache_key: str) -> dict:
 # ─────────────────────────── .msg 解析 ───────────────────────────
 
 _CONST_RE = re.compile(r"^\s*(?:uint8|int32|uint16|int8)\s+([A-Z][A-Z0-9_]*)\s*=\s*(-?\d+)\s*(?:#.*)?$")
-# 数组长度 PX4 写在**类型**上（float32[10] voltage_cell_v），少数写法写在字段名上，
+# 数组长度 PX4 写在类型上（float32[10] voltage_cell_v），少数写法写在字段名上，
 # 两种都要认；否则整行匹配不上、数组字段会被静默丢掉（曾因此丢了 voltage_cell_v /
 # control[12] / q[4]，meta 字典残缺，构建期字段校验根本没法做）。
 _FIELD_RE = re.compile(
@@ -245,7 +245,7 @@ def render_meta_json(tag: str, topics: dict[str, dict], params: dict | None) -> 
     """
 
     # 不用 json.dumps(sort_keys=True)：那会把枚举键按字符串排（0,1,10,11,…,2）。
-    # 这里显式构造顺序：topic 名字母序、字段名字母序、枚举值数值序 —— 输出确定且可读。
+    # 这里显式构造顺序：topic 名字母序、字段名字母序、枚举值数值序，输出确定且可读。
     def fix_fields(spec: dict) -> dict:
         fields = {}
         for fname in sorted(spec.get("fields", {})):

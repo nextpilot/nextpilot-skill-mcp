@@ -271,9 +271,9 @@ def main() -> int:
                     time.sleep(wait)
         else:
             # 站点滚动清理会让列表里已失效的文件返 404；同组还有别的日志就换一条顶上，
-            # 比整组放弃划算——同一测试的各条内容本就可互换。
+            # 比整组放弃划算，同一测试的各条内容本就可互换。
             key = group_key(f)
-            # 换组**必须有上限**：热门测试一组能有 248 条（FenceRelativeToTerrainMaxAlt），
+            # 换组要有上限：热门测试一组能有 248 条（FenceRelativeToTerrainMaxAlt），
             # 若整组都已失效，不设限会一路换到底、把跑批拖成十几分钟。
             used = subs.get(key, 0)
             alt = (

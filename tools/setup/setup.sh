@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# 一键装好本机开发环境（Python 走 uv，Node 走 pnpm）—— Windows 用同目录的 setup.ps1。
+# 一键装好本机开发环境（Python 走 uv，Node 走 pnpm），Windows 用同目录的 setup.ps1。
 #
-# 两份脚本做的事必须一致，所以它们只写"步骤"，不写"装什么"：装什么由
+# 两份脚本做的事要一致，所以它们只写"步骤"，不写"装什么"：装什么由
 # requirements-dev.txt / requirements-logs.txt 决定，改动只改那两份。
 # 末尾的自检是自闭环的：探测逻辑直接写在脚本里，不调用仓库其他脚本、不读清单文件。
 #
@@ -25,7 +25,7 @@ CHECK_ONLY=0
 PYTHON="3.11"
 INDEX_URL="https://pypi.org/simple"
 
-# usage 不能按行号切片（3,14p 那版把最后一行选项漏掉了——加一行选项就得记着改行号，
+# usage 不能按行号切片（3,14p 那版把最后一行选项漏掉了，加一行选项就得记着改行号，
 # 必漏）：从说明开头切到 set -euo 为止，按标记定位，加减行都不用回头改这里。
 usage() {
     sed -n '2,/^set -euo/p' "$0" | sed 's/^# \{0,1\}//' | sed '$d'
@@ -60,7 +60,7 @@ while [ $# -gt 0 ]; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# tools/setup -> tools -> 仓库根。.venv 必须在仓库根：pyrightconfig.json 写的是
+# tools/setup -> tools -> 仓库根。.venv 要放在仓库根：pyrightconfig.json 写的是
 # venvPath "." + venv ".venv"，换地方 knowledge/engine/ 的类型检查就会集体报 import 解析不了。
 ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 VENV="$ROOT/.venv"
@@ -77,7 +77,7 @@ run() {
 
 cd "$ROOT"
 
-# --check-only：跳过安装类步骤（1-5），直接进自检——日常"验证工具链"一条命令。
+# --check-only：跳过安装类步骤（1-5），直接进自检，日常"验证工具链"一条命令。
 # bash 的 if 块内不要求缩进，步骤块原样保留，只在前后加开关。
 if [ "$CHECK_ONLY" = "1" ]; then
     echo "--check-only：跳过安装步骤（uv / venv / 依赖 / Node / hook），直接自检"
@@ -149,13 +149,13 @@ if [ "$SKIP_HOOKS" = "1" ]; then
     echo "  --skip-hooks：跳过"
 else
     # 每台机器做一次，重复执行幂等。放进脚本的理由：漏了它 pre-commit / pre-push
-    # 永远不跑，而"没跑"和"跑了全绿"在 git 这边长得一模一样。
+    # 一直不跑，而"没跑"和"跑了全绿"在 git 这边长得一模一样。
     run git config core.hooksPath .githooks
     echo "  core.hooksPath = $(git config core.hooksPath)"
 
-    # 光指过去还不够：git 会**静默跳过**没有可执行位的钩子（只给一行 hint，
+    # 光指过去还不够：git 会静默跳过没有可执行位的钩子（只给一行 hint，
     # 不报错、不改退出码）。仓库里已把三个钩子按 100755 提交，但 zip 下载、
-    # 异常 umask、或某些 CI 的 checkout 会把它抹成 644 —— 那时的表现是
+    # 异常 umask、或某些 CI 的 checkout 会把它抹成 644，那时的表现是
     # hooksPath 配得对、钩子一个都不跑。所以这里显式补一次，成本一行。
     run chmod +x .githooks/pre-commit .githooks/pre-push .githooks/commit-msg
     echo "  钩子可执行位：$(ls -l .githooks/pre-commit | cut -c1-10)"
@@ -177,7 +177,7 @@ def body():
 sys.exit(m.ensure_venv_python(body))
 PY
     )
-    # 必须落成文件再跑，不能用 python -c：-c 模式下 sys.argv 只有 ['-c']，
+    # 要落成文件再跑，不能用 python -c：-c 模式下 sys.argv 只有 ['-c']，
     # 而切换解释器就是把整个 argv 交给 .venv 的 python 重跑一遍，代码本身不在
     # argv 里，切完就没了。
     probe_file="$ROOT/.workbuddy/tmp/hook_probe.py"
@@ -204,7 +204,7 @@ fi
 fi  # --check-only 跳过安装步骤（1-5）
 
 # ── 6. 自检（自闭环）─────────────────────────────────────────────────
-# 装什么就验什么：探测逻辑直接写在这里——不调 check_prereq.py / check_all.py，
+# 装什么就验什么：探测逻辑直接写在这里，不调 check_prereq.py / check_all.py，
 # 不读 checklist.yml，setup 不拖外部脚本。探的是"工具能不能跑起来"，不是全量
 # 校验：全量清单（ruff/prettier/tsc/pytest/守卫……）归 check_all.py，装完想验
 # 就手动跑，见末尾提示。

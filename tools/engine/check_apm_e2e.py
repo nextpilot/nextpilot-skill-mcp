@@ -1,9 +1,9 @@
-r"""ArduPilot 那条链路的端到端冒烟：**APM 规则真的进产物、真的在跑、真的读到参数**。
+r"""ArduPilot 那条链路的端到端冒烟：APM 规则真的进产物、真的在跑、真的读到参数。
 
 ## 为什么要有它
 
 2026-09 之前 `knowledge/ardupilot/` 那批规则是"写了但没人跑"：构建脚本与 loader 都硬编码
-`knowledge/px4/`，于是它们进不了产物；而"进不了产物"这件事**没有任何信号**——规则文件
+`knowledge/px4/`，于是它们进不了产物；而"进不了产物"这件事没有任何信号，规则文件
 看起来好好的、本地校验也是绿的，只是浏览器里永远不会执行。接线（按固件族扫描）修掉了
 路径，但路径是最容易被人改回去的东西：任何一处重新写死 `px4`，这批规则就又变成装饰品，
 而且照样没人报错。
@@ -12,16 +12,16 @@ r"""ArduPilot 那条链路的端到端冒烟：**APM 规则真的进产物、真
 APM 样本）把整条链路走一遍：认格式 → 取这一族的知识 → 读参数 → 跑规则 → 出结论。
 
 参数那一半同样是"没人看着就会退化"的：`param()` 依赖 provider 把 PARM 挂进 `PARAMS`，
-少一行 `dict(self._params)` 的表现是**规则静默不发射**（不是报错），与"这台飞机没开这项
+少一行 `dict(self._params)` 的表现是规则静默不发射（不是报错），与"这台飞机没开这项
 检查"完全无法区分。所以这里断言的是"该报的报了"，而不是"引擎没崩"。
 
 ## 判据
 
-1. 合成日志被认成 `ardupilot-bin`，且引擎装载的规则**来自 APM 那一套**（不是 PX4 的）
+1. 合成日志被认成 `ardupilot-bin`，且引擎装载的规则来自 APM 那一套（不是 PX4 的）
 2. `param()` 读得到参数、读不到时按 `default` 兜底（不抛异常）
 3. 参数类规则真的发射：ARMING_CHECK=0 / BATT_MONITOR=0 / FS_THR_ENABLE=0、
    以及"RNGFND1_TYPE>0 却没有测距仪消息"
-4. **反例**：GPS_TYPE>0 且日志里真有 GPS 消息 → 不许报（否则就是误报）
+4. 反例：GPS_TYPE>0 且日志里真有 GPS 消息 → 不许报（否则就是误报）
 5. 报告头的 `platform` 问的是 provider，不是写死的 "PX4"
 
 用法：python tools/engine/check_apm_e2e.py
@@ -48,14 +48,14 @@ import loader  # noqa: E402
 from apm_make_sample import build_sample_bytes  # noqa: E402
 
 APM_LOG_TYPE = "ardupilot-bin"
-# 夹具里故意设成 0（禁用）的参数 → 对应规则必须发射
+# 夹具里故意设成 0（禁用）的参数 → 对应规则要发射
 EXPECTED_FINDINGS = [
     ("apm-config-arming-check", "warning"),
     ("apm-config-batt-monitor", "info"),
     ("apm-config-fs-thr", "info"),
     ("apm-sensor-rangefinder", "warning"),
 ]
-# 反例：GPS_TYPE=1 且日志里有 GPS 消息 —— 报了就是误报
+# 反例：GPS_TYPE=1 且日志里有 GPS 消息，报了就是误报
 MUST_NOT_FIRE = "apm-sensor-gps"
 
 

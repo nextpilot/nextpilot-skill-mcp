@@ -5,48 +5,48 @@
   python tools/dev/workbench.py <log.ulg> <rule_id|规则文件名>
   python tools/dev/workbench.py .cache/px4/logs/sample.ulg px4-vibration --open
 
-网页模式：**一个都不给**时起一个只听 127.0.0.1 的临时服务并打开浏览器（`--port` 指定端口，
+网页模式：一个都不给时起一个只听 127.0.0.1 的临时服务并打开浏览器（`--port` 指定端口，
 `--no-browser` 不自动弹窗，Ctrl+C 结束）。为什么用下拉框而不是 `<input type=file>`：
-浏览器出于安全**不会把选中文件的真实路径给页面**（只给文件名），而本脚本要的是磁盘路径。
+浏览器出于安全不会把选中文件的真实路径给页面（只给文件名），而本脚本要的是磁盘路径。
 要用仓库外的日志，填页面上那个绝对路径框。
 
-为什么另起一份、而不是扩 `check_rules_compute.py`：那边是**表达式级**调试（把 compute 拆成子表达式
-逐个求值，回答「这一层为什么算不出来」），输出是纯文本；这边回答的是另一组问题——
+为什么另起一份、而不是扩 `check_rules_compute.py`：那边做表达式级调试（把 compute 拆成子表达式
+逐个求值，回答「这一层为什么算不出来」），输出是纯文本；这边回答的是另一组问题，
 「这条规则在这份日志上到底触发了吗」「触发的时候数据长什么样」「缺的是哪个 topic / 哪个
 字段」。两边共用 `probe_rule.probe_expr`（见下面 import），不重复实现同一件事。
 
-图从哪来：**优先复用浏览器那张图**。`knowledge/px4/plot/*.yml` 编译进
+图从哪来：优先复用浏览器那张图。`knowledge/px4/plot/*.yml` 编译进
 `web/lib/knowledge/plots.generated.ts`（`PLOT_PRESETS`），里面已经写好了画哪几条线、
 阈值线画在哪。本脚本按 `rule.group` 找同名预设，找不到就按 topics 交集退而求其次，
-再找不到就用规则 `compute` 里的 `ref(...)` 自己拼一张；取数走引擎的 `np_series()`——
-**与浏览器同一条取数路径**，所以图上看到的点和线上报告里的是同一批。
+再找不到就用规则 `compute` 里的 `ref(...)` 自己拼一张；取数走引擎的 `np_series()`，
+与浏览器同一条取数路径，所以图上看到的点和线上报告里的是同一批。
 
 为什么图是手写 SVG：本机没有 matplotlib / PIL，为一个画图库去动 anaconda 基础环境不值
 （见用户级记忆：装工具包一律走 venv）。HTML + 内联 SVG 零第三方依赖、浏览器直接打开，
-还能把「规则算出什么值 vs 阈值」和曲线放在同一屏里——判读一条规则时真正要看的就是这个。
+还能把「规则算出什么值 vs 阈值」和曲线放在同一屏里，判读一条规则时主要看的就是这个。
 
-网页模式是**三个工具**，首页各一个入口：
+网页模式是三个工具，首页各一个入口：
 
-  ① `/ulog` —— 看日志：列出一份 .ulg 里有哪些 topic（含实例数与采样数），点开一个 topic
+  ① `/ulog`：看日志，列出一份 .ulg 里有哪些 topic（含实例数与采样数），点开一个 topic
      看它有哪些字段，勾上字段就看取值摘要（最小/最大/均值/首尾）与曲线。
-  ② `/rule` —— 日志 + 规则：左栏选一份 `knowledge/px4/rules/*.yaml` 并改，右栏出这个文件
+  ② `/rule`：日志 + 规则，左栏选一份 `knowledge/px4/rules/*.yaml` 并改，右栏出这个文件
      里装的规则在这份日志上的执行效果。
-  ③ `/plot` —— 日志 + 图：左栏选一份 `knowledge/px4/plot/*.yml` 并改，右栏出这张图画出来
+  ③ `/plot`：日志 + 图，左栏选一份 `knowledge/px4/plot/*.yml` 并改，右栏出这张图画出来
      什么样。
 
 ②③ 的共同约定：改 YAML → 保存 → 写回源文件 → 跑一次全量构建 → 出效果。
-为什么按**文件**编、而不是按规则 id 拆开编：按 id 编辑要「解析 → 改一条 → 反序化回
+为什么按文件编、而不是按规则 id 拆开编：按 id 编辑要「解析 → 改一条 → 反序化回
 YAML」，那会冲掉注释与 `>-` 折叠写法；而一个文件本来就可以装多条规则（`failsafe.yaml`
-有 6 条），所以保存后是**把这个文件里的规则全跑一遍**，改一条顺手改崩隔壁能立刻看见。
-编译不过时右栏给出精确到「第几项 / 第几列」的报错，并**自动还原源文件**（备份在
-`.cache/px4/kb-backup/`）——`knowledge/` 里不会留下一个让 `pnpm build:kb` 红掉的文件。
+有 6 条），所以保存后是把这个文件里的规则全跑一遍，改一条顺手改崩隔壁能立刻看见。
+编译不过时右栏给出精确到「第几项 / 第几列」的报错，并自动还原源文件（备份在
+`.cache/px4/kb-backup/`），`knowledge/` 里不会留下一个让 `pnpm build:kb` 红掉的文件。
 
-保存是**局部刷新**：前端只把右栏那一段换掉，编辑框的滚动位置与光标不动——左右分栏的意义
+保存是局部刷新：前端只把右栏那一段换掉，编辑框的滚动位置与光标不动，左右分栏的意义
 就是边改边看，每次保存都把编辑框弹回顶部就白做了。服务端按请求头 `X-Partial` 决定回 JSON
 （只有右栏那段）还是整页，没有 JS 的浏览器走整页也能用。
 
-⚠️ 规则读的是**构建产物**：`compute` 由构建期的编译器（`web/scripts/lib/rule-expr.mjs`）
-编译成表达式，Python 侧不重复实现。所以改完 `knowledge/px4/rules/*.yaml` 必须先
+规则读的是构建产物：`compute` 由构建期的编译器（`web/scripts/lib/rule-expr.mjs`）
+编译成表达式，Python 侧不重复实现。所以改完 `knowledge/px4/rules/*.yaml` 要先
 `pnpm web:build:kb`，本脚本才会看到新规则；产物比源旧时它会直接报错并退出 2。
 
 退出码（以后要接 CI，别改成「只打印不计数」）：
@@ -96,7 +96,7 @@ REPORT_DIR = REPO_ROOT / ".cache" / "px4" / "rule-reports"
 LOG_DIR = REPO_ROOT / ".cache" / "px4" / "logs"
 ARTIFACT_TS = REPO_ROOT / "web" / "workers" / "analysis-engine.generated.ts"
 PLOT_DIR = REPO_ROOT / "knowledge" / "px4" / "plot"
-# 编辑时**保存前**的原文落在这里：编译不过要能还原，不能把坏文件留在 knowledge/ 里。
+# 编辑时保存前的原文落在这里：编译不过要能还原，不能把坏文件留在 knowledge/ 里。
 # rules 与 plot 共用一个备份目录：分开的话「改坏了要去哪个目录找」就多了一个要记的地方。
 KB_BACKUP_DIR = REPO_ROOT / ".cache" / "px4" / "kb-backup"
 NODE_BIN = shutil.which("node") or "node"
@@ -117,7 +117,7 @@ REF_RE = re.compile(r'ref\(\s*"([^"]+)"')
 # `vehicle_imu_status[:].accel_vibration_metric` / `...[0].field` → (topic, field)
 FIELD_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*\.\s*([A-Za-z0-9_]+)\s*$")
 # 区间引用：`topic[:].field` / `topic[a:b].field`（`[0]` 是单实例，不算）。
-# 线上会把它们按实例展开成多条，这个预览不展开（见 spread_notes）——识别出来才能提醒。
+# 线上会把它们按实例展开成多条，这个预览不展开（见 spread_notes），识别出来才能提醒。
 RANGE_REF_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\[\s*(-?\d*)\s*:\s*(-?\d*)\s*\]\s*\.\s*(.+?)\s*$")
 
 
@@ -174,7 +174,7 @@ def pick_preset(rule: dict, presets: list[dict]) -> tuple[dict | None, str]:
 def fallback_axes(rule: dict) -> dict:
     """没有可用预设时的兜底图：把规则 compute 里引用到的字段画出来，阈值当水平线。
 
-    阈值线取自 triggers——这正是判读时要比的东西：曲线在阈值线上方多少。
+    阈值线取自 triggers，判读时要比的就是这个：曲线在阈值线上方多少。
     """
     fields = []
     for expr in rule.get("compute") or []:
@@ -220,7 +220,7 @@ def manifest_fields(ns: dict) -> dict[str, set[str]]:
 
 
 def check_prereq(rule: dict, have: dict[str, set[str]]) -> list[str]:
-    """规则声明要的东西 vs 日志里实际有的东西。返回**人话**的报错（说清缺什么）。"""
+    """规则声明要的东西 vs 日志里实际有的东西。返回人话的报错（说清缺什么）。"""
     problems: list[str] = []
     for group in rule.get("topics") or []:
         names = [str(t) for t in group] if isinstance(group, list) else [str(group)]
@@ -241,7 +241,7 @@ def check_prereq(rule: dict, have: dict[str, set[str]]) -> list[str]:
             topic, field = m.group(1), m.group(2)
             if topic not in have:
                 continue  # topic 缺失已在上面报过，不重复
-            # 四元数这类字段在日志里是展开的（`q_d[0]`..`q_d[3]`），而规则里写 `q_d`——
+            # 四元数这类字段在日志里是展开的（`q_d[0]`..`q_d[3]`），而规则里写 `q_d`，
             # 不认这个就会把好规则报成"字段取不到"（第一版在 attitude-overshoot 上误报过）。
             present = field in have[topic] or any(f.startswith(field + "[") for f in have[topic])
             if not present:
@@ -424,7 +424,7 @@ def _esc(text) -> str:
 def instance_count(ns: dict, topic: str) -> int:
     """这个 topic 在日志里有几个实例。
 
-    **只看 manifest 里有没有这一行**：`n` 是"这一路采了多少个点"，不是"有几个实例"——
+    只看 manifest 里有没有这一行：`n` 是"这一路采了多少个点"，不是"有几个实例"，
     按 `n > 1` 筛会把只采到一个点的实例静默丢掉（前端 `topicInstances` 就栽过这一条）。
     """
     man = call(ns, "np_manifest()") or {}
@@ -432,11 +432,11 @@ def instance_count(ns: dict, topic: str) -> int:
 
 
 def spread_notes(ns: dict, yspec) -> list[str]:
-    """区间引用在这个预览里**只画实例 0**，线上却会按实例展开成多条 —— 两边不是一回事。
+    """区间引用在这个预览里只画实例 0，线上却会按实例展开成多条，两边不是一回事。
 
     引擎 `_pick_ref` 收到 `instance=` 会盖掉引用里的区间，所以这条路径既不报错也不展开：
     `sensor_accel[:].x` 在这里画出的是实例 0 一条（实测 28174ed8 确认），而线上是 3 条。
-    静默少画又不说，等于让作者照着一张不准的图调预设，所以必须点破。
+    静默少画又不说，等于让作者照着一张不准的图调预设，所以这里要点破。
     """
     out = []
     for spec in yspec or []:
@@ -461,7 +461,7 @@ def spread_notes(ns: dict, yspec) -> list[str]:
 def fetch_child(ns: dict, child: dict, compute=None) -> dict:
     """按一个 child 的声明取数。返回 {xs, lines:[{label, ys}], error, notes}。
 
-    `compute` 必须跟着传：很多图的 ydata 是 `{"kind":"var"}`（四元数转欧拉角这类换算节点的
+    `compute` 得跟着传：很多图的 ydata 是 `{"kind":"var"}`（四元数转欧拉角这类换算节点的
     输出），不把预设的换算节点一起交给 np_series，变量算不出来 → 整张图静默变空
     （roll-angle 就是这种，第一版漏了它，报告里只剩一句"数据都没有"）。
     """
@@ -476,7 +476,7 @@ def fetch_child(ns: dict, child: dict, compute=None) -> dict:
         req["xdata"] = child["xdata"]
     try:
         got = call(ns, "np_series(%s, %d)" % (json.dumps(json.dumps(req, ensure_ascii=False)), MAX_POINTS))
-    except Exception as exc:  # noqa: BLE001 —— 取数失败要变成图上的一句话，而不是让脚本崩掉
+    except Exception as exc:  # noqa: BLE001 取数失败要变成图上的一句话，而不是让脚本崩掉
         return {"xs": [], "lines": [], "error": "%s: %s" % (type(exc).__name__, exc), "notes": notes}
     if got.get("error"):
         return {"xs": [], "lines": [], "error": got["error"], "notes": notes}
@@ -492,9 +492,9 @@ def fetch_child(ns: dict, child: dict, compute=None) -> dict:
                 "label": label,
                 "ys": ys or [],
                 "xs": xs,
-                # 取没取到必须单独记：`ys` 为空有可能是"这条没取到"、也有可能是"取到了但
-                # 一个点都没有"，前者要报警。np_series 对单条取不到**不给 error**，只把
-                # series[i] 置 null——不记下来就是静默丢线
+                # 取没取到要单独记：`ys` 为空有可能是"这条没取到"、也有可能是"取到了但
+                # 一个点都没有"，前者要报警。np_series 对单条取不到不给 error，只把
+                # series[i] 置 null，不记下来就是静默丢线
                 "got": ys is not None,
                 "stats": series_stats(ys) if ys is not None else None,
             }
@@ -622,11 +622,11 @@ def result_card(
     title_tag: str = "h1",
     collapse_transcript: bool = False,
 ) -> str:
-    """一条规则的体检结果 —— 只出片段，不含 `<html>` 外壳。
+    """一条规则的体检结果，只出片段，不含 `<html>` 外壳。
 
-    为什么把外壳拆开：规则编辑页要在**同一页里并排放多条规则**的结果（`failsafe.yaml`
+    为什么把外壳拆开：规则编辑页要在同一页里并排放多条规则的结果（`failsafe.yaml`
     一个文件装 6 条，一次保存 6 条都得看得见），而单条体检页是整页只有一条。
-    外壳归外壳、正文归正文，两个页面共用同一份正文 —— 否则「编辑页里看到的结论」与
+    外壳归外壳、正文归正文，两个页面共用同一份正文，否则「编辑页里看到的结论」与
     「单独体检看到的结论」就是两份可以各自漂移的实现。
     `title_tag` 让编辑页用 `h2`（它是页面的一部分，不是页面标题）；
     `collapse_transcript` 让编辑页把过程日志折起来（6 条规则各来一份，全展开就没人看了）。
@@ -747,7 +747,7 @@ def find_rule(ns: dict, wanted: str) -> tuple[dict | None, str]:
             return r, ""
     near = difflib.get_close_matches(wanted, [r["id"] for r in rules], n=5, cutoff=0.4)
     hint = "；相近的规则 id：%s" % "、".join(near) if near else ""
-    # 源里有、产物里没有 —— 最常见的成因就是忘了 build:kb
+    # 源里有、产物里没有，最常见的成因就是忘了 build:kb
     src = RULES_DIR / (stem + ".yaml")
     if not src.exists():
         src = RULES_DIR / (stem + ".yml")
@@ -760,9 +760,9 @@ def find_rule(ns: dict, wanted: str) -> tuple[dict | None, str]:
 def _muted(logger):
     """把 logger 的输出暂时接走（网页模式的输出目标是 HTTP 响应，不是终端）。
 
-    不能只靠 `contextlib.redirect_stdout`：logging 的 `StreamHandler` 在**创建时**就把
+    不能只靠 `contextlib.redirect_stdout`：logging 的 `StreamHandler` 在创建时就把
     `sys.stdout` 那个对象存进了 `self.stream`，之后再换 `sys.stdout` 对它无效。要换的是
-    handler 自己的 stream —— `probe_rule` 里的 `log` 与本模块是同一个 logger 实例
+    handler 自己的 stream，`probe_rule` 里的 `log` 与本模块是同一个 logger 实例
     （`get_logger()` 不带名字 → 都是 `logging.getLogger("ci")`），所以换一次两边都静音。
     """
     sink = io.StringIO()
@@ -778,7 +778,7 @@ def _muted(logger):
 
 
 def _probe_body(ns: dict, rule: dict) -> dict:
-    """跑一条规则的**实现体**：前置检查 → compute → triggers → 取数画图。结果一律打进 log。"""
+    """跑一条规则的实现体：前置检查 → compute → triggers → 取数画图。结果一律打进 log。"""
     have = manifest_fields(ns)
     problems = check_prereq(rule, have)
     for p in problems:
@@ -788,7 +788,7 @@ def _probe_body(ns: dict, rule: dict) -> dict:
     declared: list[str] = []
     compute_ok = True
     # 下面几行是 probe_rule 的逐子表达式求值：子表达式被单独 eval，`_try(...)` 这类由求值器
-    # 注入的名字会报 NameError——那是**求值方式的产物**，不是规则的错；看 `->` 那一行才准。
+    # 注入的名字会报 NameError，那是求值方式的产物，不是规则的错；看 `->` 那一行才准。
     log.info("  （子表达式逐层求值；其中的 NameError 是单独 eval 的产物，以 `->` 那一行为准）")
     for i, expr in enumerate(rule.get("compute") or [], 1):
         log.info("\n  compute [%d] %s" % (i, expr))
@@ -817,7 +817,7 @@ def _probe_body(ns: dict, rule: dict) -> dict:
             try:
                 hit = bool(ns["_eval_expr"](t["when"], env))
             except Exception as exc:  # noqa: BLE001
-                # 引擎在这里是静默的（trigger 出错视为未命中），体检工具必须把它喊出来
+                # 引擎在这里是静默的（trigger 出错视为未命中），体检工具要把它喊出来
                 hit = False
                 row["exc"] = "%s: %s" % (type(exc).__name__, exc)
                 log.warning("  trigger %s -> 表达式抛异常：%s（引擎会静默当成未命中）" % (t["when"], row["exc"]))
@@ -835,7 +835,7 @@ def _probe_body(ns: dict, rule: dict) -> dict:
         worst = next((t for t in trigger_rows if t["hit"] and t.get("severity") == "critical"), None)
         verdict, level = ("触发 %d 条" % hits, "critical" if worst else "warning")
     elif exc_n:
-        # 值缺失（None 与数值比较）在引擎里是"静默未命中"，体检必须把话说出来，
+        # 值缺失（None 与数值比较）在引擎里是"静默未命中"，体检要把话说出来，
         # 否则"没报警"会被当成"数据没问题"
         verdict, level = "未触发（%d 条 trigger 因值缺失抛异常，引擎视为未命中）" % exc_n, "info"
     else:
@@ -864,7 +864,7 @@ def _probe_body(ns: dict, rule: dict) -> dict:
         for child in axes["children"]:
             res = fetch_child(ns, child, preset_compute)
             if res["error"]:
-                # 引擎那句"这张图的数据都没有"是按**一次请求**说的，而请求是逐 child 发的——
+                # 引擎那句"这张图的数据都没有"是按一次请求说的，而请求是逐 child 发的，
                 # 不点名是哪条线，就会让人以为整张图都废了
                 who = "、".join(child.get("labels") or []) or "未命名线"
                 notes.append("%s：%s" % (who, res["error"]))
@@ -888,9 +888,9 @@ def _probe_body(ns: dict, rule: dict) -> dict:
 
 
 def run_probe(ns: dict, rule: dict, *, quiet: bool = False) -> dict:
-    """在一**已加载**的 namespace 上跑一条规则，结果装进一个 dict。
+    """在一份已加载的 namespace 上跑一条规则，结果装进一个 dict。
 
-    抽成函数是为了让 CLI 与网页模式跑**同一份**逻辑（改一处两边都变，不会跑偏）。
+    抽成函数是为了让 CLI 与网页模式跑同一份逻辑（改一处两边都变，不会跑偏）。
     `quiet=True` 时过程日志不进终端，而是原样收进返回值的 `transcript`（网页模式显示它）；
     `quiet=False` 时照旧打到终端，`transcript` 是空串。
     """
@@ -972,7 +972,7 @@ def main(argv: list[str]) -> int:
     log.info("\n  结论：%s" % out["verdict"])
     log.info("  报告：%s" % out_path)
     if args.open and os.name == "nt":
-        os.startfile(str(out_path))  # noqa: S606 —— 仅 --open 时由用户显式触发
+        os.startfile(str(out_path))  # noqa: S606 仅 --open 时由用户显式触发
 
     if out["problems"] or out["compute_failed"]:
         log.error("\n=== 这条规则在这份日志上跑不通（退出 3）===")
@@ -985,7 +985,7 @@ def main(argv: list[str]) -> int:
 
 
 def discover_logs() -> list[Path]:
-    """首页列出的候选日志（大的在前——真实日志比 sample 更能说明问题）。"""
+    """首页列出的候选日志（大的在前，真实日志比 sample 更能说明问题）。"""
     if not LOG_DIR.is_dir():
         return []
     return sorted(LOG_DIR.glob("*.ulg"), key=lambda p: p.stat().st_size, reverse=True)
@@ -994,13 +994,13 @@ def discover_logs() -> list[Path]:
 def built_rules() -> tuple[list[dict], str]:
     """首页要列规则，可那时还没选日志、也就没有 namespace（规则表挂在 namespace 上）。
 
-    直接复用 `loader.load_rules`：产物里那份规则表**只该有一处实现**，
+    直接复用 `loader.load_rules`：产物里那份规则表只该有一处实现，
     在这里再写一遍正则就是给自己埋一个「两处漂移」的坑（这个仓库已经在别的地
     方为这种事付过账单）。返回 (规则列表, 读不到时的原因)。
     """
     try:
         return load_rules(), ""
-    except Exception as exc:  # noqa: BLE001 —— 产物缺失/陈旧要在页面上说，不是崩掉
+    except Exception as exc:  # noqa: BLE001 产物缺失/陈旧要在页面上说，不是崩掉
         return [], str(exc)
 
 
@@ -1011,7 +1011,7 @@ def plot_source_path(preset_id: str) -> Path | None:
 
 
 def rule_source_files() -> list[Path]:
-    """`knowledge/px4/rules/` 下的规则源文件。只收 `.yaml`——编译器也是这个口径
+    """`knowledge/px4/rules/` 下的规则源文件。只收 `.yaml`，编译器也是这个口径
     （`build-knowledge.mjs` 的 `loadRules` 里 `f.endsWith(".yaml")`），收 `.yml` 会列
     出一批编译器根本不读的文件，点进去改完毫无反应。"""
     if not RULES_DIR.is_dir():
@@ -1020,7 +1020,7 @@ def rule_source_files() -> list[Path]:
 
 
 def rule_source_path(name: str) -> Path | None:
-    """规则编辑页的源文件（只认 `knowledge/px4/rules/` 下的**文件名**）。
+    """规则编辑页的源文件（只认 `knowledge/px4/rules/` 下的文件名）。
 
     为什么只取 basename：`name` 直接来自 URL 查询串，不夹一层就拼进路径等于给网页
     开一个任意读文件的口子（`?file=../../web/.env`）。只留文件名，`../` 无处可去。
@@ -1032,14 +1032,14 @@ def rule_source_path(name: str) -> Path | None:
 def rule_ids_in(path: Path) -> list[str]:
     """一个规则文件里装了哪几条规则（按 YAML 里出现的顺序）。
 
-    产物里的规则**不带源文件名**（`loadRules` 内部那个 `sources` 只喂给了规则清单页
+    产物里的规则不带源文件名（`loadRules` 内部那个 `sources` 只喂给了规则清单页
     `rule-catalogue.mdx`，没进 `analysis-engine.generated.ts`），所以「这个文件对应哪几条
     规则」只能回源里读。一个文件可以装多条：顶层写成数组就是多条（`failsafe.yaml`
     有 6 条），写成对象就是一条。
     """
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001 —— 正在编辑的文件可能语法是坏的，那时候不展示结果就是了
+    except Exception:  # noqa: BLE001 正在编辑的文件可能语法是坏的，那时候不展示结果就是了
         return []
     items = data if isinstance(data, list) else [data]
     return [str(it["id"]) for it in items if isinstance(it, dict) and it.get("id")]
@@ -1049,7 +1049,7 @@ def compile_knowledge() -> tuple[bool, str]:
     """编译整个 `knowledge/`（规则 + 绘图预设 + facts）：直接跑构建脚本，不做第二份实现。
 
     为什么不在 Python 里重写编译：编译器只有构建期那一份（`web/scripts/build-knowledge.mjs`
-    的 `loadPresets` / `loadRules`），重实现一遍就是「同一件事两个真相」，必然漂移——这个
+    的 `loadPresets` / `loadRules`），重实现一遍就是「同一件事两个真相」，必然漂移，这个
     项目已经为这种事付过账单（facts.yaml 本地装配 vs 产物）。实测全量构建约 1 秒，够快，
     所以改一个规则文件也把 plot 一起重编，不值得为此做增量。
     返回 (是否通过, 失败原因)。
@@ -1064,7 +1064,7 @@ def compile_knowledge() -> tuple[bool, str]:
             errors="replace",
             timeout=180,
         )
-    except Exception as exc:  # noqa: BLE001 —— 跑不动也要变成页面上的一句话
+    except Exception as exc:  # noqa: BLE001 跑不动也要变成页面上的一句话
         return False, "跑不动构建脚本（%s: %s）" % (type(exc).__name__, exc)
     if proc.returncode == 0:
         return True, ""
@@ -1079,9 +1079,9 @@ def compile_knowledge() -> tuple[bool, str]:
 
 
 def save_knowledge_file(path: Path, text: str) -> Path:
-    """把编辑框的内容写回 `knowledge/` 下的源文件，返回**原文备份**的路径。
+    """把编辑框的内容写回 `knowledge/` 下的源文件，返回原文备份的路径。
 
-    为什么必须先备份：写完立刻就要编译，而编译失败时源文件已经是坏的——
+    为什么要先备份：写完立刻就要编译，而编译失败时源文件已经是坏的，
     `knowledge/` 是这个项目的本体，不能留一个让 `pnpm build:kb` 红掉的文件在里面。
     调用方拿到备份路径，在编译失败时还原（编辑框里的内容由页面自己回填，不丢）。
 
@@ -1103,13 +1103,13 @@ def restore_knowledge_file(backup: Path, path: Path) -> None:
         path.write_bytes(backup.read_bytes())
 
 
-# 逐条诊断 compute 要用引擎内部这三个名字。它们是**内部**实现，引擎重构改了名就会失效，
+# 逐条诊断 compute 要用引擎内部这三个名字。它们是内部实现，引擎重构改了名就会失效，
 # 所以调用前先确认还在（见 `diagnose_compute`），不在就整段降级而不是让页面 500。
 ENGINE_INTERNALS = ("_eval_compute", "_rule_env", "_pick_ref")
 
-# 一句 exec 进引擎 namespace 的代码：只求值**一条** compute，回报它赋值给的那些变量。
+# 一句 exec 进引擎 namespace 的代码：只求值一条 compute，回报它赋值给的那些变量。
 # 为什么要逐条、而不是整块一起算：整块里任何一条炸了，np_series 只给一句笼统的
-# "换算节点算不出来"，说不出是第几条；更糟的是引用了不存在的 topic 时它**不报错**、
+# "换算节点算不出来"，说不出是第几条；更糟的是引用了不存在的 topic 时它不报错、
 # 静默产出 None（实测 `foo = nonexistent_topic.x` → ok=True、foo=None），图变空而页面
 # 一句解释都没有。逐条求值才能把这两类都点名。
 _EVAL_ONE_STMT = """
@@ -1145,7 +1145,7 @@ def compute_targets(stmt: str) -> list[str]:
     """一条 compute 赋值给哪些变量（`roll, pitch, yaw = ...` → [roll, pitch, yaw]）。
 
     为什么看赋值左边、而不是比 eval 前后 env 的差集：env 里本来就装了一堆预置变量
-    （FW_MINOR、DURATION_S…），算差集得先空跑一次；而左边**就是**这条要产出的东西。
+    （FW_MINOR、DURATION_S…），算差集得先空跑一次；而左边就是这条要产出的东西。
     """
     try:
         tree = ast.parse(str(stmt).strip())
@@ -1164,15 +1164,15 @@ def compute_targets(stmt: str) -> list[str]:
 
 
 def diagnose_conditions(ns: dict, preset: dict) -> list[dict]:
-    """`conditions.topics` 是**候选组**（组内或、组间且）：每组报它命中的 topic 与采样数。
+    """`conditions.topics` 是候选组（组内或、组间且）：每组报它命中的 topic 与采样数。
 
-    ⚠️ 这里只报 **topic 在不在**，不报字段在不在——实测 `sensor_gps` 这个 topic 在、
+    这里只报 topic 在不在，不报字段在不在。实测 `sensor_gps` 这个 topic 在、
     但它底下的 `alt` 字段并不在，候选组是字段级的。字段那层由「取数」那段报，
     两边各说各的，别在这里下"这条线取得到"的结论。
     """
     try:
         man = call(ns, "np_manifest()")
-    except Exception as exc:  # noqa: BLE001 —— 诊断失败只让这一段缺席，不该带崩整页
+    except Exception as exc:  # noqa: BLE001 诊断失败只让这一段缺席，不该带崩整页
         return [{"group": [], "hits": [], "ok": False, "error": "%s: %s" % (type(exc).__name__, exc)}]
     have: dict[str, int] = {}
     for t in man.get("topics") or []:
@@ -1189,7 +1189,7 @@ def diagnose_conditions(ns: dict, preset: dict) -> list[dict]:
 def diagnose_compute(ns: dict, preset: dict) -> tuple[bool, list[dict]]:
     """逐条跑预设的 compute。返回 (引擎内部接口还在吗, 每行的结果)。
 
-    `available=False` 时 rows 为空——那是**降级**信号，页面据此说"逐条诊断不可用"，
+    `available=False` 时 rows 为空，那是降级信号，页面据此说"逐条诊断不可用"，
     而不是把"全都正常"当成诊断结论（这两者看起来一样，差别是致命的）。
     """
     stmts = preset.get("compute") or []
@@ -1219,7 +1219,7 @@ def diagnose_compute(ns: dict, preset: dict) -> tuple[bool, list[dict]]:
 
 
 def run_preset(ns: dict, preset: dict) -> dict:
-    """把一个绘图预设画出来。与规则体检共用 `fetch_child` / `svg_chart`——
+    """把一个绘图预设画出来。与规则体检共用 `fetch_child` / `svg_chart`，
     怎么取数、怎么画只有一处实现，所以两边看到的点必然是同一批。
 
     除了图，还回一份 `diag`（逐语句的运行结果）：最终那张图只回答"画出来没有"，
@@ -1295,7 +1295,7 @@ def group_topics(manifest: list[dict]) -> list[dict]:
     """把同一 topic 的多个实例并成一行。
 
     `np_manifest()` 里 `vehicle_imu_status` 会出现 4 次（instance 0..3），直接铺开就是 4 行
-    同名条目；清单要的是「这个 topic 有几个实例、各采了多少点」。字段取**实例 0** 的——
+    同名条目；清单要的是「这个 topic 有几个实例、各采了多少点」。字段取实例 0 的，
     同一 topic 各实例的字段是一样的，列四遍没有意义。
     """
     by_name: dict[str, dict] = {}
@@ -1313,7 +1313,7 @@ def group_topics(manifest: list[dict]) -> list[dict]:
 
 
 def series_stats(ys) -> dict:
-    """一段序列的摘要。NaN/inf 单独计数——它们在日志里是真的会出现的（除零、未初始化），
+    """一段序列的摘要。NaN/inf 单独计数，它们在日志里是真的会出现的（除零、未初始化），
     混进 min/max 会让人以为传感器真的测到了那个值。"""
     vals = [v for v in (ys or []) if isinstance(v, (int, float)) and math.isfinite(v)]
     if not vals:
@@ -1331,7 +1331,7 @@ def series_stats(ys) -> dict:
 
 def split_pick(p: str) -> tuple[str, str]:
     """拆 `topic|field`。用 `|` 分隔而不是 `.`：字段名本身可以带点（嵌套字段），
-    topic 名里不会有 `|`——按第一个点切会把 `a.b` 这种字段切坏。"""
+    topic 名里不会有 `|`，按第一个点切会把 `a.b` 这种字段切坏。"""
     t, _, f = str(p).partition("|")
     return t, f
 
@@ -1339,8 +1339,8 @@ def split_pick(p: str) -> tuple[str, str]:
 def group_picks(picked: list[str]) -> dict[str, list[str]]:
     """勾上的字段按 topic 分组（保持勾选顺序，去重）。
 
-    **为什么要分组**：实测把不同 topic 的字段塞进同一次 `np_series`，横轴只回第一个
-    topic 的，其余 topic 的序列返回空数组且 `error` 是空——勾三个字段只画出一条线，
+    为什么要分组：实测把不同 topic 的字段塞进同一次 `np_series`，横轴只回第一个
+    topic 的，其余 topic 的序列返回空数组且 `error` 是空，勾三个字段只画出一条线，
     页面一句话都不说。分组是这个引擎当前能力的诚实用法，不是偷懒。
     """
     out: dict[str, list[str]] = {}
@@ -1358,8 +1358,8 @@ def _kv_rows(pairs: list[tuple[str, str]]) -> str:
 def _log_info_block(title: str, body: str, panel: str, active: bool) -> str:
     """元信息的一块，渲染成一个 tab 页。
 
-    为什么从折叠块改成 tab：折叠块得挨个点开才能看到里面是什么，而且**展不开的那块是
-    全空的**——一列折叠条既不告诉你内容，也占满右栏高度。tab 只显示当前这一块，
+    为什么从折叠块改成 tab：折叠块得挨个点开才能看到里面是什么，而且展不开的那块是
+    全空的，一列折叠条既不告诉你内容，也占满右栏高度。tab 只显示当前这一块，
     切换是纯前端的（所有 panel 都在 HTML 里），不刷新、不丢勾选。
     """
     return '<section class="tab-panel%s" data-panel="%s"><h3>%s</h3>%s</section>' % (
@@ -1371,12 +1371,12 @@ def _log_info_block(title: str, body: str, panel: str, active: bool) -> str:
 
 
 def _log_info_tabs(blocks: list[tuple[str, str]]) -> str:
-    """把元信息各块拼成 tab 栏 + 面板。**不包 `.card`**：卡片外壳归 `log_info_card`。
+    """把元信息各块拼成 tab 栏 + 面板。不包 `.card`：卡片外壳归 `log_info_card`。
 
-    tab 与面板靠 `data-tab` / `data-panel` 配对（同一个短名），不是靠下标 ——
+    tab 与面板靠 `data-tab` / `data-panel` 配对（同一个短名），不是靠下标，
     下标在 `log_info_card` 里加了禁用块（空块要跳过）之后会错位。
 
-    tab 上只写**契约键名**，不写面板标题：标题里还带着「是 ULog 原始消息还是加工结果」
+    tab 上只写契约键名，不写面板标题：标题里还带着「是 ULog 原始消息还是加工结果」
     的说明，铺到 tab 栏上会把 8 个按钮撑成一长条。要点名的字段名就是键名本身。
     """
     if not blocks:
@@ -1393,16 +1393,16 @@ def _log_info_tabs(blocks: list[tuple[str, str]]) -> str:
 def log_info_card(*, info: dict, log_path: Path, box_id: str = "params-box") -> str:
     """右栏上半：这份日志除 `data_list`（时序采样）之外的全部元信息。
 
-    数据来自 `np_materials()`（引擎侧 `provider.report_materials()`），**不是**直读 pyulog 的
-    `ulog.msg_info_dict`——`knowledge/engine/providers/px4.py:537` 写着「走契约能力取，别再直读
+    数据来自 `np_materials()`（引擎侧 `provider.report_materials()`），不是直读 pyulog 的
+    `ulog.msg_info_dict`，`knowledge/engine/providers/px4.py:537` 写着「走契约能力取，别再直读
     self.ulog（同一份数据两处知识）」。这份契约实际给 14 块：sysInfo / infoDict /
     msgTypeStats / messages / messagesMulti / dropouts / params / defaultParams /
     changedParams / phases 等，正好就是「除了 data_list 的所有字段」。
 
     在右栏以 tab 呈现，不做整页长列表：`params` 上千条、默认值 61 条，摊在一列里
-    得一路滚，**图会被推到屏幕外**。tab 只显示选中那块，且切换是纯前端的不刷新页面。
+    得一路滚，图会被推到屏幕外。tab 只显示选中那块，且切换是纯前端的不刷新页面。
 
-    tab 上写的是**契约键名**（`infoDict` / `params` / …），不是中文标签——老大 2026-09-23
+    tab 上写的是契约键名（`infoDict` / `params` / …），不是中文标签，老大 2026-09-23
     点名要的是字段名。每块的标题里还标了它是 ULog 原始消息（'I'/'M'/'D'/'P'/'Q'）
     还是加工结果：这两类混在一起看，会把引擎算出来的东西当成日志里记的内容。
     """
@@ -1419,7 +1419,7 @@ def log_info_card(*, info: dict, log_path: Path, box_id: str = "params-box") -> 
     if info.get("msgTypeWalkOk") is False and walked != size:
         # 遍历不完整意味着下面每块都是"只看到了一部分"，不说的话会被当成全量
         head += '<div class="notice">消息类型遍历不完整：只走了 %d / %d 字节，下面的条数偏少。</div>' % (walked, size)
-    # 哪些是日志里真有的字段、哪些是算出来的，必须在看得见的地方说一次：
+    # 哪些是日志里真有的字段、哪些是算出来的，要在看得见的地方说一次：
     # 混着看会把引擎的加工结果当成日志内容（sysInfo 就是因为这一点被拿掉的）
     head += (
         '<div class="hint">只有 ULog 原始消息（I / M / D / P / Q）是日志里真有的字段；'
@@ -1428,9 +1428,9 @@ def log_info_card(*, info: dict, log_path: Path, box_id: str = "params-box") -> 
     head += "</div>"
 
     blocks = []
-    # ⚠️ `sysInfo` **故意不做成一块**：它是 `infoDict` 里按 facts.yaml 的 `sys_info_keys`
-    # 挑出来的一个子集（ver_sw / frame 之类），不是日志里独立存在的字段——同样的内容在
-    # infoDict 里一字不少。老大 2026-09-23 点名：只要**原始字段**，不要软件处理之后的结果。
+    # `sysInfo` 故意不做成一块：它是 `infoDict` 里按 facts.yaml 的 `sys_info_keys`
+    # 挑出来的一个子集（ver_sw / frame 之类），不是日志里独立存在的字段，同样的内容在
+    # infoDict 里一字不少。老大 2026-09-23 点名：只要原始字段，不要软件处理之后的结果。
     info_dict = info.get("infoDict") or []
     if info_dict:
         rows = "".join(
@@ -1572,7 +1572,7 @@ def log_info_card(*, info: dict, log_path: Path, box_id: str = "params-box") -> 
         blocks.append(
             (
                 "defaultParams",
-                # 来源不确定时把话放在**面板标题**上（tab 只放得下键名）：这一块是"参数默认值"，
+                # 来源不确定时把话放在面板标题上（tab 只放得下键名）：这一块是"参数默认值"，
                 # 来源不清会让人拿它跟 params 对比出错误结论，值得在看得见的地方标出来
                 "defaultParams —— ULog 'Q' 默认参数"
                 + ("" if info.get("defaultParamsKnown") else "（⚠️ 来源不确定：老固件没写这段）"),
@@ -1593,15 +1593,15 @@ def ulog_left(
 ) -> str:
     """左栏：日志 → 一个关键字框 → topic 清单（展开的那个列出字段复选框）。
 
-    **一个框同时筛 topic 与字段**，不给过滤按钮：`oninput` 防抖后自己提交。
+    一个框同时筛 topic 与字段，不给过滤按钮：`oninput` 防抖后自己提交。
     框里有关键字时，字段那一层只留匹配的；这样一来「只筛字段、topic 全留着」这种用法
     也成立（topic 名不含关键字 → 它自己不匹配，但它的字段匹配就仍然展开）。
     为什么不做成"按 topic 名匹配的子串还留在树上"那种树过滤：那要判定父节点是否该留，
     而这里父是 topic、子是字段，两层口径不同，混成一个框只有逐层判断才不误导。
 
-    勾选是**跨 topic 累积**的：不在当前展开 topic 里的已选项靠 hidden input 带着走。
+    勾选是跨 topic 累积的：不在当前展开 topic 里的已选项靠 hidden input 带着走。
     GET 表单只提交当前 DOM 里的控件，展开另一个 topic 时前一个 topic 的复选框根本不在
-    页面上——不加 hidden 的话「换个 topic 再勾」会静默清掉之前的选择。
+    页面上，不加 hidden 的话「换个 topic 再勾」会静默清掉之前的选择。
     """
     quote = urllib.parse.quote
     keep = "".join('<input type="hidden" name="f" value="%s"/>' % _esc(p) for p in picked if split_pick(p)[0] != open_topic)
@@ -1679,10 +1679,10 @@ def ulog_left(
 
 
 def ulog_right(*, ns: dict, log_path: Path, picked: list[str]) -> str:
-    """右栏下半：勾上的字段的取值摘要 + 图，**一个 topic 一张**。
+    """右栏下半：勾上的字段的取值摘要 + 图，一个 topic 一张。
 
     为什么按 topic 分组而不是全塞一张图：实测把不同 topic 的字段放进同一次 `np_series`，
-    横轴只回第一个 topic 的，其余 topic 的序列返回**空数组**且 `error` 为空——
+    横轴只回第一个 topic 的，其余 topic 的序列返回空数组且 `error` 为空，
     勾三个字段只画出一条线、页面还一句解释都没有。分图是这个引擎当前能力的诚实用法。
 
     同一个 topic 的字段本来就是同一条时间轴，多字段同图是安全的。
@@ -1779,7 +1779,7 @@ def top_nav(*, here: str, log_arg: str = "") -> str:
 
     为什么放顶上而且还 sticky：右栏能滚很长（`failsafe.yaml` 一个文件 6 条规则），链接挂在
     页脚的话每次换工具都得先滚到底。跳转带上 `log` 是因为三个工具看的是同一份日志，
-    切过去不该再选一次——`log` 为空就不带，省一个空参数。
+    切过去不该再选一次，`log` 为空就不带，省一个空参数。
     """
     q = "?log=%s" % urllib.parse.quote(log_arg) if log_arg else ""
     items = []
@@ -1790,9 +1790,9 @@ def top_nav(*, here: str, log_arg: str = "") -> str:
 
 
 def _file_switch(action: str, field: str, options: list[str], current: str, log_arg: str) -> str:
-    """左栏顶部的「切到另一个文件」——不用回首页。
+    """左栏顶部的「切到另一个文件」，不用回首页。
 
-    为什么是**另一个** GET 表单而不是并进保存那个 POST 表单：并进去的话一切换文件就会把
+    为什么是另一个 GET 表单而不是并进保存那个 POST 表单：并进去的话一切换文件就会把
     编辑框里没保存的内容当 `source` 一起提交上去（textarea 在同一个 form 里就是它的字段），
     等于「换个文件看看」变成了「把当前编辑的内容存进了另一个文件」。
     """
@@ -1807,7 +1807,7 @@ def _file_switch(action: str, field: str, options: list[str], current: str, log_
 
 
 def _log_switch(*, action: str, field: str, current_file: str, log_arg: str) -> str:
-    """左栏第一块：选日志。独立成一个 GET 表单是因为**换日志不该动文件里的字**——
+    """左栏第一块：选日志。独立成一个 GET 表单是因为换日志不该动文件里的字。
 
     并进保存那个 POST 表单的话，「换份日志看看」会把编辑框里没保存的内容当 `source`
     一起写回 `knowledge/`。而且顺序上它就是第一步：不知道哪份日志，选规则/选图没意义。
@@ -1831,10 +1831,10 @@ def _editor_left(
     source_text: str,
     hidden: str,
 ) -> str:
-    """左栏：**先选日志 → 再选文件 → 改 YAML → 保存**。rule 与 plot 共用这一份。
+    """左栏：先选日志 → 再选文件 → 改 YAML → 保存。rule 与 plot 共用这一份。
 
     顺序是老大点名的：没有日志就不知道规则跑出来是什么样，所以日志在最上面。
-    日志与切文件各是独立的 GET 表单，编辑框单独一个 POST 表单——三个动作互不牵连，
+    日志与切文件各是独立的 GET 表单，编辑框单独一个 POST 表单，三个动作互不牵连，
     「换个文件看看」不会顺手把没保存的内容写进 `knowledge/`（见 `_file_switch` 的注释）。
     """
     return (
@@ -1903,9 +1903,9 @@ def plot_page(
 def _pane_html(*, notice: str, ok_note: str, body: str) -> str:
     """右栏那一块的 HTML：红条 / 绿条 + 结果。
 
-    单独抽出来是因为**局部刷新只替换这一块**：JS 拿到服务端返回的这一段直接塞进
-    `#pane-right`。整页渲染与局部刷新拼的是同一个函数，所以两条路看到的东西必然一样
-    —— 各拼一份的话「刷新后少了个提示」这种事迟早发生。
+    单独抽出来是因为局部刷新只替换这一块：JS 拿到服务端返回的这一段直接塞进
+    `#pane-right`。整页渲染与局部刷新拼的是同一个函数，所以两条路看到的东西必然一样，
+    各拼一份的话「刷新后少了个提示」这种事迟早发生。
     """
     out = ""
     if notice:
@@ -1919,7 +1919,7 @@ PANE_ERROR_TITLE = "没出效果"
 
 
 def _cards_body(cards: list[str], empty: str) -> str:
-    """规则结果的右栏正文。整页渲染与局部刷新**都用这一个**：各拼一份的话，
+    """规则结果的右栏正文。整页渲染与局部刷新都用这一个：各拼一份的话，
     刷新后少一条提示这种事迟早发生，而且只在点了保存之后才看得见。"""
     if not cards:
         return '<div class="card"><p class="empty">%s</p></div>' % _esc(empty)
@@ -1949,8 +1949,8 @@ def _shape_of(cell: list) -> str:
 def diag_card(diag: dict) -> str:
     """「这张图画到哪一步」的逐语句清单：前置条件 → 换算节点 → 每条线。
 
-    为什么默认折叠、**只在有问题时展开**：全对时它就是一屏"✅ 正常"，占了右栏最好的位置；
-    而真正要读它的时刻恰恰是"图不对"——那时它自己弹开。
+    为什么默认折叠、只在有问题时展开：全对时它就是一屏"正常"提示，占了右栏最好的位置；
+    而真正要读它的时刻是"图不对"的时候，那时它自己弹开。
     """
     ok = warn = err = 0
     parts: list[str] = []
@@ -2002,7 +2002,7 @@ def diag_card(diag: dict) -> str:
             rows.append((who, "、".join(cells)))
         parts.append(_diag_section("② 换算节点（compute，逐条）", rows))
     elif not diag.get("compute_available", True):
-        # 引擎内部接口不在 = 这一段**没检**，不是"没问题"。降级要说清楚，别假装全绿
+        # 引擎内部接口不在 = 这一段没检，不是"没问题"。降级要说清楚，别假装全绿
         err += 1
         parts.append(
             '<div class="hint"><span class="warn">② 换算节点没检</span>：引擎内部接口（%s）不在了，'
@@ -2070,7 +2070,7 @@ def _charts_body(charts: list[tuple[str, str]], diag: dict | None = None) -> str
 
 
 # 保存走 fetch，只替换右栏：整页刷新的话编辑框弹回顶部、光标丢失，左右分栏就白做了。
-# 这段是脚本里唯一的 JS，刻意只用原生 API（不引第三方）——见文件头「为什么用 stdlib」。
+# 这段是脚本里唯一的 JS，刻意只用原生 API（不引第三方），见文件头「为什么用 stdlib」。
 SPLIT_JS = """
 document.addEventListener("submit", async function (ev) {
     var form = ev.target;
@@ -2145,7 +2145,7 @@ def split_shell(
 ) -> str:
     """左右分栏的页面骨架：顶部导航 + 左栏编辑器（保存时不动）+ 右栏效果（整体替换）。
 
-    三个工具共用这一份——布局各写一份的话，改一处忘了另一处就是
+    三个工具共用这一份，布局各写一份的话，改一处忘了另一处就是
     「同一个工具两种外观」，最后谁都记不清哪个是新的。
     """
     return """<!doctype html>
@@ -2186,9 +2186,9 @@ def rule_page(
     file_options: list[str] | None = None,
     log_arg: str = "",
 ) -> str:
-    """规则文件的编辑 + 试跑页：左栏改 YAML，右栏是这个文件里**每条规则**在这份日志上的结论。
+    """规则文件的编辑 + 试跑页：左栏改 YAML，右栏是这个文件里每条规则在这份日志上的结论。
 
-    一个文件可能装多条规则（`failsafe.yaml` 6 条），所以右栏是一串卡片而不是一张——
+    一个文件可能装多条规则（`failsafe.yaml` 6 条），所以右栏是一串卡片而不是一张，
     改一条会牵动同文件其它规则（共用的 group 派生、`order` 次序），只看一条不够。
     """
     cards_html = "".join('<div class="rule-result">%s</div>' % c for c in cards)
@@ -2305,8 +2305,8 @@ def serve(port: int = 0, open_browser: bool = True) -> int:
     def log_info_for(path: Path) -> dict:
         """这份日志的元信息（除时序采样外的全部字段），跟着 namespace 一起缓存。
 
-        实测 96MB 那份：首次 2.0s、复用 0.85s。不缓存的话每翻一个 topic 就多等两秒
-        ——右栏每次刷新都要它。
+        实测 96MB 那份：首次 2.0s、复用 0.85s。不缓存的话每翻一个 topic 就多等两秒，
+        右栏每次刷新都要它。
         """
         key, stamp = str(path), path.stat().st_mtime
         hit = cache.get(key)
@@ -2315,7 +2315,7 @@ def serve(port: int = 0, open_browser: bool = True) -> int:
         ns = namespace_for(path)
         try:
             info = call(ns, "np_materials()") or {}
-        except Exception as exc:  # noqa: BLE001 —— 元信息读不出来不该拖垮整个页面
+        except Exception as exc:  # noqa: BLE001 元信息读不出来不该拖垮整个页面
             return {"_error": "%s: %s" % (type(exc).__name__, exc)}
         if hit and hit[0] == stamp:
             cache[key] = (stamp, ns, info)
@@ -2358,7 +2358,7 @@ def serve(port: int = 0, open_browser: bool = True) -> int:
         def _draw(self, preset_id: str, log_arg: str) -> tuple[list, str, dict | None]:
             """在选中日志上把预设画出来。返回 (图, 出错时的一句话, 逐语句诊断)。
 
-            诊断**即使一张图都没画出来也要回**——那种时候恰恰是最需要它的时候：
+            诊断即使一张图都没画出来也要回，那种时候最需要它：
             "没画出图"只说了结果，逐语句清单才说得出是哪一句没跑成。
             """
             if not log_arg:
@@ -2424,7 +2424,7 @@ def serve(port: int = 0, open_browser: bool = True) -> int:
                 charts, draw_err, diag = self._draw(pid, log_arg)
                 notice = draw_err
             else:
-                # 源文件已经是坏的，先还原再重编译一次，让产物与源重新对齐——
+                # 源文件已经是坏的，先还原再重编译一次，让产物与源重新对齐，
                 # 否则 knowledge/ 里留着一个让 pnpm build:kb 红掉的文件
                 restore_knowledge_file(backup, src)
                 compile_knowledge()
@@ -2458,7 +2458,7 @@ def serve(port: int = 0, open_browser: bool = True) -> int:
             )
 
         def _run_rules(self, src: Path, log_arg: str) -> tuple[list[str], str]:
-            """把 `src` 这个文件里装的规则**全跑一遍**，一条规则一张卡片。
+            """把 `src` 这个文件里装的规则全跑一遍，一条规则一张卡片。
 
             全跑而不只跑一条：改一条会牵动同文件的其它规则（共用的 group 派生、`order`
             次序），只看一条会漏掉"顺手改崩了隔壁"这种情况。
@@ -2578,7 +2578,7 @@ def serve(port: int = 0, open_browser: bool = True) -> int:
             topic = fields.get("topic", [""])[0].strip()
             filtered = fields.get("q", [""])[0].strip()
             picked = [f for f in fields.get("f", []) if f.strip()]
-            page = lambda right: ulog_page(  # noqa: E731 —— 五个分支都要回同一页，只有右栏不同
+            page = lambda right: ulog_page(  # noqa: E731 五个分支都要回同一页，只有右栏不同
                 log_arg=log_arg,
                 entries=entries,
                 open_topic=topic,

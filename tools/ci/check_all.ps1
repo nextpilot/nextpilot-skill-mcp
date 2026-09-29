@@ -1,4 +1,4 @@
-# 开发机上的 Windows 包装脚本 —— 只做一件事：把开关翻译成 --stage，转调 check_all.py。
+# 开发机上的 Windows 包装脚本，只做一件事：把开关翻译成 --stage，转调 check_all.py。
 #
 # 为什么不在这里再写一遍 eslint / E2E 的命令：那样等于给同一批检查建第二个事实源，
 # 两处必然漂移，最后变成"哪个绿算绿"说不清。检查内容全部由 tools/ci/checklist.yml 决定，

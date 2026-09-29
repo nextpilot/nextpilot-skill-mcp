@@ -1,30 +1,30 @@
-r"""knowledge/engine/ 的**顶层名字不许跨片段重名**。
+r"""knowledge/engine/ 的顶层名字不许跨片段重名。
 
 ## 为什么要有它
 
-`web/scripts/build-knowledge.mjs` 把 knowledge/engine/ 下的片段按顺序拼成**一份**脚本再执行
+`web/scripts/build-knowledge.mjs` 把 knowledge/engine/ 下的片段按顺序拼成一份脚本再执行
 （浏览器与本地工具同一份源码）：
 
 ```text
 operators.py → providers/api.py → providers/*.py → engine.py
 ```
 
-拼完之后它们共享**同一个命名空间**。两个片段顶层同名 = 后者静默覆盖前者：不报错、不告警，
+拼完之后它们共享同一个命名空间。两个片段顶层同名 = 后者静默覆盖前者：不报错、不告警，
 只是某个格式突然解析不出来。`_MAGIC` 就这么被踩过一次（两个 provider 都叫 `_MAGIC`），
-现在靠人工记住"顶层名字要带格式前缀"（`_APM_MAGIC` / `_MAGIC`）—— 而人会忘，
+现在靠人工记住"顶层名字要带格式前缀"（`_APM_MAGIC` / `_MAGIC`），而人会忘，
 新加第三个 provider 时尤其会忘。
 
 ## 判据
 
-1. **顶层"定义"跨片段重名即红**（函数 / 类 / 赋值 / 注解赋值 / 增量赋值）。
-   只看**定义**、不看使用：`FORMATS` 由 `api.py` 定义、各 provider 只 `append`，那不是撞名。
-2. **import 绑定**跨片段同名时，再比**来源**：`import numpy as np` 在两个片段里都写不算撞
+1. 顶层"定义"跨片段重名即红（函数 / 类 / 赋值 / 注解赋值 / 增量赋值）。
+   只看定义、不看使用：`FORMATS` 由 `api.py` 定义、各 provider 只 `append`，那不是撞名。
+2. import 绑定跨片段同名时，再比来源：`import numpy as np` 在两个片段里都写不算撞
    （绑的是同一个模块对象）；同名却来自不同模块（`from a import x` 与 `from b import x`）才算。
-3. **判空**：片段文件数或顶层名字总数低于下限 → 红。否则文件被改名 / 搬空之后，
+3. 判空：片段文件数或顶层名字总数低于下限 → 红。否则文件被改名 / 搬空之后，
    第 1 项会因为"没东西可比"而恒绿。
-4. **前提还在**：这道门必须真的挂在 `tools/ci/checklist.yml` 的 push 阶段。
+4. 前提还在：这道门得真的挂在 `tools/ci/checklist.yml` 的 push 阶段。
 
-provider 的集合是**扫目录**得来的（`knowledge/engine/providers/*.py` 去掉 `api.py`，与构建脚本同一条
+provider 的集合是扫目录得来的（`knowledge/engine/providers/*.py` 去掉 `api.py`，与构建脚本同一条
 规则），加格式零改动；框架三个文件是结构性的，写死并在 README 的「拼接顺序」里有权威清单。
 
 退出码：任一检查失败则为 1。
@@ -47,7 +47,7 @@ PROVIDERS = ENGINE / "providers"
 CHECKLIST = ROOT / "tools" / "ci" / "checklist.yml"
 BUILD = ROOT / "web" / "scripts" / "build-knowledge.mjs"
 
-# 这道门在 checklist.yml 里的步骤 id —— 前提检查按它找，改名要两处一起改
+# 这道门在 checklist.yml 里的步骤 id，前提检查按它找，改名要两处一起改
 STEP_ID = "guard-engine-names"
 
 # 与构建脚本同规则：`api.py` 是契约，不是格式适配器
@@ -59,7 +59,7 @@ FRAMEWORK = ("operators.py", "engine.py")
 MIN_FILES = 5
 MIN_NAMES = 100
 
-# 构建脚本扫 provider 目录的写法 —— 它要是换成写死名单，"加格式零改动"这个前提就没了
+# 构建脚本扫 provider 目录的写法，它要是换成写死名单，"加格式零改动"这个前提就没了
 PROVIDER_SCAN_MARKER = "readdirSync(PROVIDER_DIR)"
 
 
@@ -86,7 +86,7 @@ def _target_names(node: ast.AST) -> list[str]:
 
 
 def top_level_bindings(path: Path) -> list[Binding]:
-    """模块顶层绑了哪些名字（函数体 / 类体里的不算 —— 那是各自的私有空间）。"""
+    """模块顶层绑了哪些名字（函数体 / 类体里的不算，那是各自的私有空间）。"""
     tree = ast.parse(path.read_text(encoding="utf-8"))
     out: list[Binding] = []
     for node in tree.body:

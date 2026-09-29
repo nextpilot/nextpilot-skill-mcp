@@ -1,6 +1,6 @@
-"""冻结规则引擎的基线输出（规则格式重构前必须先跑）。
+"""冻结规则引擎的基线输出（规则格式重构前要先跑）。
 
-把 tools/testdata/logs/ 下每个回归日志的**完整引擎输出**（findings 全字段、stats、tags、
+把 tools/testdata/logs/ 下每个回归日志的完整引擎输出（findings 全字段、stats、tags、
 guardTags、phases、checksRun/checksSkipped、matchedFaults）冻结到 baseline/ 下，
 作为后续"一条经验一个 YAML"重构的等价比对真相。
 
@@ -8,7 +8,7 @@ guardTags、phases、checksRun/checksSkipped、matchedFaults）冻结到 baselin
   python tools/engine/dump_baseline.py                    # 冻结全部回归日志
   python tools/engine/dump_baseline.py <ulg_or_bin> ...   # 只冻结指定日志
 
-产物是**冻结的快照**：重构规则时不允许改基线（除非有明确理由并单独提交）。
+产物是冻结的快照：重构规则时不允许改基线（除非有明确理由并单独提交）。
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "knowledge" / "engi
 import loader as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-# 数据在 tools/testdata/，工具在 tools/engine/——分住两处，所以用仓库根往下数，
+# 数据在 tools/testdata/，工具在 tools/engine/，分住两处，所以用仓库根往下数，
 # 不用"相对自身"（否则本文件一搬家就指到空目录，且 mkdir 会静默造出一个假的 baseline/）。
 TESTDATA = REPO_ROOT / "tools" / "testdata"
 LOG_DIR = TESTDATA / "logs"  # 校准用真实日志（不入库，需自备）
@@ -44,7 +44,7 @@ def slug(path: Path) -> str:
 
 
 def source_of(path: Path) -> str:
-    """记录日志来源：.ulg/.BIN 不入库（见 .gitignore），基线必须自带"怎么把它取回来"。
+    """记录日志来源：.ulg/.BIN 不入库（见 .gitignore），基线得自带"怎么把它取回来"。
 
     uuid 命名的日志来自 Flight Review（logs.px4.io）公开日志集。
     APM 日志来自 ArduPilot SITL autotest 或用户提供的 .BIN。

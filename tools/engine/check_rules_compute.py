@@ -3,7 +3,7 @@
 用法：python tools/engine/check_rules_compute.py <log.ulg> <rule_id>
 
 compute 是表达式，所以这里按表达式调试：
-每条打印原文，再把其中**每个子表达式**单独求值一遍——失败的那一层一眼可见。
+每条打印原文，再把其中每个子表达式单独求值一遍，失败的那一层一眼可见。
 """
 
 import ast

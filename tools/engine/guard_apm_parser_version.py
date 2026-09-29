@@ -1,11 +1,11 @@
-r"""ArduPilot `.bin` 解析器：解析逻辑变了必须升 `parserVersion`。
+r"""ArduPilot `.bin` 解析器：解析逻辑变了要升 `parserVersion`。
 
 ## 为什么要有它
 
-`.ulg` 侧的解析器版本是**环境的指纹**（`pyulog/1.2.4`，换台机器就变，所以
+`.ulg` 侧的解析器版本是环境的指纹（`pyulog/1.2.4`，换台机器就变，所以
 `compare_baseline.py` 的 `IGNORED_TOP_KEYS` 把它排除了）。而 `.bin` 侧是自研解析器，
-版本串是一个**手维护的常量** `apm-bin-parser/1.0.0`（`knowledge/engine/providers/ardupilot.py`
-的 `parser_version()`）——它跨机器稳定，但代价是：**改了解析行为不升版本号，没有任何东西会响**。
+版本串是一个手维护的常量 `apm-bin-parser/1.0.0`（`knowledge/engine/providers/ardupilot.py`
+的 `parser_version()`），它跨机器稳定，但代价是：改了解析行为不升版本号，没有任何东西会响。
 
 后果是具体的：报告头写着同一个版本号，而两次解析出来的数含义已经不同；冻结基线比对看到的
 是"结论变了"，却分不清是规则改了还是解析器改了。这类静默正是本项目最贵的那类错
@@ -13,16 +13,16 @@ r"""ArduPilot `.bin` 解析器：解析逻辑变了必须升 `parserVersion`。
 
 ## 判据
 
-1. 给 `ardupilot.py` 的**解析逻辑**算一个 AST 指纹（模块级常量表 + `ApmProvider` 的方法体 +
-   顶层工厂函数；`parser_version()` 本身排除在外——它正是被检查的对象），与冻结基线比：
+1. 给 `ardupilot.py` 的解析逻辑算一个 AST 指纹（模块级常量表 + `ApmProvider` 的方法体 +
+   顶层工厂函数；`parser_version()` 本身排除在外，它正是被检查的对象），与冻结基线比：
    - 指纹变了、`parser_version()` 没变 → 红（改了解析不认账）；
    - 指纹与版本都变了 / 只改了版本 → 红（要求显式重冻基线，防止"随手一改"）。
-2. **判空**：扫不到文件、解析不出版本串、或指纹覆盖的函数/常量太少，一律红 ——
+2. 判空：扫不到文件、解析不出版本串、或指纹覆盖的函数/常量太少，一律红，
    否则文件被改名或搬空之后，第 1 项会因为"没东西可比"而恒绿。
-3. **前提还在**：这道门必须真的挂在 `tools/ci/checklist.yml` 的 push 阶段。
-   `check_all.py` 只按清单转发，清单里没它就根本不会跑 —— 而那也是安静的。
+3. 前提还在：这道门得真的挂在 `tools/ci/checklist.yml` 的 push 阶段。
+   `check_all.py` 只按清单转发，清单里没它就根本不会跑，而那也是安静的。
 
-指纹用 **AST** 而不是源码文本：注释、docstring、空行与 ruff 的格式化都不改变 AST，
+指纹用 AST 而不是源码文本：注释、docstring、空行与 ruff 的格式化都不改变 AST，
 只有真实的语句/常量变化才变。用文本哈希会把"改一句注释"也报成"解析变了"，那种噪声
 会让人直接把守卫关掉。
 
@@ -56,7 +56,7 @@ PROVIDER = ROOT / "knowledge" / "engine" / "providers" / "ardupilot.py"
 BASELINE = Path(__file__).resolve().parent / "apm_parser_baseline.json"
 CHECKLIST = ROOT / "tools" / "ci" / "checklist.yml"
 
-# 这道门在 checklist.yml 里的步骤 id —— 前提检查按它找，改名要两处一起改
+# 这道门在 checklist.yml 里的步骤 id，前提检查按它找，改名要两处一起改
 STEP_ID = "guard-apm-parser-version"
 
 PROVIDER_CLASS = "ApmProvider"
@@ -93,7 +93,7 @@ def _body_dump(fn: ast.FunctionDef) -> str:
     """方法体的 AST 摘要（去掉 docstring）。
 
     用 `ast.Module` 包一层是因为 `ast.dump` 只吃单个节点，而方法体是一个语句列表。
-    `include_attributes` 保持默认 False：**不带行号**，于是纯格式化（ruff format）不改变指纹。
+    `include_attributes` 保持默认 False：不带行号，于是纯格式化（ruff format）不改变指纹。
     """
     stmts = [s for s in fn.body if not _is_docstring(s)]
     return ast.dump(ast.Module(body=stmts, type_ignores=[]))
@@ -150,7 +150,7 @@ def _load_baseline() -> dict | None:
 
 
 def check_parser_version_frozen() -> list[str]:
-    """解析逻辑变了 → 必须升 `parser_version()`；升了 / 改了都要重冻基线。"""
+    """解析逻辑变了就要升 `parser_version()`；升了 / 改了都要重冻基线。"""
     scan = _scan()
     if scan.problems:
         return scan.problems

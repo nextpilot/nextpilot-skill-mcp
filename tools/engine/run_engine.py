@@ -4,11 +4,11 @@
   python tools/engine/run_engine.py <file.ulg> [more.ulg ...]
   python tools/engine/run_engine.py --probe-data <file.ulg> ...
 
-**规则读构建产物**（`web/workers/analysis-engine.generated.ts` 的 `const rules = [...]`），
+规则读构建产物（`web/workers/analysis-engine.generated.ts` 的 `const rules = [...]`），
 所以改了 `knowledge/px4/rules/` 要先 `pnpm web:build:kb` 再回归（loader 会检查陈旧）。
 
-任何一份日志出错都以**非零退出码**结束（`check_all.py` 只看退出码）。别把它改回"只打印、
-不计数"——那会让这一项永远绿着，而它其实什么都没检（见 CLAUDE.md §6.6）。
+任何一份日志出错都以非零退出码结束（`check_all.py` 只看退出码）。别把它改回"只打印、
+不计数"，那会让这一项一直绿着，而它其实什么都没检（见 CLAUDE.md §6.6）。
 """
 
 import json
