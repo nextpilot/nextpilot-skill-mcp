@@ -1,7 +1,6 @@
-"""
-Format rules/*.yaml: consistent section order + blank lines between groups.
+"""Format rules/*.yaml: consistent section order + blank lines between groups.
 
-V2: Only recognize KNOWN top-level keys at their expected indent levels.
+Only KNOWN top-level keys at their expected indent levels are section boundaries.
 """
 
 import os
@@ -15,23 +14,21 @@ APM_RULES_DIR = REPO_ROOT / "knowledge" / "ardupilot" / "rules"
 # Section display order (after metadata)
 SECTION_ORDER = ["condition", "compute", "foreach", "output", "trigger"]
 
-# Meta fields that should appear at the top
+# Meta fields that first
 META_ORDER = ["id", "name", "group", "order", "tag"]
 
 # All known top-level keys (only these can be section boundaries)
 TOP_KEYS = set(META_ORDER + SECTION_ORDER)
 
-# Regex to match a top-level key at indent 0 (single-doc) or indent 2 (multi-doc)
+# Top-level key at indent 0 (single-doc) or indent 2 (multi-doc)
 _RE_KEY_0 = re.compile(r"^(" + "|".join(TOP_KEYS) + r"):")
 _RE_KEY_2 = re.compile(r"^  (" + "|".join(TOP_KEYS) + r"):")
 _RE_DOC = re.compile(r"^- id:")
 
 
 def split_sections(lines):
-    """
-    Split lines into sections. Only known top-level keys at their expected
-    indent level are treated as section boundaries.
-    Returns list of (key, lines) tuples.
+    """Split into (key, lines) sections; only known top-level keys at their expected
+    indent level are section boundaries.
     """
     sections = []
     current_key = "header"
@@ -75,13 +72,10 @@ def split_sections(lines):
 
 def _ensure_blank_before(result):
     """Ensure exactly one blank line before the next section, unless at the very start."""
-    # Never add a blank at the beginning of output
-    if not result:
+    if not result:  # never add a blank at the beginning
         return
-    # Remove trailing blanks
     while result and result[-1] == "":
         result.pop()
-    # Add exactly one blank
     result.append("")
 
 
@@ -90,7 +84,6 @@ def _reorder_one_entry(entry_lines):
     if len(entry_lines) <= 1:
         return entry_lines
 
-    # Find label line (indent 6)
     label_idx = None
     for i, line in enumerate(entry_lines):
         if line.lstrip().startswith("label:"):
@@ -98,9 +91,8 @@ def _reorder_one_entry(entry_lines):
             break
 
     if label_idx is None or label_idx == 1:
-        return entry_lines  # No label or already right after when
+        return entry_lines  # no label, or already right after when
 
-    # Move label to position 1 (after '- when:')
     label_line = entry_lines.pop(label_idx)
     entry_lines.insert(1, label_line)
     return entry_lines
@@ -133,10 +125,7 @@ def _reorder_trigger_entries(lines):
 
 
 def format_single_doc(sections):
-    """
-    Format a single document's sections.
-    Returns list of lines.
-    """
+    """Format a single document's sections into a list of lines."""
     result = []
 
     # Header comments
@@ -150,13 +139,13 @@ def format_single_doc(sections):
         if key == "doc_start":
             _ensure_blank_before(result)
             result.extend([line.rstrip() for line in lines])
-            # For multi-doc, '- id:' is part of metadata, no blank before meta
+            # '- id:' is part of metadata: no blank before meta
             skip_meta_blank = True
             break
     else:
         skip_meta_blank = False
 
-    # Meta section: id, name, group, order
+    # Meta section
     if not skip_meta_blank:
         meta_exists = any(any(key == meta_key for key, _ in sections) for meta_key in META_ORDER)
         if meta_exists:
@@ -244,7 +233,7 @@ def format_file_text(text, dry_run=False):
     lines = text.split("\n")
     while lines and lines[-1].strip() == "":
         lines.pop()
-    lines.append("")  # ensure trailing empty line for split_sections
+    lines.append("")  # trailing empty line for split_sections
 
     result = format_file_lines(lines)
     new_content = "\n".join(result) + "\n"

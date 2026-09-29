@@ -1,19 +1,18 @@
 """从 PX4 上游同步 uORB msg 与参数元数据 → knowledge/px4/meta/<tag>.json。
 
 设计依据：knowledge/px4/CLAUDE.md「工具」一节。
-- msg：按 tag 从 PX4/PX4-Autopilot 归档包解出 msg/*.msg，
-  汇总进 meta/<tag>.json 的 topics（**一 tag 一文件**：200+ topic 各占一个文件会污染仓库；
-  且这些文件只有机器读写，JSON 无 YAML 引号陷阱、引擎直接消费）
-- 参数：flight_review 的做法是只用一份 master 参数定义（实际参数值来自日志的
-  initial_parameters），默认取 px4-travis S3 的 main parameters.json，
-  汇总进同一个 meta/<tag>.json 的 parameters；可用 --params-url / --params-tag 覆盖
+- msg：按 tag 从 PX4/PX4-Autopilot 归档包解出 msg/*.msg，汇总进 meta/<tag>.json 的
+  topics（**一 tag 一文件**：200+ topic 各占一个文件会污染仓库；这些文件只有机器读写，
+  JSON 无 YAML 引号陷阱、引擎直接消费）
+- 参数：只用一份 master 参数定义（实际值来自日志的 initial_parameters），默认取
+  px4-travis S3 的 main parameters.json；可用 --params-url / --params-tag 覆盖
 - 原始下载缓存到 .cache/px4/<tag>/，不入库
 
 用法：
   python tools/dev/fetch_px4_uorb_msg.py --tags v1.15.0,v1.16.0,main
   python tools/dev/fetch_px4_uorb_msg.py --check          # 只比对不写入（CI 用），不一致则退出码 1
 
-依赖：仅标准库（urllib + tarfile + json）；无需 pip install。
+依赖：仅标准库（urllib + tarfile + json）。
 """
 
 from __future__ import annotations
@@ -35,7 +34,7 @@ META_OUT = OUT_ROOT / "meta"  # meta/<tag>.json（一 tag 一份：topics + para
 GITHUB_ARCHIVE = "https://github.com/PX4/PX4-Autopilot/archive/refs/{kind}/{ref}.tar.gz"
 DEFAULT_PARAMS_URL = "https://px4-travis.s3.amazonaws.com/Firmware/main/_general/parameters.json"
 
-# uORB 基本类型 → 简化类型名（够规则层用；不追求覆盖 msgdef 全部特性）
+# uORB 基本类型 → 简化类型名（够规则层用，不追求覆盖 msgdef 全部特性）
 TYPE_MAP = {
     "bool": "bool",
     "uint8_t": "uint8",
@@ -50,7 +49,7 @@ TYPE_MAP = {
     "double": "float64",
     "char": "char",
 }
-# 类型 → 是否按位掩码/枚举候选处理（由常量前缀进一步判断）
+# 时间字段类型（常量前缀进一步区分位掩码/枚举）
 TIME_TYPES = {"uint64"}
 
 
@@ -108,19 +107,18 @@ def fetch_params(url: str, cache_key: str) -> dict:
 # ─────────────────────────── .msg 解析 ───────────────────────────
 
 _CONST_RE = re.compile(r"^\s*(?:uint8|int32|uint16|int8)\s+([A-Z][A-Z0-9_]*)\s*=\s*(-?\d+)\s*(?:#.*)?$")
-# 数组长度 PX4 写在类型上（float32[10] voltage_cell_v），少数写法写在字段名上，
-# 两种都要认；否则整行匹配不上、数组字段会被静默丢掉（曾因此丢了 voltage_cell_v /
-# control[12] / q[4]，meta 字典残缺，构建期字段校验根本没法做）。
+# 数组长度 PX4 多写在类型上（float32[10] voltage_cell_v），少数写在字段名上，两种都要
+# 认；否则整行匹配不上、数组字段静默丢掉（曾因此丢了 voltage_cell_v / control[12] / q[4]）。
 _FIELD_RE = re.compile(
     r"^\s*([A-Za-z_][A-Za-z0-9_<>:_]*)(?:\[(\d+)\])?\s+"
     r"([A-Za-z_][A-Za-z0-9_]*)(?:\[(\d+)\])?\s*(?:#(.*))?$"
 )
 
 # 字段名与常量前缀对不上时的别名（PX4 字段改名后常量前缀常保留旧名）：
-# 字段 nav_state 的枚举常量仍叫 NAVIGATION_STATE_*
+# nav_state 的枚举常量仍叫 NAVIGATION_STATE_*
 _FIELD_CONST_ALIASES = {
     "nav_state": ("NAVIGATION_STATE",),
-    # gps_check_fail_flags 的常量前缀是 GPS_CHECK_FAIL（没有 _flags 后缀）
+    # gps_check_fail_flags 的常量前缀是 GPS_CHECK_FAIL（无 _flags 后缀）
     "gps_check_fail_flags": ("GPS_CHECK_FAIL",),
 }
 
@@ -133,8 +131,8 @@ def _tokens(name: str) -> list[str]:
 def _const_owner(fields: dict, cname: str) -> str | None:
     """把一个大写常量归属到某个已声明字段。
 
-    优先精确前缀；再用词元序列匹配（允许 navigation→nav 这类前缀缩写）。
-    取匹配到的最长字段名，避免 STATE 误命中一堆短名字段。
+    优先精确前缀，再用词元序列匹配（允许 navigation→nav 这类前缀缩写）；取匹配到
+    的最长字段名，避免 STATE 误命中一堆短名字段。
     """
     candidates: list[str] = []
     for fname in fields:
@@ -151,7 +149,7 @@ def _const_owner(fields: dict, cname: str) -> str | None:
         if not ftoks or len(ftoks) > len(ctoks):
             continue
         ok = all(ct == ft or (len(ft) >= 3 and ct.startswith(ft)) for ct, ft in zip(ctoks, ftoks))
-        # 至少两个有意义的词元对上才算（STATE 单词太短，易误命中）
+        # 至少两个有意义的词元对上才算（STATE 太短，易误命中）
         if ok and sum(len(t) for t in ftoks) >= 6:
             if best is None or len(fname) > len(best):
                 best = fname
@@ -167,8 +165,7 @@ def parse_msg(stem: str, text: str) -> dict:
     """解析一个 uORB .msg 为字段规范（两趟：先收集，再归属常量）。
 
     常量可能在字段声明之前或之后，且字段名与常量前缀常不一致
-    （nav_state ↔ NAVIGATION_STATE_*、gps_check_fail_flags ↔ GPS_CHECK_FAIL_*），
-    所以不能边读边归属。
+    （nav_state ↔ NAVIGATION_STATE_*），所以不能边读边归属。
     """
     fields: dict[str, dict] = {}
     constants: list[tuple[str, int]] = []
@@ -202,7 +199,7 @@ def parse_msg(stem: str, text: str) -> dict:
                 if m_unit:
                     spec["unit"] = m_unit.group(1).strip()
                 spec["note"] = note
-                # 注释明确写 Bitmask 的直接打标（不依赖字段命名启发）
+                # 注释明确写 Bitmask 的直接打标（不依赖命名启发）
                 if re.search(r"\bbit\s?mask\b", note, re.IGNORECASE):
                     spec["kind"] = "bitmask"
         fields[fname] = spec
@@ -237,15 +234,14 @@ def _order_values(values: dict) -> dict:
 
 
 def render_meta_json(tag: str, topics: dict[str, dict], params: dict | None) -> str:
-    """一个 tag 的全部元数据 → 一个 JSON 文件：topics（字段字典）+ parameters（参数字典）。
+    """一个 tag 的全部元数据 → 一个 JSON 文件：topics + parameters。
 
-    合并成一份的理由：两者都是"该固件版本的字段/参数语义"，都只被机器读写，
-    同属一个 tag 就该是一份文件；分开成两个目录只会让"取某个版本的全部元数据"
-    变成两处查找。
+    两者都是"该固件版本的字段/参数语义"、都只被机器读写，同属一个 tag 就是一份文件；
+    分开成两个目录只会让"取某个版本的全部元数据"变成两处查找。
     """
 
-    # 不用 json.dumps(sort_keys=True)：那会把枚举键按字符串排（0,1,10,11,…,2）。
-    # 这里显式构造顺序：topic 名字母序、字段名字母序、枚举值数值序，输出确定且可读。
+    # 不用 json.dumps(sort_keys=True)：那会把枚举键按字符串排（0,1,10,11,…,2）。这里
+    # 显式构造顺序：topic 名字母序、字段名字母序、枚举值数值序，输出确定且可读。
     def fix_fields(spec: dict) -> dict:
         fields = {}
         for fname in sorted(spec.get("fields", {})):
@@ -341,7 +337,7 @@ def sync(tags: list[str], params_url: str, params_tag: str, check: bool, base_ur
             print(f"META_WRITTEN {tag} topics={len(topics)} params={len(params) if tag == params_tag else 0}")
 
     if not check:
-        # 清理历史形态：topics/<tag>/*.yaml、topics/<tag>.json、params/<tag>.json、params/<tag>.yaml
+        # 清理历史形态：topics/<tag>/*.yaml、topics/<tag>.json、params/<tag>.json|yaml
         for legacy_dir in (OUT_ROOT / "topics", OUT_ROOT / "params"):
             if legacy_dir.is_dir():
                 for f in legacy_dir.iterdir():

@@ -25,8 +25,8 @@ CHECK_ONLY=0
 PYTHON="3.11"
 INDEX_URL="https://pypi.org/simple"
 
-# usage 不能按行号切片（3,14p 那版把最后一行选项漏掉了，加一行选项就得记着改行号，
-# 必漏）：从说明开头切到 set -euo 为止，按标记定位，加减行都不用回头改这里。
+# usage 不能按行号切片（3,14p 那版漏了最后一行选项，加选项就得记着改行号）：从说明开头切到
+# set -euo 为止，按标记定位，加减行都不用回头改这里。
 usage() {
     sed -n '2,/^set -euo/p' "$0" | sed 's/^# \{0,1\}//' | sed '$d'
 }
@@ -60,8 +60,8 @@ while [ $# -gt 0 ]; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# tools/setup -> tools -> 仓库根。.venv 要放在仓库根：pyrightconfig.json 写的是
-# venvPath "." + venv ".venv"，换地方 knowledge/engine/ 的类型检查就会集体报 import 解析不了。
+# tools/setup -> tools -> 仓库根。.venv 放仓库根：pyrightconfig.json 写死了 venvPath "." +
+# venv ".venv"，换地方 knowledge/engine/ 的类型检查就会集体报 import 解析不了。
 ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 VENV="$ROOT/.venv"
 VENV_PY="$VENV/bin/python"
@@ -77,8 +77,7 @@ run() {
 
 cd "$ROOT"
 
-# --check-only：跳过安装类步骤（1-5），直接进自检，日常"验证工具链"一条命令。
-# bash 的 if 块内不要求缩进，步骤块原样保留，只在前后加开关。
+# --check-only：跳过安装类步骤（1-5），直接进自检。bash 的 if 块内不要求缩进。
 if [ "$CHECK_ONLY" = "1" ]; then
     echo "--check-only：跳过安装步骤（uv / venv / 依赖 / Node / hook），直接自检"
 else
@@ -110,8 +109,8 @@ fi
 if [ -x "$VENV_PY" ]; then
     echo "  复用现有 .venv（要重建加 --recreate）"
 else
-    # 显式写死 3.11：不指定的话 uv 自己挑版本，"这台机器装的哪个 Python" 会随 uv 版本漂移。
-    # 3.11 与 pyproject.toml 的 target-version 对齐。
+    # 写死 3.11：不指定的话 uv 自己挑版本，"这台机器装的哪个 Python" 会随 uv 漂移；与
+    # pyproject.toml 的 target-version 对齐。
     run uv venv "$VENV" --python "$PYTHON"
 fi
 if [ ! -x "$VENV_PY" ]; then
@@ -148,20 +147,19 @@ step "5/6 Git hook 指向 .githooks"
 if [ "$SKIP_HOOKS" = "1" ]; then
     echo "  --skip-hooks：跳过"
 else
-    # 每台机器做一次，重复执行幂等。放进脚本的理由：漏了它 pre-commit / pre-push
-    # 一直不跑，而"没跑"和"跑了全绿"在 git 这边长得一模一样。
+    # 每台机器做一次，幂等。漏了它 pre-commit / pre-push 一直不跑，而"没跑"和"跑了全绿"在
+    # git 这边长得一模一样。
     run git config core.hooksPath .githooks
     echo "  core.hooksPath = $(git config core.hooksPath)"
 
-    # 光指过去还不够：git 会静默跳过没有可执行位的钩子（只给一行 hint，
-    # 不报错、不改退出码）。仓库里已把三个钩子按 100755 提交，但 zip 下载、
-    # 异常 umask、或某些 CI 的 checkout 会把它抹成 644，那时的表现是
-    # hooksPath 配得对、钩子一个都不跑。所以这里显式补一次，成本一行。
+    # 光指过去不够：git 会静默跳过没有可执行位的钩子（只给一行 hint，不报错、不改退出码）。
+    # 仓库里三个钩子按 100755 提交，但 zip 下载 / 异常 umask / 某些 CI checkout 会抹成 644，
+    # 那时 hooksPath 配得对、钩子一个都不跑。显式补一次。
     run chmod +x .githooks/pre-commit .githooks/pre-push .githooks/commit-msg
     echo "  钩子可执行位：$(ls -l .githooks/pre-commit | cut -c1-10)"
 
-    # 同 Windows 版：照 git 的方式（PATH 上的 python）真跑一次钩子里的解释器切换，
-    # 核对它最终落在 .venv 上。"钩子悄悄用了另一个 Python"不报错也不失败，只能这样拦。
+    # 同 Windows 版：照 git 的方式（PATH 上的 python）真跑一次钩子里的解释器切换，核对它落在
+    # .venv 上。"钩子悄悄用了另一个 Python"不报错也不失败，只能这样拦。
     probe=$(cat <<'PY'
 import sys
 
@@ -177,9 +175,8 @@ def body():
 sys.exit(m.ensure_venv_python(body))
 PY
     )
-    # 要落成文件再跑，不能用 python -c：-c 模式下 sys.argv 只有 ['-c']，
-    # 而切换解释器就是把整个 argv 交给 .venv 的 python 重跑一遍，代码本身不在
-    # argv 里，切完就没了。
+    # 要落成文件再跑，不能用 python -c：-c 模式下 sys.argv 只有 ['-c']，而切换解释器是把整个
+    # argv 交给 .venv 的 python 重跑，代码不在 argv 里，切完就没了。
     probe_file="$ROOT/.workbuddy/tmp/hook_probe.py"
     mkdir -p "$(dirname "$probe_file")"
     printf '%s\n' "$probe" >"$probe_file"
@@ -204,10 +201,8 @@ fi
 fi  # --check-only 跳过安装步骤（1-5）
 
 # ── 6. 自检（自闭环）─────────────────────────────────────────────────
-# 装什么就验什么：探测逻辑直接写在这里，不调 check_prereq.py / check_all.py，
-# 不读 checklist.yml，setup 不拖外部脚本。探的是"工具能不能跑起来"，不是全量
-# 校验：全量清单（ruff/prettier/tsc/pytest/守卫……）归 check_all.py，装完想验
-# 就手动跑，见末尾提示。
+# 探测逻辑直接写在这里，不调 check_prereq.py / check_all.py、不读 checklist.yml；只探"工具能
+# 不能跑起来"，全量清单（ruff/prettier/tsc/pytest/守卫……）归 check_all.py。
 step "6/6 自检（装好的工具能不能用）"
 PRE_FAIL=0
 probe() {

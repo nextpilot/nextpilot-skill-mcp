@@ -3,16 +3,8 @@
 Usage:
     from _logging import get_logger
     log = get_logger()
-
-    log.info("OK check passed")
-    log.warning("SKIP no log files")
-    log.error("FAIL expected 3, got 2")
-
-    # Logger helpers:
-    log.print_header("check Python/Node prerequisites")
-    log.print_step(1, 10, "ruff available", "$ ruff --version", 0, "")
-    log.print_check(2, 10, "inline validation", True, detail="3 items, all green")
-    log.print_summary(results, skipped)
+    log.info("OK check passed"); log.warning("SKIP no log files"); log.error("FAIL ...")
+    log.print_header(...); log.print_step(...); log.print_check(...); log.print_summary(...)
 
 Colors: ERROR → red, WARNING → yellow, INFO/DEBUG → default.
 """
@@ -72,17 +64,7 @@ def _print_step(
     returncode: int,
     stdout: str,
 ) -> None:
-    """Print a single step result.
-
-    Format:
-    --------------------------------------------------------------------------------
-    [k/N]  xxxxxx
-    --------------------------------------------------------------------------------
-    | command: xxxx
-    | result:  xxxxxxx
-    --------------------------------------------------------------------------------
-    | 子进程的输出
-    """
+    """Print a single step result: [k/N] name, then command / result / subprocess output."""
     tag = f"[{step:>2}/{total:<2}]"
     status = "OK" if returncode == 0 else f"FAIL (exit {returncode})"
 
@@ -116,18 +98,8 @@ def _print_check(
     detail: str = "",
     err: str = "",
 ) -> None:
-    """Print a single inline check result (no subprocess).
-
-    Format:
-    --------------------------------------------------------------------------------
-    [k/N]  xxxxxxxx
-    --------------------------------------------------------------------------------
-    | Result:  OK / FAIL
-    | Detail:  xxxxxx          (only if detail provided)
-    |          多行 detail      (detail 里的 \n 会被展开缩进)
-    --------------------------------------------------------------------------------
-    | ERR block               (only on failure)
-    --------------------------------------------------------------------------------
+    """Print a single inline check result (no subprocess): Result, Detail
+    (detail 里的 \n 会展开缩进), and an ERR block on failure.
     """
     tag = f"[{step:>2}/{total:<2}]"
     status = "OK" if ok else "FAIL"
@@ -152,13 +124,9 @@ def _print_check(
 def _print_summary(logger: logging.Logger, results: list[tuple[str, str]], skipped: list[str]) -> int:
     """Print a structured summary block.
 
-    ``results`` is a list of ``(name, status)`` where status is
-    ``"ok"``, ``"fail"``, or ``"skip"``.
-
-    ``skipped`` is a list of free-text descriptions for items that were
-    not run (e.g. optional phases).
-
-    Returns ``1`` if any check failed, ``0`` otherwise.
+    ``results`` is a list of ``(name, status)`` with status in
+    ``"ok"``/``"fail"``/``"skip"``; ``skipped`` holds free-text descriptions of
+    items not run. Returns ``1`` if any check failed, ``0`` otherwise.
     """
     passed = [(n, s) for n, s in results if s == "ok"]
     failed = [(n, s) for n, s in results if s == "fail"]
@@ -242,10 +210,8 @@ class _ColoredFormatter(logging.Formatter):
 
 
 def get_logger(name: str | None = None) -> _CheckLogger:
-    """Get a logger configured for colored console output.
-
-    The returned logger has ``print_header`` / ``print_step`` / ``print_summary``
-    convenience methods.
+    """Get a logger configured for colored console output, with
+    ``print_header`` / ``print_step`` / ``print_check`` / ``print_summary`` helpers.
     """
     logging.setLoggerClass(_CheckLogger)
     logger = logging.getLogger(name or "ci")

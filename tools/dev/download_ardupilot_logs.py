@@ -1,39 +1,27 @@
 """从 ArduPilot 官方 CI 站（https://autotest.ardupilot.org/）批量下载 .bin 日志。
 
-用途：为 ArduPilot provider（`knowledge/engine/providers/ardupilot.py`）的规则校准与契约测试
-积累基准日志集。文件落在 `.cache/ardupilot/logs/`（已在 .gitignore），不进仓库。
+用途：为 ArduPilot provider（knowledge/engine/providers/ardupilot.py）的规则校准与契约
+测试积累基准日志集。文件落在 .cache/ardupilot/logs/（已 .gitignore），不进仓库。
 
-与 `tools/dev/apm_make_sample.py` 的分工：那边**合成**最小夹具（写入端与读取端
-互为独立实现，防自证）；这边抓**官方真实产物**，覆盖合成夹具编不出来的规模与字段组合
-（几百条 FMT、上万条消息、块尾填充、`XKF*`/`ESC`/`VIBE` 等真实消息序列）。
+与 tools/dev/apm_make_sample.py 的分工：那边**合成**最小夹具（读写两端互为独立实现，
+防自证）；这边抓**官方真实产物**，覆盖合成夹具编不出来的规模与字段组合（几百条 FMT、
+上万条消息、块尾填充、XKF*/ESC/VIBE 等真实消息序列）。
 
-数据来源（公开页面，无需鉴权）：
-- 列表：GET https://autotest.ardupilot.org/  首页是纯 HTML 目录，正则抽 `<a href>`。
-- 下载：GET https://autotest.ardupilot.org/<file>  直接返二进制。
+数据来源（公开页面，无需鉴权）：首页纯 HTML 目录、正则抽 <a href>；`BASE/<file>` 直接
+返二进制。
 
-三个必须知道的前置事实（都实测过，2026-09-24）：
-1. **文件名里的序号不能猜**。列表里是 `ArduCopter-GyroFFTHarmonic-00000394.BIN`，
-   照着规律试 `-00000015` 之类必 404 —— 序号是 SITL 重启计数，不连续。
-2. **首页是滚动的**，只保留最新一次 test run 的产物，旧文件会被清理。
-   抓到就落盘，别指望"以后再下同一条"。
-3. **这些都是 SITL 仿真日志**，不是真实外场飞行。真实故障日志得去论坛
-   discuss.ardupilot.org 爬（用户求助帖自带 .bin），本脚本不管。
+三个前置事实（实测 2026-09-24）：
+1. **文件名里的序号不能猜**：序号是 SITL 重启计数、不连续，照规律试 -00000015 之类必 404。
+2. **首页是滚动的**，只保留最新一次 test run 的产物，旧文件被清理。抓到就落盘。
+3. **这些是 SITL 仿真日志**，不是真实外场飞行；真实故障日志得去 discuss.ardupilot.org
+   爬（用户求助帖自带 .bin），本脚本不管。
 
 示例：
-  # 每种「机型+测试」取 1 条（默认，约 32 条）
-  python tools/dev/download_ardupilot_logs.py
-
-  # 只下 ArduCopter
+  python tools/dev/download_ardupilot_logs.py                              # 每种机型+测试取 1 条
   python tools/dev/download_ardupilot_logs.py --vehicle ArduCopter
-
-  # 每组取 3 条，单文件不超过 20MB，总共不超过 50 条
   python tools/dev/download_ardupilot_logs.py --per-group 3 --max-size-mb 20 --count 50
-
-  # 下某个测试的全部（如陀螺 FFT，正好是引擎缺口：平台还没有 FFT 算子）
-  python tools/dev/download_ardupilot_logs.py --test GyroFFTHarmonic --all
-
-  # 只看清单不下载
-  python tools/dev/download_ardupilot_logs.py --list-only
+  python tools/dev/download_ardupilot_logs.py --test GyroFFTHarmonic --all  # 某测试的全部
+  python tools/dev/download_ardupilot_logs.py --list-only                  # 只看清单
 """
 
 from __future__ import annotations
@@ -57,10 +45,9 @@ USER_AGENT = "nextpilot-skill-mcp-log-dataset/0.1 (rule calibration; contact via
 
 # 首页链接形如 ArduCopter-GyroFFTHarmonic-00000394.BIN / HeliCopter-test.tlog
 FILE_RE = re.compile(r'"([A-Za-z0-9_\-]+\.(?:BIN|bin|tlog|log))"')
-# <Vehicle>-<Test>-<index> ；两种变体：
-#   少数无 index 段（HeliCopter-test.tlog）
-#   DataFlashErase 测试的文件名多一段（...-DataFlashErase-dataflash-log-002.BIN），
-#   Test 段用 `.+?` 而不是 `[A-Za-z0-9]+?`，否则这 99 个会被整个丢掉。
+# <Vehicle>-<Test>-<index>；两种变体：少数无 index 段（HeliCopter-test.tlog）；
+# DataFlashErase 测试多一段（...-DataFlashErase-dataflash-log-002.BIN），Test 段须用
+# `.+?` 而不是 `[A-Za-z0-9]+?`，否则这 99 个会被整个丢掉。
 NAME_RE = re.compile(r"^([A-Za-z]+)-(.+?)(?:-(\d+))?\.[A-Za-z0-9]+$")
 
 DATAFLASH_MAGIC = b"\xa3\x95"
@@ -69,7 +56,7 @@ DATAFLASH_MAGIC = b"\xa3\x95"
 def http_get(url: str, *, timeout: float = 60.0, max_bytes: int | None = None, retries: int = 3) -> bytes:
     """GET 一个 URL；max_bytes 时流式拉取，超限抛 ValueError。
 
-    到 autotest.ardupilot.org 偶发连接超时（同一 URL 隔几秒重试就能过），统一在此退避。"""
+    到 autotest.ardupilot.org 偶发连接超时（隔几秒重试就能过），统一在此退避。"""
     last_err: Exception | None = None
     for attempt in range(1, retries + 1):
         try:
@@ -100,8 +87,8 @@ def http_get(url: str, *, timeout: float = 60.0, max_bytes: int | None = None, r
 def fetch_index() -> list[dict]:
     """抓首页并解析出日志文件清单。
 
-    `NAME_RE` 的第二段用非贪婪 `+?`：测试名本身可能含数字（TakeoffAuto3），
-    贪婪会把 `TakeoffAuto3-00000240` 里的 3 当成序号。"""
+    `NAME_RE` 第二段用非贪婪 `+?`：测试名可能含数字（TakeoffAuto3），贪婪会把
+    TakeoffAuto3-00000240 里的 3 当成序号。"""
     html = http_get(INDEX_URL, timeout=60).decode("utf-8", "replace")
     seen: set[str] = set()
     out: list[dict] = []
@@ -126,7 +113,7 @@ def fetch_index() -> list[dict]:
 
 
 def is_valid_dataflash(path: Path) -> bool:
-    """DataFlash 以 A3 95 开头（tlog 是 MAVLink 流，无此魔数，按扩展名放行）。"""
+    """DataFlash 以 A3 95 开头（tlog 是 MAVLink 流、无此魔数，按扩展名放行）。"""
     if path.suffix.lower() != ".bin":
         return True
     try:
@@ -153,11 +140,9 @@ def group_key(f: dict) -> tuple[str, str]:
 def select(files: list[dict], args: argparse.Namespace) -> tuple[list[dict], dict[tuple[str, str], list[dict]]]:
     """挑出待下载项，并顺带返回「同组全部候选」。
 
-    默认「每机型每测试取 1 条」而不是全下：一次 run 有 2500+ 文件，
-    同一测试的上百条日志内容高度重复（都是同一套 SITL 脚本的多次重启）。
-
-    返回同组候选是为了**下载失败时能在组内换一条**——首页列出的文件不等于
-    还能下到（站点滚动清理，实测 37 条里有 3 条 404），换同组文件比直接放弃有用。"""
+    默认「每机型每测试取 1 条」而不是全下：一次 run 有 2500+ 文件，同一测试的上百条
+    日志内容高度重复（同一套 SITL 脚本的多次重启）。返回同组候选是为了下载失败时能在
+    组内换一条——首页列出的文件不等于还能下到（站点滚动清理，实测 37 条里 3 条 404）。"""
     picked = [f for f in files if matches_filters(f, args)]
     picked.sort(key=lambda x: (x["vehicle"], x["test"], x["index"]))
 
@@ -228,7 +213,7 @@ def main() -> int:
     queue = list(targets)
     done_keys: set[tuple[str, str]] = set()
     subs: dict[tuple[str, str], int] = {}  # 每组已换过几次
-    tried: set[str] = set()  # 已试过的文件名；失败的文件不会落盘，光看"是否存在"会重复挑中它
+    tried: set[str] = set()  # 已试过的文件名；失败的不会落盘，只看"是否存在"会重复挑中
     i = 0
     while queue:
         f = queue.pop(0)
@@ -244,8 +229,8 @@ def main() -> int:
         last_err = None
         for attempt in range(1, args.retries + 1):
             try:
-                # 单文件超时压到 90s：实测这些日志 2~3s 就下完，给 300s 的话
-                # 一旦连接挂起（偶发），一个失败文件就能卡满 900s。
+                # 单文件超时压到 90s：实测 2~3s 就下完，给 300s 的话一旦连接挂起，
+                # 一个失败文件就能卡满 900s。
                 data = http_get(f["url"], timeout=90, max_bytes=max_bytes, retries=1)
                 if f["ext"] == "bin" and data[:2] != DATAFLASH_MAGIC:
                     raise ValueError("返回内容不是 DataFlash（魔数不是 A3 95）")
@@ -270,11 +255,10 @@ def main() -> int:
                     print(f"  第 {attempt} 次失败（{err}），{wait}s 后重试…")
                     time.sleep(wait)
         else:
-            # 站点滚动清理会让列表里已失效的文件返 404；同组还有别的日志就换一条顶上，
-            # 比整组放弃划算，同一测试的各条内容本就可互换。
+            # 列表里已失效的文件会返 404；同组还有别的日志就换一条顶上，同一测试的
+            # 各条内容本就可互换。
             key = group_key(f)
-            # 换组要有上限：热门测试一组能有 248 条（FenceRelativeToTerrainMaxAlt），
-            # 若整组都已失效，不设限会一路换到底、把跑批拖成十几分钟。
+            # 换组有上限：热门测试一组能有 248 条，整组失效时不设限会一路换到底。
             used = subs.get(key, 0)
             alt = (
                 next(

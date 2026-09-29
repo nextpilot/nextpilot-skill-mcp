@@ -1,11 +1,11 @@
 """合成一份最小 ArduPilot .bin（AP_Logger）样本 —— 给契约测试当夹具。
 
-为什么独立实现打包、不复用 knowledge/engine/providers/ardupilot.py 的解析：
-夹具的**写入端**与被测的**读取端**是两份独立实现——两边对"格式"的理解必须各自
-站得住才能对上；复用同一份代码就成了自证（写错读错，测试照样绿）。
+为什么独立实现打包、不复用 providers/ardupilot.py 的解析：夹具的**写入端**与被测的
+**读取端**必须是两份独立实现——两边对"格式"的理解各自站得住才能对上；复用同一份代码
+就成了自证（写错读错，测试照样绿）。
 
-只写契约测试需要的最小集合：FMT 声明 + PARM/MSG/EV/MODE/GPS 各几行，
-覆盖：版本解析、参数、armed 区间（EV 10/11）、模式切段、GPS 轨迹与 Home。
+只写契约测试要求的最小集合：FMT 声明 + PARM/MSG/EV/MODE/GPS 各几行，覆盖版本解析、
+参数、armed 区间（EV 10/11）、模式切段、GPS 轨迹与 Home。
 
 用法：
   from apm_make_sample import build_sample_bytes
@@ -29,7 +29,7 @@ def _fmt_row(mtype, length, name, fmt, columns):
 
 
 def _msg(mtype, fmt, values, scaled):
-    """一条数据消息：magic + length + type + 按 fmt 打包的 payload（缩放字符在写入端同样要乘回去）。"""
+    """一条数据消息：magic + type + 按 fmt 打包的 payload（缩放字符写入端同样要乘回去）。"""
     payload = b""
     for ch, v in zip(fmt, values):
         if ch == "Q":
@@ -58,8 +58,8 @@ def _msg(mtype, fmt, values, scaled):
 # 消息类型 ID：解析器按名字查表，ID 本身随便给（这正是要自证的点之一）
 IDS = {"FMT": 128, "PARM": 132, "MSG": 133, "EV": 134, "MODE": 135, "GPS": 136}
 
-# (名字, 格式串, 列名)。长度 = 3 + 各字段字节数之和（Length 含 3 字节头，与主流固件一致；
-# 解析器有自校准，就算约定反了也该解对，这本身就是被测行为）
+# (名字, 格式串, 列名)。Length = 3 + 各字段字节数之和（含 3 字节头，与主流固件一致）；
+# 解析器有自校准，就算约定反了也该解对，这本身就是被测行为。
 STRUCTS = {
     "PARM": ("QNf", "TimeUS,Name,Value"),
     "MSG": ("QZ", "TimeUS,Message"),
@@ -76,16 +76,14 @@ def _fmt_len(fmt):
 
 def build_sample_bytes() -> bytes:
     out = bytearray()
-    # FMT 声明先写（含 FMT 自己的声明，真实日志也是如此，解析器的长度约定校准靠它）
+    # FMT 声明先写（含 FMT 自己，真实日志也如此；解析器的长度约定校准靠它）
     out += _fmt_row(128, 89, "FMT", "BBnNZ", "Type,Length,Name,Format,Columns")
     for name, (fmt, columns) in STRUCTS.items():
         out += _fmt_row(IDS[name], _fmt_len(fmt), name, fmt, columns)
 
-    # 参数：版本 + 机架 + 一批"会被规则读"的配置项。
-    # 后四个是故意挑的值：前三个取 0（禁用）让 config_safety 那三条真的发射一次。
-    # 参数类规则在 2026-09 之前一直是"provider 读不到参数"而占位，没有这份夹具它们
-    # 没有端到端证据；RNGFND1_TYPE=1 而日志里没有 RFND/RNGFND 消息，是"配置与数据对不上"
-    # 那条的正例；GPS_TYPE=1 且下面真有 GPS 消息，是同一条的反例（不该报）。
+    # 参数：版本 + 机架 + 一批"会被规则读"的配置项。后四个是故意挑的：前三个取 0
+    # （禁用）让 config_safety 那三条真的发射一次。RNGFND1_TYPE=1 而日志无 RFND 消息是
+    # "配置与数据对不上"的正例；GPS_TYPE=1 且下面真有 GPS 消息，是同一条的反例（不该报）。
     for i, (name, value) in enumerate(
         [
             ("FORMAT_VERSION", 4.5),

@@ -7,19 +7,15 @@
   python tools/dev/blob_manager.py remove <source> [--confirm]
 
 示例：
-  push .cache/pyodide-dist/pyodide/             pyodide/            # 上传目录（覆盖）
-  push .cache/pyodide-dist/pyodide/             pyodide/ --skip-existing  # 只传新文件
-  push .cache/pyodide-dist/wheels/x.whl         wheels/x.whl        # 上传单个文件
-  pull pyodide/v0.27.7/full/pyodide.js          ./local/            # 下载单文件
-  pull pyodide/v0.27.7/full/                    ./local/            # 下载文件夹
-  list                                                              # 列出全部
-  list pyodide/                                                     # 按前缀列出
-  remove wheels/x.whl                                               # 删除单文件
-  remove pyodide/v0.27.7/full/ --confirm                            # 删除文件夹
+  push .cache/pyodide-dist/pyodide/  pyodide/            # 上传目录（覆盖）
+  push .cache/pyodide-dist/pyodide/  pyodide/ --skip-existing  # 只传新文件
+  push .cache/pyodide-dist/wheels/x.whl  wheels/x.whl    # 上传单个文件
+  pull pyodide/v0.27.7/full/pyodide.js   ./local/        # 下载单文件
+  pull pyodide/v0.27.7/full/             ./local/        # 下载文件夹
+  list  /  list pyodide/                                 # 全部 / 按前缀列出
+  remove wheels/x.whl  /  remove pyodide/v0.27.7/full/ --confirm
 
-全局选项：
-  -w, --workspace  runtime               命名空间（默认 runtime）
-  -s, --site       skill.nextpilot.org   站点（默认连接生产环境）
+全局选项：-w/--workspace（默认 runtime）、-s/--site（默认连接生产环境）。
 """
 
 from __future__ import annotations
@@ -260,7 +256,7 @@ def cmd_list(args: argparse.Namespace) -> int:
 
 # --------------------------------------------------------------------------- remove
 def cmd_remove(args: argparse.Namespace) -> int:
-    """就删除一个文件或文件夹，不创造多余概念。"""
+    """删一个文件或文件夹，不创造多余概念。"""
     site = _resolve_site(args)
 
     # 文件夹：/ 结尾 → 先 list 再逐个删除

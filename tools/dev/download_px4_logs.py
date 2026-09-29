@@ -1,29 +1,19 @@
 """从 Flight Review（https://logs.px4.io/browse）批量下载真实 PX4 .ulg 日志。
 
 用途：为规则校准 / 误报率统计 / 数据分析与训练积累真实日志集。文件落在
-`.cache/px4/logs/`（已在 .gitignore），原始日志不进仓库、不上传。
+.cache/px4/logs/（已 .gitignore），原始日志不进仓库、不上传。
 
-数据来源（均为公开页面/接口，无需鉴权）：
-- 列表：GET https://logs.px4.io/browse_data_retrieval
-  这是 /browse 页面 DataTables 的 serverSide 接口（POST 在当前站点 405，只收 GET）。
-- 下载：GET https://logs.px4.io/download?log=<uuid>
-  302 跳转到 https://cdn.logs.px4.io/<uuid>.ulg，binary/octet-stream。
-- 每条日志落盘 <uuid>.ulg + <uuid>.json（元数据），并追加一行到 index.jsonl，
-  方便训练管线直接读清单。已存在且 ULog 魔数正确的文件跳过，可随时中断续跑。
+数据来源（公开页面/接口，无需鉴权）：
+- 列表：GET /browse_data_retrieval（/browse 的 DataTables serverSide 接口；POST 405，只收 GET）
+- 下载：GET /download?log=<uuid>，302 跳到 cdn.logs.px4.io/<uuid>.ulg
+- 每条落盘 <uuid>.ulg + <uuid>.json，并追加一行到 index.jsonl。已存在且 ULog 魔数正确的
+  跳过，可随时中断续跑。
 
 示例：
-  # 默认下载最新 20 条
-  python tools/dev/download_px4_logs.py
-
-  # 只要多旋翼、固件 1.15+、时长 1~20 分钟、单文件不超过 30MB，下 50 条
-  python tools/dev/download_px4_logs.py --count 50 \\
-      --vehicle Quadrotor --version v1.15 --min-duration 60 --max-duration 1200 \\
-      --max-size-mb 30
-
-  # 只看列表不下载
+  python tools/dev/download_px4_logs.py                          # 默认最新 20 条
+  python tools/dev/download_px4_logs.py --count 50 --vehicle Quadrotor --version v1.15 \\
+      --min-duration 60 --max-duration 1200 --max-size-mb 30
   python tools/dev/download_px4_logs.py --list-only --count 10
-
-  # 站点自带搜索框（服务端模糊匹配，如机型/硬件名）
   python tools/dev/download_px4_logs.py --search "FMU_V6X" --count 10
 """
 
@@ -55,7 +45,7 @@ TAG_RE = re.compile(r"<[^>]+>")
 def http_get(url: str, *, timeout: float = 60.0, max_bytes: int | None = None, retries: int = 3) -> bytes:
     """GET 一个 URL（自动跟随 302）；max_bytes 时流式拉取，超限抛 ValueError。
 
-    国内网络到 logs.px4.io / jsdelivr 偶发 SSL EOF、连接重置，统一在此重试退避。"""
+    国内网络到 logs.px4.io 偶发 SSL EOF、连接重置，统一在此重试退避。"""
     last_err: Exception | None = None
     for attempt in range(1, retries + 1):
         try:
@@ -115,7 +105,7 @@ def parse_duration(text: str) -> int | None:
 
 
 def parse_row(row: list) -> dict | None:
-    """DataTables 一行 → 元数据。列序见 /browse 页面 DataTables 配置。"""
+    """DataTables 一行 → 元数据；列序见 /browse 的 DataTables 配置。"""
     m = UUID_RE.search(str(row[1])) if len(row) > 1 else None
     if not m:
         return None
@@ -139,7 +129,7 @@ def parse_row(row: list) -> dict | None:
 
 
 def is_valid_ulg(path: Path) -> bool:
-    """ULog 文件以魔数 'ULog' + 版本字节（0x12 v1）开头。"""
+    """ULog 文件以魔数 'ULog' 开头。"""
     try:
         with path.open("rb") as f:
             return f.read(4) == b"ULog"

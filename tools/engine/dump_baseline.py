@@ -1,8 +1,8 @@
 """冻结规则引擎的基线输出（规则格式重构前要先跑）。
 
 把 tools/testdata/logs/ 下每个回归日志的完整引擎输出（findings 全字段、stats、tags、
-guardTags、phases、checksRun/checksSkipped、matchedFaults）冻结到 baseline/ 下，
-作为后续"一条经验一个 YAML"重构的等价比对真相。
+guardTags、phases、checksRun/checksSkipped、matchedFaults）冻结到 baseline/ 下，作为
+后续"一条经验一个 YAML"重构的等价比对真相。
 
 用法：
   python tools/engine/dump_baseline.py                    # 冻结全部回归日志
@@ -22,13 +22,13 @@ from _logging import get_logger  # noqa: E402
 
 log = get_logger()
 
-# 复用同一套加载/执行逻辑，保证"基线跑的是什么，比对跑的就是什么"
+# 复用同一套加载/执行逻辑：保证"基线跑的是什么，比对跑的就是什么"
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "knowledge" / "engine"))
 import loader as runner  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-# 数据在 tools/testdata/，工具在 tools/engine/，分住两处，所以用仓库根往下数，
-# 不用"相对自身"（否则本文件一搬家就指到空目录，且 mkdir 会静默造出一个假的 baseline/）。
+# 数据在 tools/testdata/、工具在 tools/engine/：用仓库根往下数，不用"相对自身"
+# （否则本文件一搬家就指到空目录，mkdir 还会静默造出一个假的 baseline/）。
 TESTDATA = REPO_ROOT / "tools" / "testdata"
 LOG_DIR = TESTDATA / "logs"  # 校准用真实日志（不入库，需自备）
 BASELINE_DIR = TESTDATA / "baseline"
@@ -45,9 +45,7 @@ def slug(path: Path) -> str:
 
 def source_of(path: Path) -> str:
     """记录日志来源：.ulg/.BIN 不入库（见 .gitignore），基线得自带"怎么把它取回来"。
-
-    uuid 命名的日志来自 Flight Review（logs.px4.io）公开日志集。
-    APM 日志来自 ArduPilot SITL autotest 或用户提供的 .BIN。
+    uuid 命名的来自 Flight Review（logs.px4.io）；APM 日志来自 SITL autotest 或用户 .BIN。
     """
     stem = path.stem
     first = stem.split("-")[0]

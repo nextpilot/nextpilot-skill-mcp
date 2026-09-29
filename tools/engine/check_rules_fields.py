@@ -1,24 +1,20 @@
 """经验字段引用 lint：查规则里引用的 `topic.field` 在该经验的版本范围内是否真的存在。
 
-为什么需要它：字段名写错、或字段只存在于别的固件版本时，引擎都不会报错，
-只是取到 None → 那条经验静默不生效，没有任何告警。
-（构建期 `pnpm build:kb` 只能校验表达式的形状与算子/变量，查不了字段存在性；
-那要按固件版本比日志实测字段与上游字典，是这里的事。）
+为什么需要它：字段名写错、或字段只存在于别的固件版本时，引擎都不报错，只取到 None
+→ 那条经验静默不生效。构建期 `pnpm build:kb` 只能校验表达式形状与算子/变量。
 
-判据是版本感知的（每条经验都声明了 `firmware`，就按它的版本范围去查对应来源）：
-  1. 回归日志实测字段：每条日志按基线里的 firmware 归类，只与经验版本范围相符的才算数
-  2. 上游固件字典：knowledge/px4/meta/<tag>.json，tag 名即版本（main 视为最新）
-任一命中即算存在。
+判据版本感知（每条经验都声明 `firmware`）：1) 回归日志实测字段（每条日志按基线里的
+firmware 归类）；2) 上游固件字典 knowledge/px4/meta/<tag>.json（tag 名即版本，main 视为
+最新）。任一命中即算存在。
 
-引用按候选组判：`ref("新名", "旧名")` 或 `ref("名", alias="旧名")` 是一组，
-组内任意一个在某版本存在即可（同义改名用候选组表达，不再需要白名单）。
-分类：
-  OK            在适用版本里能找到
-  version-gap   适用版本里没有、但别的版本里有 → 该经验在这些固件上其实不生效，
+引用按候选组判：`ref("新名", "旧名")` 或 `ref("名", alias="旧名")` 是一组，组内任意一个
+在某版本存在即可。分类：
+  OK            适用版本里能找到
+  version-gap   适用版本里没有、别的版本里有 → 该经验在这些固件上其实不生效，
                 要改 firmware 范围、补 when_fw 分支，或改用候选组
   suspicious    哪里都没有 → 大概率拼错
 
-规则取自构建产物（compute 已是表达式，老节点写法在构建期被编译掉了）。
+规则取自构建产物（compute 已是表达式）。
 
 用法：python tools/engine/check_rules_fields.py [--strict]
     --strict 时 version-gap 与 suspicious 都算失败（默认只报告、返回 0）
@@ -44,8 +40,8 @@ import loader as runner  # noqa: E402
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RULES_DIR = REPO_ROOT / "knowledge" / "px4" / "rules"
 META_DIR = REPO_ROOT / "knowledge" / "px4" / "meta"
-# 数据与工具分住两处：数据在 tools/testdata/，工具在 tools/engine/。
-# 用"相对自身"的路径会随工具搬家一起断，所以都从仓库根往下数。
+# 数据在 tools/testdata/、工具在 tools/engine/：用"相对自身"的路径会随工具搬家而断，
+# 所以都从仓库根往下数。
 TESTDATA = REPO_ROOT / "tools" / "testdata"
 LOG_DIR = TESTDATA / "logs"  # 校准用真实日志（不入库，需自备）
 BASELINE_DIR = TESTDATA / "baseline"
@@ -104,13 +100,10 @@ def fields_by_version_from_logs() -> dict[tuple[int, int], dict[str, set[str]]]:
             d = json.loads(f.read_text(encoding="utf-8"))
         except Exception:  # noqa: BLE001
             continue
-        # 固件版本在 result.facts.firmware。别写成 result.stats.firmware：
-        # 引擎从来不产出 stats（那是更早的输出形态），取不到就静默退化成 ""，
-        # 于是这条日志被判为"版本未知"而整条跳过，结果是本函数的日志侧字段源一直空转，
-        # 上面那行只会显示"日志实测 0 个版本"（很容易划过去）。
-        # 后果很严重且不报错：所有字段判定只剩上游字典（1.15/1.16/main）一个来源，
-        # 于是日志里明明存在的旧固件字段（vehicle_gps_position.*、estimator_wind.* 等）
-        # 全被报成"可疑引用，多半是拼错"，实测 18 条全是假阳性。
+        # 版本在 result.facts.firmware，不是 result.stats.firmware：引擎从不产出
+        # stats（更早的输出形态），取不到会静默退化成 ""，这条日志被判"版本未知"整条
+        # 跳过，日志侧字段源空转。后果是字段判定只剩上游字典一个来源，日志里明明存在
+        # 的旧固件字段被报成"可疑引用"，实测 18 条全是假阳性。
         label = str((d.get("result", {}).get("facts") or {}).get("firmware") or "")
         m = re.match(r"(\d+)\.(\d+)", label)
         if m and d.get("log"):
@@ -145,9 +138,9 @@ def fields_by_version_from_meta() -> dict[tuple[int, int], dict[str, set[str]]]:
 def has_field(index, version, topic: str, fld: str) -> bool:
     """某版本里有没有这个字段。
 
-    两边都归一化到基名再比：日志侧存的是 `states[0]` 这样的带下标名，字典侧（上游 .msg）
-    存的是裸名 `states`；只在引用那一侧剥下标，会让"数组字段"在日志里永远匹配不上
-    （踩过：`estimator_status.states` 明明在 1.11 日志里，却被判成"哪里都没有"）。
+    两边都归一化到基名再比：日志侧是 `states[0]` 这类带下标名，字典侧是裸名 `states`；
+    只在引用侧剥下标会让"数组字段"永远匹配不上（踩过：`estimator_status.states`
+    明明在 1.11 日志里，却被判成"哪里都没有"）。
     """
     want = ARRAY_SUFFIX.sub("", fld)
     return any(ARRAY_SUFFIX.sub("", got) == want for got in (index.get(version, {}).get(topic) or set()))
@@ -159,13 +152,9 @@ def has_field(index, version, topic: str, fld: str) -> bool:
 def field_refs(expr: str) -> list[list[str]]:
     """从一条 compute 表达式里取出字段引用（候选组）。
 
-    返回 [[候选字段名, …], …]：
-      - ref("新名", "旧名")           → 候选组：运行期取第一个存在的
-      - ref("名", alias="旧名")       → 候选组（alias 是"备用命名"的另一种写法）
-      - 裸写的 topic.field            → 单元素组
-
-    组内任意一个在某版本存在，这条引用就算在那个版本成立，它表达的是"同义改名"，
-    与版本无关（"哪个版本该用哪个字段"不另设写法：升级换代就是老名字没了、新名字在）。
+    返回 [[候选字段名, …], …]：ref("新名", "旧名") / ref("名", alias="旧名") 是候选组
+    （运行期取第一个存在的），裸写的 topic.field 是单元素组。候选组表达"同义改名"，
+    与版本无关（升级换代就是老名字没了、新名字在）。
     """
     out: list[list[str]] = []
     for node in ast.walk(ast.parse(expr, mode="exec")):
@@ -188,10 +177,8 @@ def field_refs(expr: str) -> list[list[str]]:
 def rule_refs() -> list[tuple[str, list[str], list]]:
     """(规则 id, 候选字段名, 生效的版本约束列表)。
 
-    规则来自构建产物（compute 已是表达式）。版本约束只有规则级的 `firmware`
-    （引用上不再有 when_fw）：一条经验服务哪个版本段，写在 `conditions.firmware` 上。
-
-    只检查 PX4 规则（id 以 px4- 开头）：APM 规则需要 APM 字典，这里不查。
+    版本约束只有规则级 `firmware`（引用上不再有 when_fw）。只检查 PX4 规则
+    （id 以 px4- 开头）：APM 规则需要 APM 字典，这里不查。
     """
     out = []
     for raw in runner.load_rules():
@@ -230,7 +217,7 @@ def main(argv: list[str]) -> int:
         """候选组里任意一个命中即算命中。"""
         for n in names:
             topic, _, fld = n.partition(".")
-            # 实例写法写在 topic 后（`estimator_status[:].vel_test_ratio`），查字段时要去掉
+            # 实例写法写在 topic 后（`estimator_status[:].vel_test_ratio`），查字段时去掉
             topic = INSTANCE_SUFFIX.sub("", topic)
             if has_field(index, version, topic, fld):
                 return True

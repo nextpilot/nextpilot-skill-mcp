@@ -1,18 +1,16 @@
 """Scan tracked files for committed credentials.
 
-Why this exists: the project rule is "secrets live in the edge function /
-EdgeOne console environment, never in the repo", but until now nothing checked it.
+Project rule: "secrets live in the edge function / EdgeOne console environment,
+never in the repo" -- until now nothing checked it.
 
-Why the rules are imported from web/lib/error-policy.js rather than written here:
-that file is the project's existing authority on "what counts as a sensitive
-string" (it drives issue-report scrubbing). A second set of rules would mean
-"the scrubber thinks this is safe, the scanner thinks it is a secret" -- two
-authorities disagreeing, and the eventual outcome is that someone turns the
-scanner off. test-issue-filer.mjs already forbids those literals from living
-anywhere else; this scanner obeys the same rule.
+Rule vocabulary is imported from web/lib/error-policy.js, the project's existing
+authority on "what counts as a sensitive string" (it drives issue-report
+scrubbing). A second set of rules would mean "the scrubber thinks this is safe,
+the scanner thinks it is a secret" -- two authorities disagreeing, and the
+eventual outcome is someone turning the scanner off.
 
-The judgement is "key name AND a value that looks like a real credential".
-Matching key names alone would flag documentation (docs/operations/README.md
+The judgement is "key name AND a value that looks like a real credential":
+matching key names alone would flag documentation (docs/operations/README.md
 legitimately writes EDGEONE_API_TOKEN), and a scanner that cries wolf on the
 first run is one people learn to bypass with --no-verify.
 
@@ -31,14 +29,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 ERROR_POLICY = ROOT / "web" / "lib" / "error-policy.js"
 
-# Files that are not secrets even when they match: lockfiles carry integrity
-# hashes, and the generated knowledge bundle is a build artifact.
+# Files that are not secrets even when they match: lockfiles carry integrity hashes,
+# and the generated knowledge bundle is a build artifact.
 SKIP_SUFFIXES = {".lock", ".map", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2", ".pdf"}
 SKIP_NAMES = {"pnpm-lock.yaml", "package-lock.json"}
 SKIP_PARTS = {"node_modules", ".next", ".git", "playwright-report", "test-results"}
 
-# Key names that would hold a credential. Matched case-insensitively as whole
-# words, with or without a trailing assignment.
+# Key names that would hold a credential; matched case-insensitively as whole words.
 CREDENTIAL_KEYS = [
     "EDGEONE_API_TOKEN",
     "AUTH_SECRET",
@@ -56,13 +53,11 @@ CREDENTIAL_KEYS = [
     "SECRET",
 ]
 
-# The value is not a literal at all: it is read from the environment.
-# `env?.AUTH_SECRET`, `process.env.X`, `import.meta.env.X` -- these are the
-# correct pattern, so flagging them would invert the check's meaning.
+# Value read from the environment (`env?.AUTH_SECRET`, `process.env.X`,
+# `import.meta.env.X`) -- the correct pattern; flagging it would invert the check.
 ENV_REFERENCE = re.compile(r"(?:\w+\s*[.?]\s*)*\b(?:process\.env|import\.meta\.env|env)\b\s*[.?[]")
 
-# A value is "worth reporting" only if it does not look like an obvious
-# placeholder. These are what documentation and .env.example legitimately use.
+# What documentation and .env.example legitimately use; anything matching is not reported.
 PLACEHOLDER_SHAPE = re.compile(
     r"""^[\s"']*$            # empty
       | ^<.*>$               # <your-token>
@@ -77,9 +72,8 @@ PLACEHOLDER_SHAPE = re.compile(
     re.IGNORECASE | re.VERBOSE,
 )
 
-# The value is built at runtime, not written here: `${...}` inside a template
-# literal, or a concatenation. A credential that is never a literal in the file
-# cannot be leaked by the file.
+# Value built at runtime (`${...}` in a template literal, or a concatenation):
+# a credential that is never a literal in the file cannot be leaked by the file.
 INTERPOLATION = re.compile(r"\$\{|\bencodeURIComponent\b|\bJSON\.stringify\b")
 
 # Rendered explicitly instead of inferred from the JS: the rules are the scanner's
@@ -96,8 +90,7 @@ SCRUB_EQUIVALENT = [
 
 
 def tracked_files() -> list[Path]:
-    """Tracked files to scan. Uses git so untracked scratch files are ignored --
-    a secret that was never committed is not this check's business."""
+    """Tracked files to scan; uses git so untracked scratch files are ignored."""
     out = subprocess.run(
         ["git", "ls-files", "-z"],
         cwd=str(ROOT),
@@ -126,9 +119,7 @@ def placeholder(value: str) -> bool:
 
 def looks_like_credential(value: str) -> bool:
     """A real-looking credential: long enough, no whitespace, mixed shape.
-
-    Deliberately permissive -- docs and .env.example are filtered by
-    `placeholder()` first, so this only has to separate "a value" from "a word".
+    Deliberately permissive -- `placeholder()` already filtered docs / .env.example.
     """
     v = value.strip().strip("'\"")
     if len(v) < 12:
@@ -145,9 +136,8 @@ def key_and_value_findings(text: str) -> list[tuple[int, str, str]]:
     """Lines where a credential key is assigned something credential-shaped."""
     findings: list[tuple[int, str, str]] = []
     keys = "|".join(re.escape(k) for k in CREDENTIAL_KEYS)
-    # KEY = value / KEY: value / "KEY": "value"  -- the value runs to EOL or quote.
-    # The separator must not be a comparison (`===`, `==`, `!=`) -- `if (!AUTH_SECRET)`
-    # is a check on the env var, not a value.
+    # KEY = value / KEY: value / "KEY": "value" -- value runs to EOL or quote. The
+    # separator must not be a comparison (`if (!AUTH_SECRET)` checks the env var).
     pattern = re.compile(
         rf"""["']?\b({keys})\b["']?\s*(?<![=!<>])=(?!=)\s*(?P<val>["']?[^\s"'#]{{1,200}}["']?)
           | ["']?\b({keys})\b["']?\s*:\s*(?P<val2>["']?[^\s"'#]{{1,200}}["']?)
@@ -167,10 +157,9 @@ def key_and_value_findings(text: str) -> list[tuple[int, str, str]]:
 def scrub_findings(text: str) -> list[tuple[int, str, str]]:
     """Values that already look like the things error-policy.js scrubs.
 
-    Only JWT and Bearer are checked -- a bare 24+ hex or an IP appears
-    legitimately in generated knowledge JSON and lockfiles, and flagging those
-    would drown the check. Email is excluded too: this repo's docs and fixtures
-    are full of example addresses, and a real address is not a credential.
+    Only JWT and Bearer: a bare 24+ hex or an IP appears legitimately in generated
+    knowledge JSON and lockfiles, and email is everywhere in docs/fixtures and is
+    not a credential.
     """
     findings: list[tuple[int, str, str]] = []
     wanted = {"jwt", "bearer"}
@@ -182,8 +171,8 @@ def scrub_findings(text: str) -> list[tuple[int, str, str]]:
             if not m:
                 continue
             # `Bearer <token>` / `Bearer ${...}` is the documented placeholder form,
-            # and so is a token whose own text marks it as a probe/fake value
-            # (`kv-probe.js` sends "Bearer probe-invalid-key" to test rejection).
+            # as is a token whose text marks it probe/fake (`kv-probe.js` sends
+            # "Bearer probe-invalid-key" to test rejection).
             if name == "bearer":
                 token = re.sub(r"^\s*Bearer\s+", "", m.group(0), flags=re.IGNORECASE)
                 if re.match(r"^(?:<|\$\{)", token) or placeholder(token):
@@ -193,12 +182,11 @@ def scrub_findings(text: str) -> list[tuple[int, str, str]]:
 
 
 def fixture_values() -> set[str]:
-    """Values that exist to be tested against, taken from the scrubber's fixtures.
+    """Expected values, taken from the scrubber's fixtures.
 
-    web/scripts/test-issue-filer.mjs holds literal emails/JWTs so the scrub
-    rules have something to match. Those are deliberately fake, and the project
-    already forbids them from living anywhere else -- so the scanner reads the
-    fixture file and treats whatever it finds there as expected.
+    web/scripts/test-issue-filer.mjs holds deliberately-fake literal emails/JWTs
+    so the scrub rules have something to match; the project already forbids them
+    anywhere else, so whatever the scanner finds there is expected.
     """
     fixture = ROOT / "web" / "scripts" / "test-issue-filer.mjs"
     if not fixture.exists():
@@ -242,7 +230,7 @@ def main(argv: list[str]) -> int:
         for lineno, key, value in found:
             findings.append((rel, lineno, key, value))
 
-    # This file necessarily contains the key names and the rule patterns.
+    # This file necessarily contains the key names and rule patterns.
     findings = [f for f in findings if f[0] != str(Path(__file__).relative_to(ROOT)).replace("\\", "/")]
 
     if not findings:

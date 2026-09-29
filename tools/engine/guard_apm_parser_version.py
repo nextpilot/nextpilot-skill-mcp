@@ -2,38 +2,29 @@ r"""ArduPilot `.bin` 解析器：解析逻辑变了要升 `parserVersion`。
 
 ## 为什么要有它
 
-`.ulg` 侧的解析器版本是环境的指纹（`pyulog/1.2.4`，换台机器就变，所以
-`compare_baseline.py` 的 `IGNORED_TOP_KEYS` 把它排除了）。而 `.bin` 侧是自研解析器，
-版本串是一个手维护的常量 `apm-bin-parser/1.0.0`（`knowledge/engine/providers/ardupilot.py`
-的 `parser_version()`），它跨机器稳定，但代价是：改了解析行为不升版本号，没有任何东西会响。
+`.ulg` 侧的版本是环境指纹（`pyulog/1.2.4`，换机就变，`compare_baseline.py` 的
+`IGNORED_TOP_KEYS` 因此排除它）。`.bin` 侧是自研解析器，版本串是手维护常量
+`apm-bin-parser/1.0.0`（ardupilot.py 的 `parser_version()`），跨机器稳定，代价是：
+改了解析行为不升版本号，没有任何东西会响。
 
-后果是具体的：报告头写着同一个版本号，而两次解析出来的数含义已经不同；冻结基线比对看到的
-是"结论变了"，却分不清是规则改了还是解析器改了。这类静默正是本项目最贵的那类错
-（`CLAUDE.md` §6.6：判断本身没有被任何东西检查）。
+后果具体：报告头写着同一版本号，两次解析出的数含义已不同；基线比对看到"结论变了"，
+却分不清是规则改了还是解析器改了。这类静默正是本项目最贵的那类错（CLAUDE.md §6.6）。
 
 ## 判据
 
-1. 给 `ardupilot.py` 的解析逻辑算一个 AST 指纹（模块级常量表 + `ApmProvider` 的方法体 +
-   顶层工厂函数；`parser_version()` 本身排除在外，它正是被检查的对象），与冻结基线比：
-   - 指纹变了、`parser_version()` 没变 → 红（改了解析不认账）；
-   - 指纹与版本都变了 / 只改了版本 → 红（要求显式重冻基线，防止"随手一改"）。
-2. 判空：扫不到文件、解析不出版本串、或指纹覆盖的函数/常量太少，一律红，
-   否则文件被改名或搬空之后，第 1 项会因为"没东西可比"而恒绿。
-3. 前提还在：这道门得真的挂在 `tools/ci/checklist.yml` 的 push 阶段。
-   `check_all.py` 只按清单转发，清单里没它就根本不会跑，而那也是安静的。
+1. 给 ardupilot.py 的解析逻辑算 AST 指纹（模块级常量表 + ApmProvider 方法体 + 顶层工厂；
+   `parser_version()` 本身排除，它正是被检查对象），与冻结基线比：指纹变了版本没变 → 红
+   （改了解析不认账）；指纹与版本都变 / 只改版本 → 红（要求显式重冻基线）。
+2. 判空：扫不到文件、解析不出版本串、或指纹覆盖的函数/常量太少，一律红，否则文件被改名
+   或搬空后第 1 项会恒绿。
+3. 前提还在：这道门得真的挂在 checklist.yml 的 push 阶段——check_all.py 只按清单转发，
+   清单里没它就不会跑，而那也是安静的。
 
-指纹用 AST 而不是源码文本：注释、docstring、空行与 ruff 的格式化都不改变 AST，
-只有真实的语句/常量变化才变。用文本哈希会把"改一句注释"也报成"解析变了"，那种噪声
-会让人直接把守卫关掉。
+指纹用 AST 而不是源码文本：注释、docstring、空行与 ruff 格式化都不改 AST，只有真实语句/
+常量变化才变；文本哈希会把"改一句注释"也报成"解析变了"，那种噪声会让人把守卫关掉。
 
-用法：
-
-    python tools/engine/guard_apm_parser_version.py             # 检查
-    python tools/engine/guard_apm_parser_version.py --update    # 确认改动是有意的，重冻基线
-
-输出只用 ASCII 与 GBK 里都有的符号：Windows 控制台默认 GBK。
-
-退出码：任一检查失败则为 1。
+用法：python tools/engine/guard_apm_parser_version.py [--update]（--update 重冻基线）。
+输出只用 ASCII 与 GBK 里都有的符号。退出码：任一检查失败则为 1。
 """
 
 from __future__ import annotations
@@ -62,8 +53,8 @@ STEP_ID = "guard-apm-parser-version"
 PROVIDER_CLASS = "ApmProvider"
 VERSION_METHOD = "parser_version"
 
-# 判空下限：现在的文件有 10 张模块级常量表、40 余个方法。定在远低于实际值的水平，
-# 只为抓住"类被改名 / 文件被搬空"这两种让指纹空转的情形，不给正常重构添堵。
+# 判空下限：现文件有 10 张常量表、40 余方法。定在远低于实际值，只为抓住"类被改名 /
+# 文件被搬空"这两种让指纹空转的情形。
 MIN_CONSTS = 5
 MIN_FUNCS = 20
 
@@ -72,7 +63,7 @@ UPDATE_CMD = "python tools/engine/guard_apm_parser_version.py --update"
 
 @dataclass
 class Scan:
-    """一次扫描的结果：版本串、指纹，以及"扫到了多少"（判空用）。"""
+    """一次扫描的结果：版本串、指纹、以及"扫到了多少"（判空用）。"""
 
     version: str | None = None
     fingerprint: str | None = None
@@ -92,8 +83,8 @@ def _is_docstring(stmt: ast.stmt) -> bool:
 def _body_dump(fn: ast.FunctionDef) -> str:
     """方法体的 AST 摘要（去掉 docstring）。
 
-    用 `ast.Module` 包一层是因为 `ast.dump` 只吃单个节点，而方法体是一个语句列表。
-    `include_attributes` 保持默认 False：不带行号，于是纯格式化（ruff format）不改变指纹。
+    用 ast.Module 包一层是因为 ast.dump 只吃单个节点，而方法体是语句列表。
+    include_attributes 默认 False：不带行号，纯格式化不改变指纹。
     """
     stmts = [s for s in fn.body if not _is_docstring(s)]
     return ast.dump(ast.Module(body=stmts, type_ignores=[]))
@@ -190,7 +181,7 @@ def check_parser_version_frozen() -> list[str]:
 
 
 def check_gate_still_registered() -> list[str]:
-    """这道门还在 push 阶段吗。`check_all.py` 只按清单转发，清单里没有它就不会被跑。"""
+    """这道门还在 push 阶段吗——check_all.py 只按清单转发，清单里没它就不会被跑。"""
     if not CHECKLIST.is_file():
         return [f"{_rel(CHECKLIST)} 不存在 —— 「这道门挂在 push 阶段」的前提没了"]
     if STEP_ID not in CHECKLIST.read_text(encoding="utf-8", errors="replace"):
@@ -247,8 +238,8 @@ def main(argv: list[str]) -> int:
         if ok:
             log.print_check(i, len(CHECKS), name, True)
         else:
-            # 这一行的格式有意义：`FAIL <名字>  -> <一句话>` 是 tools/ci/mutate_guards.py
-            # 从输出里数"红了几条"的依据，名字要与注册表里的 expect 逐字一致。
+            # 格式有意义：tools/ci/mutate_guards.py 靠 `FAIL <名字>  -> <一句话>` 数
+            # "红了几条"，名字要与注册表里的 expect 逐字一致。
             one_line = f"FAIL {name}  -> {problems[0]}" + (f"（共 {len(problems)} 处）" if len(problems) > 1 else "")
             log.print_check(i, len(CHECKS), name, False, detail=one_line, err="\n".join(problems))
             failed.append(name)

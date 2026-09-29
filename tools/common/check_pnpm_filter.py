@@ -2,60 +2,40 @@
 
 ## 为什么要这条守卫
 
-2026-09-23：`pnpm web:dev` 在终端里什么都不做、也不报错、退出码 0，老大以为 Next 没装好。
-真因是提交 `0fbe62d`（"move shared configs to root for monorepo structure"）把 11 个转发脚本
-从 `pnpm -C web xxx` 改成了 `pnpm --filter web xxx`，而：
-
-- pnpm 的 `--filter <值>` 不带 `./` 前缀时按包名匹配（带 `./` 才是按目录匹配）；
-- `web/package.json` 的 `name` 是 `nextpilot-skill-mcp`（与根包同名），workspace 里
-  根本没有叫 `web` 的包；
-- 匹配 0 个项目时 pnpm 静默成功：无输出、rc=0。
-
-11 个脚本因此全部空跑，包括 `typecheck` 与 `test`，也就是说那段时间里
-「`pnpm typecheck` 全绿」是假绿。
+2026-09-23：`pnpm web:dev` 什么都不做、不报错、退出码 0。真因是提交 `0fbe62d` 把 11 个
+转发脚本从 `pnpm -C web xxx` 改成 `pnpm --filter web xxx`，而：`--filter <值>` 不带 `./`
+前缀时按包名匹配（带 `./` 才是按目录）；`web/package.json` 的 name 是
+`nextpilot-skill-mcp`（与根包同名），workspace 里根本没有叫 `web` 的包；匹配 0 个项目时
+pnpm 静默成功（无输出、rc=0）。11 个脚本全部空跑，包括 `typecheck` / `test`。
 
 这类失败没有任何运行时信号：不报错、不红、不写日志。只能静态拦。
 
 ## 判据
 
-扫所有非 node_modules 的 package.json 里的 scripts（不只是根，将来谁在子包里写一个
-转发脚本，同样会静默空跑），对每个 `pnpm --filter <值>`：
+扫所有非 node_modules 的 package.json 里的 scripts，对每个 `pnpm --filter <值>`：
+以 `./` 或 `../` 开头 → OK（路径匹配）；以 `{` 开头 → OK（选择器语法）；是真实包名 → OK；
+其它 → FAIL（匹配 0 个项目）。
 
-| 值长什么样 | 判定 |
-| --- | --- |
-| 以 `./` 或 `../` 开头 | OK，路径匹配，与包名无关 |
-| 以 `{` 开头 | OK，pnpm 的选择器语法（`{./web}` 也是路径） |
-| 是 workspace 里某个真实包名 | OK |
-| 其它 | FAIL，会匹配 0 个项目 |
-
-包名集合从 `pnpm-workspace.yaml` 的 `packages` 展开得到，外加根包自己（根也是 workspace
-成员，且它与 `web/` 同名这件事本身就是个坑：`--filter nextpilot-skill-mcp` 实测会同时选中
-根与 web 两个项目）。
+包名集合从 `pnpm-workspace.yaml` 的 `packages` 展开，外加根包自己（它与 `web/` 同名这件事
+本身就是坑：`--filter nextpilot-skill-mcp` 会同时选中根与 web 两个项目）。
 
 ## 「门还在」的自保（否则守卫恒绿）
 
-- 找不到根 package.json → FAIL（不是 SKIP）。
-- 没有 `pnpm-workspace.yaml` → FAIL：那时按包名匹配的判定无从谈起。
-- `packages` 一条都没解析出目录 → FAIL：workspace 声明本身坏了（或本守卫的手工解析跟不上
-  它的写法），此时"真实包名集合"是残缺的，判定结果不可信。
-- 一个 filter 都没扫到 → FAIL：多半是脚本写法变了（比如换成 `-C web`）而本守卫的正则没跟上，
-  那这道门等于被架空了，要让人看见。
+- 找不到根 package.json / 没有 `pnpm-workspace.yaml` → FAIL（不是 SKIP）。
+- `packages` 一条都没解析出目录 → FAIL：workspace 声明坏了，包名集合残缺、判定不可信。
+- 一个 filter 都没扫到 → FAIL：多半是脚本写法变了（如换成 `-C web`）而正则没跟上，
+  那这道门等于被架空。
 
-四条各自都在 `tools/ci/mutate_guards.py` 里注册了变异（除第一条要删文件、脚本做不到），
+四条各自都在 `tools/ci/mutate_guards.py` 注册了变异（第一条要删文件、脚本做不到），
 缺一条就等于多一条"没人证明过会红"的分支。
 
 ## 输出格式
 
-每行 `FAIL <检查名> -> <详情>`：检查名是稳定标识（`tools/ci/mutate_guards.py` 按它数
-「恰好红了几条」），详情是给人看的。总结行写成 `N 处问题：`，不要以 `FAIL` 开头，
-否则它会被当成一条检查名，让每条变异都误报「牵连」。
+每行 `FAIL <检查名> -> <详情>`：检查名是稳定标识（mutate_guards.py 按它数「恰好红了几
+条」）。总结行写成 `N 处问题：`，不要以 `FAIL` 开头，否则会被当成一条检查名，让每条变异
+误报「牵连」。输出只用 ASCII 与 GBK 里都有的符号（Windows 控制台默认 GBK）。
 
-输出只用 ASCII 与 GBK 里都有的符号（Windows 控制台默认 GBK）。
-
-用法：
-  python tools/common/check_pnpm_filter.py
-
-退出码：有 FAIL 为 1。
+用法：python tools/common/check_pnpm_filter.py；有 FAIL 退出码为 1。
 """
 
 from __future__ import annotations
@@ -68,9 +48,8 @@ import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# `pnpm --filter <值>`：值取到下一个空白为止。pnpm 的完整 filter 语法还有 `...` / `!` / `,`
-# 等组合，这里只认最常见的单值形式，遇到组合形式就放行（宁可漏，不可错杀，
-# 但它仍会被下面「至少扫到一个 filter」那条兜住不至于整门失效）。
+# `pnpm --filter <值>`：值取到下一个空白。组合形式（`...` / `!` / `,`）放行——宁可漏，
+# 不可错杀；它仍被「至少扫到一个 filter」那条兜住，不至于整门失效。
 FILTER_RE = re.compile(r"pnpm\s+--filter[= ]\s*(\S+)")
 
 
@@ -86,7 +65,7 @@ def workspace_names() -> tuple[set[str], list[str]]:
         raise FileNotFoundError(ws)
 
     patterns: list[str] = []
-    # 不引 PyYAML：这份文件只有 `packages:` 一个列表，手工取即可，少一个依赖
+    # 不引 PyYAML：这份文件只有 `packages:` 一个列表，手工取即可
     in_packages = False
     with io.open(ws, encoding="utf-8") as fh:
         for line in fh:
@@ -106,7 +85,7 @@ def workspace_names() -> tuple[set[str], list[str]]:
         if not pat or pat.startswith("!"):
             continue
         base = pat.rstrip("/")
-        # 只支持 `dir` 与 `dir/*`、`*`、`**` 这类简单形式；够用且不引新依赖
+        # 只支持 `dir` 与 `dir/*`、`*`、`**` 这类简单形式
         if any(ch in base for ch in "*?["):
             hits = [
                 p
@@ -125,7 +104,7 @@ def workspace_names() -> tuple[set[str], list[str]]:
                 continue
             dirs.append(os.path.relpath(d, ROOT))
 
-    # 根包自己也是 workspace 成员（且它与 web/ 同名，这正是当初踩坑的一半）
+    # 根包自己也是 workspace 成员（且与 web/ 同名，正是当初踩坑的一半）
     try:
         names.add(_load_json(os.path.join(ROOT, "package.json")).get("name", ""))
     except Exception:

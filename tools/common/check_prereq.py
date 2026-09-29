@@ -39,10 +39,7 @@ _CheckFn = Callable[[str], _CheckResult]
 
 
 def _run_cmd(cmd: list[str], cwd: Path = ROOT) -> tuple[subprocess.CompletedProcess | None, str]:
-    """Run *cmd*, return ``(proc, cmd_display)``.
-
-    ``proc`` is ``None`` when the command cannot be launched (OSError).
-    """
+    """Run *cmd*, return ``(proc, cmd_display)``; ``proc`` is ``None`` on OSError."""
     cmd_display = " ".join(str(c) for c in cmd)
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     try:
@@ -71,11 +68,8 @@ def _cmd_output(proc: subprocess.CompletedProcess) -> str:
 def check_python_mods(mod: str) -> _CheckResult:
     """Check a Python tool/module is available.
 
-    Tries two approaches:
-    1. ``python -m <mod> --version`` (for CLI tools with ``__main__``).
-    2. ``importlib.import_module(mod)`` in-process (for packages without ``__main__``).
-
-    Returns ``(ok, output, cmd_display)``.
+    Tries ``python -m <mod> --version`` (CLI tools with ``__main__``), then
+    in-process ``importlib.import_module(mod)`` (packages without one).
     """
     proc, cmd_display = _run_cmd([PY, "-m", mod, "--version"])
     if proc is not None and proc.returncode == 0:
@@ -95,11 +89,7 @@ def check_python_mods(mod: str) -> _CheckResult:
 
 
 def _verify_exe(mod: str, exe: str) -> _CheckResult:
-    """Run ``<exe> --version`` and return ``(ok, output, cmd_display)``.
-
-    Returns ``(False, ...)`` if the command cannot be launched or exits
-    with a non-zero return code.
-    """
+    """Run ``<exe> --version``; ``(False, ...)`` if it cannot launch or exits non-zero."""
     proc, cmd_display = _run_cmd([exe, "--version"])
     if proc is None:
         return False, f"[ERROR] failed to launch: {exe}", cmd_display
@@ -110,13 +100,9 @@ def _verify_exe(mod: str, exe: str) -> _CheckResult:
 
 
 def _resolve_bin_cmd(mod: str, pkg_json: Path, bin_field: str | dict) -> str | None:
-    """Resolve a runnable command for a package's ``bin`` entry.
-
-    Returns an absolute path to an executable (``.cmd`` wrapper on Windows
-    for JS scripts, or the raw bin path for native executables), or
-    ``None`` if nothing usable is found.
+    """Resolve an absolute executable path for a package's ``bin`` entry
+    (``.cmd`` wrapper on Windows for JS scripts, else the raw bin path), or None.
     """
-    # Determine bin name (the command name) and relative path
     if isinstance(bin_field, str):
         bin_name = mod
         bin_rel = bin_field
@@ -126,13 +112,13 @@ def _resolve_bin_cmd(mod: str, pkg_json: Path, bin_field: str | dict) -> str | N
     else:
         return None
 
-    # On Windows, prefer the .cmd wrapper under node_modules/.bin/
+    # Windows: prefer the .cmd wrapper under node_modules/.bin/
     if os.name == "nt":
         cmd_wrapper = (pkg_json.parent.parent / ".bin" / f"{bin_name}.cmd").resolve()
         if cmd_wrapper.is_file():
             return str(cmd_wrapper)
 
-    # Otherwise use the resolved script path
+    # Else the resolved script path
     bin_path = (pkg_json.parent / bin_rel).resolve()
     if bin_path.is_file():
         return str(bin_path)
@@ -143,14 +129,10 @@ def _resolve_bin_cmd(mod: str, pkg_json: Path, bin_field: str | dict) -> str | N
 def check_node_mods(mod: str) -> _CheckResult:
     """Check a Node tool or npm package is available.
 
-    - If ``web/node_modules/<mod>/package.json`` exists:
-      - If it has a ``bin`` field → run the binary to verify it works.
-      - Otherwise → just the existence check is sufficient.
-    - Otherwise → ``shutil.which`` + ``--version``.
-
-    Returns ``(ok, output, cmd_display)``.
+    If ``web/node_modules/<mod>/package.json`` exists: run its ``bin`` if present,
+    else existence is enough. Otherwise ``shutil.which`` + ``--version``.
     """
-    # npm package — check package.json under web/node_modules
+    # npm package: package.json under web/node_modules
     pkg_json = ROOT / "web" / "node_modules" / mod / "package.json"
     if pkg_json.is_file():
         try:
@@ -181,10 +163,8 @@ def _run_checks(
     step_no: int,
     total: int,
 ) -> tuple[int, list[str], list[tuple[str, str]]]:
-    """Run a group of checks.
-
-    Returns ``(next_step_no, failed_mods, results)`` where each result
-    is ``(display_text, "ok"|"fail")``.
+    """Run a group of checks. Returns ``(next_step_no, failed_mods, results)``,
+    each result being ``(display_text, "ok"|"fail")``.
     """
     failed_mods: list[str] = []
     results: list[tuple[str, str]] = []

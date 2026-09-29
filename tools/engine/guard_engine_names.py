@@ -2,32 +2,23 @@ r"""knowledge/engine/ 的顶层名字不许跨片段重名。
 
 ## 为什么要有它
 
-`web/scripts/build-knowledge.mjs` 把 knowledge/engine/ 下的片段按顺序拼成一份脚本再执行
-（浏览器与本地工具同一份源码）：
-
-```text
-operators.py → providers/api.py → providers/*.py → engine.py
-```
-
-拼完之后它们共享同一个命名空间。两个片段顶层同名 = 后者静默覆盖前者：不报错、不告警，
-只是某个格式突然解析不出来。`_MAGIC` 就这么被踩过一次（两个 provider 都叫 `_MAGIC`），
-现在靠人工记住"顶层名字要带格式前缀"（`_APM_MAGIC` / `_MAGIC`），而人会忘，
-新加第三个 provider 时尤其会忘。
+`web/scripts/build-knowledge.mjs` 把 knowledge/engine/ 的片段按
+`operators.py → providers/api.py → providers/*.py → engine.py` 拼成一份脚本再执行
+（浏览器与本地工具同一份源码），拼完共享同一个命名空间。两个片段顶层同名 = 后者静默
+覆盖前者：不报错、不告警，只是某个格式突然解析不出来。`_MAGIC` 就这么被踩过一次
+（两个 provider 都叫 `_MAGIC`），现在靠人工记住"顶层名字带格式前缀"，而人会忘。
 
 ## 判据
 
-1. 顶层"定义"跨片段重名即红（函数 / 类 / 赋值 / 注解赋值 / 增量赋值）。
-   只看定义、不看使用：`FORMATS` 由 `api.py` 定义、各 provider 只 `append`，那不是撞名。
-2. import 绑定跨片段同名时，再比来源：`import numpy as np` 在两个片段里都写不算撞
-   （绑的是同一个模块对象）；同名却来自不同模块（`from a import x` 与 `from b import x`）才算。
-3. 判空：片段文件数或顶层名字总数低于下限 → 红。否则文件被改名 / 搬空之后，
-   第 1 项会因为"没东西可比"而恒绿。
-4. 前提还在：这道门得真的挂在 `tools/ci/checklist.yml` 的 push 阶段。
+1. 顶层"定义"跨片段重名即红（函数 / 类 / 赋值 / 注解赋值 / 增量赋值）。只看定义、不看
+   使用：`FORMATS` 由 api.py 定义、各 provider 只 `append`，那不是撞名。
+2. import 绑定跨片段同名时再比来源：`import numpy as np` 两处都写不算撞（同一个模块
+   对象）；同名却来自不同模块（`from a import x` 与 `from b import x`）才算。
+3. 判空：片段文件数或顶层名字总数低于下限 → 红，否则文件被改名/搬空后第 1 项会恒绿。
+4. 前提还在：这道门得真的挂在 checklist.yml 的 push 阶段。
 
-provider 的集合是扫目录得来的（`knowledge/engine/providers/*.py` 去掉 `api.py`，与构建脚本同一条
-规则），加格式零改动；框架三个文件是结构性的，写死并在 README 的「拼接顺序」里有权威清单。
-
-退出码：任一检查失败则为 1。
+provider 集合是扫目录得来（providers/*.py 去掉 api.py，与构建脚本同规则），加格式零改动；
+框架三个文件写死并在 README 的「拼接顺序」里有权威清单。退出码：任一检查失败则为 1。
 """
 
 from __future__ import annotations
@@ -54,12 +45,12 @@ STEP_ID = "guard-engine-names"
 API_FILE = "api.py"
 FRAMEWORK = ("operators.py", "engine.py")
 
-# 判空下限：现在是 6 个片段、约 180 个顶层名字。定在远低于实际值的水平，只为抓住
-# "文件被改名 / 目录被搬空 / 新增 provider 没被扫到"，不给正常重构添堵。
+# 判空下限：现 6 个片段、约 180 个顶层名字。定在远低于实际值，只为抓住"文件被改名 /
+# 目录被搬空 / 新增 provider 没被扫到"这些让规则空转的情形。
 MIN_FILES = 5
 MIN_NAMES = 100
 
-# 构建脚本扫 provider 目录的写法，它要是换成写死名单，"加格式零改动"这个前提就没了
+# 构建脚本扫 provider 目录的写法；它换成写死名单，"加格式零改动"的前提就没了
 PROVIDER_SCAN_MARKER = "readdirSync(PROVIDER_DIR)"
 
 
@@ -107,7 +98,7 @@ def top_level_bindings(path: Path) -> list[Binding]:
 
 
 def fragment_files() -> list[Path]:
-    """参与拼接的片段：框架三个 + providers/ 下除 api.py 之外的全部（按名排序，与构建脚本一致）。"""
+    """参与拼接的片段：框架三个 + providers/ 下除 api.py 外的全部（按名排序，与构建脚本一致）。"""
     files = [ENGINE / name for name in FRAMEWORK if (ENGINE / name).is_file()]
     files.append(PROVIDERS / API_FILE)
     if PROVIDERS.is_dir():
@@ -188,8 +179,8 @@ def main(argv: list[str]) -> int:
         if ok:
             log.print_check(i, len(CHECKS), name, True)
         else:
-            # 这一行的格式有意义：`FAIL <名字>  -> <一句话>` 是 tools/ci/mutate_guards.py
-            # 从输出里数"红了几条"的依据，名字要与注册表里的 expect 逐字一致。
+            # 格式有意义：tools/ci/mutate_guards.py 靠 `FAIL <名字>  -> <一句话>` 数
+            # "红了几条"，名字要与注册表里的 expect 逐字一致。
             one_line = f"FAIL {name}  -> {problems[0]}" + (f"（共 {len(problems)} 处）" if len(problems) > 1 else "")
             log.print_check(i, len(CHECKS), name, False, detail=one_line, err="\n".join(problems))
         results.append((name, "ok" if ok else "fail"))

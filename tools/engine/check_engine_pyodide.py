@@ -1,15 +1,12 @@
 """校验生成产物（web/workers/analysis-engine.generated.ts）能被当作合法 Python 执行。
 
-为什么需要它：本地回归跑的是 knowledge/engine/ 下的源文件，而浏览器里跑的是构建产物
-（operators.py + engine.py 经 String.raw 内联 + __FAULT_KB__/__RULES__
-三处替换）。只有这一步能证明"真正进 Pyodide 的东西"是合法的，否则语法错误只能在
-用户浏览器里炸出来。
+为什么需要它：本地回归跑 knowledge/engine/ 源文件，浏览器里跑的是构建产物
+（operators.py + engine.py 经 String.raw 内联 + __FAULT_KB__/__RULES__ 三处替换）。
+只有这一步能证明"真正进 Pyodide 的东西"是合法的，否则语法错误只能在用户浏览器里炸。
 
-四道检查，从松到紧：语法 → `.replace` 链按浏览器语义（只换第一处）复现 → compute
-表达式 Python 侧可解析 → 真执行（含"worker 守卫查的全局名真的存在"）。另有一组契约：
-地图预设的适用范围（`conditions.topics`）真的搬进了 `facts.track`、"取不到轨迹要逐条给出
-原因"（并构造两道反向用例逼出失败分支）、"像经纬度"的判据不会把 `relative` 里的 `lat`
-当成纬度、worker 查的全局名真的存在。
+八道检查，从松到紧：模板完整性 / 语法 / conditions.topics 搬运 / compute 侧可解析 /
+真执行 + 返回体契约 / worker globals.get 名字核对 / 轨迹契约（含两道反向用例）/
+「像经纬度」判据不误匹配。
 
 用法：python tools/engine/check_engine_pyodide.py
 """
@@ -27,8 +24,8 @@ from _logging import get_logger  # noqa: E402
 
 log = get_logger()
 
-# 数据配置的装配规则与本地回归共用一处（facts.yaml + plot/track.yml），
-# 别在这里再手写一遍，两边不一致时本地跑得出、浏览器跑不出。
+# 数据配置装配规则与本地回归共用一处（facts.yaml + plot/track.yml），别在这里再手写
+# 一遍：两边不一致时本地跑得出、浏览器跑不出。
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "knowledge" / "engine"))
 import loader as runner  # noqa: E402
 
@@ -39,15 +36,15 @@ TRACK_YML = REPO_ROOT / "knowledge" / "px4" / "plot" / "track.yml"
 
 
 def _declared_track_topics(text: str) -> list:
-    """从 plot/track.yml 读出 `conditions.topics` 的声明，并折成运行期形态（候选组）。
+    """从 plot/track.yml 读出 `conditions.topics` 声明，折成运行期形态（候选组）。
 
-    YAML 里写成 `["sensor_gps || vehicle_gps_position"]`，`facts.track` 里存的是
+    YAML 里是 `["sensor_gps || vehicle_gps_position"]`，`facts.track` 里是
     `[["sensor_gps", "vehicle_gps_position"]]`，项内 `||` 由构建期拆成候选列表
-    （`engine._missing_topics` 只认折好的形态，它不认识 `||`）。比对时要用同一个
-    语义折过，否则守卫会对着"表示形式不同"报假失败。
+    （`engine._missing_topics` 只认折好的形态）。比对时要用同一语义折过，否则守卫
+    会对着"表示形式不同"报假失败。
 
-    这里不引 pyyaml：只为一行声明装一个解析器不划算，而且这是"守卫读声明"的窄用途，
-    读不出来（格式没见过的写法）时返回空列表，由调用方报错，而不是静默当成"没声明"。
+    不引 pyyaml：只为一行声明装解析器不划算。读不出来（没见过的写法）时返回空列表，
+    由调用方报错，而不是静默当成"没声明"。
     """
     m = re.search(r"^\s*message:\s*(.*)$", text, re.M)
     if not m:
@@ -62,7 +59,7 @@ def _declared_track_topics(text: str) -> list:
     elif inline:
         return []
     else:
-        # 块状写法：`topics:` 后面换行，随后是若干 `- ...`
+        # 块状写法：`topics:` 后换行，随后若干 `- ...`
         items = []
         for line in text[m.end() :].splitlines():
             if not line.strip():
@@ -70,7 +67,7 @@ def _declared_track_topics(text: str) -> list:
             if re.match(r"^\s*-\s+", line):
                 items.append(line.split("-", 1)[1].strip().strip("\"'"))
                 continue
-            break  # 遇到同级的别的键就停
+            break  # 遇到同级别键就停
     return [[c.strip() for c in it.split("||") if c.strip()] for it in items]
 
 
@@ -149,7 +146,7 @@ def main() -> int:
     step += 1
     rule_name = "产物是合法 Python（ast.parse）"
 
-    # 产物里的规则按 log_type 分组（PX4 与 ArduPilot 各一套），逐条遍历要扁平的那一份
+    # 规则按 log_type 分组（PX4 与 ArduPilot 各一套），逐条遍历要扁平的那一份
     rules_by_type = extract_json_const(src, "rules")
     rules = [r for fam in rules_by_type.values() for r in fam]
     syntax_err = ""
@@ -171,7 +168,7 @@ def main() -> int:
     rule_name = "conditions.topics 从 track.yml 搬进 facts.track"
 
     declared_topics = _declared_track_topics(TRACK_YML.read_text(encoding="utf-8"))
-    # 数据配置同样按 log_type 分组：轨迹声明在 PX4 那一套里
+    # 数据配置同样按 log_type 分组：轨迹声明在 PX4 那一套
     px4_facts = runner.load_facts_payload().get("px4-ulog") or {}
     got_topics = (px4_facts.get("track") or {}).get("conditions", {}).get("topics")
     topics_ok = bool(declared_topics) and got_topics == declared_topics

@@ -1,57 +1,41 @@
-"""校验机制自身的卫生：四处「不会报错的裂缝」。
+"""校验机制自身的卫生：四处「不会报错的裂缝」，坏掉时都没有输出。
 
-这四项不是"再查一遍代码"，而是查我们用来查代码的那套东西有没有说谎。前三项全是
-2026-09-18 那天真实踩出来的，共同点出奇地一致：坏掉的时候没有任何输出。
-
-| 检查 | 拦什么 | 那天的现场 |
+| 检查 | 拦什么 | 现场 |
 | --- | --- | --- |
-| 悬空 § 引用 | 注释里写"见 CLAUDE.md §6.8"，而那一节不存在 | 5 处注释指向 §6.8，而 §6.8 是那天才补上的，读者按图索骥，翻到的是一页空白 |
-| 产物新鲜度不许用 git 当判据 | 判据落在"git 工作区是否干净" | 门拿 `git diff` 跟 HEAD 比，把人正常的手写文案判成"与源码漂移"（作者只好回一句"是我手动修改的"） |
-| 打了 FAIL/ERROR 就要能非零退出 | 打印了红字，退出码却是 0 | `--probe-data` 对 6 份日志全部打 `ERROR`，最后报 `OK`；`series` 那一路早已不在检，没人知道 |
-| hook 不从阶段列表反推开关 | 开关被"再推导一次"，于是开不着 | `.githooks/pre-push` 用 `with_e2e and "ci" not in stages` 决定加不加 `--with-e2e`，而 E2E 步骤就住在 ci 里 → 每条路径都不成立，`WITH_E2E=1` 静默不跑 E2E |
+| 悬空 § 引用 | 注释写"见 CLAUDE.md §6.8"而那一节不存在 | 5 处注释指向 §6.8，§6.8 是当天才补上的，读者按图索骥翻到空白 |
+| 产物新鲜度不许用 git 当判据 | 判据落在"git 工作区是否干净" | 门拿 `git diff` 跟 HEAD 比，把人正常的手写文案判成"与源码漂移" |
+| 打了 FAIL/ERROR 就要能非零退出 | 打印了红字，退出码却是 0 | `--probe-data` 对 6 份日志全打 `ERROR`，最后报 `OK`；`series` 那一路早已不在检 |
+| hook 不从阶段列表反推开关 | 开关被"再推导一次"，于是开不着 | `with_e2e and "ci" not in stages` 而 E2E 步骤就住在 ci 里 → 每条路径都不成立，`WITH_E2E=1` 静默不跑 |
 
-为什么值得单独一个脚本：这几条都不会自己报错。悬空引用是人读到才发现；误报会让人
-去改没坏的东西；吞掉的失败则连"有人在看"这个前提都不成立；开关没传则看着像跑了实则没跑。
-它们全靠人当时记得，而人会忘。所以把判据固化成可以重跑的检查（见 `CLAUDE.md` §6.6）。
+它们全靠人当时记得，而人会忘，所以把判据固化成可重跑的检查（见 `CLAUDE.md` §6.6）。
 
 ## 判据
 
-四类裂缝，落成 6 项检查（后两项分别是"防目标消失"与"动态补静态之不足"）：
+四类裂缝，落成 6 项检查：
 
-1. § 引用要有落点。解析顺序：引用的同一行如果点名了某份文档 → 只在那份文档里找
-   （最常见的是 `见 CLAUDE.md §6.4`，取离引用最近的那个名字，不是行内第一个）；否则本文档
-   是编号文档就只在本文档里找；都不是才退到全局（root `CLAUDE.md` + 任一编号文档）。
-   某份文件算不算"编号文档"由它自己的标题决定（≥3 个编号标题 + 只有 `.md` / `.mdx` 才算数），
-   不维护名单，名单会过期，标题不会。
-2. 产物新鲜度的判据只能是「重跑生成逻辑再逐字节比对」。凡调用生成器并带 `--check` 的
-   文件（以及生成器自身、声明这一步的 `checklist.yml`、跑这一步的 `check_all.py`）都算这道门
-   的当事人，它们不许用 git 判定产物。
-3. 同时断言这道门还在（收集 `drifted` + 非零退出 + 挂在统一入口上），否则门被删掉之后，
-   第 2 项会因为找不到目标而恒绿。
-4. 失败要能被调用方看见。Python 侧：会打出失败的文件（判据是"有没有把以
-   `FAIL` / `ERROR` 起头的字串交给 `print` / `log.*`，不看具体写法），模块顶层要有
-   `raise SystemExit(...)` / `sys.exit(...)`，否则 `main()` 的返回值会被丢掉，退出码还是 0
-   （这正是那天的原形）。JS 侧：往 stderr 打了 `FAIL` / `ERROR` 的脚本要设非零
+1. § 引用要有落点。解析顺序：引用的同一行点名了某份文档 → 只在那份文档里找（取离引用最近的
+   名字，不是行内第一个）；否则本文档是编号文档就只在本文档里找；都不是才退到全局。
+   某文件算不算"编号文档"由它自己的标题决定（≥3 个编号标题 + 只有 `.md` / `.mdx` 才算数），
+   不维护名单——名单会过期，标题不会。
+2. 产物新鲜度的判据只能是「重跑生成逻辑再逐字节比对」。凡调用生成器并带 `--check` 的文件
+   （以及生成器自身、`checklist.yml`、`check_all.py`）都不许用 git 判定产物。
+3. 同时断言这道门还在（`drifted` + 非零退出 + 挂在统一入口上），否则门被删后第 2 项会恒绿。
+4. 失败要能被调用方看见。Python 侧：会打出 `FAIL` / `ERROR`（判据是"有没有把这种字串交给
+   `print` / `log.*`"）的文件，模块顶层要有 `raise SystemExit(...)` / `sys.exit(...)`，
+   否则 `main()` 返回值被丢掉，退出码还是 0。JS 侧：打了 `FAIL` / `ERROR` 的脚本要设非零
    `process.exitCode` 或 `process.exit(n)`。
-5. 第 4 项是静态的（看源码），所以再配一条动态探针：拿必然失败的输入真跑一次，
-   断言「退出码非零且输出里有失败标记」，只要退出码非零是不够的，加载依赖失败、路径
-   写错都非零，那会让探针绿得毫无意义。
-6. `--with-*` 开关不许从阶段列表反推。开关控制的是阶段内的步骤（`when: args.with_e2e`），
-   与"跑哪些阶段"是正交的两件事，要各自独立传给 `check_all.py`。一旦写成
-   `if with_e2e and "ci" not in stages`，而目标步骤又住在 ci 里，条件就不成立，
+5. 第 4 项是静态的，所以再配一条动态探针：拿必然失败的输入真跑一次，断言「退出码非零且输出里
+   有失败标记」——只要非零是不够的，加载依赖失败、路径写错也都非零。
+6. `--with-*` 开关不许从阶段列表反推。开关控制阶段内的步骤，与"跑哪些阶段"正交，要各自独立传给
+   `check_all.py`；一旦写成 `if with_e2e and "ci" not in stages` 而目标步骤住在 ci 里，条件就不成立，
    命令照常拼出、退出码照常为 0，只是那一步从来没跑。
 
-第 4、5 项都要留意一个格式契约：本脚本的总结行不许写成 `FAIL <名字>` 的形状，因为
-`tools/ci/mutate_guards.py` 逐行取 "FAIL 后面的东西" 当检查名（那条写在下面的 `main()` 里）。
+第 4、5 项都要留意一个格式契约：本脚本的总结行不许写成 `FAIL <名字>`，因为
+`tools/ci/mutate_guards.py` 逐行取 "FAIL 后面的东西" 当检查名（见下面的 `main()`）。
 
-输出只用 ASCII 与 GBK 里都有的符号（`OK` / `FAIL` / `SKIP` / `·`）：
-Windows 控制台默认 GBK，`✓ ✗ ▶` 这类字符会直接 UnicodeEncodeError 崩掉脚本。
+输出只用 ASCII 与 GBK 里都有的符号：Windows 控制台默认 GBK，`✓ ✗ ▶` 会 UnicodeEncodeError。
 
-用法：
-  python tools/common/check_hygiene.py           # 跑全部
-  python tools/common/check_hygiene.py --list    # 看编号文档索引与探针清单
-
-退出码：任一检查失败则为 1；`SKIP` 不算失败，但会明说哪一块没被覆盖。
+用法：`--list` 看编号文档索引与探针清单。退出码：任一检查失败为 1；`SKIP` 不算失败。
 """
 
 from __future__ import annotations
@@ -80,8 +64,7 @@ PY = sys.executable
 
 SCAN_SUFFIXES = {".py", ".ts", ".tsx", ".mjs", ".js", ".md", ".mdx", ".yml", ".yaml"}
 
-# 产物由 `web/scripts/build-knowledge.mjs` 从源码生成，内容是某份源码的逐字拷贝，
-# 扫它们只会让同一条问题报两遍，而产物不手改，报在源码上才有可操作性。
+# 产物是某份源码的逐字拷贝，扫它们只会让同一条问题报两遍，而产物不手改，报在源码上才有可操作性。
 SKIP_FILES = frozenset(
     {
         "web/workers/analysis-engine.generated.ts",
@@ -90,10 +73,8 @@ SKIP_FILES = frozenset(
     }
 )
 
-# 走 `git ls-files` 拿文件清单：`--cached` 是被跟踪的，`--others --exclude-standard` 是
-# 还没 add 但也没被忽略的（`.gitignore` 里的日志、`.next`、`node_modules` 都据此排除）。
-# 两样都要：只取被跟踪的会让"新建的文件在 add 之前不在覆盖范围内"，本文件自己就是新建的，
-# 第一次跑时它没被扫到；而问题也最容易出现在刚写的新文件里。
+# 走 `git ls-files` 拿清单：`--cached` 是已跟踪的，`--others --exclude-standard` 是还没 add
+# 但没被忽略的。两样都要：只取被跟踪的会让新建文件在 add 之前不在覆盖范围内。
 SKIP_DIRS = frozenset({".git", "node_modules", ".next", "__pycache__", ".workbuddy", "out", "dist", "build"})
 
 
@@ -140,22 +121,19 @@ class Skip(Exception):
 # 1. 悬空 § 引用
 # ---------------------------------------------------------------------------
 
-# 编号标题：`## 6. 技术栈与部署` / `### 6.8 报错要说清"缺什么"` / `### 3.1 写法`。
-# 允许 `§` 前缀（有人会写 `## §6.8`），也允许 `、` 收尾。
+# 编号标题：`## 6. 技术栈与部署` / `### 6.8 报错要说清"缺什么"`。允许 `§` 前缀与 `、` 收尾。
 HEADING_RE = re.compile(r"\s{0,3}#{1,6}\s*§?(\d+(?:\.\d+)*)[.、]?\s")
 REF_RE = re.compile(r"§\s*(\d+(?:\.\d+)*)")
 # 同一行里点名的文档：`见 CLAUDE.md §6.4` / `见 docs/architecture/plot-schema.md §3`
 DOC_MENTION_RE = re.compile(r"([\w.\-/]*[\w\-]+\.mdx?)")
 
-# 只有 Markdown 才可能自成一册。两个真实的反例说明为什么限定后缀：
-#   - `web/scripts/build-knowledge.mjs` 里内嵌着整份指南页模板（模板字符串），于是它有
-#     25 个看着像标题的行；不限定后缀的话，它会被当成本仓库的"编号文档 25 节"；
-#   - `knowledge/engine/providers/api.py` 的注释里有 `# 1.` / `# 2.` / `# 3.`，同样会让它"看起来有编号"。
+# 只有 Markdown 才可能自成一册。两个反例：`build-knowledge.mjs` 内嵌整份指南页模板（模板
+# 字符串），有 25 个看着像标题的行；`api.py` 注释里有 `# 1.` / `# 2.`，同样"看起来有编号"。
 # 语义上也不该算：代码文件没有"自己的 §"，它引用的总是文档。条款见 `CLAUDE.md` §6.6。
 DOC_SUFFIXES = (".md", ".mdx")
 
-# 一份文档要算"编号文档"，至少得有这么多编号标题，挡住"只有一条编号行的说明文档"：
-# 它的 `§2` 多半是在引用 root `CLAUDE.md`，按本文档比会把对的判成悬空。真手册都有 7 个以上。
+# 要算"编号文档"至少得有这么多编号标题，挡住"只有一条编号行的说明文档"：它的 `§2` 多半是在
+# 引用 root `CLAUDE.md`，按本文档比会把对的判成悬空。真手册都有 7 个以上。
 MIN_SECTIONS = 3
 
 
@@ -196,9 +174,8 @@ def _indexed_docs() -> dict[str, set[str]]:
 def _named_doc(line: str, ref_start: int, docs: dict[str, set[str]], by_basename: dict[str, str]) -> str | None:
     """引用所在行里点名了哪份文档，取离这个 § 最近的那个名字。
 
-    取最近的而不是行内第一个：一行里提两份文档是常事（`… 见 docs/a.md；另有 CLAUDE.md §6.5`），
-    第一个未必是被引的那份，按它严格解析会把对的判成悬空。写在引用之前的优先于之后
-    （人写"见 X §4"），所以出现在引用后面的名字按"更远"计。
+    取最近而非行内第一个：一行提两份文档是常事，第一个未必是被引的那份，按它严格解析会把对的
+    判成悬空。写在引用之前的优先于之后（人写"见 X §4"），所以引用后面的名字按"更远"计。
     """
     best: tuple[int, str] | None = None
     for m in DOC_MENTION_RE.finditer(line):
@@ -220,8 +197,8 @@ def check_section_refs() -> list[str]:
                 refs.append((_rel(path), lineno, m.group(1), line, m.start()))
 
     problems: list[str] = []
-    # 防"恒绿"：全局回退（root CLAUDE.md）要真的在索引里，否则所有源码里的 `§6.x`
-    # 都会变成悬空，那是噪声，不是发现。索引塌了要当场说，而不是照常报一堆。
+    # 防"恒绿"：全局回退（root CLAUDE.md）要真在索引里，否则所有源码里的 `§6.x` 都会变成
+    # 悬空，那是噪声不是发现。索引塌了要当场说，而不是照常报一堆。
     if "CLAUDE.md" not in sections:
         problems.append("CLAUDE.md 不在编号文档索引里（被改名？编号标题被删？）—— 全局回退没有落点，本次检查无意义")
 
@@ -266,35 +243,30 @@ def check_section_refs() -> list[str]:
 # ---------------------------------------------------------------------------
 # 2. 产物新鲜度的判据不许落在 git 工作区状态
 #
-# 那天的原形：门拿 `git diff --exit-code` 跟 HEAD 比一份产物文档，于是作者手写的
-# 文案也被判成"与源码不一致"。判据要落在"重跑生成逻辑 → 与磁盘上的产物逐字节比对"，
-# 因为那才是这道门要问的问题（源变了，产物跟上了吗）。
+# 原形：门拿 `git diff --exit-code` 跟 HEAD 比一份产物文档，于是作者手写的文案也被判成"与源码
+# 不一致"。判据要落在"重跑生成逻辑 → 逐字节比对"，那才是这道门要问的问题（源变了，产物跟上了吗）。
 #
-# 一个文件同时满足「调生成器」与「用 git 判产物」，才算违规，单独用 git 不算：
-# `tools/ci/mutate_guards.py` 用 `git status` 只是证明自证没把仓库写脏，与产物新鲜度无关。
+# 一个文件同时满足「调生成器」与「用 git 判产物」才算违规，单独用 git 不算：`mutate_guards.py`
+# 用 `git status` 只是证明自证没把仓库写脏，与产物新鲜度无关。
 # ---------------------------------------------------------------------------
 
 GENERATOR_SCRIPTS = frozenset({"web/scripts/build-knowledge.mjs"})
 
 # 「这道门的另两个当事人」：声明这一步的清单与跑这一步的入口。加上它们是因为
 # `GENERATOR_CHECK_RE` 只认得"直接调生成器"的写法，而 CI 入口是转发，转发者拿 git 判产物
-# 一样是那条裂缝，却一个字都抓不到（那条变异因此报"守卫恒绿"，实则是覆盖漏了它）。
-# 就这三个，写死：它们是"入口"，不是会随项目生长的名单。
+# 一样是那条裂缝却抓不到（那条变异因此报"守卫恒绿"，实则是覆盖漏了它）。就这三个，写死。
 CI_ENTRY_FILES = frozenset({"tools/ci/checklist.yml", "tools/ci/check_all.py"})
 
-# 「谁在判产物新鲜度」：光提到生成器名字是不够的，`mutate_guards.py` 的注册表里就写着
-# 生成器路径（那是测试夹具，不是门），`check_hygiene.py` 自己也在核那道门还在不在。
-# 第一版把"提到生成器名"当成了判据，于是在这两处各抓了一个假阳性。
-# 真正的判定者是调用生成器并带 `--check` 的那个文件（生成器自身则按路径认定）。
+# 「谁在判产物新鲜度」：光提到生成器名字不够——`mutate_guards.py` 注册表里就写着生成器路径
+# （那是测试夹具，不是门），本文件自己也在核那道门在不在，第一版因此抓了两个假阳性。
+# 真正的判定者是调用生成器并带 `--check` 的文件（生成器自身按路径认定）。
 GENERATOR_CHECK_RE = re.compile(r"""build-knowledge\.mjs["']?\s*,\s*["']?--check|build:kb[^\n]{0,24}--check""")
 
-# 只认调用判据型 git 子命令的两种写法：argv 形式（`["git", "diff", ...]`）与整串
-# 命令形式（`"git diff ..."`）。这样文档/注释里出现的 `git diff` 这类词不会误触发
-# （`check_all.py` 的 capture() 文档里就写着一次），也就省掉了"先剥注释"。
+# 只认调用判据型 git 子命令的两种写法：argv 形式（`["git", "diff", ...]`）与整串命令形式
+# （`"git diff ..."`）。这样文档/注释里的 `git diff` 这类词不会误触发，省掉"先剥注释"。
 #
-# 子命令名单只留能表达「文件与 HEAD 不一致」的那几个。刻意不含 `git ls-files`：
-# 它是列举、表达不了差异，而本文件自己就用它列被跟踪的文件，第一版把它算进来，于是
-# 规则在自己的文件上抓了个假阳性。
+# 子命令只留能表达「文件与 HEAD 不一致」的那几个。刻意不含 `git ls-files`：它是列举、表达不了
+# 差异，而本文件自己就用它列被跟踪的文件，第一版算进来后在自家文件上抓了假阳性。
 GIT_CRITERION_RE = re.compile(
     r"""["']git["']\s*,\s*["'](?:diff|status|stash|checkout|restore)["']"""
     r"""|["']git\s+(?:diff|status|stash|checkout|restore)\b"""
@@ -302,11 +274,10 @@ GIT_CRITERION_RE = re.compile(
 
 
 def _code_only(path: Path) -> str:
-    """源码去掉注释与 docstring，让规则只针对代码，不针对说明文字。
+    """源码去掉注释与 docstring，让规则只针对代码。
 
-    为什么要这么绕：本文件自己的 docstring 里就写着 `build-knowledge.mjs`（那是解释，
-    不是调用）。不剥掉的话，规则 B 会在本文件上自我触发，而唯一的"修法"是把说明删掉，
-    那就成了规则逼人少写文档。
+    本文件 docstring 里就写着 `build-knowledge.mjs`（那是解释，不是调用），不剥掉的话规则 B
+    会自我触发，而唯一的"修法"是把说明删掉——那就成了规则逼人少写文档。
     """
     src = _read(path)
     if path.suffix == ".py":
@@ -317,11 +288,10 @@ def _code_only(path: Path) -> str:
 
 
 def py_code_only(src: str) -> str:
-    """Python：先按 AST 抠掉 docstring 所在的行，再用 tokenize 丢掉注释。
+    """Python：先按 AST 抠掉 docstring 所在行，再用 tokenize 丢掉注释。
 
-    不是本文件私有：`check_engine_purity.py` 也从这里导入它。两边共用一份"什么算代码"
-    的定义是刻意的，各写一份就会出现第二个答案，而"注释里写着标识符"正是裸子串守卫
-    被喂饱、进而恒绿的根因。改动这里等于同时改两条守卫的判据。
+    不是本文件私有：`check_engine_purity.py` 也从这里导入它。共用一份"什么算代码"的定义是
+    刻意的，各写一份就会出现第二个答案。改动这里等于同时改两条守卫的判据。
     """
     try:
         tree = ast.parse(src)
@@ -393,8 +363,8 @@ def check_git_criterion() -> list[str]:
 def _freshness_gates() -> list[Path]:
     """哪些文件在判"产物是不是新鲜的"，见 `GENERATOR_CHECK_RE` 上面那段。
 
-    新加一个生成器时要把它的调用写法加进 `GENERATOR_CHECK_RE`，否则那道新门不在本规则
-    的覆盖范围内。已知的那道门"还在不在"由 `check_freshness_gate_alive` 单独保证。
+    新加一个生成器时要把它的调用写法加进 `GENERATOR_CHECK_RE`，否则那道新门不在覆盖范围内。
+    已知那道门"还在不在"由 `check_freshness_gate_alive` 单独保证。
     """
     out: list[Path] = []
     for path in _gate_files():
@@ -418,8 +388,7 @@ def check_freshness_gate_alive() -> list[str]:
     ):
         if marker not in src:
             problems.append(f"{_rel(gen)} 里找不到 {marker!r} —— {why}")
-    # 校验命令住在 checklist.yml，check_all.py 只做转发，判据要跟到同一处，
-    # 搜错地方就是恒红。
+    # 校验命令住在 checklist.yml，check_all.py 只转发，判据要跟到同一处，搜错地方就是恒红。
     gate = ROOT / "tools" / "ci" / "checklist.yml"
     gate_src = _read(gate) if gate.is_file() else ""
     if "build-knowledge.mjs" not in gate_src or "--check" not in gate_src:
@@ -430,19 +399,17 @@ def check_freshness_gate_alive() -> list[str]:
 # ---------------------------------------------------------------------------
 # 3. 打了 FAIL/ERROR 就要能非零退出
 #
-# 那天的原形：`main()` 里对每份日志打 `ERROR: ...`，然后 `return 0`。红字照打、退出码是 0，
-# 于是 pre-push 放行、CI 放行，`series` 那一路废了多久都没人知道。
+# 原形：`main()` 对每份日志打 `ERROR: ...` 然后 `return 0`。红字照打、退出码是 0，于是 pre-push
+# 放行、CI 放行，`series` 那一路废了多久都没人知道。
 #
-# 判据落在"模块顶层有没有 SystemExit"：只要求文件里出现过 `return 1` 是不够的，
-# 那正是原形里有的东西（`return 0` 旁边就有别的 `return 1`），而 `main()` 的返回值一旦没人接，
-# 退出码仍是 0。
+# 判据落在"模块顶层有没有 SystemExit"：只要求文件里出现过 `return 1` 不够——那正是原形里有的
+# 东西（`return 0` 旁边就有别的 `return 1`），而 `main()` 的返回值一旦没人接，退出码仍是 0。
 # ---------------------------------------------------------------------------
 
-# 「这个脚本会不会打出失败」：第一版只认 `print(f"FAIL ...")` 这一种写法，漏掉了项目自己的
-# 标准写法 `log.print_check(..., detail=f"FAIL {slug}: ...")`，`compare_baseline.py` 正是
-# 后者，那条变异因此报"守卫恒绿"，其实是判据没认全。改成判交给报告函数的那个字符串
-# （位置参数或关键字参数都算），而不是"打印函数后面紧跟的字面量"：写法会变，
-# "把 FAIL 送到人眼前"这件事不会变。
+# 「这个脚本会不会打出失败」：第一版只认 `print(f"FAIL ...")`，漏掉了标准写法
+# `log.print_check(..., detail=f"FAIL {slug}: ...")`，那里报"守卫恒绿"其实是判据没认全。
+# 改成判交给报告函数的那个字符串（位置/关键字参数都算），而不是"打印函数后面紧跟的字面量"：
+# 写法会变，"把 FAIL 送到人眼前"这件事不会变。
 _FAIL_MARK_RE = re.compile(r"\s*(?:FAIL|ERROR)\b")
 
 # 会把字串送到人眼前的调用：`print(...)` 与 `log.xxx(...)`。
@@ -478,10 +445,9 @@ def _py_emits_failure(tree: ast.AST) -> bool:
 
 JS_FAIL_PRINT_RE = re.compile(r"""console\.(?:error|warn|log)\(\s*[`"']\s*(?:CHECK\s+)?(?:FAIL|ERROR)\b""")
 
-# 取"等号右边/括号里"再看它是不是常量 0，而不是把 `(?!0)` 写在 `\s*` 后面：
-# `\s*` 会回溯，先吃掉空格、负向断言在 `0;` 上失败，于是退回去只吃零个空格、断言在空格上
-# 就成功了，`process.exitCode = 0;` 照样算"非零退出"。这个坑第一版真踩了：那条变异因此
-# 报"守卫恒绿"，看着像守卫坏了，其实是正则写坏。
+# 取"等号右边/括号里"再看它是不是常量 0，而不是把 `(?!0)` 写在 `\s*` 后面：`\s*` 会回溯，
+# 先吃掉空格、负向断言在 `0;` 上失败，退回只吃零个空格断言在空格上就成功了，`= 0;` 照样算"非零"。
+# 第一版真踩了这个坑：那条变异报"守卫恒绿"，看着像守卫坏了，其实是正则写坏。
 JS_EXIT_ASSIGN_RE = re.compile(r"process\.exitCode\s*=\s*([^;\n]*)")
 JS_EXIT_CALL_RE = re.compile(r"process\.exit\(\s*([^)\n]*)")
 
@@ -496,8 +462,7 @@ def _js_exits_nonzero(code: str) -> bool:
 def _top_level_exit(node: ast.AST) -> bool:
     """模块顶层（含 `if __name__ == "__main__":` 块内）有没有 SystemExit / sys.exit。
 
-    遇到函数/类定义就不再往里走，函数里的 `sys.exit` 只有被调到才算数，而那正是"被忘掉"
-    的那一步。
+    遇到函数/类定义就不再往里走：函数里的 `sys.exit` 只有被调到才算数，而那正是"被忘掉"的一步。
     """
     for child in ast.iter_child_nodes(node):
         if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
@@ -542,10 +507,9 @@ def check_failure_visible() -> list[str]:
 # ---------------------------------------------------------------------------
 # 4. 动态探针：坏输入要非零退出
 #
-# 上面那条是静态的（看源码）。静态规则看不见"打了 ERROR、也确实 return 1 了，但那条路
-# 根本没被走到"，而那正是原形的另一半（`np_series` 用了旧签名，抛异常 → 打印 ERROR →
-# 计数没加）。所以真跑一次：拿必然失败的输入跑，断言退出码非零且输出里有失败标记。
-# 只断言非零是不够的：依赖没装、路径写错也都非零，探针会绿得毫无意义。
+# 上面那条是静态的。静态规则看不见"打了 ERROR、也确实 return 1 了，但那条路根本没被走到"，
+# 而那正是原形的另一半。所以真跑一次：拿必然失败的输入，断言退出码非零且输出里有失败标记。
+# 只断言非零不够：依赖没装、路径写错也都非零，探针会绿得毫无意义。
 # ---------------------------------------------------------------------------
 
 
@@ -607,23 +571,17 @@ def check_bad_input_exit() -> list[str]:
 # 5. 开关不许被"再推导一次"
 #
 # 原形：`.githooks/pre-push` 想用 `WITH_E2E=1` 打开 E2E，却把这个开关用阶段列表又推了一遍，
-# `if with_e2e and "ci" not in stages: cmd.append("--with-e2e")`。而 E2E 那两步住在 ci 阶段里，
-# 于是"想要 E2E"的每一条路径都恰好满足 `"ci" in stages`，那个 `append` 一次都不会执行：
-# `WITH_E2E=1 git push` 打印出 `--stage push,ci`，看着像要跑 E2E，实际两步都被静默跳过。
+# `if with_e2e and "ci" not in stages`。而 E2E 那两步住在 ci 里，于是"想要 E2E"的每条路径都恰好
+# 满足 `"ci" in stages`，那个 `append` 一次都不执行：打印出 `--stage push,ci`，看着像要跑，实则跳过。
 #
-# 为什么单独一条规则：这类错没有任何输出。命令拼得出来、退出码是 0、日志也正常，
-# 只有把参数打印出来逐条对照才发现少了东西。静态检查能看见它，人看不出来。
+# 这类错没有任何输出：命令拼得出来、退出码 0、日志正常，只有把参数打印出来逐条对照才发现少了东西。
 #
-# 判据：`.githooks/pre-push` 里出现"把某个 `--with-*` 开关与阶段表达式绑在一起"的写法即违规。
-# 开关控制的是阶段内的步骤（`when: args.with_e2e`），与"跑哪些阶段"是两个正交的维度，
-# 要各自独立地传给 check_all.py。
+# 判据：hooks 里出现"把某个 `--with-*` 开关与阶段表达式绑在一起"即违规。开关控制的是阶段内的步骤
+# （`when: args.with_e2e`），与"跑哪些阶段"正交，要各自独立传给 check_all.py。
 # ---------------------------------------------------------------------------
 
-# 只看"`--with-xxx` / `with_xxx` 出现在某个条件里，而那个条件又在看阶段"。
-#
-# 字符类要含数字：开关名是 `with_e2e`，`[a-z_]+` 匹配不到 `e2e` 里的 `2`，
-# 第一版就写成了 `with_[a-z_]+`，于是这条守卫在真 bug 上恒绿（本项目最忌讳的形状：
-# 一条一直不红的守卫比没有守卫更坏，因为它还让人以为有人在看）。自证时才发现。
+# 字符类要含数字：开关名是 `with_e2e`，`[a-z_]+` 匹配不到 `e2e` 里的 `2`，第一版写成
+# `with_[a-z_]+`，于是这条守卫在真 bug 上恒绿（一直不红的守卫比没有守卫更坏，自证时才发现）。
 REFLAG_GUARD_RE = re.compile(
     r"""(?:if|elif)\b[^\n]*\bwith_[a-z0-9_]+\b[^\n]*\b(?:in|not\s+in)\b[^\n]*\bstages\b"""
     r"""|\bwith_[a-z0-9_]+\b\s+and\b[^\n]*\bstages\b"""
