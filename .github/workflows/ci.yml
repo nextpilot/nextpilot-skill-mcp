@@ -46,7 +46,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install deps (--ci mode: pip install + pnpm --frozen-lockfile + playwright)
+      - name: "Install deps (--ci mode: pip install + pnpm --frozen-lockfile + playwright)"
         run: ./tools/setup/setup.sh
 
       - name: Validate

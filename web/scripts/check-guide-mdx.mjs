@@ -15,6 +15,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { log } from "./lib/log.mjs";
+import { checklistHasStep } from "./lib/checklist.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
@@ -55,8 +56,7 @@ if ((await compileSource(GOOD)) !== null) {
 }
 
 // ---- 门还在：这份检查必须挂在统一入口上。check_all.py 只按清单转发，checklist.yml 里没这步就没人执行 ----
-const CHECKLIST = resolve(webRoot, "..", "tools", "ci", "checklist.yml");
-if (!readFileSync(CHECKLIST, "utf8").includes('- id: "check-guide-mdx"')) {
+if (!checklistHasStep("check-guide-mdx", resolve(webRoot, ".."))) {
     log.err("  FAIL mdx-wiring -> 这道门挂在统一入口上（checklist.yml 里没有 check-guide-mdx）");
     failures++;
 }

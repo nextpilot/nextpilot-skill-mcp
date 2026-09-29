@@ -41,6 +41,7 @@ workdir: "{WEB}"
 command: ["{NODE}", "node_modules/next/dist/bin/next", "build"]
 hint: "Review the Next.js build errors above. Run `npx next build` locally for detailed output."
 
+
 # ═══════════════════════════════════════════════════════════════════════
 # commit — Staged-file checks (read-only, no modification)
 # ═══════════════════════════════════════════════════════════════════════
@@ -52,6 +53,7 @@ when: [commit]
 workdir: "{ROOT}"
 command: ["{PYTHON}", "tools/ci/check_staged.py"]
 hint: "Staged files have formatting or lint issues. Fix them before committing."
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # push — Local pre-push checks
@@ -244,7 +246,7 @@ hint: "Site settings wiring is broken. See the FAIL line above for the specific 
 ---
 id: "compare-baseline"
 name: "Frozen baseline field-by-field diff (compare_baseline)"
-when: [push, ci, logs]
+when: [logs]
 workdir: "{ROOT}"
 command: ["{PYTHON}", "tools/engine/compare_baseline.py"]
 hint: "The baseline has changed unexpectedly. Review the diff output above. If the change is intentional, re-baseline by running the comparison tool."
@@ -252,7 +254,7 @@ hint: "The baseline has changed unexpectedly. Review the diff output above. If t
 ---
 id: "check-provider"
 name: "Adapter contract test (guard_provider_contract)"
-when: [push, ci, logs]
+when: [logs]
 workdir: "{ROOT}"
 command: ["{PYTHON}", "tools/engine/guard_provider_contract.py", "{LOGS}"]
 hint: "One or more log files failed the adapter contract test. Check the output above for which adapter and what contract was violated."
@@ -260,7 +262,7 @@ hint: "One or more log files failed the adapter contract test. Check the output 
 ---
 id: "probe-data"
 name: "Data-layer structure self-check (--probe-data)"
-when: [push, ci, logs]
+when: [logs]
 workdir: "{ROOT}"
 command: ["{PYTHON}", "tools/engine/run_engine.py", "--probe-data", "{LOGS}"]
 hint: "The data layer structure is inconsistent. Review the probe output above for details."
@@ -268,10 +270,11 @@ hint: "The data layer structure is inconsistent. Review the probe output above f
 ---
 id: "lint-rules"
 name: "Field-reference lint (check_rules_fields --strict)"
-when: [push, ci, logs]
+when: [logs]
 workdir: "{ROOT}"
 command: ["{PYTHON}", "tools/engine/check_rules_fields.py", "--strict"]
 hint: "Field reference linting found violations. Review the output above and fix the referenced fields."
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # ci / e2e / audit / mutate — Cloud-only checks

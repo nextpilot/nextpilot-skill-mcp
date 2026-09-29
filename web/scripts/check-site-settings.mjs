@@ -19,6 +19,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { log } from "./lib/log.mjs";
+import { checklistHasStep } from "./lib/checklist.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
@@ -28,7 +29,6 @@ const NODE_SCHEMA = join(webRoot, "lib", "site-settings.ts");
 const EDGE_SCHEMA = join(webRoot, "functions", "_lib", "settings-schema.js");
 const FOOTER = join(webRoot, "components", "SiteFooter.tsx");
 const ROOT_LAYOUT = join(webRoot, "app", "layout.tsx");
-const CHECKLIST = join(repoRoot, "tools", "ci", "checklist.yml");
 
 /** 后台可改的四个页脚项：由服务端以 props 传进客户端组件 */
 const FOOTER_PROPS = ["footerCopyright", "footerTagline", "sourceUrl", "icp"];
@@ -346,7 +346,7 @@ function parseFields(src, label) {
 // ---- 6. 门还在：这份检查要挂在统一入口上 ----
 // check_all.py 只按清单转发：checklist.yml 里没这一步，上面全部照跑也没人执行。
 {
-    if (!read(CHECKLIST).includes('- id: "check-site-settings"')) {
+    if (!checklistHasStep("check-site-settings", repoRoot)) {
         fail("settings-wiring", "这道门挂在统一入口上（checklist.yml 里没有 check-site-settings）");
     } else {
         ok("settings-wiring", "checklist.yml 里挂着 check-site-settings");
