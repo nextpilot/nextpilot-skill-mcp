@@ -789,7 +789,7 @@ function GeneralInfo({ report }: { report: LogReportData }) {
 
 /**
  * 「重新选择该 .ulg 文件」：三处"数据没缓存"的提示（轨迹 / 曲线 / 纯历史）共用它。
- * 以前这些提示只写了这句话，页面上却没有选文件的入口，用户得自己猜出"回列表页再选一次"。
+ * 只给这句话不够——页面上得有选文件的入口，否则用户得自己猜出"回列表页再选一次"。
  */
 function RestoreButton({ onRestore, label = "重新选择该日志文件" }: { onRestore: () => void; label?: string }) {
     return (

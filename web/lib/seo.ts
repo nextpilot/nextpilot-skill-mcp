@@ -55,9 +55,9 @@ export interface PageMeta {
 
 /**
  * 为任一页面生成标准化 Metadata。用法：generateMetadata() { return makePageMeta({...}) }。
- * 刻意纯同步：域名/站名来自 site-config 的构建期常量。曾经 async 读 KV「后台改域名立即生效」，
- * 代价是每个调用页变动态渲染、CDN 缓存失效，首页 TTFB +~1s；现在站点信息走改环境变量+重新部署，
- * 调用方可静态导出 `export const metadata = makePageMeta(...)`。详见 CLAUDE.md「首页静态化」。
+ * 刻意纯同步：域名/站名来自 site-config 的构建期常量。做成 async 读 KV 会让每个调用页变动态
+ * 渲染、CDN 缓存失效，首页 TTFB +~1s；站点信息走改环境变量+重新部署，调用方可静态导出
+ * `export const metadata = makePageMeta(...)`。详见 CLAUDE.md「首页静态化」。
  */
 export function makePageMeta({
     title,

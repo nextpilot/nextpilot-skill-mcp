@@ -594,7 +594,7 @@ console.log("\n[14] 指南正文只有一个渲染入口（防止再裂成一对
     const twins = names.filter((n) => /^Guide(Markdown|Mdx)\.tsx$/.test(n));
     check("旧的孪生名没有回来", twins.length === 0, twins.length ? `又出现了：${twins.join(", ")}` : "");
 
-    // 算标题文本的 textOf 全目录只许有一份：两份就会分叉（原来的缺陷就是这样来的）
+    // 算标题文本的 textOf 全目录只许有一份：两份就会分叉
     const textOfCount = names
         .filter((n) => n.endsWith(".tsx") || n.endsWith(".ts"))
         .reduce(
@@ -630,7 +630,7 @@ console.log("\n[14] 指南正文只有一个渲染入口（防止再裂成一对
     const mdxComps = compsAt < 0 ? "" : body.slice(compsAt, body.indexOf(";", compsAt) + 1);
     check("MDX 侧也覆写了 table（否则宽表撑破窄屏）", /\btable:\s*Table\b/.test(mdxComps));
     // 1 是正确性约束：`H2`/`H3` 渲染的就是 textOf 的返回串，不递归进元素等于把标题里的
-    // 行内代码整段丢掉（老 GuideMdx 的 3 行 stub 就是这样），id 和显示一起错。
+    // 行内代码整段丢掉，id 和显示一起错。
     check(
         "textOf 递归进元素捞出文本（少了它标题会丢内容）",
         body.includes("React.isValidElement(node)") && body.includes("node.props as { children"),
@@ -818,9 +818,8 @@ console.log("\n[19] 指南页栏宽跟随内容、栏间距不许回到 40px");
 
 console.log("\n[20] 两句固定文案只有一个出处（措辞不许各写各的）");
 {
-    // 隐私承诺原来写在页脚品牌区，上传卡上只有另一句近似措辞，同一件事两份文案各自演化。
-    // 现在两句（隐私承诺 + 免责声明）收进 lib/log-analysis-notes.ts，且只在上传卡渲染
-    // （页脚品牌区与底栏不再重复）。守三件事：出处里两句都在、上传卡真取真渲染、别处不许手写字面量。
+    // 隐私承诺与免责声明收进 lib/log-analysis-notes.ts，且只在上传卡渲染（页脚品牌区与底栏
+    // 不重复）。守三件事：出处里两句都在、上传卡真取真渲染、别处不许手写字面量。
     const notes = stripComments(read("../lib/log-analysis-notes.ts"));
     const upload = stripComments(readWeb("app", "[locale]", "log", "LogEntryClient.tsx"));
 

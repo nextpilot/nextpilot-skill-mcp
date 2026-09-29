@@ -117,7 +117,6 @@ def cmd_push(args: argparse.Namespace) -> int:
     ok = fail = skip = 0
     for key, fp in files:
         sz = fp.stat().st_size
-        # 检查远端是否已存在
         exists = False
         try:
             chk = requests.get(

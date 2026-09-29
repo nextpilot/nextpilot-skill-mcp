@@ -447,7 +447,6 @@ JS_FAIL_PRINT_RE = re.compile(r"""console\.(?:error|warn|log)\(\s*[`"']\s*(?:CHE
 
 # 取"等号右边/括号里"再看它是不是常量 0，而不是把 `(?!0)` 写在 `\s*` 后面：`\s*` 会回溯，
 # 先吃掉空格、负向断言在 `0;` 上失败，退回只吃零个空格断言在空格上就成功了，`= 0;` 照样算"非零"。
-# 第一版真踩了这个坑：那条变异报"守卫恒绿"，看着像守卫坏了，其实是正则写坏。
 JS_EXIT_ASSIGN_RE = re.compile(r"process\.exitCode\s*=\s*([^;\n]*)")
 JS_EXIT_CALL_RE = re.compile(r"process\.exit\(\s*([^)\n]*)")
 

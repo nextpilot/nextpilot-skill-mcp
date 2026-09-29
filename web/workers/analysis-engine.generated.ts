@@ -686,10 +686,9 @@ def op_hypot(a, b, **kw):
 
 
 # 四元数先归一化再转欧拉角：日志里的四元数可能因插值/截断略偏离单位长度，不归一化会放大
-# atan2 误差。踩过：这里曾有一个同名的第二个定义（不归一化）静默覆盖本实现，两个消费者
-# （plot/attitude.yml 与 vtol-transition 规则）实际都用错了版本，已删除。
-# 教训：OPERATORS[name] = fn 是赋值，算子名重复注册不报错、后者静默胜出；用 ruff 的
-# F811 在提交前拦住（见仓库根 pyproject.toml）。
+# atan2 误差。坑：同名的第二个定义（不归一化）会静默覆盖本实现，两个消费者（plot/attitude.yml
+# 与 vtol-transition 规则）都用到错版本。OPERATORS[name] = fn 是赋值，算子名重复注册不报错、
+# 后者静默胜出，靠 ruff 的 F811 在提交前拦住（见仓库根 pyproject.toml）。
 @operator(
     "quat_to_euler",
     in_arity=[1, 4],  # 两种写法都认：一个四列数组，或四列分开给
@@ -2223,7 +2222,7 @@ def check_provider(provider, where="provider"):
 #     [25, 62] = SET_HOME / EKF_YAW_RESET）；但 autotest Copter 不写这两个事件且无 ARM topic，
 #     所以 armed 还要回退 STAT.Armed 状态沿
 #   · FORMAT_VERSION 是 DataFlash 日志格式版本（Copter 120 / Plane 13），不是固件版本，不能
-#     当固件版本回退（踩过，已删）；固件版本从 MSG 横幅 / VER 消息取
+#     当固件版本回退；固件版本从 MSG 横幅 / VER 消息取
 #   · 仍未逐字段验证（v1 只解析不应用，应用了才是猜数）：格式字符缩放、FRAME_CLASS 全表
 #     （Copter/Rover 语境同码不同义）、FMTU 乘子
 #   · 消息 Length 是否含 3 字节头已做自校准（见 _calibrate_len_hdr），但兜底逻辑本身要样本验

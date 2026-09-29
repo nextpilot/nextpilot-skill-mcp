@@ -56,7 +56,7 @@ def _product_text() -> str:
     """
     if not CHECK_SCRIPT.exists():
         raise RuntimeError("还没有构建产物，先 pnpm web:build:kb")
-    # 每一族的规则都要查（以前只查 px4：改了 APM 规则会一直用旧产物，且没人报错）
+    # 每一族的规则都要查：只查 px4 会漏掉 APM 的改动，一直用旧产物且不报错
     stale = [
         f"{d.name}/{f.name}"
         for d in FAMILY_DIRS

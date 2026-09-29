@@ -289,7 +289,7 @@ MUTATIONS: list[Mutation] = [
         name="坏输入不再让校验脚本非零退出",
         path="tools/engine/run_engine.py",
         # 锚点必须在探针真走到的那条路上：探针跑 `--probe-data` 进 `_main_probe`，
-        # `_main_run` 的 `return 1 if failed else 0` 一次都不会经过（第一版就这样，自证报"守卫恒绿"）。
+        # `_main_run` 的 `return 1 if failed else 0` 一次都不会经过，锚在它上面自证会报"守卫恒绿"。
         old="return log.print_summary(all_results, [])",
         new="return 0",
         guard="hygiene",
@@ -480,8 +480,8 @@ MUTATIONS: list[Mutation] = [
     ),
     # ---- 界面侧：两句固定文案只有一个出处 ----
     #
-    # 隐私承诺与免责声明原来各写各的（页脚一句、上传卡一句近似），收进 lib/log-analysis-notes.ts
-    # 并统一只在上传卡渲染。要防的回归是"有人嫌绕远、在组件里就地手写"——不报错，只让措辞悄悄分叉。
+    # 隐私承诺与免责声明统一收进 lib/log-analysis-notes.ts，只在上传卡渲染。要防的回归是
+    # "有人嫌绕远、在组件里就地手写"——不报错，只让措辞悄悄分叉。
     Mutation(
         name="唯一出处的措辞被人就地改了",
         path="web/lib/log-analysis-notes.ts",
@@ -565,7 +565,7 @@ MUTATIONS: list[Mutation] = [
     ),
     # ---- 转发脚本：pnpm --filter 匹配不到项目时静默成功 ----
     #
-    # 失败形态毫无信号：pnpm 匹配 0 个项目时不报错、退出码 0，11 个转发脚本就这样空跑过，
+    # 失败形态毫无信号：pnpm 匹配 0 个项目时不报错、退出码 0，转发脚本空跑过，
     # 「pnpm typecheck 全绿」是假绿。三条自保分支各自证明会红；第四条（找不到根 package.json）
     # 要删文件，脚本做不到，只能留给代码审查。
     Mutation(
@@ -669,7 +669,7 @@ MUTATIONS: list[Mutation] = [
         name="新增一节时把路径写错（兜底汇总要抓到）",
         path="web/scripts/test-issue-filer.mjs",
         # 插在节标题那行之后（顶层语句），不能插进 check( 的实参列表：那会先撞 SyntaxError，
-        # 连一条检查都跑不到（第一版就这样，表现为"红了但理由不对"）。
+        # 连一条检查都跑不到，表现为"红了但理由不对"。
         old=r'console.log("\n[23] 静态守卫引用的源码路径都存在（路径失效不许把后面整段带走）");',
         new=(
             r'console.log("\n[23] 静态守卫引用的源码路径都存在（路径失效不许把后面整段带走）");'
@@ -772,10 +772,10 @@ MUTATIONS: list[Mutation] = [
     ),
     # ---- knowledge/engine/ 拼接命名空间：顶层名字撞车 = 后者静默覆盖前者 ----
     #
-    # 片段被拼成一份脚本，"两个文件各写一个 `_MAGIC`"不是风格问题，是运行期静默覆盖
-    # （`_MAGIC` 真被踩过一次）。三条：撞名本体、判空、门还在。
+    # 片段被拼成一份脚本，"两个文件各写一个 `_MAGIC`"不是风格问题，是运行期静默覆盖。
+    # 三条：撞名本体、判空、门还在。
     Mutation(
-        name="新 provider 顶层忘了带格式前缀（那次 _MAGIC 事故的原形）",
+        name="新 provider 顶层忘了带格式前缀（_MAGIC 撞名的原形）",
         path="knowledge/engine/providers/ardupilot.py",
         old='_APM_MAGIC = b"\\xa3\\x95"',
         new='_MAGIC = b"\\xa3\\x95"',
@@ -1077,7 +1077,7 @@ def _failed_names(key: str, out: str) -> set[str]:
         #   `| Detail: FAIL <名字>  -> <补充>`    Python 守卫走 _logging.print_check
         #   `|   [FAIL ] <名字>`                  _logging.print_summary 的汇总行
         #
-        # 后两种此前一条都数不出来（正则要求 FAIL 紧贴行首），后果不是报错，而是四层 Python
+        # 后两种若正则只认 FAIL 紧贴行首就一条都数不出来，后果不是报错，而是四层 Python
         # 守卫的每条变异都报"red but wrong reason"，自证集体失效却看着在跑。
         # `Result:  FAIL` 那行刻意识别不到：它没有名字，算进来只会变成假牵连。
         for line in out.splitlines():

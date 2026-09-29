@@ -14,7 +14,7 @@ import type { GuideDoc } from "@/lib/guide";
  *   `meta/<tag>.json` 这类内容，MDX 会把花括号当 JSX 表达式、尖括号当标签。
  * - `.mdx`（手写页面）→ MDX，可用 `<Callout>` / `<Zh>` / `<En>`。
  *
- * 这两条路曾经各占一个文件（`GuideMarkdown.tsx` / `GuideMdx.tsx`），名字只差一个字母，
+ * 这两条路各占一个文件，名字只差一个字母（`GuideMarkdown.tsx` / `GuideMdx.tsx`），
  * 看着像"基础版 / 升级版"，容易被当成超集删掉普通 markdown 那份 —— 恰好相反，那份不能删。
  * 两条路共用 `sharedRemarkPlugins`，各写一份清单就是下次分叉的起点。
  */
@@ -50,7 +50,7 @@ export function GuideBody({ renderer, source }: { renderer: GuideDoc["renderer"]
  * 所以它错了两样一起错。两条约束：
  *
  * 1. 要递归进元素把文本捞出来，否则 `### 6.3 …（`foreach`）` 里的 `foreach` 整个消失，
- *    锚点 id 和显示文字一起错（原来的 3 行 stub 只认 string / 数组，对任何元素返回 `""`）。
+ *    锚点 id 和显示文字一起错（3 行 stub 只认 string / 数组，对任何元素返回 `""`）。
  * 2. 行内代码补回反引号，让显示文字与原始 markdown 一致。反引号不影响锚点 id：
  *    `headingId` 把所有非字母数字折叠成 `-`。1 是正确性问题，2 只是显示保真。
  *

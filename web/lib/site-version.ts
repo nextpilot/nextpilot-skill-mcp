@@ -1,7 +1,7 @@
 /**
  * 站点版本（footer 的「版本 + 日期」）唯一读取口。真源在构建期：next.config.ts 把 web/package.json
- * 的 version 与构建时 git 短哈希、提交日期注入 NEXT_PUBLIC_APP_*，全站只有这里读（别处再读是第二份口径，
- * 曾经 issue-bridge 直读没人赋值的环境变量，version 恒空串）。取不到不补假值：footer 明说"版本未知"。
+ * 的 version 与构建时 git 短哈希、提交日期注入 NEXT_PUBLIC_APP_*，全站只有这里读（别处再读是第二份
+ * 口径，会读到没人赋值的环境变量、version 恒空串）。取不到不补假值：footer 明说"版本未知"。
  */
 const version = process.env.NEXT_PUBLIC_APP_VERSION ?? "";
 const commit = process.env.NEXT_PUBLIC_APP_COMMIT ?? "";

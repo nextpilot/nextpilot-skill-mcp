@@ -678,10 +678,9 @@ def op_hypot(a, b, **kw):
 
 
 # 四元数先归一化再转欧拉角：日志里的四元数可能因插值/截断略偏离单位长度，不归一化会放大
-# atan2 误差。踩过：这里曾有一个同名的第二个定义（不归一化）静默覆盖本实现，两个消费者
-# （plot/attitude.yml 与 vtol-transition 规则）实际都用错了版本，已删除。
-# 教训：OPERATORS[name] = fn 是赋值，算子名重复注册不报错、后者静默胜出；用 ruff 的
-# F811 在提交前拦住（见仓库根 pyproject.toml）。
+# atan2 误差。坑：同名的第二个定义（不归一化）会静默覆盖本实现，两个消费者（plot/attitude.yml
+# 与 vtol-transition 规则）都用到错版本。OPERATORS[name] = fn 是赋值，算子名重复注册不报错、
+# 后者静默胜出，靠 ruff 的 F811 在提交前拦住（见仓库根 pyproject.toml）。
 @operator(
     "quat_to_euler",
     in_arity=[1, 4],  # 两种写法都认：一个四列数组，或四列分开给

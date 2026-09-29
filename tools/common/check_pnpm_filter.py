@@ -104,7 +104,7 @@ def workspace_names() -> tuple[set[str], list[str]]:
                 continue
             dirs.append(os.path.relpath(d, ROOT))
 
-    # 根包自己也是 workspace 成员（且与 web/ 同名，正是当初踩坑的一半）
+    # 根包自己也是 workspace 成员（且与 web/ 同名，是按裸名 filter 命中不了的那一半）
     try:
         names.add(_load_json(os.path.join(ROOT, "package.json")).get("name", ""))
     except Exception:

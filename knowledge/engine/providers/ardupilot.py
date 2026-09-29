@@ -17,7 +17,7 @@
 #     [25, 62] = SET_HOME / EKF_YAW_RESET）；但 autotest Copter 不写这两个事件且无 ARM topic，
 #     所以 armed 还要回退 STAT.Armed 状态沿
 #   · FORMAT_VERSION 是 DataFlash 日志格式版本（Copter 120 / Plane 13），不是固件版本，不能
-#     当固件版本回退（踩过，已删）；固件版本从 MSG 横幅 / VER 消息取
+#     当固件版本回退；固件版本从 MSG 横幅 / VER 消息取
 #   · 仍未逐字段验证（v1 只解析不应用，应用了才是猜数）：格式字符缩放、FRAME_CLASS 全表
 #     （Copter/Rover 语境同码不同义）、FMTU 乘子
 #   · 消息 Length 是否含 3 字节头已做自校准（见 _calibrate_len_hdr），但兜底逻辑本身要样本验

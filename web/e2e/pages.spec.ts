@@ -57,7 +57,6 @@ test.describe("关键页面渲染", () => {
 test("规则清单页（rule-catalogue）无 MDX 编译错误", async ({ page }) => {
     await page.goto("/guide/rule-catalogue", { waitUntil: "networkidle" });
 
-    // 关键内容应该可见（规则数量）
     await expect(page.locator("h1").first()).toBeVisible();
     const h1 = await page.locator("h1").first().textContent();
     expect(h1).toContain("规则");
@@ -113,7 +112,6 @@ test.describe("页面交互功能", () => {
     test("技能广场 — 搜索功能可用", async ({ page }) => {
         await page.goto("/skills", { waitUntil: "networkidle" });
 
-        // 搜索输入框应该存在
         const searchInput = page
             .locator('input[type="search"], input[placeholder*="搜索"], input[placeholder*="search"]')
             .first();

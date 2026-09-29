@@ -214,12 +214,11 @@ jobs:
         hint: "The built knowledge base differs from the committed artifact. Run `node scripts/build-knowledge.mjs` locally and commit the updated artifact."
 
       # build-kb-parity 的盲区补丁：它比的是「重算 vs 磁盘」，而本机磁盘常被 dev/build
-      # 刷成重算值，比对永远自洽 —— 「HEAD 里提交的产物 vs knowledge/ 真源」脱节它测不出
-      # （2026-09-26 derived-version 实际发生过）。这里真跑一次 build（写模式）再和 HEAD
-      # 比产物区：工作区里未提交的 knowledge/ 改动也会被算进重算，diff 非零就拦 ——
-      # push 出去的 HEAD 必须「源 + 产物」一起自洽。hook 只拦截不代改：让 pre-push 自动
-      # amend / 补提交等于改写历史，危险得多。产物区用 pathspec 模式，与 .prettierignore
-      # 的自动生成清单同源，新增产物沿用命名惯例即自动覆盖。
+      # 刷成重算值，比对永远自洽 —— 「HEAD 里提交的产物 vs knowledge/ 真源」脱节它测不出。
+      # 这里真跑一次 build（写模式）再和 HEAD 比产物区：工作区里未提交的 knowledge/ 改动
+      # 也会被算进重算，diff 非零就拦 —— push 出去的 HEAD 必须「源 + 产物」一起自洽。
+      # hook 只拦截不代改：让 pre-push 自动 amend / 补提交等于改写历史，危险得多。产物区
+      # 用 pathspec 模式，与 .prettierignore 的自动生成清单同源，新增产物沿用命名惯例即自动覆盖。
       - id: "build-kb-fresh"
         name: "Artifact freshness vs HEAD (build:kb + git diff)"
         workdir: "{ROOT}"
@@ -241,7 +240,7 @@ jobs:
 
       # guide 页正文由 next-mdx-remote 在请求期才编译：next build 不碰它、markdownlint 只管
       # 写法风格、build:kb --check 只比对生成产物——正文混进裸 `{` 会一路绿到用户打开页面
-      # 才 500（2026-09-26 实际发生）。这一条在本地真编译一遍，手写页与生成页都受检。
+      # 才 500。这一条在本地真编译一遍，手写页与生成页都受检。
       - id: "check-guide-mdx"
         name: "Guide MDX compiles (check-guide-mdx)"
         workdir: "{WEB}"
@@ -295,11 +294,9 @@ jobs:
     steps:
       # 与 push 阶段的 build-kb-parity 同命令，职责却不同，缺了它就是一道盲区：
       # 那条在本机跑，磁盘常被 dev / build 刷成「重算值」，「重算 vs 磁盘」永远自洽，
-      # 测不出「提交的产物 vs knowledge/」脱节——2026-09-26 实际发生过：
-      # derived-version.generated.ts 落后于真源，一路绿进主干，只有干净 clone 才会红。
-      # CI 的 checkout 恰好就是干净检出：磁盘 == HEAD，「重算 vs 磁盘」在这里才第一次
-      # 真正等于「重算 vs HEAD」。check_all.py 的阶段说明里早写着 "artifact parity"，
-      # 这一 prior art 说明它本就该住在这儿，只是清单里一直没落地。
+      # 测不出「提交的产物 vs knowledge/」脱节：derived-version.generated.ts 落后于真源，
+      # 一路绿进主干，只有干净 clone 才会红。CI 的 checkout 恰好就是干净检出：磁盘 == HEAD，
+      # 「重算 vs 磁盘」在这里才第一次真正等于「重算 vs HEAD」。
       # 命令字样别改：check_hygiene 的「产物新鲜度门还在」判据按字样扫描（GENERATOR_CHECK_RE），
       # 这条同时是 push 侧那条被误改时的兜底。
       - id: "build-kb-parity-clean"

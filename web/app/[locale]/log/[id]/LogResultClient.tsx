@@ -38,7 +38,7 @@ export function LogResultClient() {
     } = useLogAnalyzer();
 
     const [loading, setLoading] = useState(true);
-    // 打开报告默认停在「基本情况」（tab 顺序变了，落点仍按原来的习惯）
+    // 打开报告默认停在「基本情况」
     const [tab, setTab] = useState<TabKey>("metrics");
     const loadedRef = useRef(false);
 

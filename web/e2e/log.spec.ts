@@ -19,7 +19,6 @@ test.describe("日志分析流程", () => {
     test("上传 .ulg 并完成分析（解析→显示断言）", { timeout: 420_000 }, async ({ page }) => {
         await page.goto("/log", { waitUntil: "networkidle" });
 
-        // 隐藏的 file input 应该存在
         const fileInput = page.locator('input[type="file"]').first();
         await expect(fileInput).toBeAttached();
 
@@ -96,7 +95,6 @@ test.describe("日志分析流程", () => {
 
         const body = await page.locator("body").innerText();
 
-        // 应该有拖拽或上传相关提示文案
         const hasDropHint =
             body.includes("拖拽") || body.includes("上传") || body.includes("选择文件") || body.includes(".ulg");
         expect(hasDropHint).toBeTruthy();
@@ -127,7 +125,6 @@ test.describe("日志分析流程", () => {
             return; // 没有文件输入则跳过
         }
 
-        // 创建临时非 .ulg 文件并上传
         const fixturesDir = path.resolve(process.cwd(), "e2e", "fixtures");
         const fs = await import("node:fs");
         fs.mkdirSync(fixturesDir, { recursive: true });
@@ -223,7 +220,6 @@ test.describe("日志分析流程", () => {
             return;
         }
 
-        // 检查 accept 属性是否包含 .ulg
         const accept = await fileInput.getAttribute("accept");
         if (accept !== null && accept !== undefined) {
             const acceptsUlg = accept.includes(".ulg") || accept.includes("ulg") || accept === "" || accept === "*";
