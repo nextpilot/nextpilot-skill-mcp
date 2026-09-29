@@ -90,7 +90,7 @@ for (let i = 0; i < 30; i++) {
     }
 }
 
-// 若命中去重，点「解析完整数据」补全（即原先被困死的路径）
+// 若命中去重，点「解析完整数据」补全
 if (await ev(`document.body.innerText.includes("解析完整数据")`)) {
     console.log("命中去重 → 点击「解析完整数据」");
     await ev(`[...document.querySelectorAll('button')].find(b=>b.textContent.includes('解析完整数据')).click()`);

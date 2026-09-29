@@ -74,10 +74,9 @@ REQUIRED = {
         "sig": "() -> dict",
         "doc": "报告头的离散事实：机型 / 固件 / 时长 / 模式 / 载具身份……键名见各 provider",
     },
-    # ---- 知识引擎查询 API（docs/develop/engine-api-rework.md 并入契约）----
-    # 这组方法就是 provider 的正式名字（2026-09-24 迁移：get_topic_data→get_dataset、
-    # get_logged_information→get_info_dict、get_logged_messages→get_logged_events、
-    # get_flight_phases→get_mode_changed，旧名退场，不搞双轨）。
+    # ---- 知识引擎查询 API（契约见 docs/develop/engine-api-rework.md）----
+    # 这组方法就是 provider 的正式名字。旧名（get_topic_data / get_logged_information /
+    # get_logged_messages / get_flight_phases）已退场，不搞双轨。
     # 取不到一律返回 None / [] / {}（不抛异常），与上面同一套失败语义。
     "get_start_timestamp": {
         "kind": "method",

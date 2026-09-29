@@ -1880,10 +1880,9 @@ REQUIRED = {
         "sig": "() -> dict",
         "doc": "报告头的离散事实：机型 / 固件 / 时长 / 模式 / 载具身份……键名见各 provider",
     },
-    # ---- 知识引擎查询 API（docs/develop/engine-api-rework.md 并入契约）----
-    # 这组方法就是 provider 的正式名字（2026-09-24 迁移：get_topic_data→get_dataset、
-    # get_logged_information→get_info_dict、get_logged_messages→get_logged_events、
-    # get_flight_phases→get_mode_changed，旧名退场，不搞双轨）。
+    # ---- 知识引擎查询 API（契约见 docs/develop/engine-api-rework.md）----
+    # 这组方法就是 provider 的正式名字。旧名（get_topic_data / get_logged_information /
+    # get_logged_messages / get_flight_phases）已退场，不搞双轨。
     # 取不到一律返回 None / [] / {}（不抛异常），与上面同一套失败语义。
     "get_start_timestamp": {
         "kind": "method",
@@ -3240,8 +3239,8 @@ class Px4Provider:
         alias 是该字段的备用命名（旧固件改过名），字符串或列表。
         定长数组字段（如 float32[3]）：pyulog 按 'field[i]' 暴露，返回每元素一列、缺的位置为 None。
 
-        没有"把所有实例拼成一条"这个形态（曾经有，且是默认）：一条曲线混着几个传感器，
-        读的人看不出来。多实例归约交给写 \`[:]\` 会分组的算子。
+        没有"把所有实例拼成一条"这个形态：一条曲线混着几个传感器，读的人看不出来。
+        多实例归约交给写 \`[:]\` 会分组的算子。
         """
         aliases = None
         if alias is not None:

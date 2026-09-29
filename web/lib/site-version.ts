@@ -14,7 +14,7 @@ export function hasSiteVersion(): boolean {
     return Boolean(version && updatedAt);
 }
 
-/** footer 徽标上的展示串：`v0.1.0 · 2026-09-21 23:59:26`（精确到秒，一天内多次构建才分得清先后）。缺哪一项就只给另一项，都不缺才拼在一起。 */
+/** footer 徽标上的展示串，形如 `v0.1.0 · 2026-09-21 23:59:26`。时间精确到秒，一天内多次构建才分得清先后。缺哪一项就只给另一项，都不缺才拼在一起。 */
 export function siteVersionLabel(): string {
     if (version && updatedAt) return `v${version} · ${updatedAt}`;
     if (version) return `v${version}`;

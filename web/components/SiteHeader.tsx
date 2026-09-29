@@ -152,5 +152,5 @@ export function SiteHeader() {
     );
 }
 
-// 页脚原先也写在这个文件里（`SiteHeader.tsx` 导出 `SiteFooter`），文件名说的是 Header，
-// 读的人在 components/ 里找不到页脚在哪。2026-09-21 拆到 `components/SiteFooter.tsx`。
+// 页脚不在本文件里，在 `components/SiteFooter.tsx`：文件名说的是 Header，
+// 页脚写在这里会让读的人在 components/ 里找不到它。

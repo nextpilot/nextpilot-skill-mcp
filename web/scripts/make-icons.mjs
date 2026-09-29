@@ -70,8 +70,8 @@ await send("Emulation.setDefaultBackgroundColorOverride", {
 
 /**
  * 每个尺寸单独写页面、单独导航、等加载完再截。
- * 试过「一个页面反复改 innerHTML 再按 clip 截」，首帧之后的截图偶发拿到空白
- * （合成器对同一目标尺寸变化的处理不稳定）；每尺寸全新导航最稳。
+ * 不要改成「一个页面反复改 innerHTML 再按 clip 截」：合成器对同一目标尺寸变化处理不稳定，
+ * 首帧之后的截图偶发拿到空白。
  */
 async function raster(source, size) {
     const file = join(tmpdir(), `icon-${size}.html`);

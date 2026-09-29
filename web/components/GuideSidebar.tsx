@@ -30,10 +30,9 @@ export function GuideSidebar({ groups }: { groups: GuideNavGroup[] }) {
 
     const toggle = (key: string) => setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
 
-    // 侧栏宽度跟着导航文字走（`w-max`），不要写死：实测中文条目最宽 124px、英文 151px，
-    // 原先写死 `w-48`(192px) 时侧栏内部就凭空多出 27~54px 死白，再叠上那时 40px 的外层
-    // 间距，中文下「侧栏文字右边缘 → 正文左边缘」实测 94px。`min-w-36` 是下限（条目名再短
-    // 也留出可点宽度），`max-w-48` 是上限（以后条目名变长时换行，不许反过来把正文挤窄）。
+    // 侧栏宽度跟着导航文字走（`w-max`），不要写死：中文条目最宽 124px、英文 151px，
+    // 写死宽度会让侧栏内部留出死白。`min-w-36` 是下限（条目名再短也留出可点宽度），
+    // `max-w-48` 是上限（条目名变长时换行，不许把正文挤窄）。
     return (
         <aside className="hidden w-max min-w-36 max-w-48 shrink-0 lg:block">
             <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pb-10">

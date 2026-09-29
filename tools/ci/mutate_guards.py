@@ -868,7 +868,7 @@ MUTATIONS: list[Mutation] = [
         guard="site-settings",
         expect="settings-static-metadata",
         note="根 layout 一旦导出 generateMetadata（异步），Next.js 把整棵路由树判为动态渲染："
-        "首页失去静态化，TTFB 从几十毫秒退化到 ~1.5s 且 CDN 无从缓存。2026-09-27 就是这么坏的",
+        "首页失去静态化，TTFB 从几十毫秒退化到 ~1.5s 且 CDN 无从缓存",
     ),
     Mutation(
         name="渲染路径重新读运行期设置（那一页退回动态渲染）",
@@ -906,8 +906,7 @@ MUTATIONS: list[Mutation] = [
         guard="site-settings",
         expect="settings-site-url-fallback",
         note="SITE_URL 是唯一「默认值 ≠ 线上值」的字段：站名/描述/页脚漏配看不出来，"
-        "它漏配则 sitemap/robots/canonical/og:url 全指向 localhost —— 等于主动提交死链。"
-        "2026-09-28 真实发生，且此前被「sitemap 走 KV 取值」掩盖着",
+        "它漏配则 sitemap/robots/canonical/og:url 全指向 localhost —— 等于主动提交死链",
     ),
     Mutation(
         name="环境变量文件把域名变量名写成裸 SITE_URL（孤儿变量，代码读不到）",
@@ -917,8 +916,7 @@ MUTATIONS: list[Mutation] = [
         guard="site-settings",
         expect="settings-env-var-name",
         note="代码读的是 process.env.NEXT_PUBLIC_SITE_URL。写成裸名 SITE_URL，控制台/编辑器"
-        "看着「配了」，代码却读不到，落到默认值——又一个「改了没反应」的静默失败。"
-        "2026-09-28 .env.local 真实存在这个写法",
+        "看着「配了」，代码却读不到，落到默认值——又一个「改了没反应」的静默失败",
     ),
     Mutation(
         name="密钥字段名进了客户端组件（明文被序列化进 SSR HTML）",

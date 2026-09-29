@@ -1367,7 +1367,7 @@ def log_info_card(*, info: dict, log_path: Path, box_id: str = "params-box") -> 
 
     以 tab 呈现而不做整页长列表：`params` 上千条、默认值 61 条，摊在一列里图会被推到屏幕外。
 
-    tab 上写契约键名（`infoDict` / `params` / …）而不是中文标签（老大点名要字段名）。每块标题
+    tab 上写契约键名（`infoDict` / `params` / …）而不是中文标签。每块标题
     还标了它是 ULog 原始消息（'I'/'M'/'D'/'P'/'Q'）还是加工结果——混在一起会把引擎算出来的
     东西当成日志里记的内容。
     """
@@ -1394,7 +1394,7 @@ def log_info_card(*, info: dict, log_path: Path, box_id: str = "params-box") -> 
 
     blocks = []
     # `sysInfo` 故意不做成一块：它是 `infoDict` 里按 `sys_info_keys` 挑出的子集（ver_sw / frame
-    # 之类），不是日志里独立存在的字段，同样内容在 infoDict 里一字不少。老大点名只要原始字段。
+    # 之类），不是日志里独立存在的字段，同样内容在 infoDict 里一字不少。
     info_dict = info.get("infoDict") or []
     if info_dict:
         rows = "".join(
@@ -1790,7 +1790,7 @@ def _editor_left(
 ) -> str:
     """左栏：先选日志 → 再选文件 → 改 YAML → 保存。rule 与 plot 共用这一份。
 
-    日志在最上面（老大点名的顺序：没有日志就不知道规则跑出来是什么样）。日志与切文件各是
+    日志在最上面：没有日志就不知道规则跑出来是什么样。日志与切文件各是
     独立的 GET 表单，编辑框单独一个 POST，三个动作互不牵连。
     """
     return (
@@ -2551,7 +2551,7 @@ def serve(port: int = 0, open_browser: bool = True) -> int:
             except Exception as exc:  # noqa: BLE001
                 return 200, index_page("引擎起不来（%s: %s）" % (type(exc).__name__, exc)), HTML
             entries = group_topics(list((call(ns, "np_manifest()") or {}).get("topics") or []))
-            # 元信息在图上面：老大要看的就是 msg_info_dict 那一堆
+            # 元信息在图上面：要看的就是 msg_info_dict 那一堆
             right = log_info_card(info=log_info_for(path), log_path=path) + ulog_right(ns=ns, log_path=path, picked=picked)
             return 200, page(right), HTML
 
