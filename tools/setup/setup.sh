@@ -6,12 +6,14 @@
 # 末尾的自检用仓库既有的 tools/common/check_prereq.py，不在这里另写一遍工具链判断。
 #
 # 用法：
-#   ./tools/setup/setup.sh                  # 全套：Python + Node + git hook + 自检
+#   ./tools/setup/setup.sh                  # 全套：安装 + prereq 自检 + 工具链校验
 #   ./tools/setup/setup.sh --skip-node      # 只装 Python
 #   ./tools/setup/setup.sh --skip-logs      # 不装 pyulog
 #   ./tools/setup/setup.sh --skip-hooks     # 不动 git 的 core.hooksPath
 #   ./tools/setup/setup.sh --recreate       # 删掉现有 .venv 重建
 #   ./tools/setup/setup.sh --install-uv     # 允许本脚本联网装 uv（默认只打印命令）
+#   ./tools/setup/setup.sh --skip-check     # 装完不跑工具链校验（第 7 步）
+#   ./tools/setup/setup.sh --check-only     # 不装任何东西，只跑 prereq 自检 + 工具链校验
 #   ./tools/setup/setup.sh --index-url https://mirrors.aliyun.com/pypi/simple/
 set -euo pipefail
 
@@ -20,11 +22,15 @@ SKIP_HOOKS=0
 SKIP_LOGS=0
 RECREATE=0
 INSTALL_UV=0
+SKIP_CHECK=0
+CHECK_ONLY=0
 PYTHON="3.11"
 INDEX_URL="https://pypi.org/simple"
 
+# usage 不能按行号切片（3,14p 那版把最后一行选项漏掉了——加一行选项就得记着改行号，
+# 必漏）：从说明开头切到 set -euo 为止，按标记定位，加减行都不用回头改这里。
 usage() {
-    sed -n '3,14p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,/^set -euo/p' "$0" | sed 's/^# \{0,1\}//' | sed '$d'
 }
 
 while [ $# -gt 0 ]; do
@@ -34,6 +40,8 @@ while [ $# -gt 0 ]; do
     --skip-logs) SKIP_LOGS=1 ;;
     --recreate) RECREATE=1 ;;
     --install-uv) INSTALL_UV=1 ;;
+    --skip-check) SKIP_CHECK=1 ;;
+    --check-only) CHECK_ONLY=1 ;;
     --python)
         PYTHON="$2"
         shift
@@ -72,8 +80,14 @@ run() {
 
 cd "$ROOT"
 
+# --check-only：跳过安装类步骤（1-5），直接进自检与校验——日常"验证工具链"一条命令。
+# bash 的 if 块内不要求缩进，步骤块原样保留，只在前后加开关。
+if [ "$CHECK_ONLY" = "1" ]; then
+    echo "--check-only：跳过安装步骤（uv / venv / 依赖 / Node / hook），直接自检 + 校验"
+else
+
 # ── 1. uv ────────────────────────────────────────────────────────────
-step "1/6 uv（Python 侧一律由它装）"
+step "1/7 uv（Python 侧一律由它装）"
 if ! command -v uv >/dev/null 2>&1; then
     if [ "$INSTALL_UV" = "1" ]; then
         echo "  uv 不在 PATH 上，用官方安装脚本装："
@@ -91,7 +105,7 @@ fi
 run uv --version
 
 # ── 2. 虚拟环境 ──────────────────────────────────────────────────────
-step "2/6 Python 虚拟环境（$VENV）"
+step "2/7 Python 虚拟环境（$VENV）"
 if [ -d "$VENV" ] && [ "$RECREATE" = "1" ]; then
     echo "  --recreate：删除已有 .venv"
     rm -rf "$VENV"
@@ -109,7 +123,7 @@ if [ ! -x "$VENV_PY" ]; then
 fi
 
 # ── 3. Python 依赖 ───────────────────────────────────────────────────
-step "3/6 Python 依赖（uv pip install）"
+step "3/7 Python 依赖（uv pip install）"
 # 显式给 --index-url：源写死在命令里，换台机器也是同一结果（不依赖本机 pip 的配置）。
 set -- pip install --python "$VENV_PY" --index-url "$INDEX_URL" -r requirements-dev.txt
 if [ "$SKIP_LOGS" = "1" ]; then
@@ -120,7 +134,7 @@ fi
 run uv "$@"
 
 # ── 4. Node 依赖 ─────────────────────────────────────────────────────
-step "4/6 Node 依赖（pnpm install）"
+step "4/7 Node 依赖（pnpm install）"
 if [ "$SKIP_NODE" = "1" ]; then
     echo "  --skip-node：跳过"
 else
@@ -133,7 +147,7 @@ else
 fi
 
 # ── 5. Git hook ──────────────────────────────────────────────────────
-step "5/6 Git hook 指向 .githooks"
+step "5/7 Git hook 指向 .githooks"
 if [ "$SKIP_HOOKS" = "1" ]; then
     echo "  --skip-hooks：跳过"
 else
@@ -190,21 +204,36 @@ PY
     fi
 fi
 
+fi  # --check-only 跳过安装步骤（1-5）
+
 # ── 6. 自检 ──────────────────────────────────────────────────────────
-step "6/6 自检（tools/common/check_prereq.py）"
+step "6/7 自检（tools/common/check_prereq.py）"
 if [ "$SKIP_LOGS" = "1" ]; then
     run "$VENV_PY" tools/common/check_prereq.py
 else
     run "$VENV_PY" tools/common/check_prereq.py --with-logs
 fi
 
+# ── 7. 工具链校验 ────────────────────────────────────────────────────
+# 装什么就验什么：工具链是本脚本装的，装完当场用 .venv 的解释器真跑一遍工具链检查
+# （ruff / prettier / markdownlint / pyright / eslint / tsc，checklist.yml 里
+# group=toolchain 的那组），"装好了"由退出码说话，不再只打印一行提示让用户自己跑。
+# 必须显式传 $VENV_PY：check_all.py 的 {PYTHON} 取 sys.executable，用系统 python 跑
+# 会在缺包项上假失败（pyulog 不在系统环境）——真实踩过的坑。
+if [ "$SKIP_CHECK" = "1" ]; then
+    echo "  --skip-check：跳过"
+else
+    step "7/7 工具链校验（tools/ci/check_all.py --group toolchain）"
+    run "$VENV_PY" tools/ci/check_all.py --group toolchain
+fi
+
 printf '\n环境就绪。接下来：\n'
 printf '  1) 复制环境变量模板：cp web/.env.example web/.env.local（填 DEEPSEEK_API_KEY）\n'
 printf '  2) 起开发服务器：    pnpm web:dev\n'
-printf '  3) 跑校验：          %s tools/ci/check_all.py --stage push\n' "$VENV_PY"
+printf '  3) 全量校验：        %s tools/ci/check_all.py（不带参数跑全部 stage）\n' "$VENV_PY"
 printf '\n'
-printf '  校验要用 .venv 里的 python：check_all.py 走 sys.executable -m ruff，\n'
-printf '  系统 python 里通常没装 ruff。激活方式：source .venv/bin/activate\n'
+printf '  第 7 步已用 .venv 的 python 跑过工具链校验；手动跑时同样要用 .venv 的 python ——\n'
+printf '  check_all.py 走 sys.executable -m ruff，系统 python 里通常没装 ruff。激活方式：source .venv/bin/activate\n'
 if [ "$SKIP_LOGS" != "1" ]; then
     printf '\n'
     printf '  pyulog 没钉版本（与浏览器侧 micropip 现装保持一致），已知代价：\n'
