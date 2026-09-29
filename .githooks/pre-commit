@@ -43,8 +43,8 @@ def main() -> int:
     ts_files = [f for f in staged if f.endswith((".ts", ".tsx"))]
     touched = py_files + fe_files
 
-    # 部分暂存检测要先于任何格式化动作：格式化一跑，"用户的未暂存改动"和"格式化
-    # 造成的改动"在工作区里就再也无法区分。此刻 git diff 反映的纯粹是用户自己的改动。
+    # 部分暂存检测必须先于任何格式化动作：格式化一跑，"用户的未暂存改动"和"格式化造成
+    # 的改动"在工作区里就再也无法区分。此刻 git diff 反映的纯粹是用户自己的改动。
     # 下面这些文件若既有暂存又有未暂存内容，结尾的整文件 re-stage 会把未暂存部分
     # （多半是用户正在编辑的半成品）一并带进提交（审计 M12）。
     # hook 只拦不代改：自动分离两种 diff 需要备份 index + write-tree + commit-tree
@@ -82,8 +82,8 @@ def main() -> int:
         prettier = web / "node_modules" / "prettier" / "bin" / "prettier.cjs"
         if prettier.exists():
             print("[pre-commit] prettier --write on staged frontend files...")
-            # 不传 --config：配置在仓库根，prettier 从每个文件向上找就能命中。
-            # 目的正是让 hook 与编辑器保存走同一条查找路径，否则 web/ 之外的文件会被两套规则来回改。
+            # 不传 --config：配置在仓库根，prettier 从每个文件向上找就能命中——为的就是
+            # 让 hook 与编辑器保存走同一条查找路径，否则 web/ 之外的文件会被两套规则来回改。
             pw = run([_node(), str(prettier), "--write", *fe_files], cwd=root)
             if pw.returncode != 0:
                 print(pw.stdout)

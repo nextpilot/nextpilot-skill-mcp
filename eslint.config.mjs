@@ -20,9 +20,8 @@ export default tseslint.config(
         ],
     },
     js.configs.recommended,
-    // TS/TSX 曾经被整体忽略（当年没装 TS parser，解析不了只能绕开），代价是
-    // react-hooks / @next 全部规则对 TSX 从未生效过。现在接入 parser，规则只对
-    // ts/tsx 生效，js 文件维持下面的原生配置不受影响。
+    // TS/TSX 曾整体被忽略（当年没装 TS parser），代价是 react-hooks / @next 规则对 TSX 从未生效过。
+    // 现在接入 parser，规则只对 ts/tsx 生效，js 文件维持下面的原生配置不受影响。
     tseslint.config({
         files: ["**/*.ts", "**/*.tsx"],
         extends: [tseslint.configs.recommended],

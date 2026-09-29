@@ -36,10 +36,9 @@ def main() -> int:
         stages = ["push"]
 
     cmd = [sys.executable, script, "--stage", ",".join(stages)]
-    # --with-e2e is orthogonal to the stage list: it toggles steps *inside* the ci
-    # stage. Deriving it from `"ci" not in stages` would silently drop it in every
-    # case that matters: the E2E steps live in ci, so any run that wants them
-    # already has ci in the list.
+    # --with-e2e 与 stage 列表正交：它开关的是 ci stage *内部*的步骤。用
+    # `"ci" not in stages` 推导会在所有需要它的场景里悄悄失效——E2E 步骤本就在
+    # ci 里，想要它们的那次运行 stage 列表必然已含 ci。
     if with_e2e:
         cmd.append("--with-e2e")
 
