@@ -428,7 +428,12 @@ def _py_emits_failure(tree: ast.AST) -> bool:
     return False
 
 
-JS_FAIL_PRINT_RE = re.compile(r"""console\.(?:error|warn|log)\(\s*[`"']\s*(?:CHECK\s+)?(?:FAIL|ERROR)\b""")
+# 会把失败字面量送到人眼前的调用，两种写法都要认：
+# - `console.error/warn/log("FAIL ...")`：改收编之前的老写法，保留是因为第三方脚本
+#   （web/content/skills 下的示例）不在收编范围内。
+# - `err("FAIL ...")` / `log.err("FAIL ...")`：web/scripts/lib/log.mjs 的出口。
+# 两条都不认的前缀（如 `reportFail(`）一旦出现，本守卫会静默失效 —— 新增出口必须同步加进来。
+JS_FAIL_PRINT_RE = re.compile(r"""(?:console\.(?:error|warn|log)|(?:\w+\.)?err)\(\s*[`"']\s*(?:CHECK\s+)?(?:FAIL|ERROR)\b""")
 
 # 取"等号右边/括号里"再看它是不是常量 0，而不是把 `(?!0)` 写在 `\s*` 后面：`\s*` 会回溯，
 # 先吃掉空格、负向断言在 `0;` 上失败，退回只吃零个空格断言在空格上就成功了，`= 0;` 照样算"非零"。
