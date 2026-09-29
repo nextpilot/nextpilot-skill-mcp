@@ -5,10 +5,9 @@ lastmod: 2026-09-24T12:44:00+08:00
 
 # 知识引擎 API（最终版，已落地）
 
-> **状态**：本文档描述的接口**已于 2026-09-24 并入 `engine/providers/api.py` 契约**，
-> 由 `Px4Provider`（补齐）与 `ArduPilotProvider`（新建）双实现，PX4 真实日志 +
-> 36 份 APM 真实日志全量过契约守卫。决策过程、实现要点与验证记录见
-> 《[知识引擎 API 实施计划](engine-api-plan.md)》。
+> **状态**：已落地（2026-09-24）。接口并入 `engine/providers/api.py` 契约，由
+> `Px4Provider`（补齐）与 `ArduPilotProvider`（新建）双实现。
+> 本文是这套 API 的唯一文档：规范、实现要点、命名取舍与验证结果都在这里。
 >
 > **两条硬决策**：
 >
@@ -116,9 +115,62 @@ lastmod: 2026-09-24T12:44:00+08:00
 
 ## 验证结果（2026-09-24，全实测）
 
-- 契约守卫 `tools/engine/guard_provider_contract.py` 9 步：2 份真实 PX4 +
+- 构建期：契约检查通过（两个 provider 都过 REQUIRED/builtin 检查；31 规则 / 73 算子）
+- 运行期：`check_provider` 对两格式都过
+- 契约测试 `tools/engine/guard_provider_contract.py` 9 步：2 份真实 PX4 +
   **36 份真实 APM**（Copter/Plane/Rover）+ 合成 APM = **333 checks 全过**
 - PX4 规则回归（`tools/px4log_engine_runner.py`）20 份真实日志全过
-- `build-knowledge.mjs` 构建期契约检查通过（31 规则 / 73 算子）；pyright 0 errors
-- 未竟事项（如实挂账）：守卫变异自证未跑；provider 顶层撞名守卫未做；
-  APM 的 FMTU 乘子/格式字符缩放/FRAME_CLASS 全表未逐字段核对（v1 只解析不应用）
+- pyright 0 errors
+
+**挂账**（未竟事项，如实记）：
+
+- 守卫变异自证**未跑**：破坏任一新方法应让对应断言失败，`mutate_guards` 对该层未执行
+- provider 顶层撞名守卫**未做**
+- APM 的 FMTU 乘子 / 格式字符缩放 / `FRAME_CLASS` 全表**未逐字段核对**（v1 只解析不应用）
+
+## 实现要点
+
+PX4 侧：
+
+- `get_start/last_timestamp`：`_read_data_list` 已算 t_min/t_max，补存 `t_max_us`
+- `get_dataset_description` / `get_field_sizeof` / `has_data_appended` / `has_file_corruption`：委托 pyulog 同名 property 与 `ULog.get_field_size`
+- `get_field_unit`：读构建期注入的字段单位表（只含规则/图里写了 `unit=` 的字段），其余返回 None，如实标注，不冒充全量
+- home = `vehicle_global_position` 首个有效定位（armed 起点之后优先）；ref = `vehicle_local_position.ref_lat/ref_lon/ref_alt` 首个非零三元组。两概念分开，注释写明来源
+- `get_changed_parameters` 从 `report_materials` 内联逻辑提取为方法
+
+ArduPilot 侧（`engine/providers/ardupilot.py`）：
+
+- AP_Logger .bin **格式自描述**：解析器按 FMT 表通解，不逐消息硬编码；消息一律按 FMT 名字查表，不写死消息 ID
+- 长度约定自校准：用第一条 FMT 消息自己的 Length 字段判断含不含 3 字节头
+- 两遍扫描：先收 FMT 定义，再按格式解码；`TimeUS` 映射为 `timestamp` 列
+- 轨迹 = GPS（`Status>=3` 过滤）；阶段 = MODE 消息切段；armed = EV 事件 10/11，回退 STAT.Armed 状态沿，都没有就如实空
+
+两条踩过的坑：
+
+- **`FORMAT_VERSION` 参数是 DataFlash 日志格式版本（120/13），不是固件版本**，不可作回退。固件版本要从 MSG 横幅取（`ArduCopter V4.8.0-dev (hash)`）。
+- **`timestamp` 的要求是条件的**：FMT 声明了时间字段才要求 timestamp 列。AP_Logger 的 FILE 等内部传输消息没有 TimeUS，"所有 topic 都有 timestamp"在跨格式下不成立。
+
+## 守卫
+
+1. 构建期 AST：`build-knowledge.mjs` 自动要求每个 provider 定义新 REQUIRED 方法、`builtin_variables()` 含新键
+2. 运行期：`check_provider()` 补 `get_time_bounds` 形状断言
+3. 契约测试 `tools/engine/guard_provider_contract.py`：
+   - 第 7 步查真实方法名（原写法查的 `phases` / `dropouts` 属性根本不存在，可选能力检查从来只跳过不检查，是恒绿）
+   - 第 9 步断言时间边界自洽（duration 从 bounds 推导，与 start/end 同口径）、dtype/sizeof 与 meta 自洽、integrity 与 `DROPOUT_MS` 对表、armed_changed 与 `ARMED_INTERVALS` 对表
+   - `--apm`：用 `tools/dev/apm_make_sample.py` 合成一份最小 .bin 跑同一套断言
+4. 变异自证：**尚未跑**（见上方挂账）
+
+runner（`tools/engine/run_engine.py`）从硬编码 px4.py 改为自动扫描 `providers/*.py`，与构建一致。
+
+## 命名取舍记录
+
+| 原稿名                      | 处置                               | 理由                                          |
+| --------------------------- | ---------------------------------- | --------------------------------------------- |
+| `get_serials(topic, field)` | **不落地**，用现有 `get_series`    | `serials` 望文生义成"序列号"，与"序列"混淆    |
+| `get_inital_parameters`     | 落地为 `get_initial_parameters`    | 原稿拼写错误                                  |
+| `get_firmwre_version`       | 落地为 `get_firmware_version`      | 原稿拼写错误                                  |
+| `get_params_decription`     | 落地为 `get_parameter_description` | 原稿拼写错误                                  |
+| `get_default_parameters`    | OPTIONAL（原稿 REQUIRED）          | 缺数据源时对应能力隐藏，不该卡死整个 provider |
+| `AIRFAME_ID`（内置变量）    | `AIRFRAME_ID`                      | 拼写修正                                      |
+| `VEHICLE_TYPE`（内置变量）  | **不落地**                         | 与现有 `VEHICLE` 同义不同词表，孪生名禁做     |
+| "累计飞行时长"（中文键）    | `FLIGHT_TIME_S`                    | 键名统一英文                                  |
