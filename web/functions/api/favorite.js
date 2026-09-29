@@ -4,7 +4,7 @@
 //
 // 身份维度用设备 ID（与下载计数一致，免登录可用）；登录后也可后续换成 uid。
 // KV：fav_{kind}_{slugKey}_{deviceHash} = 1；fvs_{kind}_{slugKey} = 原始 slug
-import { getKv, listAll, sha256Hex, sanitizeId, clientIp } from "../_lib/kv.js";
+import { getKv, listAll, sha256Hex, sanitizeId, clientIp, checkWriteRateLimit } from "../_lib/kv.js";
 import { jsonResponse, readJson } from "../_lib/http.js";
 
 const KINDS = new Set(["skill", "mcp"]);
@@ -40,7 +40,7 @@ export async function onRequestGet({ request, env }) {
     return jsonResponse(await stats(kv, kind, sanitizeId(slug), deviceHash));
 }
 
-export async function onRequestPost({ request, env }) {
+export async function onRequestPost({ request, env, waitUntil }) {
     const body = await readJson(request);
     const kind = body?.kind;
     const slug = typeof body?.slug === "string" ? body.slug : "";
@@ -56,8 +56,13 @@ export async function onRequestPost({ request, env }) {
 
     const existing = await kv.get(key);
     if (existing) {
+        // 取消收藏不消耗限流额度：额度只拦"新增"，降噪操作不该被误伤
         await kv.delete(key);
     } else {
+        // deviceId 是客户端自报可无限轮换的，新增收藏必须按 IP 兜日限（审计 M9）
+        if (!(await checkWriteRateLimit(kv, request, { waitUntil }))) {
+            return jsonResponse({ error: "今日收藏次数已达上限" }, 429);
+        }
         await kv.put(key, String(Date.now()));
         await kv.put(`fvs_${kind}_${slugKey}`, slug);
     }

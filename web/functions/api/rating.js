@@ -4,7 +4,7 @@
 // KV：
 //   rte_{kind}_{slugKey}_{deviceHash} = 1..5   一设备一键（改评分覆盖）
 //   rts_{kind}_{slugKey}                        slugKey → 原始 slug
-import { getKv, listAll, sha256Hex, sanitizeId, clientIp } from "../_lib/kv.js";
+import { getKv, listAll, sha256Hex, sanitizeId, clientIp, checkWriteRateLimit } from "../_lib/kv.js";
 import { jsonResponse, readJson } from "../_lib/http.js";
 
 const KINDS = new Set(["skill", "mcp"]);
@@ -45,7 +45,7 @@ export async function onRequestGet({ request, env }) {
     return jsonResponse(stats);
 }
 
-export async function onRequestPost({ request, env }) {
+export async function onRequestPost({ request, env, waitUntil }) {
     const body = await readJson(request);
     const kind = body?.kind;
     const slug = typeof body?.slug === "string" ? body.slug : "";
@@ -55,6 +55,11 @@ export async function onRequestPost({ request, env }) {
     }
     const kv = getKv(env);
     if (!kv) return jsonResponse({ error: "KV 未绑定", avg: 0, count: 0 }, 503);
+
+    // deviceId 是客户端自报可无限轮换的，写操作必须按 IP 兜日限（审计 M9）
+    if (!(await checkWriteRateLimit(kv, request, { waitUntil }))) {
+        return jsonResponse({ error: "今日评分次数已达上限" }, 429);
+    }
 
     const deviceRaw = typeof body.deviceId === "string" ? body.deviceId.replace(/[^A-Za-z0-9_]/g, "").slice(0, 64) : "";
     const deviceHash = deviceRaw || (await sha256Hex(clientIp(request)));
