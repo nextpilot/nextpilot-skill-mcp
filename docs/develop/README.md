@@ -15,9 +15,11 @@
 | 平台定位、商业模式、路线图                                | 仓库根 [`CLAUDE.md`](../../CLAUDE.md)                                                                                                        |
 | 各阶段该跑哪些检查、各自耗时与分档依据                    | [`checks-by-stage.md`](checks-by-stage.md)                                                                                                   |
 | **只想快速知道"改完该跑什么、要等多久、红了看哪"**        | [`testing-at-a-glance.md`](testing-at-a-glance.md)（三分钟速查）                                                                             |
+| **代码风格 / 注释 / 打印消息 / 提交消息 / 文档规范**      | [`code-style.md`](code-style.md)（**风格要求的唯一权威落点**）                                                                               |
 
 ## 目录
 
+- `code-style.md` —— 代码风格、注释规范、打印消息、提交消息与文档规范（**已成文**；CLAUDE.md §6.8.x 只留指针）
 - `checks-by-stage.md` —— 检查的分类、分阶段安排与实测耗时（**已成文**）
 - `testing-at-a-glance.md` —— 测试流程速查：什么时候自动跑什么、耗时、红了怎么办（**已成文**；要论证看 `checks-by-stage.md`）
 - `architecture/` —— 系统边界与数据流（待写；现状速览暂在 `operations/README.md` 第 1 节）
