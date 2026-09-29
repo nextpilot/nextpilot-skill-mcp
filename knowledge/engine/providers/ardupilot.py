@@ -1,24 +1,20 @@
 # ArduPilot .bin（AP_Logger）适配器，本项目唯一认识 ArduPilot 的地方。契约见 providers/api.py。
 # 格式自描述：开头一串 FMT 消息声明每种消息的名字、长度、字段与格式字符，解析器按 FMT 表通解，
-# 不写死消息类型或 ID（不同固件版本 ID 会变）。
-#
-# 分工（与 px4.py 同一条纪律）：
-#   · 本文件：怎么从 AP_Logger 字节流取数（FMT 解析、格式字符缩放、消息名定位）
-#   · engine/*.py：与格式无关的机制；契约常量在 api.py
+# 不写死消息类型或 ID（不同固件版本 ID 会变）。取数与机制的分工同 px4.py：本文件只管从字节流
+# 取数，与格式无关的机制在 engine/*.py，契约常量在 api.py。
 #
 # 与 PX4 适配器的差异（消费方要知情）：
-#   · 时基：TimeUS 是开机以来的 µs（与 PX4 同为"开机起"，但不共享同一块表）
+#   · 时基：TimeUS 是开机以来的 µs（同为"开机起"，但不共享同一块表）
 #   · 列名：TimeUS 在 get_dataset() 里改名为 timestamp（规则与曲线统一写 timestamp）；
 #     get_dataset_description() 仍给日志原始字段名
 #
-# 核对情况（36 份 autotest SITL 日志，Copter/Plane/Rover）：
-#   · EV 10=ARMED / 11=DISARMED 经 AP_Logger.h 核对无误，但 autotest Copter 不写这两个事件
-#     且无 ARM topic，armed 还要回退 STAT.Armed 状态沿
-#   · FORMAT_VERSION 是 DataFlash 日志格式版本（Copter 120 / Plane 13），不是固件版本，
-#     不能当固件版本回退；固件版本从 MSG 横幅 / VER 消息取
-#   · 未逐字段验证（v1 只解析不应用）：格式字符缩放、FRAME_CLASS 全表（Copter/Rover 同码不同义）、
-#     FMTU 乘子
-#   · 消息 Length 是否含 3 字节头已自校准（见 _calibrate_len_hdr），兜底逻辑仍需样本验证
+# 两条易踩的坑（曾用 36 份 autotest SITL 日志对账，Copter/Plane/Rover）：
+#   · FORMAT_VERSION 是 DataFlash 格式版本（Copter 120 / Plane 13），不是固件版本，不能当固件
+#     版本回退；固件版本从 MSG 横幅 / VER 消息取
+#   · autotest Copter 不写 EV ARMED/DISARMED 且无 ARM topic，armed 还要回退 STAT.Armed 状态沿
+#
+# 未逐字段验证（v1 只解析不应用）：格式字符缩放、FRAME_CLASS 全表（Copter/Rover 同码不同义）、
+# FMTU 乘子；消息 Length 是否含 3 字节头已自校准（见 _calibrate_len_hdr），兜底逻辑仍需样本验证。
 
 import struct as _struct
 

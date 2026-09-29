@@ -1,25 +1,23 @@
-# tools/ci/checklist.yml
-# Repository validation checklist -- organised by stage.
-# 读这个文件就能看出"哪个阶段跑哪些检查"。
+# tools/ci/checklist.yml -- 阶段地图：读这个文件就能看出"哪个阶段跑哪些检查"。
 #
 # 只放"一次执行、退出码表示成败"的项（check_all.py 能驱动的）；常驻进程不在这里：
-#   dev    -- `pnpm dev` 与 `tsc --noEmit --watch`
-#   commit -- .githooks/pre-commit（对 staged 文件跑 ruff / prettier）
-#   deploy -- .github/workflows/deploy.yml 的 live E2E
+#   dev    `pnpm dev` 与 `tsc --noEmit --watch`
+#   commit .githooks/pre-commit（对 staged 文件跑 ruff / prettier）
+#   deploy .github/workflows/deploy.yml 的 live E2E
 #
-# Stage: id / stage(显示名) / description / critical(失败是否立刻中断) / steps
-# Step:
-#   id          - 稳定标识，Python 侧按它匹配，不许改
-#   name        - 短描述（步骤标题，可自由改）
-#   when        - 可选 Python 表达式，省略即总跑
-#   workdir     - {ROOT} 或 {WEB}
-#   command     - YAML 字符串数组
-#   hint        - 失败时打印，省略即无
-#   timeout     - 可选超时秒数
-#   env         - 可选额外环境变量
+# Stage 字段：id / stage(显示名) / description / critical(失败是否立刻中断) / steps
+# Step 字段：
+#   id      - 稳定标识，Python 侧按它匹配，不许改
+#   name    - 短描述（步骤标题，可自由改）
+#   when    - 可选 Python 表达式，省略即总跑
+#   workdir - {ROOT} 或 {WEB}
+#   command - YAML 字符串数组
+#   hint    - 失败时打印，省略即无
+#   timeout - 可选超时秒数
+#   env     - 可选额外环境变量
 #
-# 占位符（运行期替换）：{PYTHON} / {NODE} / {PNPM}（全局工具，须走 PATH）/
-# {ROOT} / {WEB} / {LOGS} / {ARGS.xxx}（flag 为真则 "--xxx"，否则空）/ {ENV.XXX}（未设则空）
+# 占位符（运行期替换）：{PYTHON} / {NODE} / {PNPM}（全局工具，须走 PATH）/ {ROOT} / {WEB} /
+# {LOGS} / {ARGS.xxx}（flag 为真则 "--xxx"，否则空）/ {ENV.XXX}（未设则空）
 #
 # when 用 args（argparse.Namespace）与 has_logs 求值，只表达"什么条件下跑"，不表达阶段归属
 # （那是 --stage 的职责）：

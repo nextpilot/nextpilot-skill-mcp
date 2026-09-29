@@ -1,7 +1,6 @@
 /**
- * 解析运行时的持久缓存（Service Worker + Cache API）。
- *
- * 目标：Pyodide 运行时（约 13MB）+ numpy / micropip（约 3MB）+ pyulog（51KB）只下载一次，之后走本地缓存。
+ * 解析运行时的持久缓存（Service Worker + Cache API）：Pyodide 运行时（约 13MB）+ numpy /
+ * micropip（约 3MB）+ pyulog（51KB）只下载一次，之后走本地缓存。
  *
  * 不能只靠浏览器 HTTP 缓存：micropip.install() 每次先查 PyPI 索引（no-cache）；用户清缓存 /
  * 隐私模式 / 磁盘压力会静默丢弃；jsdelivr 与 PyPI 跨境链路抖动大。
@@ -12,8 +11,8 @@
  * `importScripts` 本 SW 管不到（见 web/workers/analysis-worker.ts 的 preloadForImportScripts，
  * 两处配套，改一个要想到另一个）。
  *
- * 配置由注册时的查询参数传入（见 components/RuntimeCacheRegistrar.tsx）：/sw.js?pyodide=<索引目录>&wheel=<wheel 直链>。
- * 参数变化 → 脚本 URL 变化 → 装新版本 → 旧缓存自动清掉（天然处理换源与升级）。
+ * 配置由注册时的查询参数传入（见 components/RuntimeCacheRegistrar.tsx）：
+ * /sw.js?pyodide=<索引目录>&wheel=<wheel 直链>；参数变化 → 脚本 URL 变化 → 装新版本 → 旧缓存自动清掉。
  */
 
 const params = new URL(self.location).searchParams;
