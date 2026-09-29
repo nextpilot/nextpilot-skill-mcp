@@ -18,7 +18,7 @@ const TITLE_SUFFIX = "无人机 AI 技能、MCP服务与智能诊断平台";
 
 /**
  * metadataBase 要的是绝对地址。域名来自环境变量（控制台手填，谁都会打错一个字符），
- * **构造失败会让整站 500**，所以这里必须兜住，坏值回落到 site-config。
+ * 构造失败会让整站 500，所以这里要兜住，坏值回落到 site-config。
  */
 function safeUrl(value: string): URL {
     try {
@@ -39,17 +39,17 @@ function buildVerification(): Metadata["verification"] {
 }
 
 /**
- * 根 metadata —— **必须是静态常量，不能是 `generateMetadata()`**。
+ * 根 metadata，要写成静态常量，不能是 `generateMetadata()`。
  *
- * ⚠️ 这是一条 Next.js 的硬规则，也是首页速度的关键：只要根 layout 导出了
- * `generateMetadata`（异步），**整棵路由树都会被判为动态渲染**，首页无法静态化，
+ * 这是 Next.js 的一条硬规则，也是首页速度的关键：只要根 layout 导出了
+ * `generateMetadata`（异步），整棵路由树都会被判为动态渲染，首页无法静态化，
  * 每次请求都要实时 SSR（线上实测 TTFB ~1.5s，且 CDN 无从缓存）。
  *
  * 历史：2026-09-27 的「后台站点设置」把它改成了 `generateMetadata()` 读 KV，
  * 首页随之从静态退化为动态（`cache-control: no-store`、`eo-cache-status: Cache Miss`）。
  * 2026-09-28 改回静态常量，首页恢复 `○ (Static)`。
  *
- * 代价（有意取舍）：站点名/描述/域名改完需**重新部署**才生效——它们来自环境变量
+ * 代价（有意取舍）：站点名/描述/域名改完要重新部署才生效。它们来自环境变量
  * （`next.config.ts` 的 siteEnv + `NEXT_PUBLIC_*`），不再由后台即时改。
  * 换回来的是首页从「每次 SSR ~1.5s」变成「CDN 直出几十毫秒」。
  */

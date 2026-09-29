@@ -1,7 +1,7 @@
 /**
  * Dev 启动器：一次 `pnpm dev` 同时起「知识热重建」与「Next 开发服务器」。
  *
- * 为什么需要它：知识库是编译型内容，缺这段就会出现「改了规则没反应」——
+ * 为什么需要它：知识库是编译型内容，缺这段就会出现「改了规则没反应」的情况：
  *   1. Next 自己热更新 `web/` 里的代码；
  *   2. `build-knowledge.mjs --watch` 重编译 `knowledge/{px4,engine}`（产物是
  *      `web/workers/analysis-engine.generated.ts` 等入库文件），Next 才会看到。
@@ -30,7 +30,7 @@ const children = [];
 let shuttingDown = false;
 
 function run(args, label) {
-    // stdio: "inherit" —— 两个子进程的输出都直通终端，不额外加前缀。
+    // stdio: "inherit"，两个子进程的输出都直通终端，不额外加前缀。
     // 加了前缀会打乱 Next 自己的进度条与 sync 的 [sync] 行。
     const child = spawn(NODE, args, { cwd: webRoot, stdio: "inherit" });
     child.on("exit", (code, signal) => {
@@ -134,7 +134,7 @@ run(["scripts/build-knowledge.mjs", "--watch"], "build-knowledge --watch");
 run(["node_modules/next/dist/bin/next", "dev"], "next dev");
 console.log("[dev] 已启动：知识热重建 + Next 开发服务器（Ctrl+C 一起停）");
 
-// 预热首页：Turbopack 懒编译，第一个请求才编译器。等 Next 完全就绪后自动发一个
+// 预热首页：Turbopack 懒编译，第一个请求才走编译器。等 Next 完全就绪后自动发一个
 // GET / 让编译器预热，用户打开浏览器时首页已是热的（2.5s → <200ms）。
 // 试 3 次，间隔 2s → 4s → 6s，任一次成功就停。
 let warmAttempt = 0;

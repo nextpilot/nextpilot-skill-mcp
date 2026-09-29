@@ -7,7 +7,7 @@ import type { GuideHeading } from "@/lib/guide";
 
 /**
  * 右侧「本页目录」。VitePress 式：标题常驻、随滚动高亮当前小节。
- * 窄屏收起——正文本身已经够长，再挤一列会把行宽压到不可读。
+ * 窄屏收起，正文本身已经够长，再挤一列会把行宽压到不可读。
  */
 export function GuideOutline({ headings }: { headings: GuideHeading[] }) {
     const { language } = useLanguage();
@@ -31,7 +31,7 @@ export function GuideOutline({ headings }: { headings: GuideHeading[] }) {
                     .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
                 if (visible[0]) setActive(visible[0].target.id);
             },
-            // 顶部让出 sticky header，底部收窄，避免最后一节永远不激活
+            // 顶部让出 sticky header，底部收窄，避免最后一节一直不激活
             { rootMargin: "-88px 0px -70% 0px", threshold: 0 },
         );
         els.forEach((el) => observer.observe(el));
@@ -67,7 +67,7 @@ export function GuideOutline({ headings }: { headings: GuideHeading[] }) {
             {/* 桌面端：右侧粘性目录。
           宽度跟标题文字走（w-max），和左侧栏同一套规矩：写死 w-56 时目录文字只有 ~85px，
           列内右侧常年空 126px；上限 max-w-56（标题再长也不许反过来挤正文，换行）。
-          断点必须是 lg（1024）而不是 xl（1280）：1280 的窗口扣掉滚动条只剩 ~1263，
+          断点要用 lg（1024）而不是 xl（1280）：1280 的窗口扣掉滚动条只剩 ~1263，
           xl 踩不准，目录整列消失，正文右缘到内容区右缘量出 176px 死白（1152/1200/1240/1263
           全是 176）。降到 lg 后最窄 1024 时正文仍有 ~672px，可读；1263 时正文能到 768 上限。 */}
             <aside className="hidden w-max min-w-28 max-w-56 shrink-0 lg:block">

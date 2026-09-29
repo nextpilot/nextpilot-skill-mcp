@@ -113,11 +113,11 @@ export function getSkillBySlug(slug: string): Skill | undefined {
     return parseSkillDir(slug);
 }
 
-/** 站点当文本展示的扩展名白名单——不在名单里（.ulg 等）就不进「文件」Tab */
+/** 站点当文本展示的扩展名白名单，不在名单里（.ulg 等）就不进「文件」Tab */
 const TEXT_EXTS = new Set([".md", ".markdown", ".yaml", ".yml", ".json", ".py", ".txt", ".toml", ".sh", ".js", ".ts"]);
 
 /**
- * 列出一个 Skill 目录下的全部文本文件（含内容），供详情页「文件」Tab 展示——
+ * 列出一个 Skill 目录下的全部文本文件（含内容），供详情页「文件」Tab 展示。
  * 一个 Skill = 一个可整体拷进 `.claude/skills/` 的目录，目录里有什么这里就列什么，
  * 参考 skillhub.cn 的文件浏览器：树形列表 + 点击打开。
  *
@@ -138,7 +138,7 @@ export function getSkillFiles(slug: string): SkillFile[] {
         }
     };
     walk("");
-    // 子目录在前、根目录文件在后，各自按路径字母序——与常见文件浏览器的「目录优先」一致
+    // 子目录在前、根目录文件在后，各自按路径字母序，与常见文件浏览器的「目录优先」一致
     out.sort((a, b) => {
         const da = a.path.includes("/");
         const db = b.path.includes("/");

@@ -8,11 +8,11 @@ import { contentHostLabel } from "@/lib/constants";
 
 /**
  * 详情页右栏（版式参照腾讯 SkillHub 的侧栏收窄到 320px；宽度由页面的 grid 轨道给，
- * 这里不写死——skill / mcp 两个详情页共用本组件，轨道各改各的就会像当年那样
+ * 这里不写死，skill / mcp 两个详情页共用本组件，轨道各改各的就会像当年那样
  * 一边 320px 一边 390px，卡比轨道宽的 70px 会向右溢出、贴出内容区）：
  * 安装卡（复制/下载/收藏）→ 相关推荐；元信息在左栏分组表内。
  *
- * **Skill 与 MCP 两类条目共用**，所以家族名是 `Entry*` 而不是 `Skill*`：叫 `SkillSidebar`
+ * Skill 与 MCP 两类条目共用，所以家族名是 `Entry*` 而不是 `Skill*`：叫 `SkillSidebar`
  * 会宣称它只服务 Skill 一类，而 `/mcp/[slug]` 也在用（详见 `EntryContentTabs.tsx` 顶部）。
  * 两类差异全部走参数（`kind` 决定统计接口，`installTitle` / `installHint` 决定文案）。
  */
@@ -50,7 +50,7 @@ export function EntrySidebar({
     // 会把它们链到不存在的 skill 页
     const relatedBase = kind === "mcp" ? "mcp" : "skills";
     // 复制按钮文案跟 kind 走：Skill 复制的是给 AI 的提示词原文（SKILL.md），
-    // MCP 复制的是接入配置（JSON 配置块）——后者叫「Skill 内容」是撒谎
+    // MCP 复制的是接入配置（JSON 配置块），后者叫「Skill 内容」是撒谎
     const copyLabel = kind === "mcp" ? "复制接入配置" : "复制 SKILL 提示词";
 
     useEffect(() => {
@@ -93,7 +93,7 @@ export function EntrySidebar({
 
     return (
         <div className="flex w-full flex-col">
-            {/* 安装卡：说明 + 主 CTA（对应 SkillHub 的“将提示词发送给你的 AI 安装该 skills”） */}
+            {/* 安装卡：说明 + 主 CTA（对应 SkillHub 的"将提示词发送给你的 AI 安装该 skills"） */}
             <section className="card p-5">
                 <h3 className="text-[15px] font-semibold">{installTitle}</h3>
                 <p className="mt-2 text-xs leading-5 text-muted">{installHint}</p>

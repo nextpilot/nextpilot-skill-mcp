@@ -1,5 +1,5 @@
 /**
- * 瓦片图层配置 —— 报告页大地图（LogFlightMap）与历史列表缩略图（ReportHistoryList）
+ * 瓦片图层配置，报告页大地图（LogFlightMap）与历史列表缩略图（ReportHistoryList）
  * 共用一份，免得两处各写一遍。
  *
  * 支持多个底图提供商，默认 Esri（全球 WGS-84，无需 API key）。
@@ -61,7 +61,7 @@ export const ESRI_STREET =
 export const ESRI_ATTRIBUTION =
     '&copy; <a href="https://www.esri.com/">Esri</a> &copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>';
 
-// ===================== 天地图（仅中国大陆，必须带 Key） =====================
+// ===================== 天地图（仅中国大陆，需带 Key） =====================
 
 /**
  * 天地图 WMTS 强制带 Key：官方《地图服务》页写明"使用本组服务之前，需要申请 Key"

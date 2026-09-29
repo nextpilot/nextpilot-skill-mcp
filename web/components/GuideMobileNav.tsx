@@ -28,7 +28,7 @@ export function GuideMobileNav({ groups, headings }: { groups: GuideNavGroup[]; 
     }, [openPanel]);
 
     // 悬浮面板的公共外壳。为什么不用 card 类：它的 box-shadow（--shadow-card）只有 1px 级，
-    // 是给「平铺在文档流里的卡片」用的；浮层压在正文上，必须靠更重的投影才能从内容里浮出来。
+    // 是给「平铺在文档流里的卡片」用的；浮层压在正文上，得靠更重的投影才能从内容里浮出来。
     const panelClass =
         "absolute inset-x-0 top-full z-30 mt-2 max-h-[60vh] overflow-y-auto rounded-xl border border-border bg-surface px-4 py-3 shadow-xl";
 
@@ -56,7 +56,7 @@ export function GuideMobileNav({ groups, headings }: { groups: GuideNavGroup[]; 
               互斥切换不用先点一下收起再点开（遮罩若盖住按钮，点它只会白关一次）。 */}
                         <div className="fixed inset-0 z-20" onClick={close} aria-hidden="true" />
                         {/* 悬浮展开：盖在正文上方，不再把整个页面往下推。z-30 在遮罩上、
-              sticky header（z-40）下——面板从卡片下缘展开，正常滚动态不与 header 重叠 */}
+              sticky header（z-40）下，面板从卡片下缘展开，正常滚动态不与 header 重叠 */}
                         <div className={panelClass}>
                             <nav>
                                 {groups.map((group) => (

@@ -1,17 +1,17 @@
 import type { TopicManifest } from "./types";
 
 /**
- * 绘图预设的**解析器**：把「预设声明 + 日志 manifest」解析成可画的面板。
+ * 绘图预设的解析器：把「预设声明 + 日志 manifest」解析成可画的面板。
  *
- * 这里住着**只有一份**的东西——字段引用的写法、实例怎么数、区间引用怎么展开成多条线。
+ * 这里只有一份实现：字段引用的写法、实例怎么数、区间引用怎么展开成多条线。
  * 两个消费方都从这里取：`lib/chart-presets.ts`（构建期编译好的 `knowledge/px4/plot/*.yml`）
  * 与 `lib/tools/compile-yaml-preset.ts`（工具页里现贴现编译的 YAML）。这两处曾经各自抄了
  * 一份同样的逻辑，改一处漏一处，所以合并到这里。
  *
  * 引用写法（与 `knowledge/px4/CLAUDE.md` 同一套，改那边也要改这里）：
- *   `topic.field`      不写下标 —— 只取第 0 个实例，与 `topic[0].field` 同义
+ *   `topic.field`      不写下标，只取第 0 个实例，与 `topic[0].field` 同义
  *   `topic[N].field`   第 N 个实例（N 可为负，从末尾数）
- *   `topic[a:b].field` 实例 a~b 的**闭区间**（含 b）；`[:]` 是全部
+ *   `topic[a:b].field` 实例 a~b 的闭区间（含 b）；`[:]` 是全部
  *   `topic.field[K]`   数组字段的第 K 个元素（`q[0]`）；`field[i,j]` 是第 i 行第 j 列
  */
 
@@ -20,13 +20,13 @@ export type FieldDesc = { kind: "field"; fields: string[]; unit?: string | null 
 
 /** 一次 np_series 请求（一个容器可能发多次：多条 child 各有自己的横轴时） */
 export type SeriesRequest = {
-    /** 面板要第几个实例——声明里写**区间**的引用按它取（"每实例一张图"用） */
+    /** 面板要第几个实例，声明里写区间的引用按它取（"每实例一张图"用） */
     instance: number;
     xdata: FieldDesc | null;
     ydata: FieldDesc[];
     /** 预设的换算节点（与规则 compute 同一套），引擎在取数前求值 */
     compute: string[];
-    /** 与 ydata **同序等长**：每条线的图例名与样式（style = solid / dashed / dotted） */
+    /** 与 ydata 同序等长：每条线的图例名与样式（style = solid / dashed / dotted） */
     series: { label: string; style: string | null; color: string | null }[];
 };
 
@@ -49,7 +49,7 @@ export type PanelSpec = {
 
 // ─────────────────────────── 字段引用 ───────────────────────────
 
-/** 引用里写的实例下标。**不写**与**写区间**是两件事：前者是单条线，后者要展开成多条 */
+/** 引用里写的实例下标。不写与写区间是两件事：前者是单条线，后者要展开成多条 */
 export type InstSpec =
     { kind: "default" } | { kind: "index"; n: number } | { kind: "range"; a: number | null; b: number | null };
 
@@ -82,8 +82,8 @@ export function instToString(spec: InstSpec): string {
 
 // ─────────────────────────── manifest 查询 ───────────────────────────
 
-/** 这个 topic 在日志里有哪几个实例。**只看 manifest 里有没有这一行**——
- *  这里曾经还判了 `t.n > 1`，但 `n` 是**采样点数**不是实例数：只采到一个点的实例会被
+/** 这个 topic 在日志里有哪几个实例。只看 manifest 里有没有这一行。
+ *  这里曾经还判了 `t.n > 1`，但 `n` 是采样点数不是实例数：只采到一个点的实例会被
  *  静默丢掉，全是单点时整张预设直接消失。判"有没有这个实例"用不着看点数。 */
 export function topicInstances(m: TopicManifest, topic: string): number[] {
     return m.topics
@@ -96,14 +96,14 @@ export function hasField(m: TopicManifest, topic: string, instance: number, fiel
     return m.topics.some((t) => t.topic === topic && t.instance === instance && t.fields.some((f) => f.name === field));
 }
 
-/** 区间引用没法说"第几个实例上有没有"——只要有**任一实例**带这个字段，这条线就有得展 */
+/** 区间引用没法说"第几个实例上有没有"，只要有任一实例带这个字段，这条线就有得展 */
 export function hasFieldAnyInstance(m: TopicManifest, topic: string, field: string): boolean {
     return m.topics.some((t) => t.topic === topic && t.fields.some((f) => f.name === field));
 }
 
-/** 闭区间 → 实例号列表。负数从末尾数，越界**截断**——越界的完整说法（"要 1~9 只有 0~2"）
+/** 闭区间 → 实例号列表。负数从末尾数，越界截断；越界的完整说法（"要 1~9 只有 0~2"）
  *  只有引擎那边才说得出来，那边的提示走 SeriesResponse.warnings，这里不重复喊。
- *  `all` 必须已按实例号升序；返回的也是升序。 */
+ *  `all` 要已按实例号升序；返回的也是升序。 */
 export function instancesInRange(all: number[], spec: InstSpec): number[] {
     if (spec.kind !== "range" || all.length === 0) return all;
     const n = all.length;
@@ -113,7 +113,7 @@ export function instancesInRange(all: number[], spec: InstSpec): number[] {
 }
 
 /** 这条线在日志里有得画吗：候选里有一个字段存在就画。
- *  换算节点的输出（`compute` 算出来的变量）在这里判不了 —— 一律留着，引擎取不到会给 null。 */
+ *  换算节点的输出（`compute` 算出来的变量）在这里判不了，一律留着，引擎取不到会给 null。 */
 export function seriesVisible(m: TopicManifest, desc: FieldDesc, instance: number): boolean {
     if (desc.kind === "var") return true;
     for (const f of desc.fields) {
@@ -149,7 +149,7 @@ export type UnifiedAxes = {
     flipy: boolean;
     range: number[] | null;
     hlines: { value: number; level: "ok" | "warning" | "critical"; label: string }[] | null;
-    /** true = 按实例**拆成多张图**；false = 区间引用在**同一张图**里展开成多条线 */
+    /** true = 按实例拆成多张图；false = 区间引用在同一张图里展开成多条线 */
     split_by_instance: boolean;
     children: UnifiedChild[];
 };
@@ -177,7 +177,7 @@ type PendingLine = {
     spread: { topic: string; field: string; unit: string | null; instances: number[] } | null;
 };
 
-/** 一个 child 里所有区间线能落到哪些实例上 —— 取**并集**。
+/** 一个 child 里所有区间线能落到哪些实例上，取并集。
  *  多条线来自不同 topic、实例数不一样时（比如 `a[:].x` 有 3 个、`b[:].z` 只有 2 个），
  *  少的那边在缺的实例上画不出来：按并集留位置并给一句告警，而不是把多的那边砍掉。 */
 function unionOfSpread(pendings: PendingLine[]): number[] | null {
@@ -189,8 +189,8 @@ function unionOfSpread(pendings: PendingLine[]): number[] | null {
 }
 
 /** `spread` = 区间引用是不是要展开成多条线。
- *  拆图模式（split_by_instance）下**不展开**：那时要的是"每张图一个实例"，区间引用按面板
- *  的实例号取——引擎 `_pick_ref` 收到 `instance=` 会盖掉引用里的区间，所以原样发出去就行。 */
+ *  拆图模式（split_by_instance）下不展开：那时要的是"每张图一个实例"，区间引用按面板
+ *  的实例号取。引擎 `_pick_ref` 收到 `instance=` 会盖掉引用里的区间，所以原样发出去就行。 */
 function planChild(child: UnifiedChild, m: TopicManifest, instance: number, spread: boolean): PendingLine[] {
     const out: PendingLine[] = [];
     child.ydata.forEach((desc, i) => {
@@ -236,7 +236,7 @@ function planChild(child: UnifiedChild, m: TopicManifest, instance: number, spre
             });
             return;
         }
-        // 单条线按**作者写的原文**发出去，不重写成 `topic[0].field`：引擎对"不写下标"与
+        // 单条线按作者写的原文发出去，不重写成 `topic[0].field`：引擎对"不写下标"与
         // "写 [0]"给的是同一个结果，而报错文案里打出来的要是他认得的那串
         out.push({ label, style, color, desc: { kind: "field", fields: [hitRaw], unit }, spread: null });
     });
@@ -254,8 +254,8 @@ export function resolveAxes(out: UnifiedAxes, m: TopicManifest, opts: ResolveOpt
     if (out.split_by_instance) {
         const topic = firstRangeTopic(out);
         if (!topic) {
-            // 声明了要拆、却没有任何区间引用可依据——按哪一个 topic 的实例拆无从判断。
-            // 这时**不拆**而不是让整组图消失：图先画出来，再加一句提示说明声明没生效
+            // 声明了要拆、却没有任何区间引用可依据，按哪一个 topic 的实例拆无从判断。
+            // 这时不拆而不是让整组图消失：图先画出来，再加一句提示说明声明没生效
             warnings.push(
                 `${out.title ?? "这张图"} 写了 split_by_instance，但引用里没有区间（[:] / [a:b]）——按一张图渲染`,
             );
@@ -289,7 +289,7 @@ export function resolveAxes(out: UnifiedAxes, m: TopicManifest, opts: ResolveOpt
                         continue;
                     }
                     // 展开出来的每条线把实例写死：`a[:].b` 变成 `a[0].b`、`a[1].b`…
-                    // 名字就用这个串——多实例同图时，光看 `X` 分不清是哪一路 IMU
+                    // 名字就用这个串，多实例同图时，光看 `X` 分不清是哪一路 IMU
                     const ref = `${p.spread.topic}[${k}].${p.spread.field}`;
                     ydata.push({ kind: "field", fields: [ref], unit: p.spread.unit });
                     series.push({ label: ref, style: p.style, color: p.color });
@@ -324,8 +324,8 @@ export function resolveAxes(out: UnifiedAxes, m: TopicManifest, opts: ResolveOpt
     return { panels, warnings };
 }
 
-/** 拆图时按哪条引用的实例列表走：取**第一条区间引用**的 topic。
- *  不写下标（= 实例 0）不是"要拆"的信号——那是单条线的写法。 */
+/** 拆图时按哪条引用的实例列表走：取第一条区间引用的 topic。
+ *  不写下标（= 实例 0）不是"要拆"的信号，那是单条线的写法。 */
 function firstRangeTopic(out: UnifiedAxes): string | null {
     for (const c of out.children) {
         for (const d of c.ydata) {

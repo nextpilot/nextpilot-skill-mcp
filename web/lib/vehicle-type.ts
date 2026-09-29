@@ -3,7 +3,7 @@
  * `vehicle_types` 码表：`rotary_wing` / `fixed_wing` / `rover` / `airship` / `unknown`，
  * 认不出的码值引擎会给 `unknown(N)`）。
  *
- * 报告页「飞行概况」与历史列表「机型」列共用这一份——各写一张表迟早会对不上
+ * 报告页「飞行概况」与历史列表「机型」列共用这一份，各写一张表迟早会对不上
  * （飞行阶段的配色就吃过这个亏，所以才挪进 lib/）。
  */
 export const VEHICLE_TYPE_LABELS: Record<string, string> = {

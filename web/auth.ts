@@ -15,7 +15,7 @@ const githubSecret = process.env.AUTH_GITHUB_SECRET;
 /**
  * 后台（/admin/settings）管理员白名单。
  *
- * 没配 AUTH_ADMIN_EMAILS 时任何人都不算管理员——宁可后台进不去，也不能让
+ * 没配 AUTH_ADMIN_EMAILS 时任何人都不算管理员，宁可后台进不去，也不要让
  * "没配 = 全放行"这种默认成立。邮箱比对大小写不敏感，逗号分隔。
  */
 function isAdminEmail(email: string): boolean {
@@ -92,7 +92,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     token.plan = record.plan;
                     // GitHub 个人设置里邮箱可能为私密，OAuth profile 拿不到；
                     // 但 KV upsert 时如果能从之前的登录记录里取回邮箱，就写回 token，
-                    // 否则管理员白名单依赖 email 就会永远判 false。
+                    // 否则管理员白名单依赖 email 就会一直判 false。
                     if (record.email) token.email = record.email;
                 }
                 token.loginType = "github";

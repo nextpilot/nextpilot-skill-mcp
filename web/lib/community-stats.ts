@@ -28,7 +28,7 @@ export interface FavoriteStats {
 }
 
 /* ── 外部 JSON → 内部类型的唯一闸门（见 CLAUDE.md §6.5）─────────────────────────────
- * 这几个响应由边缘函数（`functions/api/*.js`）产生，而**静态站与边缘函数是分开部署的**：
+ * 这几个响应由边缘函数（`functions/api/*.js`）产生，而静态站与边缘函数是分开部署的：
  * 页面更新到新版本时，请求可能还落在旧版本函数上（反之亦然）。直接 `as FavoriteStats`
  * 只是把类型检查关掉，缺字段的响应会一路走到 UI 才现形（"undefined 收藏"、NaN 评分）。
  * 所以边界处一律过归一，函数内部信任类型。 */
@@ -40,7 +40,7 @@ function normalizeFavoriteStats(raw: unknown): FavoriteStats | null {
     return { count: toCount(r.count), favorited: r.favorited === true };
 }
 
-/** `/api/rating` → `{avg, count, mine}`；`mine` 在"KV 未绑定"分支里确实会缺，必须兜 */
+/** `/api/rating` → `{avg, count, mine}`；`mine` 在"KV 未绑定"分支里确实会缺，要兜 */
 function normalizeRatingStats(raw: unknown): RatingStats | null {
     const r = asRecord(raw);
     if (!r) return null;

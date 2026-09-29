@@ -8,13 +8,13 @@ import { getSiteSettings } from "@/lib/site-settings";
  * 例：smtp.qq.com / 465 / true / 发件邮箱 / 授权码
  *
  * SMTP_PASS 后台可覆盖（`/admin/settings`）：授权码过期或被吊销时，改一下就能继续发信，
- * 不用动控制台再重新部署。取值口径是 `后台值 || 环境变量`——后台没填就用环境变量。
+ * 不用动控制台再重新部署。取值口径是 `后台值 || 环境变量`，后台没填就用环境变量。
  */
 
 let transporterPromise: ReturnType<typeof nodemailer.createTransport> | null = null;
 
 async function getTransporter() {
-    // 注意：transporter 会缓存，但**密码不缓存**——每次发信前重新取一次，
+    // 注意：transporter 会缓存，但密码不缓存，每次发信前重新取一次，
     // 后台换掉授权码后最多 60 秒（site-settings 的缓存时长）生效。
     const pass = (await getSiteSettings()).smtpPass || process.env.SMTP_PASS;
     if (transporterPromise) {
@@ -24,7 +24,7 @@ async function getTransporter() {
         return transporterPromise;
     }
     // `??` 兜不住空字符串（控制台把 SMTP_PORT 留空时 env 是 ""，Number("") === 0 → 端口 0，
-    // OTP 邮件全挂）——项目在 Pyodide 路径上踩过同款坑，凡 env 兜底一律用 `||`。
+    // OTP 邮件全挂），项目在 Pyodide 路径上踩过同款坑，凡 env 兜底一律用 `||`。
     const port = Number(process.env.SMTP_PORT) || 465;
     transporterPromise = nodemailer.createTransport({
         host: process.env.SMTP_HOST,

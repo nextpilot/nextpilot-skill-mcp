@@ -37,7 +37,7 @@ export async function getSessionUser(request, env) {
                 contentEncryptionAlgorithms: ["A256CBC-HS512"],
             });
             // uid 可选：GitHub 登录时 upsertGithubUser 可能因内部 API 不通而失败，
-            // JWT 里不会有 uid；但 isAdmin / email / sub 总是有的，不影响鉴权。
+            // JWT 里就没有 uid；但 isAdmin / email / sub 一般都有，不影响鉴权。
             const uid = payload.uid ? String(payload.uid) : payload.sub ? String(payload.sub) : "";
             if (!uid && !payload.email) return null;
             return {
@@ -46,7 +46,7 @@ export async function getSessionUser(request, env) {
                 name: payload.name ? String(payload.name) : null,
                 plan: typeof payload.plan === "string" ? payload.plan : "free",
                 // JWT 里的 isAdmin 来自 NextAuth jwt 回调（读 process.env.AUTH_ADMIN_EMAILS），
-                // 边缘函数 env 里同名变量可能没配 / 不一致 —— 以 JWT 为准是唯一事实源。
+                // 边缘函数 env 里同名变量可能没配或不一致，以 JWT 为准，它是唯一事实源。
                 isAdmin: payload.isAdmin === true,
             };
         } catch {
@@ -57,9 +57,9 @@ export async function getSessionUser(request, env) {
 }
 
 /**
- * 后台（/admin/settings）管理员判定 —— 与 `web/auth.ts` 的 jwt 回调同一套规则。
+ * 后台（/admin/settings）管理员判定，与 `web/auth.ts` 的 jwt 回调同一套规则。
  *
- * 没配 AUTH_ADMIN_EMAILS 时任何人都不算管理员：宁可后台进不去，也不能让
+ * 没配 AUTH_ADMIN_EMAILS 时任何人都不算管理员：宁可后台进不去，也不要让
  * "没配 = 全放行"这种默认成立。
  *
  * @param {{email?: string|null}|null} session getSessionUser 的结果
@@ -67,7 +67,7 @@ export async function getSessionUser(request, env) {
  */
 export function isAdminSession(session, env) {
     // JWT 里的 isAdmin 来自 NextAuth jwt 回调（读 process.env.AUTH_ADMIN_EMAILS），
-    // 边缘函数 env 里同名变量可能没配或不同步 —— JWT 是唯一事实源。
+    // 边缘函数 env 里同名变量可能没配或不同步，JWT 是唯一事实源。
     if (session?.isAdmin === true) return true;
 
     // 兜底：旧 JWT 没 isAdmin 字段时，用边缘函数自身的 env.AUTH_ADMIN_EMAILS 再算一次

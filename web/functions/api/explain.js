@@ -1,4 +1,4 @@
-// POST /api/explain —— 登录用户把端侧确定性引擎产出的 findings 上送，
+// POST /api/explain：登录用户把端侧确定性引擎产出的 findings 上送，
 // 边缘函数做配额校验后转发 DeepSeek 生成中文报告，并写 usage 计数与报告记录。
 // 架构铁律（CLAUDE.md 4.1/9）：LLM 只翻译 findings，不做任何数值判断。
 // 冲刺 2：本逻辑由 Next.js Node 路由迁移到 Edge Function（KV 只能在边缘运行时访问）。
@@ -201,7 +201,7 @@ ${JSON.stringify(body.matchedFaults ?? [], null, 2)}
             });
             if (!resp.ok) {
                 const detail = await resp.text().catch(() => "");
-                // 上游抖动属高频可恢复错误：只报状态码，绝不把上游响应体（detail 里可能夹带
+                // 上游抖动属高频可恢复错误：只报状态码，不要把上游响应体（detail 里可能夹带
                 // 本次请求的 findings，等同用户数据）带进公开 issue
                 waitUntil?.(
                     reportIssue(env, {
@@ -257,7 +257,7 @@ ${markdown}`;
     if (kv) {
         const now = Date.now();
         const reportId = sanitizeId(body.reportId || crypto.randomUUID());
-        // 配额事件键必须每次调用唯一：同一份报告重复生成（历史里再点生成）也要计一次，
+        // 配额事件键每次调用都要唯一：同一份报告重复生成（历史里再点生成）也要计一次，
         // 否则可以通过复用 reportId 绕过额度。报告记录仍按 reportId 覆盖。
         const eventId = `${now}_${Math.random().toString(36).slice(2, 8)}`;
         if (session) {

@@ -8,7 +8,7 @@ import { MCP_DIR } from "./content-dir";
 /**
  * MCP Registry 规范里我们真正用到的那几个字段（`server.json`）。
  *
- * 只声明**站点要读**的字段，没有把整份 schema 搬进来：搬了就得跟着 schema 版本走，
+ * 只声明站点要读的字段，没有把整份 schema 搬进来：搬了就得跟着 schema 版本走，
  * 而站点只关心"上游在哪、怎么装、走什么传输"。完整合规由 `check-mcp-spec.mjs` 校验。
  */
 export interface McpManifest {

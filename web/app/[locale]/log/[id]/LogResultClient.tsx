@@ -43,7 +43,7 @@ export function LogResultClient() {
     const loadedRef = useRef(false);
 
     // 加载报告：优先本机存档，其次云端。
-    // 存档里若带着派生数据（参数/消息/曲线），openSaved 会直接渲染 —— **不启动 Worker、不解析日志**；
+    // 存档里若带着派生数据（参数/消息/曲线），openSaved 会直接渲染，不启动 Worker、不解析日志；
     // 只有老记录（没有派生数据）才会退回"用本机缓存的原始字节重新解析"。
     useEffect(() => {
         if (loadedRef.current) return;
@@ -166,8 +166,8 @@ export function LogResultClient() {
                 </div>
             )}
 
-            {/* 「重新选择该 .ulg 文件」用的选择框：报告页唯一的上传入口，选完**就地**重解析补齐
-          图表/轨迹（不跳回列表页）。选完清空 value——同一份文件要能连选两次（上次没成功能再试），
+            {/* 「重新选择该 .ulg 文件」用的选择框：报告页唯一的上传入口，选完就地重解析补齐
+          图表/轨迹（不跳回列表页）。选完清空 value，同一份文件要能连选两次（上次没成功能再试），
           不清的话第二次选同一个文件不会触发 onChange。 */}
             <input
                 ref={inputRef}

@@ -33,8 +33,8 @@ const MCP_SLUGS = ["ardupilot-log", "msfs-sim-flight"];
 
 test.describe("关键页面渲染", () => {
     for (const page of CRITICAL_PAGES) {
-        // 标 @smoke：这 15 条覆盖全部路由骨架，单条只验 200 + 无错误覆盖层，是"每次都必须过"的最小集。
-        // 详情页与交互用例留在全量跑——它们验的是数据层渲染细节，静态层已有 build:kb / check-skill-spec 守着。
+        // 标 @smoke：这 15 条覆盖全部路由骨架，单条只验 200 + 无错误覆盖层，是"每次都要过"的最小集。
+        // 详情页与交互用例留在全量跑，它们验的是数据层渲染细节，静态层已有 build:kb / check-skill-spec 守着。
         test(`${page.label} — ${page.path}`, { tag: "@smoke" }, async ({ page: pwPage }) => {
             const res = await pwPage.goto(page.path, { waitUntil: "networkidle" });
             expect(res?.status()).toBe(200);
@@ -44,7 +44,7 @@ test.describe("关键页面渲染", () => {
             await expect(errorOverlay)
                 .not.toBeVisible({ timeout: 3000 })
                 .catch(() => {
-                    // 即便 timeout 也不代表失败——可能 overlay 已消失或未出现
+                    // 即便 timeout 也不代表失败，可能 overlay 已消失或未出现
                     // 我们再检查 body 里有没有明显的错误文本
                 });
 

@@ -15,7 +15,7 @@ test.describe("日志分析流程", () => {
     });
 
     // 这条跑一次要 7 分钟（Pyodide 下载 WASM + numpy + pyulog），移出 @smoke 后由
-    // pnpm test:e2e:log 或部署后的全量 E2E 守住。timeout 保留——它是真实耗时需要，不是冒烟预算。
+    // pnpm test:e2e:log 或部署后的全量 E2E 守住。timeout 保留，它是真实耗时需要，不是冒烟预算。
     test("上传 .ulg 并完成分析（解析→显示断言）", { timeout: 420_000 }, async ({ page }) => {
         await page.goto("/log", { waitUntil: "networkidle" });
 
@@ -31,16 +31,16 @@ test.describe("日志分析流程", () => {
         const doneIndicator = page.locator("text=完成").first();
         await expect(doneIndicator).toBeVisible({ timeout: 240_000 });
 
-        // 必须跳转到结果页 /log/[id]，否则解析链路没走完
+        // 要跳转到结果页 /log/[id]，否则解析链路没走完
         await page.waitForURL("**/log/**", { timeout: 30_000 });
         expect(page.url()).toMatch(/\/log\/.+/);
 
-        // 默认停在「关键数据」tab：标题（确定性引擎实测）必须渲染 —— 证明解析产物进了显示层
+        // 默认停在「关键数据」tab：标题（确定性引擎实测）要渲染，证明解析产物进了显示层
         const metricsHeading = page.getByText("关键数据（确定性引擎实测）", { exact: true });
         await expect(metricsHeading).toBeVisible({ timeout: 30_000 });
 
         // 关键数据区要么有实测行（data-testid=metrics-table）、要么有「没有记录关键数据」
-        // 的兜底文案 —— 二者都证明「解析 → 显示」链路把数据真的渲染出来了
+        // 的兜底文案，二者都证明「解析 → 显示」链路把数据真的渲染出来了
         const hasRows = await page.locator('[data-testid="metrics-table"] tbody tr').count();
         const hasMetricsFallback = await page.getByText("这份报告没有记录关键数据").count();
         expect(hasRows > 0 || hasMetricsFallback > 0).toBeTruthy();

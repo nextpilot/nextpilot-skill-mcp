@@ -1,21 +1,21 @@
 /**
  * 解析运行时的持久缓存（Service Worker + Cache API）。
  *
- * 目标：Pyodide 运行时（约 13MB）+ numpy / micropip（约 3MB）+ pyulog（51KB）**只下载一次**，
- * 之后全部走本地缓存——离线也能在本机解析日志。
+ * 目标：Pyodide 运行时（约 13MB）+ numpy / micropip（约 3MB）+ pyulog（51KB）只下载一次，
+ * 之后全部走本地缓存，离线也能在本机解析日志。
  *
  * 为什么不能只靠浏览器 HTTP 缓存：
  *   1) `micropip.install()` 每次都先查 PyPI 索引（响应 no-cache，压根不受缓存保护）；
  *   2) 用户清缓存 / 隐私模式 / 磁盘压力会静默丢弃，用户无感；
  *   3) jsdelivr 与 PyPI 的跨境链路抖动大，慢到像没缓存。
  *
- * 拦截范围**只有** `/pyodide/` 目录（自托管运行时资产）与 PyPI 兜底地址；
- * 站点自身资源（`/_next/` 等）、`/api`、`/internal` 一律**不拦不缓存**，
+ * 拦截范围只有 `/pyodide/` 目录（自托管运行时资产）与 PyPI 兜底地址；
+ * 站点自身资源（`/_next/` 等）、`/api`、`/internal` 一律不拦不缓存，
  * 所以站点更新、鉴权、配额完全不受影响（这也是不把它做成完整 PWA 的原因）。
  *
- * ⚠️ 注意 `importScripts` 是本 SW 管不到的：`pyodide.js` 用它**同步**加载 `pyodide.asm.js`，
+ * 注意 `importScripts` 是本 SW 管不到的：`pyodide.js` 用它同步加载 `pyodide.asm.js`，
  * 而 `importScripts` 由 WorkerGlobalScope 直接发起、不走 fetch 事件，这里拦不住。
- * 所以 worker 侧另有 `preloadForImportScripts()` 先用 fetch 把它拉进缓存——
+ * 所以 worker 侧另有 `preloadForImportScripts()` 先用 fetch 把它拉进缓存，
  * 两处是配套的，改一个要想到另一个（见 web/workers/analysis-worker.ts）。
  *
  * 配置由注册时的查询参数传入（见 components/RuntimeCacheRegistrar.tsx）：

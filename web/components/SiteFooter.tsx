@@ -8,9 +8,9 @@ import { hasSiteVersion, siteVersionLabel, siteVersionTitle } from "@/lib/site-v
 /**
  * 页脚的可变文案由服务端（`app/[locale]/layout.tsx`）传进来。
  *
- * 本组件是 `"use client"`，自己没法 async 读 KV——客户端组件里没有 KV 绑定，也没有
+ * 本组件是 `"use client"`，自己没法 async 读 KV：客户端组件里没有 KV 绑定，也没有
  * 服务端环境变量。所以版权行 / 品牌介绍 / 源码链接 / 备案号一律 props 传入，
- * **不许在组件里写死**（写死的那份在后台改完之后永远不变，且看代码看不出问题）。
+ * 不要在组件里写死（写死的那份在后台改完之后一直不变，且看代码看不出问题）。
  *
  * 空串的语义是「后台没配，用内置的双语文案」，不是「这一行空着」。
  */
@@ -54,12 +54,12 @@ function FooterLinkItem({ link }: { link: FooterLink }) {
 /**
  * 站点页脚：分组导航 + 版本徽标。
  *
- * 版本号与日期只从 `lib/site-version.ts` 取（构建期注入），这里不写死任何字面量——
+ * 版本号与日期只从 `lib/site-version.ts` 取（构建期注入），这里不写死任何字面量，
  * 写死的版本号不会报错，只会安静地过期。取不到时按那边的话说"版本未知"，不编一个。
  *
  * 布局有两份 DOM，用断点切换而不是用 JS 测屏宽：桌面是「品牌 + 4 栏」，
  * 手机是「品牌 + 分组 2×2 平铺」（参考阿木实验室移动端页脚：标题加粗亮色、
- * 链接灰色宽行距、全部展开不折叠——就 11 条链接，折叠反而多一步点击）。
+ * 链接灰色宽行距、全部展开不折叠，就 11 条链接，折叠反而多一步点击）。
  * display:none 的那份不进无障碍树，两份 DOM 不会读两遍。
  */
 export function SiteFooter({ footerCopyright, footerTagline, sourceUrl, icp }: SiteFooterProps) {
@@ -85,8 +85,8 @@ export function SiteFooter({ footerCopyright, footerTagline, sourceUrl, icp }: S
         {
             title: t("社区", "Community"),
             links: [
-                // 报告页里还有一个「反馈问题」，那个带着命中的规则与结论条数，是另一回事
-                // ——两者都走 /api/issues，别把入口合并掉。
+                // 报告页里还有一个「反馈问题」，那个带着命中的规则与结论条数，是另一回事，
+                // 两者都走 /api/issues，别把入口合并掉。
                 { href: "/issue", label: t("提交反馈", "Report an issue") },
                 { href: "/me", label: t("个人中心", "My account") },
             ],
@@ -107,7 +107,7 @@ export function SiteFooter({ footerCopyright, footerTagline, sourceUrl, icp }: S
         },
     ];
 
-    // 缺版本信息时如实说"未知"——编一个看起来正常的串，比空着更坏（它会一直过期、且没人发现）
+    // 缺版本信息时如实说"未知"，编一个看起来正常的串，比空着更坏（它会一直过期、且没人发现）
     const versionLabel = hasSiteVersion() ? siteVersionLabel() : t("版本未知", "Version unknown");
     const year = versionLabel.match(/\d{4}/)?.[0] ?? "";
 
@@ -129,8 +129,8 @@ export function SiteFooter({ footerCopyright, footerTagline, sourceUrl, icp }: S
                         "A flight-control AI Skill & MCP hub across perception, decision, control and toolchain, with deterministic PX4 / ArduPilot log analysis built in.",
                     )}
             </p>
-            {/* 隐私承诺那句原来也写在这里，2026-09-21 挪去了上传卡（用户交日志的地方才是
-                它该在的位置），页脚不再重复——措辞见 lib/log-analysis-notes.ts。 */}
+            {/* 隐私承诺那句原来也写在这里，2026-09-21 挪去了上传卡（用户交日志的地方，
+                那才是它该在的位置），页脚不再重复，措辞见 lib/log-analysis-notes.ts。 */}
         </div>
     );
 

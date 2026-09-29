@@ -99,7 +99,7 @@ export function SiteHeader() {
                 <nav id="mobile-nav" className="border-t border-border bg-surface md:hidden" aria-label="主导航">
                     <ul className="page-shell py-2">
                         {links.map((l) => {
-                            // "/" 要精确匹配：否则 startsWith("/") 恒真，首页永远高亮
+                            // "/" 要精确匹配：否则 startsWith("/") 恒真，首页会一直高亮
                             const active =
                                 l.href === "/"
                                     ? pathname === "/"
@@ -152,5 +152,5 @@ export function SiteHeader() {
     );
 }
 
-// 页脚原先也写在这个文件里（`SiteHeader.tsx` 导出 `SiteFooter`）——文件名说的是 Header，
+// 页脚原先也写在这个文件里（`SiteHeader.tsx` 导出 `SiteFooter`），文件名说的是 Header，
 // 读的人在 components/ 里找不到页脚在哪。2026-09-21 拆到 `components/SiteFooter.tsx`。

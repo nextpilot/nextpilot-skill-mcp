@@ -41,7 +41,7 @@ type LeafletModule = typeof import("leaflet");
 
 async function getLeaflet(): Promise<LeafletModule> {
     const mod = await import("leaflet");
-    // 只动态引 JS（leaflet 本体约 150KB，不进首屏）；CSS 必须**静态 import**——
+    // 只动态引 JS（leaflet 本体约 150KB，不进首屏）；CSS 要静态 import：
     // 动态 import 样式在 Next 里不保证注入，样式没进来时图层面板失去定位锚点，
     // 轨迹会画到页面别处、瓦片位置全乱
     return (mod as unknown as { default: LeafletModule }).default ?? mod;
@@ -54,7 +54,7 @@ export function LogFlightMap({
     /** 取轨迹：存档里有就直接给（打开历史时不必解析），否则问 Worker 要 */
     loadTrack: () => Promise<TrackData>;
     /** 「重新选择该 .ulg 文件」：由报告页打开文件选择框，选完就地重解析补齐轨迹。
-     *  只在"这份日志本次会话还没解析过"时给按钮——那种情况重选确实能救回来。 */
+     *  只在"这份日志本次会话还没解析过"时给按钮，那种情况重选确实能救回来。 */
     onRestore?: () => void;
 }) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -105,7 +105,7 @@ export function LogFlightMap({
                 const list: TrackSeries[] = track.tracks ?? [];
                 if (track.error || list.length === 0) {
                     // `track.error` 一定带着逐条原因（引擎侧保证）。走到 ?? 那一支说明引擎违约，
-                    // 别把它伪装成"日志里没有轨迹"——那是另一回事
+                    // 别把它伪装成"日志里没有轨迹"，那是另一回事
                     setErrorMsg(track.error ?? "引擎没有返回任何轨道，也没给出原因（解析器缺陷，请反馈）");
                     setErrorReasons(track.errorReasons ?? []);
                     setErrorCode(track.code);
@@ -146,7 +146,7 @@ export function LogFlightMap({
 
                 if (drawn.length === 0) {
                     // 引擎说"有轨道"，可换算后一条都画不出来（坐标数组里混了 null 等）。以前这里只把
-                    // state 置成 error，界面就只剩兜底那句文案——等于什么都没说
+                    // state 置成 error，界面就只剩兜底那句文案，等于什么都没说
                     setErrorMsg(`解析出 ${list.length} 条轨道，但换算后顶点都不足 2 个（${thin.join("；")}）`);
                     setState("error");
                     return;
@@ -194,8 +194,8 @@ export function LogFlightMap({
 
     useEffect(() => {
         if (state !== "ready" || !mapRef.current) return;
-        // 容器尺寸可能到下一帧才稳定：先让 Leaflet 重新量一次，再按同一组 bounds 重新 fit——
-        // 只 invalidateSize 不重 fit 的话，首帧量到 0×0 时会永远停在全球视野（比例尺显示 10000 km）
+        // 容器尺寸可能到下一帧才稳定：先让 Leaflet 重新量一次，再按同一组 bounds 重新 fit，
+        // 只 invalidateSize 不重 fit 的话，首帧量到 0×0 时会一直停在全球视野（比例尺显示 10000 km）
         const timer = setTimeout(() => {
             const map = mapRef.current;
             if (!map) return;
@@ -206,7 +206,7 @@ export function LogFlightMap({
         return () => clearTimeout(timer);
     }, [state]);
 
-    /** 图例点选：把那条轨道的图层从地图上摘掉/加回来（**不重 fit**，免得视野乱跳） */
+    /** 图例点选：把那条轨道的图层从地图上摘掉/加回来（不重 fit，免得视野乱跳） */
     const toggleTrack = useCallback((label: string) => {
         const map = mapRef.current;
         if (!map) return;
@@ -278,11 +278,11 @@ export function LogFlightMap({
         const layersControl = L.control
             .layers({ 卫星影像: satellite, 街道图: street }, overlays, { position: "topright", collapsed: true })
             .addTo(map);
-        // 图层图标与左上角缩放按钮**同尺寸**：Leaflet 给 .leaflet-control-layers-toggle
-        // 的是 44×44（触屏下），而左侧 .leaflet-bar a 只有 30px —— 两个角一大一小，
+        // 图层图标与左上角缩放按钮同尺寸：Leaflet 给 .leaflet-control-layers-toggle
+        // 的是 44×44（触屏下），而左侧 .leaflet-bar a 只有 30px，两个角一大一小，
         // 看着不像同一套控件。缩到 30 之后两边顶边都是 10px，同一条水平线。
         //
-        // background-size 必须跟着缩：那个图标是 80×80 的 sprite（layers.png 里两张图平铺），
+        // background-size 要跟着缩：那个图标是 80×80 的 sprite（layers.png 里两张图平铺），
         // 只改容器不改它，图会被裁掉一角。
         // 同样用 inline style：.leaflet-touch 下的选择器权重比自定义类高，谁后加载谁赢不可控。
         const layersToggle = layersControl.getContainer()?.querySelector("a");
@@ -293,12 +293,12 @@ export function LogFlightMap({
         }
         L.control.scale({ imperial: false, position: "bottomright" }).addTo(map);
 
-        // 一键回到轨迹视野：直接**插进 Leaflet 自带的缩放条**，排成 + / − / ◎ 一条。
+        // 一键回到轨迹视野：直接插进 Leaflet 自带的缩放条，排成 + / − / ◎ 一条。
         //
         // 为什么不另起一个 L.Control（position topleft + controlOrder 1000 排到缩放下面）：
-        // Leaflet 的 CSS 给**每个** .leaflet-control 都加了 margin-top 10px，两组之间必定
+        // Leaflet 的 CSS 给每个 .leaflet-control 都加了 margin-top 10px，两组之间必定
         // 留一道 10px 的空档；而且两个 .leaflet-bar 各有 1px 边框，就算把 margin 抹掉，
-        // 贴在一起也是 2px 的双线。只有塞进**同一个** .leaflet-bar 才会共享一条边框、
+        // 贴在一起也是 2px 的双线。只有塞进同一个 .leaflet-bar 才会共享一条边框、
         // 由 .leaflet-bar a 的 border-bottom 自动分隔，看着才像"一条按钮"。
         //
         // 代价：按钮列底边上移了 10px 多，高度色带的 top 要跟着改（见 JSX 里的注释）。
@@ -317,10 +317,10 @@ export function LogFlightMap({
             btn.innerHTML =
                 '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>';
             // 尺寸交给 Leaflet 的 .leaflet-bar a（26px，触屏下 30px），这里只管让 svg 居中：
-            // svg 是 inline 元素，按基线对齐全往上偏，必须 flex 才正。
+            // svg 是 inline 元素，按基线对齐全往上偏，得用 flex 才正。
             btn.style.cssText = "display:flex;align-items:center;justify-content:center;cursor:pointer;";
             // 手动塞进 .leaflet-bar 的元素不会被 Leaflet 的控件容器接管，click 会冒泡到地图
-            // （变成"点一下地图"），必须自己掐掉。
+            // （变成"点一下地图"），得自己掐掉。
             L.DomEvent.disableClickPropagation(btn);
             L.DomEvent.on(btn, "click", (e) => {
                 L.DomEvent.preventDefault(e);
@@ -333,12 +333,12 @@ export function LogFlightMap({
             });
             zoomBar.appendChild(btn);
 
-            // 三个按钮**横排**：竖着堆要占掉 ~94px 高，横过来只剩 ~32px，省下的 60 多 px
+            // 三个按钮横排：竖着堆要占掉 ~94px 高，横过来只剩 ~32px，省下的 60 多 px
             // 全给高度色带（色带的 top 就是从这条的底边往下数的，见下方 JSX）。
             //
             // 用 inline style 而不是 CSS 类：分隔线得从 border-bottom 改成 border-right，
             // 而 Leaflet 的 `.leaflet-touch .leaflet-bar a` 是 (0,2,1) 权重，自定义类写出来
-            // 跟它同权重、谁赢取决于两份 CSS 谁后加载 —— 不可控。inline 恒定最高。
+            // 跟它同权重、谁赢取决于两份 CSS 谁后加载，不可控。inline 恒定最高。
             zoomBar.style.display = "flex";
             for (const a of Array.from(zoomBar.querySelectorAll<HTMLAnchorElement>("a"))) {
                 a.style.borderBottom = "none";
@@ -387,7 +387,7 @@ export function LogFlightMap({
             all.push(...tk.points.map((p) => [p.lat, p.lon] as [number, number]));
         }
 
-        // 起终点只画**第一条**轨道：多条轨道时 2N 个 marker 太乱，图例里已经分得清
+        // 起终点只画第一条轨道：多条轨道时 2N 个 marker 太乱，图例里已经分得清
         const startIcon = L.divIcon({
             className: "",
             html: '<div style="background:#22c55e;width:10px;height:10px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3)"></div>',
@@ -452,30 +452,29 @@ export function LogFlightMap({
                 </select>
             </h4>
 
-            {/* 容器**始终可见**：Leaflet 建图时要拿到真实尺寸，曾经是 display:none 时建图 →
+            {/* 容器始终可见：Leaflet 建图时要拿到真实尺寸，曾经是 display:none 时建图 →
           尺寸算成 0×0 → fitBounds 只能给到全球视野（比例尺 10000 km），事后 invalidateSize
           也救不回缩放级别。加载/错误状态改用浮层盖住。 */}
             {/* isolate：给地图单独开一个层叠上下文。Leaflet 自己的面板 / 控件用的是 z-index 400~1000
-          （.leaflet-pane / .leaflet-top），不隔离的话它们会盖过站点的 sticky 顶栏（z-40）——
+          （.leaflet-pane / .leaflet-top），不隔离的话它们会盖过站点的 sticky 顶栏（z-40），
           滚动时地图糊在导航栏上面。隔离后这些 z-index 只在这个容器内比较。 */}
             <div className="relative isolate">
                 <div ref={containerRef} className="h-[380px] w-full overflow-hidden rounded-lg sm:h-[520px]" />
-                {/* 高度色带：竖着贴在地图左侧，从按钮行**底下**一路铺到地图底边
-            （颜色 = 轨迹那段的平均高度）。只在**单条轨道**时给 —— 多条时每条是纯色
+                {/* 高度色带：竖着贴在地图左侧，从按钮行底下（颜色 = 轨迹那段的平均高度）一路铺到地图底边。
+                    只在单条轨道时给，多条时每条是纯色
             （图例里分色），色带就没有对应关系了。
-
-            **横向**：左边缘与按钮行左边缘对齐（都是 Leaflet 定死的 10px）。
-            两个数字标签挂在**色带右侧**（left-full + ml-1）：压在条上的话数字会盖住渐变本身，
+            横向：左边缘与按钮行左边缘对齐（都是 Leaflet 定死的 10px）。
+            两个数字标签挂在色带右侧（left-full + ml-1）：压在条上的话数字会盖住渐变本身，
             而条只有 12px 宽，任何标签都宽过它。
 
-            **纵向**：上接按钮行（横排后底边实测 44px，留 4px 取 48），下接地图底边（bottom-0）。
+            纵向：上接按钮行（横排后底边实测 44px，留 4px 取 48），下接地图底边（bottom-0）。
             按钮之所以要横排，就是为了把这一段尽量留长：竖排时三个按钮吃掉 ~94px，横排只剩 ~32px。
             这个数是量出来的、不是算出来的：按钮尺寸由 Leaflet 的 .leaflet-bar a 决定
             （26px，触屏下 30px），改按钮个数或排布就得重新量。
             此前是"与轨迹包围盒等高对齐"，那个做法在轨迹短时会把色带缩成一小截、悬在半空，
             看着像"压住了什么"；现在整列铺满，色带首先是「颜色 ↔ 高度」的图例，位置稳定。
 
-            **只写 bottom-0 不写 top 就没有上边界** —— 容器会被内容高度挤成 2px，整条色带
+            只写 bottom-0 不写 top 就没有上边界，容器会被内容高度挤成 2px，整条色带
             看不见（2026-09-23 实测过一次）。
 
             标签用 absolute 叠在条的两端，不跟着流排：跟着排的话 min 标签会把条的底端从
@@ -507,7 +506,7 @@ export function LogFlightMap({
                 )}
 
                 {/* 图例：多条轨道时给出"哪条是什么颜色"，点一下可以隐藏/显示那条。
-            放在右上角图层控件**下面**（top-20），避免两个控件叠在一起 */}
+            放在右上角图层控件下面（top-20），避免两个控件叠在一起 */}
                 {state === "ready" && legend.length > 1 && (
                     <div className="absolute top-20 right-3 z-[1100] flex flex-col gap-1 rounded-md bg-surface-2/90 px-2 py-1.5 text-[11px] backdrop-blur-sm">
                         {legend.map((r) => (
@@ -538,7 +537,7 @@ export function LogFlightMap({
                                 加载 GPS 轨迹…
                             </span>
                         ) : (
-                            // 说清是什么问题 + （能救回来时）给个**就地**重选文件的按钮。
+                            // 说清是什么问题 + （能救回来时）给个就地重选文件的按钮。
                             // 只写一句"重新选择该 .ulg 文件"的话，用户得自己猜到要回列表页再选一次
                             <div className="flex max-w-2xl flex-col items-center gap-2">
                                 <span>{errorMsg ?? "无法加载 GPS 轨迹数据"}</span>

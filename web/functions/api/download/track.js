@@ -1,5 +1,5 @@
-// POST /api/download/track —— Skill/MCP "获取"计数（防刷：设备+IP 每日只计一次）。
-// GET  /api/download/track —— 排行榜（实时从 KV 唯一键聚合，seed 基值见 body 外的 stats 接口）。
+// POST /api/download/track：Skill/MCP "获取"计数（防刷：设备+IP 每日只计一次）。
+// GET  /api/download/track：排行榜（实时从 KV 唯一键聚合，seed 基值见 body 外的 stats 接口）。
 //
 // KV 计数键（key 只能含字母数字下划线）：
 //   dle_{kind}_{slugKey}_{day}_{deviceHash}   设备日唯一事件（计数用）

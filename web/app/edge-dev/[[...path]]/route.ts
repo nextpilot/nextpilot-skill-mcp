@@ -9,7 +9,7 @@
  * 部署为边缘函数直接执行（KV 在该层注入）；没有边缘函数文件的 /api/* 穿透到 SSR，
  * 走真实 route 或 app/api/[[...path]] 兜底。opennext 运行时不应用 next.config 的
  * rewrites（2026-09-28 实测：同一个不存在的端点，本地吃到本垫片的纯文本 404，
- * 线上吃到兜底 route 的 JSON 404——两端响应来自不同层，证明线上没有 rewrite）。
+ * 线上吃到兜底 route 的 JSON 404，两端响应来自不同层，证明线上没有 rewrite）。
  */
 import { NextRequest } from "next/server";
 import { installDevKv } from "@/lib/dev/dev-kv";
@@ -24,15 +24,15 @@ type EdgeHandler = (ctx: {
 
 // 显式映射（不用运行时文件系统查找，保证 Turbopack 可静态分析）。
 //
-// ⚠️ **这里是白名单，漏一个就是"该功能在本地整条静默失效"**：没列进来的路径由
+// 这里是白名单，漏一个就是"该功能在本地整条静默失效"：没列进来的路径由
 // `next.config.ts` 的 rewrite 转进来、却在这儿查不到 loader，于是回 404。
-// 而 404 恰恰是"本机还是边缘"最难看出区别的一种失败——本地联调时你以为功能没做，
+// 而 404 是"本机还是边缘"最难看出区别的一种失败。本地联调时你以为功能没做，
 // 实际只是没被路由。2026-09-18 就这样漏了 `api/issues`：`lib/issue-bridge.ts` 的
 // `ENDPOINT = "/api/issues"` 是客户端错误上报的唯一出口，本地一直 404，
-// 于是**所有 `reportError()`（包括"报告缺 findings"那条证据）在本机全部静默丢掉**，
+// 于是所有 `reportError()`（包括"报告缺 findings"那条证据）在本机全部静默丢掉，
 // 排查时等于没有证据。根级探针（ping / kv-probe / issue-probe）同理。
 //
-// 新增 `functions/` 下的端点时必须同时加进这里（`scripts/test-issue-filer.mjs` §[13]
+// 新增 `functions/` 下的端点时要同时加进这里（`scripts/test-issue-filer.mjs` §[13]
 // 会拿 functions/ 的目录清单核对本表，漏了会红）。
 const handlers: Record<string, () => Promise<Record<string, unknown>>> = {
     "api/me": () => import("@/functions/api/me.js"),

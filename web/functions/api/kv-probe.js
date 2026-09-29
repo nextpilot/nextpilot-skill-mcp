@@ -1,9 +1,9 @@
-// GET /api/kv-probe —— 验证 KV 绑定读写 + 边缘函数外网 fetch（DeepSeek 连通性）。
+// GET /api/kv-probe：验证 KV 绑定读写 + 边缘函数外网 fetch（DeepSeek 连通性）。
 // 控制台需先开通 KV、创建 namespace（nextpilot_skill_mcp）并绑定到本项目，变量名 NEXTPILOT_KV。
 //
-// **必须带内部密钥**（请求头 `x-internal-secret`，值为环境变量 AUTH_EDGE_SECRET——
+// 要带内部密钥（请求头 `x-internal-secret`，值为环境变量 AUTH_EDGE_SECRET，
 // 与 /internal/* 同一道门）：
-// 探针会枚举 KV 键位——不设防的话，`?prefix=em_` 就成了"任意邮箱是否注册"的公开 oracle
+// 探针会枚举 KV 键位，不设防的话，`?prefix=em_` 就成了"任意邮箱是否注册"的公开 oracle
 // （em_<sha256(邮箱)> 是用户键），还能摸到 otp_ / use_ 等业务键的布局。
 import { getKv, listAll } from "../_lib/kv.js";
 import { assertInternal, jsonResponse } from "../_lib/http.js";
@@ -23,7 +23,7 @@ export async function onRequestGet({ request, env }) {
     const kv = getBinding(env);
 
     const prefix = new URL(request.url).searchParams.get("prefix") ?? "kvprobe_";
-    // 即使过了密钥校验，也只许列 kvprobe_ 自己的键位——探针不需要（也不该能）翻业务键
+    // 即使过了密钥校验，也只许列 kvprobe_ 自己的键位，探针不需要（也不该能）翻业务键
     if (!prefix.startsWith("kvprobe_")) {
         return jsonResponse({ error: "prefix 只允许 kvprobe_ 前缀（探针只测自己的键位）" }, 400);
     }

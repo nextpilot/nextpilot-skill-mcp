@@ -8,17 +8,17 @@
 /**
  * 站点完整域名（不含末尾斜杠）。
  *
- * ⚠️ 这里的**生产兜底值**不是可选的：`NEXT_PUBLIC_SITE_URL` 只在 EdgeOne 控制台配了才有值，
- * 一旦漏配，`SITE_URL` 就会落到 `localhost:3000`——而它是**唯一一个默认值 ≠ 线上值**的
+ * 这里的生产兜底值不是可选的：`NEXT_PUBLIC_SITE_URL` 只在 EdgeOne 控制台配了才有值，
+ * 一旦漏配，`SITE_URL` 就会落到 `localhost:3000`，而它是唯一一个默认值 ≠ 线上值的
  * 字段（站名/描述/页脚的默认值恰好就是想要的线上值，漏配也看不出来）。漏配的后果是
- * **静默的**：页面照常打开，只有 sitemap.xml、robots.txt、canonical、og:url、JSON-LD
- * 里的域名全变成 localhost —— 等于主动把一批死链提交给搜索引擎。
+ * 静默的：页面照常打开，只有 sitemap.xml、robots.txt、canonical、og:url、JSON-LD
+ * 里的域名全变成 localhost，等于主动把一批死链提交给搜索引擎。
  *
  * 2026-09-28 真实发生：首页静态化（改读构建期常量）之前，sitemap 走 KV 取值恰好掩盖了
  * 这个漏配；改成读常量后隐患立刻暴露。所以这里加一层生产兜底，把「记得去控制台配」
- * 从**必要条件**降级为**可选优化**。
+ * 从必要条件降级为可选优化。
  *
- * 兜底口径与 `REPO_URL` / `SOCIAL_*` 一致：域名换了要改代码，但**不会因为忘配变量而坏站**。
+ * 兜底口径与 `REPO_URL` / `SOCIAL_*` 一致：域名换了要改代码，但不会因为忘配变量而坏站。
  */
 export const SITE_URL = (
     process.env.NEXT_PUBLIC_SITE_URL ||
@@ -69,7 +69,7 @@ export const FOOTER_TAGLINE = process.env.NEXT_PUBLIC_FOOTER_TAGLINE || "";
 /**
  * 页脚"源代码"链接。
  *
- * 名字用 REPO_URL 而不是 GITEE_URL：这个字段填的是**仓库地址**，而实际填进来的
+ * 名字用 REPO_URL 而不是 GITEE_URL：这个字段填的是仓库地址，而实际填进来的
  * 完全可能是 GitHub（SKILL.md 里就有 `https://github.com/robotto-xyz` 这种）。
  * 叫 gitee 会把一个中性字段变成"名不副实"，改托管平台时还得连带改名。
  */
@@ -91,7 +91,7 @@ export const PYODIDE_INDEX_PATH = process.env.NEXT_PUBLIC_PYODIDE_URL || "/pyodi
 /**
  * pyulog 的 wheel 地址（相对路径）。
  *
- * 给了自托管 wheel 就直接装这个文件：**跳过 PyPI 索引查询**（那一步每次都要联网、
+ * 给了自托管 wheel 就直接装这个文件：跳过 PyPI 索引查询（那一步每次都要联网、
  * 且不受缓存保护）。换版本时重跑 fetch_pyodide_assets.py，改这里的文件名即可。
  * 路径变了 SW 缓存会自动失效重下。
  */

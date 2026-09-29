@@ -18,15 +18,15 @@ const INTERNAL_PATHS = {
 /**
  * 推导 Node 侧同源调用 `/internal/*` 时的公网源站。
  *
- * ⚠️ **不能直接信 `SITE_URL`**（`lib/site-config.ts` 的常量），有两个坑：
+ * 不能直接信 `SITE_URL`（`lib/site-config.ts` 的常量），有两个坑：
  *
- * 1. **本地 `next start` 会被打成线上**：`next start` 的 `NODE_ENV` 也是 `production`，
- *    于是 `SITE_URL` 的生产兜底让 `publicOrigin()` 返回**生产域名**——本地测登录/发信时
- *    请求真的打到 `skill.nextpilot.org`。必须优先用**本次请求的转发头**推导。
- * 2. **配错域名会连带自请求失败**：`NEXT_PUBLIC_SITE_URL` 填了错值（或换了域名没同步改
+ * 1. 本地 `next start` 会被打成线上：`next start` 的 `NODE_ENV` 也是 `production`，
+ *    于是 `SITE_URL` 的生产兜底让 `publicOrigin()` 返回生产域名，本地测登录/发信时
+ *    请求真的打到 `skill.nextpilot.org`。要优先用本次请求的转发头推导。
+ * 2. 配错域名会连带自请求失败：`NEXT_PUBLIC_SITE_URL` 填了错值（或换了域名没同步改
  *    代码兜底）时，自请求跟着打到错地址，登录整条链路静默失效。
  *
- * 所以口径是「**用请求头推导的现实值**优先，`SITE_URL` 只作最后兜底」：
+ * 所以口径是「用请求头推导的现实值优先，`SITE_URL` 只作最后兜底」：
  * 线上 EdgeOne 一定会注入 `x-forwarded-host`/`x-forwarded-proto`，推导结果就是当前
  * 真实访问的域名（多域名、预览环境都对）；请求头缺失（极端情况）才回落到常量。
  *
@@ -82,8 +82,8 @@ async function callInternal(
 }
 
 /* ── 外部 JSON → 内部类型的唯一闸门（见 CLAUDE.md §6.5）────────────────────────────
- * 这些响应由 `functions/internal/*` 边缘函数产生，而 **Next 的 Node 侧与边缘函数是分开部署的**
- * （这正是要经它中转的原因：KV 只能在边缘访问）。`{ok, user}` 在工作日里的中间版本完全可能缺字段——
+ * 这些响应由 `functions/internal/*` 边缘函数产生，而 Next 的 Node 侧与边缘函数是分开部署的
+ * （这就是要经它中转的原因：KV 只能在边缘访问）。`{ok, user}` 在工作日里的中间版本完全可能缺字段，
  * 直接 `as InternalUser` 只是把类型检查关掉，缺失的 `uid` 会一路走到 `auth.ts` 的 `{ id: user.uid }`，
  * 于是一个 `id: undefined` 的用户被写进 JWT（`session.user.id` 的取值条件跟着失效）。 */
 
@@ -96,7 +96,7 @@ export interface InternalUser {
 }
 
 /** `/internal/users/upsert` → `{ok, user:{uid,email,name,plan,isNew?}}`。
- *  `uid` 是身份的唯一凭据，没有它等于没有这个人 —— 返回 null，由调用方当"登录失败"处理。 */
+ *  `uid` 是身份的唯一凭据，没有它等于没有这个人，返回 null，由调用方当"登录失败"处理。 */
 function normalizeInternalUser(raw: unknown): InternalUser | null {
     const r = asRecord(raw);
     if (!r) return null;
@@ -114,7 +114,7 @@ function normalizeInternalUser(raw: unknown): InternalUser | null {
     };
 }
 
-/** 归一失败即抛：返回一个"半个用户"比直接失败更糟 —— 那个 uid 会被写进 JWT */
+/** 归一失败即抛：返回一个"半个用户"比直接失败更糟，那个 uid 会被写进 JWT */
 function requireUser(raw: unknown, path: string): InternalUser {
     const user = normalizeInternalUser(raw);
     if (!user) {
@@ -152,11 +152,11 @@ function normalizeOtpConsume(raw: unknown): OtpConsumeResult {
 }
 
 /**
- * 边缘函数对**领域内的失败**用 4xx + `{ok:false, reason}` 作答（重发太频繁、每日限额、验证码错误），
- * 对**基础设施故障**用 5xx + `{error}`（KV 未绑定、内部密钥不对）。
+ * 边缘函数对领域内的失败用 4xx + `{ok:false, reason}` 作答（重发太频繁、每日限额、验证码错误），
+ * 对基础设施故障用 5xx + `{error}`（KV 未绑定、内部密钥不对）。
  *
  * 前者要变回结果交给调用方：`app/api/auth/otp/request/route.ts` 靠 `reason` 区分"请 N 秒后再试"
- * 与"今日次数已达上限"。少了这一步那两个分支就是死代码 —— `callInternal` 在 `!resp.ok` 时抛，
+ * 与"今日次数已达上限"。少了这一步那两个分支就是死代码，`callInternal` 在 `!resp.ok` 时抛，
  * 于是 429 一律被 `.catch` 吃成 null，用户看到的是"验证码服务暂时不可用"，而不是还剩多少秒。
  * 后者继续抛：把配置问题降级成"验证码发送失败"，等于用用户错误的口吻掩盖运维问题。
  */
@@ -221,9 +221,9 @@ export async function upsertGithubUser(input: {
 /**
  * 后台保存的站点设置覆盖项（/internal/settings/get）。
  *
- * 返回 null 表示"没有覆盖"，**不是出错**——KV 没绑定、内部密钥没配、后台从来没存过
+ * 返回 null 表示"没有覆盖"，不是出错。KV 没绑定、内部密钥没配、后台从来没存过
  * 都是这个结果。调用方一律回落到 site-config.ts 的静态默认值：
- * 配置丢了网站必须照常起来，不能白屏。
+ * 配置丢了网站要照常起来，不能白屏。
  */
 export async function fetchSiteSettings(): Promise<Record<string, unknown> | null> {
     try {

@@ -1,14 +1,14 @@
 // 由 app/icon.svg 生成一套位图图标：favicon.ico（16/32/48）与 apple-icon.png（180）。
 //
-// 为什么自带光栅化：仓库没有任何图像依赖，而 favicon 需要 .ico 兜底——Safari 16 以前
-// 不认 SVG 图标，只抓 /favicon.ico；iOS 加到主屏则要 apple-touch-icon。两条都不能靠 SVG。
+// 为什么自带光栅化：仓库没有任何图像依赖，而 favicon 需要 .ico 兜底，因为 Safari 16
+// 以前不认 SVG 图标，只抓 /favicon.ico；iOS 加到主屏则要 apple-touch-icon。两条都不能靠 SVG。
 // 这里借已跑着的 headless Chrome 出 PNG（抗锯齿由浏览器负责），再用 Node 内置 zlib 之外的
-// 纯拼装写 ICO——ICO 允许条目直接内嵌 PNG，不需要 BMP 编码。
+// 纯拼装写 ICO：ICO 允许条目直接内嵌 PNG，不需要 BMP 编码。
 //
 // 用法: 先以 --remote-debugging-port=9222 启动 Chrome，再 node web/scripts/make-icons.mjs
 //
 // 为什么住在 web/scripts/ 根、而不是跟另 5 个 CDP 脚本一起放 browser/ 子目录：它是
-// **产物要提交**的构建脚本
+// 产物要提交的构建脚本
 // （读 app/icon.svg、写回 app/favicon.ico 与 apple-icon.png），跟 build-knowledge.mjs
 // 同类；只是恰好借 Chrome 做光栅化，不需要 Next、也不打开任何页面。
 import { readFileSync, writeFileSync } from "node:fs";
@@ -65,7 +65,7 @@ ws.addEventListener("message", (e) => {
 await new Promise((r) => ws.addEventListener("open", r, { once: true }));
 
 await send("Page.enable");
-// 强制透明底：否则 Chrome 看到页面背景「恰好」不透明就只输出 RGB（无 alpha 通道）的
+// 强制透明底：否则 Chrome 看到页面背景不透明就只输出 RGB（无 alpha 通道）的
 // PNG，Next 的 ICO 解码器会直接报 "The PNG is not in RGBA format"。显式给一个 alpha=0
 // 的底色覆盖，输出才会是 colorType 6（RGBA）。
 await send("Emulation.setDefaultBackgroundColorOverride", {

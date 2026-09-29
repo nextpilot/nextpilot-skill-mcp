@@ -1,21 +1,21 @@
 // 线上报错自动提 issue：指纹、脱敏、去重、限流与平台适配。
 //
 // 三条铁律（改动前先读）：
-//   1. **token 只存在边缘函数**。浏览器永远不接触 issue token，只 POST 到自家
+//   1. token 只存在边缘函数。浏览器不会接触 issue token，只 POST 到自家
 //      /api/issues（见 api/issues.js）。
-//   2. **上报永不阻塞用户**。调用方用 waitUntil 包裹；本模块内部全量 try/catch，
-//      任何失败静默并留下记录。上报挂了绝不能影响日志分析——这是比"能收到报错"更硬的约束。
-//   3. **脱敏走白名单**。项目卖点是"原始日志不上传"，错误上报不能变成后门：
+//   2. 上报不阻塞用户。调用方用 waitUntil 包裹；本模块内部全量 try/catch，
+//      任何失败静默并留下记录。上报挂了也不能影响日志分析，这比"能收到报错"更重要。
+//   3. 脱敏走白名单。项目卖点是"原始日志不上传"，错误上报不能变成后门：
 //      只允许错误类型/消息/栈/路由/版本，禁止日志文件名、字段值、findings、邮箱、uid、IP。
 //
 // 另外两道护栏决定了这个功能是资产还是灾难：
-//   - **分级**：崩溃类（fatal）必报；高频可恢复类（LLM 502、网络抖动）同指纹每天最多一次。
+//   - 分级：崩溃类（fatal）必报；高频可恢复类（LLM 502、网络抖动）同指纹每天最多一次。
 //     不分级的话，上游抖动一天能刷出几百个 issue。
-//   - **指纹去重**：同一个 bug 只留一个 issue，后续命中追加评论。KV 最终一致（60s），
-//     去重是尽力而为，所以还有内存限流兜底——宁可偶尔重复建一个，不可雪崩。
+//   - 指纹去重：同一个 bug 只留一个 issue，后续命中追加评论。KV 最终一致（60s），
+//     去重是尽力而为，所以还有内存限流兜底，宁可偶尔重复建一个，也不要雪崩。
 //
-// 脱敏 / 截断 / 归一化这三件事与浏览器侧**共用一份实现**：lib/error-policy.js。
-// 改规则只改那里——本文件与 lib/issue-bridge.ts 都不许再各写一份。
+// 脱敏 / 截断 / 归一化这三件事与浏览器侧共用一份实现：lib/error-policy.js。
+// 改规则只改那里，本文件与 lib/issue-bridge.ts 都不再各写一份。
 
 import { getKv, sha256Hex } from "./kv.js";
 import { getSecret } from "./secrets.js";
@@ -30,7 +30,7 @@ import {
     normalize,
 } from "../../lib/error-policy.js";
 
-/** issue 标题上限。纯展示用，只有边缘侧参与，不必共享。 */
+/** issue 标题上限。纯展示用，只有边缘侧参与，不用共享。 */
 const MAX_TITLE = 120;
 
 /** 每实例每分钟最多提交几次。实例重启即归零，只是最后一道保险，KV 去重才是主力。 */
@@ -41,8 +41,8 @@ let windowCount = 0;
 /** 重复命中时，追加评论的最小间隔：致命类每小时一条，可恢复类每天一条。 */
 const COMMENT_GAP = { fatal: 60 * 60 * 1000, recoverable: 24 * 60 * 60 * 1000 };
 
-// —— 脱敏 / 截断 / 归一化 ——
-// 这三件事与浏览器侧**必须逐字一致**（客户端先粗脱、截断，边缘再兜一层），
+// 脱敏 / 截断 / 归一化
+// 这三件事与浏览器侧要逐字一致（客户端先粗脱、截断，边缘再兜一层），
 // 所以实现统一放在 lib/error-policy.js，这里只引用，不再各写一份。
 // 改动点也只有一个：lib/error-policy.js。
 
@@ -99,7 +99,7 @@ export function sanitizePayload(raw) {
 }
 
 /**
- * 去重指纹。**归一化之后**才 hash——否则 `file 17.ulg` 与 `file 18.ulg` 会各算一个
+ * 去重指纹。归一化之后才 hash，否则 `file 17.ulg` 与 `file 18.ulg` 会各算一个
  * 指纹，去重形同虚设。导出是为了能直接跑自测（web/scripts/test-issue-filer.mjs）。
  */
 export async function fingerprintOf(p) {
@@ -138,7 +138,7 @@ function rateLimited() {
  * 单一出口：所有 issue 平台请求都从这里走，便于统一记录真实响应。
  * Gitee 的 `POST /repos/{owner}/{repo}/issues` 有已知的中间件问题
  * （见 gitee.com/oschina/git-osc/issues/IJZAPB：带 access_token 时返回
- * `404 project or enterprise`），所以不能假设它能通——失败必须留痕，
+ * `404 project or enterprise`），所以不能假设它能通，失败要留痕，
  * 由 /issue-probe 暴露出来让运维一眼看到。
  */
 async function callApi(cfg, path, payload) {
@@ -228,7 +228,7 @@ function issueTitle(p) {
     return title.length > MAX_TITLE ? `${title.slice(0, MAX_TITLE - 1)}…` : title;
 }
 
-/** 把一次失败写进 KV，供 /issue-probe 查——"上报没生效"必须能被发现。 */
+/** 把一次失败写进 KV，供 /issue-probe 查，让"上报没生效"能被发现。 */
 async function recordFailure(kv, stage, detail) {
     if (!kv) return;
     try {
@@ -241,7 +241,7 @@ async function recordFailure(kv, stage, detail) {
 
 /**
  * 主入口。返回值只用于本地调试与自检端点，业务侧忽略即可。
- * 调用方式（务必包在 waitUntil 里，别让用户等）：
+ * 调用方式（注意包在 waitUntil 里，别让用户等）：
  *   waitUntil?.(reportIssue(env, { kind: "server-error", level: "fatal", ... }));
  */
 export async function reportIssue(env, payload) {
@@ -262,7 +262,7 @@ export async function reportIssue(env, payload) {
         const prev = prevRaw ? safeParse(prevRaw) : null;
         const labels = p.kind === "manual-report" ? [...cfg.labels, "用户反馈"] : [...cfg.labels];
 
-        // —— 首次：建 issue ——
+        // 首次：建 issue
         if (!prev?.n) {
             const resp = await callApi(cfg, "/issues", {
                 title: issueTitle(p),
@@ -284,7 +284,7 @@ export async function reportIssue(env, payload) {
             return { created: number, fingerprint: fp };
         }
 
-        // —— 后续：追加评论（节流），不新建 ——
+        // 后续：追加评论（节流），不新建
         const now = Date.now();
         const gap = COMMENT_GAP[p.level] ?? COMMENT_GAP.recoverable;
         const next = { ...prev, c: (prev.c ?? 0) + 1, l: now };
@@ -299,7 +299,7 @@ export async function reportIssue(env, payload) {
         if (kv) await kv.put(key, JSON.stringify(next)).catch(() => {});
         return { commented: prev.n, count: next.c, fingerprint: fp };
     } catch (err) {
-        // 上报自身的任何异常都不许外溢：调用方通常已经在 waitUntil 里，这里再兜一层
+        // 上报自身的任何异常都不外溢：调用方通常已经在 waitUntil 里，这里再兜一层
         await recordFailure(getKv(env), "exception", String(err?.message ?? err));
         return { skipped: "exception" };
     }

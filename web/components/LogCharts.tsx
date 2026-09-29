@@ -76,7 +76,7 @@ export function LogCharts({
     }, [manifest, storedPanels]);
 
     // 告警栏的两批来源：解析时就知道的（面板上带着），和取数后引擎回来才知道的（PanelChart 回调）。
-    // 后者要在多个面板并发取数时去重——同一条提示会被每张图重复报一次
+    // 后者要在多个面板并发取数时去重，同一条提示会被每张图重复报一次
     const [runtimeWarnings, setRuntimeWarnings] = useState<string[]>([]);
     const seenRef = useRef<Set<string>>(new Set());
     const pushWarnings = useCallback((ws: string[]) => {
@@ -326,8 +326,8 @@ function PanelChart({
         };
 
         let cancelled = false;
-        // unmount 时 React 先把 ref 置 null 再跑 cleanup——cleanup 里要 purge 的话，
-        // 必须用这里捕获的引用，到时再读 fullscreenRef.current 拿到的是 null，purge 会被跳过
+        // unmount 时 React 先把 ref 置 null 再跑 cleanup，cleanup 里要 purge 的话，
+        // 得用这里捕获的引用，到时再读 fullscreenRef.current 拿到的是 null，purge 会被跳过
         const el = fullscreenRef.current;
         (async () => {
             const Plotly = await getPlotly();
@@ -379,13 +379,13 @@ function PanelChart({
     useEffect(() => {
         let cancelled = false;
         // cleanup 里要 purge（见文件内其他 effect 的说明）：unmount 时 React 已把 ref 置 null，
-        // 必须在 effect 同步段捕获元素引用
+        // 得在 effect 同步段捕获元素引用
         const el = elRef.current;
         if (!el) return;
         (async () => {
             try {
-                // 存档可能是**旧版格式**（取数声明从"topic + 列名"改成 ref 之后，`ydata` 才存在）：
-                // 派生版本一变就会触发重解析，但本机原始日志已被淘汰时只能拿旧数据渲染——
+                // 存档可能是旧版格式（取数声明从"topic + 列名"改成 ref 之后，`ydata` 才存在）：
+                // 派生版本一变就会触发重解析，但本机原始日志已被淘汰时只能拿旧数据渲染，
                 // 那种情况说清楚，别让 Plotly 拿着半截请求去画
                 const stale = panel.requests.find((r) => !Array.isArray(r.ydata) || r.ydata.length === 0 || !r.series);
                 if (stale) {
@@ -515,7 +515,7 @@ function PanelChart({
         return () => {
             cancelled = true;
             // responsive:true 会挂 window resize 监听并持有图数据；同时 newPlot 反复在同一个
-            // div 上重建 graph 也会累积旧事件绑定——不 purge 的话切 tab / 换报告反复挂载
+            // div 上重建 graph 也会累积旧事件绑定，不 purge 的话切 tab / 换报告反复挂载
             // 就持续泄漏内存
             void getPlotly()
                 .then((P) => P.purge(el))
@@ -540,8 +540,8 @@ function PanelChart({
                     )}
                     <div ref={elRef} className="w-full" style={{ minHeight: "300px" }} />
                 </div>
-                {/* 工具栏：浮在图的右上角、落在那圈**留给刻度标签的白边**里（layout 的 margin.r = 34），
-            所以既不压曲线也不离图远——中间那版把它放在容器外面，34+ 的空档看着就远。
+                {/* 工具栏：浮在图的右上角、落在那圈留给刻度标签的白边里（layout 的 margin.r = 34），
+            所以既不压曲线也不离图远，中间那版把它放在容器外面，34+ 的空档看着就远。
             竖排一列、固定间距，不存在互相重叠。 */}
                 {state === "done" && (
                     <div className="absolute top-1 right-1 flex w-7 flex-col items-center gap-1 rounded-md bg-surface-1/85 py-1 backdrop-blur-sm">
@@ -574,7 +574,7 @@ function PanelChart({
 
             {/*
         全屏浮层用 portal 挂到 body：面板可能落在任何祖先里，`position: fixed` 一旦遇上带
-        transform / filter / contain 的祖先，就会以那个祖先（而不是视口）为基准，浮层整体偏出去——
+        transform / filter / contain 的祖先，就会以那个祖先（而不是视口）为基准，浮层整体偏出去，
         表现就是"全屏之后按钮跑到屏幕外面"。挂到 body 下就没有这层依赖了。
       */}
             {fullscreen &&
@@ -646,7 +646,7 @@ function buildLayout(panel: PanelSpec, phases: FlightPhase[], dark: boolean): Re
             layer: "below",
         });
     }
-    // 坐标轴：范围 / 翻转 / 网格都是**面板级**属性（一张图一个量纲、一个视野）
+    // 坐标轴：范围 / 翻转 / 网格都是面板级属性（一张图一个量纲、一个视野）
     const xaxis: Record<string, unknown> = {
         title: { text: panel.xLabel, font: { color: muted, size: 10 } },
         gridcolor: grid,

@@ -21,7 +21,7 @@ export function LogEntryClient() {
         error,
         report,
         history,
-        // 这里不取 `quota`：上传卡上不再显示「匿名试用 3/3 次」——次数限制改由后台配置，
+        // 这里不取 `quota`：上传卡上不再显示「匿名试用 3/3 次」，次数限制改由后台配置，
         // 前端不先替后台报一个写死的数。要用时从 useLogAnalyzer() 取回来即可。
         cloudItems,
         cachedHashes,
@@ -85,7 +85,7 @@ export function LogEntryClient() {
                 <LocalizedText zh="飞控日志分析" en="Flight log analysis" />
             </h1>
             {/* 占满容器宽度（原来 max-w-3xl 会在宽屏上提前折行，看着像半截的说明）。
-          注意 LocalizedText 只输出纯文本，不解析 markdown——别在里面写 ** 强调，会原样显示出来 */}
+          注意 LocalizedText 只输出纯文本，不解析 markdown，别在里面写 ** 强调，会原样显示出来 */}
             <p className="mt-2 text-sm leading-6 text-muted">
                 <LocalizedText
                     zh="把 PX4 .ulg 或 ArduPilot .bin 拖进来，几分钟读完一份中文诊断报告：解析、规则检查和故障知识库匹配全部在你的浏览器里完成，原始日志与 GPS 轨迹一步不出本机（规则检查当前覆盖 PX4，ArduPilot 规则库扩展中）。结论里的每个数字都能对回具体字段、阈值和官方文档；DeepSeek 只把结果讲成人话——是什么问题、为什么、先查哪里，不参与任何数值判断。"
@@ -111,7 +111,7 @@ export function LogEntryClient() {
                         <UploadCloud className="mb-4 h-10 w-10 text-primary" />
                     )}
                     {/* 三行：标题带容量上限 → 隐私承诺 → 免责声明。容量上限并进标题，是为了让用户
-              先看"能不能传"，再看"传上去安不安全"——这两句要在用户交出日志之前就看到。
+              先看"能不能传"，再看"传上去安不安全"，这两句要在用户交出日志之前就看到。
               文案本体在 lib/log-analysis-notes.ts，这里只管排版，别在组件里手写措辞。 */}
                     <div className="text-lg font-semibold">
                         {busy ? (

@@ -34,7 +34,7 @@ import { reportError } from "@/lib/issue-bridge";
  * Worker 跨路由复用（模块级单例）。
  *
  * 为什么不能跟 hook 一起销毁：本 hook 在 /log 与 /log/[id] 各挂一次，卸载时会 terminate；
- * 而 Worker 里的 Pyodide 初始化很贵——运行时（约 10MB）要下载并做 WASM 编译，还要装 numpy
+ * 而 Worker 里的 Pyodide 初始化很贵。运行时（约 10MB）要下载并做 WASM 编译，还要装 numpy
  * （约 6MB wheel）与 pyulog（micropym 会去 PyPI 查索引）。跟 hook 一起销毁的话，
  * 列表↔结果页来回切一趟就要重来一遍，表现出来就是"每次上传都要重新下载 pyulog"。
  *
@@ -50,20 +50,20 @@ function broadcastError(message: string) {
 }
 
 /**
- * Worker **现在装着哪一份**日志（内容指纹）。
+ * Worker 现在装着哪一份日志（内容指纹）。
  *
- * 为什么必须是模块级、而不是每个 hook 一份：Worker 本身是模块级单例（见上），
+ * 为什么要是模块级、而不是每个 hook 一份：Worker 本身是模块级单例（见上），
  * "里面装着谁"是 Worker 的属性、不是某个页面的属性。同一个页面开着两份报告时，
- * 各存各的就会互相撒欢——A 以为装着 A、B 以为装着 B。
+ * 各存各的就会互相撒欢，A 以为装着 A、B 以为装着 B。
  *
  * `null` = 不知道／没装上（Worker 刚建、还装的是别的日志、上次 analyze 失败了）。
- * 只在 `done` 里按 Worker 回传的 logId 记，**不靠"我发过 analyze"推断**：
+ * 只在 `done` 里按 Worker 回传的 logId 记，不靠"我发过 analyze"推断：
  * analyze 是会失败的（pyulog 装不上、日志损坏），推断出来的"装着"会让后续
- * 取数拿到上一份日志的数据——静默错，比报错难查得多。
+ * 取数拿到上一份日志的数据。静默错，比报错难查得多。
  */
 let workerLoadedHash: string | null = null;
 
-/** 正在为哪份日志补解析（键 = 内容指纹）。同样必须是模块级：Worker 只有一份，
+/** 正在为哪份日志补解析（键 = 内容指纹）。同样要放模块级：Worker 只有一份，
  *  同一份日志的解析请求也就只该有一次，任何一个页面发起的都算数。 */
 const analyzeInFlight = new Map<string, Promise<boolean>>();
 
@@ -107,8 +107,8 @@ function dropSharedWorker() {
 /**
  * 刚分析完的那一份结果（模块级）。
  *
- * 为什么需要：在列表页分析完会跳到结果页，而结果页是**另一个 hook 实例**，它去 IndexedDB
- * 读派生数据时，后台的曲线抽取（约 1 秒）往往还没写完 —— 于是只看到参数/消息、没有曲线，
+ * 为什么需要：在列表页分析完会跳到结果页，而结果页是另一个 hook 实例，它去 IndexedDB
+ * 读派生数据时，后台的曲线抽取（约 1 秒）往往还没写完，于是只看到参数/消息、没有曲线，
  * 图表 tab 就被判成"不可用"。这里把内存里的结果直接交接过去，既消除竞态，也省掉一次重复解析。
  */
 /** parseBytes 的入参（也是"补解析"时用的那份描述） */
@@ -123,13 +123,13 @@ type ParseBytesMeta = {
 /**
  * Worker 交上来的报告 → 前端敢直接解引用的形状（外部边界，见 CLAUDE.md §6.5）。
  *
- * 为什么 Worker 也算外部：它是模块级单例、**常驻且从不因代码更新重建**（见下面的说明），
+ * 为什么 Worker 也算外部：它是模块级单例，常驻且不会因代码更新而重建（见下面的说明），
  * 所以"页面已经是新代码、Worker 还揣着上一版产物"是常态。判据（写入方与读取方可能不是
  * 同一版本）成立。
  *
- * 这里只保证**前端会直接解引用的字段**：`findings` 是唯一一个（`GeneralInfo` 里
+ * 这里只保证前端会直接解引用的字段：`findings` 是唯一一个（`GeneralInfo` 里
  * `report.findings.filter`，缺了整页白屏）。其余字段 UI 本来就用 `?.` / `?? []` 取，
- * 缺了不会白屏——也就不该在这里编个默认值假装它有。
+ * 缺了不会白屏，也就不该在这里编个默认值假装它有。
  */
 function normalizeWorkerReport(raw: unknown): LogReportData {
     const r = (raw ?? {}) as LogReportData;
@@ -162,14 +162,14 @@ export function useLogAnalyzer() {
     const pendingFileRef = useRef<{ name: string; size: number }>({ name: "", size: 0 });
     const pendingHashRef = useRef<string>("");
     const pendingAiRef = useRef<string | null>(null);
-    /** **当前显示的报告**带的那份 AI 解读，跟着 state 走。
+    /** 当前显示的那份报告带的 AI 解读，跟着 state 走。
      *  与 pendingAiRef 是两件事：后者是"上次解析那份日志的 priorAi"，只被 parseBytes 写；
      *  拿它去补解析当前报告，会把这份报告的 AI 解读覆盖成别的（或空）。
      *  补解析（ensureLogLoaded / recoverWithFile）要沿用的是这一份。 */
     const aiMarkdownRef = useRef<string | null>(null);
     const pendingBytesRef = useRef<Uint8Array | null>(null);
-    /** `pendingBytesRef` 里那份字节是**哪一份日志**的。
-     *  `pendingHashRef` 会被 viewSaved 改成"当前显示的报告"的指纹，而字节不会跟着变——
+    /** `pendingBytesRef` 里那份字节是哪一份日志的。
+     *  `pendingHashRef` 会被 viewSaved 改成"当前显示的报告"的指纹，而字节不会跟着变，
      *  两者配对存才不会出现"拿 A 的字节去补 B 的数据"。 */
     const pendingBytesHashRef = useRef<string>("");
     /** 等某份日志解析结束的回调（键 = 内容指纹）；done / error 时结算 */
@@ -342,8 +342,8 @@ export function useLogAnalyzer() {
                 });
                 const data = await resp.json();
                 if (resp.status === 429) {
-                    // 429 的两种来路：额度用完，或**限流**（来得太快）。服务端给了 error
-                    // 就用它；没给时不许替它编"额度已用完"——那是其中一种，另一种下这句
+                    // 429 的两种来路：额度用完，或限流（来得太快）。服务端给了 error
+                    // 就用它；没给时不许替它编"额度已用完"，那是其中一种，另一种下这句
                     // 是错的，用户按它去等第二天重置，其实重试一下就行（同 §6.8 的教训）。
                     markdown = `> ${data.error ?? "请求过于频繁或已达上限，请稍后重试"}`;
                 } else if (!resp.ok) {
@@ -382,7 +382,7 @@ export function useLogAnalyzer() {
     }, []);
 
     /** 解析失败、或这次解析顶掉了另一份日志时，把等待者放行：宁可让调用方拿到"取不到"，
-     *  也不能让一个 await 永远挂着（界面会卡在"加载中"，连"重新选择文件"的按钮都看不到）。 */
+     *  也不能让一个 await 一直挂着（界面会卡在"加载中"，连"重新选择文件"的按钮都看不到）。 */
     const failPendingAnalyze = useCallback((exceptHash?: string) => {
         const all = [...analyzeWaitersRef.current.entries()];
         analyzeWaitersRef.current.clear();
@@ -393,19 +393,19 @@ export function useLogAnalyzer() {
     }, []);
 
     /**
-     * **在取数据之前，先把当前这份日志装进 Worker。**
+     * 在取数据之前，先把当前这份日志装进 Worker。
      *
-     * 为什么必须有这一步：Worker 共享且常驻（见文件头），它可能正装着**另一份**日志——
+     * 为什么要有这一步：Worker 共享且常驻（见文件头），它可能正装着另一份日志。
      * 要么本会话先分析过别的日志，要么用户从历史里打开了第二份报告。
      * 以前遇到这种情况只有一个结果：Worker 回一句"当前解析的是另一份日志，重新选择该 .ulg 文件"，
-     * 界面给个按钮让用户再选一次文件——**而字节明明就在手里**（刚选过的那份、或本机缓存里的），
+     * 界面给个按钮让用户再选一次文件，而字节明明就在手里（刚选过的那份、或本机缓存里的），
      * 却要用户再选一遍；曲线那条路连按钮都没有，只能一直看不到图。
      *
      * 现在把"Worker 得装着这一份"做成取数的前置条件：
      *   · 装着 → 直接走；
      *   · 不是这一份 → 用手里的字节补一次解析并等它结束；
      *   · 手里也没字节（历史记录 + 本机缓存已被淘汰／来自别的设备）→ 返回 false，
-     *     让 Worker 照旧回那句实话，界面给"重新选择该 .ulg 文件"——**那才是唯一真需要用户动手的情况**。
+     *     让 Worker 照旧回那句实话，界面给"重新选择该 .ulg 文件"，这是唯一真需要用户动手的情况。
      *
      * 同一份日志的并发请求共用一次解析（analyzeInFlight 去重），不会解析好几遍。
      */
@@ -434,8 +434,8 @@ export function useLogAnalyzer() {
                 list.push(resolve);
                 analyzeWaitersRef.current.set(hash, list);
             });
-            // priorAi 沿用**当前显示的报告**那份解读：这次解析只是把数据装进 Worker，
-            // 不该把花过额度生成的 AI 报告覆盖成空。用 aiMarkdownRef 而不是 pendingAiRef——
+            // priorAi 沿用当前显示的那份报告的解读：这次解析只是把数据装进 Worker，
+            // 不该把花过额度生成的 AI 报告覆盖成空。用 aiMarkdownRef 而不是 pendingAiRef，
             // 后者是"上一次解析那份日志的 priorAi"，从历史打开另一份报告时它还是上一份的
             // 值（常常是 null），拿它去补解析正好把这份报告的 AI 抹掉。
             parseBytesRef.current?.(bytes, {
@@ -489,7 +489,7 @@ export function useLogAnalyzer() {
         const reqId = `t${reqIdRef.current++}`;
         return new Promise((resolve) => {
             pendingRef.current.set(reqId, (data) => resolve(data as TrackData));
-            // 同上：轨迹也要说清是哪一份日志的——装错日志时画出来的是**别人**的航线
+            // 同上：轨迹也要说清是哪一份日志的。装错日志时画出来的是别人的航线
             worker.postMessage({ type: "track", reqId, logId: pendingHashRef.current });
         });
     }, [ensureLogLoaded]);
@@ -503,7 +503,7 @@ export function useLogAnalyzer() {
                 const series: StoredPlotSeries = {};
                 for (const sp of panels) {
                     for (let i = 0; i < sp.panels.length; i++) {
-                        // 一个面板可能要发多次取数（多条 child 各有自己的横轴）——
+                        // 一个面板可能要发多次取数（多条 child 各有自己的横轴），
                         // 落盘时按请求顺序存成数组，键仍是 `${presetId}#面板序号`
                         const reqs = sp.panels[i].requests;
                         if (reqs.length === 0) continue;
@@ -516,7 +516,7 @@ export function useLogAnalyzer() {
                 setStoredPlots({ panels, series });
                 if (liveAnalysis?.id === id) liveAnalysis.storedPlots = { panels, series };
                 // 轨迹（地图用）：一次抽好存下，之后打开历史不必再解析。
-                // 可能有多条（多条叠画 + 图例）——一条都没有才算没轨迹。
+                // 可能有多条（多条叠画 + 图例），一条都没有才算没轨迹。
                 const track = await requestTrack();
                 const hasTrack = Boolean(track && !track.error && (track.tracks?.length ?? 0) > 0);
                 if (hasTrack) setStoredTrack(track);
@@ -543,14 +543,14 @@ export function useLogAnalyzer() {
     /**
      * 换了一份日志：丢掉上一份的派生数据（曲线、轨迹）。
      *
-     * 这两样都必须按**日志身份**清，不能留在 state 里跨报告用：
-     *   · 曲线的键是 `presetId#面板序号`——**与日志无关**（预设是静态的），
+     * 这两样都要按日志身份清，不能留在 state 里跨报告用：
+     *   · 曲线的键是 `presetId#面板序号`，与日志无关（预设是静态的），
      *     于是 LogCharts 会直接命中上一份的序列画出来，看起来完全正常，实际是别人的数据；
      *   · 轨迹更直白：画出来就是另一份日志的航线。
      * 分析刚完成到抽完曲线之间有几秒，抽失败（`extractPlots` 的 catch）时这个错会一直留着。
      *
-     * 判据用报告 id（= 日志内容指纹）：**就地复解析**（`recoverWithFile`、打开存档补齐）
-     * 的 id 不变 → 不清，那种情况下"旧数据先渲染着、后台补"正是想要的。
+     * 判据用报告 id（= 日志内容指纹）：就地复解析（`recoverWithFile`、打开存档补齐）
+     * 的 id 不变，就不清，那种情况下"旧数据先渲染着、后台补"就是想要的效果。
      */
     const dropOtherReportData = useCallback((nextId: string): void => {
         if (reportIdRef.current === nextId) return;
@@ -564,7 +564,7 @@ export function useLogAnalyzer() {
             setManifest(null);
             setInfo(null);
             setAiMarkdown(saved.aiMarkdown);
-            // 换了报告就把上一份的派生数据丢掉再换 id：这两步必须挨着，
+            // 换了报告就把上一份的派生数据丢掉再换 id：这两步要挨着，
             // 否则"当前显示的 id"与"state 里的曲线轨迹"会各说各话
             dropOtherReportData(saved.id);
             reportIdRef.current = saved.id;
@@ -618,7 +618,7 @@ export function useLogAnalyzer() {
             } else if (m.type === "error") {
                 setError(m.message ?? "解析失败");
                 setStage("idle");
-                // 等这次解析的人全部放行（它失败了，别让谁永远挂着）
+                // 等这次解析的人全部放行（它失败了，别让谁一直挂着）
                 failPendingAnalyze();
                 // 解析失败是"整份日志都读不了"级别的错误，也是最容易藏起来的一类：
                 // Pyodide 里的 Python 异常只在用户机器上出现，本地回归覆盖不到
@@ -634,12 +634,12 @@ export function useLogAnalyzer() {
                 const r = normalizeWorkerReport(m.report);
                 // 记下"Worker 现在装着哪一份"：取数据前要靠它判断要不要补解析
                 // （见 ensureLogLoaded）。旧的 Worker 实例不回传 logId，退化成发 analyze
-                // 的那个页面所记的指纹——同一份代码里 done 的处理本来就依赖它（看 r.logHash）
+                // 的那个页面所记的指纹，同一份代码里 done 的处理本来就依赖它（看 r.logHash）
                 const logId = typeof m.logId === "string" ? m.logId : pendingHashRef.current;
                 workerLoadedHash = logId || null;
                 settleAnalyze(workerLoadedHash ?? "", true);
-                // **这份结果是给谁的。** 补解析（ensureLogLoaded）是在页面已经把报告渲染出来
-                // 之后才发起的，而 Pyodide 首次初始化要十几秒——用户完全可能在这中间回列表
+                // 这份结果是给谁的。补解析（ensureLogLoaded）是在页面已经把报告渲染出来
+                // 之后才发起的，而 Pyodide 首次初始化要十几秒，用户完全可能在这中间回列表
                 // 打开另一份报告。这时把结果写进 state，就是"拿 B 的结论盖住 C 的页面"：
                 // 页面头部显示 C、结论却是 B，liveAnalysis 还会被记成「C 的 id + B 的 manifest」。
                 // Worker 里确实已经装好了（上面那行已记下），只是这一份对当前页面已经不是它要的了。
@@ -666,7 +666,7 @@ export function useLogAnalyzer() {
                 setAiMarkdown(pendingAiRef.current);
                 persist(r, reportIdRef.current, pendingAiRef.current, pendingHashRef.current);
                 void cacheCurrentLog();
-                // 派生数据随报告落盘：下次打开这份报告，参数/消息/阶段/曲线直接渲染，**不再解析原始日志**。
+                // 派生数据随报告落盘：下次打开这份报告，参数/消息/阶段/曲线直接渲染，不再解析原始日志。
                 const info = m.info as LogInfo;
                 lastInfoRef.current = info;
                 void saveReportData(reportIdRef.current, { derivedVersion: DERIVED_DATA_VERSION, info });
@@ -699,7 +699,7 @@ export function useLogAnalyzer() {
         void cachedLogHashes().then(setCachedHashes);
         void cacheUsage().then(setCacheInfo);
 
-        // 订阅共享 Worker 的消息；卸载时只摘监听器——**不销毁 Worker**，
+        // 订阅共享 Worker 的消息；卸载时只摘监听器，不销毁 Worker，
         // 否则每次路由切换都要重下 Pyodide 与 numpy/pyulog（见文件顶部说明）
         const onMsg = (msg: WorkerOutMessage) => handleWorkerMessage(msg);
         const onErr = (message: string) => {
@@ -714,8 +714,8 @@ export function useLogAnalyzer() {
         return () => {
             sharedListeners.delete(onMsg);
             sharedErrorListeners.delete(onErr);
-            // 卸载时把在途的 series/track 等待者**全部结算**：只 clear 的话这些 Promise
-            // 永远 pending，await 点的异步帧（含其闭包）就挂在内存里等一个不会来的响应。
+            // 卸载时把在途的 series/track 等待者全部结算：只 clear 的话这些 Promise
+            // 会一直 pending，await 点的异步帧（含其闭包）就挂在内存里等一个不会来的响应。
             // 哨兵带 error 字段，消费方按"取数失败"处理（如 LogCharts 对 resp.error 直接跳过）。
             for (const resolve of pending.values()) {
                 resolve({ error: "页面已离开，取数取消" });
@@ -724,15 +724,15 @@ export function useLogAnalyzer() {
         };
     }, [handleWorkerMessage, refreshMe]);
 
-    /** 拿共享 Worker；本 hook 的监听器在挂载 effect 里注册（只注册一次） */ const ensureWorker =
-        useCallback((): Worker | null => {
-            const worker = getSharedWorker();
-            if (!worker) {
-                setError("本地解析引擎无法启动（浏览器不支持 Web Worker？）");
-                setStage("idle");
-            }
-            return worker;
-        }, []);
+    /** 拿共享 Worker；本 hook 的监听器在挂载 effect 里注册（只注册一次） */
+    const ensureWorker = useCallback((): Worker | null => {
+        const worker = getSharedWorker();
+        if (!worker) {
+            setError("本地解析引擎无法启动（浏览器不支持 Web Worker？）");
+            setStage("idle");
+        }
+        return worker;
+    }, []);
 
     const parseBytes = useCallback(
         (bytes: Uint8Array, meta: ParseBytesMeta) => {
@@ -741,15 +741,15 @@ export function useLogAnalyzer() {
             pendingFileRef.current = { name: meta.name, size: meta.size };
             pendingHashRef.current = meta.hash;
             // 这次解析会顶掉 Worker 里原本装着的那一份：别的日志的等待者再等不到自己的 done，
-            // 现在就放行（放行的是"没拿到"，不是"拿到了"——调用方据此说真话）
+            // 现在就放行（放行的是"没拿到"，不是"拿到了"，调用方据此说真话）
             failPendingAnalyze(meta.hash);
             // 字节和它的指纹配对存：viewSaved 之后会把 pendingHashRef 换成"当前显示的报告"，
-            // 而这里的字节还是上一份的——ensureLogLoaded 靠这一对判断"手里的字节是不是你要的"
+            // 而这里的字节还是上一份的，ensureLogLoaded 靠这一对判断"手里的字节是不是你要的"
             pendingBytesHashRef.current = meta.hash;
             pendingAiRef.current = meta.priorAi;
             pendingBytesRef.current = bytes;
             // 换的是另一份日志就丢掉上一份的派生数据（见 dropOtherReportData）；
-            // 就地复解析同一个报告时 id 不变，留着旧曲线继续渲染正是想要的
+            // 就地复解析同一个报告时 id 不变，留着旧曲线继续渲染就是想要的效果
             dropOtherReportData(meta.reportId);
             reportIdRef.current = meta.reportId;
             setAiMarkdown(meta.priorAi);
@@ -767,9 +767,9 @@ export function useLogAnalyzer() {
 
     useEffect(() => {
         // 同上：ensureLogLoaded 声明在 state 之前、deps 又是空的，拿不到 aiMarkdown。
-        // 它补解析时要沿用**当前这份报告**的 AI 解读（见 aiMarkdownRef 的说明）。
+        // 它补解析时要沿用当前这份报告的 AI 解读（见 aiMarkdownRef 的说明）。
         // 跟着 state 走、而不是逐个 setAiMarkdown 调用点去写：setAiMarkdown 是导出给
-        // 调用方的，写漏一处就会在补解析时把 AI 报告抹掉——一个只有 AI 调用过的用户
+        // 调用方的，写漏一处就会在补解析时把 AI 报告抹掉：一个只有 AI 调用过的用户
         // （花过额度的）才会踩到的静默丢失。
         aiMarkdownRef.current = aiMarkdown;
     }, [aiMarkdown]);
@@ -780,7 +780,7 @@ export function useLogAnalyzer() {
             const data = await getReportData(id);
             if (!data) return { hasInfo: false, hasPlots: false, hasTrack: false, stale: false };
             // 派生数据的形状随引擎改（多值信息分行、新增 infoDict…）：版本不对就当作"得重新解析"，
-            // 但**照样先用它渲染**——重解析在后台进行，页面不会白一下
+            // 但照样先用它渲染，重解析在后台进行，页面不会白一下
             const stale = data.derivedVersion !== DERIVED_DATA_VERSION;
             if (data.info) setInfo(data.info as LogInfo);
             const panels = data.plotPanels;
@@ -813,17 +813,17 @@ export function useLogAnalyzer() {
      * 打开一份已存档的报告（本机历史 / 云端记录 / 去重命中都走这里）：
      * 1) 先用存档的结论立刻渲染；
      * 2) 本会话刚分析完的，直接沿用内存里的 manifest / 曲线（不等后台落盘）；
-     * 3) 否则读存档的派生数据：**齐全且版本一致**就不用解析；
+     * 3) 否则读存档的派生数据：齐全且版本一致就不用解析；
      * 4) 缺曲线/轨迹，或派生数据是旧版本引擎生成的（造型改过），就退回"拿本机缓存的原始字节
-     *    重新解析"补齐——旧数据先渲染着，解析完自动换成新的。
+     *    重新解析"补齐，旧数据先渲染着，解析完自动换成新的。
      * 返回 reparsing / stale / incomplete 供调用方决定提示文案与是否补一次解析
      * （`incomplete` = 存档里缺曲线或轨迹：本机缓存还在时这里就自己补了；缓存不在时
-     *  **只有调用方手里的原始字节能补**——回一句"已载入历史结论"就完事，等于让那句
+     *  只有调用方手里的原始字节能补，回一句"已载入历史结论"就完事，等于让那句
      *  "重新选择该 .ulg 文件即可恢复"变成空话）。
      */
     const openSaved = useCallback(
         async (saved: Partial<SavedReport>): Promise<{ reparsing: boolean; stale: boolean; incomplete: boolean }> => {
-            // **归一放在这里，不放在调用方。** openSaved 是"打开一份存档"的唯一入口，
+            // 归一放在这里，不放在调用方。openSaved 是"打开一份存档"的唯一入口，
             // 四个调用点里有三个是外部数据：索引库旧记录、云端列表摘要、/api/reports/:id
             // 取回的完整记录（后者是 7 天 TTL 内的任意历史版本写的，字段可能缺）。
             // 以前这几处各自 `as SavedReport` 强转，类型检查被关掉，
@@ -866,7 +866,7 @@ export function useLogAnalyzer() {
             setAiMarkdown(null);
             setDedupeNotice(null);
 
-            // 扩展名只是预筛（文件选择器也拦不住改名文件）：真正的格式判定在引擎里
+            // 扩展名只是预筛（文件选择器也拦不住改名文件）：格式判定在引擎里
             // 按文件头 magic 走（open_log → FORMATS 逐个探测），这里拦的只是明显不对的
             const name = file.name.toLowerCase();
             if (!name.endsWith(".ulg") && !name.endsWith(".bin")) {
@@ -907,7 +907,7 @@ export function useLogAnalyzer() {
                     // 存档是旧引擎生成的、或存档里缺曲线/轨迹，而原始日志又不在本机缓存里
                     // （被容量淘汰、或这份记录来自别的设备）：
                     // 手里正好有刚选中的字节，就用它重新解析一遍补上。
-                    // 少了后半条判断，"重新选择该 .ulg 文件即可恢复轨迹"就成了一句空话——
+                    // 少了后半条判断，"重新选择该 .ulg 文件即可恢复轨迹"就成了一句空话：
                     // 用户照做一遍，回到报告页看到的是同一句提示（存档没变，轨迹还是缺）。
                     let reparsing = opened.reparsing;
                     if (!reparsing && (opened.stale || opened.incomplete)) {
@@ -931,7 +931,7 @@ export function useLogAnalyzer() {
                     return existing.id;
                 }
 
-                // 报告 id 直接用**日志内容指纹**（SHA-256）：地址栏 /log/<hash> 与 .ulg 一一对应，
+                // 报告 id 直接用日志内容指纹（SHA-256）：地址栏 /log/<hash> 与 .ulg 一一对应，
                 // 同一份日志在任何设备、任何浏览器上都是同一个链接，也不会再出现"同一份日志两条历史"。
                 // 非安全上下文（局域网 http）拿不到内容哈希时，退化为大小+时间+文件名，仍是确定的，
                 // 真的都没有才用随机 id。
@@ -954,10 +954,10 @@ export function useLogAnalyzer() {
     );
 
     /**
-     * 报告页的「重新选择该 .ulg 文件」：**就地**用选中的这份字节重解析当前报告，
+     * 报告页的「重新选择该 .ulg 文件」：就地用选中的这份字节重解析当前报告，
      * 把缺的图表/轨迹补齐（报告页不跳走、不清空已渲染的结论）。
      *
-     * 为什么另写一个而不复用 handleFile：handleFile 是"上传新日志"的入口——开头会把
+     * 为什么另写一个而不复用 handleFile：handleFile 是"上传新日志"的入口，开头会把
      * report/info/manifest 清空（报告页会闪一下"未找到该分析报告"），且查重命中时默认不再解析。
      * 这里的前提正好相反：页面已经开着这份报告（id 就是日志指纹），缺的只是派生数据。
      *
@@ -984,7 +984,7 @@ export function useLogAnalyzer() {
                     );
                     return false;
                 }
-                // priorAi：重新解析必须沿用已有的 AI 报告，否则会把花过额度生成的解读覆盖成空
+                // priorAi：重新解析要沿用已有的 AI 报告，否则会把花过额度生成的解读覆盖成空
                 parseBytes(bytes, {
                     name: file.name,
                     size: file.size,
@@ -1006,14 +1006,14 @@ export function useLogAnalyzer() {
         setHistory([]);
     }, []);
 
-    /** 删单条**本机**记录：结论与派生数据一起删；原始日志缓存（nextpilot-cache）保留，
+    /** 删单条本机记录：结论与派生数据一起删；原始日志缓存（nextpilot-cache）保留，
      *  下次再上传同一份日志仍是秒开（缓存上限与淘汰见 log-cache.ts） */
     const deleteLocal = useCallback((id: string) => {
         deleteReport(id);
         setHistory(listReports());
     }, []);
 
-    /** 删单条**云端**记录：调 /api/reports/:id（服务端只允许删自己前缀下的键），删完重拉列表 */
+    /** 删单条云端记录：调 /api/reports/:id（服务端只允许删自己前缀下的键），删完重拉列表 */
     const deleteCloud = useCallback(
         async (id: string) => {
             try {
@@ -1042,9 +1042,9 @@ export function useLogAnalyzer() {
         info,
         aiMarkdown,
         history,
-        // 配额数据继续留在这里（/api/me、explain 响应都在更新它），但**暂无任何界面消费**：
+        // 配额数据继续留在这里（/api/me、explain 响应都在更新它），但暂无任何界面消费：
         // 次数展示 2026-09-21 全线撤掉（上传卡 / AI 解读页 / 我的页），上限以后由后台配置。
-        // 后台配好之后 UI 直接从这里取，不用再动 hook 和取数逻辑——所以别把它当死代码删。
+        // 后台配好之后 UI 直接从这里取，不用再动 hook 和取数逻辑，所以别把它当死代码删。
         quota,
         loggedIn,
         cloudItems,

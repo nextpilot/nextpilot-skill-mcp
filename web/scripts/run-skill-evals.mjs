@@ -8,17 +8,17 @@
  *   node scripts/run-skill-evals.mjs <slug> --e2e        # 跑 evals/e2e.yaml（确定性，不需要 API key）
  *
  * 为什么需要这个：
- *   scripts/check-skill-spec.mjs 只校验**格式**——字段齐不齐、枚举对不对。
+ *   scripts/check-skill-spec.mjs 只校验格式，字段齐不齐、枚举对不对。
  *   但 SKILL.md 本质是 prompt，改一句话可能就让召回率崩掉，
  *   而格式校验会告诉你"一切正常"。这是两套完全不同的失效。
  *
- * e2e 模式的定位（**不需要 API key，可在 CI 里跑**）：
+ * e2e 模式的定位（不需要 API key，可在 CI 里跑）：
  *   evals/e2e.yaml 断言的是 scripts/ 里那些确定性工具的行为，不经过模型。
  *   它守的是"工具对给定输入输出确定的结论"，判据可以直接查字符串、
  *   查退出码，所以跑一次几百毫秒、结果可复现。
  *
  * 为什么不比对精确输出：
- *   模型输出是自然语言，逐字比对必然全红。这里判的是**要素**——
+ *   模型输出是自然语言，逐字比对必然全红。这里判的是要素：
  *   must_mention / must_not_mention 用正则机械查，
  *   judge 交给 LLM-as-judge（用于"有没有拒绝回答"这类没法正则的判据）。
  *
@@ -43,7 +43,7 @@ if (fs.existsSync(path.join(VENV_BIN, "python3"))) {
 
 // 位置参数先滤掉 flag，否则 --e2e 会被当成 skills 目录
 const argv = process.argv.slice(2).filter((a) => !a.startsWith("--"));
-// 默认相对**脚本自身**定位，不依赖 cwd —— 从仓库根或 web/ 跑结果都一样。
+// 默认相对脚本自身定位，不依赖 cwd，从仓库根或 web/ 跑结果都一样。
 // 传第二个位置参数可覆盖（想在临时目录里试改过的 skill 时用）。
 const SKILLS_DIR = path.resolve(argv[1] ?? path.join(import.meta.dirname, "..", "content", "skills"));
 const target = argv[0];
@@ -54,7 +54,7 @@ const E2E = process.argv.includes("--e2e");
 // 不引依赖是为了让脚本能在任何 CI 里跑。如果 cases.yaml 变复杂，
 // 换成 js-yaml 即可。
 //
-// 关键是区分「块标量」和「块序列」——两者都是 key 后面什么都不写，
+// 关键是区分「块标量」和「块序列」，两者都是 key 后面什么都不写，
 // 只能靠下一行的缩进内容判断：
 //     judge: |          → 块标量
 //       文本
@@ -343,7 +343,7 @@ async function runE2E(slug) {
                 encoding: "utf8",
                 stdio: ["ignore", "pipe", "pipe"],
                 // e2e.yaml 里的 run 写的是 `python3`，那到底是哪个 python3 取决于 PATH。
-                // 装 pyulog 的是仓库的 .venv，系统解释器里未必有——于是同一份用例
+                // 装 pyulog 的是仓库的 .venv，系统解释器里未必有，于是同一份用例
                 // 在开发者机器上全绿、在干净 CI 上因为 ImportError 全红，而红的原因是
                 // "环境"，不是"脚本坏了"。这里把 .venv/bin 提到 PATH 最前面，与
                 // .githooks/_venv_python.py 的做法保持一致：钩子、CI、本脚本认同一个解释器。
@@ -379,7 +379,7 @@ if (process.argv.includes("--selftest")) {
     console.log("自检：");
     console.log(`  坏输出应被抓到 ${fails.length} 条 →`, fails.join(" / "));
     console.log(`  好输出应无报错 →`, passes.length === 0 ? "✅ 干净" : `❌ ${passes.join(" / ")}`);
-    // 坏输出必须至少命中一条（实际是 3：缺 2 个必需要素 + 出现 1 个禁止词）
+    // 坏输出至少要命中一条（实际是 3：缺 2 个必需要素 + 出现 1 个禁止词）
     const ok1 = fails.length >= 2 && passes.length === 0;
     console.log(ok1 ? "\n✅ 判据有效" : "\n❌ 判据有问题");
     process.exit(ok1 ? 0 : 1);

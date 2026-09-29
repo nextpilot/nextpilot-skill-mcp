@@ -21,7 +21,7 @@ export default async function LoginPage({
     const params = await searchParams;
     // 仅允许站内相对路径回跳，避免开放重定向。
     // `//` 开头的协议相对 URL（如 `//evil.com`）也满足 startsWith("/")，浏览器会把它解析成
-    // 跳往外站——登录成功后 router.push 直达钓鱼站，必须显式排除。
+    // 跳往外站，登录成功后 router.push 直达钓鱼站，要显式排除。
     const callbackUrl =
         typeof params.callbackUrl === "string" &&
         params.callbackUrl.startsWith("/") &&

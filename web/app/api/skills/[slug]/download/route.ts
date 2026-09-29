@@ -5,11 +5,11 @@ import { getSkillBySlug } from "@/lib/skills";
 import { SKILLS_DIR } from "@/lib/content-dir";
 
 /**
- * GET /api/skills/<slug>/download —— Skill 安装包（zip）下载。
+ * GET /api/skills/<slug>/download：Skill 安装包（zip）下载。
  *
  * 一个 Skill = 一个可整体拷进 `.claude/skills/<slug>/` 的目录，所以安装包打的是
- * **整个目录**（SKILL.md / README / evals / scripts / assets 的 .ulg 素材……），
- * 不只是 SKILL.md——只给单文件，示例日志和脚本就丢了。
+ * 整个目录（SKILL.md / README / evals / scripts / assets 的 .ulg 素材……），
+ * 不只是 SKILL.md，只给单文件，示例日志和脚本就丢了。
  * zip 内带顶层目录 `<slug>/`，解压出来直接就是一个可加载的 Skill 目录。
  *
  * 打包在运行期做（真源 `web/content/skills/` 直读，与其他读取方一致），

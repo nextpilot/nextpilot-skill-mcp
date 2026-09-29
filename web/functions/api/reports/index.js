@@ -1,8 +1,8 @@
-// GET /api/reports —— 当前用户的云端报告列表（元数据，不含 findings/正文）。
+// GET /api/reports：当前用户的云端报告列表（元数据，不含 findings/正文）。
 // 超过 7 天 TTL 的记录惰性删除。
 //
-// ⚠️ 用 `reports/index.js`（而非顶层 reports.js）是为了与同目录的 [id].js 共存：
-// 线上实测（2026-09-28）EdgeOne 会丢弃「与同名文件共存的子目录」——顶层
+// 用 `reports/index.js`（而非顶层 reports.js）是为了与同目录的 [id].js 共存：
+// 线上实测（2026-09-28）EdgeOne 会丢弃「与同名文件共存的子目录」：顶层
 // api/reports.js 存在时，api/reports/[id].js 不被部署（/api/reports/<id> 穿透到 SSR）。
 // 详情/删除见 ./[id].js。
 import { getKv, listAll, reportPrefix, REPORT_TTL_MS } from "../../_lib/kv.js";
@@ -39,7 +39,7 @@ export async function onRequestGet({ request, env, waitUntil }) {
             parserVersion: rec.parserVersion,
             logHash: rec.logHash,
             // 历史卡片用：记录起始时刻、机架编号与软件版本串（源是存档里的 report.facts）
-            // 软件版本串必须一起带上：本地行用 facts.firmwareDisplay 渲染，云端行少了它就会退回
+            // 软件版本串要一起带上：本地行用 facts.firmwareDisplay 渲染，云端行少了它就会退回
             // 裸哈希，同一份日志在两个来源下显示不一样
             startUtc: rec.facts?.startUtc,
             airframeId: rec.facts?.airframeId,

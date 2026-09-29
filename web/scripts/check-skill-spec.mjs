@@ -1,14 +1,14 @@
 /**
  * Skill 目录合规校验：每个 `web/content/skills/<slug>/` 是否真的满足 Agent Skills 规范。
  *
- * 为什么必须有它：转换脚本**跑完就删了原 .mdx**，之后没人再审查这些目录。少了这道校验，
- * 「我们说它合规」就只是一句没有机器背书的话——而规范里 name / description 的约束
- * （长度、字符集、必须与目录名一致）恰好是**手改时最容易顺手破坏**的几项。
+ * 为什么必须有它：转换脚本跑完就删了原 .mdx，之后没人再审查这些目录。少了这道校验，
+ * 「我们说它合规」就只是一句没有机器背书的话，而规范里 name / description 的约束
+ * （长度、字符集、要与目录名一致）恰好是手改时最容易顺手破坏的几项。
  *
  * 规范依据（2026-09-20 核对，口径冲突一律取严）：
  *   - https://agentskills.io/specification
- *     name 1-64 / 仅小写字母数字与连字符 / 不首尾连字符 / 不含 `--` / 必须与父目录名一致
- *     description 1-1024 / 必须同时说清做什么与什么时候用
+ *     name 1-64 / 仅小写字母数字与连字符 / 不首尾连字符 / 不含 `--` / 要与父目录名一致
+ *     description 1-1024 / 要同时说清做什么与什么时候用
  *     metadata 是 string→string 映射（数组与数字都要转成字符串）
  *     顶层只允许 name / description / license / compatibility / metadata / allowed-tools
  *     SKILL.md 正文建议 < 500 行
@@ -18,16 +18,16 @@
  *
  * ## 输出契约（被 mutate_guards.py 解析，改格式前先看那边）
  *
- * 失败行必须是 `  FAIL <规则id> -> <详情>`：自证机按 `<规则id>` 判「**恰好**这一条红」，
+ * 失败行必须是 `  FAIL <规则id> -> <详情>`：自证机按 `<规则id>` 判「恰好这一条红」，
  * 所以规则 id 是稳定契约，不能随文案改。总结行不许写成 `FAIL <名字>`（会被当成一条
- * 检查名，于是每条变异都报"牵连"）——用 `RESULT: N 处未过`。
+ * 检查名，于是每条变异都报"牵连"），用 `RESULT: N 处未过`。
  * 只用 ASCII：Windows 控制台默认 GBK，`✗ ✓ ▶` 这类字符会让读输出的脚本崩掉。
  *
  * ## 内置反例自检（--self-test，默认也跑）
  *
- * 每条规则都配一个**故意违规**的内存反例，断言它真的会把那条规则打红。目的不是测
+ * 每条规则都配一个故意违规的内存反例，断言它真的会把那条规则打红。目的不是测
  * Skill 目录，而是防「守卫恒绿」：把 `if (problems.length)` 改成 `if (false)`、
- * 或把某条判据写反，真目录全绿时**没有任何东西会报警**——只有反例会。
+ * 或把某条判据写反，真目录全绿时没有任何东西会报警，只有反例会。
  *
  * 用法（在 web/ 下）：
  *   node scripts/check-skill-spec.mjs               # 反例自检 + 真目录
@@ -50,7 +50,7 @@ const REQUIRED_META = ["display_name", "category", "platforms", "tags"];
 const DESC_MAX = 200;
 
 /**
- * 分类白名单从 `lib/constants.ts` 的 CATEGORIES 里现读，不在本文件另存一份——
+ * 分类白名单从 `lib/constants.ts` 的 CATEGORIES 里现读，不在本文件另存一份，
  * 存了就是第二份真源，加分类时只改一处会静默漏掉另一处。
  */
 function readCategories() {
@@ -66,7 +66,7 @@ function readCategories() {
 }
 
 /**
- * 单个 Skill 目录的全部问题。纯函数（不碰文件系统）——反例自检要拿内存里的假目录
+ * 单个 Skill 目录的全部问题。纯函数（不碰文件系统），反例自检要拿内存里的假目录
  * 走同一套判据，否则自检测的是另一份逻辑，等于没测。
  *
  * @param {{slug: string, files: string[], raw?: string, changelog?: string, cases?: string,
@@ -154,8 +154,8 @@ export function collectProblems(input) {
     }
 
     // 交叉引用：cases.yaml 里 route_to 标的是"这个问题该转给哪份 Skill"。
-    // 改名时最容易漏的就是这类引用——目录名改了、别处提它的地方没改，于是
-    // 用例断言指向一份不存在的 Skill，跑出来永远是"没转对"，而没人会想到
+    // 改名时最容易漏的就是这类引用，目录名改了、别处提它的地方没改，于是
+    // 用例断言指向一份不存在的 Skill，跑出来一直是"没转对"，而没人会想到
     // 是断言本身过期了。这里把引用表与实际目录对一遍。
     // 用正则而不是解析 YAML：只要拿到那几行值，不值得为它拉整套结构进来。
     const cases = input.cases ?? "";
@@ -172,10 +172,10 @@ export function collectProblems(input) {
 }
 
 // ---------------------------------------------------------------------------
-// 反例自检：每条规则一个**故意违规**的假目录，断言它真的会红。
+// 反例自检：每条规则一个故意违规的假目录，断言它真的会红。
 //
 // 这些反例存在的唯一理由是防「守卫恒绿」。真目录现在是全绿的，于是任何一条判据被写反
-// （阈值写错、正则写反、门被删掉）都表现为空输出 + exit 0——CI 一路放行，直到有人手改
+// （阈值写错、正则写反、门被删掉）都表现为空输出 + exit 0，CI 一路放行，直到有人手改
 // Skill 时才暴露，而那时已经不知道是守卫坏了还是内容坏了。
 // ---------------------------------------------------------------------------
 
@@ -188,9 +188,9 @@ const GOOD_META = `  display_name: "示例"
   seed_downloads: "0"
   featured: "false"`;
 
-// 两条要改 metadata 里某一项的反例**必须整段另写**：在 GOOD_META 后面追加同名键会
+// 两条要改 metadata 里某一项的反例得整段另写：在 GOOD_META 后面追加同名键会
 // 造成 YAML 重复键（js-yaml 直接抛错 -> 走到 frontmatter/parse 那条），于是自检测的是
-// "解析失败"而不是目标规则——恒绿照旧，只是换了个藏法。
+// "解析失败"而不是目标规则，恒绿照旧，只是换了个藏法。
 const META_NUMBER_VALUE = `  display_name: "示例"
   icon: "x"
   category: "perception"
@@ -345,7 +345,7 @@ function selfTest(categories) {
         }
     }
     if (notRed.length > 0) {
-        // 这一条走的是同一套 collectProblems，所以**到不了这里**本身就说明门被删了或判据写反了
+        // 这一条走的是同一套 collectProblems，所以到不了这里本身就说明门被删了或判据写反了
         console.error(
             `  FAIL self-test/guards-fired -> ${notRed.length} 条规则对反例无反应（守卫恒绿）：${notRed.join(", ")}`,
         );

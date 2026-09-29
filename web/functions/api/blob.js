@@ -1,6 +1,6 @@
-// GET/POST/DELETE /api/blob —— EdgeOne Blob 存储管理（本地工具通过此端点操作）。
+// GET/POST/DELETE /api/blob：EdgeOne Blob 存储管理（本地工具通过此端点操作）。
 //
-// 鉴权：必须携带 `x-internal-secret`，值与 AUTH_EDGE_SECRET 一致。
+// 鉴权：要携带 `x-internal-secret`，值与 AUTH_EDGE_SECRET 一致。
 //
 // 操作：
 //   GET  ?store=X&key=Y           下载 blob 原始字节

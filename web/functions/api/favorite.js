@@ -59,7 +59,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
         // 取消收藏不消耗限流额度：额度只拦"新增"，降噪操作不该被误伤
         await kv.delete(key);
     } else {
-        // deviceId 是客户端自报可无限轮换的，新增收藏必须按 IP 兜日限（审计 M9）
+        // deviceId 是客户端自报可无限轮换的，新增收藏要按 IP 兜日限（审计 M9）
         if (!(await checkWriteRateLimit(kv, request, { waitUntil }))) {
             return jsonResponse({ error: "今日收藏次数已达上限" }, 429);
         }

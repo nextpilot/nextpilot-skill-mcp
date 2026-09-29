@@ -38,7 +38,7 @@ export interface ChangelogEntry {
 
 /**
  * Skill 详情页「文件」Tab 里可打开的一个文件（参考 skillhub.cn 的文件浏览器）。
- * 只收文本文件——`.ulg` 等二进制不该被站点当文本展示，也不会进这个列表。
+ * 只收文本文件，`.ulg` 等二进制不该被站点当文本展示，也不会进这个列表。
  */
 export interface SkillFile {
     /** 相对 skill 目录的路径，如 `evals/cases.yaml`、`SKILL.md` */
@@ -133,7 +133,7 @@ export interface LogFacts {
     dropoutTotalMs?: number;
     /** 飞控唯一 ID（sys_uuid / PX4GUID）；SITL 之类没有就是空 */
     uuid?: string;
-    /** 载具**累计**飞行时长（秒），来自参数 LND_FLIGHT_T_HI/LO */
+    /** 载具累计飞行时长（秒），来自参数 LND_FLIGHT_T_HI/LO */
     vehicleLifeS?: number;
     /** 机架编号（参数 SYS_AUTOSTART，如 4040） */
     airframeId?: number;
@@ -186,7 +186,7 @@ export interface LogReportData {
     guardTags?: string[];
     checksRun?: string[];
     checksSkipped?: { ruleId: string; reason: string }[];
-    /** 规则取数时的实例提示（区间越界被截断等）——不是判定结论，是"这份日志没有你写的那么
+    /** 规则取数时的实例提示（区间越界被截断等），不是判定结论，是"这份日志没有你写的那么
      *  多路数据"。与图上的 `SeriesResponse.warnings` 同源，界面上一起进告警栏 */
     instanceNotes?: string[];
     /** 第三层故障知识库命中条目 */
@@ -215,24 +215,24 @@ export interface TopicManifest {
 
 /** np_series() 的返回：LTTB 降采样后的时序，NaN 已转为 null。
  *
- *  `series` 与请求里的 `ydata` **同序等长**（取不到的那条是 null）——前端按预设里
+ *  `series` 与请求里的 `ydata` 同序等长（取不到的那条是 null），前端按预设里
  *  逐项写好的 label / color 对齐即可，不用靠字段名反查（一条线画什么由预设定，
  *  引擎只负责把数取出来、把单位换算掉）。 */
 export interface SeriesResponse {
-    /** 时间基准：**开机以来的秒数**（与 Flight Review 一致） */
+    /** 时间基准：开机以来的秒数（与 Flight Review 一致） */
     t: number[];
     /** 显式声明的横轴（`mode: xyplot`）；null = 横轴就是 `t` */
     x: (number | null)[] | null;
     series: ((number | null)[] | null)[];
     fullCount: number;
-    /** 取数过程中的提示（如"要实例 1~9，这份日志只有 0~2 —— 按 1~2 取"）。
+    /** 取数过程中的提示（如"要实例 1~9，这份日志只有 0~2，按 1~2 取"）。
      *  不是错误：图还是画出来了，只是取到的和写的不完全一样，界面上要给出来 */
     warnings?: string[];
     error?: string;
 }
 
 /** 地图上的一条轨道（`container: map` 的一个 child）。
- *  坐标**已按固件换算成度/米**（候选组按存在性挑、unit= 在引擎侧换算）。 */
+ *  坐标已按固件换算成度/米（候选组按存在性挑、unit= 在引擎侧换算）。 */
 export interface TrackSeries {
     /** 图例名（预设里的 label） */
     label: string;
@@ -246,7 +246,7 @@ export interface TrackSeries {
     dropped?: number;
 }
 
-/** GPS 轨迹（地图用）：np_track() 的产物。**可以多条**——多条叠画 + 图例。 */
+/** GPS 轨迹（地图用）：np_track() 的产物。可以多条，多条叠画 + 图例。 */
 export interface TrackData {
     /** 地图标题（预设里的 container.title） */
     title?: string;
@@ -254,24 +254,24 @@ export interface TrackData {
     legend?: boolean;
     tracks: TrackSeries[];
     error?: string;
-    /** 取不到轨迹的**逐条原因**（有 error 时才有，界面按列表渲染）。
+    /** 取不到轨迹的逐条原因（有 error 时才有，界面按列表渲染）。
      *
-     *  为什么要有它：`error` 只有一句话，而"画不出轨迹"有六种原因，各说各的实话——
+     *  为什么要有它：`error` 只有一句话，而"画不出轨迹"有六种原因，各说各的实话：
      *    ① 日志里没有声明要的 topic（`sensor_gps` / `vehicle_gps_position` 一个都不在）
      *    ② 那个 topic 在，但没有声明里找的坐标字段（字段改了名）
      *    ③ 字段名对得上却取不出值（`ref()` 解析失败）
      *    ④ 那个 topic 没有 `timestamp` 列（轨迹的时间轴取自它）
      *    ⑤ `timestamp` 与 lat/lon/alt 的采样数不一致（同 topic 同实例却长度不同）
      *    ⑥ 有采样但有效定位不足 2 个（坐标全 0 / NaN，或 `fix_type` 一直 < 3）
-     *  只给一句概括时，用户拿到的是**听起来合理但可能是错的**提示——曾经一律说"声明里的坐标
+     *  只给一句概括时，用户拿到的是听起来合理但可能是错的提示；曾经一律说"声明里的坐标
      *  候选都不在日志里"，可实测有两份日志是 ①、另有一份是 ⑥，界面上长得一模一样。
      *  见 CLAUDE.md §6.8。 */
     errorReasons?: string[];
-    /** 出错的**种类**（有 error 时才有）。
-     *  `log-not-loaded` = 这个 Worker 里没装着这份日志（从没解析过，或装的是另一份）——
+    /** 出错的种类（有 error 时才有）。
+     *  `log-not-loaded` = 这个 Worker 里没装着这份日志（从没解析过，或装的是另一份），
      *  重新选择该 .ulg 文件解析一次就能恢复，界面据此给出「重新选择 .ulg 文件」按钮；
      *  其它错误（日志里本来就没有 GPS 等）重选也没用，不给按钮。
-     *  名字说的是**Worker 的状态**，不是这份日志的历史：报告页上的轨迹缺了，往往是
+     *  名字说的是 Worker 的状态，不是这份日志的历史：报告页上的轨迹缺了，往往是
      *  "轨迹没进存档 + 本页没解析过"，而不是"这份日志没被解析过"。 */
     code?: "log-not-loaded";
 }
@@ -304,7 +304,7 @@ export interface ChangedParam {
     value: number | string | null;
 }
 
-/** ULog 的 Parameter Default（'Q' 消息）。PX4 只记录**与当前值不同**的默认值：
+/** ULog 的 Parameter Default（'Q' 消息）。PX4 只记录与当前值不同的默认值：
  *  某个键缺失 = 当前值与该默认相同；整条记录存在 = 该参数被改过。 */
 export interface ParamDefault {
     /** current_setup：机架配置 + 自定义默认文件算出来的默认值 */
@@ -361,7 +361,7 @@ export interface LogInfo {
     /** 逐字节统计是否正好走到文件末尾；false 表示尾部有截断/追加段，统计只是"读到多少算多少" */
     msgTypeWalkOk?: boolean;
     messages: LogMessage[];
-    /** **老存档专用**：'C' 消息。新数据的 'C' 与事件都已并进 messages（按 kind 区分），不再单独发这个字段 */
+    /** 老存档专用：'C' 消息。新数据的 'C' 与事件都已并进 messages（按 kind 区分），不再单独发这个字段 */
     messagesTagged?: LogTaggedMessage[];
     /** Multi Information（固件 boot 日志、性能计数、被排除的话题等） */
     messagesMulti?: LogMultiInfo[];

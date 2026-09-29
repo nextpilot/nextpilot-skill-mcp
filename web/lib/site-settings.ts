@@ -19,8 +19,8 @@ import { fetchSiteSettings } from "./internal-kv";
  * 本模块只负责最后那一跳"把三层压平成一个值"，消费方不该再写 if-else。
  *
  * 加一项配置 = 这张表加一行：表单、校验、审计、类型全跟着走。
- * ⚠️ 同一份 key/kind 在 `web/functions/_lib/settings-schema.js` 还有一份（边缘侧落库前
- * 校验用）。两边必须一致，否则"存进去读不出来"，一致性由步骤 5 的守卫检查。
+ * 同一份 key/kind 在 `web/functions/_lib/settings-schema.js` 还有一份（边缘侧落库前
+ * 校验用）。两边要一致，否则"存进去读不出来"，一致性由步骤 5 的守卫检查。
  */
 export const SETTINGS_FIELDS = [
     { key: "siteName", label: "网站标题（全称）", kind: "text", fallback: SITE_NAME },
@@ -44,7 +44,7 @@ export const SETTINGS_FIELDS = [
     { key: "footerTagline", label: "页脚品牌介绍", kind: "textarea", fallback: FOOTER_TAGLINE, optional: true },
     { key: "sourceUrl", label: "源代码链接", kind: "url", fallback: REPO_URL, optional: true },
     { key: "icp", label: "备案号", kind: "text", fallback: ICP_NUMBER, optional: true },
-    // 服务密钥（第 4 步）：fallback 是空串——**没有代码地板值**，地板是环境变量。
+    // 服务密钥（第 4 步）：fallback 是空串，没有代码地板值，地板是环境变量。
     // 所以消费方一律写 `设置值 || process.env.X`，不能直接用这里的值了事。
     { key: "deepseekApiKey", label: "DeepSeek API Key", kind: "secret", fallback: "", optional: true },
     { key: "smtpPass", label: "SMTP 密码（发信用）", kind: "secret", fallback: "", optional: true },
@@ -75,7 +75,7 @@ let cached: { at: number; value: SiteSettings } | null = null;
  * 当前生效的站点设置。
  *
  * 拿不到覆盖项（KV 没绑 / 内部密钥没配 / 后台没存过）时，每一项都回落到
- * `site-config.ts` 的地板值——所以这个函数永不抛错，网站不会因为没有配置而白屏。
+ * `site-config.ts` 的地板值，所以这个函数永不抛错，网站不会因为没有配置而白屏。
  */
 export async function getSiteSettings(): Promise<SiteSettings> {
     if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.value;
@@ -95,10 +95,10 @@ export function flattenSettings(overrides: Record<string, unknown> | null): Site
 }
 
 /**
- * 给**页面**用的版本：密钥字段只给尾 4 位。
+ * 给页面用的版本：密钥字段只给尾 4 位。
  *
- * ⚠️ 为什么必须有这个函数：`getSiteSettings()` 返回的是**明文**（`mailer.ts` 要拿
- * SMTP 授权码去发信，脱敏了就发不出去）。而后台页要把值当 `initial` 传给表单组件——
+ * 为什么需要这个函数：`getSiteSettings()` 返回的是明文（`mailer.ts` 要拿
+ * SMTP 授权码去发信，脱敏了就发不出去）。而后台页要把值当 `initial` 传给表单组件，
  * 那是客户端组件，props 会被序列化进 SSR 的 HTML。直接传明文等于把密钥写进页面源码，
  * 查看源代码就能拿走。凡是要渲染给浏览器的地方，一律用这个版本。
  */

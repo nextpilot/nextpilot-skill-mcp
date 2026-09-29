@@ -8,9 +8,9 @@ const inputCls =
     "w-56 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-sm text-text placeholder:text-muted focus:border-primary focus:outline-none";
 
 /**
- * 系统消息 tab：ULog 的**键值字典与记录统计**——
- * - **Information Message**（'I'）：变量名 / 取值 / 说明（固件版本、硬件、UUID、boot 时间等）；
- * - **消息记录统计**：逐字节走文件数出来的各类消息条数（'I'/'M'/'P'/'D'…），也是"文件有没有被截断"的旁证。
+ * 系统消息 tab：ULog 的键值字典与记录统计：
+ * - Information Message（'I'）：变量名 / 取值 / 说明（固件版本、硬件、UUID、boot 时间等）；
+ * - 消息记录统计：逐字节走文件数出来的各类消息条数（'I'/'M'/'P'/'D'…），也是"文件有没有被截断"的旁证。
  *
  * Multi Information（'M'）虽然也是字典，但内容多是固件 boot 日志、性能计数这类"发生了什么"，
  * 所以放在「事件消息」tab。说明列取自 facts.yaml 的 info_key_docs，表里没有的键留空。
@@ -30,7 +30,7 @@ export function LogSystemMsg({ info }: { info: LogInfo }) {
         return dict.filter((e) => e.key.toLowerCase().includes(q) || e.value.toLowerCase().includes(q));
     }, [dict, query]);
 
-    // 类型统计是从文件字节流现算的，任何正常日志都不为空 —— 两者都空只可能是老存档（没采集）
+    // 类型统计是从文件字节流现算的，任何正常日志都不为空，两者都空只可能是老存档（没采集）
     if (!hasDict && stats.length === 0) {
         return (
             <p className="rounded-lg bg-surface-2 p-3 text-xs leading-5 text-muted">

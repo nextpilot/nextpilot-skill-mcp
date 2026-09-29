@@ -17,13 +17,13 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 }
 
 /**
- * ⚠️ 这一页**必须保持静态**（不要接 `searchParams` / `headers` 这类动态 API）。
+ * 这一页要保持静态（不要接 `searchParams` / `headers` 这类动态 API）。
  *
  * Skill 清单的真源在 `web/content/skills/<slug>/SKILL.md`（入库），`lib/skills.ts` 读的是那里。
- * 以前读的是 `process.cwd()/../content/skills`——那个目录不在部署包里，页面一旦变成
+ * 以前读的是 `process.cwd()/../content/skills`，那个目录不在部署包里，页面一旦变成
  * 按需渲染，读盘就发生在线上运行时，`getAllSkills()` 返回空数组、页面成了"0 个 Skill"
  * （2026-09-16 线上实测到的就是这个：RSC 里 skills: []）。挪进 `content/skills/` 之后
- * 这个坑填上了，但**静态页仍然更快**：清单每次构建就那么几个文件，没必要每次请求读盘。
+ * 这个坑填上了，但静态页仍然更快：清单每次构建就那么几个文件，没必要每次请求读盘。
  *
  * 所以 `?category=` 的预选改由 SkillExplorer 在浏览器端读 location.search 完成，
  * 首页那几个分类入口照样能跳进对应筛选。

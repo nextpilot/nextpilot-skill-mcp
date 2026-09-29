@@ -1,22 +1,22 @@
-// POST /api/issues —— 浏览器端错误上报的唯一入口（只接收与限流，判定在 _lib/issue-filer.js）。
+// POST /api/issues：浏览器端错误上报的唯一入口（只接收与限流，判定在 _lib/issue-filer.js）。
 //
-// 命名（改名前先读）：这条链三个文件共用 `issue` 词根、各占一个**不重复的角色词**，
+// 命名（改名前先读）：这条链三个文件共用 `issue` 词根、各占一个不重复的角色词，
 // 合起来读成一句"谁采、谁收、谁建单"（见 CLAUDE.md §6.4）：
 //   lib/issue-bridge.ts（bridge：浏览器采集）
 //   → api/issues.js（入口：本文件）→ _lib/issue-filer.js（filer：建单）
-// **文件名即路由**：本文件叫 issues.js，所以 URL 就是 /api/issues，不必再写 `-route` 这类后缀
+// 文件名即路由：本文件叫 issues.js，所以 URL 就是 /api/issues，不用再写 `-route` 这类后缀
 // （那是位置后缀，多写一遍是冗余，文件一挪还撒谎）。
 //
 // 早先叫过 `report-error` / `telemetry`，都不用：
 //   · `report-error` 与 `/api/reports`（飞行分析报告）同前缀反义、并列在一个目录里，
 //     而且它和浏览器侧的模块名只差一个词序，看文件名分不出哪个是路由、哪个是模块；
-//   · `telemetry` 不撞词根，但**语义比这条链实际做的事宽**（这条链只装错误自动建单）。
+//   · `telemetry` 不撞词根，但语义比这条链实际做的事宽（这条链只装错误自动建单）。
 //
 // 为什么不让浏览器直接调 issue API：那等于把 issue token 发给全世界
 // （任何人打开 DevTools 就能拿到写权限）。所以浏览器只 POST 到这里，
 // token 始终留在边缘函数。
 //
-// 这个端点是**公开**的（未登录用户也要能报错），因此：
+// 这个端点是公开的（未登录用户也要能报错），因此：
 //   - 按 IP 日限流，超了直接 429，不给 KV 被刷的机会；
 //   - 限制请求体大小，超大直接拒绝；
 //   - 立刻返回 202，真正的去重与提交放进 waitUntil，不让用户等。
@@ -24,7 +24,7 @@ import { getKv, listAll, sha256Hex, dateStamp, clientIp } from "../_lib/kv.js";
 import { jsonResponse, readJson } from "../_lib/http.js";
 import { reportIssue } from "../_lib/issue-filer.js";
 
-/** 每 IP 每日最多接收阈值。正常用户一天不可能报这么多，超了必是脚本。 */
+/** 每 IP 每日最多接收阈值。正常用户一天不会报这么多，超了多半是脚本。 */
 const DAILY_CAP_PER_IP = 20;
 /** 请求体上限：栈已经由 issue-filer 截到 4KB，这里再挡一道超大 body。 */
 const MAX_BODY_BYTES = 64 * 1024;

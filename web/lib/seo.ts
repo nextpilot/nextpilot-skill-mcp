@@ -59,10 +59,10 @@ export interface PageMeta {
  * 用法：
  *   export function generateMetadata() { return makePageMeta({ ... }); }
  *
- * **为什么是同步的**：域名 / 站名 / 短名全部来自 `@/lib/site-config` 的构建期常量
+ * 为什么是同步的：域名 / 站名 / 短名全部来自 `@/lib/site-config` 的构建期常量
  * （环境变量 + 默认值）。曾经这里是 `async` + `await getSiteSettings()` 读 KV，
  * 为的是「后台改域名后 canonical 立即生效」。代价是每一个调用它的页面都成了动态渲染，
- * CDN 一个字节都缓存不了——首页 TTFB 为此多花 ~1 秒。
+ * CDN 一个字节都缓存不了，首页 TTFB 为此多花 ~1 秒。
  *
  * 站点信息现在改为「改环境变量 + 重新部署」，所以这里可以是纯同步的，
  * 调用方可以直接 `export const metadata = makePageMeta(...)` 静态导出。

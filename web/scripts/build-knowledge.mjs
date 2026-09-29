@@ -49,11 +49,11 @@ import { buildRuleSchema } from "./lib/gen-rule-schema.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(here, "..");
-// knowledge/ 根目录：放**与固件族无关**的资产（第四层 LLM 提示词、给人工抄的骨架模板）。
-// 它们不属于任何族，所以不放在 KN 下——ards/px4 共用同一份。
+// knowledge/ 根目录：放与固件族无关的资产（第四层 LLM 提示词、给人工抄的骨架模板）。
+// 它们不属于任何族，所以不放在 KN 下，ardupilot/px4 共用同一份。
 const KN_ROOT = resolve(webRoot, "../knowledge");
-// ⚠️ `KN` 现在只剩一个用途：PX4 的参数元数据（产物文件名就是 px4-main.json，而 APM 没有
-// `meta/main.json` 这种参数快照）。**别再往它下面挂新东西**——其余一切按族走 FAMILIES。
+// `KN` 现在只剩一个用途：PX4 的参数元数据（产物文件名就是 px4-main.json，而 APM 没有
+// `meta/main.json` 这种参数快照）。别再往它下面挂新东西，其余一切按族走 FAMILIES。
 const KN = resolve(KN_ROOT, "px4");
 
 const ENGINE = resolve(webRoot, "../knowledge/engine"); // 确定性引擎源码（浏览器与本地工具共用一份）
@@ -70,12 +70,12 @@ if (providerFiles.length === 0) throw new Error("knowledge/engine/providers/ 下
 
 // ---------------- 固件族（family）----------------
 // 一族 = knowledge/<族名>/ 下的一整套知识（facts.yaml / rules/ / fault-kb.yaml / plot/）
-//      + knowledge/engine/providers/<族名>.py 里那个**同名**适配器。
-// **两边同名就是唯一的配对规则**：加一种日志格式 = 加一个目录 + 一个同名适配器，本脚本零改动。
+//      + knowledge/engine/providers/<族名>.py 里那个同名适配器。
+// 两边同名就是唯一的配对规则：加一种日志格式 = 加一个目录 + 一个同名适配器，本脚本零改动。
 //
-// 为什么要有这一层：2026-09 之前这些路径是硬编码的 `knowledge/px4/`，于是
-// knowledge/ardupilot/ 那批规则一条都进不了产物——写了、校验了、但永远不会被任何人跑。
-// 知识是**按格式分开**的（码表、阈值、group 都是各自那一套），引擎侧同理按 `log_type` 取用
+// 为什么要有这一层：2026-09 之前这些路径硬编码成 `knowledge/px4/`，于是
+// knowledge/ardupilot/ 那批规则一条都进不了产物，写了、校验了，但不会被任何人跑。
+// 知识按格式分开（码表、阈值、group 都是各自那一套），引擎侧同理按 `log_type` 取用
 // （见 engine.py 的 `_LOG_TYPE_KNOWLEDGE`）。
 const FAMILIES = readdirSync(KN_ROOT, { withFileTypes: true })
     .filter((d) => d.isDirectory())
@@ -112,7 +112,7 @@ const GUIDES_DIR = resolve(webRoot, "content/guide");
 
 /**
  * 产物落盘。`--check` 时只比对不写入：产物是提交进仓库的，所以"改了 knowledge/ 却没重新
- * 生成产物"必须在 CI 里能被发现，而不是等线上跑着旧规则（`pnpm build:kb --check`）。
+ * 生成产物"要在 CI 里能被发现，而不是等线上跑着旧规则（`pnpm build:kb --check`）。
  */
 const CHECK = process.argv.includes("--check");
 const drifted = [];
@@ -281,22 +281,22 @@ function parseFaultKb(text) {
 
 /**
  * 把文本包进 TS String.raw 模板。raw 模板里反斜杠按字面保留（正合 Python 转义），
- * 所以只须转义反引号与 ${ 起始，绝不能转义反斜杠（否则 \\n 会变成 \\\\n）。
+ * 所以只须转义反引号与 ${ 起始，不要去转义反斜杠（否则 \n 会变成 \\n）。
  */
 function toRawTemplate(text) {
     return text.replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
 }
 
 // 框架自己往求值环境里补的名字（不属于 provider，见 providers/api.py 末尾的说明）。
-// `no_data` 曾经在这儿——它随 skip 机制一起退役了（compute 失败现在自动记一条 skipped），
-// 留着会让引用了它的规则构建期放行、运行期 NameError → 那条规则静默失效。
+// `no_data` 曾经在这儿，它随 skip 机制一起退役了（compute 失败现在自动记一条 skipped）。
+// 留着会让引用了它的规则构建期放行、运行期 NameError，那条规则静默失效。
 const FRAMEWORK_VARS = ["has_topic", "log_ok"];
 
 /**
  * 规则表达式能引用的内置变量 = provider 契约的 BUILTIN_VARIABLES + 框架补的两个。
  *
- * **从 knowledge/engine/providers/api.py 派生，不手抄**：这份名字以前是手维护的副本，
- * 与引擎漂移时表现为"构建期放行、运行期 NameError"——引擎按"数据不足"静默处理，
+ * 从 knowledge/engine/providers/api.py 派生，不手抄：这份名字以前是手维护的副本，
+ * 与引擎漂移时表现为"构建期放行、运行期 NameError"。引擎按"数据不足"静默处理，
  * 那条规则从此不出结论，没有任何提示（`no_data` 当初就是这么漏的）。
  */
 const BUILTIN_VARS = new Set([...parseProviderApi(read(PY_PROVIDER_API)).builtinVariables, ...FRAMEWORK_VARS]);
@@ -322,7 +322,7 @@ function parseOperatorSignatures(py) {
             const mm = rest.match(new RegExp(key + "\\s*=\\s*(\\d+)"));
             return mm ? Number(mm[1]) : 1;
         };
-        // 入参个数可以写成**列表**（如 `in_arity=[1, 4]`）：同一种运算接受两种写法时用
+        // 入参个数可以写成列表（如 `in_arity=[1, 4]`）：同一种运算接受两种写法时用
         // （`quat_to_euler` 收一组四列、或收 w/x/y/z 四列）。列表里每个数都是"可以接受的个数"，
         // 构建期逐个放行、别的一律拒绝。
         const arity = (key) => {
@@ -338,9 +338,9 @@ function parseOperatorSignatures(py) {
             return list;
         };
         const names = rest.match(/out_names\s*=\s*\[([^\]]*)\]/);
-        // 紧跟装饰器的 def 的形参名：用来校验**关键字实参名**。
+        // 紧跟装饰器的 def 的形参名：用来校验关键字实参名。
         // node 上的额外键是 `**kw` 直通给算子的，名字写错不会报错、算子会用默认值算出错的结果，
-        // 所以必须在这里拦住。形参里的 **kw / * 会被下面的正则过滤掉。
+        // 所以要在这里拦住。形参里的 **kw / * 会被下面的正则过滤掉。
         const dm = /def\s+[A-Za-z_][A-Za-z0-9_]*\s*\(([\s\S]*?)\)\s*:/.exec(py.slice(re.lastIndex));
         const params = dm
             ? dm[1]
@@ -366,8 +366,8 @@ function parseOperatorSignatures(py) {
 /**
  * 从 providers/api.py 解析契约的三张常量表（格式固定：`NAME = {` 起、顶层键各占一行）。
  *
- * 为什么在 Node 里用正则而不是"跑一下 Python"：构建期**不执行** knowledge/engine/ 下的代码
- * （只当文本搬运，见 knowledge/engine/README.md），这条约定不能破——所以契约表按固定格式解析，
+ * 为什么在 Node 里用正则而不是"跑一下 Python"：构建期不执行 knowledge/engine/ 下的代码
+ * （只当文本搬运，见 knowledge/engine/README.md），这条约定不能破，所以契约表按固定格式解析，
  * 解析不到就构建失败（同 parseOperatorSignatures 的做法）。
  */
 function parseProviderApi(py) {
@@ -390,14 +390,14 @@ function parseProviderApi(py) {
 /**
  * 解析 `BUILTIN_VARIABLES` 每个条目的 `type` 与 `doc`（指南页 §6.1 要用）。
  *
- * `doc` 允许**隐式字符串拼接**（一句太长折成几行相邻字面量），所以是把条目体内所有
- * 字符串字面量收集起来再拼——不要求 `"doc":` 后面只有一个字面量。
+ * `doc` 允许隐式字符串拼接（一句太长折成几行相邻字面量）），所以是把条目体内所有
+ * 字符串字面量收集起来再拼，不要求 `"doc":` 后面只有一个字面量。
  * 只取 `doc` 之后的字面量：`type` 写在它前面，按出现顺序切一刀即可。
  */
 function parseBuiltinVarDocs(body) {
     // 条目有两种写法：一行写完（`"X": {"type": ..., "doc": ...},`）与拆成多行。
-    // 所以不能靠"匹配到 `^    },`"来切——那样会把后面的一行式条目整段吞进来。
-    // 按**下一个顶层键的起点**切才是稳的：条目边界就是 `/^ {4}"NAME":/m`。
+    // 所以不能靠"匹配到 `^    },`"来切，那样会把后面的一行式条目整段吞进来。
+    // 按下一个顶层键的起点切才稳：条目边界就是 `/^ {4}"NAME":/m`。
     const heads = [...body.matchAll(/^ {4}"([A-Za-z_0-9]+)":/gm)];
     const out = {};
     heads.forEach((head, i) => {
@@ -427,11 +427,11 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
     const seen = new Set();
     const byGroup = ruleMeta.by_group ?? {};
     const metaDefaults = ruleMeta.defaults ?? {};
-    // 同一个 group 的多条规则，派生的 category/doc 必须一致——不一致就逼作者显式写，
+    // 同一个 group 的多条规则，派生的 category/doc 要一致，不一致就逼作者显式写，
     // 而不是静默取第一个（否则"改了派生表、却只有一条规则跟着变"没人会发现）。
     const seenMeta = new Map();
 
-    // 先整读一遍：一个 YAML 可以装多条经验——**顶层数组**与**多个 YAML 文档**（`---` 分隔）
+    // 先整读一遍：一个 YAML 可以装多条经验，顶层数组与多个 YAML 文档（`---` 分隔）
     // 两种写法都收。PX4 多数文件一条；APM 那一批全用多文档。
     // （以前只认单文档：APM 规则一进构建就报 MULTIPLE_DOCS，这也是它们迟迟没接线的副作用之一）
     const loaded = files.map((file) => {
@@ -473,7 +473,7 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
                 throw new Error(`${where}: output 必须是数组`);
             }
             // ── 适用范围：一个 conditions 块，六个键都能省（规则与绘图预设共用 normalizeConditions）──
-            // 下面归一化成运行期的形态：两个平铺的轴 + 嵌套的 topics。**没有 skip 这个键**
+            // 下面归一化成运行期的形态：两个平铺的轴 + 嵌套的 topics。没有 skip 这个键
             // （原来那坨 no_data / not has_armed 的判定已退役，理由见 knowledge/px4/CLAUDE.md）。
             // 退役的顶层键：不静默忽略，写错了要当场知道
             for (const [key, hint] of [
@@ -509,7 +509,7 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
             const gm = byGroup[raw.group];
             if (raw.category === undefined) raw.category = gm.category;
             if (raw.docurl === undefined && gm.doc !== undefined) raw.docurl = gm.doc;
-            // 同 group 的多条规则必须派生出同样的 category/doc
+            // 同 group 的多条规则要派生出同样的 category/doc
             for (const [field, val] of [
                 ["category", raw.category],
                 ["docurl", raw.docurl],
@@ -529,8 +529,8 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
             if (Array.isArray(raw.compute) && raw.compute.length === 0) {
                 throw new Error(`${where}: compute 必须是非空数组`);
             }
-            // compute 是一串**字符串表达式**（与 triggers.when / skip.when 同一套 Python 子集）；
-            // **算子节点**（旧）。旧写法在这里编译成等价表达式，于是产物里只有一种形态、
+            // compute 是一串字符串表达式（与 triggers.when / skip.when 同一套 Python 子集）；
+            // 算子节点（旧）。旧写法在这里编译成等价表达式，于是产物里只有一种形态、
             // 也只有一套校验（不写第二套）。运行期由 knowledge/engine/engine.py 的 _eval_compute 求值。
             const compute = (raw.compute ?? []).map((item) => normalizeCompute(item, where));
             if (compute.length > 0) {
@@ -547,7 +547,7 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
                 throw new Error(`${where}: trigger 必须是非空数组`);
             }
             // foreach：把「事件列表」展开成多条 finding。事件 dict 的键（如 t_s / name）
-            // 会叠加进模板环境，因此必须显式声明 keys，才能继续做占位符校验。
+            // 会叠加进模板环境，所以要显式声明 keys，才能继续做占位符校验。
             const eventKeys = new Set();
             if (raw.foreach) {
                 const fe = typeof raw.foreach === "string" ? { var: raw.foreach } : raw.foreach;
@@ -573,7 +573,7 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
                 if (!t.evidence || typeof t.evidence !== "object")
                     throw new Error(`${where}: trigger 缺 evidence 对象`);
                 if (typeof t.evidence.source !== "string") throw new Error(`${where}: trigger.evidence 缺 source`);
-                // 表达式里的标识符必须已声明（内置变量 / compute 输出 / foreach 事件键）
+                // 表达式里的标识符要已声明（内置变量 / compute 输出 / foreach 事件键）
                 const whenList = Array.isArray(t.when) ? t.when : [t.when || "True"];
                 for (const w of whenList) {
                     if (typeof w !== "string") continue;
@@ -643,7 +643,6 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
 // 把 knowledge/engine/ 源码的算子签名与内置变量渲染成 /guide/rule-schema 那一页（算子目录与内置变量表动态派生）。
 // 与引擎产物同源、同一次构建生成：规则/算子改了页面就跟着变，不用谁记得手动同步。
 // 清单与参考页只出网站这一份，仓库里不留第二份拷贝（免得两处对不上）。
-
 const GROUP = { zh: "开发指南", en: "For Developers" };
 
 const CATALOGUE_INTRO = `引擎当前内置的 **{n} 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
@@ -657,13 +656,13 @@ const CATALOGUE_INTRO = `引擎当前内置的 **{n} 条检查经验**，按执�
 const listOr = (v, fallback) => (Array.isArray(v) ? v.join(",") : v === undefined || v === null ? fallback : String(v));
 
 /**
- * `ref(..., unit="deg")` 的**源单位**从哪来：`meta/<tag>.json`（经 `meta/topic-map.yaml`
- * 换字典键），`meta/topic-overrides.yaml` 可补/纠——meta 是生成的，单位常缺失或直接是
+ * `ref(..., unit="deg")` 的源单位从哪来：`meta/<tag>.json`（经 `meta/topic-map.yaml`
+ * 换字典键），`meta/topic-overrides.yaml` 可补/纠。meta 是生成的，单位常缺失或直接是
  * `.msg` 注释里的自由文本（`metres` / `radians` / `'stop the motors'` 混在一起）。
  *
- * **只收录写了 `unit=` 的引用**涉及的字段：没写的一个都不查，所以 meta 的脏数据卡不住
- * 现有规则。查不到 → **告警**（不是失败）：那条留空，运行期按原样给、不换算。
- * 目标单位（作者写的那个）认不出、或与源单位不同量纲 → 构建失败。
+ * 只收录写了 `unit=` 的引用涉及的字段：没写的一个都不查，所以 meta 的脏数据卡不住
+ * 现有规则。查不到就告警（不是失败）：那条留空，运行期按原样给、不换算。
+ * 目标单位（作者写的那个）认不出、或与源单位不同量纲，就构建失败。
  */
 function resolveFieldUnits(refs, metaDir) {
     const topicMap = parseYaml(read(resolve(metaDir, "topic-map.yaml"))).topics ?? {};
@@ -708,7 +707,7 @@ function resolveFieldUnits(refs, metaDir) {
     const out = {};
     const unknown = [];
     for (const fldRaw of [...wanted.keys()].sort()) {
-        // 实例号写在 topic 后（`vehicle_gps_position[-1].lat`）——单位表的键去掉它
+        // 实例号写在 topic 后（`vehicle_gps_position[-1].lat`），单位表的键去掉它
         const fld = fldRaw.replace(/\[[^\]]*\]\./, ".");
         const [topic, field] = fld.split(".");
         const dictKey = topicMap[topic] ?? topic;
@@ -743,10 +742,10 @@ function resolveFieldUnits(refs, metaDir) {
 /**
  * 机架名归一化：`mc` / `fw` 这类简写换成规范名（表在 facts.yaml 的 `vehicle_aliases`）。
  *
- * 简写只是**书写方便**：产物里只留规范名，所以引擎 `_match_vehicle` 与各适配器都不用
- * 认识别名——"同一个意思只留一种写法"这条在运行时那边成立。
- * 表里没有、又不在合法机架名集合（facts.yaml 的 `vehicle_types` 值 + unknown）里的 → 报错，
- * 不静默放过（写错的机架名会让那条经验**永远不跑**，最难发现的一种坏）。
+ * 简写只是书写方便：产物里只留规范名，所以引擎 `_match_vehicle` 与各适配器都不用
+ * 认识别名，"同一个意思只留一种写法"这条在运行时那边成立。
+ * 表里没有、又不在合法机架名集合（facts.yaml 的 `vehicle_types` 值 + unknown）里的就报错，
+ * 不静默放过（写错的机架名会让那条经验不会跑，最难发现的一种坏）。
  */
 function normalizeVehicle(spec, vehicles, where) {
     const canon = (name) => {
@@ -763,23 +762,23 @@ function normalizeVehicle(spec, vehicles, where) {
 }
 
 // ─────────────────────────── 绘图预设（plot/*.yml）───────────────────────────
-// 曲线与地图**共用一套声明**：conditions（适用范围，与规则同形）+ 可选的 compute（换算）
+// 曲线与地图共用一套声明：conditions（适用范围，与规则同形）+ 可选的 compute（换算）
 // + outputs[]（容器 = 一张图 or 地图，children = 图上的线 / 地图上的轨道）。
 // 取数一律走 ref 那套语言（候选组 + unit=），所以"字段换代、改了量纲"在图上与规则里是
 // 同一种写法，单位也共用同一张表（resolveFieldUnits）。
 
 /** 图的两种模式；`track` 只出现在 `container: map` 的 child 上 */
 const CHART_MODES = new Set(["TimeSeries", "xyplot"]);
-/** 线型取值：三个通用叫法（渲染时映射到绘图库的线型；**不自造 `-^` 那种格式串**） */
+/** 线型取值：三个通用叫法（渲染时映射到绘图库的线型；不自造 `-^` 那种格式串） */
 const LINE_STYLES = new Set(["solid", "dashed", "dotted"]);
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 /**
- * 与 `ydata` **逐项对齐**的并列键（`label` / `style` / `color`）——必须是 **YAML 列表**。
+ * 与 `ydata` 逐项对齐的并列键（`label` / `style` / `color`），要是 YAML 列表。
  *
  * 为什么不用逗号串：这三个都是枚举/普通字符串，让 YAML 自己切既准确又能报到位；
- * 而且颜色是 `#rrggbb`，逗号串形态下**没法写**（YAML 不允许标量以引号开头，`#` 不加引号
- * 又会被当注释，只能绕块标量）。表达式那一列（`ydata`）仍走逗号串——它必须由
+ * 而且颜色是 `#rrggbb`，逗号串形态下没法写（YAML 不允许标量以引号开头，`#` 不加引号
+ * 又会被当注释，只能绕块标量）。表达式那一列（`ydata`）仍走逗号串，它得由
  * `parseExprList` 认引号与括号。
  */
 function parallelList(raw, n, where, what, check) {
@@ -804,10 +803,10 @@ function parallelList(raw, n, where, what, check) {
 }
 
 /**
- * 一个取数声明（`xdata`、地图的 `lat`…）→ 运行期描述。**单个**必须是字符串。
+ * 一个取数声明（`xdata`、地图的 `lat`…）→ 运行期描述。单个要是字符串。
  *
- * 带 `unit=` 的引用在这里登记进单位表（源单位在 meta/<tag>.json 查，见 resolveFieldUnits）——
- * **在编译处登记**，不靠事后遍历产物猜形状：地图坐标编译后不是同一个形状，遍历会漏。
+ * 带 `unit=` 的引用在这里登记进单位表（源单位在 meta/<tag>.json 查，见 resolveFieldUnits），
+ * 在编译处登记，不靠事后遍历产物猜形状：地图坐标编译后不是同一个形状，遍历会漏。
  */
 function compileFieldOne(raw, where, what, declaredVars, refs) {
     if (typeof raw !== "string" || !raw.trim()) {
@@ -825,7 +824,7 @@ function compileFieldOne(raw, where, what, declaredVars, refs) {
     return desc;
 }
 
-/** 一条线一个取数声明（`ydata`）→ 运行期描述数组。**必须是 YAML 列表**，与 label/style/color 同形。 */
+/** 一条线一个取数声明（`ydata`）→ 运行期描述数组。要是 YAML 列表，与 label/style/color 同形。 */
 function compileFieldList(raw, where, what, declaredVars, refs) {
     if (!Array.isArray(raw)) {
         throw new Error(
@@ -890,10 +889,10 @@ function containerSwitches(out, where) {
 }
 
 /**
- * `container: axes` → 一张图。**单位一致性在这里卡住**：同一张图里写了 `unit=` 的引用必须
- * 目标单位相同（一图一量纲 —— `eph`(m) 与 `hdop`(无量纲) 画在一个 y 轴上没法读）。
+ * `container: axes` → 一张图。单位一致性在这里卡住：同一张图里写了 `unit=` 的引用要
+ * 目标单位相同（一图一量纲，`eph`(m) 与 `hdop`(无量纲) 画在一个 y 轴上没法读）。
  * `split_by_instance` 要求图上有 `[:]` 的引用（否则拆不出多张图）；反过来，没有 `split_by_instance`
- * 的图不许出现 `[:]`（那会取到一组实例，引擎会报错——不如在这里说清楚）。
+ * 的图不许出现 `[:]`（那会取到一组实例，引擎会报错，不如在这里说清楚）。
  */
 function compileAxes(out, where, declaredVars, refs) {
     const switches = containerSwitches(out, where);
@@ -969,7 +968,7 @@ function compileAxes(out, where, declaredVars, refs) {
 
 /**
  * `container: map` → 轨迹声明（进 `facts.track`，由 provider 在引擎侧取数、换算、抽稀）。
- * 三个坐标都必须写明实例：同一条轨道的时间戳与 `fix_type` 得跟坐标来自同一个 topic 的
+ * 三个坐标都要写明实例：同一条轨道的时间戳与 `fix_type` 得跟坐标来自同一个 topic 的
  * 同一个实例，否则三路采样率不同、画出来是错的。
  */
 function compileMap(out, where, declaredVars, refs) {
@@ -1024,15 +1023,15 @@ function compileMap(out, where, declaredVars, refs) {
 /**
  * 把预设的适用范围（`conditions`）附到地图声明上（它会进 `facts.track`）。
  *
- * 地图与曲线**共用同一份声明**，但判据在两头：曲线在前端按 `conditions.topics` 判适用性
+ * 地图与曲线共用同一份声明，但判据在两头：曲线在前端按 `conditions.topics` 判适用性
  * （`web/lib/chart-presets.ts` 的 `presetApplies`），地图的判据在引擎侧
  * （`knowledge/engine/providers/px4.py` 的 `get_flight_track`）。`facts.track` 以前只带 `children`，
- * 于是引擎**看不到这句声明**，取不到坐标时只能笼统报"声明里的坐标候选都不在日志里"——
+ * 于是引擎看不到这句声明，取不到坐标时只能笼统报"声明里的坐标候选都不在日志里"，
  * 而真相常常是"这份日志根本没有 `sensor_gps` / `vehicle_gps_position`"。带上声明之后，
- * 引擎就能复用 `engine._missing_topics` 说清缺哪个 topic（**文案只在那里生成一处**）。
+ * 引擎就能复用 `engine._missing_topics` 说清缺哪个 topic（文案只在那里生成一处）。
  *
  * 只认 `topics`：固件 / 机架 / 先决条件这三个轴，引擎的地图路径没有求值器（规则的闸门是
- * 内联在 `_run_rules` 里的）。写了非默认值就在**构建期**报错，别让它在运行期悄悄不生效。
+ * 内联在 `_run_rules` 里的）。写了非默认值就在构建期报错，别让它在运行期悄悄不生效。
  */
 function withMapConditions(map, conditions, where) {
     const unsupported = ["firmware", "vehicle"].filter((k) => conditions[k] && conditions[k] !== "any");
@@ -1062,7 +1061,7 @@ function compilePreset(spec, where, vehicles) {
     let declaredVars = new Set();
     if (compute.length) {
         try {
-            // 与规则的 compute **同一个校验器**：左值个数对得上算子、引用的名字已声明、算子已注册
+            // 与规则的 compute 同一个校验器：左值个数对得上算子、引用的名字已声明、算子已注册
             declaredVars = new Set(validateComputeList(compute, { signatures, builtinVars: BUILTIN_VARS }).keys());
         } catch (err) {
             throw new Error(`${where}: compute ${err.message}`);
@@ -1127,19 +1126,19 @@ function loadPresets(dir, vehicles) {
 }
 
 /**
- * 适用范围（`conditions`）→ 运行期形态。**规则与绘图预设共用这一处**（别造第三种方言）：
+ * 适用范围（`conditions`）→ 运行期形态。规则与绘图预设共用这一处（别造第三种方言）：
  *
  *   firmware  固件约束串（any / ">=1.15" / ">=1.14,<1.15"），由 provider.match_version 解释
  *   vehicle  any / 机架名 / 机架名列表；简写（mc / fw）在这里换成规范名
  *   topics    日志里得有这些 topic，缺了记一条 skipped；项内 `||` = 任意一个存在即可
- *   mode      与 topics **同形**，但比的是「日志里出现过哪些飞行模式」（MODES_PRESENT）
+ *   mode      与 topics 同形，但比的是「日志里出现过哪些飞行模式」（MODES_PRESENT）
  *   armed     解锁：any（缺省）/ true / false / ">12"（对 ARMED_S 求值的门槛，秒）
  *   placeholder  这条经验还没实现，引擎跳过并把这句当原因显示（占位专用）
  *
- * 后三个**只有规则这边用得上**：绘图预设的 conditions 由前端按 topics 判适用性，
- * 拿不到 MODES_PRESENT / ARMED_S，写了会在运行期悄悄不生效——所以预设侧直接拦掉。
+ * 后三个只有规则这边用得上：绘图预设的 conditions 由前端按 topics 判适用性，
+ * 拿不到 MODES_PRESENT / ARMED_S，写了会在运行期悄悄不生效，所以预设侧直接拦掉。
  *
- * 没写的键**省略掉**——产物里不留空壳。退役的顶层键（skip / ran_on_success / known_legacy）
+ * 没写的键省略掉，产物里不留空壳。退役的顶层键（skip / ran_on_success / known_legacy）
  * 由调用方各自拦（规则那边有历史包袱，预设那边写了直接报错）。
  */
 function normalizeConditions(raw, where, vehicles) {
@@ -1198,7 +1197,7 @@ function normalizeConditions(raw, where, vehicles) {
 /**
  * `conditions.mode` → 候选组的数组，与 `topics` 同形（项内 `||` = 任一，项间 = 都要）。
  * 校验只做形状：模式名是日志原文（APM 的 `AUTO` / `LOITER`，PX4 也是字符串），
- * 不做码表比对——码表是 facts 的事，且老固件总有表外的模式名。
+ * 不做码表比对，码表是 facts 的事，且老固件总有表外的模式名。
  */
 function parseModeSpec(spec, where) {
     if (spec === undefined) return [];
@@ -1320,7 +1319,7 @@ const SLOT_LABEL = {
 
 function renderCatalogue(rules, sources) {
     // 按码点比较而非 localeCompare：后者的结果随机器 ICU 语言环境变化，
-    // 生成产物必须逐字节可复现（group 名都是 ASCII，码点序就是稳定序）
+    // 生成产物要逐字节可复现（group 名都是 ASCII，码点序就是稳定序）
     const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
     const bySlot = rules
         .map((raw, i) => ({ file: sources[i], raw }))
@@ -1679,16 +1678,16 @@ Python \`str.format_map\` 支持的格式：
 
 const banner = `// ⚠️ 自动生成，请勿手改。源文件在 knowledge/（按固件族分目录）与 knowledge/engine/，改完跑 \`pnpm build:kb\`（dev/build 自动执行）。\n`;
 
-// 整份构建按顺序写在一个函数里（`--watch` 要复用它重建）。下面这两个是**唯一**被深层函数读到的值：
+// 整份构建按顺序写在一个函数里（`--watch` 要复用它重建）。下面这两个是唯一被深层函数读到的值：
 // `signatures` 被 compileFieldOne / compilePreset 读，`operatorsPy` 被 renderSchemaPage 读。
-// 它们必须声明在模块级而不是 build() 里——放进 build() 就成了函数的自由变量，运行时报
+// 它们要声明在模块级而不是 build() 里，放进 build() 就成了函数的自由变量，运行时报
 // "xxx is not defined"。新增这种跨层读取的值时，照这里的样子提上来。
 let signatures;
 let operatorsPy;
 
 /**
  * 跑一次完整构建。写成函数是为了给 `--watch` 复用同一段逻辑：
- * 不能靠重新 import 本模块来重建——那样每改一次就多一层模块状态。
+ * 不能靠重新 import 本模块来重建，那样每改一次就多一层模块状态。
  */
 function build() {
     operatorsPy = read(OPERATORS_PY);
@@ -1697,13 +1696,13 @@ function build() {
     const enginePy = read(PY_ENGINE);
 
     // ---- 每一族各自编译一遍：规则 / 数据 / 故障库 / 单位表 ----
-    // 四样东西都是**按 log_type 分开**的（见 FAMILIES 的注释）。产物里它们长成
+    // 四样东西都是按 log_type 分开的（见 FAMILIES 的注释）。产物里它们长成
     // `{log_type: ...}`，引擎按文件头认出格式后取下标（engine.py 的 _LOG_TYPE_KNOWLEDGE）。
     const rulesByLogType = {};
     const factsByLogType = {};
     const fieldUnitsByLogType = {};
     const kbByLogType = {};
-    // 合并视图只给**跨族**的产物用（规则清单页、编辑器 schema、总数打印）
+    // 合并视图只给跨族的产物用（规则清单页、编辑器 schema、总数打印）
     const allRules = [];
     const allSources = {};
     const allVehicles = new Set(["unknown"]);
@@ -1712,10 +1711,10 @@ function build() {
     const plotsByLogType = {};
 
     for (const fam of FAMILIES) {
-        // 1) 故障库：族里没有 fault-kb.yaml 就是**空库**（第三层检索可选），不是错误
+        // 1) 故障库：族里没有 fault-kb.yaml 就是空库（第三层检索可选），不是错误
         kbByLogType[fam.logType] = existsSync(fam.faultKbPath) ? parseFaultKb(read(fam.faultKbPath)) : [];
 
-        // 2) facts.yaml 要在规则校验**之前**读：规则的 category / doc / 身份块默认值都在 rule_meta 里
+        // 2) facts.yaml 要在规则校验之前读：规则的 category / doc / 身份块默认值都在 rule_meta 里
         const facts = parseYaml(read(fam.factsPath));
         const vehicles = {
             // 简写 → 规范名（facts.yaml 里的人工数据）；合法名 = vehicle_types 的值 + unknown
@@ -1726,10 +1725,10 @@ function build() {
         const { rules, sources } = loadRules(fam.rulesDir, signatures, facts.rule_meta ?? {}, vehicles);
         // guards via triggers[].severity: guard, validated in loadRules already
 
-        // 3) 绘图预设（plot/*.yml）—— 曲线与地图**同一套声明**。编译结果两处消费：
+        // 3) 绘图预设（plot/*.yml）：曲线与地图同一套声明。编译结果两处消费：
         //    · 曲线与布局 → plots.generated.ts（前端）
         //    · `container: map` 那一份 → facts.track（provider 在引擎侧取数、换算、抽稀）
-        //    族里没有 plot/ 就是没有曲线声明（APM 目前如此）：**不报错**，产一份空的。
+        //    族里没有 plot/ 就是没有曲线声明（APM 目前如此），不报错，产一份空的。
         const hasPlots = existsSync(fam.plotDir);
         const {
             plots,
@@ -1743,7 +1742,7 @@ function build() {
             : [];
         facts.track = mapSpec ?? {};
         // 单位表：规则与预设里所有写了 `unit=` 的引用一起查（源单位在 meta/<tag>.json，见
-        // resolveFieldUnits）。**没有 meta/ 目录的族不换算**（APM：单位声明在 FMTU 里、没核对过）
+        // resolveFieldUnits）。没有 meta/ 目录的族不换算（APM：单位声明在 FMTU 里、没核对过）
         const ruleRefs = rules.flatMap((r) =>
             (r.compute ?? []).flatMap((expr) => collectRefs(expr).map((x) => ({ where: r.id, ...x }))),
         );
@@ -1757,10 +1756,10 @@ function build() {
         for (const g of facts.group_order ?? []) allGroups.add(g);
 
         // ---------------- facts.yaml 的形状校验（按族）----------------
-        // 必填键分两类，这不是偷懒而是**各族的知识本来就不一样全**：
-        //   · 通用（每族都要）：group_order / vehicle_types / rule_meta —— 引擎机制直接靠它们
+        // 必填键分两类，这不是偷懒而是各族的知识本来就不一样全：
+        //   · 通用（每族都要）：group_order / vehicle_types / rule_meta，引擎机制直接靠它们
         //     （group_order 决定执行顺序、rule_meta 给规则派生身份、vehicle_types 校验机架约束）
-        //   · 格式专有（**给了才查形状**）：nav_state_* / ulog_msg_types / info_key_docs /
+        //   · 格式专有（给了才查形状）：nav_state_* / ulog_msg_types / info_key_docs /
         //     sys_info_keys / log_levels 全是 PX4 的 ULog 码表，APM 一份都没有。
         //     一刀切必填的后果是"要么照抄一遍假码表、要么进不了产物"，两条路都是编造。
         for (const key of ["group_order", "vehicle_types", "rule_meta"]) {
@@ -1803,7 +1802,7 @@ function build() {
         if (!Array.isArray(facts.group_order) || facts.group_order.length === 0) {
             throw new Error(`knowledge/${fam.key}/facts.yaml 的 group_order 不能为空`);
         }
-        // 经验声明的 group 必须已登记在本族的 group_order 里——否则那条经验**永远不会被执行**
+        // 经验声明的 group 要已登记在本族的 group_order 里，否则那条经验不会被执行
         // （引擎按 group_order 逐个 group 跑），且失败是静默的。宁可构建失败。
         const knownGroups = new Set(facts.group_order);
         for (const r of rules) {
@@ -1813,7 +1812,7 @@ function build() {
                 );
             }
         }
-        // 曲线**按族**存（APM 没有 plot/ 就是空数组），但**适用性不看族**：
+        // 曲线按族存（APM 没有 plot/ 就是空数组），但适用性不看族：
         // 一张图出不出由它自己的 `conditions.topics` 与这份日志的 manifest 决定，
         // 而 topic 名本身就是各格式的命名空间（vehicle_attitude 不会出现在 .bin 里）。
         plotsByLogType[fam.logType] = plots.map(({ order: _order, ...rest }) => rest);
@@ -1825,12 +1824,12 @@ function build() {
     writeArtifact(
         resolve(outWorkers, "fault-kb.generated.json"),
         // 不写 generatedAt：时间戳会让产物每次构建都产生 diff（而它没有任何消费者），
-        // 产物应当可复现 —— 同样的 knowledge/ 输入必须得到逐字节相同的输出。
+        // 产物应当可复现，同样的 knowledge/ 输入要得到逐字节相同的输出。
         // entries 按 log_type 分组：引擎只取这一份日志那一族的条目。
         JSON.stringify({ entries: kbByLogType }, null, 2) + "\n",
     );
     // 单位词表在两边各有一份（构建期管"别名 → 规范名"，运行期管"规范名 → 换算因子"），
-    // 规范名必须一模一样。各改各的会静默换算出错数，所以在这里比一次。
+    // 规范名要一模一样。各改各的会静默换算出错数，所以在这里比一次。
     {
         const pyUnits = enginePy.slice(enginePy.indexOf("_UNIT_FACTORS"));
         const names = [...pyUnits.matchAll(/^\s{4}"([a-z0-9]+)":\s*\(/gm)].map((m) => m[1]);
@@ -1844,12 +1843,12 @@ function build() {
             );
         }
     }
-    // （各族 facts.yaml 的形状校验与 group 登记检查在族循环里做完了——它们是按族的）
+    // （各族 facts.yaml 的形状校验与 group 登记检查在族循环里做完了，它们是按族的）
     // ---------------- provider 契约：构建期查"漏写" ----------------
-    // 契约的事实源是 knowledge/engine/providers/api.py 的两张常量表。这里查每个适配器是否**定义了**
+    // 契约的事实源是 knowledge/engine/providers/api.py 的两张常量表。这里查每个适配器是否定义了
     // 契约要求的能力、builtin_variables() 的字典字面量键是否齐全。
-    // 查不了运行时行为（类型、失败语义）——那两道在引擎的运行期自检与
-    // tools/engine/guard-px4log-provider.py 里，三道合起来才是完整的一道关。
+    // 查不了运行时行为（类型、失败语义），那两道在引擎的运行期自检与
+    // tools/engine/guard-px4log-provider.py 里，三道合起来才是一道完整的关。
     const providerApi = parseProviderApi(read(PY_PROVIDER_API));
     for (const f of providerFiles) {
         const src = read(resolve(PROVIDER_DIR, f));
@@ -1864,7 +1863,7 @@ function build() {
                 );
             }
         }
-        // builtin_variables() 必须给出契约里列的每一个内置变量——少一个，引用它的规则会**静默**算不出数据
+        // builtin_variables() 要给出契约里列的每一个内置变量，少一个，引用它的规则就会静默算不出数据
         const body = src.slice(src.indexOf("def builtin_variables("));
         const cut = body.indexOf("\n    def ", 10);
         const sem = cut === -1 ? body : body.slice(0, cut);
@@ -1882,10 +1881,10 @@ function build() {
         enginePy,
     ].join("\n");
 
-    // 四个占位符在拼接后的 Python 里**必须恰好出现一次**。
-    // 产物用的是 JS 的 `.replace()`——**只换第一处**：多出来的那一处（往往只是某段注释里提了一句
-    // `__FACTS__`）会把真正的赋值挡在替换范围之外，浏览器里报 `NameError: name '__FACTS__' is not
-    // defined`、整份日志都解析不了；而本地回归与 Python 的 `str.replace` 都是全换 → 本地全绿、线上打不开。
+    // 四个占位符在拼接后的 Python 里要恰好出现一次。
+    // 产物用的是 JS 的 `.replace()`，只换第一处：多出来的那一处（往往只是某段注释里提了一句
+    // `__FACTS__`）会把实际的赋值挡在替换范围之外，浏览器里报 `NameError: name '__FACTS__' is not
+    // defined`、整份日志都解析不了；而本地回归与 Python 的 `str.replace` 都是全换，本地全绿、线上打不开。
     // 2026-09-17 就是这么挂的（provider 注释里提到占位符），所以这里按"恰好一次"卡住，不按"存在"。
     for (const ph of ["__FAULT_KB__", "__RULES__", "__FACTS__", "__FIELD_UNITS__"]) {
         const n = pyWithOperators.split(ph).length - 1;
@@ -1902,12 +1901,12 @@ function build() {
         resolve(outWorkers, "analysis-engine.generated.ts"),
         banner +
             'import faultKbJson from "./fault-kb.generated.json";\n\n' +
-            // 四样知识**都按 log_type 分组**：引擎按文件头认出格式后取自己那一套
+            // 四样知识都按 log_type 分组：引擎按文件头认出格式后取自己那一套
             // （见 engine.py 的 _LOG_TYPE_KNOWLEDGE）。名字不换，形状从"一份"变成"按族一份"。
             "const rules = " +
             JSON.stringify(rulesByLogType) +
             ";\n" +
-            // facts 也必须在此声明：下面的 .replace 链在模块加载时求值，缺声明就是 ReferenceError
+            // facts 也要在此声明：下面的 .replace 链在模块加载时求值，缺声明就是 ReferenceError
             "const facts = " +
             JSON.stringify(factsByLogType) +
             ";\n\n" +
@@ -1941,10 +1940,10 @@ function build() {
     );
 
     // 4.5) 绘图预设 → web/lib/knowledge/plots.generated.ts
-    // 与引擎产物不同，这一份是**纯前端**渲染用（不进 Pyodide），所以单独生成一个 ESM 文件。
-    // 内容已在上面编译并校验过（loadPresets）：这里只负责写出来。
-    // **按 log_type 分组**（与 rules / facts 同款）：没有 plot/ 的族给空数组，
-    // 而不是拿别人的图来凑——那会在 APM 日志上画出 PX4 的曲线。
+    // 与引擎产物不同，这一份是纯前端渲染用（不进 Pyodide），所以单独生成一个 ESM 文件。
+    // 内容已在上面编译并校验过（loadPresets），这里只负责写出来。
+    // 按 log_type 分组（与 rules / facts 同款）：没有 plot/ 的族给空数组，
+    // 而不是拿别人的图来凑，那会在 APM 日志上画出 PX4 的曲线。
     writeArtifact(
         resolve(webRoot, "lib/knowledge/plots.generated.ts"),
         banner +
@@ -1954,17 +1953,17 @@ function build() {
             " as const;\n",
     );
 
-    // 4.6) 派生数据版本：**内容哈希**，不是手写常量——改了数据层就会出现新值，
+    // 4.6) 派生数据版本：内容哈希，不是手写常量。改了数据层就会出现新值，
     //      浏览器据此判断"这份存档的 info/曲线/轨迹是不是旧引擎生成的"，是就重解析一次。
     //      覆盖范围只放"决定派生数据形状"的源：data 层 Python、事实层 Python、facts.yaml、曲线预设；
-    //      规则（rules/*.yaml）不在其内——那影响的是结论文本，不该因为改个阈值就让所有历史重算。
-    //      engine.py 在列：它产出的 facts / findings **同样随报告一起归档**，口径一变
+    //      规则（rules/*.yaml）不在其内，那影响的是结论文本，不该因为改个阈值就让所有历史重算。
+    //      engine.py 在列：它产出的 facts / findings 同样随报告一起归档，口径一变
     //      （如 2026-09-16 那次软件版本串）老存档也得跟着刷一次，否则只能靠用户重新上传。
     const versionSources = [
         ["knowledge/engine/engine.py", PY_ENGINE],
         ["knowledge/engine/providers/api.py", PY_PROVIDER_API],
         ...providerFiles.map((f) => [`knowledge/engine/providers/${f}`, resolve(PROVIDER_DIR, f)]),
-        // **每一族**的 facts.yaml 与曲线预设都在内：派生数据的形状是各族各一份的
+        // 每一族的 facts.yaml 与曲线预设都在内：派生数据的形状是各族各一份的
         ...FAMILIES.flatMap((fam) => [
             [`knowledge/${fam.key}/facts.yaml`, fam.factsPath],
             ...plotFilesByFamily[fam.key].map((f) => [`knowledge/${fam.key}/plot/${f}`, resolve(fam.plotDir, f)]),
@@ -1986,12 +1985,12 @@ function build() {
             ";\n",
     );
 
-    // 4.7) 飞控参数的范围与说明：knowledge/px4/meta/<tag>.json 的 parameters → 前端**按需拉取**的静态 JSON
+    // 4.7) 飞控参数的范围与说明：knowledge/px4/meta/<tag>.json 的 parameters → 前端按需拉取的静态 JSON
     //      为什么放 public 而不是内联进 Pyodide：这份字典与具体日志无关，内联等于每份日志都要
     //      连它一起下载；放静态文件则浏览器缓存一次、只在打开「飞控参数」tab 时才要。
     //      只发 [min, max, desc] 三样（表格要的就是这三列），2656 条约 175 KB、gzip 33 KB。
     //      注意：目前只有 main 分支有参数元数据（PX4 release tag 不产出 parameters.json），
-    //      所以老固件的日志只能拿这份"最新的"当参考——界面要如实说明来源。
+    //      所以老固件的日志只能拿这份"最新的"当参考，界面要如实说明来源。
     const PARAM_META = resolve(KN, "meta/main.json");
     const paramMeta = JSON.parse(read(PARAM_META)).parameters ?? {};
     const paramCompact = {};
@@ -2012,14 +2011,14 @@ function build() {
         }) + "\n",
     );
 
-    // 4.8) rules/*.yaml 的**编辑器 schema**（yaml-language-server 消费，配 .vscode/settings.json）
-    //      词表全部从 facts.yaml / knowledge/engine/ 派生（见 lib/gen-rule-schema.mjs）——手抄一份就多一个
+    // 4.8) rules/*.yaml 的编辑器 schema（yaml-language-server 消费，配 .vscode/settings.json）
+    //      词表全部从 facts.yaml / knowledge/engine/ 派生（见 lib/gen-rule-schema.mjs），手抄一份就多一个
     //      真源：改了 facts.yaml 而这里没跟上时，IDE 会拿旧词表去纠正新写法，比没提示更糟。
     //      与别的产物一样走 writeArtifact：`--check` 会比对它与源是否一致。
     writeArtifact(
         // 落在 knowledge/ 根（不是族目录）：它是「规则的形状」，与固件族无关；
-        // 顺带不再污染 px4/ —— 「产物落在源目录里」那条历史尾巴就此了结。
-        // 词表取**各族的并集**（group / 机型名各族不同）：schema 只做提示，漏提示无所谓、
+        // 顺带不再污染 px4/ ，「产物落在源目录里」那条历史尾巴就此了结。
+        // 词表取各族的并集（group / 机型名各族不同）：schema 只做提示，漏提示无所谓、
         // 错提示会让人改错，所以宁宽。真正拦人的判据在各族 facts.yaml 的构建期校验里。
         resolve(KN_ROOT, "rules-editor-schema.generated.json"),
         JSON.stringify(
@@ -2038,7 +2037,7 @@ function build() {
     // 5) 指南的「开发指南」分组：规则清单 + 规则编写参考（改规则/算子/内置变量后自动跟上，不用谁记得手动同步）
     if (!CHECK) {
         mkdirSync(GUIDES_DIR, { recursive: true });
-        // 规则清单是**跨族**的（各族规则混在一起按 group 展示），所以传合并后的那一份
+        // 规则清单是跨族的（各族规则混在一起按 group 展示），所以传合并后的那一份
         writeFileSync(resolve(GUIDES_DIR, "rule-catalogue.mdx"), renderCataloguePage(allRules, allSources), "utf8");
         writeFileSync(resolve(GUIDES_DIR, "rule-schema.mdx"), renderSchemaPage(allRules.length, providerApi), "utf8");
     }
@@ -2071,12 +2070,12 @@ if (CHECK && process.argv.includes("--watch")) {
 if (!process.argv.includes("--watch")) {
     build();
 } else {
-    // 监听**真源**目录。这里只列真源所在的子目录，不监听 ENGINE / KN 的顶层——
+    // 监听真源目录。这里只列真源所在的子目录，不监听 ENGINE / KN 的顶层：
     // 顶层有真源文件（facts.yaml / fault-kb.yaml）也有产物，监听顶层会让「写产物」
     // 触发「再构建」，自己喂自己、无限重建（所以回调里还要按名字滤掉 *.generated.*）。
     // 注：`rules-editor-schema.generated.json` 2026-09 已挪出族目录，现在写在
     // knowledge/ 根；KN_ROOT 不在监听表里，这一路不会再自触发。
-    // **每一族**的规则 / 曲线 / 元数据目录都要监听（APM 改规则也得触发重建）
+    // 每一族的规则 / 曲线 / 元数据目录都要监听（APM 改规则也得触发重建）
     const WATCH_DIRS = [
         ...FAMILIES.flatMap((f) => [f.rulesDir, f.plotDir, f.metaDir]).filter((d) => existsSync(d)),
         LLM_DIR,
@@ -2111,7 +2110,7 @@ if (!process.argv.includes("--watch")) {
         }
     };
     const schedule = (dir) => (_event, filename) => {
-        // 顶层目录里的产物改名/写入会一路走到这里，必须拦掉，否则就是自触发死循环
+        // 顶层目录里的产物改名/写入会一路走到这里，要拦掉，否则就是自触发死循环
         if (dir && filename && GENERATED_IN_SOURCE.test(String(filename))) return;
         // 编辑器保存与「先清后拷」的 sync-content 都会在毫秒内连发多次事件，防抖到 200ms
         clearTimeout(timer);

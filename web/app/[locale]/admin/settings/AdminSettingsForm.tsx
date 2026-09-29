@@ -6,7 +6,7 @@ import { AlertCircle, Check, Loader2, Save } from "lucide-react";
 /**
  * 后台站点设置表单。
  *
- * 字段是服务端按 `lib/site-settings.ts` 的字段表传进来的，这里不认得任何具体配置项——
+ * 字段是服务端按 `lib/site-settings.ts` 的字段表传进来的，这里不认得任何具体配置项，
  * 加一项配置不用改这个组件。
  *
  * 保存走 POST /api/admin/settings（边缘函数直接写 KV）。用 POST 不是 PUT：
@@ -17,7 +17,7 @@ export interface SettingFieldView {
     key: string;
     label: string;
     kind: "text" | "textarea" | "domain" | "url" | "secret";
-    /** secret 专用：服务端给的尾 4 位（如 `****3f9a`），完整值永不回显 */
+    /** secret 专用：服务端给的尾 4 位（如 `****3f9a`），完整值不回显 */
     masked?: string;
     optional?: boolean;
     /** 改了影响搜索收录/分享链接，保存前弹一次确认 */
@@ -29,7 +29,7 @@ interface SaveError {
     message: string;
 }
 
-/** 与服务端同一套规则：只留尾 4 位。前端也要算一次——保存成功后输入框里不能留着明文 */
+/** 与服务端同一套规则：只留尾 4 位。前端也要算一次，保存成功后输入框里不能留着明文 */
 function maskSecret(value: string): string {
     if (!value) return "";
     return value.length <= 4 ? "****" : `****${value.slice(-4)}`;
@@ -43,7 +43,7 @@ export function AdminSettingsForm({
     initial: Record<string, string>;
 }) {
     // baseline = "上次保存时的样子"，用来算 diff。props 的 initial 只是初始值：
-    // 保存成功后必须**就地更新**它，否则下一次提交会把没变的字段又报成改动。
+    // 保存成功后要就地更新它，否则下一次提交会把没变的字段又报成改动。
     const [baseline, setBaseline] = useState<Record<string, string>>(initial);
     const [values, setValues] = useState<Record<string, string>>(initial);
     const [saving, setSaving] = useState(false);
@@ -59,7 +59,7 @@ export function AdminSettingsForm({
             return;
         }
 
-        // 只提交**改动过**的字段。
+        // 只提交改动过的字段。
         // 全量提交会把"当前默认值"一起固化进 KV：管理员只改备案号，siteName 的默认值也被
         // 写死在库里，之后改 site-config.ts 的代码默认值就再也不生效了（"改了代码没反应"
         // 这种问题看代码看不出来）。initial 是压平后的当前生效值，跟它不一样的就是改动。
@@ -101,7 +101,7 @@ export function AdminSettingsForm({
             }
             setSavedKeys(data.changed ?? []);
 
-            // 保存成功后把密钥输入框里的明文换回尾 4 位：屏幕上的明文才是最容易被
+            // 保存成功后把密钥输入框里的明文换回尾 4 位：屏幕上的明文最容易被
             // 截图带走的东西，而它此刻已经落库、不再需要留在输入框里。
             const saved = { ...values };
             for (const field of fields) {
@@ -155,7 +155,7 @@ export function AdminSettingsForm({
                             />
                         )}
                         {/* 密钥的提示与别的不一样：这里说的是"清空 = 删掉覆盖、用回环境变量"，
-                            而不是"用回默认值"——密钥的下一层是环境变量，没有代码里的默认值。 */}
+                            不是"用回默认值"。密钥的下一层是环境变量，没有代码里的默认值。 */}
                         {field.kind === "secret" ? (
                             <span className="mt-1 block text-xs text-faint">
                                 {baseline[field.key]

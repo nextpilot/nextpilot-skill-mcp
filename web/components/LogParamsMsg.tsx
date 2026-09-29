@@ -9,8 +9,8 @@ const inputCls =
     "w-56 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-sm text-text placeholder:text-muted focus:border-primary focus:outline-none";
 
 /** 参数范围与说明的静态字典（构建期从 knowledge/px4/meta/main.json 生成）：
- *  参数名 → [min, max, desc]。**版本注意**：目前只有 PX4 main 分支产出过 parameters.json，
- *  release tag 没有，所以这份是最新分支的快照，与老固件可能有出入——界面如实标注来源。 */
+ *  参数名 → [min, max, desc]。版本注意：目前只有 PX4 main 分支产出过 parameters.json，
+ *  release tag 没有，所以这份是最新分支的快照，与老固件可能有出入，界面如实标注来源。 */
 const PARAM_META_URL = "/params/px4-main.json";
 type ParamMeta = Record<string, [number | null, number | null, string]>;
 interface ParamMetaFile {
@@ -35,7 +35,7 @@ function loadParamMeta(): Promise<ParamMetaFile | null> {
 }
 
 /** 参数值多是 float32 放大成 double 的十进制展开（36.367515563964844），
- *  按 float32 的有效位数（7 位）收敛，读起来才是 PX4 里那个数。 */
+ *  按 float32 的有效位数（7 位）收敛，读起来才像 PX4 里那个数。 */
 function fmtVal(v: number | string | null | undefined): string {
     if (v === null || v === undefined) return "—";
     if (typeof v !== "number") return String(v);
@@ -66,11 +66,11 @@ interface ParamRow {
 }
 
 /**
- * 一行的默认值怎么来（PX4 的 'Q' 消息只记录**与当前值不同**的默认值，这条语义是全部依据）：
+ * 一行的默认值怎么来（PX4 的 'Q' 消息只记录与当前值不同的默认值，这条语义是全部依据）：
  *   · 记了机架默认（current_setup）→ 用它（机架配置算出来的值，通常就是"本该是多少"）
  *   · 只记了固件默认（system）→ 用它
- *   · 一条没记 → 当前值**就是**默认值（日志里没分歧，不编）
- * 所以这一列永远是一个具体数字，不需要"一致 / 已改"这种标记文字。
+ *   · 一条没记 → 当前值就是默认值（日志里没分歧，不编）
+ * 所以这一列总是一个具体数字，不需要"一致 / 已改"这种标记文字。
  */
 function defaultValue(
     value: number | string | undefined,
@@ -93,7 +93,7 @@ function defaultValue(
  *
  * - 默认值：PX4 只记录与当前值不同的默认值（PX4 logger.cpp: write_parameter_defaults），
  *   「没记录」= 当前值与两个默认都相同，所以这一列对每一行都能给出具体数字；
- * - 当前值与默认值不一致时**当前值标红**（这就是"被改过"的全部表达，不再另加标记文字）；
+ * - 当前值与默认值不一致时当前值标红（这就是"被改过"的全部表达，不再另加标记文字）；
  * - 最小值 / 最大值 / 说明：来自 PX4 参数元数据快照（见 PARAM_META_URL），可能与你这份固件的
  *   版本有出入，缺失的留空。
  */

@@ -1,11 +1,11 @@
-// 报错上报的**共用政策**：脱敏规则、截断方式、归一化规则、字段词表。
+// 报错上报的共用政策：脱敏规则、截断方式、归一化规则、字段词表。
 //
 // 为什么要有这个文件：浏览器侧（lib/issue-bridge.ts）与边缘侧
-// （functions/_lib/issue-filer.js）跑在两个运行时里，模块**不可能**合成一个；
-// 但下面这几件事两边必须逐字一致——只要各写一份，就会悄悄分叉：
+// （functions/_lib/issue-filer.js）跑在两个运行时里，模块不可能合成一个；
+// 但下面这几件事两边要逐字一致，只要各写一份，就会悄悄分叉：
 //
 //   · clip()      客户端先截、边缘再截。客户端要是只留头部，Pyodide 那个 Python
-//                 traceback 末尾的异常行（`NameError: ...`）在边缘侧就**已经不存在**，
+//                 traceback 末尾的异常行（`NameError: ...`）在边缘侧就已经不存在，
 //                 兜底再截也救不回来。截断方式两边一旦不同，丢掉的证据不可恢复。
 //   · scrub()     客户端先粗脱敏、边缘再按白名单脱。规则不一致时，客户端会先一步
 //                 把边缘想匹配的东西吃掉（JWT 被宽泛的长 hex 规则咬掉一半，就再也
@@ -13,14 +13,14 @@
 //   · normalize() 指纹（去重）靠它抹平数字与长标识符。只要有一侧不归一化，
 //                 `file 17.ulg` 与 `file 18.ulg` 就会各算一个指纹，去重形同虚设。
 //
-// 所以：**规则只在这里改**。两侧都从这里 import，谁都不许再抄一份实现。
+// 所以：规则只在这里改。两侧都从这里 import，谁都不许再抄一份实现。
 //
 // 为什么是 .js 而不是 .ts：边缘函数全是 .js（21 个），而且"从 lib/ 引 .js"是本仓库
 // 既有做法（functions/api/explain.js 就引了 lib/knowledge/prompts.generated.js）。
 // 浏览器侧靠 tsconfig 的 allowJs 直接引，类型由下面的 JSDoc 提供。
 //
 // 守卫生效点：web/scripts/test-issue-filer.mjs 会检查这两个源文件里不再出现
-// 脱敏/截断的实现字面量——谁再抄一份进去，统一校验入口就会红。
+// 脱敏/截断的实现字面量，谁再抄一份进去，统一校验入口就会红。
 
 /** 消息 / 栈 / 类型 的长度上限（字符）。两侧共用，改一处两边同时生效。 */
 export const MAX_MESSAGE = 1000;
@@ -29,14 +29,14 @@ export const MAX_TYPE = 120;
 
 /**
  * 级别与来源的合法取值。边缘侧按白名单兜底。
- * 浏览器侧的类型定义（lib/issue-bridge.ts 的 ReportLevel / kind）必须与之一致——
+ * 浏览器侧的类型定义（lib/issue-bridge.ts 的 ReportLevel / kind）要与之一致，
  * 那是编译期约束，写错了编译器会拦，所以不留运行时副本。
  */
 export const ALLOWED_LEVELS = new Set(["fatal", "recoverable"]);
 export const ALLOWED_KINDS = new Set(["client-error", "server-error", "manual-report"]);
 
 /**
- * 脱敏规则。**顺序有讲究**：先干掉带结构的凭证，再干掉宽泛的长 hex——
+ * 脱敏规则。顺序有讲究：先干掉带结构的凭证，再干掉宽泛的长 hex，
  * 反过来的话 JWT 会被长 hex 规则咬掉一半，再也匹配不上。
  * @type {Array<[RegExp, string]>}
  */
@@ -64,7 +64,7 @@ export function scrub(text) {
 
 /**
  * 头尾都保留的截断。Pyodide 抛的 Python traceback 里，最关键的那一行
- * （异常类型与消息）在**末尾**，只从头部截会把最有用的证据丢掉。
+ * （异常类型与消息）在末尾，只从头部截会把最有用的证据丢掉。
  *
  * 幂等：对已截断的文本再截（同样的 max 或更大的 max）不会二次加工。
  * @param {unknown} text

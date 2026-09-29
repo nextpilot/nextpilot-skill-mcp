@@ -1,7 +1,7 @@
 // 浏览器端日志分析链路自检：开全新标签页 → 清历史去重 → 塞入 .ulg → 等报告 → 截图。
 // 用法: node check-upload.mjs <ulog 路径> <out.png> [baseUrl] [light|dark] [keep-history]
 // 依赖: 已用 --remote-debugging-port=9222 启动的 Chrome。
-// 默认清掉该源 localStorage（报告去重存这里）——否则同一日志会走“此前已分析过”捷径，
+// 默认清掉该源 localStorage（报告去重存这里），否则同一日志会走“此前已分析过”捷径，
 // 根本不启动 Pyodide，e2e 就测不到引擎。第 5 个参数传 keep-history 可保留。
 import { writeFileSync } from "node:fs";
 
@@ -51,7 +51,7 @@ ws.addEventListener("message", (e) => {
         else res(msg.result);
         return;
     }
-    // 只记录，绝不抛：事件监听里抛错会让整个脚本崩掉，掩盖真正的失败原因
+    // 只记录，不抛：事件监听里抛错会让整个脚本崩掉，掩盖真正的失败原因
     try {
         if (msg.method === "Runtime.exceptionThrown") {
             events.push(
@@ -99,7 +99,7 @@ const evalIn = async (expr) => {
 
 /**
  * 等 React 完成 hydration 再动手。
- * 之前偶发"文件塞进去了、页面却毫无反应"，根因就是 dev server 刚重编译完，
+ * 之前偶发"文件塞进去了、页面却毫无反应"，根因是 dev server 刚重编译完，
  * 4 秒后 DOM 在、事件处理器还没挂上，派发的 change 落到未 hydrate 的节点上。
  * React 会在 DOM 节点上留下 __reactProps$xxx，用它判断处理器是否已就绪。
  */
@@ -154,7 +154,7 @@ async function tryUpload() {
     });
     const n = await evalIn("document.querySelector('input[type=file]').files.length");
     // setFileInputFiles 只把文件塞进 input，不保证触发事件（Chrome 版本间行为不一致），
-    // 必须显式派发；若 React 仍未接住则重试（见下方的响应判定）
+    // 需要显式派发；若 React 仍未接住则重试（见下方的响应判定）
     await evalIn("document.querySelector('input[type=file]').dispatchEvent(new Event('change',{bubbles:true}))");
     await sleep(2500);
     const reacted = await evalIn(`(() => {

@@ -56,7 +56,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
     const kv = getKv(env);
     if (!kv) return jsonResponse({ error: "KV 未绑定", avg: 0, count: 0 }, 503);
 
-    // deviceId 是客户端自报可无限轮换的，写操作必须按 IP 兜日限（审计 M9）
+    // deviceId 是客户端自报可无限轮换的，写操作要按 IP 兜日限（审计 M9）
     if (!(await checkWriteRateLimit(kv, request, { waitUntil }))) {
         return jsonResponse({ error: "今日评分次数已达上限" }, 429);
     }

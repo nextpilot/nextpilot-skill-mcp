@@ -17,7 +17,7 @@ export function RuntimeCacheRegistrar() {
         if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
 
         const params = new URLSearchParams();
-        // SW 里比对的是**请求 URL 前缀**，必须是绝对地址才能匹配上；相对路径在 SW 上下文里
+        // SW 里比对的是请求 URL 前缀，要是绝对地址才能匹配上；相对路径在 SW 上下文里
         // 无法确定基准（它的 location 是 /sw.js，不是页面）。这里统一转成绝对 URL。
         params.set("pyodide", new URL(PYODIDE_INDEX_PATH, location.href).href);
         params.set("wheel", new URL(PYULOG_WHEEL_PATH, location.href).href);

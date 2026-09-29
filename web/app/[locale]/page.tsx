@@ -268,7 +268,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                             </div>
 
                             {/* MCP 那组的抬头与「精选 Skill」同款（英文小标 + 中文标题 + 右侧入口），
-                  两个分组视觉上才是一对 */}
+                  两个分组视觉上就是一对 */}
                             {featuredMcp.length > 0 && (
                                 <div className="mt-10">
                                     <div className="mb-6 flex items-end justify-between gap-4">

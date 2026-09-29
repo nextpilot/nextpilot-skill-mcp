@@ -1,23 +1,23 @@
 /**
- * `rules/*.yaml` 的**编辑器用 JSON Schema**（给 yaml-language-server 消费）。
+ * `rules/*.yaml` 的编辑器用 JSON Schema（给 yaml-language-server 消费）。
  *
  * 为什么要有它：规则的键名、`group` / `vehicle` / `severity` 词表都不是随手写的字符串，
  * 拼错要等 `pnpm build:kb` 才报。给编辑器一份 schema，敲键名就有补全、写错当场飘红。
  *
- * ⚠ **这份 schema 是生成出来的，不是手写的** —— 词表全部从 `facts.yaml`、
+ * 这份 schema 是生成出来的，不是手写的：词表全部从 `facts.yaml`、
  * `knowledge/engine/operators.py`、`knowledge/engine/providers/api.py` 派生（由 build-knowledge.mjs 调用）。
- * 手抄一份词表等于立刻造出第二份真源：改了 `facts.yaml` 而这里没跟上时，IDE 会**拿着旧
- * 词表去纠正新写法**，那种错误比没有提示更糟。所以它跟其它产物一样走 `writeArtifact`，
+ * 手抄一份词表等于立刻造出第二份真源：改了 `facts.yaml` 而这里没跟上时，IDE 会拿着旧
+ * 词表去纠正新写法，那种错误比没有提示更糟。所以它跟其它产物一样走 `writeArtifact`，
  * `--check` 会比对它是否与源一致。
  *
- * 它**不替代**构建期校验，只是把"纯形状"的那部分提前到打字时：
+ * 它不替代构建期校验，只是把"纯形状"的那部分提前到打字时：
  *   · 能抓：键名拼错（`additionalProperties: false`）、枚举值不在词表里、类型写错
- *   · 抓不了：`compute` 表达式内部的语法 / 算子 / 字段 —— 那些在**字符串里**，
+ *   · 抓不了：`compute` 表达式内部的语法 / 算子 / 字段，那些在字符串里，
  *     JSON Schema 只看得到"这是个字符串"，仍然只有 `rule-expr.mjs` 查得到
  *
  *
- * ⚠ **enum 只给「构建期本来就强制校验」的词表**（group / severity / vehicle）。
- * 反过来——schema 比构建期更严——会在**合法写法**上飘红，而假红比没有提示更糟：
+ * enum 只给「构建期本来就强制校验」的词表（group / severity / vehicle）。
+ * 反过来（schema 比构建期更严）会在合法写法上飘红，而假红比没有提示更糟：
  * 作者会以为自己写错了，去改一个本来对的值。`category` 就是活例子：
  * 构建期允许它们偏离派生值。
  * 所以这两处只能给 `examples` 提示，不能给 enum。
@@ -26,7 +26,7 @@
  */
 import { SEVERITIES, UNIT_ALIASES } from "./rule-expr.mjs";
 
-/** 排序后去重：产物必须可复现（同样的输入 → 逐字节相同的输出），别依赖对象遍历顺序 */
+/** 排序后去重：产物要可复现（同样的输入 → 逐字节相同的输出），别依赖对象遍历顺序 */
 const uniqSorted = (xs) => [...new Set(xs)].filter((x) => typeof x === "string" && x).sort();
 
 const FW_PATTERN = "^(any|\\s*(>=|<=|==|>|<)?\\s*\\d+(\\.\\d+)?(\\s*,\\s*(>=|<=|==|>|<)?\\s*\\d+(\\.\\d+)?\\s*)*)$";
@@ -66,7 +66,7 @@ export function buildRuleSchema({ signatures, facts, vehicles, builtinVars }) {
             "改完跑 `pnpm web:build:kb`。\n" +
             "字段级权威参考见站内 /guide/rule-schema；可抄的骨架见 knowledge/rules-template.yml。",
         type: "object",
-        // 身份三件套是所有经验都必填的
+        // 身份三件套是所有经验都要填的
         required: ["id", "group", "name"],
         // 关掉它是这份 schema 最大的收益之一：键名拼错会当场飘红，而不是等构建
         additionalProperties: false,

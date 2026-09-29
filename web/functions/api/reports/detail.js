@@ -1,9 +1,9 @@
-// GET/DELETE /api/reports/detail?id=<id> —— 单份报告详情 / 删除单条（仅限本人前缀）。
+// GET/DELETE /api/reports/detail?id=<id>：单份报告详情 / 删除单条（仅限本人前缀）。
 // 超过 7 天 TTL 的记录惰性删除。
 //
-// ⚠️ 为什么用 `detail?id=` 而不是 REST 风格的 `/api/reports/:id`（[id].js）：
-// 线上实测（2026-09-28，响应头 eo-pages-inner-scf-status 区分执行层）——
-// EdgeOne 边缘函数**不部署带动态段 [xxx] 的函数文件名**：
+// 为什么用 `detail?id=` 而不是 REST 风格的 `/api/reports/:id`（[id].js）：
+// 线上实测（2026-09-28，响应头 eo-pages-inner-scf-status 区分执行层），
+// EdgeOne 边缘函数不部署带动态段 [xxx] 的函数文件名：
 //   · functions/api/reports/index.js  → /api/reports 正常（401，无穿透标记）
 //   · functions/api/reports/[id].js   → /api/reports/<id> 穿透到 SSR、落兜底 404
 //   · functions/api/reports/[[default]].js → 同样不部署

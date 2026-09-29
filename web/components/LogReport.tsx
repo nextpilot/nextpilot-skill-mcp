@@ -75,18 +75,18 @@ const TAG_LABELS: Record<string, string> = {
 type TabKey = "sysmsg" | "metrics" | "messages" | "params" | "charts" | "summary" | "ai";
 
 /**
- * 一份日志的**分析报告**正文（tab 壳）。六个子组件——`LogCharts` / `LogEventsMsg` /
- * `LogParamsMsg` / `LogSystemMsg` / `LogPhaseStrip` / `LogFlightMap`——全在 `Log*` 家族里，
- * 所以本组件也带 `Log` 词根：它渲染的确实是**某一份**日志。
+ * 一份日志的分析报告正文（tab 壳）。六个子组件：`LogCharts` / `LogEventsMsg` /
+ * `LogParamsMsg` / `LogSystemMsg` / `LogPhaseStrip` / `LogFlightMap`，全在 `Log*` 家族里，
+ * 所以本组件也带 `Log` 词根：它渲染的确实是某一份日志。
  *
- * `Log*` 家族的定义是"渲染**某一份**日志的分析结果"，**不是**"手里有日志字节"：
+ * `Log*` 家族的定义是"渲染某一份日志的分析结果"，不是"手里有日志字节"：
  * 从历史打开时字节可能已被淘汰（`REPORT_DATA_KEEP`），本组件与子组件都各自处理了那条路
- * （`isHistory` / `manifest?` / `storedPanels`）。**集合类**（一次列很多份）不在此列，
+ * （`isHistory` / `manifest?` / `storedPanels`）。集合类（一次列很多份）不在此列，
  * 见 `ReportHistoryList.tsx` 那份说明。
  *
- * 名字曾叫 `AnalyzeReport`：`Analyze` 是**路由**的词（`app/log/`、`Log*Client`、
+ * 名字曾叫 `AnalyzeReport`：`Analyze` 是路由的词（`app/log/`、`Log*Client`、
  * `useLogAnalyzer`），让 `components/` 里的一个共享组件再挂一次同一个词，读的人看不出它在
- * `Log*` 家族里占哪一格——正是 §6.4「词根认亲」要避免的（同 §6.4 第②条的事故形态：
+ * `Log*` 家族里占哪一格，这是 §6.4「词根认亲」要避免的（同 §6.4 第②条的事故形态：
  * 名字读出的关系与真实关系不一致）。
  */
 export function LogReport({
@@ -114,7 +114,7 @@ export function LogReport({
     requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
     /** 取 GPS 轨迹（存档优先，否则问 Worker） */
     loadTrack: () => Promise<TrackData>;
-    /** 「重新选择该 .ulg 文件」：打开文件选择框，选完**就地**重解析，把缺的图表/轨迹补齐
+    /** 「重新选择该 .ulg 文件」：打开文件选择框，选完就地重解析，把缺的图表/轨迹补齐
      *  （不跳走、不清空当前报告；AI 报告沿用存档里那份，不重复花额度） */
     onRestore: () => void;
     explaining: boolean;
@@ -367,12 +367,12 @@ function SummaryTab({ report }: { report: LogReportData }) {
 /**
  * 用户主动反馈"结论不对 / 漏判 / 看不懂"。
  *
- * 自动上报只能看见崩溃，看不见"结论算错了"——而后者恰恰是日志分析最容易出的问题，
+ * 自动上报只能看见崩溃，看不见"结论算错了"，而后者是日志分析最容易出的问题，
  * 所以这个入口的价值不低于自动上报。
  *
- * 代价是要让用户提交内容，与"原始日志不上传"的卖点需要划清界限：只提交**结构性信息**
+ * 代价是要让用户提交内容，与"原始日志不上传"的卖点需要划清界限：只提交结构性信息
  * （命中的规则 id、结论条数、固件版本、平台、路由）与用户自己写的一段话，
- * **不含**日志内容、字段数值、文件名与账号信息。界面上把这一点明说。
+ * 不含日志内容、字段数值、文件名与账号信息。界面上把这一点明说。
  */
 function ReportIssueButton({ report }: { report: LogReportData }) {
     const [open, setOpen] = useState(false);
@@ -604,7 +604,7 @@ function formatDuration(sec: number): string {
  *   Vehicle Life（载具累计飞行时长）/ Flight Time（本次飞行时长）/ Logging Start /
  *   软件版本（ver_sw_branch（ver_sw））/ 硬件版本（ver_hw（ver_hw_subtype））
  * 数据由引擎算好并随 report 存档（`report.facts`），历史卡片与这里同源；缺哪项就不显示哪行。
- * 标签列**不带图标**：一列小图标只会让人多扫一遍，字段名本身已经说清了。
+ * 标签列不带图标：一列小图标只会让人多扫一遍，字段名本身已经说清了。
  */
 function GeneralInfo({ report }: { report: LogReportData }) {
     const g = report.facts;
@@ -636,7 +636,7 @@ function GeneralInfo({ report }: { report: LogReportData }) {
     // 数据图表底色同一套（lib/phase-colors.ts）
     const modeList = g?.modes?.length ? g.modes : g?.mainMode ? [g.mainMode] : [];
     // 机型（机架）：机型是 PX4 的四类之一（vehicle_status.vehicle_type），机架是参数
-    // SYS_AUTOSTART 的编号——编号对应的名字要查 PX4 的 airframes 表，本机没有那份表，
+    // SYS_AUTOSTART 的编号：编号对应的名字要查 PX4 的 airframes 表，本机没有那份表，
     // 就如实只给编号（别编名字）。两者合成一行：`旋翼（4040）`，只有一半时只显示那一半。
     // （云端记录取回的也是完整 report，facts 齐全，不必另找退路）
     const vt = g?.vehicleType;
@@ -668,7 +668,7 @@ function GeneralInfo({ report }: { report: LogReportData }) {
     }
     // 软件版本：展示串与历史卡片同一口径（`formatFirmware`，对齐 Flight Review 的
     // `_format_sw_version`：正式版 `v1.16.0`、alpha/beta/RC 带后缀、未打标签的开发版附短哈希）。
-    // 分支 / 标签（ver_sw_branch）与 git 提交（ver_sw）放 title——它们是展示串的原料，
+    // 分支 / 标签（ver_sw_branch）与 git 提交（ver_sw）放 title：它们是展示串的原料，
     // 摆在行里会跟展示串重复。老固件没有 branch；云端记录或极旧的存档可能没有 facts.verSw，
     // 退回报告记录上的 verSw（同源、截断过）
     const branch = g?.verSwBranch ?? "";
@@ -686,7 +686,7 @@ function GeneralInfo({ report }: { report: LogReportData }) {
     }
 
     // 硬件版本：板型（ver_hw）+ 同型号的批次 / 变体（ver_hw_subtype）。
-    // 子型号显式写出来（哪怕是「日志未写」）——PX4 只给部分板子写这个键，
+    // 子型号显式写出来（哪怕是「日志未写」）：PX4 只给部分板子写这个键，
     // 空着会被当成"没做"，写明了才知道是日志里确实没有（可在「系统信息」tab 的字典里核对）
     const hw = g?.hardware ?? "";
     const hwSub = g?.hardwareSubtype ?? "";
@@ -812,7 +812,7 @@ function GeneralInfo({ report }: { report: LogReportData }) {
 
 /**
  * 「重新选择该 .ulg 文件」：三处"数据没缓存"的提示（轨迹 / 曲线 / 纯历史）共用它。
- * 以前这些提示只写了这句话，但页面上根本没有选文件的入口——用户得自己猜出"回列表页再选一次"，
+ * 以前这些提示只写了这句话，但页面上根本没有选文件的入口，用户得自己猜出"回列表页再选一次"，
  * 而那条路以前也不会重新解析（存档不缺"版本"就跳过解析，见 useLogAnalyzer.handleFile）。
  */
 function RestoreButton({ onRestore, label = "重新选择该日志文件" }: { onRestore: () => void; label?: string }) {

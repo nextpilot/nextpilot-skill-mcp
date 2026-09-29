@@ -5,11 +5,11 @@ import { reportError } from "@/lib/issue-bridge";
 
 /**
  * App Router 的渲染错误兜底。放在 app/ 根下，替换整个根 layout，
- * 因此**不能**依赖任何 Provider（SessionProvider 在这里不可用），
- * 样式也只能内联——globals.css 未必已加载。
+ * 因此不能依赖任何 Provider（SessionProvider 在这里不可用），
+ * 样式也只能内联，globals.css 未必已加载。
  *
  * 这个文件是 React 渲染崩溃时的最后一道防线，也是最值得自动上报的一类错误：
- * 用户看到的是一片白屏，如果不报，我们永远不会知道。
+ * 用户看到的是一片白屏，如果不报，我们就无从知道。
  */
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
     useEffect(() => {

@@ -20,22 +20,22 @@ import type { SkillFile } from "@/lib/types";
 type TabKey = "overview" | "files" | "changelog" | "comments";
 
 /**
- * 详情页内容区 Tab。**Skill 与 MCP 两类条目共用**（`/skills/[slug]` 与 `/mcp/[slug]`）。
+ * 详情页内容区 Tab。Skill 与 MCP 两类条目共用（`/skills/[slug]` 与 `/mcp/[slug]`）。
  *
- * 为什么叫 `Entry*` 而不是 `Skill*`：`Skill` 是其中**一类**内容的名字，导航里
+ * 为什么叫 `Entry*` 而不是 `Skill*`：`Skill` 是其中一类内容的名字，导航里
  * 「Skill 技能」与「MCP 服务」是并列的两类。这个组件两类都在用，叫 `SkillContentTabs`
- * 就等于宣称它只服务 Skill——于是给 MCP 页面用的时候要么说谎，要么复制一份
+ * 就等于宣称它只服务 Skill，于是给 MCP 页面用的时候要么说谎，要么复制一份
  * `McpContentTabs`（那样就长出一对只差前缀的孪生组件，改一边漏一边）。
  * 家族名取的是两类共有的上位词"收录条目"，见 CLAUDE.md 的命名约定。
  *
  * Skill 的内容 Tab 各对应 `web/content/skills/<slug>/` 下的文件，所以每个 Tab
- * 都能给出**那一份文件**的仓库编辑入口——改哪份就跳哪份，不让人在仓库里自己找。
+ * 都能给出那一份文件的仓库编辑入口：改哪份就跳哪份，不让人在仓库里自己找。
  * 概述 / 版本给人看；「文件」Tab 是整个 Skill 目录的文件浏览器（树形列表 +
  * 点击打开原文），给 AI 用的 SKILL.md 打开后带一段「这是什么」的说明和一键复制
  * （复制的就是能直接放进 `.claude/skills/` 的那份文件内容）。
  *
  * MCP 条目走的是另一份规范（server.json，不是 SKILL.md），没有文件浏览这层，
- * 只给 readme / changelog 两个编辑入口——不传 `files` 就没有「文件」Tab。
+ * 只给 readme / changelog 两个编辑入口，不传 `files` 就没有「文件」Tab。
  */
 
 /* ---------- 「文件」Tab：目录树 + 点击打开（参考 skillhub.cn 的文件浏览器） ---------- */
@@ -249,7 +249,7 @@ export function EntryContentTabs({
         { key: "comments", label: "评论", icon: <MessageSquare className="h-3.5 w-3.5" /> },
     ];
     // 「文件」这层只有 Skill 有（整个目录的文件浏览器），插在「概述」后面，与阅读顺序一致；
-    // 编辑入口指向 SKILL.md——目录里最常改的主文件
+    // 编辑入口指向 SKILL.md，目录里最常改的主文件
     if (files?.length) {
         tabs.splice(1, 0, {
             key: "files",
@@ -261,7 +261,7 @@ export function EntryContentTabs({
 
     const active = tabs.find((t) => t.key === tab);
 
-    // 编辑入口：桌面端与 tab 同行（-mb-px 对齐底线）。移动端**不渲染**——tab 行下方
+    // 编辑入口：桌面端与 tab 同行（-mb-px 对齐底线）。移动端不渲染：tab 行下方
     // 再挂一行链接在手机上显得杂，且手机上也没有"顺手去仓库改文件"的场景。
     const desktopEditLink = active?.editUrl ? (
         <a
@@ -279,7 +279,7 @@ export function EntryContentTabs({
         <section>
             <div className="border-b border-border">
                 {/* 移动端：tab 等宽铺满一行、藏图标、active 用居中短下划线（参考 skillhub.cn
-          的详情页）—— 390px 下四个 tab 一屏全见，不用滑动，点按面积也大。
+          的详情页），390px 下四个 tab 一屏全见，不用滑动，点按面积也大。
           桌面端（sm+）：回到「图标 + 自然宽度 + 放不下横向滑」，编辑入口同行右端。 */}
                 <div
                     className="grid border-b border-border sm:flex sm:gap-1 sm:overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"

@@ -137,7 +137,7 @@ export function EntryMetaGroups({
     paperUrl?: string;
     license?: string;
 }) {
-    // 推荐徽章在标题旁展示（见页面头部），这里只列属性标记；跳转由“来源”行承担
+    // 推荐徽章在标题旁展示（见页面头部），这里只列属性标记；跳转由"来源"行承担
     const badges = [
         sourceUrl && { key: "oss", icon: <Code2 className="h-3 w-3" />, label: "开源", tone: "muted" as const },
         paperUrl && { key: "paper", icon: <FileText className="h-3 w-3" />, label: "有论文", tone: "muted" as const },

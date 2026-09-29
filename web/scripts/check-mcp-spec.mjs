@@ -1,8 +1,8 @@
 /**
  * MCP 条目合规校验：`web/content/mcp/<slug>/` 是否满足 MCP Registry 规范与本站的字段约定。
  *
- * 与 `check-skill-spec.mjs` 是一对，但**规范不同源**，别当成同一套：
- * Skill 走 Agent Skills 规范（SKILL.md，name 是 kebab 且必须等于目录名）；
+ * 与 `check-skill-spec.mjs` 是一对，但规范不同源，别当成同一套：
+ * Skill 走 Agent Skills 规范（SKILL.md，name 是 kebab 且要等于目录名）；
  * MCP 走 MCP Registry 规范的 `server.json`（name 是反向 DNS `io.github.owner/repo`）。
  * 两条命名规则互斥，所以这两个守卫只能分开写，合成一个必然有一边是错的。
  *
@@ -16,13 +16,13 @@
  * ## 输出契约（被 mutate_guards.py 解析，改格式前先看那边）
  *
  * 失败行必须是 `  FAIL <规则id> -> <详情>`；总结行不许写成 `FAIL <名字>`（会被当成一条
- * 检查名，于是每条变异都误报"牵连"）——用 `RESULT: N 处未过`。只用 ASCII。
+ * 检查名，于是每条变异都误报"牵连"），用 `RESULT: N 处未过`。只用 ASCII。
  *
  * ## 上游未确认的条目
  *
- * `README.md` frontmatter 写 `upstream_status: "pending"` 的条目允许**暂时没有**
+ * `README.md` frontmatter 写 `upstream_status: "pending"` 的条目允许暂时没有
  * `server.json`（本站收录 MSFS 那条时没记 sourceUrl，工具名也对不上任何公开项目，
- * 硬填 manifest 就是编造）。这种条目会被显式打印成 `SKIP` 而不是悄悄放过——
+ * 硬填 manifest 就是编造）。这种条目会被显式打印成 `SKIP` 而不是悄悄放过，
  * 每次校验都看得见"还有几条待补"。
  *
  * 用法（在 web/ 下）：
@@ -50,7 +50,7 @@ const PENDING = "pending";
 const VERSION_HEADING = /^##\s+(\S+)(?:\s*[—–-]\s*(\S+))?\s*$/;
 
 /**
- * 单个 MCP 目录的全部问题。纯函数（不碰文件系统）——反例自检要拿内存里的假目录
+ * 单个 MCP 目录的全部问题。纯函数（不碰文件系统），反例自检要拿内存里的假目录
  * 走同一套判据，否则自检测的是另一份逻辑，等于没测。
  *
  * @param {{slug: string, files: string[], readme?: string, changelog?: string, serverJson?: object}} input
@@ -99,7 +99,7 @@ export function collectProblems(input) {
                 msg: '缺 server.json；上游确实还没核实就在 README frontmatter 写 upstream_status: "pending"',
             });
         }
-        // pending 条目没有 manifest，传输方式只能退回 README 的过渡值——那就必须有，否则站点没得显示
+        // pending 条目没有 manifest，传输方式只能退回 README 的过渡值，那就得有，否则站点没得显示
         if (!data.transport) {
             fail(
                 "transport/needed-when-pending",
@@ -179,7 +179,7 @@ export function collectProblems(input) {
 }
 
 // ---------------------------------------------------------------------------
-// 反例自检：每条规则一个**故意违规**的假目录，断言它真会红。
+// 反例自检：每条规则一个故意违规的假目录，断言它真会红。
 //
 // 存在的唯一理由是防「守卫恒绿」。真目录数量少且多数合法，任何一条判据被写反都表现为
 // 空输出 + exit 0，只有反例会失声。
@@ -397,7 +397,7 @@ function main() {
         if (!serverJson && matter(readme).data?.upstream_status === PENDING) pending.push(slug);
     }
 
-    // 待补不是"通过"，是**挂在明处的一次例外**：每次校验都列出来，免得长成永久状态
+    // 待补不是"通过"，是挂在明处的一次例外：每次校验都列出来，免得长成永久状态
     for (const slug of pending) {
         console.log(
             `SKIP ${slug} 上游未确认（upstream_status: "pending"），暂缺 server.json —— 核实后补上并删掉该字段`,

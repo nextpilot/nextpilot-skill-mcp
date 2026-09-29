@@ -5,8 +5,8 @@ import type { StoredPlotPanel, StoredPlotSeries } from "./chart-presets";
  * 报告存档（IndexedDB）。
  *
  * 为什么从 localStorage 搬到这里：
- * - localStorage 一个键装整个数组，每次保存全量序列化，**只留 20 条**，5MB 配额、隐私模式写不进；
- * - "命中即看"要求把**派生数据**（参数 / 消息 / 曲线降采样）也存下来，才能不再等一次解析——
+ * - localStorage 一个键装整个数组，每次保存全量序列化，只留 20 条，5MB 配额、隐私模式写不进；
+ * - "命中即看"要求把派生数据（参数 / 消息 / 曲线降采样）也存下来，才能不再等一次解析，
  *   这些是大对象，只有 IndexedDB 装得下。
  *
  * 三个 store 分工（不同库，互不干扰）：
@@ -69,7 +69,7 @@ export interface SavedReport {
  */
 export type TrackThumb = [number, number][];
 
-/** 与结论分开存的**派生数据**：命中时直接给「消息 / 参数 / 图表」用，不必再解析原始日志 */
+/** 与结论分开存的派生数据：命中时直接给「消息 / 参数 / 图表」用，不必再解析原始日志 */
 export interface ReportData {
     /** 产出这份派生数据的引擎版本（build 期算的源文件哈希）。
      *  与当前版本不一致 = 旧引擎生成的（比如多值信息的分行规则变了），打开时重解析一次。 */
@@ -90,18 +90,18 @@ type StoredReport = SavedReport & { savedAt?: number };
 /** 老版本写入的记录可能缺字段（如早期没有 findings）；在读取边界补默认值，
  *  避免 UI 里 r.findings.length 之类直接抛错（真机上出现过 crash）。
  *
- * ⚠️ 这是**所有外部来源**进入 `SavedReport` 的唯一闸门，不只是索引库的：
+ * 这是所有外部来源进入 `SavedReport` 的唯一闸门，不只是索引库的：
  *    · 索引库里躺着上上个版本写下的记录（早期没有 findings 字段），
  *      还有从 localStorage 迁移进来的更老的记录；
- *    · 云端 KV 里的记录也一样——`explain.js` 保证新写的带 findings，
- *      但 TTL 是 7 天，**旧版本部署写下的记录仍在有效期内**，取回来照样是缺字段的 JSON。
+ *    · 云端 KV 里的记录也一样，`explain.js` 保证新写的带 findings，
+ *      但 TTL 是 7 天，旧版本部署写下的记录仍在有效期内，取回来照样是缺字段的 JSON。
  *    两者到了前端都只是 JSON，TypeScript 拦不住，只有过这道函数才安全。
  *
- * 所以：新增读取入口必须过这里，**不要再写 `xxx as SavedReport`**——
+ * 所以：新增读取入口都要过这里，不要再写 `xxx as SavedReport`。
  * 那句强转把类型检查关掉了，缺字段要到渲染时才炸（`GeneralInfo` 的 `findings.filter` 就这么炸过）。
  *
  * 名字刻意不叫 `normalize`：`lib/error-policy.js` 已经有一个 `normalize`（正则替换，
- * 给错误消息脱敏用的），两者同名不同义正是 §6.4 第⑤条禁的那种迷惑。 */
+ * 给错误消息脱敏用的），两者同名不同义就是 §6.4 第⑤条禁的那种迷惑。 */
 export function normalizeSavedReport(raw: unknown): SavedReport {
     // 入参刻意是 unknown 而不是 Partial<SavedReport>：边界上拿到的本来就是"没有类型的东西"，
     // 写成 Partial 只会让调用方以为字段已经对上了（§6.5）。强转集中在这一行。
@@ -272,9 +272,9 @@ async function migrateFromLocalStorage(): Promise<void> {
 /**
  * 打开库、迁移旧记录、把结论记录载入内存镜像。
  *
- * ⚠️ 必须**共享同一个 Promise**，不能只用 `initialized` 布尔量做"进过一次就返回"：
+ * 要共享同一个 Promise，不能只用 `initialized` 布尔量做"进过一次就返回"：
  * 同一个页面上有两个调用方（`useLogAnalyzer` 的挂载 effect 先跑，报告页自己的 effect 紧随其后），
- * 前者刚开始 await、后者就返回了 —— 于是报告页紧接着 `getReport(id)` 查的是**还没载入的镜像**，
+ * 前者刚开始 await、后者就返回了，于是报告页紧接着 `getReport(id)` 查的是还没载入的镜像，
  * 结果就是"刷新 /log/<id> 说未找到该分析报告"（站内点进详情却正常，因为镜像早就在了）。
  */
 let initPromise: Promise<void> | null = null;
@@ -333,12 +333,12 @@ export function deleteReport(id: string): void {
     void removeMany([id]);
 }
 
-/** 清空本机的历史记录：**只删 `reports` + `reportData` 两个 store**。
+/** 清空本机的历史记录：只删 `reports` + `reportData` 两个 store。
  *
- *  刻意**不碰**另两处缓存：
- *    · `nextpilot-cache/logs`（原始 .ulg 字节）——留着才能"恢复完整数据"；
- *    · Service Worker 的 `nextpilot-runtime-*`（Pyodide + numpy + pyulog，约 16MB，见 public/sw.js）
- *      ——清个历史不该让下次分析重新下载一遍运行时。
+ *  刻意不碰另两处缓存：
+ *    · `nextpilot-cache/logs`（原始 .ulg 字节），留着才能"恢复完整数据"；
+ *    · Service Worker 的 `nextpilot-runtime-*`（Pyodide + numpy + pyulog，约 16MB，见 public/sw.js），
+ *      清个历史不该让下次分析重新下载一遍运行时。
  *  想连它们一起清，得显式调 clearCachedLogs() / caches.delete()，别在这里顺手加。 */
 export function clearReports(): void {
     const ids = mirror.map((r) => r.id);
@@ -377,7 +377,7 @@ async function pruneReportData(): Promise<void> {
 }
 
 /** 存派生数据（参数/消息/曲线）：分析完成或首次画图后调，之后命中就能直接渲染。
- *  **按字段合并**而不是整条覆盖：两处调用各带一部分数据（分析完成只有 info，抽完曲线才有
+ *  按字段合并而不是整条覆盖：两处调用各带一部分数据（分析完成只有 info，抽完曲线才有
  *  plotPanels/track），谁后到都不该把对方写没了。 */
 export async function saveReportData(id: string, data: ReportData): Promise<void> {
     if (typeof window === "undefined" || !id) return;

@@ -5,13 +5,13 @@ import { MCP_DIR } from "@/lib/content-dir";
 /**
  * 把 MCP 条目的 `server.json` 原样吐出来：`/mcp/<slug>/server.json`。
  *
- * 有这个路由，`web/content/mcp/<slug>/server.json` 才不只是"仓库里躺着给守卫看的文件"——
- * MCP 客户端能直接照它装包。返回的是**文件原文**而不是 `lib/mcp.ts` 解析后的
+ * 有这个路由，`web/content/mcp/<slug>/server.json` 才不只是"仓库里躺着给守卫看的文件"，
+ * MCP 客户端能直接照它装包。返回的是文件原文，而不是 `lib/mcp.ts` 解析后的
  * `McpManifest`：那份 struct 只声明了站点要用的几个字段（见 `lib/mcp.ts` 顶部），
  * 拿它再序列化一次会静默丢掉站点不关心的字段，manifest 就不完整了。
  *
  * 上游未确认的条目没有 `server.json`（README frontmatter 标了 `upstream_status: "pending"`）。
- * 这时返回 404 **并在 body 里说清缺什么**——不给一个空对象或占位 manifest：客户端照着
+ * 这时返回 404，并在 body 里说清缺什么：不给一个空对象或占位 manifest。客户端照着
  * 占位内容去装包，会装到一个不存在的包，而它无从判断那是"还没核实"还是"就是这样"。
  * 判红与放行由 `check-mcp-spec.mjs` 负责，这里只管如实回答。
  */

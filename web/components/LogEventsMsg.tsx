@@ -33,9 +33,9 @@ const inputCls =
     "w-56 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-sm text-text placeholder:text-muted focus:border-primary focus:outline-none";
 
 /**
- * 事件消息 tab：ULog 的 **Logged String Message**（'L'，带时间戳与级别）与
- * **Tagged Logged String Message**（'C'，同形，多一个来源 tag）并成一条时间轴，
- * 下面是 **Multi Information**（'M'，键 → 多组值、无时间戳）—— 都是"发生了什么"。
+ * 事件消息 tab：ULog 的 Logged String Message（'L'，带时间戳与级别）与
+ * Tagged Logged String Message（'C'，同形，多一个来源 tag）并成一条时间轴，
+ * 下面是 Multi Information（'M'，键 → 多组值、无时间戳），都是"发生了什么"。
  * 消息可按级别档过滤、按内容搜索；多值信息按组折叠、单独搜索。
  * 键值字典（Information Message）与消息记录统计在「系统消息」tab。
  */

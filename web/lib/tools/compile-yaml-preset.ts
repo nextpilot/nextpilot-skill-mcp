@@ -13,9 +13,9 @@ import {
 } from "@/lib/panel-resolver";
 
 /**
- * 工具页里**现贴现编译**的绘图预设：YAML 文本 → PanelSpec[]。
- * 与 `lib/chart-presets.ts` 是同一个解析器的两个入口——那边喂构建期编译好的产物，这边喂
- * 用户贴进来的原始 YAML。**实例怎么数、区间引用怎么展开成多条线不在这里**，在
+ * 工具页里现贴现编译的绘图预设：YAML 文本 → PanelSpec[]。
+ * 与 `lib/chart-presets.ts` 是同一个解析器的两个入口，那边喂构建期编译好的产物，这边喂
+ * 用户贴进来的原始 YAML。实例怎么数、区间引用怎么展开成多条线不在这里，在
  * `lib/panel-resolver.ts` 那一份里（改那边，两边一起变）。
  */
 
@@ -47,7 +47,7 @@ export function parseRef(
 export function toFieldDesc(raw: string): FieldDesc {
     const r = parseRef(raw);
     if (r) {
-        // 引用串**保持作者写的样子**：不把"不写下标"改写成 `[0]`，`[:]` 也要原样留着——
+        // 引用串保持作者写的样子：不把"不写下标"改写成 `[0]`，`[:]` 也要原样留着，
         // 展开成多条线是解析期的事，在这里改写成 [0] 就把区间信息弄丢了
         return { kind: "field", fields: r.candidates, unit: r.unit || null };
     }

@@ -55,7 +55,7 @@ export default async function SkillDetailPage({ params }: { params: Promise<{ sl
             <Breadcrumbs items={[{ label: "Skill 技能库", href: "/skills" }, { label: skill.slug }]} />
 
             {/* 两栏：左栏 = 标题 + 内容（纵向堆叠），右栏 = 320px 侧栏（与 EntrySidebar
-                的说明、/mcp/[slug] 一致；gap 收到 12px——左右卡各自有 20px+ 内边距，
+                的说明、/mcp/[slug] 一致；gap 收到 12px，左右卡各自有 20px+ 内边距，
                 再叠 24px 的 gap，中缝看着有一掌宽，用户点过名「空白可以减少一些」） */}
             <div className="flex flex-col gap-4 lg:grid lg:gap-x-3 lg:[grid-template-columns:minmax(0,1fr)_320px]">
                 <div className="card min-w-0 p-5 sm:p-6">
@@ -157,7 +157,7 @@ export default async function SkillDetailPage({ params }: { params: Promise<{ sl
                     />
                 </div>
 
-                {/* 右栏：不做 sticky——2026-09-26 试过（top-20 + 内部滚动那套），用户实测
+                {/* 右栏：不做 sticky，2026-09-26 试过（top-20 + 内部滚动那套），用户实测
                     否决「跟随滚动不好用」，撤回。self-start 保持右栏与左栏顶对齐。 */}
                 <aside className="lg:self-start">
                     <EntrySidebar

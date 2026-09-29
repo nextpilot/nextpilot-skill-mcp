@@ -2,11 +2,11 @@
 // KV 平台约束（官方文档）：key 仅允许字母/数字/下划线、长度 ≤512B；value ≤25MB；
 // 最终一致（60s 全球同步）；put 无 TTL，过期时间写进 value 惰性清理。
 //
-// ⚠️ **平台硬限制（2026-09-28 排查线上确认）**：
-//   1. EdgeOne 官方明确「KV 仅边缘函数可用，Node Functions（opennext SSR 云函数）不支持」
-//      —— Next.js 全栈部署下 /api/* 被 rewrite 进 SSR 垫片（见 next.config.ts），
-//      因此 **SSR 侧拿不到 KV 注入，所有 KV 写路径在该形态下必然降级/丢失**；
-//   2. 绑定变量是**全局变量而非 env 属性**（控制台绑定时的变量名必须与本文件的
+// 平台硬限制（2026-09-28 排查线上确认）：
+//   1. EdgeOne 官方明确「KV 仅边缘函数可用，Node Functions（opennext SSR 云函数）不支持」。
+//      Next.js 全栈部署下 /api/* 被 rewrite 进 SSR 垫片（见 next.config.ts），
+//      所以 SSR 侧拿不到 KV 注入，所有 KV 写路径在该形态下都会降级或丢失；
+//   2. 绑定变量是全局变量而非 env 属性（控制台绑定时的变量名要与本文件的
 //      NEXTPILOT_KV 约定一字不差），getKv 的 globalThis 通道 + env 兜底扫描就是为
 //      兼容这两种注入方式；若哪天平台给 SSR 也注入了 KV，代码无需再改。
 
@@ -65,7 +65,7 @@ export async function listAll(kv, prefix) {
     const keys = [];
     let cursor;
     do {
-        // 只在真正翻页时才带上 cursor：部分平台的 list 实现不接受显式的 undefined
+        // 只在翻页时才带上 cursor：部分平台的 list 实现不接受显式的 undefined
         const options = { prefix, limit: 256 };
         if (cursor) options.cursor = cursor;
         const result = await kv.list(options);
@@ -81,8 +81,8 @@ export const usagePrefix = (uid, day = dateStamp()) => `use_${uid}_${day}_`;
 export const anonUsagePrefix = (deviceHash, day = dateStamp()) => `anuse_${deviceHash}_${day}_`;
 export const reportPrefix = (uid) => `rpt_${uid}_`;
 
-// 匿名**写操作**按 IP 的日上限（评分 / 收藏共用一个桶，接口间轮换绕不过去；审计 M9）。
-// deviceId 是客户端自报的、可无限轮换，没有这道按 IP 的兜底，刷评分/收藏数只需换个随机 id。
+// 匿名写操作按 IP 的日上限（评分 / 收藏共用一个桶，接口间轮换绕不过去；审计 M9）。
+// deviceId 是客户端自报的、可无限轮换，没有这道按 IP 的兜底，刷评分/收藏数只要换个随机 id。
 export const WRITE_IP_DAILY_CAP = 30;
 const writeRatePrefix = (ipHash, day = dateStamp()) => `wrrl_${ipHash}_${day}_`;
 
@@ -109,11 +109,11 @@ export function sanitizeDeviceId(id) {
 
 // 客户端 IP 只认平台注入的通道。x-real-ip / x-forwarded-for 是客户端可任意写的请求头，
 // 信它们等于 IP 限流形同虚设（审计 M8）：
-//   1. request.eo.clientIp —— 边缘函数 Runtime API 注入（IncomingRequestEoProperties），不可伪造，首选；
-//   2. EO-Client-IP 头 —— 需在 EdgeOne 控制台「规则引擎 → 客户端 IP 头部」开启（头部名配
+//   1. request.eo.clientIp：边缘函数 Runtime API 注入（IncomingRequestEoProperties），不可伪造，首选；
+//   2. EO-Client-IP 头：需在 EdgeOne 控制台「规则引擎 → 客户端 IP 头部」开启（头部名配
 //      EO-Client-IP），开启后平台用真实 IP 覆盖该头，客户端伪造值不生效；
 //   3. 都拿不到（本地 dev / 控制台未开启）时统一返回 "unknown"。
-//      ⚠️ 未开启平台开关前，全网匿名请求共享同一个 "unknown" 限流桶（宁严勿漏）；
+//      未开启平台开关前，全网匿名请求共享同一个 "unknown" 限流桶（宁严勿漏）；
 //      上线前应完成控制台开启，操作见 docs/develop/operations/README.md。
 export function clientIp(request) {
     const eoIp = request?.eo?.clientIp;

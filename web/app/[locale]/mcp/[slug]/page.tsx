@@ -172,7 +172,7 @@ export default async function McpDetailPage({ params }: { params: Promise<{ slug
                     />
                 </div>
 
-                {/* 右栏：不做 sticky——与 skills/[slug] 同一结论（2026-09-26 试过又撤，
+                {/* 右栏：不做 sticky，与 skills/[slug] 同一结论（2026-09-26 试过又撤，
                     用户实测「跟随滚动不好用」）。self-start 保持顶对齐。 */}
                 <aside className="lg:self-start">
                     <EntrySidebar
