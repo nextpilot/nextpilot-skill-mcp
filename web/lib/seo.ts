@@ -76,7 +76,9 @@ export function makePageMeta({
 }: PageMeta): Metadata {
     const canonicalPath = locale ? `/${locale}${path}` : path || "/";
     const canonicalUrl = `${SITE_URL}${canonicalPath}`;
-    const ogUrl = path ? `${SITE_URL}${path}` : SITE_URL;
+    // og:url 必须与 canonical 同址。带 locale 的页面分享到社交平台时，抓取器按 og:url 回访；
+    // 少一层 /en 就会让英文页被当成中文页收录，卡片也跟着串语言。
+    const ogUrl = canonicalUrl;
     const image = ogImage
         ? ogImage.startsWith("http")
             ? ogImage

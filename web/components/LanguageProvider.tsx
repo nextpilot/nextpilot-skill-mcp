@@ -21,10 +21,16 @@ export function LanguageProvider({
 }) {
     const [language, setLanguageState] = useState<Language>(initialLanguage ?? "zh");
 
+    // 同步 <html lang>：URL 带 locale 时以 URL 为准（initialLanguage），否则回落到本地记忆。
+    // 不能因为 initialLanguage 存在就提前 return —— 那会让 /en/* 的 lang 永远停在根 layout
+    // 的默认值 zh-CN，读屏软件按中文发音、搜索引擎按中文收录。
     useEffect(() => {
-        if (initialLanguage) return;
-        const stored = window.localStorage.getItem("nextpilot-language");
-        const nextLanguage = stored === "en" || stored === "zh" ? stored : "zh";
+        const nextLanguage = initialLanguage
+            ? initialLanguage
+            : (() => {
+                  const stored = window.localStorage.getItem("nextpilot-language");
+                  return stored === "en" || stored === "zh" ? stored : "zh";
+              })();
         setLanguageState(nextLanguage);
         document.documentElement.lang = nextLanguage === "zh" ? "zh-CN" : "en";
     }, [initialLanguage]);

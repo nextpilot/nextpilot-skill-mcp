@@ -6,6 +6,10 @@ import { SITE_URL } from "@/lib/site-config";
 
 // sitemap 里的每条 URL 都是给搜索引擎的"门牌号"，域名取自构建期常量（`SITE_URL`）。
 // 换域名 = 改环境变量 + 重新部署，整份 sitemap 随之重建，不会出现"提交一批死链"。
+//
+// lastModified 只在内容有真实修改时间时才写（Skill / MCP 取自 CHANGELOG）。
+// `new Date()` 是陷阱：它在每次请求时求值，等于宣称"所有页面刚改过"，
+// 而不可信的 lastmod 会被搜索引擎直接忽略，反而不如不写。
 export default function sitemap(): MetadataRoute.Sitemap {
     const baseUrl = SITE_URL;
 
@@ -28,7 +32,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
         for (const { path, priority, changeFreq } of staticPaths) {
             entries.push({
                 url: `${baseUrl}/${locale}${path}`,
-                lastModified: new Date(),
                 changeFrequency: changeFreq,
                 priority,
                 alternates: {
@@ -46,7 +49,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
         for (const locale of locales) {
             entries.push({
                 url: `${baseUrl}/${locale}${doc.href}`,
-                lastModified: new Date(),
                 changeFrequency: "monthly" as const,
                 priority: 0.6,
                 alternates: {
@@ -63,7 +65,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
         for (const locale of locales) {
             entries.push({
                 url: `${baseUrl}/${locale}/skills/${skill.slug}`,
-                lastModified: skill.updatedAt ? new Date(skill.updatedAt) : new Date(),
+                ...(skill.updatedAt ? { lastModified: new Date(skill.updatedAt) } : {}),
                 changeFrequency: "weekly" as const,
                 priority: 0.7,
                 alternates: {
@@ -80,7 +82,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
         for (const locale of locales) {
             entries.push({
                 url: `${baseUrl}/${locale}/mcp/${mcp.slug}`,
-                lastModified: mcp.updatedAt ? new Date(mcp.updatedAt) : new Date(),
+                ...(mcp.updatedAt ? { lastModified: new Date(mcp.updatedAt) } : {}),
                 changeFrequency: "weekly" as const,
                 priority: 0.7,
                 alternates: {

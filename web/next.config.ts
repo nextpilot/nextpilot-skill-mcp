@@ -72,6 +72,46 @@ const nextConfig: NextConfig = {
     // 被转进垫片、静默 404，新增真实 API route 时要同步加进这里。
     async headers() {
         return [
+            // 全站安全响应头。放在最前，所有路径都吃到。
+            //
+            // CSP 先走 Report-Only：站点有百度统计的内联脚本、Plotly 的内联样式，直接上强制
+            // CSP 会把它们全挡掉。Report-Only 只上报不拦截，观察一段时间确认无误报后再改成
+            // Content-Security-Policy 强制生效。
+            //
+            // X-Frame-Options 防点击劫持（页面被别的站 iframe 套住，诱导用户点广告）；
+            // nosniff 防 MIME 嗅探（上传的 .json 被当脚本执行）；HSTS 防首次访问被降级到 http。
+            {
+                source: "/:path*",
+                headers: [
+                    { key: "X-Content-Type-Options", value: "nosniff" },
+                    { key: "X-Frame-Options", value: "SAMEORIGIN" },
+                    { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+                    {
+                        key: "Strict-Transport-Security",
+                        value: "max-age=63072000; includeSubDomains",
+                    },
+                    {
+                        key: "Permissions-Policy",
+                        value: "camera=(), microphone=(), geolocation=(self)",
+                    },
+                    {
+                        key: "Content-Security-Policy-Report-Only",
+                        value: [
+                            "default-src 'self'",
+                            // Next.js 的水合脚本与百度统计都是内联，'unsafe-inline' 暂时离不开
+                            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://hm.baidu.com",
+                            "style-src 'self' 'unsafe-inline'",
+                            // Plotly 图表把数据渲染成 data: URL 的图片，Leaflet 瓦片走 https
+                            "img-src 'self' data: blob: https:",
+                            "font-src 'self' data:",
+                            "connect-src 'self' https://hm.baidu.com https://api.nextpilot.org",
+                            "frame-ancestors 'self'",
+                            "base-uri 'self'",
+                            "form-action 'self'",
+                        ].join("; "),
+                    },
+                ],
+            },
             // API / 内部端点禁止一切缓存：EdgeOne CDN 会缓存 404 等 HTML 错误页（缓存键忽略
             // query string），部署后最长几分钟内该路径都吃到旧错误响应。opennext 适配器实测忽略
             // 本配置，线上靠默认 TTL 约 5 分钟自然过期；要根治需在 EdgeOne 控制台配不缓存规则。

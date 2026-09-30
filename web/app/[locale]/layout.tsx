@@ -37,8 +37,14 @@ export default async function LocaleLayout({
     // 且让整棵路由树无法静态化。代价是页脚文案改完要重新部署。
     const messages = await getMessages();
 
+    // lang 纠正脚本：根 layout 的 `<html lang="zh-CN">` 是框架强制的默认值——根 layout 拿不到
+    // locale（拿它就得读请求头，整棵树退回动态渲染），而 Next 不允许子 layout 另起一个 <html>。
+    // 所以只能在这里补：脚本随 HTML 解析即执行，早于 hydration，Googlebot / Bingbot 能读到。
+    const langScript = `document.documentElement.lang=${JSON.stringify(locale === "en" ? "en" : "zh-CN")}`;
+
     return (
         <NextIntlClientProvider messages={messages} locale={locale}>
+            <script dangerouslySetInnerHTML={{ __html: langScript }} />
             <LanguageProvider initialLanguage={locale as "zh" | "en"}>
                 <RuntimeCacheRegistrar />
                 <SessionProvider>
