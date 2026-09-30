@@ -78,9 +78,12 @@
 
 **决定**：`docs/develop/` 只长期保留三类内容：
 
-1. **要求**（code-style.md、checks-by-stage.md、testing-at-a-glance.md）
+1. **要求**（`requirements/`：code-style / checks-by-stage / testing-at-a-glance）
 2. **成果 / 机制**（architecture/、knowledge/、operations/）
 3. **决策记录**（本文）
+
+> `requirements/` 是 2026-09-30 重组时新设的：这三份是**改动前必读的规范**，不是过程文件，
+> 故与 `plans/` 分开、单独成桶。
 
 **中间过程文件**（评估报告、重构 plan、复现报告）一旦**结论落地**，就：
 **把可长期复用的结论抽进本文或对应"要求"文档，然后删掉原文件**（git 历史里能找回）。

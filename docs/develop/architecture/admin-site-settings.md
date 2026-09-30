@@ -1,7 +1,7 @@
 # 后台站点设置系统 `/admin/settings`
 
 > 状态：**五步全部完成**（2026-09-27）。本文只记当前的机制与口径，实施过程与实测记录不在本文。
-> 静态化的完整说明见 `CLAUDE.md` §6.2.4，域名兜底见 §6.2.5。守卫清单见 `checks-by-stage.md`。
+> 静态化的完整说明见 `CLAUDE.md` §6.2.4，域名兜底见 §6.2.5。守卫清单见 [`../requirements/checks-by-stage.md`](../requirements/checks-by-stage.md)。
 
 ## 0. 需求（这就是全部）
 

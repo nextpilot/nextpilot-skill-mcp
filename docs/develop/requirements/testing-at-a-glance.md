@@ -230,10 +230,10 @@ pnpm test:e2e            # 全量 42 条
 
 ## 附 · 想再往下挖
 
-| 想找什么                           | 去哪                                                                   |
-| ---------------------------------- | ---------------------------------------------------------------------- |
-| 为什么这样分档、各项完整实测档案   | [`checks-by-stage.md`](checks-by-stage.md)                             |
-| 校验命令的**定义**（唯一事实源）   | [`../../tools/ci/checklist.yml`](../../tools/ci/checklist.yml)         |
-| 本地开发、部署、环境变量、故障排查 | [`operations/README.md`](operations/README.md)                         |
-| 引擎实现细节                       | [`../../knowledge/engine/README.md`](../../knowledge/engine/README.md) |
-| 怎么**写**一条检查规则             | 网站 `/guide/rule-schema`                                              |
+| 想找什么                           | 去哪                                                                      |
+| ---------------------------------- | ------------------------------------------------------------------------- |
+| 为什么这样分档、各项完整实测档案   | [`checks-by-stage.md`](checks-by-stage.md)                                |
+| 校验命令的**定义**（唯一事实源）   | [`../../tools/ci/checklist.yml`](../../../tools/ci/checklist.yml)         |
+| 本地开发、部署、环境变量、故障排查 | [`operations/README.md`](../operations/README.md)                         |
+| 引擎实现细节                       | [`../../knowledge/engine/README.md`](../../../knowledge/engine/README.md) |
+| 怎么**写**一条检查规则             | 网站 `/guide/rule-schema`                                                 |

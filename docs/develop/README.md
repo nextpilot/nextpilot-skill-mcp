@@ -1,8 +1,8 @@
 # docs/dev/ —— 开发者与运维文档
 
 **这里是"怎么跑起来、怎么部署、出问题怎么查"的地方**——不是知识库，也不是设计文档。
-面向**用户**的文档在 [`../guide/`](../guide/README.md)（会发布到站内 `/guide`），本目录不发布。
-三类内容各有归属，别往这里放：
+面向**用户**的文档真源在 [`web/content/guide/`](../../web/content/guide)（发布到站内 `/guide`），本目录不发布。
+五类内容各有归属，别往这里放：
 
 | 想找什么                                                        | 在哪                                                                                                                                         |
 | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -17,9 +17,9 @@
 | **基线日志为什么入库、放哪、CI 怎么用**                         | [`baselines.md`](knowledge/baselines.md)                                                                                                     |
 | 故障根因 / 排查步骤 / 禁忌                                      | [`knowledge/px4/fault-kb.yaml`](../../knowledge/px4/fault-kb.yaml)                                                                           |
 | 平台定位、商业模式、路线图                                      | 仓库根 [`CLAUDE.md`](../../CLAUDE.md)                                                                                                        |
-| 各阶段该跑哪些检查、各自耗时与分档依据                          | [`checks-by-stage.md`](checks-by-stage.md)                                                                                                   |
-| **只想快速知道"改完该跑什么、要等多久、红了看哪"**              | [`testing-at-a-glance.md`](testing-at-a-glance.md)（三分钟速查）                                                                             |
-| **代码风格 / 注释 / 打印消息 / 提交消息 / 产品资产 / 文档规范** | [`code-style.md`](code-style.md)（**风格要求的唯一权威落点**）                                                                               |
+| 各阶段该跑哪些检查、各自耗时与分档依据                          | [`checks-by-stage.md`](requirements/checks-by-stage.md)                                                                                      |
+| **只想快速知道"改完该跑什么、要等多久、红了看哪"**              | [`testing-at-a-glance.md`](requirements/testing-at-a-glance.md)（三分钟速查）                                                                |
+| **代码风格 / 注释 / 打印消息 / 提交消息 / 产品资产 / 文档规范** | [`code-style.md`](requirements/code-style.md)（**风格要求的唯一权威落点**）                                                                  |
 
 ## 目录
 
@@ -27,9 +27,9 @@
 **中间过程文件（评估报告、重构 plan、复现记录）完成即删**，只把结论抽进本目录的正式文档 —— 见 [`decisions.md`](decisions.md) D4。
 
 - **要求**（改动前必读）：
-  - `code-style.md` —— 代码风格、注释规范、打印消息、提交消息、产品资产保护与文档规范（**本仓风格要求的唯一权威落点**）
-  - `checks-by-stage.md` —— 检查的分类、分阶段安排与实测耗时
-  - `testing-at-a-glance.md` —— 测试流程速查：什么时候自动跑什么、耗时、红了怎么办
+  - `requirements/code-style.md` —— 代码风格、注释规范、打印消息、提交消息、产品资产保护与文档规范（**本仓风格要求的唯一权威落点**）
+  - `requirements/checks-by-stage.md` —— 检查的分类、分阶段安排与实测耗时
+  - `requirements/testing-at-a-glance.md` —— 测试流程速查：什么时候自动跑什么、耗时、红了怎么办
 - **知识**（`knowledge/` —— 上游与知识库资料，**统一放这里便于查找**）：
   - `knowledge/upstream-inventory.md` —— **上游清单**：上游有哪些（Flight Review 45 项图表逐条 + 子系统 + 工具），我们有哪些
   - `knowledge/upstream-itemized.md` —— **逐条对表**：上游每一项检查原来怎么写的、本仓现在怎么写的（PX4 8 项 + APM 16 项）

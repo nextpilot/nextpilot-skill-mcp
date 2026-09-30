@@ -629,7 +629,7 @@ const PYODIDE_INDEX_URL = process.env.NEXT_PUBLIC_PYODIDE_URL || "https://cdn...
 ### 6.4 文件命名规范
 
 新建文件先查后缀选型表与「望文生义」六条判据，两者都在
-[`docs/develop/code-style.md`](docs/develop/code-style.md) §1.1。
+[`docs/develop/requirements/code-style.md`](docs/develop/requirements/code-style.md) §1.1。
 
 本节只记一条不在这两类里、且**只有本仓才成立**的约束：
 
@@ -1268,7 +1268,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 篇幅：文件头不设行数上限；函数 / 块的注释上限 6 行；行内 / 行尾注释上限 1 行。
 
 模板（文件头 / 函数与块 / 变量与字段 / YAML）、四类位置的完整写法、删除对照表与提交前自检，
-见 [`docs/develop/code-style.md`](docs/develop/code-style.md) §2。
+见 [`docs/develop/requirements/code-style.md`](docs/develop/requirements/code-style.md) §2。
 
 **`knowledge/engine/` 下的文件会被当文本拼进产物，那些片段必须用 `#` 注释** —— 模块 docstring
 在拼接后不再是 docstring，会变成裸字符串表达式。
@@ -1315,7 +1315,7 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
    守卫按首词判"这个脚本会不会打出失败"，字面量挪进不带该词的出口会让守卫静默失效。
 
 四类位置的完整写法、出口对照表、消息文案约定，见
-[`docs/develop/code-style.md`](docs/develop/code-style.md) §2–§3。
+[`docs/develop/requirements/code-style.md`](docs/develop/requirements/code-style.md) §2–§3。
 
 ---
 

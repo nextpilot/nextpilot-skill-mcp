@@ -5,7 +5,7 @@
 >
 > 配套文档：
 >
-> - `upstream-itemized.md`(upstream-itemized.md) —— **检查/规则**逐条对表（PX4 8 项 + APM 16 项）
+> - [`upstream-itemized.md`](upstream-itemized.md) —— **检查/规则**逐条对表（PX4 8 项 + APM 16 项）
 > - 本文 —— **图表 / 子系统 / 工具**逐条对表
 > - [`baselines.md`](baselines.md) —— 基线日志为什么入库、放哪、CI 怎么用
 >
@@ -180,7 +180,7 @@ U3/U4 是旁证。U6–U8 是能力参考。U9/U10 明确不学。
 ## 三、U2 robotto：PX4 规则 8 项
 
 > **逐条对表（实码位置/判定/取数/证据/产物/本仓多做的/未做的）见
-> `upstream-itemized.md`(upstream-itemized.md) §一**。此处只放汇总。
+> [`upstream-itemized.md`](upstream-itemized.md) §一**。此处只放汇总。
 
 | #   | 上游检查          | 状态          | 一句话                                         |
 | --- | ----------------- | ------------- | ---------------------------------------------- |
@@ -199,7 +199,7 @@ U3/U4 是旁证。U6–U8 是能力参考。U9/U10 明确不学。
 
 ## 四、U5 ardupilot-mcp：APM 检查 16 项 + 额外能力
 
-> **逐条对表见 `upstream-itemized.md`(upstream-itemized.md) §二。**
+> **逐条对表见 [`upstream-itemized.md`](upstream-itemized.md) §二。**
 
 | 分组           | 上游检查                                                                               | 本仓                         |
 | -------------- | -------------------------------------------------------------------------------------- | ---------------------------- |
