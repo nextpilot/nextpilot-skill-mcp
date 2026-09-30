@@ -5,7 +5,7 @@
 > 与图表端到端验证。
 
 关联：本仓现状见 [`upstream-inventory.md`](upstream-inventory.md)；
-规则逐条对表见 [`rules/upstream-itemized.md`](rules/upstream-itemized.md)。
+规则逐条对表见 `upstream-itemized.md`(upstream-itemized.md)。
 
 ---
 
@@ -128,7 +128,7 @@ tools/testdata/
 tools/testdata/logs/*.ulg
 tools/testdata/logs/*.bin
 tools/testdata/logs/*.BIN
-# 例外：受控体积的基线日志入库（见 docs/develop/baselines.md §四）
+# 例外：受控体积的基线日志入库（见 `docs/develop/knowledge/baselines.md` §四）
 !tools/testdata/logs/px4-quad-healthy-*.ulg
 !tools/testdata/logs/px4-fw-healthy-*.ulg
 !tools/testdata/logs/apm-copter-*.BIN

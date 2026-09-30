@@ -51,7 +51,7 @@
 
 > 频谱图的实现前提是引擎侧能做 FFT。`knowledge/engine/operators.py` 目前没有频谱算子，
 > 需先补一个 `psd()` / `fft()` 算子（跑在 `web/workers/analysis-engine` 还是构建期预计算，
-> 要看数据量与首屏预算 —— 见 `docs/develop/perf-audit-2026-09-28.md`）。
+> 要看数据量与首屏预算 —— 见 `docs/develop/decisions.md` D5.4）。
 
 **B. 可选择补 —— 有条件才出现**
 

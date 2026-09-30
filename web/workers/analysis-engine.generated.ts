@@ -1879,7 +1879,7 @@ REQUIRED = {
         "sig": "() -> dict",
         "doc": "报告头的离散事实：机型 / 固件 / 时长 / 模式 / 载具身份……键名见各 provider",
     },
-    # ---- 知识引擎查询 API（契约见 docs/develop/engine-api-rework.md）----
+    # ---- 知识引擎查询 API（契约见 docs/develop/architecture/engine-api.md）----
     # 这组方法就是 provider 的正式名字。旧名（get_topic_data / get_logged_information /
     # get_logged_messages / get_flight_phases）已退场，不搞双轨。
     # 取不到一律返回 None / [] / {}（不抛异常），与上面同一套失败语义。
@@ -2051,7 +2051,7 @@ BUILTIN_VARIABLES = {
     "ARMED_S": {"type": "float", "doc": "armed 总时长（秒）"},
     "T0_US": {"type": "int", "doc": "日志起点时间戳（us），事件类算子算相对时刻的基准"},
     "DROPOUT_MS": {"type": "int", "doc": "全日志丢包累计（毫秒）"},
-    # ---- 知识引擎内置变量（docs/develop/engine-api-rework.md 并入）----
+    # ---- 知识引擎内置变量（docs/develop/architecture/engine-api.md 并入）----
     # 缺什么给 None / ""（类型里写明 |None 或直接给空串），不许编值。
     "SYS_UUID": {"type": "str", "doc": "系统唯一 ID。这份日志没写就给空串"},
     "AIRFRAME_ID": {
@@ -3341,7 +3341,7 @@ class Px4Provider:
         return out
 
     # ================= 知识引擎查询 API =================
-    # 契约见 api.py 的 REQUIRED（docs/develop/engine-api-rework.md 并入）。
+    # 契约见 api.py 的 REQUIRED（docs/develop/architecture/engine-api.md 并入）。
     # 取数尽量委托上面已有的方法（同一份数据不写两条路）；新聚合只在没有现成入口时才算。
 
     def get_start_timestamp(self):

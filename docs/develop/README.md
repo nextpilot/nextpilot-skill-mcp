@@ -11,10 +11,10 @@
 | 日志分析的检查经验（阈值 / 判定条件 / 算子）                    | [`knowledge/px4/rules/*.yaml`](../../knowledge/px4/rules) → 网站 [`/guide/rule-catalogue`](https://skill.nextpilot.org/guide/rule-catalogue) |
 | 怎么**写**一条检查经验                                          | 网站 `/guide/rule-schema`（由 `web/scripts/build-knowledge.mjs` 从 `knowledge/engine/` 源码生成 `web/.generated/guide/rule-schema.mdx`）     |
 | 规则体系的设计动机、实施状态与已知缺口                          | [`knowledge/px4/CLAUDE.md`](../../knowledge/px4/CLAUDE.md)（给 AI 与维护者，不发布到网站）                                                   |
-| 本仓与上游（Flight Review / ECL EKF Analysis）的能力差与取舍    | [`rules/upstream-gap.md`](rules/upstream-gap.md)                                                                                             |
-| **上游每一项检查到底覆盖了没有**（逐条对表，不要"超集"式概括）  | [`rules/upstream-itemized.md`](rules/upstream-itemized.md)                                                                                   |
-| **上游有哪些、我们有哪些**（图表 45 项 / 子系统 / 工具逐条）    | [`upstream-inventory.md`](upstream-inventory.md)                                                                                             |
-| **基线日志为什么入库、放哪、CI 怎么用**                         | [`baselines.md`](baselines.md)                                                                                                               |
+| 本仓与上游（Flight Review / ECL EKF Analysis）的能力差与取舍    | [`knowledge/upstream-gap.md`](knowledge/upstream-gap.md)                                                                                     |
+| **上游每一项检查到底覆盖了没有**（逐条对表，不要"超集"式概括）  | [`knowledge/upstream-itemized.md`](knowledge/upstream-itemized.md)                                                                           |
+| **上游有哪些、我们有哪些**（图表 45 项 / 子系统 / 工具逐条）    | [`upstream-inventory.md`](knowledge/upstream-inventory.md)                                                                                   |
+| **基线日志为什么入库、放哪、CI 怎么用**                         | [`baselines.md`](knowledge/baselines.md)                                                                                                     |
 | 故障根因 / 排查步骤 / 禁忌                                      | [`knowledge/px4/fault-kb.yaml`](../../knowledge/px4/fault-kb.yaml)                                                                           |
 | 平台定位、商业模式、路线图                                      | 仓库根 [`CLAUDE.md`](../../CLAUDE.md)                                                                                                        |
 | 各阶段该跑哪些检查、各自耗时与分档依据                          | [`checks-by-stage.md`](checks-by-stage.md)                                                                                                   |
@@ -23,16 +23,29 @@
 
 ## 目录
 
-- `code-style.md` —— 代码风格、注释规范、打印消息、提交消息、产品资产保护与文档规范（**已成文**；本仓风格要求的唯一权威落点）
-- `upstream-inventory.md` —— **上游清单**：上游有哪些（Flight Review 45 项图表逐条 + 子系统 + 工具），我们有哪些，一条一条列
-- `baselines.md` —— **基线日志**：为什么入库、选哪些、目录约定、CI 怎么同步跑（含 `.gitignore` 白名单与体积门禁）
-- `checks-by-stage.md` —— 检查的分类、分阶段安排与实测耗时（**已成文**）
-- `testing-at-a-glance.md` —— 测试流程速查：什么时候自动跑什么、耗时、红了怎么办（**已成文**；要论证看 `checks-by-stage.md`）
-- `architecture/` —— 系统边界与数据流（待写；现状速览暂在 `operations/README.md` 第 1 节）
-  - `upstream-alignment-plan.md` —— 复刻 Flight Review（图表/PID/3D）+ 借鉴 PX4/APM 生态的实施计划
-  - `upstream-kb-collection.md` —— 上游知识收集：robotto 检查清单、45 张图、PID、EKF 分析
-- `operations/` —— 本地开发、EdgeOne 部署、环境变量与故障排查（**已成文**）
-- `rules/` —— 规则文档（规则清单已由网站 `/guide/rule-catalogue` 自动生成，此处只放不适合进网站的说明）
-  - `upstream-itemized.md` —— **逐条对表**：上游每一项检查原来怎么写的、本仓现在怎么写的（PX4 8 项 + APM 16 项）
-  - `upstream-gap.md` —— 本仓 PLOT / 规则与上游（Flight Review、ECL EKF Analysis）的能力差、取舍与可借鉴项
-  - `coverage-plan.md` —— 该检查什么、现在检查了什么：14 个高价值 topic 零覆盖清单与分批补法
+**按"性质"分五类**：要求 / 成果 / 知识 / 运维 / 计划。
+**中间过程文件（评估报告、重构 plan、复现记录）完成即删**，只把结论抽进本目录的正式文档 —— 见 [`decisions.md`](decisions.md) D4。
+
+- **要求**（改动前必读）：
+  - `code-style.md` —— 代码风格、注释规范、打印消息、提交消息、产品资产保护与文档规范（**本仓风格要求的唯一权威落点**）
+  - `checks-by-stage.md` —— 检查的分类、分阶段安排与实测耗时
+  - `testing-at-a-glance.md` —— 测试流程速查：什么时候自动跑什么、耗时、红了怎么办
+- **知识**（`knowledge/` —— 上游与知识库资料，**统一放这里便于查找**）：
+  - `knowledge/upstream-inventory.md` —— **上游清单**：上游有哪些（Flight Review 45 项图表逐条 + 子系统 + 工具），我们有哪些
+  - `knowledge/upstream-itemized.md` —— **逐条对表**：上游每一项检查原来怎么写的、本仓现在怎么写的（PX4 8 项 + APM 16 项）
+  - `knowledge/upstream-gap.md` —— 本仓 PLOT / 规则与上游的能力差、取舍与可借鉴项
+  - `knowledge/upstream-kb-collection.md` —— 上游知识收集：robotto 检查清单、图表、PID、EKF 分析
+  - `knowledge/coverage-plan.md` —— 该检查什么、现在检查了什么：14 个高价值 topic 零覆盖清单与分批补法
+  - `knowledge/baselines.md` —— 基线日志：为什么入库、选哪些、目录约定、CI 怎么同步跑
+- **成果**（`architecture/` —— 系统边界、机制与数据流）：
+  - `architecture/README.md` —— 架构文档入口
+  - `architecture/plot-schema.md` —— 绘图预设 schema（`container` 是扩展点）
+  - `architecture/engine-api.md` —— 知识引擎 API（已落地，provider 契约）
+  - `architecture/error-reporting.md` —— 错误上报链路
+  - `architecture/admin-site-settings.md` —— 后台站点设置系统 `/admin/settings`
+- **运维**：`operations/` —— 本地开发、EdgeOne 部署、环境变量与故障排查
+- **计划与决策**：
+  - `decisions.md` —— **决策记录**：已拍板、别走回头路的结论 + 未闭合待办
+  - `plans/` —— **进行中的 plan**（完成即按 `decisions.md` D4 处理，不留根层）
+    - `plans/upstream-alignment-plan.md` —— 复刻 Flight Review（图表/PID/3D）+ 借鉴 PX4/APM 生态
+    - `plans/audit-2026-09-30.md` —— 现状评估（技术栈/功能/SEO）

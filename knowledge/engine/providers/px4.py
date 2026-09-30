@@ -239,7 +239,7 @@ class Px4Provider:
         return out
 
     # ================= 知识引擎查询 API =================
-    # 契约见 api.py 的 REQUIRED（docs/develop/engine-api-rework.md 并入）。
+    # 契约见 api.py 的 REQUIRED（docs/develop/architecture/engine-api.md 并入）。
     # 取数尽量委托上面已有的方法（同一份数据不写两条路）；新聚合只在没有现成入口时才算。
 
     def get_start_timestamp(self):

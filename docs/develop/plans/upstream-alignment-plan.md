@@ -6,8 +6,8 @@
 >
 > 原则：**先覆盖，后精调**。阈值一律 `[暂定]`，先把检查与图表挂上。
 >
-> 本文是**可执行 plan**，不是评估报告。事实底账见 `../rules/upstream-gap.md`、
-> `../rules/coverage-plan.md`、`upstream-kb-collection.md`、`plot-schema.md`。
+> 本文是**可执行 plan**，不是评估报告。事实底账见 `../knowledge/upstream-gap.md`、
+> `../knowledge/coverage-plan.md`、`../knowledge/upstream-kb-collection.md`、`../architecture/plot-schema.md`。
 
 ---
 
@@ -73,25 +73,25 @@ Motor RPM、Manual Control Inputs。**其中 6 张卡在同一个前置能力：
 
 ### 3.1 PX4 侧：三个上游
 
-| 上游                            | 是什么                                                    | 与本仓的关系                                                                                                                                                                                                                                                   | 该借鉴什么                                                                                                  |
-| ------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| **`robotto` ai-drone-toolkit**  | monorepo，`ulog_tools.py` 的 `diagnose_flight()` 8 项检查 | **本仓规则直接祖先**，8/8 已迁移：`logged_errors`/`ekf_innovations`/`battery`/`failsafe` 4 条更强、`cpu_load`/`mode_thrash` 2 条等价、`ekf_faults`/`vibration` 2 条已声明降级。**逐条对表见 [`../rules/upstream-itemized.md`](../rules/upstream-itemized.md)** | 仅剩 2 处未对齐：`estimator_status.nan_flags`（未查）、`estimator_status.vibe[2]`（换了数据源，数值不可比） |
-| **`Auterion/ecl_ekf_analysis`** | EKF 专用批处理 CLI，管 EKF 创新与创新比                   | 本仓 `ekf-innovation.yaml` / `ekf-faults.yaml` 已覆盖，**阈值是 `[暂定]`**                                                                                                                                                                                     | ①创新比阈值对表 `params/` ②**四步结构化分析**作为报告叙事骨架                                               |
-| **`px4_log_analyzer`**          | `events.yaml` 声明 ~80 参数 + `time_window_sec` 去抖      | 与本仓 `compute`+`trigger` **几乎同构**                                                                                                                                                                                                                        | 事件的**时间窗去抖**（本仓 `excursion_events` 已有雏形）；`complex_data` 组合派生                           |
+| 上游                            | 是什么                                                    | 与本仓的关系                                                                                                                                                                                                                                                           | 该借鉴什么                                                                                                  |
+| ------------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **`robotto` ai-drone-toolkit**  | monorepo，`ulog_tools.py` 的 `diagnose_flight()` 8 项检查 | **本仓规则直接祖先**，8/8 已迁移：`logged_errors`/`ekf_innovations`/`battery`/`failsafe` 4 条更强、`cpu_load`/`mode_thrash` 2 条等价、`ekf_faults`/`vibration` 2 条已声明降级。**逐条对表见 [`../knowledge/upstream-itemized.md`](../knowledge/upstream-itemized.md)** | 仅剩 2 处未对齐：`estimator_status.nan_flags`（未查）、`estimator_status.vibe[2]`（换了数据源，数值不可比） |
+| **`Auterion/ecl_ekf_analysis`** | EKF 专用批处理 CLI，管 EKF 创新与创新比                   | 本仓 `ekf-innovation.yaml` / `ekf-faults.yaml` 已覆盖，**阈值是 `[暂定]`**                                                                                                                                                                                             | ①创新比阈值对表 `params/` ②**四步结构化分析**作为报告叙事骨架                                               |
+| **`px4_log_analyzer`**          | `events.yaml` 声明 ~80 参数 + `time_window_sec` 去抖      | 与本仓 `compute`+`trigger` **几乎同构**                                                                                                                                                                                                                                | 事件的**时间窗去抖**（本仓 `excursion_events` 已有雏形）；`complex_data` 组合派生                           |
 
 **PX4 官方「结构化四步分析」**（应写进报告页叙事）：① 日志完整性（是否空中截断）② 控制器是否跟踪设定值
 ③ 传感器是否有效 ④ 排除电源故障。第 2 步＝批 C；第 4 步需 SD 卡 `fault_*.log`，**日志里拿不到，明确不做**。
 
 ### 3.2 APM 侧：`ardupilot-mcp` 与同类
 
-| 工具                                                 | 形态                        | 覆盖面                                                                                                           | 该借鉴什么                                                                                                                                                                                                                                                                                             |
-| ---------------------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **`furkanisikay/ardupilot-mcp`**（本仓 APM 知识源）  | MCP，16 检查                | 飞行动态 + **配置/安装**（参数审计/校准/接线/预解锁）+ **物理推理**（功率裕度/推重比）                           | **16/16 已对齐**：13 齐平 + 2 主动降级（`power` 阈值待验证、`gps` 有意 skip）+ `vehicle_profile` **未迁移**。**逐条对表见 [`../rules/upstream-itemized.md`](../rules/upstream-itemized.md) §二**；可借鉴：①`vehicle_profile` 物理推理 ②规则**注册表** ③**按机型跳过不适用的检查**（heli 不跑电机平衡） |
-| **`Praddyx15/FlightMD`**                             | Web 应用，7 规则引擎 + 评分 | 振荡/振动/EKF/电池/GPS/参数/电机 + 上升回收；**50 份真实日志验证**                                               | ①**health score 0–100 + 权重**（本仓无总评分）②**每条 finding 给确切参数改动**（`MPC_XY_P: 0.95 → 1.4`）③**50 份真实日志验证**的做法 ④3D 轨迹按风速/HDOP 着色                                                                                                                                          |
-| **`ArduPilot/WebTools`**（官方）                     | **纯浏览器**套件            | FilterReview（FFT+滤波仿真）/ AnalyticTune / **PIDReview** / FilterTool（Bode）/ SysID / MAGFit / HardwareReport | ①**纯客户端零上传**（与本仓同一架构，可互相印证）②`fft.js` + Pyodide 的数学栈 ③**PIDReview 的频域做法** ④MAGFit 罗盘拟合 ⑤FilterTool 的 Bode 图                                                                                                                                                        |
-| **`raylanlin/smarttune-cli`**                        | CLI + MCP，16 工具          | PID/FFT/Filter/Mag/SysID/Hardware；**APM+Betaflight+PX4 多平台**                                                 | ①**参数存在性校验门禁**（推荐参数前先验参数在固件里存在且在范围内）——**这是本仓最该抄的一条** ②**6 层知识库为纯 JSON**（Agent 可读写）③每条建议带**置信度 + 推理过程**                                                                                                                                 |
-| `BeastAyyG` / `Sathvik12004` ardupilot-log-diagnosis | ML 分类器                   | 异常分类 + GPS/IMU 故障                                                                                          | **不学**：结果是训练权重，不可从代码审计（与「确定性引擎是唯一真相源」冲突）                                                                                                                                                                                                                           |
-| `fossuav/aap`（AI Playbooks）                        | AI 剧本                     | —                                                                                                                | 观察即可                                                                                                                                                                                                                                                                                               |
+| 工具                                                 | 形态                        | 覆盖面                                                                                                           | 该借鉴什么                                                                                                                                                                                                                                                                                                     |
+| ---------------------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`furkanisikay/ardupilot-mcp`**（本仓 APM 知识源）  | MCP，16 检查                | 飞行动态 + **配置/安装**（参数审计/校准/接线/预解锁）+ **物理推理**（功率裕度/推重比）                           | **16/16 已对齐**：13 齐平 + 2 主动降级（`power` 阈值待验证、`gps` 有意 skip）+ `vehicle_profile` **未迁移**。**逐条对表见 [`../knowledge/upstream-itemized.md`](../knowledge/upstream-itemized.md) §二**；可借鉴：①`vehicle_profile` 物理推理 ②规则**注册表** ③**按机型跳过不适用的检查**（heli 不跑电机平衡） |
+| **`Praddyx15/FlightMD`**                             | Web 应用，7 规则引擎 + 评分 | 振荡/振动/EKF/电池/GPS/参数/电机 + 上升回收；**50 份真实日志验证**                                               | ①**health score 0–100 + 权重**（本仓无总评分）②**每条 finding 给确切参数改动**（`MPC_XY_P: 0.95 → 1.4`）③**50 份真实日志验证**的做法 ④3D 轨迹按风速/HDOP 着色                                                                                                                                                  |
+| **`ArduPilot/WebTools`**（官方）                     | **纯浏览器**套件            | FilterReview（FFT+滤波仿真）/ AnalyticTune / **PIDReview** / FilterTool（Bode）/ SysID / MAGFit / HardwareReport | ①**纯客户端零上传**（与本仓同一架构，可互相印证）②`fft.js` + Pyodide 的数学栈 ③**PIDReview 的频域做法** ④MAGFit 罗盘拟合 ⑤FilterTool 的 Bode 图                                                                                                                                                                |
+| **`raylanlin/smarttune-cli`**                        | CLI + MCP，16 工具          | PID/FFT/Filter/Mag/SysID/Hardware；**APM+Betaflight+PX4 多平台**                                                 | ①**参数存在性校验门禁**（推荐参数前先验参数在固件里存在且在范围内）——**这是本仓最该抄的一条** ②**6 层知识库为纯 JSON**（Agent 可读写）③每条建议带**置信度 + 推理过程**                                                                                                                                         |
+| `BeastAyyG` / `Sathvik12004` ardupilot-log-diagnosis | ML 分类器                   | 异常分类 + GPS/IMU 故障                                                                                          | **不学**：结果是训练权重，不可从代码审计（与「确定性引擎是唯一真相源」冲突）                                                                                                                                                                                                                                   |
+| `fossuav/aap`（AI Playbooks）                        | AI 剧本                     | —                                                                                                                | 观察即可                                                                                                                                                                                                                                                                                                       |
 
 ### 3.3 社区共识（重要，影响产品定位）
 
@@ -138,18 +138,18 @@ ArduPilot Discourse 的「自动日志分析工具清单」帖里，核心开发
 
 ## 5. 技术方案
 
-| 层级           | 方案                                                                                  | 说明 / 依据                                                                                                       |
-| -------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| **规则层**     | 新增 YAML，复用既有 `conditions` + `compute` + `triggers`                             | schema 必填只有 `id`/`name`/`group`/`compute`；`placeholder` 是「未实现」的一等字段                               |
-| **规则分组**   | 新 group 登记进 `facts.yaml` 的 `group_order` 与 `rule_meta.by_group`                 | 不登记 = 构建期报错                                                                                               |
-| **频谱算子**   | 在 `operators.py` 加**字段无关**的频域算子；**先读已有 `zero_cross_hz`**              | 判据：`engine.py`/`operators.py` 里 grep 不到 `vehicle_` 等具体名                                                 |
-| **频谱落点**   | 走既有 `np_series(request_json, max_points=3000)` 通道                                | 该门面已支持 `compute` + 实例 + 单位换算 + LTTB 降采样                                                            |
-| **新容器**     | `container` 加 `spectrogram`                                                          | `plot-schema.md` 明确：**`container` 是扩展点，不是枚举**，加一种容器只需加容器类型与 children 变体，其余各层不动 |
-| **前端渲染**   | `chart-presets.ts` 加同级 `if (out.container !== "spectrogram") continue;` + 渲染分支 | 现有判别位 `type CompiledOutput = (UnifiedAxes & { container: "axes" }) \| { container: "map" }`                  |
-| **PID**        | 降压版：setpoint vs 实测的跟踪误差 + 统计，不做反卷积                                 | 用现有 `mask_and`/`apply_mask`/`interval_mask` 对齐；反卷积 / 频域裕度留第二阶段                                  |
-| **3D view**    | 中档 `D2`：three.js 轨迹 + 姿态，做报告页一个 tab                                     | 数据已在 `analysis-engine.generated.ts` 的 `facts.track`，**不需要改引擎**                                        |
-| **APM phases** | provider 从 `MODE` 消息切段推 `takeoff`/`hover`/`cruise`                              | `providers/ardupilot.py` 的 `get_report_facts()` 现在硬编码 `"phases": []`                                        |
-| **文档同源**   | `knowledge/engine/README.md` 算子计数校准（现写 92，实测 **91**）                     | 顺手修正                                                                                                          |
+| 层级           | 方案                                                                                  | 说明 / 依据                                                                                                                       |
+| -------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **规则层**     | 新增 YAML，复用既有 `conditions` + `compute` + `triggers`                             | schema 必填只有 `id`/`name`/`group`/`compute`；`placeholder` 是「未实现」的一等字段                                               |
+| **规则分组**   | 新 group 登记进 `facts.yaml` 的 `group_order` 与 `rule_meta.by_group`                 | 不登记 = 构建期报错                                                                                                               |
+| **频谱算子**   | 在 `operators.py` 加**字段无关**的频域算子；**先读已有 `zero_cross_hz`**              | 判据：`engine.py`/`operators.py` 里 grep 不到 `vehicle_` 等具体名                                                                 |
+| **频谱落点**   | 走既有 `np_series(request_json, max_points=3000)` 通道                                | 该门面已支持 `compute` + 实例 + 单位换算 + LTTB 降采样                                                                            |
+| **新容器**     | `container` 加 `spectrogram`                                                          | `../architecture/plot-schema.md` 明确：**`container` 是扩展点，不是枚举**，加一种容器只需加容器类型与 children 变体，其余各层不动 |
+| **前端渲染**   | `chart-presets.ts` 加同级 `if (out.container !== "spectrogram") continue;` + 渲染分支 | 现有判别位 `type CompiledOutput = (UnifiedAxes & { container: "axes" }) \| { container: "map" }`                                  |
+| **PID**        | 降压版：setpoint vs 实测的跟踪误差 + 统计，不做反卷积                                 | 用现有 `mask_and`/`apply_mask`/`interval_mask` 对齐；反卷积 / 频域裕度留第二阶段                                                  |
+| **3D view**    | 中档 `D2`：three.js 轨迹 + 姿态，做报告页一个 tab                                     | 数据已在 `analysis-engine.generated.ts` 的 `facts.track`，**不需要改引擎**                                                        |
+| **APM phases** | provider 从 `MODE` 消息切段推 `takeoff`/`hover`/`cruise`                              | `providers/ardupilot.py` 的 `get_report_facts()` 现在硬编码 `"phases": []`                                                        |
+| **文档同源**   | `knowledge/engine/README.md` 算子计数校准（现写 92，实测 **91**）                     | 顺手修正                                                                                                                          |
 
 ### 5.1 频谱算子：架构权衡留痕（多候选 + 性能敏感，必填）
 
@@ -201,7 +201,7 @@ ArduPilot Discourse 的「自动日志分析工具清单」帖里，核心开发
 | **回滚**     | `git revert <sha>` + **必须重跑 `pnpm web:build:kb`**（产物是构建期搬运的，不重跑会不一致）                                                                          |
 | **监控**     | 基线对比脚本是回归哨兵；新 finding 一旦在无相关改动的提交里出现即视为回归                                                                                            |
 | **告警**     | `compare-baseline` job 红即阻断 push                                                                                                                                 |
-| **巡检**     | 每次新增规则后回看 `coverage-plan.md` 的 topic 覆盖数字是否需要更新                                                                                                  |
+| **巡检**     | 每次新增规则后回看 `../knowledge/coverage-plan.md` 的 topic 覆盖数字是否需要更新                                                                                     |
 
 ---
 
@@ -242,13 +242,13 @@ ArduPilot Discourse 的「自动日志分析工具清单」帖里，核心开发
 
 ## 11. 已核实的事实（备查）
 
-- 上游 robotto `diagnose_flight` 8 项逐条对表 → `../rules/upstream-gap.md` §2
-- 45 张图逐张清单与缺口 → `../rules/upstream-gap.md` §1
-- 14 个零覆盖 topic 的字段与优先级 → `../rules/coverage-plan.md` §2
+- 上游 robotto `diagnose_flight` 8 项逐条对表 → `../knowledge/upstream-gap.md` §2
+- 45 张图逐张清单与缺口 → `../knowledge/upstream-gap.md` §1
+- 14 个零覆盖 topic 的字段与优先级 → `../knowledge/coverage-plan.md` §2
 - APM 接线现状与缺口 → `knowledge/ardupilot/PENDING.md`（第六节"其它待定"）
 - 取数路径：`cdn.jsdelivr.net/gh/<repo>@<branch>/<path>`（沙箱直连 GitHub 被拦）
 - 上游关键文件：`configured_plots.py`(62KB)、`pid_analysis.py`(20KB)、
   `robotto_drone_core/ulog_tools.py`(27KB)、`Auterion/ecl_ekf_analysis`
 - 引擎现状：`operators.py` 实测 **91** 个算子（`README.md` 写 92，待校准）；
   `np_series(request_json, max_points=3000)` 已支持 `compute` + 实例 + 换算 + LTTB；
-  `plot-schema.md` 已把 `spectrogram` 列为 `container` 预留扩展点
+  `../architecture/plot-schema.md` 已把 `spectrogram` 列为 `container` 预留扩展点

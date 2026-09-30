@@ -269,14 +269,14 @@ MODE_CHANGES_WARN = 12
 
 ### PX4 侧
 
-| 未覆盖                       | 上游/参考来源                       | 为什么没做                        | 计划                                 |
-| ---------------------------- | ----------------------------------- | --------------------------------- | ------------------------------------ |
-| `estimator_status.nan_flags` | robotto `ekf_faults`                | 迁移时只挑了 `filter_fault_flags` | 批 A4                                |
-| `estimator_status.vibe[2]`   | robotto `vibration`                 | 换了数据源（见上）                | 批 A4                                |
-| 45 张图里的 9 张             | Flight Review `configured_plots.py` | 6 张卡在"没有频谱算力"            | 批 B                                 |
-| PID tune 整块                | Flight Review `pid_analysis.py`     | 完整子系统，零对应物              | 批 C                                 |
-| 3D view                      | Flight Review `link_to_3d_page`     | 完整子系统，零对应物              | 批 D                                 |
-| EKF 四步结构化分析的叙事     | PX4 官方文档                        | 未做成报告页骨架                  | 见 `upstream-alignment-plan.md` §3.1 |
+| 未覆盖                       | 上游/参考来源                       | 为什么没做                        | 计划                                          |
+| ---------------------------- | ----------------------------------- | --------------------------------- | --------------------------------------------- |
+| `estimator_status.nan_flags` | robotto `ekf_faults`                | 迁移时只挑了 `filter_fault_flags` | 批 A4                                         |
+| `estimator_status.vibe[2]`   | robotto `vibration`                 | 换了数据源（见上）                | 批 A4                                         |
+| 45 张图里的 9 张             | Flight Review `configured_plots.py` | 6 张卡在"没有频谱算力"            | 批 B                                          |
+| PID tune 整块                | Flight Review `pid_analysis.py`     | 完整子系统，零对应物              | 批 C                                          |
+| 3D view                      | Flight Review `link_to_3d_page`     | 完整子系统，零对应物              | 批 D                                          |
+| EKF 四步结构化分析的叙事     | PX4 官方文档                        | 未做成报告页骨架                  | 见 `../plans/upstream-alignment-plan.md` §3.1 |
 
 ### APM 侧
 

@@ -1,7 +1,7 @@
 # 上游知识收集：规则 / 图表 / PID / 3D
 
-> 2026-09-30 收集。**只做清点，不做取舍**——取舍见 `../rules/upstream-gap.md`、
-> `../rules/coverage-plan.md`、`upstream-alignment-plan.md`。
+> 2026-09-30 收集。**只做清点，不做取舍**——取舍见 `./upstream-gap.md`、
+> `./coverage-plan.md`、`../plans/upstream-alignment-plan.md`。
 >
 > 取数：沙箱直连 GitHub 被拦，走 `cdn.jsdelivr.net/gh/<repo>@<branch>/<path>` 拿源码原文。
 
@@ -49,7 +49,7 @@
 
 ## 2. Flight Review 图表清单（45 张）与缺口
 
-> `app/plot_app/configured_plots.py`（62KB）。逐张对表见 `../rules/upstream-gap.md` §1.3。
+> `app/plot_app/configured_plots.py`（62KB）。逐张对表见 `./upstream-gap.md` §1.3。
 
 **缺 9 张**：
 
@@ -65,7 +65,7 @@
 | Motor RPM (`esc_status`)   | 无（纯新图）         |
 | Manual Control Inputs      | 无（纯新图）         |
 
-**6 张卡在频谱能力上** —— 这是「照搬图表」的硬前提，见 `upstream-alignment-plan.md` 批 B。
+**6 张卡在频谱能力上** —— 这是「照搬图表」的硬前提，见 `../plans/upstream-alignment-plan.md` 批 B。
 
 上游的图表**阈值线写法**（可照搬）：
 
@@ -91,14 +91,14 @@
 
 核心参数：`framelen=1s`、`resplen=0.5s`、`cutfreq=25Hz`、`superpos=16`。
 
-**本仓零对应物。** 降压做法（先做跟踪误差）见 `upstream-alignment-plan.md` 批 C。
+**本仓零对应物。** 降压做法（先做跟踪误差）见 `../plans/upstream-alignment-plan.md` 批 C。
 
 ---
 
 ## 4. 3D view
 
 上游是 `link_to_3d_page` + 独立 3D 站点（Cesium/three.js 系），本仓只有 2D 地图（`track.yml`）。
-**本仓零对应物。** 分档做法见 `upstream-alignment-plan.md` 批 D。
+**本仓零对应物。** 分档做法见 `../plans/upstream-alignment-plan.md` 批 D。
 
 ---
 
