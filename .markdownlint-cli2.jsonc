@@ -41,6 +41,10 @@
     "**/node_modules/**",
     "**/.next/**",
     "web/test-results/**",
+    // Playwright 跑过 e2e 就会写出这个目录（内含 data/*.md 的报错上下文），
+    // 它被 web/.gitignore 忽略、却不在 gitignore 的管辖里——cli2 只读自己的 ignores。
+    // 不排除的话，本地跑一次 e2e 就会让 markdownlint 报一堆与本项目无关的假错（MD025/MD047）。
+    "web/playwright-report/**",
     // 本地类型检查用的虚拟环境（pyright 靠它找 numpy / pyulog）。site-packages 里带
     // 第三方 LICENSE.md，扫进来会报一堆与本项目无关的规则错。gitignore 管不到这里——
     // cli2 只读自己的 ignores。
