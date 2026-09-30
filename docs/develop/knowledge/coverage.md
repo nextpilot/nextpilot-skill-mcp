@@ -1,9 +1,12 @@
-# PX4 规则覆盖清单：该检查什么，现在检查了什么
+# 覆盖情况：该检查什么，现在检查了什么
 
-> **口径**：本文只回答「覆盖没覆盖」，不回答「阈值准不准」。阈值精调是另一笔（见 `./upstream-gap.md` §2.4）。
+> **本文回答一个问题**：PX4 那一堆 topic 里，**我们检查了哪些、漏了哪些、先补哪些**。
 >
-> 2026-09-30 摸底。数据面来自 `meta/v1.16.0.json`（227 个 topic），
-> 现状来自 26 条规则 + 6 份 PX4 基线日志的实测。
+> **口径**：本文只回答「覆盖没覆盖」，不回答「阈值准不准」。阈值精调见
+> [`gap.md`](gap.md) §2.4。上游具体有哪些检查见 [`upstream.md`](upstream.md)。
+
+**摸底时间**：2026-09-30。数据面来自 `meta/v1.16.0.json`（227 个 topic），
+现状来自 26 条规则 + 6 份 PX4 基线日志的实测。
 
 ## 结论速览
 
@@ -12,6 +15,8 @@
 - 6 份基线里，`power-sag` / `motor-unbalance` / `imu-bias-drift` **每份都跳过**，
   `airspeed-invalid` / `ekf-innovation` / `wind-estimate` 多数跳过。
   **跳过率高未必是 bug**（多旋翼本来没空速、没风估），但要能一眼看出是"不适用"还是"取不到数"。
+
+---
 
 ## 一、现状：26 条规则按维度
 
@@ -37,6 +42,8 @@
 `estimator_sensor_bias`、`estimator_states`、`estimator_status`、`vehicle_air_data`、
 `vehicle_imu_status`、`vehicle_status` + guard 用的日志元信息。
 
+---
+
 ## 二、缺口：高价值但完全没检查的 topic
 
 按「检查了有没有用」排序，**全部 14 个当前零覆盖**：
@@ -61,6 +68,8 @@
 > 第 2、3、11 项特别值钱：**PX4 固件自己已经算完了结论**，我们只是没读。
 > 补这三项的成本远低于从原始数据自己推（尤其 FFT，`sensor_gyro_fft` 直接给了峰值频率）。
 
+---
+
 ## 三、缺口：已有规则里没检查的子维度
 
 不是没 topic，是同一个 topic 里还有没看的字段：
@@ -73,6 +82,8 @@
 | `vibration`           | `vehicle_imu_status`   | `gyro_vibration_metric`、`delta_angle_dt` 等                         | **陀螺振动**（现在只看加速度计）          |
 | `log-errors/warnings` | 消息流                 | 未按来源模块分类                                                     | 区分"哪类模块在报错"                      |
 
+---
+
 ## 四、上游有、我们没有任何对应检查的
 
 从 `configured_plots.py` 与 PX4 文档反推（不计已列的 topic 缺口）：
@@ -84,6 +95,8 @@
 | 磁力计推力相关性                   | `Thrust and Magnetic Field` 图   | **无**（磁干扰是常见坠机诱因）               |
 | 估计器看门狗                       | `Estimator Flags` 图             | `ekf-faults` 覆盖了一部分                    |
 | 采样规律 / 时间滑移                | `Sampling Regularity` 图         | 只有 `guard-log-dropouts` 判丢包             |
+
+---
 
 ## 五、建议的补法（分批）
 
@@ -103,4 +116,5 @@
 
 **与阈值精调的关系**：批 1 做完，覆盖数从 26 → 31，`[暂定]` 阈值从 15 条会涨到 20+ 条。
 那是**预期的**——先有覆盖，再校准。`thresholds_source` 字段（设计里第 6 层，尚未落地）
-就是为此准备的，见 `knowledge/px4/CLAUDE.md`。
+就是为此准备的，字段定义见网站 `/guide/rule-schema` 与
+[`../../knowledge/px4/rules`](../../../knowledge/px4/rules)。

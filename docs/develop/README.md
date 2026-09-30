@@ -1,51 +1,92 @@
-# docs/dev/ —— 开发者与运维文档
+# docs/develop/ —— 开发者文档
 
-**这里是"怎么跑起来、怎么部署、出问题怎么查"的地方**——不是知识库，也不是设计文档。
-面向**用户**的文档真源在 [`web/content/guide/`](../../web/content/guide)（发布到站内 `/guide`），本目录不发布。
-五类内容各有归属，别往这里放：
+**给开发者看：这个仓库怎么实现、怎么跑、怎么改。**
 
-| 想找什么                                                        | 在哪                                                                                                                                         |
-| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| 架构速览、环境变量、GitHub OAuth、KV 绑定、部署与故障排查       | [operations/](operations/README.md)（**当前唯一有真实内容的目录**）                                                                          |
-| 引擎实现（算子注册表 / 规则框架 / 报告数据层）                  | [`knowledge/engine/`](../../knowledge/engine/README.md)（浏览器与本地工具共用同一份源码）                                                    |
-| 日志分析的检查经验（阈值 / 判定条件 / 算子）                    | [`knowledge/px4/rules/*.yaml`](../../knowledge/px4/rules) → 网站 [`/guide/rule-catalogue`](https://skill.nextpilot.org/guide/rule-catalogue) |
-| 怎么**写**一条检查经验                                          | 网站 `/guide/rule-schema`（由 `web/scripts/build-knowledge.mjs` 从 `knowledge/engine/` 源码生成 `web/.generated/guide/rule-schema.mdx`）     |
-| 规则体系的设计动机、实施状态与已知缺口                          | [`knowledge/px4/CLAUDE.md`](../../knowledge/px4/CLAUDE.md)（给 AI 与维护者，不发布到网站）                                                   |
-| 本仓与上游（Flight Review / ECL EKF Analysis）的能力差与取舍    | [`knowledge/upstream-gap.md`](knowledge/upstream-gap.md)                                                                                     |
-| **上游每一项检查到底覆盖了没有**（逐条对表，不要"超集"式概括）  | [`knowledge/upstream-itemized.md`](knowledge/upstream-itemized.md)                                                                           |
-| **上游有哪些、我们有哪些**（图表 45 项 / 子系统 / 工具逐条）    | [`upstream-inventory.md`](knowledge/upstream-inventory.md)                                                                                   |
-| **基线日志为什么入库、放哪、CI 怎么用**                         | [`baselines.md`](knowledge/baselines.md)                                                                                                     |
-| 故障根因 / 排查步骤 / 禁忌                                      | [`knowledge/px4/fault-kb.yaml`](../../knowledge/px4/fault-kb.yaml)                                                                           |
-| 平台定位、商业模式、路线图                                      | 仓库根 [`CLAUDE.md`](../../CLAUDE.md)                                                                                                        |
-| 各阶段该跑哪些检查、各自耗时与分档依据                          | [`checks-by-stage.md`](requirements/checks-by-stage.md)                                                                                      |
-| **只想快速知道"改完该跑什么、要等多久、红了看哪"**              | [`testing-at-a-glance.md`](requirements/testing-at-a-glance.md)（三分钟速查）                                                                |
-| **代码风格 / 注释 / 打印消息 / 提交消息 / 产品资产 / 文档规范** | [`code-style.md`](requirements/code-style.md)（**风格要求的唯一权威落点**）                                                                  |
+> 面向**用户**的文档真源在 [`web/content/guide/`](../../web/content/guide)
+> （发布到站内 `/guide`），本目录不发布。
+> **判断标准**：这段话用户会不会在 `/guide` 上看到？会 → `web/content/`；不会 → 本目录。
 
-## 目录
+---
 
-**按"性质"分五类**：要求 / 成果 / 知识 / 运维 / 计划。
-**中间过程文件（评估报告、重构 plan、复现记录）完成即删**，只把结论抽进本目录的正式文档 —— 见 [`decisions.md`](decisions.md) D4。
+## 一、先看这里
 
-- **要求**（改动前必读）：
-  - `requirements/code-style.md` —— 代码风格、注释规范、打印消息、提交消息、产品资产保护与文档规范（**本仓风格要求的唯一权威落点**）
-  - `requirements/checks-by-stage.md` —— 检查的分类、分阶段安排与实测耗时
-  - `requirements/testing-at-a-glance.md` —— 测试流程速查：什么时候自动跑什么、耗时、红了怎么办
-- **知识**（`knowledge/` —— 上游与知识库资料，**统一放这里便于查找**）：
-  - `knowledge/upstream-inventory.md` —— **上游清单**：上游有哪些（Flight Review 45 项图表逐条 + 子系统 + 工具），我们有哪些
-  - `knowledge/upstream-itemized.md` —— **逐条对表**：上游每一项检查原来怎么写的、本仓现在怎么写的（PX4 8 项 + APM 16 项）
-  - `knowledge/upstream-gap.md` —— 本仓 PLOT / 规则与上游的能力差、取舍与可借鉴项
-  - `knowledge/upstream-kb-collection.md` —— 上游知识收集：robotto 检查清单、图表、PID、EKF 分析
-  - `knowledge/coverage-plan.md` —— 该检查什么、现在检查了什么：14 个高价值 topic 零覆盖清单与分批补法
-  - `knowledge/baselines.md` —— 基线日志：为什么入库、选哪些、目录约定、CI 怎么同步跑
-- **成果**（`architecture/` —— 系统边界、机制与数据流）：
-  - `architecture/README.md` —— 架构文档入口
-  - `architecture/plot-schema.md` —— 绘图预设 schema（`container` 是扩展点）
-  - `architecture/engine-api.md` —— 知识引擎 API（已落地，provider 契约）
-  - `architecture/error-reporting.md` —— 错误上报链路
-  - `architecture/admin-site-settings.md` —— 后台站点设置系统 `/admin/settings`
-- **运维**：`operations/` —— 本地开发、EdgeOne 部署、环境变量与故障排查
-- **计划与决策**：
-  - `decisions.md` —— **决策记录**：已拍板、别走回头路的结论 + 未闭合待办
-  - `plans/` —— **进行中的 plan**（完成即按 `decisions.md` D4 处理，不留根层）
-    - `plans/upstream-alignment-plan.md` —— 复刻 Flight Review（图表/PID/3D）+ 借鉴 PX4/APM 生态
-    - `plans/audit-2026-09-30.md` —— 现状评估（技术栈/功能/SEO）
+| 你的处境                           | 去哪                                      |
+| ---------------------------------- | ----------------------------------------- |
+| **第一天进来，想跑起来**           | [`quickstart/`](quickstart/README.md)     |
+| **要改代码，想懂系统怎么分层**     | [`architecture/`](architecture/README.md) |
+| **要加规则 / 改图 / 动知识库**     | [`knowledge/`](knowledge/README.md)       |
+| **要部署、线上出问题**             | [`operations/`](operations/README.md)     |
+| **想知道接下来做什么、已定了什么** | [`roadmap/`](roadmap/decisions.md)        |
+| **动手写代码前，想守规矩**         | [`style.md`](style.md)                    |
+
+---
+
+## 二、六个位置，各有归属
+
+```text
+docs/develop/
+├── README.md                  # 本文（导航）
+├── style.md                   # 规范：命名/注释/打印/提交/产品资产/文档
+├── quickstart/                # 上手
+│   ├── README.md              #   快速开始：装环境、跑起来、常用命令
+│   └── checks-by-stage.md     #   什么时候跑哪些检查：分档、六阶段、耗时、坑
+├── architecture/              # 怎么实现的
+│   ├── README.md              #   索引 + 四层总览
+│   ├── engine.md              #   知识引擎：算子、规则框架、报告数据层
+│   ├── provider.md            #   格式适配层：provider 契约
+│   ├── web-app.md             #   Web 应用：双层运行时、端侧分析、内容管线
+│   ├── mcp-server.md          #   MCP 服务：工具集与装配
+│   ├── error-reporting.md     #   错误上报
+│   └── admin-site-settings.md #   后台站点设置
+├── knowledge/                 # 知识库状况
+│   ├── upstream.md            #   上游有什么（一个 plot、一条 rule 逐条）
+│   ├── gap.md                 #   我们差在哪、哪些不补、该抄什么
+│   ├── coverage.md            #   我们现在的覆盖情况
+│   └── baselines.md           #   基线日志怎么入库、CI 怎么用
+├── operations/                # 运维
+│   ├── README.md              #   架构速览、环境变量、KV、排障
+│   └── deploy.md              #   部署、回滚、CI/CD
+└── roadmap/                   # 计划与决策
+    ├── decisions.md           #   决策记录：已拍板 + 未闭合待办
+    └── *-plan.md              #   进行中的方案（一个方案一份）
+```
+
+**三条铁律**：
+
+1. **一个 md 只讲一个主题**，不许两份文档说同一件事。
+2. **本目录任何文档不得引用 `CLAUDE.md`**——那是给 AI 看的。只允许反向（`CLAUDE.md` → 本目录）。
+3. **中间过程文件（评估报告、重构 plan、复现记录）完成即删**，只把结论抽进正式文档
+   —— 见 [`roadmap/decisions.md`](roadmap/decisions.md) D4。
+
+---
+
+## 三、写在哪儿：判断标准
+
+**「这份内容，三个月后还需要被人读吗？」**
+
+| 内容性质                           | 去哪                                   | 生命周期       |
+| ---------------------------------- | -------------------------------------- | -------------- |
+| 规范（你该写成什么样）             | `style.md`                             | 长期           |
+| 上手（怎么跑起来、改完跑什么）     | `quickstart/`                          | 长期           |
+| 机制（已落地的设计、契约、schema） | `architecture/`                        | 长期           |
+| 知识库状况（上游/差距/覆盖/基线）  | `knowledge/`                           | 长期           |
+| 运维（部署、排障）                 | `operations/`                          | 长期           |
+| 决策与待办                         | `roadmap/decisions.md`                 | 长期           |
+| **方案（还没做完的）**             | `roadmap/`，一个方案一份 `*-plan.md`   | **完成即处理** |
+| **过程（评估、复现、重构记录）**   | 不进本目录；结论抽进上面某处后删原文件 | **即用即弃**   |
+
+**代码旁的文档**（`knowledge/engine/README.md`、`tools/README.md`、各 `CLAUDE.md`）
+留在代码旁，本目录不复制它们的内容，需要时链接过去。
+
+---
+
+## 四、周边真源
+
+| 你想知道                          | 去哪                                                                                      |
+| --------------------------------- | ----------------------------------------------------------------------------------------- |
+| 引擎实现（算子注册表 / 规则框架） | [`knowledge/engine/`](../../knowledge/engine/README.md)（浏览器与本地工具共用同一份源码） |
+| 检查经验（阈值 / 判定条件）       | [`knowledge/px4/rules/*.yaml`](../../knowledge/px4/rules) → 网站 `/guide/rule-catalogue`  |
+| 怎么**写**一条检查经验            | 网站 `/guide/rule-schema`                                                                 |
+| 故障根因 / 排查步骤 / 禁忌        | [`knowledge/px4/fault-kb.yaml`](../../knowledge/px4/fault-kb.yaml)                        |
+| 绘图预设 schema                   | [`knowledge/px4/plot/README.md`](../../knowledge/px4/plot/README.md)                      |
+| 站点内容（guide / skills / mcp）  | [`web/content/`](../../web/content)                                                       |

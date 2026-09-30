@@ -5,29 +5,41 @@
 > 真知源在仓库根的 [`knowledge/`](../../../knowledge/README.md)（规则 YAML、算子、provider）。
 > 本目录是**关于知识库的文档**：上游有什么、我们有什么、差在哪、怎么补。
 
-## 怎么读
+## 四问四文档
 
-| 你想知道                                         | 看这份                                                   |
-| ------------------------------------------------ | -------------------------------------------------------- |
-| **上游有哪些、我们有哪些**（一条一条）           | [`upstream-inventory.md`](upstream-inventory.md)         |
-| **每一项上游检查原来怎么写的、我们现在怎么写的** | [`upstream-itemized.md`](upstream-itemized.md)           |
-| 本仓与上游的能力差、取舍、可借鉴项               | [`upstream-gap.md`](upstream-gap.md)                     |
-| 上游原始资料清点（robotto 清单、图表、PID、EKF） | [`upstream-kb-collection.md`](upstream-kb-collection.md) |
-| 该检查什么、现在检查了什么（零覆盖清单）         | [`coverage-plan.md`](coverage-plan.md)                   |
-| 基线日志为什么入库、放哪、CI 怎么用              | [`baselines.md`](baselines.md)                           |
+本目录按四个问题组织，**一个问题只有一份文档**，不重复：
+
+| #   | 你想知道                                    | 看这份                         |
+| --- | ------------------------------------------- | ------------------------------ |
+| 1   | **有哪些上游**（一个 plot、一条 rule 逐条） | [`upstream.md`](upstream.md)   |
+| 2   | **我们差在哪 / 哪些不补 / 该抄什么**        | [`gap.md`](gap.md)             |
+| 3   | **我们现在的覆盖情况**（规则 vs topic）     | [`coverage.md`](coverage.md)   |
+| 4   | **基线日志怎么入库、CI 怎么用**             | [`baselines.md`](baselines.md) |
+
+配套：本目录怎么读、架构入口见 [`README.md`](README.md)（本文）。
+
+## 上游十个源
+
+| #   | 上游                   | 仓                                 | 覆盖什么                       |
+| --- | ---------------------- | ---------------------------------- | ------------------------------ |
+| U1  | **Flight Review**      | `PX4/flight_review`                | 图表 / PID / 3D（45 图）       |
+| U2  | **robotto toolkit**    | `robotto-drone-core`               | PX4 规则（8 项），**本仓前身** |
+| U3  | **ecl_ekf_analysis**   | `Auterion/ecl_ekf_analysis`        | EKF 阈值权威 + golden log 回归 |
+| U4  | **px4_log_analyzer**   | `riccardodamiani/px4_log_analyzer` | 声明式事件 + 时间窗去抖        |
+| U5  | **ardupilot-mcp**      | `furkanisikay/ardupilot-mcp`       | APM 规则（16 项）              |
+| U6  | **ArduPilot WebTools** | `ArduPilot/WebTools`               | 纯浏览器 FFT / PIDReview       |
+| U7  | **FlightMD**           | `Praddyx15/FlightMD`               | health score + 回归集          |
+| U8  | **smarttune-cli**      | `raylanlin/smarttune-cli`          | 参数存在性校验门禁             |
+| U9  | 桌面工具（备查）       | PlotJuggler / Foxglove …           | 🚫 不学形态                    |
+| U10 | ML 分类器              | `BeastAyyG/*` 等                   | 🚫 不学（权重不可审计）        |
+
+**必须逐条对表的三个**：**U1**（图表 + PID + 3D）、**U2**（PX4 规则）、**U5**（APM 规则）。
+逐条清单见 [`upstream.md`](upstream.md)。
 
 ## 口径
 
 - **差异要逐条列，不许用"超集"这类概括** —— 这是本目录的硬要求。
   一条上游检查，必须能回答：「原来怎么写的 / 我们怎么写的 / 差在哪」。
 - 状态口径：**✅ 已有** / **🟡 部分** / **🔵 占位** / **❌ 没有** / **🚫 明确不做**（并写清为什么）。
-- 与本目录相关的实施计划在 [`../plans/upstream-alignment-plan.md`](../plans/upstream-alignment-plan.md)；
-  一旦实施完成，结论按 [`../decisions.md`](../decisions.md) D4 抽进正式文档。
-
-## 上游三个主源
-
-| 源              | 仓                           | 覆盖什么          |
-| --------------- | ---------------------------- | ----------------- |
-| Flight Review   | `PX4/flight_review`          | 图表 / PID / 3D   |
-| robotto toolkit | `robotto` monorepo           | PX4 规则（8 项）  |
-| ardupilot-mcp   | `furkanisikay/ardupilot-mcp` | APM 规则（16 项） |
+- 与本目录相关的实施计划在 [`../roadmap/upstream-alignment-plan.md`](../roadmap/upstream-alignment-plan.md)；
+  一旦实施完成，结论按 [`../roadmap/decisions.md`](../roadmap/decisions.md) D4 抽进正式文档。

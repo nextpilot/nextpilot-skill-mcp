@@ -24,6 +24,7 @@
     "typecheck": "pnpm typecheck:tsc && pnpm typecheck:py",
     "lint:all": "pnpm format && pnpm lint && pnpm typecheck",
     "eng:test": "python -m pytest knowledge/engine/tests",
+    "dev": "pnpm --filter ./web dev",
     "web:dev": "pnpm --filter ./web dev",
     "web:build": "pnpm --filter ./web build",
     "web:start": "pnpm --filter ./web start",
@@ -34,6 +35,8 @@
     "web:fix:links": "pnpm --filter ./web fix:links",
     "web:typecheck": "pnpm --filter ./web typecheck",
     "web:test:e2e": "pnpm --filter ./web test:e2e",
+    "web:test:e2e:smoke": "pnpm --filter ./web test:e2e:smoke",
+    "web:test:e2e:log": "pnpm --filter ./web test:e2e:log",
     "hook:pre-commit": "python .githooks/pre-commit",
     "hook:pre-push": "python .githooks/pre-push"
   },

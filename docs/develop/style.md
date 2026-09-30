@@ -2,8 +2,8 @@
 
 **改代码、写注释、写文档、提 commit 前读这一份。** 这里是风格要求的唯一权威落点。
 
-适用范围是**源码**。文档主题归属与检查挂载点分别见 [`checks-by-stage.md`](checks-by-stage.md)
-与 [`testing-at-a-glance.md`](testing-at-a-glance.md)，本文不重复。
+适用范围是**源码**。文档主题归属与「什么时候跑哪些检查」见
+[`checks-by-stage.md`](quickstart/checks-by-stage.md)，本文不重复。
 
 两条总原则，后面所有条目都是它的推论：
 
@@ -85,8 +85,7 @@ python -m ruff format --check . && python -m ruff check .
 
 格式化器说了算，人不与它争论。局部不一致时以 `ruff format` / `prettier` 的输出为准。
 
-前端侧**待落地**的部分（prettier 写入、`eslint --fix`）见
-[`checks-by-stage.md`](checks-by-stage.md) 第 4–5 节，本文不重复。
+前端的格式化与 lint 挂载点见 [`checks-by-stage.md`](quickstart/checks-by-stage.md) 第三节，本文不重复。
 
 ### 1.3 类型
 
@@ -338,7 +337,7 @@ style(dev): 输出收编到 log API，进度条改流式写入
   同一主题只选一个，选定后别分散。
 - **过程类**（方案怎么来的、踩过什么）不写进详细落点。方案文档只留需求、结论、待办
   与至今仍起作用的坑。
-- **清单类**（有哪些检查、各自耗时、挂在哪一阶段）落在清单本身或 [`checks-by-stage.md`](checks-by-stage.md)。
+- **清单类**（有哪些检查、各自耗时、挂在哪一阶段）落在清单本身或 [`checks-by-stage.md`](quickstart/checks-by-stage.md)。
 
 写文档时注意：
 
@@ -355,13 +354,14 @@ style(dev): 输出收编到 log API，进度条改流式写入
 
 `docs/develop/` **按"性质"分五个位置**，放错就是又给将来埋一处"同一件事两处说法"：
 
-| 位置            | 放什么                                                                    | 生命周期       |
-| --------------- | ------------------------------------------------------------------------- | -------------- |
-| （根）          | **要求**：`code-style.md`、`checks-by-stage.md`、`testing-at-a-glance.md` | 长期           |
-| `knowledge/`    | **上游与知识库资料**（清单、逐条对表、基线）                              | 长期           |
-| `architecture/` | **已落地的机制**：边界、契约、schema                                      | 长期           |
-| `operations/`   | **运维**：部署、环境变量、排障                                            | 长期           |
-| `plans/`        | **进行中的 plan**                                                         | **完成即处理** |
+| 位置            | 放什么                                            | 生命周期       |
+| --------------- | ------------------------------------------------- | -------------- |
+| `requirements/` | **要求**：`code-style.md`、`checks-by-stage.md`   | 长期           |
+| `knowledge/`    | **上游与知识库资料**（上游 / 差距 / 覆盖 / 基线） | 长期           |
+| `architecture/` | **已落地的机制**：边界、契约、schema              | 长期           |
+| `operations/`   | **运维**：部署、环境变量、排障                    | 长期           |
+| `plans/`        | **进行中的 plan**                                 | **完成即处理** |
+| `decisions.md`  | **决策记录**：已拍板结论 + 未闭合待办             | 长期           |
 
 **过程文件（评估报告、重构 plan、复现记录）完成后的处理规则**：
 
@@ -371,4 +371,4 @@ style(dev): 输出收编到 log API，进度条改流式写入
 
 判断标准一句话：**这份内容，三个月后还需要被人读吗？** 不需要就删。
 
-决策与未闭合待办一律进 [`decisions.md`](../decisions.md)，**不要在别处新开文档**。
+决策与未闭合待办一律进 [`decisions.md`](roadmap/decisions.md)，**不要在别处新开文档**。

@@ -4,7 +4,7 @@
 > 让 CI 在**没有外网、没有本地缓存**的机器上也能跑完整的 `compare-baseline`
 > 与图表端到端验证。
 
-关联：本仓现状见 [`upstream-inventory.md`](upstream-inventory.md)；
+关联：本仓现状见 [`upstream.md`](upstream.md)；
 规则逐条对表见 `upstream-itemized.md`(upstream-itemized.md)。
 
 ---

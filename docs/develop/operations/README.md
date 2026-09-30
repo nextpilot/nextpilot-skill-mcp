@@ -1,6 +1,13 @@
-# 运维文档
+# 运维：架构、环境变量、KV 与排障
 
-本地开发、EdgeOne Pages 部署、环境变量、KV 绑定与故障排查。
+| 你想知道                         | 看哪                                                     |
+| -------------------------------- | -------------------------------------------------------- |
+| **部署、回滚、CI/CD**            | [`deploy.md`](deploy.md)                                 |
+| **本地开发怎么跑起来**           | [`../quickstart/README.md`](../quickstart/README.md)     |
+| **系统怎么分层**                 | [`../architecture/README.md`](../architecture/README.md) |
+| 环境变量、GitHub OAuth、KV、排障 | 本文                                                     |
+
+---
 
 ## 1. 架构速览
 
@@ -17,15 +24,15 @@
        /api/reports、/api/reports/[id]   云端报告 CRUD（免费版保留 7 天，惰性过期）
        /internal/otp/set|consume   仅 Node 侧（x-internal-secret）调用
        /internal/users/upsert
-      /api/issues           浏览器报错入口（公开，按 IP 日限流）→ 去重后提 issue
-      /api/issue-probe            上报链路自检探针
-      /api/ping、/api/kv-probe    兼容性探针（验证完可删）
+       /api/issues           浏览器报错入口（公开，按 IP 日限流）→ 去重后提 issue
+       /api/issue-probe            上报链路自检探针
+       /api/ping、/api/kv-probe    兼容性探针（验证完可删）
 ```
 
 > 根级探针（`/ping`、`/kv-probe`、`/issue-probe`、`/blob`）**已退役**：探针统一迁到
 > `/api/` 前缀，根级写法自然 404。**入口一律用 `/api/` 前缀**（如 `/api/kv-probe`）。
 > 这类路径**不需要任何特殊处理**——非 `/api`、非页面的根级路径由 next-intl 统一判 404
-> （与 `/abc`、`/foobar` 行为完全一致）。详见 `CLAUDE.md` 6.2.3。
+> （与 `/abc`、`/foobar` 行为完全一致）。
 
 - 会话：next-auth JWT 策略（JWE，A256CBC-HS512，密钥 HKDF(AUTH_SECRET, cookie名)）。边缘函数用 `jose` 以同一 `AUTH_SECRET` 验签（`functions/_lib/auth.js`）。
 - KV：`NEXTPILOT_KV` 绑定，**只在边缘函数可用**。key 仅允许字母/数字/下划线，无 TTL（过期写进 value 惰性清理）。
@@ -33,12 +40,7 @@
 
 ## 2. 本地开发
 
-```bash
-cd web
-pnpm install
-cp .env.example .env       # 填入本地开发密钥
-pnpm dev                   # 页面 + Node 路由（/api/auth、发信）
-```
+见 [`../quickstart/README.md`](../quickstart/README.md)。
 
 需要联调 KV / 边缘函数时安装 EdgeOne CLI：
 
@@ -130,14 +132,7 @@ KV key 规则（代码见 `functions/_lib/kv.js`）：
 用真实客户端 IP 覆盖该头，伪造值不生效。未开启时所有请求拿到的都是 `"unknown"`，
 按 IP 的配额/限流会合并成一个全网桶（宁严勿漏，但正常用户会被误伤）。
 
-## 5. EdgeOne Pages 构建配置
-
-- 项目根目录：`web/`
-- 安装/构建：`pnpm install` / `pnpm build`
-- 输出目录：`.next`（Next.js 全栈模式，非静态导出）
-- 实测 Next.js 16.3.5 可直接部署（官方文档标称支持 13.5-15）
-
-## 6. 故障排查
+## 5. 故障排查
 
 | 现象                    | 排查                                                                                                                                                                                                        |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -151,9 +146,9 @@ KV key 规则（代码见 `functions/_lib/kv.js`）：
 | 报错没生成 issue        | 访问 `/api/issue-probe`，看 `enabled` / `repo` / `tokenSet` 与 `recentFailures`。**Gitee 的写接口与读接口表现可能不一致**（读 200、写 404 `project or enterprise`），所以必须用 `?write=1` 真发一次才能确认 |
 | 报错 issue 刷屏         | 不应发生：同指纹只建一条、后续追加评论，可恢复类每天最多一条。若真刷屏，检查 `/api/issue-probe` 里 `recentFailures`——多半是建单成功但去重记录没写进 KV（KV 最终一致，60s 内可能出现一次重复）               |
 
-## 7. 线上报错自动提 issue
+## 6. 线上报错自动提 issue
 
-完整设计与护栏见 `docs/architecture/error-reporting.md`，这里只留运维要点。
+完整机制与护栏见 [`../architecture/error-reporting.md`](../architecture/error-reporting.md)，这里只留运维要点。
 
 链路：浏览器（未捕获异常 / 未处理的 Promise / Worker 解析失败 / React 渲染崩溃）或边缘函数（LLM 调用失败）
 → `/api/issues` 或进程内直调 → **分级 → 指纹去重 → 白名单脱敏 → 硬限流** → Gitee issue。
@@ -172,32 +167,3 @@ curl -H "x-internal-secret: $AUTH_EDGE_SECRET" "https://<域名>/api/issue-probe
 ```
 
 `write=1` 走正常上报路径，反复自检只会建**一个** issue（同指纹后续都是评论），验完手动关掉即可。
-
-## 8. CI/CD（GitHub Actions）
-
-两个 workflow，分工是「CI 只判质量，Deploy 只管发布」：
-
-| 文件                           | 触发                                            | 做什么                                                                                                                        |
-| ------------------------------ | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `.github/workflows/ci.yml`     | push 到 master / PR / 手动                      | 跑 `tools/ci/check_all.py --stage build,ci --with-e2e`（含 ruff、产物比对、`tsc --noEmit`、`next build`、E2E 冒烟、依赖审计） |
-| `.github/workflows/deploy.yml` | CI 跑完且成功（`workflow_run`）/ 手动 / 同仓 PR | `edgeone pages deploy` 到 EdgeOne Pages，生产环境加 `/ping` 冒烟                                                              |
-
-- **部署等 CI 绿了才发**：`workflow_run` 无法在 `on` 里过滤结果，判据写在 job 的 `if` 里（只认 `conclusion == 'success'`）。
-- **回滚 / 补发**走 Actions 页面手动触发 `Deploy`，`env` 选 `production`。
-- **同仓 PR 自动发预览环境**（`-e preview`）；fork 的 PR 拿不到 secret，已显式跳过而不是让它红。
-- 环境变量（见第 3 节）**仍配在 EdgeOne 控制台**，不进仓库、不进 CI 日志。
-
-需要配的仓库配置（Settings → Secrets and variables → Actions）：
-
-| 类型     | 名称                | 说明                                                           |
-| -------- | ------------------- | -------------------------------------------------------------- |
-| Secret   | `EDGEONE_API_TOKEN` | EdgeOne 控制台 → API Token                                     |
-| Variable | `EDGEONE_PROJECT`   | Pages 项目名。**填错会自动新建一个空项目**，首次跑前务必核对   |
-| Variable | `SMOKE_BASE_URL`    | 可选。生产源站如 `https://skill.nextpilot.org`，不配则跳过冒烟 |
-
-> ⚠ **仓库托管方**：当前 `origin` 是 Gitee（默认分支 `master`），而 Gitee **不执行 `.github/workflows/`**，
-> 它有自己的流水线配置目录。要让上面两个文件真正跑起来，需要把仓库镜像/迁移到 GitHub，
-> 或在 Gitee 侧另写一份等价配置（但那样就破了「校验命令只写一处」的约定，CI 与本地会分成两处维护）。
-> 未迁移前，云端门禁实际处于**未生效**状态，质量仍只靠本机 `.githooks/pre-push` 拦。
-
-改动校验清单时只改 `tools/ci/checklist.yml` 一处，两个 workflow 与本地 hook 都跟着变——命令不要在 workflow 里另抄一份。
