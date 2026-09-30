@@ -13,6 +13,8 @@
 | 规则体系的设计动机、实施状态与已知缺口                          | [`knowledge/px4/CLAUDE.md`](../../knowledge/px4/CLAUDE.md)（给 AI 与维护者，不发布到网站）                                                   |
 | 本仓与上游（Flight Review / ECL EKF Analysis）的能力差与取舍    | [`rules/upstream-gap.md`](rules/upstream-gap.md)                                                                                             |
 | **上游每一项检查到底覆盖了没有**（逐条对表，不要"超集"式概括）  | [`rules/upstream-itemized.md`](rules/upstream-itemized.md)                                                                                   |
+| **上游有哪些、我们有哪些**（图表 45 项 / 子系统 / 工具逐条）    | [`upstream-inventory.md`](upstream-inventory.md)                                                                                             |
+| **基线日志为什么入库、放哪、CI 怎么用**                         | [`baselines.md`](baselines.md)                                                                                                               |
 | 故障根因 / 排查步骤 / 禁忌                                      | [`knowledge/px4/fault-kb.yaml`](../../knowledge/px4/fault-kb.yaml)                                                                           |
 | 平台定位、商业模式、路线图                                      | 仓库根 [`CLAUDE.md`](../../CLAUDE.md)                                                                                                        |
 | 各阶段该跑哪些检查、各自耗时与分档依据                          | [`checks-by-stage.md`](checks-by-stage.md)                                                                                                   |
@@ -22,6 +24,8 @@
 ## 目录
 
 - `code-style.md` —— 代码风格、注释规范、打印消息、提交消息、产品资产保护与文档规范（**已成文**；本仓风格要求的唯一权威落点）
+- `upstream-inventory.md` —— **上游清单**：上游有哪些（Flight Review 45 项图表逐条 + 子系统 + 工具），我们有哪些，一条一条列
+- `baselines.md` —— **基线日志**：为什么入库、选哪些、目录约定、CI 怎么同步跑（含 `.gitignore` 白名单与体积门禁）
 - `checks-by-stage.md` —— 检查的分类、分阶段安排与实测耗时（**已成文**）
 - `testing-at-a-glance.md` —— 测试流程速查：什么时候自动跑什么、耗时、红了怎么办（**已成文**；要论证看 `checks-by-stage.md`）
 - `architecture/` —— 系统边界与数据流（待写；现状速览暂在 `operations/README.md` 第 1 节）
