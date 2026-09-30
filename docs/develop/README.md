@@ -27,3 +27,4 @@
 - `operations/` —— 本地开发、EdgeOne 部署、环境变量与故障排查（**已成文**）
 - `rules/` —— 规则文档（规则清单已由网站 `/guide/rule-catalogue` 自动生成，此处只放不适合进网站的说明）
   - `upstream-gap.md` —— 本仓 PLOT / 规则与上游（Flight Review、ECL EKF Analysis）的能力差、取舍与可借鉴项
+  - `coverage-plan.md` —— 该检查什么、现在检查了什么：14 个高价值 topic 零覆盖清单与分批补法
