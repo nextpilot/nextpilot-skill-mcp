@@ -156,6 +156,14 @@ command: ["{PYTHON}", "tools/engine/check_engine_purity.py"]
 hint: "The knowledge/engine/ directory contains non-Pyodide-safe code. Review the violations above; knowledge/engine/ must work in both browser (Pyodide) and native CPython."
 
 ---
+id: "check-seo-contract"
+name: "SEO output contract (check_seo_contract)"
+when: [push, ci]
+workdir: "{ROOT}"
+command: ["{PYTHON}", "tools/engine/check_seo_contract.py"]
+hint: "A crawler-facing tag regressed: og:url lost its locale prefix, the [locale] layout lost its lang fix-up, sitemap writes a fake lastModified, or a security header was dropped. See the FAIL lines above for which one and why it matters."
+
+---
 id: "guard-apm-parser-version"
 name: "APM parser version follows parse logic (guard_apm_parser_version)"
 when: [push, ci]

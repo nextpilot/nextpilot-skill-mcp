@@ -77,6 +77,8 @@ GUARDS = {
     "hygiene": ([PY, "tools/common/check_hygiene.py"], ROOT, "卫生检查（check_hygiene）", "fail-lines"),
     # 只扫 knowledge/engine/ 源码文本，无依赖、无网络、不需要日志，快，每次都跑
     "engine": ([PY, "tools/engine/check_engine_purity.py"], ROOT, "引擎纯度（check_engine_purity）", "fail-lines"),
+    # 只扫几个前端源码文件的文本，无依赖、无构建，快
+    "seo": ([PY, "tools/engine/check_seo_contract.py"], ROOT, "SEO 输出契约（check_seo_contract）", "fail-lines"),
     # 只扫 package.json 的 scripts 文本，快、无依赖
     "pnpm-filter": ([PY, "tools/common/check_pnpm_filter.py"], ROOT, "pnpm 转发脚本（check_pnpm_filter）", "fail-lines"),
     # 只跑纯函数（内置假 manifest），无浏览器无日志
@@ -341,6 +343,46 @@ MUTATIONS: list[Mutation] = [
         expect="knowledge/engine/ 仍被浏览器与本机共用（纯 Python 的前提还在）",
         note="同上：本机侧消费者也消失时，这条规则该被删掉而不是继续绿。"
         "runner 与 server 都经这份装配入口取引擎，指错一层，两边一起红",
+    ),
+    # ---- SEO：爬虫与社交平台拿到的标签 ----
+    #
+    # 这几条守的是"本地看不见的对外契约"：改坏了页面照样能开，只有搜索引擎和分享卡片会遭殃。
+    Mutation(
+        name="og:url 退回不带 locale 的写法",
+        path="web/lib/seo.ts",
+        old="const ogUrl = canonicalUrl;",
+        new="const ogUrl = path ? `${SITE_URL}${path}` : SITE_URL;",
+        guard="seo",
+        expect="og:url 与 canonical 同址",
+        note="社媒按 og:url 回访：少一层 /en 就把英文页当中文页抓，卡片串语言",
+    ),
+    Mutation(
+        name="[locale] layout 去掉 lang 纠正脚本",
+        path="web/app/[locale]/layout.tsx",
+        old="document.documentElement.lang",
+        new="noop-lang-fix-removed",
+        guard="seo",
+        expect="[locale] layout 带 lang 纠正",
+        note="根 layout 的 lang 写死 zh-CN 且框架不许子 layout 另起 <html>，去掉这段英文页就永远是 zh-CN。"
+        "新串不得含锚点 —— `documentElement.langDisabled` 仍包含 `documentElement.lang`，会报 always-green",
+    ),
+    Mutation(
+        name="sitemap 用裸 new Date() 当 lastModified",
+        path="web/app/sitemap.ts",
+        old="changeFrequency: changeFreq,",
+        new="lastModified: new Date(),\n                changeFrequency: changeFreq,",
+        guard="seo",
+        expect="sitemap 不写假 lastModified",
+        note="每次请求求值 = 宣称所有页面刚改过，不可信的 lastmod 会被搜索引擎忽略",
+    ),
+    Mutation(
+        name="next.config 少下发 X-Frame-Options",
+        path="web/next.config.ts",
+        old='{ key: "X-Frame-Options", value: "SAMEORIGIN" },',
+        new="",
+        guard="seo",
+        expect="next.config 下发安全响应头",
+        note="缺了它页面能被任意站点 iframe 套住做点击劫持；守卫按 key 值匹配，注释里留着头名不算数",
     ),
     # ---- 界面侧：站点版本只有一个读取口 ----
     #
