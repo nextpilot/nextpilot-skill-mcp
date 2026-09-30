@@ -18,7 +18,7 @@
 
 **为什么不叫 `tests/`**：这里装的绝大多数不是测试——`guard-*` `check-*` 是守卫与契约检查，
 跑一遍断言的是"某一族不变量还成不成立"，不是单元测试。仓库里已有
-见 `docs/develop/decisions.md` D2（命名诊断与决策）。
+见 [`docs/develop/roadmap/decisions.md`](../docs/develop/roadmap/decisions.md) D2（命名诊断与决策）。
 
 ## 单元测试不在 tools/ 下
 

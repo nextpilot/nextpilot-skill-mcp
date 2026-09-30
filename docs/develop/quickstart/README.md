@@ -90,6 +90,28 @@ pnpm web:kb:watch                  # 单独开着知识热重建（另开终端�
 > **E2E 三条**：根层对应 `web:test:e2e` / `web:test:e2e:smoke` / `web:test:e2e:log`，
 > 定义在 `web/package.json`（`test:e2e` / `test:e2e:smoke` / `test:e2e:log`）。
 
+**本地 MCP 服务**（`server/`，可选——只有要让 AI 助手直接分析本地日志时才需要）：
+
+```bash
+# 依赖：server 那份单独装，不进开发机默认依赖
+python -m pip install -r requirements-dev.txt -r requirements-server.txt
+
+# 启动（stdio，阻塞到对端断开）
+python -m nextpilot_mcp
+```
+
+它是 **stdio 传输**，不是 HTTP 服务——不用手动"起服务再访问端口"，而是让 AI 客户端
+（Claude Code / Cursor 等）通过配置去**拉起这个进程**：
+
+```jsonc
+// 客户端配置里指向仓库，路径换成你自己的
+{ "command": "python", "args": ["-m", "nextpilot_mcp"], "cwd": "/path/to/nextpilot-skill-mcp" }
+```
+
+> ⚠️ **stdout 是协议线**：`server.py` 及其依赖**都不许往 stdout 写任何东西**。
+> 想冒烟测试就在进程内调（`Client(mcp)`），**不要用 `python -c "...print(...)"` 去测协议**。
+> 机制与 9 个工具清单见 [`../architecture/mcp-server.md`](../architecture/mcp-server.md)。
+
 **代码检查**（本地手动跑，与 hook 同一套）：
 
 | 命令             | 干什么                                     |

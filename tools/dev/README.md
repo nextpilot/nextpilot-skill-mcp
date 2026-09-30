@@ -1,6 +1,6 @@
 # 日志规则校准脚本
 
-用真实 `.ulg` 校准阈值（CLAUDE.md 4.3 / 8）的本地工具。
+用真实 `.ulg` 校准阈值的本地工具（阈值本身住在 `knowledge/` 下）。
 它**直接跑 knowledge/engine/ 下的 Python 引擎与 knowledge/px4/rules/\*.yaml 中的规则**，
 与浏览器端 Pyodide 执行的是同一份规则源码、同一套逻辑——改完 `knowledge/` 无需 Node 构建即可回归。
 

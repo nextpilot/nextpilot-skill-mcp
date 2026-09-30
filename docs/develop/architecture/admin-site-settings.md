@@ -46,7 +46,7 @@ RSC ──getSiteSettings()──▶ Node 侧 60s 缓存
 - **清空一项 = 删掉 KV 里这个 key**，回落到第 2/3 层，不是存空字符串。可选字段（如备案号）允许空值，字段定义标 `optional: true`。
 - **表单只提交改动过的字段**。全量提交会把当前默认值固化进 KV，之后改 `site-config.ts` 的代码默认值就再也不生效。
 - **保存用 POST 不是 PUT**：本地 `edge-dev` 垫片只把 GET/POST/DELETE 映射到 `onRequest*`，PUT 会落到 `onRequest` 兜底而静默走不通。
-- `NEXT_PUBLIC_*` 在 Next 构建时被替换成字面量写进 bundle，运行期改控制台环境变量对已构建产物无效。`SITE_URL` 是服务端变量，不受此限。
+- `NEXT_PUBLIC_*` 在 Next 构建时被替换成字面量写进 bundle，运行期改控制台环境变量对已构建产物无效（`NEXT_PUBLIC_SITE_URL` 也在此列，改完要重新构建）。
 - KV 里出现表里没有的 key，原样保留不丢数据、表单不显示，回滚到旧代码也不丢。
 
 ## 3. 字段定义表驱动
@@ -56,7 +56,7 @@ RSC ──getSiteSettings()──▶ Node 侧 60s 缓存
 ```ts
 export const SITE_SETTINGS_FIELDS = [
   { key: "siteName", label: "网站标题（全称）", kind: "text", fallback: SITE_NAME },
-  { key: "siteUrl", label: "网站域名", kind: "domain", fallback: SITE_URL, confirm: true },
+  { key: "siteUrl", label: "网站域名", kind: "domain", fallback: NEXT_PUBLIC_SITE_URL, confirm: true },
   { key: "sourceUrl", label: "源代码链接", kind: "url", fallback: REPO_URL },
   { key: "icp", label: "备案号", kind: "text", fallback: "", optional: true },
 ] as const;

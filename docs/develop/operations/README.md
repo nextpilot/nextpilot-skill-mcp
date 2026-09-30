@@ -34,7 +34,7 @@
 > 这类路径**不需要任何特殊处理**——非 `/api`、非页面的根级路径由 next-intl 统一判 404
 > （与 `/abc`、`/foobar` 行为完全一致）。
 
-- 会话：next-auth JWT 策略（JWE，A256CBC-HS512，密钥 HKDF(AUTH_SECRET, cookie名)）。边缘函数用 `jose` 以同一 `AUTH_SECRET` 验签（`functions/_lib/auth.js`）。
+- 会话：next-auth JWT 策略（JWE，A256CBC-HS512，密钥 HKDF(AUTH_SESSION_SECRET, cookie名)）。边缘函数用 `jose` 以同一 `AUTH_SESSION_SECRET` 验签（`functions/_lib/auth.js`）。
 - KV：`NEXTPILOT_KV` 绑定，**只在边缘函数可用**。key 仅允许字母/数字/下划线，无 TTL（过期写进 value 惰性清理）。
 - **平台坑（实测）**：`kv.list()` 在**没有任何匹配 key 时，返回体里没有 `keys` 字段**（`{"cursor":"","complete":true}`），直接 `for...of result.keys` 会抛错导致 545。统一走 `_lib/kv.js` 的 `listAll()`（已对 `keys ?? []` 加守卫），不要在业务里直接调 `kv.list`。
 
@@ -57,21 +57,21 @@ edgeone pages dev         # 本地同时跑 Next、functions、KV 模拟
 见 `web/.env.example`。密钥生成：
 
 ```bash
-openssl rand -base64 32   # AUTH_SECRET
+openssl rand -base64 32   # AUTH_SESSION_SECRET
 openssl rand -hex 24      # AUTH_EDGE_SECRET
 ```
 
-| 变量                                            | 说明                                                                                     |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `AUTH_SECRET`                                   | 会话 JWE 密钥，Node 与边缘函数共享，改了全员掉线                                         |
-| `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET`         | GitHub OAuth App                                                                         |
-| `AUTH_EDGE_SECRET`                              | SSR ↔ `/functions/internal/*` 共享密钥（探针 `/api/kv-probe`、`/api/issue-probe` 同用）  |
-| `SITE_URL`                                      | 公网源站，Node 侧同源调内部函数用，如 `https://skill.nextpilot.org`                      |
-| `SMTP_*`                                        | QQ/163 SMTP，`SMTP_PASS` 填**邮箱授权码**（QQ 邮箱 → 设置 → 账户 → 开启 SMTP）           |
-| `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL`           | 边缘函数 `/api/explain` 读取                                                             |
-| `ISSUE_ENABLED`                                 | 置 `1` 才开启报错上报；不配则整个上报层 no-op（本地开发天然安全）                        |
-| `ISSUE_PROVIDER` / `ISSUE_REPO` / `ISSUE_TOKEN` | 目标：`gitee`（默认）或 `github`；`owner/repo`；令牌**只在边缘函数使用**，浏览器永不接触 |
-| `ISSUE_LABELS` / `ISSUE_DEBUG`                  | 可选。标签（逗号分隔）；`ISSUE_DEBUG=1` 时 `/api/issue-probe?write=1` 可做真实写入自检   |
+| 变量                                                 | 说明                                                                                                        |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `AUTH_SESSION_SECRET`                                | 会话 JWE 密钥，Node 与边缘函数共享，改了全员掉线                                                            |
+| `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET`              | GitHub OAuth App                                                                                            |
+| `AUTH_EDGE_SECRET`                                   | SSR ↔ `/functions/internal/*` 共享密钥（探针 `/api/kv-probe`、`/api/issue-probe` 同用）                     |
+| `NEXT_PUBLIC_SITE_URL`                               | 公网源站（`web/lib/site-config.ts` 读它），用于 sitemap / robots / canonical / og:url；不配则落到生产兜底值 |
+| `SMTP_*`                                             | QQ/163 SMTP，`SMTP_PASS` 填**邮箱授权码**（QQ 邮箱 → 设置 → 账户 → 开启 SMTP）                              |
+| `DEEPSEEK_API_KEY` / `DEEPSEEK_MODEL`                | 边缘函数 `/api/explain` 读取                                                                                |
+| `ISSUE_ENABLED`                                      | 置 `1` 才开启报错上报；不配则整个上报层 no-op（本地开发天然安全）                                           |
+| `ISSUE_PROVIDER` / `ISSUE_REPO` / `AUTH_GITEE_TOKEN` | 目标：`gitee`（默认）或 `github`；`owner/repo`；令牌**只在边缘函数使用**，浏览器永不接触                    |
+| `ISSUE_LABELS` / `ISSUE_DEBUG`                       | 可选。标签（逗号分隔）；`ISSUE_DEBUG=1` 时 `/api/issue-probe?write=1` 可做真实写入自检                      |
 
 ### GitHub OAuth App
 
@@ -136,9 +136,9 @@ KV key 规则（代码见 `functions/_lib/kv.js`）：
 
 | 现象                    | 排查                                                                                                                                                                                                        |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/api/explain` 返回 401 | 未登录或 `AUTH_SECRET` 两端不一致                                                                                                                                                                           |
+| `/api/explain` 返回 401 | 未登录或 `AUTH_SESSION_SECRET` 两端不一致                                                                                                                                                                   |
 | `/api/explain` 返回 503 | 边缘函数未配 `DEEPSEEK_API_KEY`                                                                                                                                                                             |
-| 登录后仍 401            | 检查生产是否 HTTPS（cookie 名 `__Secure-` 前缀）；边缘函数与 SSR 的 `AUTH_SECRET` 是否一致                                                                                                                  |
+| 登录后仍 401            | 检查生产是否 HTTPS（cookie 名 `__Secure-` 前缀）；边缘函数与 SSR 的 `AUTH_SESSION_SECRET` 是否一致                                                                                                          |
 | 验证码发不出            | `SMTP_*` 是否配置；QQ 授权码是否正确；Node 函数出网 465 是否可用                                                                                                                                            |
 | `/internal/*` 403       | `AUTH_EDGE_SECRET` 未配或不一致（探针 `/api/kv-probe`、`/api/issue-probe` 同用这把钥匙）                                                                                                                    |
 | KV 报 binding missing   | KV 命名空间（`nextpilot_skill_mcp`）未绑定到 Pages 项目；绑定后需重新部署                                                                                                                                   |

@@ -22,7 +22,7 @@
 支持 PX4 `.ulg` 和 ArduPilot `.bin` 两种飞控日志格式，平台在**浏览器本地**完成全部分析，输出中文报告：
 
 - **原始日志不出浏览器** —— 隐私安全有保障
-- **规则引擎做数值判断** —— PX4：31 条检查规则覆盖 16 个维度；ArduPilot：43 条规则（阈值 draft）
+- **规则引擎做数值判断** —— PX4：26 条检查规则覆盖 16 个维度；ArduPilot：16 条规则（阈值仍在核实）
 - **LLM 只做中文解释** —— AI 接收的是脱敏后的结构化结论，不接触原始数据
 
 在线体验：已上线 [Skill Hub](https://nextpilot-skill-mcp.pages.dev)，支持 GitHub / 邮箱登录。
@@ -47,19 +47,19 @@
 
 ```
 .
-├── CLAUDE.md           # 项目说明（定位、架构、路线图、决策依据）
+├── CLAUDE.md           # 给 AI 看的项目备忘（人看的文档在 docs/）
 ├── LICENSE             # BSD-3-Clause 许可证
 ├── README.md
 ├── package.json        # 根级转发：pnpm -C web dev/build，这里不装依赖
 ├── docs/               # 文档
-│   ├── guide/          # 面向用户的指南（发布到站内 /guide）
+│   ├── guide/          # 用户文档导航（正文真源在 web/content/guide/，发布到站内 /guide）
 │   └── develop/        # 面向开发与运维
 ├── knowledge/          # 经验与引擎的唯一真源（改经验只改这里）
 │   ├── engine/         # 确定性分析引擎源码（engine.py / loader.py / operators.py）
 │   │   ├── providers/  # 日志格式适配器（PX4 .ulg / ArduPilot .bin）
 │   │   └── tests/      # 引擎单测（单测跟着被测模块走）
-│   ├── px4/            # PX4：rules/*.yaml（31 条）+ fault-kb.yaml + meta/ + plot/
-│   ├── ardupilot/      # ArduPilot：rules/*.yaml（43 条）+ docs/ + facts.yaml
+│   ├── px4/            # PX4：rules/*.yaml（26 条）+ fault-kb.yaml + meta/ + plot/
+│   ├── ardupilot/      # ArduPilot：rules/*.yaml（16 条）+ docs/ + facts.yaml
 │   ├── llm/            # LLM 提示词（GJB-841 system prompt 等）
 │   └── rules-template.yml / plot-template.yml / rules-editor-schema.generated.json
 ├── server/             # 本地 MCP 服务（stdio，全部只读工具）
@@ -102,16 +102,18 @@ pnpm web:dev
 
 打开 <http://localhost:3000>，可以访问以下页面：
 
-| 路由       | 功能                                             |
-| ---------- | ------------------------------------------------ |
-| `/`        | 首页与精选 Skill                                 |
-| `/guide`   | Skill / MCP 帮助文档与提交指南                   |
-| `/skills`  | Skill 技能库（支持 Fuse.js 客户端搜索）          |
-| `/mcp`     | 收录的 MCP 服务                                  |
-| `/analyze` | PX4 / ArduPilot 日志分析（Pyodide 浏览器端解析） |
-| `/login`   | 登录（GitHub / 邮箱验证码）                      |
-| `/me`      | 个人中心与历史报告                               |
-| `/tools`   | 开发工具与资源                                   |
+| 路由              | 功能                                             |
+| ----------------- | ------------------------------------------------ |
+| `/`               | 首页与精选 Skill                                 |
+| `/guide`          | Skill / MCP 帮助文档与提交指南                   |
+| `/skills`         | Skill 技能库（支持 Fuse.js 客户端搜索）          |
+| `/mcp`            | 收录的 MCP 服务                                  |
+| `/log`            | PX4 / ArduPilot 日志分析（Pyodide 浏览器端解析） |
+| `/login`          | 登录（GitHub / 邮箱验证码）                      |
+| `/me`             | 个人中心与历史报告                               |
+| `/issue`          | 提交反馈                                         |
+| `/tools`          | 开发工具（规则编辑器 / 现场探查）                |
+| `/admin/settings` | 后台站点设置（仅管理员）                         |
 
 ---
 
@@ -129,8 +131,8 @@ pnpm web:dev
   │
   ▼
 第二层 · 规则检查
-  PX4：31 条 YAML 规则（16 个维度）
-  ArduPilot：43 条 YAML 规则（来自 ardupilot-mcp 的 16 项检查）
+  PX4：26 条 YAML 规则（16 个维度）
+  ArduPilot：16 条 YAML 规则（来自 ardupilot-mcp 的检查项）
   构建期编译为 Python → 内联到 Worker
   │
   ▼
@@ -228,11 +230,13 @@ git config core.hooksPath .githooks
 
 ## 仓库与远程
 
-项目同时托管在 Gitee 和 GitHub，两者互为镜像：
+项目托管在 Gitee，`origin` 即它：
 
 ```bash
-origin  → https://gitee.com/nextpilot/nextpilot-skill-mcp.git  # Gitee（主）
-github  → git@github.com/nextpilot/nextpilot-skill-mcp.git     # GitHub（镜像）
+origin  → https://gitee.com/nextpilot/nextpilot-skill-mcp.git
 ```
 
-> 推送时两个远程都必须推到。详细开发流程见 [CLAUDE.md §6.9.2](CLAUDE.md)。
+> **当前只配了 `origin`（Gitee）**。`.github/workflows/` 下的 CI 配置**在 Gitee 上不执行**，
+> 所以云端门禁目前实际未生效，质量只靠本机 `.githooks/pre-push` 拦——见
+> [`docs/develop/operations/deploy.md`](docs/develop/operations/deploy.md)。
+> 开发流程见 [`docs/develop/quickstart/`](docs/develop/quickstart/README.md)。

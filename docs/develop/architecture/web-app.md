@@ -122,8 +122,8 @@ Web Worker
 
 ## 六、认证与配额
 
-- **会话**：next-auth v5 JWT 策略（JWE，A256CBC-HS512，密钥 HKDF(AUTH_SECRET, cookie名)）。
-  边缘函数用 `jose` 以同一 `AUTH_SECRET` 验签，**不需要查库**。
+- **会话**：next-auth v5 JWT 策略（JWE，A256CBC-HS512，密钥 HKDF(AUTH_SESSION_SECRET, cookie名)）。
+  边缘函数用 `jose` 以同一 `AUTH_SESSION_SECRET` 验签，**不需要查库**。
 - **登录方式**：GitHub OAuth + 邮箱验证码（Credentials）两种。
 - **配额**：KV 计数，登录用户 10/天、匿名 3/天。密钥形状见
   [`../operations/README.md`](../operations/README.md) §4。

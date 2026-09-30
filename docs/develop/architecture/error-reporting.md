@@ -84,7 +84,7 @@
 
 - 每进程内存计数：每分钟最多 N 次 issue API 调用（建议 5），超了**直接丢弃**并记一条本地 warn。宁可漏报不可雪崩。
 - 上游返回 403 / 429（限流）→ 静默放弃，**不重试**。
-- `ISSUE_ENABLED` 未开或 `ISSUE_TOKEN` / `ISSUE_REPO` 未配 → 整个上报层是 **no-op**。本地开发、未配置环境天然安全，不需要额外开关。
+- `ISSUE_ENABLED` 未开或 `AUTH_GITEE_TOKEN` / `ISSUE_REPO` 未配 → 整个上报层是 **no-op**。本地开发、未配置环境天然安全，不需要额外开关。
 - 上报接口本身要防滥用：`/api/issues` 是公开端点，按 IP + 设备 hash 限流（复用 `_lib/kv.js` 的日计数模式）。
 
 ---
@@ -103,12 +103,12 @@
 
 环境变量（EdgeOne 控制台）：
 
-| 变量             | 说明                                                                                                              |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `ISSUE_ENABLED`  | `1` 才开，不配则整个上报层 no-op                                                                                  |
-| `ISSUE_PROVIDER` | `github`（默认）/ `gitee`                                                                                         |
-| `ISSUE_REPO`     | `owner/repo`                                                                                                      |
-| `ISSUE_TOKEN`    | **fine-grained PAT，只给目标仓库 `issues: write`**。不要用 classic token 的 `repo` 全权（那把代码读写都交出去了） |
+| 变量               | 说明                                                                                                              |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `ISSUE_ENABLED`    | `1` 才开，不配则整个上报层 no-op                                                                                  |
+| `ISSUE_PROVIDER`   | `github`（默认）/ `gitee`                                                                                         |
+| `ISSUE_REPO`       | `owner/repo`                                                                                                      |
+| `AUTH_GITEE_TOKEN` | **fine-grained PAT，只给目标仓库 `issues: write`**。不要用 classic token 的 `repo` 全权（那把代码读写都交出去了） |
 
 ---
 

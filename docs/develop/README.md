@@ -2,9 +2,9 @@
 
 **给开发者看：这个仓库怎么实现、怎么跑、怎么改。**
 
-> 面向**用户**的文档真源在 [`web/content/guide/`](../../web/content/guide)
-> （发布到站内 `/guide`），本目录不发布。
-> **判断标准**：这段话用户会不会在 `/guide` 上看到？会 → `web/content/`；不会 → 本目录。
+> 面向**用户**的文档见 [`../guide/`](../guide/README.md)；用户能读到的完整指南
+> 真源在 [`web/content/guide/`](../../web/content/guide)（发布到站内 `/guide`），本目录不发布。
+> **判断标准**：这段话用户会不会在 `/guide` 上看到？会 → `web/content/guide/`；不会 → 本目录。
 
 ---
 
