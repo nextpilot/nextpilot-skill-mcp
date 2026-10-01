@@ -49,6 +49,13 @@ export type WorkerInMessage =
           /** 取数声明（前端从预设拼好，引擎解释）：字段引用 + 候选组 + 单位 + 换算节点 */
           request: SeriesRequest;
           logId: string;
+      }
+    | {
+          type: "spectrum";
+          reqId: string;
+          /** 频谱取数声明：与 SeriesRequest 同形，额外带 freq（频率轴变量名）+ kind:"spectrum" */
+          request: SeriesRequest;
+          logId: string;
       };
 
 export type WorkerOutMessage =
@@ -65,6 +72,7 @@ export type WorkerOutMessage =
           logId: string;
       }
     | { type: "series"; reqId: string; data: unknown }
+    | { type: "spectrum"; reqId: string; data: unknown }
     | { type: "track"; reqId: string; data: unknown }
     | { type: "error"; message: string };
 
@@ -377,6 +385,28 @@ async function handleMessage(msg: WorkerInMessage): Promise<void> {
             } catch (err) {
                 post({
                     type: "series",
+                    reqId: msg.reqId,
+                    data: { error: err instanceof Error ? err.message : String(err) },
+                });
+            }
+            return;
+        }
+
+        if (msg.type === "spectrum") {
+            try {
+                // 与 series 同一道闸门：没装日志时直接跑只会抛 NameError，装的是别的日志会静默取错
+                const why = logNotLoadedReason(pyodide, msg.logId);
+                if (why) {
+                    post({ type: "spectrum", reqId: msg.reqId, data: { error: why } });
+                    return;
+                }
+                // 频谱是第二条取数通道（频率轴 = Hz，与时间序列正交），引擎侧走 np_spectrum
+                const code = `np_spectrum(${JSON.stringify(JSON.stringify(msg.request))})`;
+                const data = await runJson(pyodide, code);
+                post({ type: "spectrum", reqId: msg.reqId, data });
+            } catch (err) {
+                post({
+                    type: "spectrum",
                     reqId: msg.reqId,
                     data: { error: err instanceof Error ? err.message : String(err) },
                 });

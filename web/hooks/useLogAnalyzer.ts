@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { LogReportData, LogInfo, SeriesResponse, TopicManifest, TrackData } from "@/lib/types";
+import type { LogReportData, LogInfo, SeriesResponse, SpectrumResponse, TopicManifest, TrackData } from "@/lib/types";
 import type { WorkerOutMessage, WorkerStage } from "@/workers/analysis-worker";
 import {
     resolvePlotPanels,
@@ -459,6 +459,26 @@ export function useLogAnalyzer() {
         });
     }, [ensureLogLoaded]);
 
+    /** 要一张频谱图；与 requestSeries 平行的第二条取数通道（返回形状不同，不合并） */
+    const requestSpectrum = useCallback(
+        async (req: SeriesRequest): Promise<SpectrumResponse> => {
+            const worker = getSharedWorker();
+            if (!worker) return { error: "worker 未就绪" } as SpectrumResponse;
+            await ensureLogLoaded(pendingHashRef.current);
+            const reqId = `sp${reqIdRef.current++}`;
+            return new Promise((resolve) => {
+                pendingRef.current.set(reqId, (data) => resolve(data as SpectrumResponse));
+                worker.postMessage({
+                    type: "spectrum",
+                    reqId,
+                    request: req,
+                    logId: pendingHashRef.current,
+                });
+            });
+        },
+        [ensureLogLoaded],
+    );
+
     /** 把各预设的曲线抽出来存进报告存档（键与 LogCharts 的 seriesKey 一致：`presetId#面板序号`） */
     const extractPlots = useCallback(
         async (id: string, manifest: TopicManifest, info: LogInfo) => {
@@ -472,9 +492,13 @@ export function useLogAnalyzer() {
                         // 存成数组，键仍是 `${presetId}#面板序号`
                         const reqs = sp.panels[i].requests;
                         if (reqs.length === 0) continue;
-                        const got = await Promise.all(reqs.map((r) => requestSeries(r)));
+                        // 频谱走 np_spectrum 通道（返回形状不同），与时间序列分开取
+                        const isSpectrum = sp.panels[i].spectrum === true;
+                        const got = await Promise.all(
+                            reqs.map((r) => (isSpectrum ? requestSpectrum(r) : requestSeries(r))),
+                        );
                         if (got.every((r) => r && !(r as { error?: string }).error)) {
-                            series[`${sp.presetId}#${i}`] = got;
+                            series[`${sp.presetId}#${i}`] = got as never;
                         }
                     }
                 }
@@ -496,7 +520,7 @@ export function useLogAnalyzer() {
                 // 抽曲线失败不影响结论展示；下次打开会退回"重新解析"
             }
         },
-        [requestSeries, requestTrack],
+        [requestSeries, requestSpectrum, requestTrack],
     );
 
     /** 地图用：优先用存档里的轨迹（打开历史时不必解析），否则问 Worker 要 */
@@ -635,6 +659,12 @@ export function useLogAnalyzer() {
                     resolve(m.data as never);
                 }
             } else if (m.type === "series") {
+                const resolve = pendingRef.current.get(m.reqId ?? "");
+                if (resolve) {
+                    pendingRef.current.delete(m.reqId ?? "");
+                    resolve(m.data);
+                }
+            } else if (m.type === "spectrum") {
                 const resolve = pendingRef.current.get(m.reqId ?? "");
                 if (resolve) {
                     pendingRef.current.delete(m.reqId ?? "");
@@ -1008,6 +1038,7 @@ export function useLogAnalyzer() {
         refreshCloud,
         explain,
         requestSeries,
+        requestSpectrum,
         viewSaved,
         storedPlots,
         loadTrack,

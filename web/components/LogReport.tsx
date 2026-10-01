@@ -24,7 +24,15 @@ import {
     HardDrive,
     FileUp,
 } from "lucide-react";
-import type { LogReportData, Finding, LogInfo, Severity, SeriesResponse, TopicManifest } from "@/lib/types";
+import type {
+    LogReportData,
+    Finding,
+    LogInfo,
+    Severity,
+    SeriesResponse,
+    SpectrumResponse,
+    TopicManifest,
+} from "@/lib/types";
 import type { SeriesRequest } from "@/lib/chart-presets";
 import type { TrackData } from "@/lib/types";
 import { LogCharts } from "./LogCharts";
@@ -88,6 +96,7 @@ export function LogReport({
     storedPlots,
     info,
     requestSeries,
+    requestSpectrum,
     loadTrack,
     onRestore,
     explaining,
@@ -104,6 +113,8 @@ export function LogReport({
     storedPlots: { panels: StoredPlotPanel[]; series: StoredPlotSeries } | null;
     info: LogInfo | null;
     requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
+    /** 取频谱图（与 requestSeries 平行的第二条通道，返回形状不同） */
+    requestSpectrum: (req: SeriesRequest) => Promise<SpectrumResponse>;
     /** 取 GPS 轨迹（存档优先，否则问 Worker） */
     loadTrack: () => Promise<TrackData>;
     /** 「重新选择该 .ulg 文件」：打开文件选择框，选完就地重解析，把缺的图表/轨迹补齐
@@ -252,6 +263,7 @@ export function LogReport({
                         storedSeries={storedPlots?.series ?? null}
                         phases={info.phases}
                         requestSeries={requestSeries}
+                        requestSpectrum={requestSpectrum}
                         notes={report.instanceNotes ?? null}
                     />
                 )}

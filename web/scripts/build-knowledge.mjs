@@ -28,6 +28,7 @@ import {
     SEVERITIES,
     checkFieldItem,
     splitFieldRef,
+    parseCompute,
 } from "./lib/rule-expr.mjs";
 import { buildRuleSchema } from "./lib/gen-rule-schema.mjs";
 import { log } from "./lib/log.mjs";
@@ -878,6 +879,107 @@ function compileAxes(out, where, declaredVars, refs) {
     };
 }
 
+// `container: spectrogram` → 一张频谱图（x 轴 = 频率 Hz，y 轴 = 幅度）。
+// 与 `axes` 的取舍：频率轴由算子给（不是时间轴），所以 **不做时间轴联动、不画阶段底色**，
+// 也不收 hlines / flipx / flipy / range（频段选择改由 `fmax` 表达）。
+// 一条 child 的 ydata **必须全是 `compute` 算出来的变量**（`spectrum(...)` 的输出）：
+// 频谱的纵轴是 FFT 幅度，裸字段直接画没有频率含义，构建期就拦住。
+// 频率轴那个变量名从同一条预设的 `f, px = spectrum(...)` 左值里取（写进请求的 `freq`），
+// 运行期 np_spectrum 据此从 env 取频率轴——所以算子那条语句在 compute 里不能省。
+function spectrumFreqMap(compute, where) {
+    // 幅度变量名 → 频率变量名。约定 `spectrum(...)` 的第一个输出是频率轴、第二个是幅度轴。
+    const map = new Map();
+    for (const stmt of compute) {
+        let parsed;
+        try {
+            parsed = parseCompute(stmt);
+        } catch {
+            continue;
+        }
+        if (parsed.value?.k !== "call" || parsed.value.fn !== "spectrum") continue;
+        if (parsed.targets.length !== 2) {
+            throw new Error(
+                `${where}: spectrum(...) 要接两个变量（频率轴, 幅度轴），如 \`f, px = spectrum(gx)\`——` +
+                    `实际接了 ${parsed.targets.length} 个`,
+            );
+        }
+        map.set(parsed.targets[1], parsed.targets[0]);
+    }
+    return map;
+}
+
+function compileSpectrogram(out, where, declaredVars, refs, freqMap) {
+    const switches = containerSwitches(out, where);
+    if (switches.hlines) throw new Error(`${where}: spectrogram 不接受 hlines（频率图上没有水平门限线这回事）`);
+    if (switches.flipx || switches.flipy) throw new Error(`${where}: spectrogram 不接受 flipx / flipy`);
+    if (switches.range) {
+        throw new Error(`${where}: spectrogram 不接受 range（频段上限请用 fmax；两轴都按数据范围自动）`);
+    }
+    if (typeof out.ylabel !== "string" || !out.ylabel.trim()) {
+        throw new Error(`${where}: container: spectrogram 必须有 ylabel（幅度轴标签，如 幅度 / deg/s）`);
+    }
+    let fmax = null;
+    if (out.fmax !== undefined) {
+        fmax = Number(out.fmax);
+        if (!Number.isFinite(fmax) || fmax <= 0) throw new Error(`${where}: fmax 要是一个正数（关注频段上限，Hz）`);
+    }
+    if (!Array.isArray(out.children) || out.children.length === 0) {
+        throw new Error(`${where}: children 必须是非空数组（这张频谱图画哪几条谱线）`);
+    }
+    const children = out.children.map((child, ci) => {
+        const cwhere = `${where} 第 ${ci + 1} 条 child`;
+        if (child.mode !== "spectrum") {
+            throw new Error(
+                `${cwhere}: spectrogram 的 child mode 只能是 spectrum（实际 ${JSON.stringify(child.mode)}）`,
+            );
+        }
+        const ydata = compileFieldList(child.ydata, cwhere, "ydata", declaredVars, refs);
+        const freqs = [];
+        for (const d of ydata) {
+            if (d.kind !== "var") {
+                throw new Error(
+                    `${cwhere}: 频谱的 ydata 只能是 compute 的输出变量（spectrum(...) 算出来的幅度轴）——` +
+                        `裸字段没有频率含义；要用字段请先在 compute 里 spectrum(field) 再引用输出`,
+                );
+            }
+            const fv = freqMap.get(d.name);
+            if (!fv) {
+                throw new Error(
+                    `${cwhere}: ${d.name} 不是 spectrum(...) 的幅度输出——频谱的 ydata 要引用 ` +
+                        `\`f, 幅度 = spectrum(...)\` 里的那个幅度变量`,
+                );
+            }
+            freqs.push(fv);
+        }
+        const labels = parallelList(child.label, ydata.length, cwhere, "label") ?? ydata.map(defaultLabel);
+        const styles =
+            parallelList(child.style, ydata.length, cwhere, "style", (v, i) => {
+                if (!LINE_STYLES.has(v)) {
+                    throw new Error(
+                        `${cwhere}: style 第 ${i + 1} 项 ${JSON.stringify(v)} 不是合法线型` +
+                            `（可用：${[...LINE_STYLES].join(" / ")}）`,
+                    );
+                }
+            }) ?? [];
+        const colors =
+            parallelList(child.color, ydata.length, cwhere, "color", (v, i) => {
+                if (!COLOR_RE.test(v))
+                    throw new Error(`${cwhere}: color 第 ${i + 1} 项 ${JSON.stringify(v)} 要是 #rrggbb`);
+            }) ?? [];
+        return { mode: "spectrum", xdata: null, ydata, freqs, labels, styles, colors };
+    });
+    return {
+        container: "spectrogram",
+        title: switches.title,
+        legend: switches.legend,
+        grid: switches.grid,
+        fmax,
+        ylabel: out.ylabel.trim(),
+        xlabel: typeof out.xlabel === "string" && out.xlabel.trim() ? out.xlabel.trim() : "Hz",
+        children,
+    };
+}
+
 // `container: map` → 轨迹声明（进 `facts.track`，由 provider 在引擎侧取数、换算、抽稀）。
 // 三个坐标都要写明实例：时间戳与 `fix_type` 得跟坐标来自同一个 topic 的同一个实例，
 // 否则三路采样率不同、画出来是错的。
@@ -973,15 +1075,20 @@ function compilePreset(spec, where, vehicles) {
     }
     let map = null;
     const refs = [];
+    // 频谱的频率轴变量名从 compute 的 spectrum(...) 左值里取（详见 compileSpectrogram）
+    const freqMap = spec.output.some((o) => o.container === "spectrogram") ? spectrumFreqMap(compute, where) : null;
     const outputs = spec.output.map((out, oi) => {
         const owhere = `${where} 第 ${oi + 1} 个 container`;
         if (out.container === "axes") return compileAxes(out, owhere, declaredVars, refs);
+        if (out.container === "spectrogram") return compileSpectrogram(out, owhere, declaredVars, refs, freqMap);
         if (out.container === "map") {
             if (map) throw new Error(`${where}: 一份预设里最多一个 container: map`);
             map = compileMap(out, owhere, declaredVars, refs);
             return map;
         }
-        throw new Error(`${owhere}: container 只能是 axes / map（实际 ${JSON.stringify(out.container)}）`);
+        throw new Error(
+            `${owhere}: container 只能是 axes / spectrogram / map（实际 ${JSON.stringify(out.container)}）`,
+        );
     });
     const plot = {
         id: spec.id,

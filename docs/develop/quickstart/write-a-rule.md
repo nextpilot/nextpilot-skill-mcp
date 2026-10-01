@@ -72,7 +72,7 @@ git push    # pre-push hook 自动跑 check_all.py --push（含字段 lint、基
 
 ## 五、两个容易踩的
 
-1. 算子只能用注册过的：`op:` 引用 `knowledge/engine/operators.py` 的 91 个算子，
+1. 算子只能用注册过的：`op:` 引用 `knowledge/engine/operators.py` 的 92 个算子，
    没有「内置隐式算子」——没注册构建期就红。
 2. 新规则要带反例：规则清单页的「反例自检」要求每条规则都能被自己的反例打红，
    写规则时同步想清楚"什么日志不该命中"。

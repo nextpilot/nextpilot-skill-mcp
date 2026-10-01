@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, ChevronDown, Loader2, LineChart, Maximize2, RotateCcw, Share2, X } from "lucide-react";
-import type { FlightPhase, SeriesResponse, TopicManifest } from "@/lib/types";
+import type { FlightPhase, SeriesResponse, SpectrumResponse, TopicManifest } from "@/lib/types";
 import {
     CHART_PRESETS,
     SERIES_COLORS_DARK,
@@ -50,6 +50,7 @@ export function LogCharts({
     storedSeries,
     phases,
     requestSeries,
+    requestSpectrum,
     notes,
 }: {
     /** 实时分析：用 manifest 解析面板；打开历史：manifest 为空、改用下面两项 */
@@ -58,6 +59,8 @@ export function LogCharts({
     storedSeries?: StoredPlotSeries | null;
     phases: FlightPhase[];
     requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
+    /** 取频谱图：与 requestSeries 平行的第二条通道（返回形状不同，不合并） */
+    requestSpectrum: (req: SeriesRequest) => Promise<SpectrumResponse>;
     /** 报告级的取数提示（规则侧的实例越界等），与图上的提示一起进告警栏 */
     notes?: string[] | null;
 }) {
@@ -95,7 +98,10 @@ export function LogCharts({
         return [...new Set(all.filter(Boolean))];
     }, [notes, presets, runtimeWarnings]);
 
-    if (phases.length === 0) {
+    // 没有飞行阶段：时间序列图依赖阶段底色，没它就整块不画（原来直接早退整页）。
+    // 但频谱图不看阶段（x 轴是频率），混在这种日志里不该被一起挡掉——只要有频谱面板就继续渲染。
+    const hasSpectrum = presets.some((x) => (x.panels ?? []).some((p) => p.spectrum === true));
+    if (phases.length === 0 && !hasSpectrum) {
         return (
             <p className="text-sm text-muted">该日志未记录飞行模式（vehicle_status.nav_state），无法绘制阶段背景。</p>
         );
@@ -103,6 +109,11 @@ export function LogCharts({
 
     return (
         <div className="space-y-6">
+            {phases.length === 0 && (
+                <p className="text-sm text-muted">
+                    该日志未记录飞行模式（vehicle_status.nav_state），时间序列图不绘制阶段背景；频谱图不受影响。
+                </p>
+            )}
             {notices.length > 0 && (
                 <div className="rounded-lg border border-warning/40 bg-warning/[0.08] px-4 py-3 text-sm">
                     <div className="flex items-start gap-2">
@@ -133,6 +144,7 @@ export function LogCharts({
                             panels={panels!}
                             phases={phases}
                             requestSeries={requestSeries}
+                            requestSpectrum={requestSpectrum}
                             storedSeries={storedSeries ?? null}
                             onWarnings={pushWarnings}
                         />
@@ -150,6 +162,7 @@ function PresetCard({
     panels,
     phases,
     requestSeries,
+    requestSpectrum,
     storedSeries,
     onWarnings,
 }: {
@@ -159,6 +172,7 @@ function PresetCard({
     panels: PanelSpec[];
     phases: FlightPhase[];
     requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
+    requestSpectrum: (req: SeriesRequest) => Promise<SpectrumResponse>;
     storedSeries: StoredPlotSeries | null;
     onWarnings: (ws: string[]) => void;
 }) {
@@ -189,7 +203,7 @@ function PresetCard({
             </button>
             {open && (
                 <div>
-                    {xRange && panels.length > 1 && (
+                    {xRange && panels.length > 1 && panels.some((p) => p.spectrum !== true) && (
                         <div className="mb-3 flex items-center gap-2">
                             <span className="text-xs text-muted">
                                 X 轴已同步：{xRange[0].toFixed(1)}s – {xRange[1].toFixed(1)}s
@@ -211,6 +225,7 @@ function PresetCard({
                                 panel={panel}
                                 phases={phases}
                                 requestSeries={requestSeries}
+                                requestSpectrum={requestSpectrum}
                                 storedSeries={storedSeries}
                                 seriesKey={`${id}#${i}`}
                                 groupKey={id}
@@ -230,6 +245,7 @@ function PanelChart({
     panel,
     phases,
     requestSeries,
+    requestSpectrum,
     storedSeries,
     seriesKey,
     groupKey,
@@ -240,6 +256,7 @@ function PanelChart({
     panel: PanelSpec;
     phases: FlightPhase[];
     requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
+    requestSpectrum: (req: SeriesRequest) => Promise<SpectrumResponse>;
     /** 存档里的曲线：命中就直接画，不打扰 Worker（打开历史时无 Worker 可问） */
     storedSeries: StoredPlotSeries | null;
     /** `${presetId}#${面板序号}`，与落盘时的键一致 */
@@ -349,6 +366,8 @@ function PanelChart({
     // Apply external xRange changes to the plot
     useEffect(() => {
         if (state !== "done" || !elRef.current) return;
+        // 频谱不参与时间轴联动：外部的 xRange（别的图拖出来的）不往频谱图上套
+        if (panel.spectrum === true) return;
         const el = elRef.current;
         const applyRange = async () => {
             try {
@@ -373,7 +392,7 @@ function PanelChart({
             }
         };
         void applyRange();
-    }, [xRange, state]);
+    }, [xRange, state, panel.spectrum]);
 
     useEffect(() => {
         let cancelled = false;
@@ -392,8 +411,16 @@ function PanelChart({
                     return;
                 }
                 const stored = storedSeries?.[seriesKey];
+                // 频谱与时间序列是两条取数通道（返回形状不同），按面板判别位各走各的
+                const isSpectrum = panel.spectrum === true;
                 const responses = await Promise.all(
-                    panel.requests.map((r, i) => (stored && stored[i] ? Promise.resolve(stored[i]) : requestSeries(r))),
+                    panel.requests.map((r, i) =>
+                        stored && stored[i]
+                            ? Promise.resolve(stored[i])
+                            : isSpectrum
+                              ? requestSpectrum(r)
+                              : requestSeries(r),
+                    ),
                 );
                 if (cancelled) return;
                 onWarnings(responses.flatMap((r) => r?.warnings ?? []));
@@ -403,30 +430,56 @@ function PanelChart({
                 const colors = isDark() ? SERIES_COLORS_DARK : SERIES_COLORS_LIGHT;
                 const traces: unknown[] = [];
                 let colorIdx = 0;
-                // 一条线画什么完全由预设定（label / color / style），引擎只按 ydata 顺序把序列给回来：
-                // 取不到的那条是 null，跳过即可（老固件少个字段就少一条线，不用另写回退）
-                panel.requests.forEach((req, ri) => {
-                    const resp = responses[ri];
-                    if (!resp || resp.error) return;
-                    const x = resp.x ?? resp.t;
-                    req.series.forEach((meta, si) => {
-                        const vals = resp.series?.[si];
-                        if (!vals) return;
-                        traces.push({
-                            x,
-                            y: vals,
-                            type: "scatter",
-                            mode: "lines",
-                            name: meta.label,
-                            line: {
-                                color: meta.color ?? colors[colorIdx++ % colors.length],
-                                width: 2,
-                                dash: plotlyDash(meta.style),
-                            },
-                            connectgaps: false,
+                if (isSpectrum) {
+                    // 频谱：x 轴是频率（resp.f），y 轴是幅度（series[si].p）。与时间序列各写各的，
+                    // 不复用 `const x = resp.x ?? resp.t`（那条是时间轴，频谱没有）
+                    panel.requests.forEach((req, ri) => {
+                        const resp = responses[ri] as SpectrumResponse | undefined;
+                        if (!resp || resp.error || !resp.f) return;
+                        req.series.forEach((meta, si) => {
+                            const entry = resp.series?.[si];
+                            if (!entry) return;
+                            traces.push({
+                                x: resp.f,
+                                y: entry.p,
+                                type: "scatter",
+                                mode: "lines",
+                                name: meta.label,
+                                line: {
+                                    color: meta.color ?? colors[colorIdx++ % colors.length],
+                                    width: 2,
+                                    dash: plotlyDash(meta.style),
+                                },
+                                connectgaps: false,
+                            });
                         });
                     });
-                });
+                } else {
+                    // 一条线画什么完全由预设定（label / color / style），引擎只按 ydata 顺序把序列给回来：
+                    // 取不到的那条是 null，跳过即可（老固件少个字段就少一条线，不用另写回退）
+                    panel.requests.forEach((req, ri) => {
+                        const resp = responses[ri] as SeriesResponse | undefined;
+                        if (!resp || resp.error) return;
+                        const x = resp.x ?? resp.t;
+                        req.series.forEach((meta, si) => {
+                            const vals = resp.series?.[si];
+                            if (!vals) return;
+                            traces.push({
+                                x,
+                                y: vals,
+                                type: "scatter",
+                                mode: "lines",
+                                name: meta.label,
+                                line: {
+                                    color: meta.color ?? colors[colorIdx++ % colors.length],
+                                    width: 2,
+                                    dash: plotlyDash(meta.style),
+                                },
+                                connectgaps: false,
+                            });
+                        });
+                    });
+                }
 
                 if (panel.hlines) {
                     for (const h of panel.hlines) {
@@ -487,6 +540,8 @@ function PanelChart({
                 };
                 if (!cancelled)
                     gd.on?.("plotly_relayout", (eventData) => {
+                        // 频谱图的 x 轴是频率，绝不参与时间轴联动（用户明确纠正：只有时间序列图才 link 时间轴）
+                        if (isSpectrum) return;
                         if (ignoreNextRelayout.current) {
                             ignoreNextRelayout.current = false;
                             return;
@@ -518,7 +573,7 @@ function PanelChart({
                 .then((P) => P.purge(el))
                 .catch(() => {});
         };
-    }, [panel, phases, requestSeries, groupKey, onWarnings]);
+    }, [panel, phases, requestSeries, requestSpectrum, groupKey, onWarnings]);
 
     return (
         <div className="w-full min-w-0">
@@ -625,20 +680,23 @@ function buildLayout(panel: PanelSpec, phases: FlightPhase[], dark: boolean): Re
     // 再用 mirror 轴框住四边。这两个值是 globals.css 里 --app-surface-2 的拷贝，改配色时一并改。
     const plotBg = dark ? "#232e27" : "#eef1ee";
     const shapes: unknown[] = [];
-    // 阶段背景带：用低透明度中性色，模式颜色由报告页顶部那条飞行阶段条承载
-    for (const p of phases) {
-        shapes.push({
-            type: "rect",
-            xref: "x",
-            x0: p.startSec,
-            x1: p.endSec,
-            yref: "paper",
-            y0: 0,
-            y1: 1,
-            fillcolor: p.armed ? "rgba(105,211,157,0.06)" : "rgba(128,128,128,0.03)",
-            line: { width: 0 },
-            layer: "below",
-        });
+    // 阶段背景带：用低透明度中性色，模式颜色由报告页顶部那条飞行阶段条承载。
+    // 频谱图的 x 轴是频率、不是时间，画阶段带就错位了——只给时间序列图加。
+    if (panel.spectrum !== true) {
+        for (const p of phases) {
+            shapes.push({
+                type: "rect",
+                xref: "x",
+                x0: p.startSec,
+                x1: p.endSec,
+                yref: "paper",
+                y0: 0,
+                y1: 1,
+                fillcolor: p.armed ? "rgba(105,211,157,0.06)" : "rgba(128,128,128,0.03)",
+                line: { width: 0 },
+                layer: "below",
+            });
+        }
     }
     // 坐标轴：范围 / 翻转 / 网格都是面板级属性（一张图一个量纲、一个视野）
     const xaxis: Record<string, unknown> = {
@@ -653,7 +711,12 @@ function buildLayout(panel: PanelSpec, phases: FlightPhase[], dark: boolean): Re
         showgrid: panel.grid,
     };
     if (panel.flipx) xaxis.autorange = "reversed";
-    if (panel.range) xaxis.range = [panel.range[0], panel.range[1]];
+    // 频谱图：x 轴按 fmax 截关注频段（两轴都按数据范围自动，没有 fmax 就全谱）；不设 range / 不翻转
+    if (panel.spectrum === true) {
+        if (panel.fmax) xaxis.range = [0, panel.fmax];
+    } else if (panel.range) {
+        xaxis.range = [panel.range[0], panel.range[1]];
+    }
     const yaxis: Record<string, unknown> = {
         title: { text: panel.yLabel, font: { color: muted, size: 10 } },
         gridcolor: grid,

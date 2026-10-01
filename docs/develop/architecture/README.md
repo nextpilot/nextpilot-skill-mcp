@@ -12,7 +12,7 @@
 
 ```text
 ① 知识引擎（Python，knowledge/engine/）
-   规则框架 + 91 个算子 + 报告数据层
+   规则框架 + 92 个算子 + 报告数据层
    「怎么算」——与日志格式无关
         │
         │ 构建期拼接（build-knowledge.mjs）

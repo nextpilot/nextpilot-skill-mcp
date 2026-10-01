@@ -3350,6 +3350,55 @@ export const PLOT_PRESETS = {
           ]
         }
       ]
+    },
+    {
+      "id": "spectrum-gyro",
+      "title": "Gyro Spectrum (X)",
+      "description": "sensor_combined 陀螺 X 轴的单边幅度谱（字段无关频谱算子；采样率由该话题 timestamp 自推）。",
+      "condition": {
+        "firmware": "any",
+        "vehicle": "any",
+        "message": [
+          [
+            "sensor_combined"
+          ]
+        ]
+      },
+      "compute": [
+        "gx = sensor_combined.gyro_rad[0]",
+        "f, px = spectrum(gx, norm=\"amplitude\")"
+      ],
+      "outputs": [
+        {
+          "container": "spectrogram",
+          "title": "Gyro X 幅度谱",
+          "legend": true,
+          "grid": true,
+          "fmax": null,
+          "ylabel": "幅度 [rad/s]",
+          "xlabel": "Hz",
+          "children": [
+            {
+              "mode": "spectrum",
+              "xdata": null,
+              "ydata": [
+                {
+                  "kind": "var",
+                  "name": "px"
+                }
+              ],
+              "freqs": [
+                "f"
+              ],
+              "labels": [
+                "Gyro X"
+              ],
+              "styles": [],
+              "colors": []
+            }
+          ]
+        }
+      ]
     }
   ]
 } as const;

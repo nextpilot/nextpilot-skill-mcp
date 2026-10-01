@@ -111,6 +111,18 @@ def test_compute_multi_output_assignment():
     assert (env["roll"], env["pitch"], env["yaw"]) == (0.0, 0.0, 0.0)
 
 
+def test_compute_spectrum_outputs_freq_and_mag_axes():
+    # 频谱算子走的多输出赋值：f/p 两条等长数组都要进 env（图上 ydata 当 kind:"var" 取 p）
+    env: dict = {}
+    _eval_compute("f, p = spectrum([0.0, 1.0, 0.0, -1.0] * 16, sample_rate=1000.0)", env)
+    assert env["f"] is not None and env["p"] is not None
+    assert len(env["f"]) == len(env["p"])
+    # 退化输入 → 两个名字都是 None，不抛异常（规则据此 skip）
+    env2: dict = {}
+    _eval_compute("f2, p2 = spectrum([1.0, 1.0, 1.0], sample_rate=100.0)", env2)
+    assert env2["f2"] is None and env2["p2"] is None
+
+
 def test_compute_zero_division_propagates_none():
     env: dict = {}
     _eval_compute("d = div(10.0, 0.0)", env)
@@ -173,3 +185,139 @@ def test_missing_topics_reads_message_key_not_topics():
     # 旧键名 topics 不再被读：即便塞了值也不该被当成依赖
     legs = {"topics": [["whatever"]]}
     assert eng["_missing_topics"](legs.get("message")) is None
+
+
+def _load_engine_with_series(fs: float, n: int) -> dict:
+    """带一个能吐出正弦序列 + 时间戳的桩 provider 的引擎命名空间。
+
+    频谱要跑通 `compute 里 spectrum(...) → env → np_spectrum 取频率轴/幅度轴` 这条链，
+    需要 get_series 真能回数据，而 `_load_engine` 的桩恒回 None。这里按同一套拼接方式
+    再装一份，只把 get_series 换成合成信号（50 Hz 正弦 @ fs）。
+    """
+    operators_src = (ENGINE / "operators.py").read_text(encoding="utf-8")
+    rule_src = (ENGINE / "engine.py").read_text(encoding="utf-8")
+    rule_src = (
+        rule_src.replace("__FAULT_KB__", "{}")
+        .replace('r"""__RULES__"""', "'{\"stub\": []}'")
+        .replace('r"""__FACTS__"""', "'{\"stub\": {}}'")
+        .replace("__FIELD_UNITS__", "{}")
+    )
+    combined = operators_src + "\n" + rule_src
+    stub = (
+        "import numpy as _np\n"
+        f"_FS, _N = {fs}, {n}\n"
+        "_SIG = _np.sin(2 * _np.pi * 50.0 * _np.arange(_N) / _FS)\n"
+        "_TS = (_np.arange(_N) * (1e6 / _FS)).astype('int64')\n"
+        "class _StubProvider:\n"
+        "    log_type = 'stub'\n"
+        "    def has_topic(self, t):\n"
+        "        return t == 'sensor_combined'\n"
+        "    def is_log_ok(self):\n"
+        "        return True\n"
+        "    def get_mode_present(self):\n"
+        "        return []\n"
+        "    def builtin_variables(self):\n"
+        "        return {}\n"
+        "    def get_initial_parameters(self):\n"
+        "        return {}\n"
+        "    def armed_intervals(self):\n"
+        "        return []\n"
+        "    def get_series(self, bare, instance=None, alias=None):\n"
+        "        if bare == 'sensor_combined.gyro_rad[0]':\n"
+        "            return [_np.asarray(_SIG)]\n"
+        "        if bare == 'sensor_combined.timestamp':\n"
+        "            return _TS\n"
+        "        return None\n"
+        "def detect_log_type(b):\n"
+        "    return 'stub'\n"
+        "def open_log(b, facts):\n"
+        "    return _StubProvider()\n"
+        "ulog_bytes = b''\n"
+    )
+    ns: dict = {}
+    exec(compile(stub + combined, "<engine_ut_series>", "exec"), ns)
+    return ns
+
+
+def test_np_spectrum_end_to_end_from_compute():
+    """频谱算子经 compute 求值、再被 np_spectrum 取出频率轴与幅度轴（W4/W5 的引擎链路）。"""
+    import json
+
+    ns = _load_engine_with_series(fs=1000.0, n=4096)
+    request = {
+        "instance": 0,
+        "ydata": [{"kind": "var", "name": "px", "unit": None}],
+        "compute": [
+            "gx = sensor_combined.gyro_rad[0]",
+            'f, px = spectrum(gx, sample_rate=1000.0, norm="amplitude")',
+        ],
+        "series": [{"label": "Gyro X", "style": None, "color": None}],
+        "kind": "spectrum",
+        "freq": "f",
+    }
+    ns["__result"] = None
+    ns["np_spectrum"](json.dumps(request))
+    out = json.loads(ns["__result"])
+    assert "error" not in out, out
+    assert len(out["f"]) == len(out["series"][0]["p"])
+    # 主频落在 50 Hz（误差 < 1 bin）、采样率标成显式
+    peak = out["f"][max(range(len(out["series"][0]["p"])), key=lambda i: out["series"][0]["p"][i] or 0)]
+    assert abs(peak - 50.0) < 1000.0 / 4096
+    assert out["fs"] == 1000.0 and out["fsSource"] == "explicit"
+
+    # 缺 freq 名 → 取不到频率轴，明确报错而不是画错图
+    bad = dict(request)
+    bad.pop("freq")
+    ns["__result"] = None
+    ns["np_spectrum"](json.dumps(bad))
+    assert "error" in json.loads(ns["__result"])
+
+
+def test_np_spectrum_infers_fs_from_timestamp():
+    """没写 sample_rate 时，引擎从命中话题的 timestamp 自推 fs 并注入重算。
+
+    这条链是 W5 的关键：作者不该在 preset 里写死 fs（有版本/机架差异），而算子本身拿不到
+    时间戳，只能由 `np_spectrum` → `_inject_spectrum_fs` 补。注入要在实参表**末尾**追加关键字
+    实参——插到开头会得到 `spectrum(sample_rate=…, gx, …)`，Python 语法错误，而异常被 `_try`
+    吞掉后的表现是"整张图没数据"，从报错里看不出是注入位置错了（踩过）。
+    """
+    import json
+
+    ns = _load_engine_with_series(fs=1000.0, n=4096)
+    request = {
+        "instance": 0,
+        "ydata": [{"kind": "var", "name": "px", "unit": None}],
+        "compute": [
+            "gx = sensor_combined.gyro_rad[0]",
+            'f, px = spectrum(gx, norm="amplitude")',
+        ],
+        "kind": "spectrum",
+        "freq": "f",
+    }
+    ns["__result"] = None
+    ns["np_spectrum"](json.dumps(request))
+    out = json.loads(ns["__result"])
+    assert "error" not in out, out
+    # 桩时间戳就是按 fs=1000 造的，自推值应当回到 1000
+    assert out["fsSource"] == "inferred"
+    assert abs(out["fs"] - 1000.0) < 1e-6, out["fs"]
+    # 自推之后幅度轴也要真算出来（注入位置写错时这里是全 None / error）
+    assert len(out["f"]) == len(out["series"][0]["p"])
+    peak = out["f"][max(range(len(out["series"][0]["p"])), key=lambda i: out["series"][0]["p"][i] or 0)]
+    assert abs(peak - 50.0) < 1000.0 / 4096
+
+
+def test_append_spectrum_kwarg_places_after_positional():
+    """`_append_spectrum_kwarg` 把关键字实参插在实参表末尾，且不碰字符串里的括号。"""
+    eng = _load_engine()
+    fn = eng["_append_spectrum_kwarg"]
+    assert fn('f, px = spectrum(gx, norm="amplitude")', "sample_rate", 204.5) == (
+        'f, px = spectrum(gx, norm="amplitude", sample_rate=204.5)'
+    )
+    # 没有别的实参：直接补一个，不能多出逗号
+    assert fn("f, px = spectrum(px0)", "sample_rate", 100.0) == "f, px = spectrum(px0, sample_rate=100.0)"
+    # 字符串里的括号不能让扫描提前收尾
+    assert fn('f, px = spectrum(gx, label="a)b", norm="psd")', "sample_rate", 1.0) == (
+        'f, px = spectrum(gx, label="a)b", norm="psd", sample_rate=1.0)'
+    )
+    assert fn("x = 1 + 2", "sample_rate", 1.0) is None

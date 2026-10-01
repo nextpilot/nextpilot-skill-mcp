@@ -6,6 +6,7 @@ export type WorkerMsg =
     | { type: "stage"; stage: string; detail?: string }
     | { type: "done"; report: unknown; manifest: TopicManifest; info: unknown; logId: string }
     | { type: "series"; reqId: string; data: unknown }
+    | { type: "spectrum"; reqId: string; data: unknown }
     | { type: "track"; reqId: string; data: unknown }
     | { type: "error"; message: string };
 

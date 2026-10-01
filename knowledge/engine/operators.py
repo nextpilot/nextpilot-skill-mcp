@@ -1423,6 +1423,62 @@ def op_zero_cross_hz(values, sample_rate=50.0, **kw):
     return flips / 2.0 / max(dur, 1e-3)
 
 
+def _infer_fs(ts_us, n):
+    """从微秒时间戳自推采样率（Hz）：1e6 / median(相邻间隔)。样本 < 2 或间隔退化 → None。
+    只在算子上没给 sample_rate 时兜底；给不给由规则/预设决定（算子不认识固件与机架）。"""
+    import numpy as np
+
+    if ts_us is None:
+        return None
+    t = np.asarray(ts_us, dtype=np.int64)
+    if t.size < 2:
+        return None
+    d = np.diff(t)
+    d = d[d > 0]
+    if d.size == 0:
+        return None
+    return 1e6 / float(np.median(d))
+
+
+@operator(
+    "spectrum",
+    in_arity=1,
+    out_arity=2,
+    out_names=["f", "p"],
+    doc="一维序列 → 单边幅度谱（或 PSD）：返回频率轴（Hz）与幅度/功率轴两条等长数组。"
+    "seq：任意数值序列（通常来自字段引用）；ts_us：可选时间戳（微秒），只在 sample_rate 缺省时"
+    "用来自推采样率；sample_rate：显式采样率（Hz）；norm：'amplitude'（默认，峰值幅度）| 'psd'"
+    "（功率谱密度）；max_bins：最多保留多少 bin（默认 2048，只截低频段，不做随机抽稀）；"
+    "min_samples：参与 FFT 的最少样本数。样本不足、全常数或推不出采样率时返回 (None, None)。",
+)
+def op_spectrum(seq, ts_us=None, sample_rate=None, norm="amplitude", max_bins=2048, min_samples=32, **kw):
+    import numpy as np
+
+    if seq is None:
+        return None, None
+    a = _finite(seq)
+    if a.size < int(min_samples):
+        return None, None
+    if float(a.max() - a.min()) == 0.0:  # 全常数：去直流后幅度恒为 0，谱无意义
+        return None, None
+    fs = float(sample_rate) if sample_rate is not None else _infer_fs(ts_us, a.size)
+    if fs is None or not np.isfinite(fs) or fs <= 0:
+        return None, None
+
+    n = a.size
+    a = a - float(a.mean())  # 去直流：否则 0 Hz bin 会压过真实信号
+    w = np.hanning(n)  # Hann 窗抑制频谱泄漏（与固件频谱工具口径一致）
+    spec = np.abs(np.fft.rfft(a * w))
+    f = np.fft.rfftfreq(n, d=1.0 / fs)
+    if norm == "psd":
+        denom = fs * float(np.sum(w**2))
+        p = (spec**2) / max(denom, 1e-12)
+    else:  # amplitude：单边幅度谱，量纲同输入
+        p = spec * 2.0 / max(float(np.sum(w)), 1e-12)
+    k = min(int(max_bins), f.size)
+    return f[:k], p[:k]
+
+
 # ─────────────────────────── 复合算子：整段分析（多入多出）───────────────────────────
 # 多个小节点串起来的链条读起来太长（姿态那条曾是 30 个节点）。这类「取数 → 对齐 → 掩码 →
 # 统计」的固定套路可以收成一个算子：输入仍是 YAML 里写明的字段引用（算子不认识具体

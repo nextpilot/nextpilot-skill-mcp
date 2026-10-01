@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { TopicManifest, SeriesResponse } from "@/lib/types";
+import type { TopicManifest, SeriesResponse, SpectrumResponse } from "@/lib/types";
 import type { SeriesRequest } from "@/lib/chart-presets";
 import { hashLogBytes } from "@/lib/log-hash";
 import {
@@ -106,6 +106,29 @@ export function useLogProbe() {
         [logId],
     );
 
+    const requestSpectrum = useCallback(
+        async (req: SeriesRequest): Promise<SpectrumResponse> => {
+            const w = getSharedWorker();
+            if (!w) return { f: [], series: [], fullCount: 0, fs: 0, fsSource: "inferred", error: "Worker 不可用" };
+            if (!logId) return { f: [], series: [], fullCount: 0, fs: 0, fsSource: "inferred", error: "未解析日志" };
+
+            const reqId = String(++reqIdRef.current);
+            const promise = new Promise<unknown>((resolve) => {
+                pendingRef.current.set(reqId, resolve);
+            });
+
+            w.postMessage({ type: "spectrum", reqId, request: req, logId });
+
+            const raw = await promise;
+            const data = raw as SpectrumResponse;
+            if (data.error) {
+                return { f: [], series: [], fullCount: 0, fs: 0, fsSource: "inferred", error: data.error };
+            }
+            return data;
+        },
+        [logId],
+    );
+
     const reset = useCallback(() => {
         setManifest(null);
         setLogId(null);
@@ -123,6 +146,7 @@ export function useLogProbe() {
         parsed,
         handleFile,
         requestSeries,
+        requestSpectrum,
         reset,
     };
 }

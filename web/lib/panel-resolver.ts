@@ -11,7 +11,8 @@ import type { TopicManifest } from "./types";
 /** 一条线的数据来源：字段引用（可带候选组）或预设 compute 节点的输出 */
 export type FieldDesc = { kind: "field"; fields: string[]; unit?: string | null } | { kind: "var"; name: string };
 
-/** 一次 np_series 请求（一个容器可能发多次：多条 child 各有自己的横轴时） */
+/** 一次 np_series / np_spectrum 请求（一个容器可能发多次：多条 child 各有自己的横轴时）。
+ *  `kind` 是判别位：缺省 / "field" 走时间序列（np_series）；"spectrum" 走频谱（np_spectrum）。 */
 export type SeriesRequest = {
     /** 面板要第几个实例，声明里写区间的引用按它取（"每实例一张图"用） */
     instance: number;
@@ -21,6 +22,10 @@ export type SeriesRequest = {
     compute: string[];
     /** 与 ydata 同序等长：每条线的图例名与样式（style = solid / dashed / dotted） */
     series: { label: string; style: string | null; color: string | null }[];
+    /** 取数通道。缺省（旧存档）= "field"（时间序列） */
+    kind?: "field" | "spectrum";
+    /** 仅频谱：频率轴那个变量名（spectrum(...) 的第一个输出），np_spectrum 据此从 env 取横轴 */
+    freq?: string;
 };
 
 export type PanelSpec = {
@@ -38,6 +43,10 @@ export type PanelSpec = {
     /** 解析这张图时发现的问题（如"某条线在实例 2 上取不到"），交给界面上的告警栏 */
     warnings?: string[];
     requests: SeriesRequest[];
+    /** 频谱图判别位：true = 走 np_spectrum、x 轴是频率、不参与时间轴联动、不画阶段底色 */
+    spectrum?: boolean;
+    /** 频谱图关注频段上限（Hz）；null = 按数据范围自动 */
+    fmax?: number | null;
 };
 
 // ─────────────────────────── 字段引用 ───────────────────────────
@@ -122,12 +131,14 @@ export function seriesVisible(m: TopicManifest, desc: FieldDesc, instance: numbe
 // ─────────────────────────── 统一的输入形状 ───────────────────────────
 
 export type UnifiedChild = {
-    mode: "TimeSeries" | "xyplot";
+    mode: "TimeSeries" | "xyplot" | "spectrum";
     xdata: FieldDesc | null;
     ydata: FieldDesc[];
     labels: (string | null)[];
     styles: (string | null)[];
     colors: (string | null)[];
+    /** 仅 spectrogram：与 ydata 同序的频率轴变量名（spectrum(...) 的第一个输出），运行期从 env 取 */
+    freqs?: string[];
 };
 
 export type UnifiedAxes = {
@@ -142,6 +153,21 @@ export type UnifiedAxes = {
     hlines: { value: number; level: "ok" | "warning" | "critical"; label: string }[] | null;
     /** true = 按实例拆成多张图；false = 区间引用在同一张图里展开成多条线 */
     split_by_instance: boolean;
+    children: UnifiedChild[];
+};
+
+/** 频谱图的容器形状：与 `UnifiedAxes` 不同轴语义——x 轴是频率（Hz，由算子给），
+ *  没有时间轴、没有 flip / hlines / range，频段上限由 `fmax` 表达。children 的 mode 恒为 "spectrum"。 */
+export type UnifiedSpectrum = {
+    title: string | null;
+    /** 幅度轴标签（必填，构建期校验） */
+    ylabel: string;
+    /** 频率轴标签，缺省 "Hz" */
+    xlabel: string;
+    /** 关注频段上限（Hz）；null = 按数据范围自动 */
+    fmax: number | null;
+    legend: boolean;
+    grid: boolean;
     children: UnifiedChild[];
 };
 
@@ -308,6 +334,59 @@ export function resolveAxes(out: UnifiedAxes, m: TopicManifest, opts: ResolveOpt
         warnings.push(...panelWarnings);
     }
     return { panels, warnings };
+}
+
+/** 一个频谱容器 → 一张频谱图。与 resolveAxes 的关键差别：
+ *  - 不按时间轴拆实例（频率轴不是时间，频谱天然按实例单画；W5 只支持单实例）
+ *  - 产出面板带 `spectrum: true`，界面据此走 np_spectrum 通道、不参与时间轴联动
+ *  - child 的 ydata 全是 compute 输出变量（构建期已校验），这里按 kind:"var" 逐条发出 */
+export function resolveSpectrum(out: UnifiedSpectrum, _m: TopicManifest, _opts: ResolveOptions): ResolveResult {
+    if (out.children.length === 0) return { panels: [], warnings: [] };
+
+    const warnings: string[] = [];
+    const requests: SeriesRequest[] = [];
+    const panelWarnings: string[] = [];
+    for (const child of out.children) {
+        const ydata: FieldDesc[] = [];
+        const series: SeriesRequest["series"] = [];
+        let freqName: string | null = null;
+        child.ydata.forEach((desc, i) => {
+            // 频谱纵轴只能是 compute 输出（构建期已卡），这里再兜一道，别把裸字段发去 np_spectrum
+            if (desc.kind !== "var") {
+                panelWarnings.push(`频谱的 ydata 第 ${i + 1} 项不是 compute 输出，已跳过`);
+                return;
+            }
+            ydata.push(desc);
+            series.push({
+                label: child.labels[i] ?? desc.name,
+                style: child.styles[i] ?? null,
+                color: child.colors[i] ?? null,
+            });
+            freqName = freqName ?? child.freqs?.[i] ?? null;
+        });
+        if (ydata.length === 0) continue;
+        const req: SeriesRequest = { instance: 0, xdata: null, ydata, compute: [], series, kind: "spectrum" };
+        if (freqName) req.freq = freqName;
+        requests.push(req);
+    }
+    if (requests.length === 0) return { panels: [], warnings };
+
+    const spec: PanelSpec = {
+        title: out.title ?? "",
+        yLabel: out.ylabel,
+        xLabel: out.xlabel,
+        legend: out.legend,
+        grid: out.grid,
+        flipx: false,
+        flipy: false,
+        range: null,
+        spectrum: true,
+        fmax: out.fmax,
+        requests,
+    };
+    if (panelWarnings.length) spec.warnings = panelWarnings;
+    warnings.push(...panelWarnings);
+    return { panels: [spec], warnings };
 }
 
 /** 拆图时按哪条引用的实例列表走：取第一条区间引用的 topic。

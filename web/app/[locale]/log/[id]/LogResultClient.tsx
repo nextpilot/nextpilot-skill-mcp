@@ -31,6 +31,7 @@ export function LogResultClient() {
         busy,
         explain,
         requestSeries,
+        requestSpectrum,
         loadTrack,
         openSaved,
         recoverWithFile,
@@ -190,6 +191,7 @@ export function LogResultClient() {
                     storedPlots={storedPlots}
                     info={info}
                     requestSeries={requestSeries}
+                    requestSpectrum={requestSpectrum}
                     loadTrack={loadTrack}
                     onRestore={handleRestoreClick}
                     explaining={stage === "explaining"}

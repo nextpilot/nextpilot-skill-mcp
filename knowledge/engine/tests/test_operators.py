@@ -231,3 +231,71 @@ def test_count_items_contains_text():
     assert len(_op("take_items")(items, key="text", contains="prearm", limit=5)) == 2
     # 数值判定不受影响
     assert _op("count_items")(items, key="level", gte=5) == 1
+
+
+# 频谱算子（2026-10 频谱图用）：字段无关，输入任意一维序列 → 频率轴 + 幅度轴
+
+
+def test_spectrum_registry():
+    assert "spectrum" in OPERATORS
+    sig = SIGNATURES["spectrum"]
+    assert sig["out_arity"] == 2 and sig["out_names"] == ["f", "p"]
+
+
+def test_spectrum_peak_frequency_matches_input_sine():
+    fs = 1000.0
+    n = 4096
+    t = np.arange(n) / fs
+    x = np.sin(2 * np.pi * 50.0 * t)
+    f, p = _op("spectrum")(x, sample_rate=fs)
+    assert len(f) == len(p)
+    # 主频落在 50 Hz 那个 bin（误差 < 1 个 bin）
+    peak = float(f[int(np.argmax(p))])
+    assert abs(peak - 50.0) < fs / n
+    # 频率轴单调递增、从 0 起
+    assert f[0] == 0.0 and np.all(np.diff(f) > 0)
+
+
+def test_spectrum_length_and_max_bins_truncate_low_band():
+    fs = 1000.0
+    n = 4096
+    x = np.sin(2 * np.pi * 50.0 * np.arange(n) / fs)
+    # rfft 的满谱长度 = n//2 + 1；max_bins 只截低频段
+    f_full, _ = _op("spectrum")(x, sample_rate=fs, max_bins=10_000)
+    assert len(f_full) == n // 2 + 1
+    f_small, p_small = _op("spectrum")(x, sample_rate=fs, max_bins=128)
+    assert len(f_small) == 128 and len(p_small) == 128
+
+
+def test_spectrum_infers_sample_rate_from_timestamps():
+    fs = 500.0
+    n = 2048
+    ts_us = (np.arange(n) * (1e6 / fs)).astype(np.int64)
+    x = np.sin(2 * np.pi * 40.0 * np.arange(n) / fs)
+    f, p = _op("spectrum")(x, ts_us=ts_us)
+    # 自推 fs ≈ 500 Hz，主频应落在 40 Hz
+    assert abs(float(f[int(np.argmax(p))]) - 40.0) < fs / n
+    # 不给 fs 也不给时间戳 → 推不出采样率
+    assert _op("spectrum")(x) == (None, None)
+
+
+def test_spectrum_psd_normalization_differs_from_amplitude():
+    fs = 1000.0
+    n = 4096
+    x = np.sin(2 * np.pi * 50.0 * np.arange(n) / fs)
+    _, amp = _op("spectrum")(x, sample_rate=fs, norm="amplitude")
+    _, psd = _op("spectrum")(x, sample_rate=fs, norm="psd")
+    # 两种口径数值不同，但主频一致、长度一致
+    assert len(amp) == len(psd)
+    assert np.argmax(amp) == np.argmax(psd)
+    assert not np.allclose(np.asarray(amp), np.asarray(psd))
+
+
+def test_spectrum_degenerate_inputs_return_none_pair():
+    # 缺输入 / 太短 / 单点 / 全 NaN / 全常数 → (None, None)，不抛异常
+    assert _op("spectrum")(None) == (None, None)
+    assert _op("spectrum")([]) == (None, None)
+    assert _op("spectrum")([1.0]) == (None, None)
+    assert _op("spectrum")([1.0, 2.0, 3.0]) == (None, None)
+    assert _op("spectrum")([float("nan")] * 100, sample_rate=100.0) == (None, None)
+    assert _op("spectrum")([3.0] * 100, sample_rate=100.0) == (None, None)

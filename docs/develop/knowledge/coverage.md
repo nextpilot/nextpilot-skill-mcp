@@ -101,6 +101,27 @@ guard 用的日志元信息。
 | 磁力计推力相关性                   | `Thrust and Magnetic Field` 图   | 无（磁干扰是常见坠机诱因）               |
 | 估计器看门狗                       | `Estimator Flags` 图             | `ekf-faults` 覆盖了一部分                |
 | 采样规律 / 时间滑移                | `Sampling Regularity` 图         | 只有 `guard-log-dropouts` 判丢包         |
+| 谱分析（PSD / FFT）                | 6 张 FFT/PSD 图 + 作动器 FFT     | **引擎已具备**（W4/W5），图待 W6 铺      |
+
+---
+
+## 四点五、频谱：能力已到、图还没铺
+
+W4/W5 把「缺算子」这个根因解掉了，谱分析从「做不了」变成「写完 YAML 就有」。
+现状与待办分开记，免得下次又把"没图"当成"没能力"。
+
+| 项                       | 状态                                                                                    |
+| ------------------------ | --------------------------------------------------------------------------------------- |
+| 频谱算子 `spectrum`      | **已落地**。字段无关，`norm="amplitude"\|"psd"`，去直流 + Hann 窗 + `np.fft.rfft`       |
+| 采样率口径               | 显式给 `sample_rate=` 或由引擎从话题 `timestamp` 自推（自推值随响应回传，界面标口径）   |
+| `container: spectrogram` | **已落地**（构建期 `compileSpectrogram` + 前端判别位 + 渲染分支）                       |
+| Preset                   | `px4/plot/spectrum-gyro.yml` 一张（`sensor_combined` 陀螺 X，单边幅度谱）               |
+| 剩余六张图               | **待 W6**：加速度 PSD、角速度 PSD、角加速度 PSD、FIFO ×2、标滤波器频率线、作动器 FFT    |
+| 多实例（多 IMU）         | **待后续**：现在只出实例 0 的谱；多 IMU 会各自有采样率，需 `resolveSpectrum` 按实例拆分 |
+
+多实例这一项是**已知取舍不是遗漏**：`px4/plot/spectrum-gyro.yml` 只声明一条 `ydata`，
+命中哪个实例取哪个（默认 0）。上游会为每个 IMU 各画一张；本仓留到有真实多 IMU 日志驱动时再做，
+免得凭空设计。登记在此，W6 铺图时一并评估。
 
 ---
 
@@ -116,6 +137,8 @@ guard 用的日志元信息。
   `home_position`（返航点）。**部分落地（2026-10）**：`px4-rc-link`、`px4-home-position`
   两条已做，规则数 31 → 33；`esc_*` 卡在取数层的嵌套数组支持，见"结论速览"。
 - 批 3（补字段）：GPS 干扰（`noise_per_ms`/`jamming_indicator`）、陀螺振动、电池温度。
+- 批 3.5（谱图，2026-02）：借 W4/W5 落地的 `spectrum` 算子与 `spectrogram` 容器铺 6 张谱图，
+  见第四点五节。这是唯一"算子已在、只差声明"的一批，成本最低。
 - 批 4（需新算子）：PID 跟踪误差（需要 setpoint-actual 对齐统计）、磁力计推力相关性、
   执行器饱和。
 

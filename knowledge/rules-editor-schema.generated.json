@@ -509,6 +509,7 @@
     "scale",
     "scale_series",
     "smaller",
+    "spectrum",
     "stack_columns",
     "std",
     "step_drop_events",

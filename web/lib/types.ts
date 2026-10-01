@@ -216,6 +216,23 @@ export interface SeriesResponse {
     error?: string;
 }
 
+/** np_spectrum() 的返回：频率轴（Hz）+ 幅度/功率轴。与 SeriesResponse 正交——
+ *  频率轴长度 = FFT bin 数，量纲是 Hz，不做 LTTB、与时间轴无关联。 */
+export interface SpectrumResponse {
+    /** 频率轴，Hz，长度 = bin 数（算子已按 max_bins 截低频段） */
+    f: number[];
+    /** 与请求 ydata 同序等长；取不到那条为 null。p = 幅度/功率轴，unit 由请求侧带 */
+    series: ({ p: (number | null)[]; unit?: string | null } | null)[];
+    /** 参与 FFT 的原始样本数 */
+    fullCount: number;
+    /** 实际使用的采样率（Hz）：显式给的或从 timestamp 自推的 */
+    fs: number;
+    /** 采样率来源：explicit = YAML 写的；inferred = 由 timestamp 自推（界面要说明口径） */
+    fsSource: "explicit" | "inferred";
+    warnings?: string[];
+    error?: string;
+}
+
 /** 地图上的一条轨道（`container: map` 的 child）；坐标已按固件换算成度/米 */
 export interface TrackSeries {
     /** 图例名（预设里的 label） */

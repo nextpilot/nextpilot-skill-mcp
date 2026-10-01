@@ -19,7 +19,7 @@
 | 术语     | 一句话                                                                              | 细读                                                        |
 | -------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | 知识引擎 | `knowledge/engine/` 下的 Python 包，浏览器（Pyodide）与本地工具共用同一份源码       | [`architecture/engine.md`](architecture/engine.md)          |
-| 算子     | 引擎里最小的计算单元（取值、滤波、统计……91 个），写规则时的积木                     | [`architecture/engine.md`](architecture/engine.md)          |
+| 算子     | 引擎里最小的计算单元（取值、滤波、统计、频谱……92 个），写规则时的积木               | [`architecture/engine.md`](architecture/engine.md)          |
 | 规则     | 一条 YAML 检查经验：条件（算子组合）+ 结论（中文提示），PX4 26 条 / ArduPilot 16 条 | [`quickstart/write-a-rule.md`](quickstart/write-a-rule.md)  |
 | 故障库   | `fault-kb.yaml`：故障根因、排查步骤、禁忌，按关键字检索                             | [`knowledge/`](knowledge/README.md)                         |
 | 预设     | 绘图预设：一张图画哪些曲线、怎么分组，YAML 定义                                     | [`knowledge/px4/plot/`](../../knowledge/px4/plot/README.md) |

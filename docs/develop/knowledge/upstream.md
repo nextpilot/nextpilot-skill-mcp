@@ -96,9 +96,16 @@ S11 参数变更（`changed_parameters`），上游也只是个按钮占位。
 
 没建的七项全是谱分析：加速度 PSD（V5）、角速度 PSD（V6）、角加速度 PSD（V7）、
 FIFO 加速度 PSD（V9）、FIFO 陀螺 PSD（V12）、角加速度 FFT 标滤波器频率线（V13）、
-作动器 FFT（即上表 C7）。根因是同一个：上游的谱变换写在 `DataPlotSpec` 绘图类里，
-本仓把这一层抽到了引擎算子，而引擎 91 个算子里没有 `fft` / `psd` / `spectrogram`
-（只有时域过零 `zero_cross_hz`）。谱算子一缺，七张图同时缺。
+作动器 FFT（即上表 C7）。根因原本是同一个：上游的谱变换写在 `DataPlotSpec` 绘图类里，
+本仓把这一层抽到了引擎算子，而引擎里没有频域算子。
+
+**W4 已解锁这个根因**：新增字段无关的 `spectrum` 算子（去直流 + Hann 窗 + `np.fft.rfft`，
+`norm="amplitude"|"psd"` 两种口径，采样率可显式给、缺省时由引擎从话题 timestamp 自推），
+配套 `container: spectrogram` 与前端的频谱渲染分支（W5）。七张图从「缺算子」变成
+「缺各族的 plot 预设声明」——W6 铺图即可，不再有引擎侧阻塞。
+
+已建的一张：`px4/plot/spectrum-gyro.yml`（`sensor_combined` 陀螺 X 轴单边幅度谱），
+作为 W6 的样板。剩余六张（PSD 口径、FIFO 系列、标滤波器频率线、作动器）待 W6。
 
 ### 概览区与非图表子系统
 

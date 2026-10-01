@@ -29,7 +29,7 @@
 ```text
 knowledge/
 ├── engine/                    ← 机制层（与格式无关）
-│   ├── operators.py           91 个通用算子（@operator 声明 arity）
+│   ├── operators.py           92 个通用算子（@operator 声明 arity）
 │   ├── engine.py              规则框架 + 报告数据层
 │   ├── loader.py              装配入口（本地工具与 server/ 共用）
 │   └── providers/             格式适配层
@@ -87,7 +87,7 @@ knowledge/
 
 ---
 
-## 五、算子：91 个，不认识任何字段
+## 五、算子：92 个，不认识任何字段
 
 `operators.py` 是算子注册表。算子是纯函数，只认输入输出，不认 field 名、阈值、文案——
 那些都由规则/图的声明传进来。
@@ -102,16 +102,20 @@ def op_mean(series, axis=None): ...
 
 算子的分类（完整清单见网站 `/guide/operator-catalogue`）：
 
-| 类别     | 例子                                                           |
-| -------- | -------------------------------------------------------------- |
-| 统计     | `mean` / `max` / `min` / `std` / `median` / `percentile`       |
-| 序列处理 | `diff` / `lt` / `diff` / `clip` / `downsample`                 |
-| 区间事件 | `excursion_events` / `rising_edge_events` / `step_into_events` |
-| 取数     | `get_series` / `_ref` 候选组 / `unit=` 换算                    |
-| 组合     | `stack_columns` / `add` / `bit_or_max`                         |
+| 类别     | 例子                                                                                              |
+| -------- | ------------------------------------------------------------------------------------------------- |
+| 统计     | `mean` / `max` / `min` / `std` / `median` / `percentile`                                          |
+| 序列处理 | `diff` / `lt` / `diff` / `clip` / `downsample`                                                    |
+| 区间事件 | `excursion_events` / `rising_edge_events` / `step_into_events`                                    |
+| 取数     | `get_series` / `_ref` 候选组 / `unit=` 换算                                                       |
+| 组合     | `stack_columns` / `add` / `bit_or_max`                                                            |
+| 频域     | `spectrum`（去直流 + Hann 窗 + `np.fft.rfft`，amplitude/psd 双口径）｜`zero_cross_hz`（时域过零） |
 
-> **已知缺口**：没有 `fft` / `psd` / `spectrogram` 频谱算子，只有 `zero_cross_hz`（时域过零）。
-> 这是 7 张频谱图同时缺的根因，见 [`../knowledge/gap.md`](../knowledge/gap.md)。
+> **`spectrum` 的两种调用形态**：算子拿不到时间戳（`compute` 的实参只允许字面量或前面算出的
+> 变量），所以采样率要么由写作者显式给 `sample_rate=<字面量>`，要么留空由取数入口
+> `np_spectrum` 从命中话题的 `timestamp` 自推后注回重算。它不走 `np_series`：频率轴长度 =
+> FFT bin 数，与时间序列长度不同源，硬塞进 `np_series` 会撞"采样数对不上"的守卫。
+> 产物落 `container: spectrogram`，前端另有一条渲染分支（不参与时间轴联动、不画阶段底色）。
 
 ---
 

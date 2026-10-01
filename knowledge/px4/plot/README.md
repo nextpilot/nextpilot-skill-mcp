@@ -51,7 +51,7 @@ outputs:
 
 | 键                  | 必填      | 说明                                                                                   |
 | ------------------- | --------- | -------------------------------------------------------------------------------------- |
-| `container`         | ✓         | `axes`（一张曲线图）｜`map`（地图轨迹，**全局最多一个**）                              |
+| `container`         | ✓         | `axes`（一张曲线图）｜`spectrogram`（频谱图）｜`map`（地图轨迹，**全局最多一个**）     |
 | `title`             |           | 这张图的标题；`axes` 里可用 `{instance}` 占位（`split_by_instance` 时）                |
 | `ylabel`            | ✓（axes） | 这张图的 y 轴标签。**一张图只画一个量纲**：同一图里写了 `unit=` 的引用必须目标单位相同 |
 | `xlabel`            |           | 缺省「秒（相对日志开始）」；`xyplot` 时写你的横轴名                                    |
@@ -75,6 +75,51 @@ outputs:
 
 `map` 的 child：`mode: track` + `label` + `max_points` + `lat` / `lon` / `alt`（各一个字段引用，
 **必须写明实例**：同一条轨道的时间戳与 `fix_type` 要跟坐标来自同一个话题的同一个实例）。
+
+## 频谱图（`container: spectrogram`）
+
+频谱的横轴是**频率（Hz）**，不是时间——它跟 `axes` 是两套坐标，所以单列一个容器。写法：
+
+```yaml
+compute:
+  - gx = sensor_combined.gyro_rad[0]
+  - f, px = spectrum(gx, norm="amplitude") # 第一个左值=频率轴，第二个=幅度轴
+output:
+  - container: spectrogram
+    title: Gyro X 幅度谱
+    ylabel: "幅度 [rad/s]"
+    xlabel: Hz
+    children:
+      - mode: spectrum
+        ydata: [px]
+        label: ["Gyro X"]
+```
+
+| 键                | 必填 | 说明                                                                                                                                                        |
+| ----------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `container`       | ✓    | 固定 `spectrogram`                                                                                                                                          |
+| `title`           |      | 标题                                                                                                                                                        |
+| `ylabel`          | ✓    | 幅度轴单位（一张图一个量纲，与 `axes` 同规矩）                                                                                                              |
+| `xlabel`          |      | 缺省 `Hz`                                                                                                                                                   |
+| `fmax`            |      | 横轴上限（Hz）。缺省按数据自适应；**只调上限，不画阶段底色**（频谱不是时间序列）                                                                            |
+| `legend` / `grid` |      | 缺省 `true`                                                                                                                                                 |
+| `children[]`      | ✓    | `mode: spectrum` + `ydata`（**只能是 `compute` 里 `spectrum(...)` 的第二个输出**，即幅度轴变量）+ `label` / `style` / `color`（与 `axes` 同规矩，逐项对齐） |
+
+三条必须知道的约束：
+
+1. **`spectrogram` 不支持 `hlines` / `flipx` / `flipy` / `range`**，构建期会报错。频谱的横轴
+   范围用 `fmax`（只给上限），因为下限天然是 0。
+2. **幅度轴与频率轴必须来自同一条 `spectrum(...)` 语句**。构建期会核对 `ydata` 里的变量确实是
+   `spectrum` 的输出，配错会报错而不是画一张对不上的图。
+3. **采样率不用你写。** 不写 `sample_rate=` 时，引擎从命中话题的 `timestamp` 自推
+   （`median(相邻间隔)` 的倒数），随响应回传真实值，界面标注口径为"自推"。要压过自推就显式写
+   `spectrum(gx, sample_rate=1000.0)`（**只允许字面量**——运行时变量会在构建期被拦）。
+
+> 为什么采样率由引擎推而不是算子自己推：算子在 `compute` 里求值，它的实参只能是字面量或
+> 前面算出的变量，**拿不到时间戳序列**。所以自推这件事落在 `np_spectrum` 这个取数入口上，
+> 由它从命中话题的 timestamp 推完再注回 `spectrum(...)` 重算。写 preset 的人不用关心。
+
+`px4/plot/spectrum-gyro.yml` 是现成样板，抄它改话题和字段即可。
 
 ## 横轴（时间轴）是怎么定的
 
@@ -140,10 +185,10 @@ ydata:
 
 设计这套 schema 时在几个岔路口做了选择，理由记在这里，改动前先读：
 
-1. **`container` 是扩展点，不是枚举。** 将来加 `polar` / `table` / `spectrogram`，
-   只需新增一种容器类型和它的 `children` 变体，其余各层不动。反过来，若按"图表种类"
-   分别设计子 schema（曲线一套 `panels`、地图一套 `overlays`、表格再来一套），
-   每加一种渲染器就多一套词汇、一套校验、一套示例。
+1. **`container` 是扩展点，不是枚举。** 加 `polar` / `table`，只需新增一种容器类型和它的
+   `children` 变体，其余各层不动（`spectrogram` 已在 2026-02 按这条走完一遍，可直接参照）。
+   反过来，若按"图表种类"分别设计子 schema（曲线一套 `panels`、地图一套 `overlays`、
+   表格再来一套），每加一种渲染器就多一套词汇、一套校验、一套示例。
 2. **`container` + `children[].mode` 是判别式联合的正当用法。** 容器决定 `mode` 的合法
    取值域，这正是 `oneOf` + `const` 的标准写法，TypeScript 的 discriminated union 同理；
    非法组合由类型本身表达，不必另维护一张组合表。
