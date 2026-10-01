@@ -2,9 +2,9 @@
 # 与 failsafe 规则互补（那条判的是「已经触发保护」，这条判「信号正在变差」）。
 # 纯数传 / 无遥控的机型没有 input_rc，引擎按 condition 直接 skip，不算问题。
 #
-# 字段名跨固件版本变过：老固件只有 rssi，新固件另给 link_quality。两者都用候选组
-# 取数，取不到给 None；link_quality 是新增字段，老日志上没有，所以它的赋值裹 _try——
-# 不裹会让整条规则因为一个 None 比较而中止成 skipped（踩过）。
+# 趋势判定要 rssi 的原始序列：老固件（如本仓 1.11 样例）只有 rssi，新固件另给
+# link_quality。这里只读 rssi——它在两代固件里都在，link_quality 是老日志没有的字段，
+# 读它要么多一层 _try 容错、要么白白拖垮整条规则（踩过）。
 # 阈值 [暂定]：RSSI < 40（百分比量纲）为弱信号经验线，待真实日志标定。
 
 id: px4-rc-link
@@ -22,10 +22,9 @@ compute:
   - fs = max(input_rc.rc_failsafe)
   - n_drop = max(input_rc.rc_lost_frame_count)
   - n_total = max(input_rc.rc_total_frame_count)
+  # RSSI 取「有信号的那些帧」里的最小值：0 表示这一帧没测到，不参与比大小
   - rssi_series = _ref("input_rc.rssi")
   - rssi_min = _try(min(rssi_series[rssi_series > 0]))
-  - lq_series = _ref("input_rc.link_quality")
-  - lq_min = _try(min(lq_series[lq_series > 0]))
 
 output:
   - name: rcRssiMin

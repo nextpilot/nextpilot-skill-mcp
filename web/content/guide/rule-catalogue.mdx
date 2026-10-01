@@ -990,8 +990,6 @@ order: 12
 - `n_total = max(input_rc.rc_total_frame_count)`
 - `rssi_series = _ref("input_rc.rssi")`
 - `rssi_min = _try(min(rssi_series[rssi_series > 0]))`
-- `lq_series = _ref("input_rc.link_quality")`
-- `lq_min = _try(min(lq_series[lq_series > 0]))`
 - 判定：
 - <strong>critical</strong> | `fs > 0` | threshold 0 | description "遥控触发失效保护（丢帧累计 \{n_drop\}，总帧 \{n_total\}）"
 - <strong>warning</strong> | `lost > 0` | threshold 0 | description "遥控信号丢失（丢帧累计 \{n_drop\}，总帧 \{n_total\}）"
