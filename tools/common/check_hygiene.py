@@ -2,7 +2,8 @@
 
 它们全靠人记得，而人会忘，所以把判据固化成可重跑的检查：
 
-1. § 引用要有落点。引用的同行点名了文档 → 只在那份文档里找；否则本文档是编号文档就只在本文档里找；
+1. § 引用要有落点。引用的同行点名了文档 → 只在那份文档里找（名字按原文 → Markdown 相对链接
+   语义 → 唯一 basename 三步解析，撞名短名不算点名）；否则本文档是编号文档就只在本文档里找；
    都不是才退到全局。某文件算不算"编号文档"由它自己的标题决定（≥3 个编号标题 + 只有 .md/.mdx），
    不维护名单——名单会过期，标题不会。
 2. 产物新鲜度的判据只能是「重跑生成逻辑再逐字节比对」。调用生成器并带 `--check` 的文件（以及
@@ -33,6 +34,7 @@ from __future__ import annotations
 import argparse
 import ast
 import io
+import posixpath
 import re
 import subprocess
 import sys
@@ -169,17 +171,26 @@ def _indexed_docs() -> dict[str, set[str]]:
     return docs
 
 
-def _named_doc(line: str, ref_start: int, docs: dict[str, set[str]], by_basename: dict[str, str]) -> str | None:
+def _named_doc(line: str, ref_start: int, docs: dict[str, set[str]], by_basename: dict[str, str], cur_rel: str) -> str | None:
     """引用所在行里点名了哪份文档，取离这个 § 最近的那个名字。
 
     取最近而非行内第一个：一行提两份文档是常事，第一个未必是被引的那份，按它严格解析会把对的
     判成悬空。写在引用之前的优先于之后（人写"见 X §4"），所以引用后面的名字按"更远"计。
+
+    名字按三步解析：原文直配索引 → 按 Markdown 相对链接语义解析（`[文本](../x/y.md)` 的 URL
+    也是文档名，且常比链接文本离 § 更近，不解析 URL 就会漏）→ 退唯一 basename。**撞名短名
+    不算点名**：全仓多份 `README.md`，回退到谁全看扫描顺序，等于赌运气。
     """
     best: tuple[int, str] | None = None
     for m in DOC_MENTION_RE.finditer(line):
-        rel = m.group(1) if m.group(1) in docs else by_basename.get(Path(m.group(1)).name)
+        raw = m.group(1)
+        if raw in docs:
+            rel: str | None = raw
+        else:
+            cand = posixpath.normpath(posixpath.join(posixpath.dirname(cur_rel), raw))
+            rel = cand if cand in docs else by_basename.get(Path(raw).name)
         if rel is None:
-            continue  # 点名的不是编号文档（如 knowledge/px4/CLAUDE.md），不据此严格解析
+            continue  # 解析不出唯一落点（如撞名的 README.md），不据此严格解析
         dist = ref_start - m.end() if m.end() <= ref_start else (m.start() - ref_start) + len(line)
         if best is None or dist < best[0]:
             best = (dist, rel)
@@ -200,13 +211,15 @@ def check_section_refs() -> list[str]:
     if "CLAUDE.md" not in sections:
         problems.append("CLAUDE.md 不在编号文档索引里（被改名？编号标题被删？）—— 全局回退没有落点，本次检查无意义")
 
-    by_basename: dict[str, str] = {}
+    # basename 回退只收唯一名：README.md 这类撞名短名解析到谁全看扫描顺序，不能赌
+    name_counts: dict[str, int] = {}
     for rel in sections:
-        by_basename.setdefault(Path(rel).name, rel)
+        name_counts[Path(rel).name] = name_counts.get(Path(rel).name, 0) + 1
+    by_basename: dict[str, str] = {Path(rel).name: rel for rel in sections if name_counts[Path(rel).name] == 1}
 
     how_counts: dict[str, int] = {"点名文档": 0, "本文档": 0, "全局": 0}
     for rel, lineno, num, line, start in refs:
-        named = _named_doc(line, start, sections, by_basename)
+        named = _named_doc(line, start, sections, by_basename, rel)
         if named is not None:
             how = "点名文档"
             ok = num in sections[named]
