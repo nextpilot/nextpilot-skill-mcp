@@ -3,7 +3,7 @@
 **这里放「已落地的机制」** —— 系统分层、每个板块的机制与数据流、契约、schema、
 以及**为什么这么设计**。
 
-**不放**：计划（进 [`../roadmap/`](../roadmap/)）、规范（进 [`../style.md`](../style.md)）、
+**不放**：计划（进 [`../roadmap/`](../roadmap/)）、规范（进 [`../contribute/`](../contribute/)）、
 评估报告与过程留痕。
 
 ---
@@ -54,13 +54,13 @@
 
 **周边文档**：
 
-| 你想知道                    | 去哪                                                                   |
-| --------------------------- | ---------------------------------------------------------------------- |
-| 知识库（规则/图）现在的状况 | [`../knowledge/`](../knowledge/README.md)                              |
-| 改完代码该跑什么检查        | [`../quickstart/checks-by-stage.md`](../quickstart/checks-by-stage.md) |
-| 部署、环境变量、排障        | [`../operations/README.md`](../operations/README.md)                   |
-| 写代码要守什么规矩          | [`../style.md`](../style.md)                                           |
-| 已拍板的决策与未闭合待办    | [`../roadmap/decisions.md`](../roadmap/decisions.md)                   |
+| 你想知道                    | 去哪                                                         |
+| --------------------------- | ------------------------------------------------------------ |
+| 知识库（规则/图）现在的状况 | [`../knowledge/`](../knowledge/README.md)                    |
+| 改完代码该跑什么检查        | [`../testing/README.md`](../testing/README.md)               |
+| 部署、环境变量、排障        | [`../operations/README.md`](../operations/README.md)         |
+| 写代码要守什么规矩          | [`../contribute/code-style.md`](../contribute/code-style.md) |
+| 已拍板的决策与未闭合待办    | [`../roadmap/decisions.md`](../roadmap/decisions.md)         |
 
 ---
 

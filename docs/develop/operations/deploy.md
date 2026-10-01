@@ -38,7 +38,7 @@
 
 **每个 CI workflow 只做一件事**：装依赖 → 调 `check_all.py` 带对应开关。
 检查项各自耗时、为什么这样分档，见
-[`../quickstart/checks-by-stage.md`](../quickstart/checks-by-stage.md) §六；
+[`../testing/checks-by-stage.md`](../testing/checks-by-stage.md) §五（CI）；
 本文件只讲**发布流程**。
 
 **几条关键约定**：

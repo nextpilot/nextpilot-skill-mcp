@@ -159,7 +159,7 @@
 **这三个文件的名字是有意这么起的**：连起来读是"谁采 → 谁收 → 谁建单"——
 `lib/issue-bridge.ts`（浏览器）→ `api/issues.js`（边缘入口）→ `_lib/issue-filer.js`（边缘建单）。
 端点原来叫 `/api/report-error`，与浏览器侧模块 `error-reporter.ts` 只差一个词序、又与 `/api/reports`
-（飞行分析报告）同前缀反义，因此改掉。命名规则见 [`../style.md`](../style.md) §1.1「名字要能望文生义」，本功能是那条规则的由来。
+（飞行分析报告）同前缀反义，因此改掉。命名规则见 [`../contribute/code-style.md`](../contribute/code-style.md) §1.1「名字要能望文生义」，本功能是那条规则的由来。
 
 ### 6.2 为什么是两个模块：运行时分界，不是概念分界
 

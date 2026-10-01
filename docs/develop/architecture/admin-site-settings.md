@@ -1,7 +1,7 @@
 # 后台站点设置系统 `/admin/settings`
 
 > 状态：**五步全部完成**（2026-09-27）。本文只记当前的机制与口径，实施过程与实测记录不在本文。
-> 守卫清单见 [`../quickstart/checks-by-stage.md`](../quickstart/checks-by-stage.md)。
+> 守卫清单见 [`../testing/guards.md`](../testing/guards.md)。
 
 ## 0. 需求（这就是全部）
 

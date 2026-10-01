@@ -157,36 +157,44 @@ DNS/TCP 在 1 毫秒级可忽略；连接复用后第 2 次起 TLS 成本归零�
 
 ---
 
-## D7. `docs/develop/` 六分类结构（2026-10 决定）
+## D7. `docs/develop/` 目录结构（2026-10 决定，同月扩为八位置）
 
-**决定**：`docs/develop/` 按「**读者在什么时刻需要它**」分六个位置，一个主题一个落点：
+**决定**：`docs/develop/` 按「**读者在什么时刻需要它**」分八个位置，一个主题一个落点：
 
-| 位置            | 回答的问题                       | 读者状态            |
-| --------------- | -------------------------------- | ------------------- |
-| `quickstart/`   | 我怎么把它跑起来？               | 第一天进来          |
-| `architecture/` | 它是怎么设计和实现的？           | 要改代码、要懂边界  |
-| `knowledge/`    | 知识库（规则/图/算子）什么状况？ | 要给知识库加/改东西 |
-| `operations/`   | 怎么部署、怎么排障？             | 上线、线上出问题    |
-| `roadmap/`      | 接下来做什么、已经定了什么？     | 接手待办、查决策    |
-| `style.md`      | 写代码要守什么规矩？             | 动手写代码前        |
+| 位置            | 回答的问题                       | 读者状态             |
+| --------------- | -------------------------------- | -------------------- |
+| `quickstart/`   | 我怎么跑起来、写第一条东西？     | 第一天进来           |
+| `architecture/` | 它是怎么设计和实现的？           | 要改代码、要懂边界   |
+| `testing/`      | 什么时候跑哪些检查、怎么过门禁？ | 改完代码、等 CI      |
+| `contribute/`   | 怎么求助、怎么贡献、守什么规矩？ | 动手写代码前、遇问题 |
+| `knowledge/`    | 知识库（规则/图/算子）什么状况？ | 要给知识库加/改东西  |
+| `operations/`   | 怎么部署、怎么排障？             | 上线、线上出问题     |
+| `roadmap/`      | 接下来做什么、已经定了什么？     | 接手待办、查决策     |
 
-**为什么 `style.md` 放在 `develop/` 根、不设 `requirements/` 目录**：它是**横切规范**，
-每个目录都要守，塞进任何子目录都等于宣称它只管那一块。`requirements/` 只装它一份会
-让目录名失去意义，因此裁掉该目录。
+**演进**：最初为六分类（`style.md` 单文件放 `develop/` 根、`checks-by-stage.md` 归
+`quickstart/`）。落地后两份文件各自超过 300 行，按「一份 md 只讲一个主题」拆成子目录：
+`style.md` → `contribute/`（三份：README / code-style / docs-and-assets），
+`checks-by-stage.md` → `testing/`（六份：README / checks-by-stage / check-catalog /
+guards / log-regression / pitfalls）。拆分依据见铁律 2。
 
-**为什么 `checks-by-stage.md` 归 `quickstart/` 而不是 `architecture/`**：
-新手拿起仓库第二件想知道的事就是「改完要跑什么、要等多久」，与「装环境」同一阅读顺序。
-`architecture/` 讲的是**已落地的机制**，不是"你该怎么做"。
+**为什么规范进 `contribute/` 而不是独立 `requirements/` 目录**：代码风格与「如何贡献、
+如何获取帮助」是同一读者在同一个动作（动手写代码）前后需要的东西，放一起少一跳；
+`requirements/` 目录名与仓库里真正的依赖清单（package.json / requirements 惯例）撞车，裁掉。
 
-**为什么 `architecture/` 按系统分层拆六份**：一个板块一份，避免"一份文档讲三件事"。
+**为什么 `checks-by-stage` 归 `testing/` 而不是 `quickstart/`**：`quickstart/` 只回答
+「怎么上手」（装环境、跑起来、写第一条东西）；「什么时候跑哪些检查」是**日常开发循环**
+的一部分，与速查、清单、守卫、坑同属质量门禁主题，单独立目录才讲得开。
+
+**为什么 `architecture/` 按系统分层拆七份**：一个板块一份，避免"一份文档讲三件事"。
 当前为 `README`（四层总览）+ `engine` + `provider` + `web-app` + `mcp-server` +
 `error-reporting` + `admin-site-settings`。
 
-**三条铁律（同时确立）**：
+**四条铁律（同时确立）**：
 
 1. **一个 md 只讲一个主题**，不许两份文档说同一件事。
-2. **`docs/` 下任何文档不得引用 `CLAUDE.md`**；只允许反向（`CLAUDE.md` → `docs/`）。
-3. **`CLAUDE.md` 是给 AI 看的，`docs/` 下其余都是给人看的**——不是 AI 备忘录。
+2. **一份 md 超过约 300 行就该问要不要拆**——按主题拆子目录，拆出的目录配短 README。
+3. **`docs/` 下任何文档不得引用 `CLAUDE.md`**；只允许反向（`CLAUDE.md` → `docs/`）。
+4. **`CLAUDE.md` 是给 AI 看的，`docs/` 下其余都是给人看的**——不是 AI 备忘录。
 
 **过程文件的处置**：本轮的规划文件（`docs-system-plan.md`）在落地后按 D4 即删；
 结论全部收进本条 D7，不另留文档。
