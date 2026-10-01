@@ -39,25 +39,28 @@
   `meta/`、`knowledge/llm/` 这些真源目录，并在监听顶层目录时按文件名滤掉
   `*.generated.*` —— 否则写产物会触发自己、无限重建。
 
-## hook 的解释器探测
+## hook 的解释器：写死 `.venv`，不探测
 
-`python` 不等同于"有 ruff 的 python"：本机 `python` 可能解析到没有 ruff 的托管 Python，
-而 `check_all.py` 内部用 `sys.executable -m ruff` 跑格式化检查。hook 若被那个解释器启动，
-ruff 那一步直接 `No module named ruff`，**每次 push 都红**。所以 hook 必须自己探测解释器，
-不能靠 shebang。
+`python` 不等同于"有 ruff 的 python"：`check_all.py` 内部用 `sys.executable -m ruff`
+跑格式化检查，hook 若被一个没装 ruff 的解释器启动，那步直接 `No module named ruff`，
+**每次 push 都红**——表现像「工具缺失」，实际是「选错了解释器」。
 
-探测的三条约束：
+方案迭代过：最早在 PATH 上探测候选（优先 anaconda、回退 `python`），后来废掉——
+**两个候选都有 ruff 时算谁的**，那个答案迟早因两台机器装的版本不同而打架。
+现行方案（`.githooks/_venv_python.py`）是**不找，写死**：hook 解释器 = 仓库根 `.venv`
+（`tools/setup` 用 uv 建它，`pyrightconfig.json` 按同一路径找它，三方同一个约定）。
 
-1. **优先 anaconda，回退 PATH 上的 `python`**。顺序不能反——托管 Python 恰好排在 PATH 前面，反了等于没探测。
-2. **探测不到时按需 `re-exec`**：若 `sys.executable` 不是选中的那个、且 hook 是被 Python 启动的，用 `os.execv` 换到选中的解释器重跑自己（加环境变量哨兵防无限递归）。
-3. **`exit 127` 是逃生门**：两个候选都不可用时打印明确的"缺什么"再 `exit 127`，由 Git 放行。hook 的职责是提醒，不是把人锁在门外。
+三条现行规则：
 
-候选顺序写死，不读配置文件——多一个事实源就多一处会腐烂。
+1. **`.venv` 不存在 → `exit 127`**：打印「怎么建 .venv」再退出，Git 把 127 当 warning 放行。
+   hook 的职责是提醒，不是把人锁在门外。
+2. **当前进程不在 `.venv` → `re-exec`**：用 `.venv` 解释器重跑整个 hook（环境变量哨兵防无限递归），
+   所以 hook 正文永远不会在两个解释器下各跑一遍。
+3. **不在 PATH 上找候选**，也不读配置文件——多一个事实源就多一处会腐烂。
 
-**Windows 上 Git 用 `/bin/sh` 启动 hook，脚本里一律用 `/` 分隔符**，反斜杠会被 sh 当转义符吃掉。
-
-**hook 的变异锚点一律用单行**：`mutate_guards._apply` 按字节读写，工作区里 hook 是 CRLF，
-多行锚点里写 `\n` 一个都匹配不到，会报 `anchor mismatch`。
+顺带两条 hook 工程事实：**Windows 上 Git 用 `/bin/sh` 启动 hook，脚本里一律用 `/` 分隔符**
+（反斜杠会被 sh 当转义符吃掉）；**hook 的变异锚点一律用单行**（`mutate_guards._apply`
+按字节读写，工作区里 hook 是 CRLF，多行锚点里写 `\n` 一个都匹配不到，报 `anchor mismatch`）。
 
 ## 文档 § 引用的点名解析
 

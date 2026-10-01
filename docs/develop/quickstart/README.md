@@ -15,14 +15,19 @@
 
 ## 最短路径（已熟练后）
 
+前置只有两样要自己装：Node.js 22+ 和 pnpm（装法见 [`setup.md`](setup.md) §第 0 步）。然后：
+
 ```bash
 git clone https://gitee.com/nextpilot/nextpilot-skill-mcp.git
 cd nextpilot-skill-mcp
-python -m pip install -r requirements-dev.txt        # Python 依赖
-(cd web && pnpm install)                             # 前端依赖
-git config core.hooksPath .githooks                  # 挂 hook（每台机器一次）
-pnpm web:dev                                         # 跑起来 → http://localhost:3000
+./tools/setup/setup.sh          # .venv、双端依赖、hook、自检，一条命令
+cp web/.env.example web/.env.local
+pnpm web:dev                    # → http://localhost:3000
 ```
+
+依赖永远装进 `.venv`（hook、CI、IDE 用的都是它）——手动补装打
+`uv pip install --python .venv/bin/python -r requirements-dev.txt`，
+机制见 [`setup.md`](setup.md) 末节。
 
 ## 我该从哪条线开始
 
