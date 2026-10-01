@@ -3,21 +3,25 @@
 PX4 那一堆 topic 里，我们检查了哪些、漏了哪些、先补哪些。本文只回答「覆盖没覆盖」，
 阈值准不准见 [`gap.md`](gap.md) §2.4，上游具体有哪些检查见 [`upstream.md`](upstream.md)。
 
-摸底时间 2026-09-30；批 1 落地后（2026-10）规则数由 26 涨到 31。
+摸底时间 2026-09-30；批 1 落地后（2026-10）规则数由 26 涨到 31，批 2 再涨到 33。
 
 ## 结论速览
 
-- 现状 31 条规则，覆盖 `meta` 里的 17 个 topic（批 1 新增
+- 现状 33 条规则，覆盖 `meta` 里的 19 个 topic（批 1 新增
   `failure_detector_status`、`sensor_gyro_fft`、`estimator_gps_status`、`system_power`、
-  `vehicle_land_detected` 五个）。
-- 「该检查但完全没检查」的高价值 topic 从 14 个降到 9 个，剩余清单见第二节。
-- 6 份基线里，`power-sag` / `motor-unbalance` / `imu-bias-drift` 每份都跳过，
+  `vehicle_land_detected`；批 2 新增 `input_rc`、`home_position`）。
+- 「该检查但完全没检查」的高价值 topic 从 14 个降到 8 个，剩余清单见第二节。
+- 批 2 的 `esc_status`/`esc_report`（电机级）**没做**：它们是结构体数组，字段嵌在
+  `esc[i]` 里（`esc_rpm`、`esc_current`……），而 v1 引擎的取数层对嵌套复合类型如实返回
+  `None`（`providers/px4.py` 的 `get_field_sizeof` 等处）。要做先给取数层补嵌套数组支持，
+  超出「写 YAML」的范围，故本轮记为待办而非落地。
+- 9 份基线里，`power-sag` / `motor-unbalance` / `imu-bias-drift` 每份都跳过，
   `airspeed-invalid` / `ekf-innovation` / `wind-estimate` 多数跳过。
   跳过率高未必是 bug（多旋翼本来没空速、没风估），但要能一眼看出是"不适用"还是"取不到数"。
 
 ---
 
-## 一、现状：26 条规则按维度
+## 一、现状：33 条规则按维度
 
 | 维度         | group                          | 规则数 | 依赖 topic                    |
 | ------------ | ------------------------------ | ------ | ----------------------------- |
@@ -41,36 +45,34 @@ PX4 那一堆 topic 里，我们检查了哪些、漏了哪些、先补哪些。
 | GPS 明细     | `gps_detailed`                 | 1      | `estimator_gps_status`        |
 | 供电健康     | `power_supply`                 | 1      | `system_power`                |
 | 落地检测     | `land_detection`               | 1      | `vehicle_land_detected`       |
+| 遥控链路     | `rc_link`                      | 1      | `input_rc`                    |
+| 返航点       | `home_position`                | 1      | `home_position`               |
 
-覆盖的 12 个 topic：`actuator_motors`、`airspeed_validated`、`battery_status`、`cpuload`、
-`estimator_sensor_bias`、`estimator_states`、`estimator_status`、`vehicle_air_data`、
-`vehicle_imu_status`、`vehicle_status` + guard 用的日志元信息。
+覆盖的 19 个 topic：`actuator_motors`、`airspeed_validated`、`battery_status`、`cpuload`、
+`estimator_gps_status`、`estimator_sensor_bias`、`estimator_states`、`estimator_status`、
+`failure_detector_status`、`home_position`、`input_rc`、`sensor_gyro_fft`、`system_power`、
+`vehicle_air_data`、`vehicle_imu_status`、`vehicle_land_detected`、`vehicle_status` +
+guard 用的日志元信息。
 
 ---
 
 ## 二、缺口：高价值但完全没检查的 topic
 
-按「检查了有没有用」排序，全部 14 个当前零覆盖：
+按「检查了有没有用」排序，当前零覆盖的高价值项（表中第 2、3、5、6 项已于批 1 落地，
+第 4、9 项已于批 2 落地，这里留档的是**尚未覆盖**的）：
 
 | #   | topic                              | 关键字段                                                                                  | 能判什么                                                                                          | 优先级 |
 | --- | ---------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------ |
 | 1   | `esc_status` / `esc_report`        | `esc_rpm`、`esc_current`、`esc_voltage`、`esc_temperature`、`esc_errorcount`、`esc_state` | 电机级故障：转速异常、电流失衡、过温、ESC 报错。比现在的 `actuator_motors` 输出推断精细一个数量级 | 高     |
-| 2   | `failure_detector_status`          | `fd_roll/pitch/alt/battery/motor`、`fd_imbalanced_prop`、`motor_failure_mask`             | PX4 自带的故障检测器已经给出结论，我们一条都没读。最省事的"白捡"检查                              | 高     |
-| 3   | `sensor_gyro_fft`                  | `peak_frequencies_x/y/z`、`peak_snr_x/y/z`                                                | 振动频点：PX4 固件已算好 FFT 峰值。补这里等于拿到了上游频谱图的分析结论，不用自己算 FFT           | 高     |
-| 4   | `input_rc` / `rc_channels`         | `rssi`、`link_quality`、`rc_lost`、`rc_failsafe`、`frame_drop_count`                      | 遥控链路质量：失控前兆、丢帧、信号弱。当前只有 `failsafe` 事后判定                                | 高     |
-| 5   | `vehicle_land_detected`            | `landed`、`ground_contact`、`at_rest`、`freefall`、`in_descend`                           | 落地/自由落体：`freefall` 是坠机强信号；`ground_contact` 可切分起降段                             | 高     |
-| 6   | `system_power`                     | `brick_valid`、`servo_valid`、`usb_valid`、`periph_5v_oc`、`hipower_5v_oc`                | 供电健康：5V 过流、电源砖失效 —— 这类问题会直接导致飞控重启                                       | 高     |
 | 7   | `sensor_baro` / `vehicle_air_data` | `pressure`、`temperature`、`error_count`、`temperature_source`                            | 气压计故障：`error_count` 增长 = 传感器在报错；温度异常 = 影响高度估计                            | 中     |
 | 8   | `distance_sensor`                  | `current_distance`、`signal_quality`、`variance`                                          | 定高/避障传感器：信号质量、读数跳变                                                               | 中     |
-| 9   | `home_position`                    | `valid_alt`、`valid_hpos`、`update_count`                                                 | 返航点有效性：家点没定好 = 失控返航会瞎飞                                                         | 中     |
 | 10  | `health_report`                    | `health_error_flags`、`arming_check_error_flags`、`can_arm_mode_flags`                    | 健康汇总与解锁拒绝原因（PX4 1.16 新 topic）                                                       | 中     |
-| 11  | `estimator_gps_status`             | `check_fail_*` 一串（fix/sat/drift/err/pdop/spoofed）                                     | GPS 检查明细：PX4 逐项列出 GPS 哪项没过，比现在的 eph/sats 粗判细                                 | 中     |
 | 12  | `mission_result`                   | `failure`、`finished`、`seq_current`、`geofence_id`                                       | 任务执行：任务失败原因、地理围栏触发                                                              | 中     |
 | 13  | `tecs_status`                      | `altitude_sp`、`height_rate_*`、`airspeed` 相关                                           | TECS 高度/速度控制（固定翼核心）：跟踪误差                                                        | 中     |
 | 14  | `vehicle_global_position`          | `dead_reckoning`、`eph`、`epv`、`alt_valid`                                               | 全局位置可信度：`dead_reckoning` = 在纯推算（GPS 丢了）                                           | 低     |
 
-第 2、3、11 项特别值钱：PX4 固件自己已经算完了结论，我们只是没读。补这三项的成本远低于
-从原始数据自己推（尤其 FFT，`sensor_gyro_fft` 直接给了峰值频率）。
+`esc_status`/`esc_report` 是这份清单里唯一卡在**引擎能力**而非规则工作量上的：它是结构体
+数组，取数层现在读不出嵌套字段（见"结论速览"）。其余各项都能按现有方言直接写。
 
 ---
 
@@ -111,14 +113,15 @@ PX4 那一堆 topic 里，我们检查了哪些、漏了哪些、先补哪些。
   不需要复杂算子。**已于 2026-10 落地**：对应规则 `px4-fd-status`、`px4-gyro-fft`、
   `px4-gps-detailed`、`px4-power-supply`、`px4-land-detection`，规则数 26 → 31。
 - 批 2（新维度）：`esc_status`/`esc_report`（电机级）、`input_rc`/`rc_channels`（链路）、
-  `home_position`（返航点）。
+  `home_position`（返航点）。**部分落地（2026-10）**：`px4-rc-link`、`px4-home-position`
+  两条已做，规则数 31 → 33；`esc_*` 卡在取数层的嵌套数组支持，见"结论速览"。
 - 批 3（补字段）：GPS 干扰（`noise_per_ms`/`jamming_indicator`）、陀螺振动、电池温度。
 - 批 4（需新算子）：PID 跟踪误差（需要 setpoint-actual 对齐统计）、磁力计推力相关性、
   执行器饱和。
 
-每批的验收标准：新规则在 6 份基线上跑通，产出的差异只允许新增 finding/skipped，
+每批的验收标准：新规则在基线上跑通，产出的差异只允许新增 finding/skipped，
 不允许改动既有 finding，用 `tools/engine/compare_baseline.py` 卡。
 
-批 1 做完，覆盖数从 26 → 31，`[暂定]` 阈值从 15 条会涨到 20+ 条。这是预期的——先有覆盖，
+批 1+2 做完，覆盖数从 26 → 33，`[暂定]` 阈值从 15 条涨到 22 条。这是预期的——先有覆盖，
 再校准。`thresholds_source` 字段（设计里第 6 层，尚未落地）就是为此准备的，字段定义见网站
 `/guide/rule-schema` 与 [`../../knowledge/px4/rules`](../../../knowledge/px4/rules)。

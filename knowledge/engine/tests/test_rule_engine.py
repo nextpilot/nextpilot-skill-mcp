@@ -151,3 +151,25 @@ def test_compute_try_guard_swallows_errors():
 def test_operators_present_in_compute_namespace():
     # 记录性断言：compute 命名空间里确实带了一整批算子
     assert len(OPERATORS) >= 50
+
+
+def test_missing_topics_reads_message_key_not_topics():
+    """依赖 topic 的闸门要读规则对象的 `message` 键。
+
+    `message` 由构建期从 `conditions.message` 归一而来（见 build-knowledge.mjs 的
+    normalizeConditions）。历史上这里误读过 `topics`——那是改名前的旧键，导致闸门对
+    所有规则恒不触发：缺 topic 的规则不报"未录制"，而是溜到 compute 后要么静默跑过、
+    要么误报成"数据不足"。这条测试把键名钉死，改名或改回旧键都会当场红。
+    """
+    eng = _load_engine()
+    rule = {
+        "id": "t",
+        "message": [["never_recorded_topic"], ["also_absent", "absent"]],
+    }
+    # 桩 provider 的 has_topic 恒 False → 第一项候选全缺，应命中并回报
+    reason = eng["_missing_topics"](rule.get("message"))
+    assert reason == "never_recorded_topic not in log"
+
+    # 旧键名 topics 不再被读：即便塞了值也不该被当成依赖
+    legs = {"topics": [["whatever"]]}
+    assert eng["_missing_topics"](legs.get("message")) is None

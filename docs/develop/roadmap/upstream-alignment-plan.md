@@ -1,6 +1,7 @@
 # 上游对齐实施 Plan：复刻 Flight Review → 借鉴 EKF/APM 生态 → 拉开差距
 
-状态：进行中。批 1（W2 的 5 条规则）已完成，规则数 26 → 31；频谱、PID、3D 三项未完成。
+状态：进行中。批 1（W2 的 5 条规则）、批 2 的链路与返航点两条已完成，规则数 26 → 33；
+`esc_*` 待引擎补嵌套数组支持；频谱、PID、3D 三项未完成。
 
 用户需求（2026-09-30）：先把上游优点全盘覆盖（绘图、PID tune、3D view），再细化拉开差距；
 PX4 侧借鉴 `ecl_ekf_analysis` / `px4_log_analyzer` / `ai-drone-toolkit`；APM 侧对比
@@ -31,8 +32,8 @@ PX4 侧借鉴 `ecl_ekf_analysis` / `px4_log_analyzer` / `ai-drone-toolkit`；APM
 成功标准（可判定）
 
 1. 规则 26 → 34~35（PX4），新 group 全部登记进 `facts.yaml` 的 `group_order` 与 `rule_meta.by_group`。
-   （批 1 已完成：26 → 31，批 2 再 +3~4 收口）
-2. `compare_baseline.py` 跑 6 份 PX4 基线：只允许新增 finding / skipped，既有 finding 一字不改。
+   （批 1 完成：26 → 31；批 2 完成链路与返航点：31 → 33；`esc_*` 受限于引擎嵌套数组支持）
+2. `compare_baseline.py` 跑 PX4 基线：只允许新增 finding / skipped，既有 finding 一字不改。
 3. 前端能渲染 `container: spectrogram` 的图；6 张频谱图在基线上不报错。
 4. PID 页能画出「setpoint vs 实测」跟踪误差曲线 + 统计值。
 5. 报告页 3D tab 能看轨迹 + 姿态。
@@ -57,14 +58,14 @@ Out of scope
 
 ## 2. 现状盘点（已实测，非估算）
 
-| 资产       | 数量                       | 说明                                                   |
-| ---------- | -------------------------- | ------------------------------------------------------ |
-| PX4 规则   | 31                         | 覆盖 `meta` 的 227 个 topic 里的 17 个（批 1 已 +5）   |
-| APM 规则   | 43                         | 全部 `status: draft`，无真实 `.bin` 验证               |
-| PLOT 预设  | 40                         | 上游 Flight Review 45 张，缺 9 张                      |
-| 引擎算子   | 91                         | 无 `fft` / `psd` / `spectrogram`；已有 `zero_cross_hz` |
-| 前端图表库 | `plotly.js-basic-dist-min` | `container` 是判别位，`spectrogram` 为其预留扩展点     |
-| 基线       | 9 份（PX4 6 + APM 3）      | `tools/testdata/baseline/*.json`                       |
+| 资产       | 数量                       | 说明                                                       |
+| ---------- | -------------------------- | ---------------------------------------------------------- |
+| PX4 规则   | 33                         | 覆盖 `meta` 的 227 个 topic 里的 19 个（批 1 +5、批 2 +2） |
+| APM 规则   | 43                         | 全部 `status: draft`，无真实 `.bin` 验证                   |
+| PLOT 预设  | 40                         | 上游 Flight Review 45 张，缺 9 张                          |
+| 引擎算子   | 91                         | 无 `fft` / `psd` / `spectrogram`；已有 `zero_cross_hz`     |
+| 前端图表库 | `plotly.js-basic-dist-min` | `container` 是判别位，`spectrogram` 为其预留扩展点         |
+| 基线       | 9 份（PX4 6 + APM 3）      | `tools/testdata/baseline/*.json`                           |
 
 Flight Review 缺的 9 张图：Actuator Controls FFT、Angular Velocity FFT、Angular Acceleration FFT、
 Acceleration PSD、Angular Velocity PSD、Angular/Accel PSD（FIFO ×2）、Sampling Regularity（FIFO）、
@@ -171,18 +172,18 @@ B4 性能敏感路径：禁止无基线声称「提升」。两种方案都必�
 
 ## 6. Wave 执行计划
 
-| Wave | 任务                                                                                                                                    | 依赖     | 验证                                                              |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------- |
-| W1   | 基线冻结：跑 `compare_baseline.py` 存 6 份结果作为对照                                                                                  | —        | 6 份基线可复现                                                    |
-| W2   | 批 A1：`failure_detector_status` / `sensor_gyro_fft` / `estimator_gps_status` / `system_power` / `vehicle_land_detected`（+5，26 → 31） | W1       | **已完成**：`check_rules_fields.py --strict` + 基线只新增 finding |
-| W3   | 批 A2：`esc_status`/`esc_report` / `input_rc`/`rc_channels` / `home_position`（+3~4，31 → 34~35）                                       | W2       | 同上；新 group 已在 `facts.yaml` 登记                             |
-| W4   | 批 B1a：读并确认 `zero_cross_hz`；实现字段无关频谱算子（先按候选 A）                                                                    | 频谱实测 | 算子单测（正常 + 退化输入）                                       |
-| W5   | 批 B2：`container` 加 `spectrogram`；前端加判别位与渲染分支                                                                             | W4       | 6 份基线端到端无异常；`tsc` / `eslint` 绿                         |
-| W6   | 批 B3 + B4：铺 6 张频谱图 + Motor RPM + Sampling Regularity                                                                             | W5       | `pnpm web:build:kb` 通过                                          |
-| W7   | 批 C 降压版：PID 跟踪误差曲线 + 统计                                                                                                    | W3       | 页面可交互验证                                                    |
-| W8   | 批 D2：three.js 轨迹 + 姿态 tab                                                                                                         | W3       | 有数据时正常渲染；空数据隐藏 tab                                  |
-| W9   | APM `phases` 修复（从 `MODE` 切段推飞行阶段）                                                                                           | W1       | `check_apm_e2e.py` 通过；故障库命中率上升                         |
-| W10  | 文档与门禁收口：算子计数校准、覆盖率文档更新、`check_all.py --push` 全绿                                                                | W2–W9    | 34 项全绿                                                         |
+| Wave | 任务                                                                                                                                    | 依赖     | 验证                                                                                         |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------- |
+| W1   | 基线冻结：跑 `compare_baseline.py` 存 6 份结果作为对照                                                                                  | —        | 6 份基线可复现                                                                               |
+| W2   | 批 A1：`failure_detector_status` / `sensor_gyro_fft` / `estimator_gps_status` / `system_power` / `vehicle_land_detected`（+5，26 → 31） | W1       | **已完成**：`check_rules_fields.py --strict` + 基线只新增 finding                            |
+| W3   | 批 A2：`esc_status`/`esc_report` / `input_rc`/`rc_channels` / `home_position`（+3~4，31 → 34~35）                                       | W2       | **部分完成**：`px4-rc-link`、`px4-home-position` 已做（31 → 33）；`esc_*` 卡引擎嵌套数组支持 |
+| W4   | 批 B1a：读并确认 `zero_cross_hz`；实现字段无关频谱算子（先按候选 A）                                                                    | 频谱实测 | 算子单测（正常 + 退化输入）                                                                  |
+| W5   | 批 B2：`container` 加 `spectrogram`；前端加判别位与渲染分支                                                                             | W4       | 6 份基线端到端无异常；`tsc` / `eslint` 绿                                                    |
+| W6   | 批 B3 + B4：铺 6 张频谱图 + Motor RPM + Sampling Regularity                                                                             | W5       | `pnpm web:build:kb` 通过                                                                     |
+| W7   | 批 C 降压版：PID 跟踪误差曲线 + 统计                                                                                                    | W3       | 页面可交互验证                                                                               |
+| W8   | 批 D2：three.js 轨迹 + 姿态 tab                                                                                                         | W3       | 有数据时正常渲染；空数据隐藏 tab                                                             |
+| W9   | APM `phases` 修复（从 `MODE` 切段推飞行阶段）                                                                                           | W1       | `check_apm_e2e.py` 通过；故障库命中率上升                                                    |
+| W10  | 文档与门禁收口：算子计数校准、覆盖率文档更新、`check_all.py --push` 全绿                                                                | W2–W9    | 34 项全绿                                                                                    |
 
 执行顺序：`W1 → W2 → W3 → W4 → W5 → W6 → W7 → W8 → W9 → W10`。
 A 风险最低、直接扩大产品面；B 是「复刻 Flight Review」的主体；C/D 是「拉开差距」的新战场，

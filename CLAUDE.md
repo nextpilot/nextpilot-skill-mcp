@@ -1138,6 +1138,20 @@ Worker 里一次只装得下一份日志，而它是模块级单例、跨路由�
 
    `check_engine_pyodide.py` 拿 `track.yml` 的声明与产物里的 `facts.track.conditions.topics` 对账。
 
+   同一类坑在**规则**那一侧也踩过（2026-10 修复）：构建期把 `conditions.message` 归一成规则
+
+   对象的 `message` 键（`conditions.topics` 这个写法更早，改名过一次），而引擎的
+
+   `_missing_topics(_rule.get("topics"))` 没跟着改 —— 读到的是不存在的旧键，于是这道
+
+   "日志没录这个 topic 就报 skipped" 的闸门对所有规则**静默失效**：缺 topic 的规则不是报
+
+   "未录制"，而是溜到 compute 后要么静默跑过、要么误报成 "数据不足"。英文简称 `message`
+
+   与 `topics` 长得不像，改名时最容易漏。修法是引擎读 `message`，并加了单测
+
+   `test_missing_topics_reads_message_key_not_topics` 把键名钉死。
+
 5. **"缺什么" 要和 "实际有什么" 成对出现。** 只说缺，用户分不清是固件版本不同、还是字段改了名；
 
    附一句 "这份日志里带经纬度字段的 topic 有：…" 才有对照物。挑对照物要按**字段**而不是 topic 名 ——

@@ -42,6 +42,8 @@ group_order:
         gps_detailed,
         power_supply,
         land_detection,
+        rc_link,
+        home_position,
         logged_messages,
         guards,
     ]
@@ -84,6 +86,8 @@ rule_meta:
         gps_detailed: { category: gps, doc: "https://docs.px4.io/main/en/gps_compass/" }
         power_supply: { category: power, doc: "https://docs.px4.io/main/en/config/battery.html" }
         land_detection: { category: failsafe, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
+        rc_link: { category: rc, doc: "https://docs.px4.io/main/en/config/radio.html" }
+        home_position: { category: gps, doc: "https://docs.px4.io/main/en/flying/geofence.html" }
 
 # ULog 日志级别：PX4 把 **ASCII 码**写进 log_level（'0'=48 … '7'=55），与 pyulog
 # Message.log_level_str() 一致。经验里按 level_name 判定，别拿 3/4 去比 51/52。

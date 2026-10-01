@@ -1,0 +1,61 @@
+# 遥控链路质量（input_rc）：抓的是失控前兆——信号强度偏低、丢帧累积，
+# 与 failsafe 规则互补（那条判的是「已经触发保护」，这条判「信号正在变差」）。
+# 纯数传 / 无遥控的机型没有 input_rc，引擎按 condition 直接 skip，不算问题。
+#
+# 字段名跨固件版本变过：老固件只有 rssi，新固件另给 link_quality。两者都用候选组
+# 取数，取不到给 None；link_quality 是新增字段，老日志上没有，所以它的赋值裹 _try——
+# 不裹会让整条规则因为一个 None 比较而中止成 skipped（踩过）。
+# 阈值 [暂定]：RSSI < 40（百分比量纲）为弱信号经验线，待真实日志标定。
+
+id: px4-rc-link
+name: 遥控链路质量
+group: rc_link
+order: 1
+tag: rc_link_degraded
+
+condition:
+  message:
+    - input_rc
+
+compute:
+  - lost = max(input_rc.rc_lost)
+  - fs = max(input_rc.rc_failsafe)
+  - n_drop = max(input_rc.rc_lost_frame_count)
+  - n_total = max(input_rc.rc_total_frame_count)
+  - rssi_series = _ref("input_rc.rssi")
+  - rssi_min = _try(min(rssi_series[rssi_series > 0]))
+  - lq_series = _ref("input_rc.link_quality")
+  - lq_min = _try(min(lq_series[lq_series > 0]))
+
+output:
+  - name: rcRssiMin
+    value: rssi_min
+    round: 1
+  - name: rcLostFrames
+    value: n_drop
+
+trigger:
+  - when: "fs > 0"
+    severity: critical
+    suggestion: "遥控进入失效保护状态。结合故障库核对天线摆放、接收机供电、周围干扰源；这类事件会直接触发返航或降落。"
+    description: "遥控触发失效保护（丢帧累计 {n_drop}，总帧 {n_total}）"
+    evidence:
+      source: input_rc.rc_failsafe(max)
+      value: fs
+      threshold: 0
+  - when: "lost > 0"
+    severity: warning
+    suggestion: "遥控信号丢失过。检查天线是否被遮挡、接收机与飞控连线、遥控器距离。"
+    description: "遥控信号丢失（丢帧累计 {n_drop}，总帧 {n_total}）"
+    evidence:
+      source: input_rc.rc_lost(max)
+      value: lost
+      threshold: 0
+  - when: "rssi_min < 40.0"
+    severity: info
+    suggestion: "链路信号弱。RSSI 是前兆指标，尚未触发保护；留意天线朝向与飞行距离。"
+    description: "遥控信号强度偏低（RSSI 最低 {rssi_min:.0f}）"
+    evidence:
+      source: input_rc.rssi(min>0)
+      value: rssi_min
+      threshold: 40

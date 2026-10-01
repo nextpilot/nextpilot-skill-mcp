@@ -1,0 +1,47 @@
+# 返航点有效性（home_position）：返航点没定好，失控返航时会飞错方向；
+# 这是「自动返航落偏 / 飞丢」最常见的前置原因，与 gps-* 的定位质量判定正交
+# （GPS 准不代表返航点设对了）。
+#
+# 老固件（本仓 1.11 样例）没有 home_position 这个 topic：引擎按 conditions.message
+# 直接记一条「not in log」的 skipped，根本不会跑到这里。
+# 阈值 [暂定]：update_count 为 0 = 全程没更新过返航点。
+
+id: px4-home-position
+name: 返航点有效性
+group: home_position
+order: 1
+tag: home_position_invalid
+
+condition:
+  message:
+    - home_position
+
+compute:
+  - n_upd = max(home_position.update_count)
+  - n_frames = len(home_position.timestamp)
+  - hpos_bad = sum(home_position.valid_hpos == 0)
+  - alt_bad = sum(home_position.valid_alt == 0)
+
+output:
+  - name: homeUpdateCount
+    value: n_upd
+  - name: homeInvalidHposFrames
+    value: hpos_bad
+
+trigger:
+  - when: "n_upd == 0"
+    severity: warning
+    suggestion: "全程没有有效的返航点更新。失控返航（RTL）会因缺少返航参考而失效，检查解锁前是否完成 GPS 定位与 home 设定。"
+    description: "返航点从未更新（update_count=0，共 {n_frames} 帧）"
+    evidence:
+      source: home_position.update_count(max)
+      value: n_upd
+      threshold: 0
+  - when: "hpos_bad > 0"
+    severity: info
+    suggestion: "返航点水平位置出现过无效帧。多发生于起飞前 GPS 未收敛阶段，若起飞后仍无效需排查定位。"
+    description: "返航点水平位置无效 {hpos_bad} 帧（高度轴无效 {alt_bad} 帧）"
+    evidence:
+      source: home_position.valid_hpos(=0 计数)
+      value: hpos_bad
+      threshold: 0

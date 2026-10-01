@@ -276,7 +276,8 @@ def _match_vehicle(spec, env):
 
 
 def _missing_topics(spec):
-    """`conditions.topics` 判定：每项是「候选 topic」（`a || b` 任一在即满足），项间都要有；
+    """规则依赖的 topic 是否都在日志里（spec = 规则对象的 `message` 键，来自
+    `conditions.message` 归一）。每项是「候选 topic」（`a || b` 任一在即满足），项间都要有；
     命中第一项即中止。全缺则返回原因文案（`"a / b not in log"`）。文案只在这里生成一处，
     构建期只把 `a || b` 拆成候选列表、不认识语义。
     """
@@ -652,7 +653,12 @@ def _run_rules(group):
         if _not_applicable:
             skipped(_rid, _not_applicable)
             continue
-        _missing = _missing_topics(_rule.get("topics"))
+        # 声明的依赖 topic：构建期把 conditions.message 归一成规则对象的 message 键
+        # （项内候选组，见 build-knowledge.mjs 的 normalizeConditions）。**别写成 topics**——
+        # 那个键在"适用范围收进 conditions"那次改名后就没了，写成 topics 等于这道闸门
+        # 对所有规则失效：缺 topic 的规则会溜到 compute，然后要么静默跑过、要么误报成
+        # "数据不足"，用户看不到"这条日志根本没录这个 topic"。
+        _missing = _missing_topics(_rule.get("message"))
         if _missing:
             skipped(_rid, _missing)
             continue

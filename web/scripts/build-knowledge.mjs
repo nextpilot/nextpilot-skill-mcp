@@ -569,6 +569,10 @@ function loadRules(dir, signatures, ruleMeta, vehicles) {
             sources.push(file);
         }
     }
+    // 来源文件名钉在规则对象上（`__file`）。别只留并行数组 `sources`：清单页要按 group
+    // 排序，排序会打乱下标对应；跨族合并后下标还会互相覆盖（见 allRules 合并处）。
+    // 钉在对象上，排序/合并都拆不散。前缀 __ 标明是构建期附注，不是规则 schema 的字段。
+    for (let i = 0; i < rules.length; i++) rules[i].__file = sources[i];
     return { rules, sources };
 }
 
@@ -1200,21 +1204,27 @@ const SLOT_LABEL = {
     guards: "数据质量 guard",
 };
 
-function renderCatalogue(rules, sources) {
+function renderCatalogue(rules) {
     // 按码点比较而非 localeCompare：后者随机器 ICU 语言环境变化，生成产物要逐字节可复现
     const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
-    const bySlot = rules
-        .map((raw, i) => ({ file: sources[i], raw }))
-        .sort(
-            (a, b) =>
-                cmp(String(a.raw.group ?? ""), String(b.raw.group ?? "")) ||
-                Number(a.raw.order ?? 100000) - Number(b.raw.order ?? 100000),
-        );
+    // 来源文件名从规则对象自带的 `__file` 取（loadRules 钉上去的）。**不能**拿并行数组按
+    // 下标配：下面要排序，一排序下标就错位，清单页会显示错的文件名（改前这里显示
+    // `rules/undefined` 或张冠李戴的文件名）。
+    const bySlot = [...rules].sort(
+        (a, b) =>
+            cmp(String(a.group ?? ""), String(b.group ?? "")) || Number(a.order ?? 100000) - Number(b.order ?? 100000),
+    );
 
     const body = [];
     let current = null;
-    for (const { file, raw } of bySlot) {
+    for (const raw of bySlot) {
         const slot = raw.group ?? "";
+        const file = raw.__file;
+        if (!file) {
+            // 断链信号：来源文件名丢了，清单页会显示 `rules/undefined`。宁可构建失败，
+            // 也别把带占位的页面发出去——那正是这个 bug 藏了很久的原因（没人盯着渲染结果）。
+            throw new Error(`规则 ${raw.id} 没有 __file（loadRules 没钉上来源文件名），清单页会显示 undefined`);
+        }
         if (slot !== current) {
             current = slot;
             body.push(`\n## ${SLOT_LABEL[slot] ?? slot}（group: \`${slot}\`）\n`);
@@ -1245,7 +1255,7 @@ function catalogueFrontmatter({ title, titleEn, description, descriptionEn, orde
 }
 
 /** 规则清单页的完整内容（清单只出网站这一份，仓库里不留第二份拷贝） */
-function renderCataloguePage(rules, sources) {
+function renderCataloguePage(rules) {
     return (
         catalogueFrontmatter({
             title: "现在规则清单",
@@ -1254,7 +1264,7 @@ function renderCataloguePage(rules, sources) {
             descriptionEn:
                 "Every built-in check — the fields it reads, the condition that fires it, and the tags it emits.",
             order: 12,
-        }) + `${CATALOGUE_INTRO.replace("{n}", String(rules.length))}\n\n---\n${renderCatalogue(rules, sources)}`
+        }) + `${CATALOGUE_INTRO.replace("{n}", String(rules.length))}\n\n---\n${renderCatalogue(rules)}`
     );
 }
 
@@ -1578,9 +1588,9 @@ function build() {
     const factsByLogType = {};
     const fieldUnitsByLogType = {};
     const kbByLogType = {};
-    // 合并视图只给跨族的产物用（规则清单页、编辑器 schema、总数打印）
+    // 合并视图只给跨族的产物用（规则清单页、编辑器 schema、总数打印）。
+    // 来源文件名不用单独攒一份：每条规则的 `__file` 自带（见 loadRules），跨族合并也拆不散。
     const allRules = [];
-    const allSources = {};
     const allVehicles = new Set(["unknown"]);
     const allGroups = new Set();
     const plotFilesByFamily = {};
@@ -1626,7 +1636,6 @@ function build() {
         factsByLogType[fam.logType] = facts;
         fieldUnitsByLogType[fam.logType] = fieldUnits;
         allRules.push(...rules);
-        Object.assign(allSources, sources);
         for (const g of facts.group_order ?? []) allGroups.add(g);
 
         // ---------------- facts.yaml 的形状校验（按族）----------------
@@ -1895,7 +1904,7 @@ function build() {
     if (!CHECK) {
         mkdirSync(GUIDES_DIR, { recursive: true });
         // 规则清单是跨族的（各族规则混在一起按 group 展示），所以传合并后的那一份
-        writeFileSync(resolve(GUIDES_DIR, "rule-catalogue.mdx"), renderCataloguePage(allRules, allSources), "utf8");
+        writeFileSync(resolve(GUIDES_DIR, "rule-catalogue.mdx"), renderCataloguePage(allRules), "utf8");
         writeFileSync(resolve(GUIDES_DIR, "rule-schema.mdx"), renderSchemaPage(allRules.length, providerApi), "utf8");
     }
 
