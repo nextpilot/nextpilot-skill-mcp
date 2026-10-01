@@ -1818,7 +1818,7 @@ function build() {
             valid: new Set([...Object.values(facts.vehicle_types ?? {}).map(String), "unknown"]),
         };
         for (const v of vehicles.valid) allVehicles.add(String(v));
-        const { rules, sources } = loadRules(fam.rulesDir, signatures, facts.rule_meta ?? {}, vehicles);
+        const { rules } = loadRules(fam.rulesDir, signatures, facts.rule_meta ?? {}, vehicles);
         // guards via triggers[].severity: guard, validated in loadRules already
 
         // 3) 绘图预设（plot/*.yml）：曲线与布局 → plots.generated.ts（前端）；

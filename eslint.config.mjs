@@ -17,6 +17,10 @@ export default tseslint.config(
             // Pyodide 运行时与 wheel（第三方产物，由 tools/dev/fetch_pyodide_assets.py 抓取）。
             // 不排除的话 eslint 会去解析 pyodide.js / pyodide.asm.js，报出上万条 no-undef。
             "**/public/pyodide/**",
+            // Playwright 的 HTML 报告与 trace 产物（第三方打包 JS，`npx playwright show-trace`/
+            // `--trace on` 生成），不是源码；不排除会报上千条 no-undef。
+            "**/playwright-report/**",
+            "**/test-results/**",
             ".venv/**",
             ".claude/**",
             ".workbuddy/**",

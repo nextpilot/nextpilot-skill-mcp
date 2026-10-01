@@ -111,7 +111,7 @@ S11 参数变更（`changed_parameters`），上游也只是个按钮占位。
 推迟的两项是 FIFO PSD（V9/V12，`spectrogram-*.yml` 的 FIFO 版本）：样例日志没有
 `sensor_accel_fifo`/`sensor_gyro_fifo`，铺了也无法满足 L0（真实浏览器渲染断言），
 登记到 W7 后有真实 FIFO 日志再铺。多实例（多 IMU）频谱拆分同理推迟（见
-`coverage.md` §4.5）。
+`coverage.md`「四点五」节）。
 
 另一张超出上游的：Motor RPM（`plot/motor-rpm.yml`，`esc_status.esc[0..7].esc_rpm`
 嵌套字段引用）——上游没有这张图，本仓补上。它依赖 W6 顺带修好的**取数层嵌套数组

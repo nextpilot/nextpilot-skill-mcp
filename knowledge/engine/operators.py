@@ -1568,7 +1568,7 @@ def op_stft(
     wsum = float(np.sum(w**2))
     scale = 1.0 / max(fs * wsum, 1e-12)
 
-    psd_sum = None
+    psd_sum: np.ndarray | None = None
     for a in arrs:
         psd = np.empty((frames, nperseg // 2 + 1), dtype=float)
         for k in range(frames):
@@ -1581,6 +1581,8 @@ def op_stft(
             psd_sum = psd
         else:
             psd_sum = psd_sum + psd
+    if psd_sum is None:  # 不可达：三个输入任一为 None 早已 return，arrs 至少三路；给 pyright 收窄
+        return None, None, None
     # 列抽稀在 dB 之后做不省事（-inf 替换要全图口径），先 dB 再抽行
     S = 10.0 * np.log10(psd_sum)  # psd_sum ≥ 0；全静默帧 PSD=0 → -inf
     finite = S[np.isfinite(S)]
