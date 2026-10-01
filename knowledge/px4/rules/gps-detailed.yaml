@@ -1,0 +1,50 @@
+# GPS 专项检查（estimator_gps_status）：PX4 估计器逐项判定 GPS 是否可用
+# （fix/卫星数/漂移/误差/PDOP/欺骗），本仓读这些结论位，比只看 eph/sats 两个粗指标细。
+# check_fail_* 非零 = 该项检查未通过；checks_passed = 0 表示该帧整体判不通过。
+# 阈值 [暂定]：以固件判定为准，本仓只统计不通过帧数。
+
+id: px4-gps-detailed
+name: GPS 检查明细
+group: gps_detailed
+order: 1
+tag: gps_check_fail
+
+condition:
+  message:
+    - estimator_gps_status
+
+compute:
+  - n_fix = sum(estimator_gps_status.check_fail_gps_fix)
+  - n_sat = sum(estimator_gps_status.check_fail_min_sat_count)
+  - n_drift = sum(estimator_gps_status.check_fail_max_horz_drift)
+  - n_err = sum(estimator_gps_status.check_fail_max_horz_err)
+  - n_pdop = sum(estimator_gps_status.check_fail_max_pdop)
+  - n_spoof = sum(estimator_gps_status.check_fail_spoofed_gps)
+  - n_fail = n_fix + n_sat + n_drift + n_err + n_pdop + n_spoof
+  - drift_rate = max(estimator_gps_status.position_drift_rate_horizontal_m_s)
+  - spd = max(estimator_gps_status.filtered_horizontal_speed_m_s)
+
+output:
+  - name: gpsCheckFailFrames
+    value: n_fail
+  - name: gpsDriftRateMax
+    value: drift_rate
+    round: 2
+
+trigger:
+  - when: "n_spoof > 0"
+    severity: critical
+    suggestion: "估计器报告 GPS 欺骗嫌疑（check_fail_spoofed_gps）。这类信号会污染位置估计，务必人工复核本次飞行的定位可信度。"
+    description: "GPS 欺骗检测触发 {n_spoof} 帧"
+    evidence:
+      source: estimator_gps_status.check_fail_spoofed_gps(sum)
+      value: n_spoof
+      threshold: 0
+  - when: "n_fail > 0"
+    severity: warning
+    suggestion: "GPS 检查有未通过项（fix={n_fix} 卫星={n_sat} 漂移={n_drift} 误差={n_err} PDOP={n_pdop}）。结合故障库 F002 排查天线干扰/遮挡/多路径。"
+    description: "GPS 检查未通过 {n_fail} 帧（峰值水平漂移率 {drift_rate:.2f} m/s）"
+    evidence:
+      source: estimator_gps_status.check_fail_*(sum)
+      value: n_fail
+      threshold: 0

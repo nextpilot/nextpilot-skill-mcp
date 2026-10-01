@@ -3,13 +3,14 @@
 PX4 那一堆 topic 里，我们检查了哪些、漏了哪些、先补哪些。本文只回答「覆盖没覆盖」，
 阈值准不准见 [`gap.md`](gap.md) §2.4，上游具体有哪些检查见 [`upstream.md`](upstream.md)。
 
-摸底时间 2026-09-30。数据面来自 `meta/v1.16.0.json`（227 个 topic），现状来自 26 条规则加
-6 份 PX4 基线日志的实测。
+摸底时间 2026-09-30；批 1 落地后（2026-10）规则数由 26 涨到 31。
 
 ## 结论速览
 
-- 现状 26 条规则 / 16 个维度，覆盖 `meta` 里的 12 个 topic。
-- 「该检查但完全没检查」的高价值 topic 14 个，这是要补的清单。
+- 现状 31 条规则，覆盖 `meta` 里的 17 个 topic（批 1 新增
+  `failure_detector_status`、`sensor_gyro_fft`、`estimator_gps_status`、`system_power`、
+  `vehicle_land_detected` 五个）。
+- 「该检查但完全没检查」的高价值 topic 从 14 个降到 9 个，剩余清单见第二节。
 - 6 份基线里，`power-sag` / `motor-unbalance` / `imu-bias-drift` 每份都跳过，
   `airspeed-invalid` / `ekf-innovation` / `wind-estimate` 多数跳过。
   跳过率高未必是 bug（多旋翼本来没空速、没风估），但要能一眼看出是"不适用"还是"取不到数"。
@@ -35,6 +36,11 @@ PX4 那一堆 topic 里，我们检查了哪些、漏了哪些、先补哪些。
 | VTOL 转换    | `vtol_transition`              | 1      | `vtol_vehicle_status`         |
 | 风扰         | `wind_estimate`                | 1      | `estimator_wind`              |
 | 日志消息     | `logged_messages`              | 2      | 消息流                        |
+| 故障检测器   | `fd_status`                    | 1      | `failure_detector_status`     |
+| 陀螺频谱     | `gyro_fft`                     | 1      | `sensor_gyro_fft`             |
+| GPS 明细     | `gps_detailed`                 | 1      | `estimator_gps_status`        |
+| 供电健康     | `power_supply`                 | 1      | `system_power`                |
+| 落地检测     | `land_detection`               | 1      | `vehicle_land_detected`       |
 
 覆盖的 12 个 topic：`actuator_motors`、`airspeed_validated`、`battery_status`、`cpuload`、
 `estimator_sensor_bias`、`estimator_states`、`estimator_status`、`vehicle_air_data`、
@@ -102,7 +108,8 @@ PX4 那一堆 topic 里，我们检查了哪些、漏了哪些、先补哪些。
 
 - 批 1（白捡型，成本最低）：`failure_detector_status`、`sensor_gyro_fft`、
   `estimator_gps_status`、`system_power`、`vehicle_land_detected` —— 都是「读现成结论/现成标志位」，
-  不需要复杂算子。
+  不需要复杂算子。**已于 2026-10 落地**：对应规则 `px4-fd-status`、`px4-gyro-fft`、
+  `px4-gps-detailed`、`px4-power-supply`、`px4-land-detection`，规则数 26 → 31。
 - 批 2（新维度）：`esc_status`/`esc_report`（电机级）、`input_rc`/`rc_channels`（链路）、
   `home_position`（返航点）。
 - 批 3（补字段）：GPS 干扰（`noise_per_ms`/`jamming_indicator`）、陀螺振动、电池温度。

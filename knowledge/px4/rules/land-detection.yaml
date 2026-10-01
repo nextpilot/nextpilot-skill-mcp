@@ -1,0 +1,35 @@
+# 落地与自由落体（vehicle_land_detected）：freefall 非零是坠机的强信号（整机失重），
+# landed/ground_contact 可用于切分起降段。这里重点是抓 freefall——正常飞行中不该出现。
+# 阈值 [暂定]：freefall 只要出现即告警；ground_contact 仅作输出供切段参考，不单独触发。
+
+id: px4-land-detection
+name: 落地与自由落体
+group: land_detection
+order: 1
+tag: freefall_detected
+
+condition:
+  message:
+    - vehicle_land_detected
+
+compute:
+  - n_freefall = sum(vehicle_land_detected.freefall)
+  - n_landed = sum(vehicle_land_detected.landed)
+  - n_ground = sum(vehicle_land_detected.ground_contact)
+  - n_descend = sum(vehicle_land_detected.in_descend)
+
+output:
+  - name: freefallFrames
+    value: n_freefall
+  - name: groundContactFrames
+    value: n_ground
+
+trigger:
+  - when: "n_freefall > 0"
+    severity: critical
+    suggestion: "检测到自由落体（freefall 非零）。这是坠机/失重的强信号，结合姿态、电机、供电数据定位失去动力的时刻与原因。"
+    description: "自由落体 {n_freefall} 帧（落地判定 {n_landed} 帧、接地 {n_ground} 帧）"
+    evidence:
+      source: vehicle_land_detected.freefall(sum)
+      value: n_freefall
+      threshold: 0

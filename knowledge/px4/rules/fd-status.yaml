@@ -1,0 +1,57 @@
+# PX4 内置故障检测器（failure_detector_status）：固件已经把「哪个自由度失控、电机是否失效」
+# 算成结论写进日志，本仓直接读标志位，不从原始数据重推。
+# fd_* 非零 = 该自由度触发检测；motor_failure_mask 非零位 = 对应电机被判失效。
+# 阈值 [暂定]：这些是固件自己的判定，本仓不设阈值，只做「有无触发」的透传与计数。
+
+id: px4-fd-status
+name: 飞行故障检测器
+group: fd_status
+order: 1
+tag: fd_triggered
+
+condition:
+  message:
+    - failure_detector_status
+
+compute:
+  # 各自由度的触发样本数（fd_* 是 0/1，求和即触发帧数）。
+  - n_roll = sum(failure_detector_status.fd_roll)
+  - n_pitch = sum(failure_detector_status.fd_pitch)
+  - n_alt = sum(failure_detector_status.fd_alt)
+  - n_batt = sum(failure_detector_status.fd_battery)
+  - n_motor = sum(failure_detector_status.fd_motor)
+  - imbal = sum(failure_detector_status.fd_imbalanced_prop)
+  - motor_mask = max(failure_detector_status.motor_failure_mask)
+  - fd_any = n_roll + n_pitch + n_alt + n_batt + n_motor
+
+output:
+  - name: fdTriggeredFrames
+    value: fd_any
+  - name: fdMotorFailureMask
+    value: motor_mask
+
+trigger:
+  - when: "motor_mask > 0"
+    severity: critical
+    suggestion: "固件已判定电机失效（motor_failure_mask 非零）。核对电机/电调接线与 ESC 报错，结合故障库排查动力失效。"
+    description: "飞行故障检测器报告电机失效（mask={motor_mask}）"
+    evidence:
+      source: failure_detector_status.motor_failure_mask(max)
+      value: motor_mask
+      threshold: 0
+  - when: "fd_any > 0"
+    severity: critical
+    suggestion: "固件故障检测器已触发（姿态/高度/电池/电机）。按触发的自由度定位：Roll/Pitch 查姿态控制，Alt 查高度估计，Battery 查电源。"
+    description: "飞行故障检测器触发 {fd_any} 帧（roll={n_roll} pitch={n_pitch} alt={n_alt} batt={n_batt} motor={n_motor}）"
+    evidence:
+      source: failure_detector_status.fd_*(sum)
+      value: fd_any
+      threshold: 0
+  - when: "imbal > 0"
+    severity: warning
+    suggestion: "固件报告动力不平衡（fd_imbalanced_prop）。检查桨叶、电机、机架装配，与「电机平衡」规则互相印证。"
+    description: "动力不平衡检测触发 {imbal} 帧"
+    evidence:
+      source: failure_detector_status.fd_imbalanced_prop(sum)
+      value: imbal
+      threshold: 0

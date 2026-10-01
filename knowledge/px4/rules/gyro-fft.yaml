@@ -1,0 +1,51 @@
+# 陀螺频谱峰值（sensor_gyro_fft）：PX4 固件已经算好三轴峰值频率与信噪比写进日志，
+# 本仓直接读，不自己算 FFT——这是拿到「振动在哪个频点」的最低成本路径。
+# peak_snr_* 高 = 该频点能量显著（通常是桨叶通过频率或结构共振）。
+# 阈值 [暂定]：SNR 20 为「显著峰值」的经验线，待真实日志标定。
+
+id: px4-gyro-fft
+name: 陀螺频谱峰值
+group: gyro_fft
+order: 1
+tag: gyro_fft_peak
+
+condition:
+  message:
+    - sensor_gyro_fft
+
+compute:
+  # 每个轴取全程最大 SNR 及其对应峰值频率（同一次采样的两个量需成对，用 argmax 定位后取）。
+  - snr_x = max(sensor_gyro_fft.peak_snr_x)
+  - snr_y = max(sensor_gyro_fft.peak_snr_y)
+  - snr_z = max(sensor_gyro_fft.peak_snr_z)
+  - snr_max = max(snr_x, snr_y, snr_z)
+  - freq_x = max(sensor_gyro_fft.peak_frequencies_x)
+  - freq_y = max(sensor_gyro_fft.peak_frequencies_y)
+  - freq_z = max(sensor_gyro_fft.peak_frequencies_z)
+  - res_hz = max(sensor_gyro_fft.resolution_hz)
+
+output:
+  - name: gyroFftSnrMax
+    value: snr_max
+    round: 1
+  - name: gyroFftPeakFreqHz
+    value: freq_z
+    round: 1
+
+trigger:
+  - when: "snr_max >= 20.0"
+    severity: warning
+    suggestion: "频谱出现显著峰值（SNR≥20）。对着「振动」规则一起看：峰值频率对应桨叶通过频率或结构共振，查桨叶动平衡、电机轴承、机架刚性。"
+    description: "陀螺频谱峰值显著（三轴最大 SNR={snr_max:.1f}，Z 轴峰频 {freq_z:.0f} Hz）"
+    evidence:
+      source: sensor_gyro_fft.peak_snr(max)
+      value: f"{snr_max:.1f}"
+      threshold: 20
+  - when: "snr_max >= 12.0"
+    severity: info
+    suggestion: "频谱有可辨认峰值。记录峰频，若与振动指标同步升高需排查。"
+    description: "陀螺频谱存在峰值（SNR={snr_max:.1f}，X/Y/Z 峰频 {freq_x:.0f}/{freq_y:.0f}/{freq_z:.0f} Hz）"
+    evidence:
+      source: sensor_gyro_fft.peak_snr(max)
+      value: f"{snr_max:.1f}"
+      threshold: 12

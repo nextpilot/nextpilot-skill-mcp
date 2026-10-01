@@ -1,0 +1,49 @@
+# 供电健康（system_power）：5V 过流、电源砖/舵机轨/USB 失效这类问题会直接导致飞控重启，
+# 是「日志中途断、飞控莫名重启」的常见根因，单看电池电压判不出来。
+# periph_5v_oc / hipower_5v_oc 是过流标志，非零即事件；*_valid 是各供电轨是否有效。
+# 阈值 [暂定]：过流/失效按固件标志位透传，不额外设阈值。
+
+id: px4-power-supply
+name: 供电健康
+group: power_supply
+order: 1
+tag: power_5v_fault
+
+condition:
+  message:
+    - system_power
+
+compute:
+  - n_oc = sum(system_power.periph_5v_oc) + sum(system_power.hipower_5v_oc)
+  # brick_valid/servo_valid 是布尔流：sum(x == 0) 数「无效」帧，不能写 1 - x（会得到负数）
+  - brick_bad = sum(system_power.brick_valid == 0)
+  - servo_bad = sum(system_power.servo_valid == 0)
+  - v5_min = min(system_power.voltage5v_v[system_power.voltage5v_v > 0])
+  - n_bad = n_oc + brick_bad + servo_bad
+
+output:
+  - name: power5vOcFrames
+    value: n_oc
+  - name: powerBrickInvalidFrames
+    value: brick_bad
+  - name: power5vMinV
+    value: v5_min
+    round: 2
+
+trigger:
+  - when: "brick_bad > 0 or servo_bad > 0"
+    severity: critical
+    suggestion: "电源砖或舵机供电轨失效（brick_valid/servo_valid 出现 0）。这类故障会使飞控或舵机失去供电，优先检查电源模块与接线。"
+    description: "供电轨失效（brick={brick_bad} 帧，servo={servo_bad} 帧）"
+    evidence:
+      source: system_power.brick_valid/servo_valid(=0 计数)
+      value: n_bad
+      threshold: 0
+  - when: "n_oc > 0"
+    severity: warning
+    suggestion: "5V 出现过流（periph/hipower 5v_oc）。外设或大功率负载拉高了 5V 电流，核对外设接线与负载功率。"
+    description: "5V 过流 {n_oc} 帧（5V 最低 {v5_min:.2f} V）"
+    evidence:
+      source: system_power.*_5v_oc(sum)
+      value: n_oc
+      threshold: 0
