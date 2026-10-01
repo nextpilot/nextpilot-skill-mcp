@@ -3,17 +3,23 @@ import { PLOT_PRESETS } from "./knowledge/plots.generated";
 import {
     presetApplies,
     resolveAxes,
+    resolveSpectrogram,
     resolveSpectrum,
     type FieldDesc,
     type PanelSpec,
     type SeriesRequest,
     type UnifiedAxes,
+    type UnifiedSpectrogram,
     type UnifiedSpectrum,
 } from "./panel-resolver";
 
-/** 编译产物里的一个输出。`container` 是判别位：axes 走曲线，spectrogram 走频谱，map 挂常驻地图区 */
+/** 编译产物里的一个输出。`container` 是判别位：axes 走曲线，spectrum 走频谱线图，
+ *  spectrogram 走时频热图，map 挂常驻地图区 */
 type CompiledOutput =
-    (UnifiedAxes & { container: "axes" }) | (UnifiedSpectrum & { container: "spectrogram" }) | { container: "map" };
+    | (UnifiedAxes & { container: "axes" })
+    | (UnifiedSpectrum & { container: "spectrum" })
+    | (UnifiedSpectrogram & { container: "spectrogram" })
+    | { container: "map" };
 
 /**
  * 绘图预设的入口：声明在 knowledge/px4/plot/*.yml（构建期编译成 plots.generated.ts，字段引用已校验、
@@ -50,9 +56,11 @@ function resolvePreset(p: CompiledPreset, manifest: TopicManifest): PanelSpec[] 
         if (out.container === "map") continue; // 地图不进曲线 tab（挂在常驻地图区）
         // 换算节点随请求带上：图上的换算在引擎侧做（前端不写数学）
         const resolved =
-            out.container === "spectrogram"
+            out.container === "spectrum"
                 ? resolveSpectrum(out, manifest, { hlineColor: (lv) => STATUS_COLORS[lv] })
-                : resolveAxes(out, manifest, { hlineColor: (lv) => STATUS_COLORS[lv] });
+                : out.container === "spectrogram"
+                  ? resolveSpectrogram(out, manifest, { hlineColor: (lv) => STATUS_COLORS[lv] })
+                  : resolveAxes(out, manifest, { hlineColor: (lv) => STATUS_COLORS[lv] });
         for (const spec of resolved.panels) {
             for (const r of spec.requests) r.compute = p.compute;
             panels.push(spec);

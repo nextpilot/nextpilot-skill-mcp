@@ -1,7 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { LogReportData, LogInfo, SeriesResponse, SpectrumResponse, TopicManifest, TrackData } from "@/lib/types";
+import type {
+    LogReportData,
+    LogInfo,
+    SeriesResponse,
+    SpectrumResponse,
+    StftResponse,
+    TopicManifest,
+    TrackData,
+} from "@/lib/types";
 import type { WorkerOutMessage, WorkerStage } from "@/workers/analysis-worker";
 import {
     resolvePlotPanels,
@@ -479,6 +487,26 @@ export function useLogAnalyzer() {
         [ensureLogLoaded],
     );
 
+    /** 要一张时频热图；第三条取数通道（np_stft，[频率][时间] 的 dB 矩阵） */
+    const requestStft = useCallback(
+        async (req: SeriesRequest): Promise<StftResponse> => {
+            const worker = getSharedWorker();
+            if (!worker) return { error: "worker 未就绪" } as StftResponse;
+            await ensureLogLoaded(pendingHashRef.current);
+            const reqId = `st${reqIdRef.current++}`;
+            return new Promise((resolve) => {
+                pendingRef.current.set(reqId, (data) => resolve(data as StftResponse));
+                worker.postMessage({
+                    type: "stft",
+                    reqId,
+                    request: req,
+                    logId: pendingHashRef.current,
+                });
+            });
+        },
+        [ensureLogLoaded],
+    );
+
     /** 把各预设的曲线抽出来存进报告存档（键与 LogCharts 的 seriesKey 一致：`presetId#面板序号`） */
     const extractPlots = useCallback(
         async (id: string, manifest: TopicManifest, info: LogInfo) => {
@@ -492,10 +520,13 @@ export function useLogAnalyzer() {
                         // 存成数组，键仍是 `${presetId}#面板序号`
                         const reqs = sp.panels[i].requests;
                         if (reqs.length === 0) continue;
-                        // 频谱走 np_spectrum 通道（返回形状不同），与时间序列分开取
+                        // 频谱/热图走各自通道（返回形状不同），与时间序列分开取
                         const isSpectrum = sp.panels[i].spectrum === true;
+                        const isStft = sp.panels[i].spectrogram === true;
                         const got = await Promise.all(
-                            reqs.map((r) => (isSpectrum ? requestSpectrum(r) : requestSeries(r))),
+                            reqs.map((r) =>
+                                isStft ? requestStft(r) : isSpectrum ? requestSpectrum(r) : requestSeries(r),
+                            ),
                         );
                         if (got.every((r) => r && !(r as { error?: string }).error)) {
                             series[`${sp.presetId}#${i}`] = got as never;
@@ -520,7 +551,7 @@ export function useLogAnalyzer() {
                 // 抽曲线失败不影响结论展示；下次打开会退回"重新解析"
             }
         },
-        [requestSeries, requestSpectrum, requestTrack],
+        [requestSeries, requestSpectrum, requestStft, requestTrack],
     );
 
     /** 地图用：优先用存档里的轨迹（打开历史时不必解析），否则问 Worker 要 */
@@ -1039,6 +1070,7 @@ export function useLogAnalyzer() {
         explain,
         requestSeries,
         requestSpectrum,
+        requestStft,
         viewSaved,
         storedPlots,
         loadTrack,

@@ -1,0 +1,23 @@
+id: spectrogram-angular-velocity
+title: Angular velocity Power Spectral Density
+description: >
+  角速度三轴的时频热图（上游 DataPlotSpec 口径：hann 256/128、帧内去均值、三轴 PSD
+  求和、10*log10 dB、fs<100Hz 不画）。看陀螺频段能量随时间的分布：滤波器截止频率
+  以上的残留噪声、机架共振峰在什么时刻被激起。
+order: 47
+condition:
+  message: [vehicle_angular_velocity]
+compute:
+  - wx = vehicle_angular_velocity.xyz[0]
+  - wy = vehicle_angular_velocity.xyz[1]
+  - wz = vehicle_angular_velocity.xyz[2]
+  - f, t, S = stft(wx, wy, wz, min_fs=100)
+output:
+  - container: spectrogram
+    title: Angular velocity Power Spectral Density
+    ylabel: Hz
+    xlabel: s
+    children:
+      - mode: stft
+        z: S
+        label: ["rollspeed", "pitchspeed", "yawspeed"]

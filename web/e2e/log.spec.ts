@@ -25,12 +25,9 @@ test.describe("日志分析流程", () => {
         // 上传 .ulg 文件
         await fileInput.setInputFiles(SAMPLE_ULG);
 
-        // 等待分析完成：加载 Pyodide → 安装 pyulog → 解析 → 完成（首次启动慢，预留充足时间）
-        const doneIndicator = page.locator("text=完成").first();
-        await expect(doneIndicator).toBeVisible({ timeout: 240_000 });
-
-        // 要跳转到结果页 /log/[id]，否则解析链路没走完
-        await page.waitForURL("**/log/**", { timeout: 30_000 });
+        // 等待分析完成：加载 Pyodide → 安装 pyulog → 解析 → 完成的标志是**跳转到结果页**。
+        // （别等"完成"文案：它只是过渡态，解析快时在 expect 轮询间隙就随跳转消失，等它必竞态。）
+        await page.waitForURL("**/log/**", { timeout: 240_000 });
         expect(page.url()).toMatch(/\/log\/.+/);
 
         // 默认停在「关键数据」tab：标题（确定性引擎实测）要渲染，证明解析产物进了显示层
@@ -52,6 +49,30 @@ test.describe("日志分析流程", () => {
             .getByText("振动 / IMU 削波、EKF 创新检验、电源三项基础检查均未触发阈值")
             .count();
         expect(hasFindings > 0 || hasSummaryFallback > 0).toBeTruthy();
+
+        // ── W6 L0：图表 tab 的三种容器（时间序列 / 频谱线图 / 时频热图）真实渲染断言 ──
+        // L0 硬约束：用户可达入口必须真实浏览器驱动，禁止仅 lint/静态断言替代。
+        await page.getByTestId("tab-charts").click();
+
+        // 频谱预设卡是折叠的：按标题展开，等 Plotly newPlot 产出 .main-svg
+        const spectrumCard = page.locator("button", { hasText: "Angular Velocity FFT" }).first();
+        await expect(spectrumCard).toBeVisible({ timeout: 30_000 });
+        await spectrumCard.click();
+        const spectrumPlot = page
+            .locator("div", { has: page.getByText("Angular Velocity FFT", { exact: true }) })
+            .locator(".main-svg")
+            .first();
+        await expect(spectrumPlot).toBeVisible({ timeout: 120_000 });
+
+        // 时频热图（container: spectrogram）：标题来自上游 DataPlotSpec
+        const specCard = page.locator("button", { hasText: "Acceleration Power Spectral Density" }).first();
+        await expect(specCard).toBeVisible({ timeout: 30_000 });
+        await specCard.click();
+        const specPlot = page
+            .locator("div", { has: page.getByText("Acceleration Power Spectral Density", { exact: true }) })
+            .locator(".main-svg")
+            .first();
+        await expect(specPlot).toBeVisible({ timeout: 120_000 });
 
         const body = await page.locator("body").textContent();
         expect(body).not.toMatch(/Application error/);

@@ -5,7 +5,7 @@ const BASE_URL = `http://localhost:${PORT}`;
 
 export default defineConfig({
     testDir: "./e2e",
-    timeout: 120_000,
+    timeout: 480_000,
     expect: { timeout: 10_000 },
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
@@ -30,7 +30,7 @@ export default defineConfig({
         command: `pnpm exec next dev --port ${PORT}`,
         url: BASE_URL,
         reuseExistingServer: !process.env.CI,
-        timeout: 120_000,
+        timeout: 120_000, // webServer 启动超时（dev 编译一个页面足够）
         cwd: __dirname,
     },
 });

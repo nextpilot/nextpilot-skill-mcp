@@ -7,6 +7,7 @@ exec 进独立命名空间——测的是拼进 Pyodide 的那份代码，而不
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 ENGINE = Path(__file__).resolve().parents[1]
@@ -121,6 +122,115 @@ def test_compute_spectrum_outputs_freq_and_mag_axes():
     env2: dict = {}
     _eval_compute("f2, p2 = spectrum([1.0, 1.0, 1.0], sample_rate=100.0)", env2)
     assert env2["f2"] is None and env2["p2"] is None
+
+
+def test_spectrum_window_none_recovers_amplitude():
+    """上游 DataPlotFFT 口径（window="none"，2/N 归一）：bin 对齐正弦的峰值幅度恢复为 A。"""
+    op = ENG["op_spectrum"]
+    fs, f0, n, amp = 1000.0, 50.0, 1000, 0.7
+    sig = [amp * math.sin(2.0 * math.pi * f0 * i / fs) for i in range(n)]
+    f, p = op(sig, sample_rate=fs, window="none")
+    k = max(range(len(p)), key=lambda i: p[i])
+    assert abs(f[k] - f0) < 1.0  # bin 分辨率 fs/n = 1 Hz
+    assert abs(p[k] - amp) < 0.05 * amp
+    # Hann 窗在相干增益补偿（除以 sum(w)）后同样恢复幅值，两种口径自洽
+    f2, p2 = op(sig, sample_rate=fs)
+    k2 = max(range(len(p2)), key=lambda i: p2[i])
+    assert abs(f2[k2] - f0) < 1.0
+    assert abs(p2[k2] - amp) < 0.05 * amp
+
+
+def test_spectrum_min_fs_gate_returns_none():
+    """min_fs 门：低采样率的谱没有调参价值，上游 fs<100Hz 直接不画，preset 按需声明。"""
+    op = ENG["op_spectrum"]
+    sig = [math.sin(0.1 * i) for i in range(256)]
+    assert op(sig, sample_rate=50.0, min_fs=100.0) == (None, None)
+    # 边界：fs == min_fs 不拦（只有小于才拦）
+    f, p = op(sig, sample_rate=100.0, min_fs=100.0)
+    assert f is not None and p is not None and len(f) == len(p)
+    # 不声明 min_fs 时任何采样率都画
+    f2, p2 = op(sig, sample_rate=50.0)
+    assert f2 is not None and p2 is not None
+
+
+def test_stft_three_axis_psd_sum_recovers_tone():
+    """上游 DataPlotSpec 口径：hann 256/128、帧内去均值、三轴 PSD 求和、dB 输出。
+
+    三轴里只有一轴带 50Hz 正弦（fs=256，正好 2 秒 = 512 点，nperseg 整数帧）：
+    峰应出现在 50Hz 行，且 dB 值随功率可预期；另两轴是常数（帧内去均值后为 0，
+    PSD 全 0 → -inf → 换全图最小有限值，不产生 NaN/inf）。
+    """
+    op = ENG["op_stft"]
+    fs, f0, n = 256.0, 50.0, 512
+    amp = 2.0
+    ax = [amp * math.sin(2.0 * math.pi * f0 * i / fs) for i in range(n)]
+    ay = [1.0] * n  # 常数轴：帧内去均值后为 0
+    az = [1.0] * n
+    f, t, S = op(ax, ay, az, sample_rate=fs)
+    assert f is not None and t is not None and S is not None
+    nperseg, hop = 256, 128
+    assert len(f) == nperseg // 2 + 1
+    assert len(t) == 1 + (n - nperseg) // hop  # hann 256/128 → 3 帧
+    assert len(S) == len(f) and all(len(row) == len(t) for row in S)
+    assert abs(f[-1] - fs / 2) < 1e-9  # 0 ~ fs/2 全谱
+    # 峰在 50Hz 行（bin 间隔 1Hz，正弦只落在一个 bin 上）
+    k = max(range(len(f)), key=lambda i: max(v for v in S[i]))
+    assert abs(f[k] - f0) < 1.0
+    # 幅值核对：bin 对齐正弦过 hann 窗后 rfft 峰 = A·N·mean(w)/2，单边 PSD = 峰²·2/(fs·Σw²)
+    peak_db = max(S[k])
+    w_arr = _hann(nperseg)
+    sum_w = sum(w_arr)
+    sum_w2 = sum(v * v for v in w_arr)
+    x_peak = amp * nperseg * (sum_w / nperseg) / 2.0
+    expect = 10.0 * math.log10(x_peak**2 * 2.0 / (fs * sum_w2))
+    assert abs(peak_db - expect) < 0.5
+    # 全图有限：常数轴的 -inf 已被替换成全图最小有限值
+    flat = [v for row in S for v in row]
+    assert all(math.isfinite(v) for v in flat)
+
+
+def _hann(nperseg):
+    # 与算子同口径的周期 hann（测试内自算，不 import 引擎内部）
+    return [0.5 - 0.5 * math.cos(2.0 * math.pi * k / nperseg) for k in range(nperseg)]
+
+
+def test_stft_degenerate_and_gates():
+    """stft 的退化路径：三轴等长（取最短）、样本不足一个窗长、min_fs 门、max_frames 抽帧。"""
+    op = ENG["op_stft"]
+    fs = 200.0
+    sig = [math.sin(0.05 * i) for i in range(5000)]
+    # 样本不足窗长（256）→ 全 None
+    assert op(sig[:100], sig[:100], sig[:100], sample_rate=fs) == (None, None, None)
+    # min_fs 门
+    assert op(sig, sig, sig, sample_rate=90.0, min_fs=100.0) == (None, None, None)
+    # 三轴取最短长度对齐
+    f, t, S = op(sig, sig[:1000], sig[:600], sample_rate=fs)
+    assert f is not None and t is not None and S is not None
+    frames = 1 + (600 - 256) // (256 - 128)
+    assert len(t) == frames
+    # 帧抽稀：max_frames=4 时帧数不超 4，且保留首帧
+    f2, t2, S2 = op(sig, sig, sig, sample_rate=fs, max_frames=4)
+    assert len(t2) <= 4 and t2[0] == t[0] and len(S2[0]) == len(t2)
+
+
+def test_pad_end_restores_diff_length():
+    """pad_end：diff 后 n-1 补回 n，与时间戳对齐（上游 np.append(sampling_diff, 0) 口径）。
+
+    走完整 compute 链：`dt = diff(ts)`、`dt_full = pad_end(dt, 1)` 两条语句串着算。
+    """
+    op = ENG["op_pad_end"]
+    ts = [1000.0 * i for i in range(100)]
+    # 自定义补值与补数
+    assert list(op([1.0, 2.0], 3, value=-1.0)) == [1.0, 2.0, -1.0, -1.0, -1.0]
+    # count=0 原样返回；None 透传
+    assert list(op([1.0, 2.0], 0)) == [1.0, 2.0]
+    assert op(None, 1) is None
+    # 与 diff 串用（compute 链）：n 点时间戳 → diff 出 n-1 → pad 回 n，尾补 0
+    env: dict = {"ts": ts}
+    _eval_compute("dt = diff(ts)", env)
+    _eval_compute("dt_full = pad_end(dt, 1)", env)
+    assert len(env["dt_full"]) == len(ts)
+    assert env["dt_full"][0] == 1000.0 and env["dt_full"][-1] == 0.0
 
 
 def test_compute_zero_division_propagates_none():

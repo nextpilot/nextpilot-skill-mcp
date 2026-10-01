@@ -571,6 +571,25 @@ def op_diff(values, n=1, **kw):
 
 
 @operator(
+    "pad_end",
+    doc="尾部补 count 个 value（缺省 0）：把 diff 等短一位的序列补回与时间戳等长"
+    "（上游 np.append(sampling_diff, 0) 的口径，补在结尾不补在开头）",
+)
+def op_pad_end(values, count=1, value=0.0, **kw):
+    import numpy as np
+
+    if values is None:
+        return None
+    a = np.asarray(values, dtype=float)
+    k = int(count)
+    if k < 0 or k > 1_000_000:
+        return None
+    if k == 0:
+        return a
+    return np.append(a, np.full(k, float(value)))
+
+
+@operator(
     "wrap_degrees",
     doc="角度绕回到 -period/2 到 period/2（默认 ±180 度）：航向误差跨 ±180 度时不会给出约 360 度的假误差",
 )
@@ -1451,7 +1470,9 @@ def _infer_fs(ts_us, n):
     "（功率谱密度）；max_bins：最多保留多少 bin（默认 2048，只截低频段，不做随机抽稀）；"
     "min_samples：参与 FFT 的最少样本数。样本不足、全常数或推不出采样率时返回 (None, None)。",
 )
-def op_spectrum(seq, ts_us=None, sample_rate=None, norm="amplitude", max_bins=2048, min_samples=32, **kw):
+def op_spectrum(
+    seq, ts_us=None, sample_rate=None, norm="amplitude", max_bins=2048, min_samples=32, window="hann", min_fs=None, **kw
+):
     import numpy as np
 
     if seq is None:
@@ -1464,10 +1485,16 @@ def op_spectrum(seq, ts_us=None, sample_rate=None, norm="amplitude", max_bins=20
     fs = float(sample_rate) if sample_rate is not None else _infer_fs(ts_us, a.size)
     if fs is None or not np.isfinite(fs) or fs <= 0:
         return None, None
+    if min_fs is not None and fs < float(min_fs):
+        # 上游 FFT/PSD 图在低采样率下直接不画（fs<100Hz 的谱没有调参价值），preset 按需声明
+        return None, None
 
     n = a.size
     a = a - float(a.mean())  # 去直流：否则 0 Hz bin 会压过真实信号
-    w = np.hanning(n)  # Hann 窗抑制频谱泄漏（与固件频谱工具口径一致）
+    if str(window) == "none":
+        w = np.ones(n)  # 上游 DataPlotFFT 口径：不加窗、2/N 归一（对比其 y=0.01 上限的图时不失真）
+    else:
+        w = np.hanning(n)  # Hann 窗抑制频谱泄漏（与固件频谱工具口径一致）
     spec = np.abs(np.fft.rfft(a * w))
     f = np.fft.rfftfreq(n, d=1.0 / fs)
     if norm == "psd":
@@ -1477,6 +1504,98 @@ def op_spectrum(seq, ts_us=None, sample_rate=None, norm="amplitude", max_bins=20
         p = spec * 2.0 / max(float(np.sum(w)), 1e-12)
     k = min(int(max_bins), f.size)
     return f[:k], p[:k]
+
+
+@operator(
+    "stft",
+    in_arity=3,
+    out_arity=3,
+    out_names=["f", "t", "S"],
+    doc="三轴时频谱（热图数据）：三轴各自按 hann 短窗切帧（帧内去均值），"
+    "功率谱密度（density 口径）三轴相加后转 dB。输出频率轴 f（Hz）、"
+    "帧中心时间轴 t（秒）、二维 dB 矩阵 S[频率][时间]；帧数超 max_frames 按步长抽列。",
+)
+def op_stft(
+    x0,
+    x1,
+    x2,
+    ts_us=None,
+    sample_rate=None,
+    window="hann",
+    window_length=256,
+    noverlap=128,
+    min_fs=None,
+    max_frames=256,
+    **kw,
+):
+    """上游 DataPlotSpec（"Power Spectral Density" 三张热图）的口径：
+
+    `scipy.signal.spectrogram(x, fs, window='hann', nperseg=256, noverlap=128,
+    scaling='density')`（默认 mode='psd'、detrend='constant'）逐轴计算后 PSD 相加，
+    `10*log10` 成 dB，-inf 换全图最小有限值。fs < min_fs（上游 100Hz）不画。
+    帧抽稀对应上游按 plot_width 抽列（等比间隔，保首帧）。
+    """
+    import numpy as np
+
+    arrs = []
+    for seq in (x0, x1, x2):
+        if seq is None:
+            return None, None, None
+        arrs.append(_finite(seq))
+    n = min(a.size for a in arrs)
+    if n < 2:
+        return None, None, None
+    fs = float(sample_rate) if sample_rate is not None else _infer_fs(ts_us, n)
+    if fs is None or not np.isfinite(fs) or fs <= 0:
+        return None, None, None
+    if min_fs is not None and fs < float(min_fs):
+        return None, None, None
+
+    nperseg = int(window_length)
+    if nperseg < 2:
+        return None, None, None
+    if n < nperseg:  # 不学 scipy 自动降窗：窗长是口径的一部分，降了出来的谱没法跟别的日志对看
+        return None, None, None
+    hop = nperseg - int(noverlap)
+    if hop < 1:
+        return None, None, None
+    frames = 1 + (n - nperseg) // hop
+
+    if str(window) == "none":
+        w = np.ones(nperseg)
+    else:  # 周期 hann（scipy 'hann' 口径），不是 np.hanning 的对称窗
+        w = 0.5 - 0.5 * np.cos(2.0 * np.pi * np.arange(nperseg) / nperseg)
+    wsum = float(np.sum(w**2))
+    scale = 1.0 / max(fs * wsum, 1e-12)
+
+    psd_sum = None
+    for a in arrs:
+        psd = np.empty((frames, nperseg // 2 + 1), dtype=float)
+        for k in range(frames):
+            seg = a[k * hop : k * hop + nperseg]
+            seg = seg - float(seg.mean())  # detrend='constant'：每帧各自去均值（与整段去直流不同）
+            spec = np.abs(np.fft.rfft(seg * w)) ** 2
+            spec[1:-1] *= 2.0  # 单边谱倍增（首尾 bin 除外，scipy 同款）
+            psd[k] = spec * scale
+        if psd_sum is None:
+            psd_sum = psd
+        else:
+            psd_sum = psd_sum + psd
+    # 列抽稀在 dB 之后做不省事（-inf 替换要全图口径），先 dB 再抽行
+    S = 10.0 * np.log10(psd_sum)  # psd_sum ≥ 0；全静默帧 PSD=0 → -inf
+    finite = S[np.isfinite(S)]
+    if finite.size < S.size:  # 换全图最小有限值（上游处理：不能让 -inf 拉爆色标范围）
+        floor = float(finite.min()) if finite.size else 0.0
+        S[~np.isfinite(S)] = floor
+    if int(max_frames) > 0 and frames > int(max_frames):
+        step = int(np.ceil(frames / float(max_frames)))
+        S = S[::step]
+        frame_idx = np.arange(0, frames, step)
+    else:
+        frame_idx = np.arange(frames)
+    f = np.fft.rfftfreq(nperseg, d=1.0 / fs)
+    t = (frame_idx * hop + nperseg / 2.0) / fs  # 帧中心相对首样本的秒数
+    return f, t, np.asarray(S).T  # 转成 [频率][时间]：一行一个频点，heatmap 的 z 直接可用
 
 
 # ─────────────────────────── 复合算子：整段分析（多入多出）───────────────────────────

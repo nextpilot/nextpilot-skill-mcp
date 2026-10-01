@@ -1,0 +1,30 @@
+id: spectrum-angular-velocity
+title: Angular Velocity FFT
+description: >
+  角速度三轴的幅度谱（上游 DataPlotFFT 口径：无窗、2/N 归一、fs<100Hz 不画）。
+  对照 IMU_GYRO_CUTOFF / IMU_GYRO_NF_FREQ 参数线看陀螺滤波器与陷波器实际落点。
+order: 44
+condition:
+  message: [vehicle_angular_velocity]
+compute:
+  - wx = vehicle_angular_velocity.xyz[0]
+  - wy = vehicle_angular_velocity.xyz[1]
+  - wz = vehicle_angular_velocity.xyz[2]
+  - f, px = spectrum(wx, norm="amplitude", window="none", min_fs=100)
+  - f, py = spectrum(wy, norm="amplitude", window="none", min_fs=100)
+  - f, pz = spectrum(wz, norm="amplitude", window="none", min_fs=100)
+output:
+  - container: spectrum
+    title: Angular Velocity FFT
+    ylabel: Amplitude
+    xlabel: Hz
+    ymax: 0.01
+    vlines:
+      - param: IMU_GYRO_CUTOFF
+        label: IMU_GYRO_CUTOFF
+      - param: IMU_GYRO_NF_FREQ
+        label: IMU_GYRO_NF_FREQ
+    children:
+      - mode: spectrum
+        ydata: [px, py, pz]
+        label: ["Rollspeed", "Pitchspeed", "Yawspeed"]

@@ -1,0 +1,23 @@
+id: spectrogram-acceleration
+title: Acceleration Power Spectral Density
+description: >
+  加速度三轴的时频热图（上游 DataPlotSpec 口径：hann 256/128、帧内去均值、三轴 PSD
+  求和、10*log10 dB、fs<100Hz 不画）。上游叫它 "Power Spectral Density" 但不是折线图——
+  颜色深浅是 dB 强弱，横轴时间、纵轴频率，看振动能量随时间/频率的分布（机架共振、桨叶不平衡）。
+order: 46
+condition:
+  message: [sensor_combined]
+compute:
+  - ax = sensor_combined.accelerometer_m_s2[0]
+  - ay = sensor_combined.accelerometer_m_s2[1]
+  - az = sensor_combined.accelerometer_m_s2[2]
+  - f, t, S = stft(ax, ay, az, min_fs=100)
+output:
+  - container: spectrogram
+    title: Acceleration Power Spectral Density
+    ylabel: Hz
+    xlabel: s
+    children:
+      - mode: stft
+        z: S
+        label: ["X", "Y", "Z"]

@@ -1,9 +1,15 @@
 id: sampling
 title: Sampling Regularity
-description: sensor_combined 采样间隔与 estimator_status time_slip。
+description: >
+  sensor_combined 采样间隔（相邻 timestamp 差，diff 短一位由 pad_end 补齐）、
+  estimator_status time_slip。采样间隔抖动大或出现离群值说明日志记录不稳。
 order: 40
 condition:
   message: [sensor_combined]
+compute:
+  # delta t 与时间戳的对齐用 pad_end 尾补（上游 np.append(sampling_diff, 0) 同口径）
+  - dt = diff(sensor_combined.timestamp)
+  - dt_full = pad_end(dt, count=1)
 output:
   - container: axes
     title: Sampling Regularity of Sensor Data
@@ -11,5 +17,6 @@ output:
     children:
       - mode: TimeSeries
         ydata:
+          - dt_full
           - estimator_status.time_slip
-        label: ["Estimator time slip (cumulative)"]
+        label: ["delta t (between 2 logged samples)", "Estimator time slip (cumulative)"]

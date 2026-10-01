@@ -23,9 +23,13 @@ export type SeriesRequest = {
     /** 与 ydata 同序等长：每条线的图例名与样式（style = solid / dashed / dotted） */
     series: { label: string; style: string | null; color: string | null }[];
     /** 取数通道。缺省（旧存档）= "field"（时间序列） */
-    kind?: "field" | "spectrum";
-    /** 仅频谱：频率轴那个变量名（spectrum(...) 的第一个输出），np_spectrum 据此从 env 取横轴 */
+    kind?: "field" | "spectrum" | "stft";
+    /** 仅频谱/热图：频率轴那个变量名（spectrum(...) / stft(...) 的第一个输出），np_* 据此从 env 取 */
     freq?: string;
+    /** 仅热图：时间轴变量名（stft(...) 的第二个输出） */
+    times?: string;
+    /** 仅热图：dB 矩阵变量名（stft(...) 的第三个输出，[频率][时间]） */
+    z?: string;
 };
 
 export type PanelSpec = {
@@ -45,8 +49,15 @@ export type PanelSpec = {
     requests: SeriesRequest[];
     /** 频谱图判别位：true = 走 np_spectrum、x 轴是频率、不参与时间轴联动、不画阶段底色 */
     spectrum?: boolean;
+    /** 时频热图判别位：true = 走 np_stft（x 时间、y 频率、色 dB）。x 轴虽是时间，
+     *  但它是 xyplot 语义的热图——两轴按数据范围自动，不参与时间轴联动、不画阶段底色 */
+    spectrogram?: boolean;
     /** 频谱图关注频段上限（Hz）；null = 按数据范围自动 */
     fmax?: number | null;
+    /** 频谱图幅度轴上限；null = 自动 */
+    ymax?: number | null;
+    /** 频谱图竖线标注（value=字面量 Hz / param=参数名）；引擎解析后随响应回 actual 值 */
+    vlines?: { value?: number; param?: string; label: string }[];
 };
 
 // ─────────────────────────── 字段引用 ───────────────────────────
@@ -58,7 +69,8 @@ export type InstSpec =
 export type FieldRef = { topic: string; inst: InstSpec; field: string };
 
 /** 与构建期同形：`topic[N].field[M]`；字段下标只许出现在最后一段 */
-export const FIELD_REF_RE = /^([a-z][a-z0-9_]*)(?:\[([-]?\d*(?::-?\d*)?)\])?\.([a-z][a-z0-9_]*(?:\[\d+(?:,\d+)?\])?)$/;
+export const FIELD_REF_RE =
+    /^([a-z][a-z0-9_]*)(?:\[([-]?\d*(?::-?\d*)?)\])?\.((?:[a-z][a-z0-9_]*(?:\[\d+(?:,\d+)?\])?\.)*[a-z][a-z0-9_]*(?:\[\d+(?:,\d+)?\])?)$/;
 
 export function parseInstSpec(txt: string | null | undefined): InstSpec {
     if (!txt) return { kind: "default" };
@@ -137,7 +149,7 @@ export type UnifiedChild = {
     labels: (string | null)[];
     styles: (string | null)[];
     colors: (string | null)[];
-    /** 仅 spectrogram：与 ydata 同序的频率轴变量名（spectrum(...) 的第一个输出），运行期从 env 取 */
+    /** 仅 spectrum：与 ydata 同序的频率轴变量名（spectrum(...) 的第一个输出），运行期从 env 取 */
     freqs?: string[];
 };
 
@@ -166,9 +178,26 @@ export type UnifiedSpectrum = {
     xlabel: string;
     /** 关注频段上限（Hz）；null = 按数据范围自动 */
     fmax: number | null;
+    /** 幅度轴上限；null = 自动（下游 FFT 图用它压掉大幅低频段，小信号才可见） */
+    ymax: number | null;
+    /** 竖线标注（滤波器截止频率等）：value=字面量 Hz 或 param=参数名，运行期由引擎解 */
+    vlines?: { value?: number; param?: string; label: string }[];
     legend: boolean;
     grid: boolean;
     children: UnifiedChild[];
+};
+
+/** 时频热图的容器形状（上游 DataPlotSpec）：x 轴时间（秒）、y 轴频率（Hz）、颜色 dB。
+ *  一图一矩阵（三轴 PSD 求和），没有 fmax/ymax/vlines。children 的 mode 恒为 "stft"，
+ *  只点名矩阵变量，freq/times 由构建期从 compute 左值反查（单一事实来源）。 */
+export type UnifiedSpectrogram = {
+    title: string | null;
+    /** 频率轴标签（必填，构建期校验，一般就是 Hz） */
+    ylabel: string;
+    /** 时间轴标签，缺省 "s" */
+    xlabel: string;
+    grid: boolean;
+    children: { mode: "stft"; freq: string; times: string; z: string; labels: string[] }[];
 };
 
 export type ResolveOptions = {
@@ -384,9 +413,44 @@ export function resolveSpectrum(out: UnifiedSpectrum, _m: TopicManifest, _opts: 
         fmax: out.fmax,
         requests,
     };
+    if (out.ymax != null) spec.ymax = out.ymax;
+    if (out.vlines && out.vlines.length > 0) spec.vlines = out.vlines;
     if (panelWarnings.length) spec.warnings = panelWarnings;
     warnings.push(...panelWarnings);
     return { panels: [spec], warnings };
+}
+
+/** 一个时频热图容器 → 一张热图。与 resolveSpectrum 的关键差别：
+ *  - 请求走 np_stft（freq/times/z 三个输出变量），数据本体是 [频率][时间] 的 dB 矩阵
+ *  - x 轴是时间，但按用户铁律它是 xyplot 语义：两轴按数据范围自动，
+ *    不参与时间轴联动、不画阶段底色（前端据 `spectrogram: true` 判别） */
+export function resolveSpectrogram(out: UnifiedSpectrogram, _m: TopicManifest, _opts: ResolveOptions): ResolveResult {
+    if (out.children.length === 0) return { panels: [], warnings: [] };
+    const child = out.children[0];
+    const req: SeriesRequest = {
+        instance: 0,
+        xdata: null,
+        ydata: [],
+        compute: [],
+        series: [],
+        kind: "stft",
+        freq: child.freq,
+        times: child.times,
+        z: child.z,
+    };
+    const spec: PanelSpec = {
+        title: out.title ?? "",
+        yLabel: out.ylabel,
+        xLabel: out.xlabel,
+        legend: false, // 热图没有图例（一张矩阵一个色标）
+        grid: out.grid,
+        flipx: false,
+        flipy: false,
+        range: null,
+        spectrogram: true,
+        requests: [req],
+    };
+    return { panels: [spec], warnings: [] };
 }
 
 /** 拆图时按哪条引用的实例列表走：取第一条区间引用的 topic。

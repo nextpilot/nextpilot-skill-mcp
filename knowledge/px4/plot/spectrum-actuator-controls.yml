@@ -1,0 +1,33 @@
+id: spectrum-actuator-controls
+title: Actuator Controls FFT
+description: >
+  作动器扭矩轴控制的幅度谱（上游 DataPlotFFT 口径：无窗、2/N 归一、fs<100Hz 不画）。
+  对照 MC_DTERM_CUTOFF / IMU_DGYRO_CUTOFF / IMU_GYRO_CUTOFF 参数线看输出噪声有没有被滤波器压住。
+order: 43
+condition:
+  message: [actuator_controls_0]
+compute:
+  # 不写 sample_rate：引擎从命中话题的 timestamp 自推（写死解析式有版本/机架差异）
+  - roll = actuator_controls_0.control[0]
+  - pitch = actuator_controls_0.control[1]
+  - yaw = actuator_controls_0.control[2]
+  - f, pr = spectrum(roll, norm="amplitude", window="none", min_fs=100)
+  - f, pp = spectrum(pitch, norm="amplitude", window="none", min_fs=100)
+  - f, py = spectrum(yaw, norm="amplitude", window="none", min_fs=100)
+output:
+  - container: spectrum
+    title: Actuator Controls FFT
+    ylabel: Amplitude
+    xlabel: Hz
+    ymax: 0.01
+    vlines:
+      - param: MC_DTERM_CUTOFF
+        label: MC_DTERM_CUTOFF
+      - param: IMU_DGYRO_CUTOFF
+        label: IMU_DGYRO_CUTOFF
+      - param: IMU_GYRO_CUTOFF
+        label: IMU_GYRO_CUTOFF
+    children:
+      - mode: spectrum
+        ydata: [pr, pp, py]
+        label: ["Roll", "Pitch", "Yaw"]

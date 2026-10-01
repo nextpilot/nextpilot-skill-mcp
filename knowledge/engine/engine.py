@@ -493,8 +493,10 @@ class _ComputeRefs(ast.NodeTransformer):
 
     def visit_Name(self, node):
         """ALL_CAPS 内置变量 → _cfg("NAME") 调用（不在 env 声明过的才转）。
-        小写/混名保持原样，算 compute 变量。"""
-        if re.match(r"^[A-Z][A-Z0-9_]*$", node.id) and node.id not in self.env_keys:
+        小写/混名保持原样，算 compute 变量。**只转 Load 上下文**：Store 是赋值目标
+        （在声明变量），转了会得到「函数调用当赋值目标」的语法错误——stft 的
+        三输出 `f, t, S = stft(...)` 里的 S 踩过（构建期合法、运行期编译炸）。"""
+        if isinstance(node.ctx, ast.Load) and re.match(r"^[A-Z][A-Z0-9_]*$", node.id) and node.id not in self.env_keys:
             return ast.copy_location(
                 ast.Call(
                     func=ast.Name(id="_cfg", ctx=ast.Load()),
@@ -1303,11 +1305,89 @@ def np_spectrum(request_json, max_bins=None):
             )
             return
     fs, fs_source = _spectrum_fs_meta(req.get("compute"), inferred_fs)
+    vlines, vlines_notes = _resolve_spectrum_vlines(req.get("vlines"))
     __result = json.dumps(
         {
             "f": f_axis,
             "series": series,
             "fullCount": n,
+            "fs": fs,
+            "fsSource": fs_source,
+            "vlines": vlines,
+            "warnings": (take_notes() if take_notes else []) + vlines_notes,
+        },
+        ensure_ascii=False,
+    )
+
+
+# ============ np_stft：时频谱热图（x 时间、y 频率、值 dB）============
+# 第三条取数通道，形状介于 np_series 与 np_spectrum 之间：x 是时间（秒）、y 是频率（Hz），
+# 但两条轴的长度都不跟任何时间戳序列走，数据本体是一个 [频率][时间] 的 dB 矩阵——
+# 所以不复用 np_series（强制序列长度 = 时间戳长度）也不复用 np_spectrum（没有第二条谱线）。
+# request 带 freq/times/z 三个变量名（构建期从 `f, t, S = stft(...)` 的左值里取）。
+def np_stft(request_json):
+    global __result
+    req = json.loads(request_json)
+    take_notes = getattr(provider, "take_inst_notes", None)
+    if take_notes:
+        take_notes()
+    inst = int(req.get("instance") or 0)
+    freq_name = req.get("freq")
+    times_name = req.get("times")
+    z_name = req.get("z")
+    if not (freq_name and times_name and z_name):
+        __result = json.dumps({"error": "这张热图没有声明频率轴/时间轴/矩阵变量（freq/times/z 缺失）"}, ensure_ascii=False)
+        return
+
+    env = _rule_env()
+    if req.get("compute"):
+
+        def panel_ref(*args, **kwargs):
+            return _pick_ref(*args, instance=inst, **kwargs)[0]
+
+        try:
+            for stmt in req["compute"]:
+                _eval_compute(stmt, env, ref_fn=panel_ref)
+        except Exception as exc:
+            __result = json.dumps({"error": "热图的换算节点算不出来：%s" % exc}, ensure_ascii=False)
+            return
+
+    # 采样率自推与频谱同一条链：compute 里 stft(...) 没写 sample_rate 时，从命中话题的
+    # timestamp 推 median 间隔倒数，注回语句末尾重算（详见 _inject_spectrum_fs）。
+    inferred_fs = _inject_spectrum_fs(req, env, inst)
+
+    fv = env.get(freq_name)
+    tv = env.get(times_name)
+    zv = env.get(z_name)
+    if fv is None or tv is None or zv is None:
+        __result = json.dumps(
+            {
+                "error": "取不到热图数据（compute 里 stft(...) 没算出来——常见原因：样本数不够一个窗长，"
+                "或采样率低于预设声明的 min_fs 门槛）"
+            },
+            ensure_ascii=False,
+        )
+        return
+    f_axis = np.asarray(fv, dtype=float)
+    t_axis = np.asarray(tv, dtype=float)
+    Z = np.asarray(zv, dtype=float)
+    if Z.ndim != 2 or Z.shape[0] != f_axis.size or Z.shape[1] != t_axis.size:
+        __result = json.dumps(
+            {
+                "error": "热图矩阵形状和轴对不上（矩阵 %s，频率轴 %d 点、时间轴 %d 点），"
+                "检查 compute 里 stft(...) 的输出是否配对" % (Z.shape, f_axis.size, t_axis.size)
+            },
+            ensure_ascii=False,
+        )
+        return
+    z_rows = [[_clean(x) for x in row] for row in Z]
+    fs, fs_source = _spectrum_fs_meta(req.get("compute"), inferred_fs)
+    __result = json.dumps(
+        {
+            "f": [_clean(x) for x in f_axis],
+            "t": [_clean(x) for x in t_axis],
+            "z": z_rows,
+            "fullCount": int(t_axis.size),
             "fs": fs,
             "fsSource": fs_source,
             "warnings": take_notes() if take_notes else [],
@@ -1316,11 +1396,49 @@ def np_spectrum(request_json, max_bins=None):
     )
 
 
+def _resolve_spectrum_vlines(spec):
+    """把预设里的竖线声明解成 (Hz, label) 列表，附解析说明。
+
+    两种给法：`value` 字面量直接用；`param` 是参数名——滤波器截止频率各机架不同，
+    构建期只知道名字，这里查 initial_parameters 解。解不出来的线**消失**并留一句说明，
+    绝不画到猜的频率上（一条错位的标线比没有更误导）。
+    """
+    out = []
+    notes = []
+    if not spec:
+        return out, notes
+    params_fn = getattr(provider, "get_initial_parameters", None)
+    params = params_fn() if params_fn else {}
+    for item in spec:
+        if not isinstance(item, dict) or not item.get("label"):
+            continue
+        if item.get("param") is not None:
+            name = str(item["param"])
+            raw = (params or {}).get(name)
+            try:
+                f = float(raw) if raw is not None and str(raw).strip() != "" else None
+            except (TypeError, ValueError):
+                f = None
+            if f is None or f <= 0:
+                notes.append("参数 %s 没取到（或不是正数），标线「%s」没画" % (name, item["label"]))
+                continue
+            out.append({"f": f, "label": item["label"]})
+        else:
+            try:
+                f = float(item.get("value"))
+            except (TypeError, ValueError):
+                continue
+            if f > 0:
+                out.append({"f": f, "label": item["label"]})
+    return out, notes
+
+
 def _spectrum_stmt_fs(stmts):
-    """扫 compute 里的 `spectrum(...)` 调用 → `{"explicit": [fs...], "inferred": [stmt...]}`。
+    """扫 compute 里的 `spectrum(...)` / `stft(...)` 调用 → `{"explicit": [fs...], "inferred": [...]}`。
 
     `explicit`：语句里写了 `sample_rate=<字面量>`（构建期只允许字面量）。`inferred`：没写，
-    需要运行期补采样率——把那些语句原文留给 `_inject_spectrum_fs` 重算。
+    需要运行期补采样率——元素是 `{"fn": 调用名, "stmt": 语句原文}`，留给 `_inject_spectrum_fs`
+    重算（谱类算子都拿不到时间戳，fs 只能由引擎从命中话题的 timestamp 推）。
     """
     explicit = []
     inferred = []
@@ -1330,14 +1448,14 @@ def _spectrum_stmt_fs(stmts):
         except SyntaxError:
             continue
         for node in ast.walk(tree):
-            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "spectrum"):
+            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in ("spectrum", "stft")):
                 continue
             fs = None
             for kw in node.keywords:
                 if kw.arg == "sample_rate" and isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, (int, float)):
                     fs = float(kw.value.value)
             if fs is None:
-                inferred.append(stmt)
+                inferred.append({"fn": node.func.id, "stmt": stmt})
             else:
                 explicit.append(fs)
     return {"explicit": explicit, "inferred": inferred}
@@ -1359,8 +1477,8 @@ def _infer_topic_fs(bare, inst):
     return 1e6 / float(np.median(d))
 
 
-def _append_spectrum_kwarg(stmt, key, value):
-    """在 `spectrum(...)` 的实参表**末尾**追加一个关键字实参，返回改写后的语句（失败返 None）。
+def _append_spectrum_kwarg(stmt, key, value, fn="spectrum"):
+    """在 `fn(...)` 的实参表**末尾**追加一个关键字实参，返回改写后的语句（失败返 None）。
 
     `spectrum(gx, norm="amplitude")` → `spectrum(gx, norm="amplitude", sample_rate=204.58?)`。
     关键字实参必须排在所有位置实参之后，插到开头会得到 `spectrum(sample_rate=…, gx, …)`——
@@ -1368,7 +1486,7 @@ def _append_spectrum_kwarg(stmt, key, value):
     定位靠字符串扫描而不是 AST 重写：语句原文在构建期已被编译过一次，这里只做最小改动，
     重写回去还会引入 unparse 的格式化差异（引号、括号），反而更容易出问题。
     """
-    idx = stmt.find("spectrum(")
+    idx = stmt.find("%s(" % fn)
     if idx < 0:
         return None
     open_paren = idx + len("spectrum(")
@@ -1419,8 +1537,8 @@ def _inject_spectrum_fs(req, env, inst):
     if not fs or not np.isfinite(fs) or fs <= 0:
         return None
     ok = False
-    for stmt in info["inferred"]:
-        injected = _append_spectrum_kwarg(stmt, "sample_rate", float(fs))
+    for entry in info["inferred"]:
+        injected = _append_spectrum_kwarg(entry["stmt"], "sample_rate", float(fs), fn=entry["fn"])
         if injected is None:
             continue
         try:

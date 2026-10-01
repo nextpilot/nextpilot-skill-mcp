@@ -579,6 +579,25 @@ def op_diff(values, n=1, **kw):
 
 
 @operator(
+    "pad_end",
+    doc="尾部补 count 个 value（缺省 0）：把 diff 等短一位的序列补回与时间戳等长"
+    "（上游 np.append(sampling_diff, 0) 的口径，补在结尾不补在开头）",
+)
+def op_pad_end(values, count=1, value=0.0, **kw):
+    import numpy as np
+
+    if values is None:
+        return None
+    a = np.asarray(values, dtype=float)
+    k = int(count)
+    if k < 0 or k > 1_000_000:
+        return None
+    if k == 0:
+        return a
+    return np.append(a, np.full(k, float(value)))
+
+
+@operator(
     "wrap_degrees",
     doc="角度绕回到 -period/2 到 period/2（默认 ±180 度）：航向误差跨 ±180 度时不会给出约 360 度的假误差",
 )
@@ -1459,7 +1478,9 @@ def _infer_fs(ts_us, n):
     "（功率谱密度）；max_bins：最多保留多少 bin（默认 2048，只截低频段，不做随机抽稀）；"
     "min_samples：参与 FFT 的最少样本数。样本不足、全常数或推不出采样率时返回 (None, None)。",
 )
-def op_spectrum(seq, ts_us=None, sample_rate=None, norm="amplitude", max_bins=2048, min_samples=32, **kw):
+def op_spectrum(
+    seq, ts_us=None, sample_rate=None, norm="amplitude", max_bins=2048, min_samples=32, window="hann", min_fs=None, **kw
+):
     import numpy as np
 
     if seq is None:
@@ -1472,10 +1493,16 @@ def op_spectrum(seq, ts_us=None, sample_rate=None, norm="amplitude", max_bins=20
     fs = float(sample_rate) if sample_rate is not None else _infer_fs(ts_us, a.size)
     if fs is None or not np.isfinite(fs) or fs <= 0:
         return None, None
+    if min_fs is not None and fs < float(min_fs):
+        # 上游 FFT/PSD 图在低采样率下直接不画（fs<100Hz 的谱没有调参价值），preset 按需声明
+        return None, None
 
     n = a.size
     a = a - float(a.mean())  # 去直流：否则 0 Hz bin 会压过真实信号
-    w = np.hanning(n)  # Hann 窗抑制频谱泄漏（与固件频谱工具口径一致）
+    if str(window) == "none":
+        w = np.ones(n)  # 上游 DataPlotFFT 口径：不加窗、2/N 归一（对比其 y=0.01 上限的图时不失真）
+    else:
+        w = np.hanning(n)  # Hann 窗抑制频谱泄漏（与固件频谱工具口径一致）
     spec = np.abs(np.fft.rfft(a * w))
     f = np.fft.rfftfreq(n, d=1.0 / fs)
     if norm == "psd":
@@ -1485,6 +1512,98 @@ def op_spectrum(seq, ts_us=None, sample_rate=None, norm="amplitude", max_bins=20
         p = spec * 2.0 / max(float(np.sum(w)), 1e-12)
     k = min(int(max_bins), f.size)
     return f[:k], p[:k]
+
+
+@operator(
+    "stft",
+    in_arity=3,
+    out_arity=3,
+    out_names=["f", "t", "S"],
+    doc="三轴时频谱（热图数据）：三轴各自按 hann 短窗切帧（帧内去均值），"
+    "功率谱密度（density 口径）三轴相加后转 dB。输出频率轴 f（Hz）、"
+    "帧中心时间轴 t（秒）、二维 dB 矩阵 S[频率][时间]；帧数超 max_frames 按步长抽列。",
+)
+def op_stft(
+    x0,
+    x1,
+    x2,
+    ts_us=None,
+    sample_rate=None,
+    window="hann",
+    window_length=256,
+    noverlap=128,
+    min_fs=None,
+    max_frames=256,
+    **kw,
+):
+    """上游 DataPlotSpec（"Power Spectral Density" 三张热图）的口径：
+
+    \`scipy.signal.spectrogram(x, fs, window='hann', nperseg=256, noverlap=128,
+    scaling='density')\`（默认 mode='psd'、detrend='constant'）逐轴计算后 PSD 相加，
+    \`10*log10\` 成 dB，-inf 换全图最小有限值。fs < min_fs（上游 100Hz）不画。
+    帧抽稀对应上游按 plot_width 抽列（等比间隔，保首帧）。
+    """
+    import numpy as np
+
+    arrs = []
+    for seq in (x0, x1, x2):
+        if seq is None:
+            return None, None, None
+        arrs.append(_finite(seq))
+    n = min(a.size for a in arrs)
+    if n < 2:
+        return None, None, None
+    fs = float(sample_rate) if sample_rate is not None else _infer_fs(ts_us, n)
+    if fs is None or not np.isfinite(fs) or fs <= 0:
+        return None, None, None
+    if min_fs is not None and fs < float(min_fs):
+        return None, None, None
+
+    nperseg = int(window_length)
+    if nperseg < 2:
+        return None, None, None
+    if n < nperseg:  # 不学 scipy 自动降窗：窗长是口径的一部分，降了出来的谱没法跟别的日志对看
+        return None, None, None
+    hop = nperseg - int(noverlap)
+    if hop < 1:
+        return None, None, None
+    frames = 1 + (n - nperseg) // hop
+
+    if str(window) == "none":
+        w = np.ones(nperseg)
+    else:  # 周期 hann（scipy 'hann' 口径），不是 np.hanning 的对称窗
+        w = 0.5 - 0.5 * np.cos(2.0 * np.pi * np.arange(nperseg) / nperseg)
+    wsum = float(np.sum(w**2))
+    scale = 1.0 / max(fs * wsum, 1e-12)
+
+    psd_sum = None
+    for a in arrs:
+        psd = np.empty((frames, nperseg // 2 + 1), dtype=float)
+        for k in range(frames):
+            seg = a[k * hop : k * hop + nperseg]
+            seg = seg - float(seg.mean())  # detrend='constant'：每帧各自去均值（与整段去直流不同）
+            spec = np.abs(np.fft.rfft(seg * w)) ** 2
+            spec[1:-1] *= 2.0  # 单边谱倍增（首尾 bin 除外，scipy 同款）
+            psd[k] = spec * scale
+        if psd_sum is None:
+            psd_sum = psd
+        else:
+            psd_sum = psd_sum + psd
+    # 列抽稀在 dB 之后做不省事（-inf 替换要全图口径），先 dB 再抽行
+    S = 10.0 * np.log10(psd_sum)  # psd_sum ≥ 0；全静默帧 PSD=0 → -inf
+    finite = S[np.isfinite(S)]
+    if finite.size < S.size:  # 换全图最小有限值（上游处理：不能让 -inf 拉爆色标范围）
+        floor = float(finite.min()) if finite.size else 0.0
+        S[~np.isfinite(S)] = floor
+    if int(max_frames) > 0 and frames > int(max_frames):
+        step = int(np.ceil(frames / float(max_frames)))
+        S = S[::step]
+        frame_idx = np.arange(0, frames, step)
+    else:
+        frame_idx = np.arange(frames)
+    f = np.fft.rfftfreq(nperseg, d=1.0 / fs)
+    t = (frame_idx * hop + nperseg / 2.0) / fs  # 帧中心相对首样本的秒数
+    return f, t, np.asarray(S).T  # 转成 [频率][时间]：一行一个频点，heatmap 的 z 直接可用
 
 
 # ─────────────────────────── 复合算子：整段分析（多入多出）───────────────────────────
@@ -5039,8 +5158,10 @@ class _ComputeRefs(ast.NodeTransformer):
 
     def visit_Name(self, node):
         """ALL_CAPS 内置变量 → _cfg("NAME") 调用（不在 env 声明过的才转）。
-        小写/混名保持原样，算 compute 变量。"""
-        if re.match(r"^[A-Z][A-Z0-9_]*$", node.id) and node.id not in self.env_keys:
+        小写/混名保持原样，算 compute 变量。**只转 Load 上下文**：Store 是赋值目标
+        （在声明变量），转了会得到「函数调用当赋值目标」的语法错误——stft 的
+        三输出 \`f, t, S = stft(...)\` 里的 S 踩过（构建期合法、运行期编译炸）。"""
+        if isinstance(node.ctx, ast.Load) and re.match(r"^[A-Z][A-Z0-9_]*$", node.id) and node.id not in self.env_keys:
             return ast.copy_location(
                 ast.Call(
                     func=ast.Name(id="_cfg", ctx=ast.Load()),
@@ -5849,11 +5970,89 @@ def np_spectrum(request_json, max_bins=None):
             )
             return
     fs, fs_source = _spectrum_fs_meta(req.get("compute"), inferred_fs)
+    vlines, vlines_notes = _resolve_spectrum_vlines(req.get("vlines"))
     __result = json.dumps(
         {
             "f": f_axis,
             "series": series,
             "fullCount": n,
+            "fs": fs,
+            "fsSource": fs_source,
+            "vlines": vlines,
+            "warnings": (take_notes() if take_notes else []) + vlines_notes,
+        },
+        ensure_ascii=False,
+    )
+
+
+# ============ np_stft：时频谱热图（x 时间、y 频率、值 dB）============
+# 第三条取数通道，形状介于 np_series 与 np_spectrum 之间：x 是时间（秒）、y 是频率（Hz），
+# 但两条轴的长度都不跟任何时间戳序列走，数据本体是一个 [频率][时间] 的 dB 矩阵——
+# 所以不复用 np_series（强制序列长度 = 时间戳长度）也不复用 np_spectrum（没有第二条谱线）。
+# request 带 freq/times/z 三个变量名（构建期从 \`f, t, S = stft(...)\` 的左值里取）。
+def np_stft(request_json):
+    global __result
+    req = json.loads(request_json)
+    take_notes = getattr(provider, "take_inst_notes", None)
+    if take_notes:
+        take_notes()
+    inst = int(req.get("instance") or 0)
+    freq_name = req.get("freq")
+    times_name = req.get("times")
+    z_name = req.get("z")
+    if not (freq_name and times_name and z_name):
+        __result = json.dumps({"error": "这张热图没有声明频率轴/时间轴/矩阵变量（freq/times/z 缺失）"}, ensure_ascii=False)
+        return
+
+    env = _rule_env()
+    if req.get("compute"):
+
+        def panel_ref(*args, **kwargs):
+            return _pick_ref(*args, instance=inst, **kwargs)[0]
+
+        try:
+            for stmt in req["compute"]:
+                _eval_compute(stmt, env, ref_fn=panel_ref)
+        except Exception as exc:
+            __result = json.dumps({"error": "热图的换算节点算不出来：%s" % exc}, ensure_ascii=False)
+            return
+
+    # 采样率自推与频谱同一条链：compute 里 stft(...) 没写 sample_rate 时，从命中话题的
+    # timestamp 推 median 间隔倒数，注回语句末尾重算（详见 _inject_spectrum_fs）。
+    inferred_fs = _inject_spectrum_fs(req, env, inst)
+
+    fv = env.get(freq_name)
+    tv = env.get(times_name)
+    zv = env.get(z_name)
+    if fv is None or tv is None or zv is None:
+        __result = json.dumps(
+            {
+                "error": "取不到热图数据（compute 里 stft(...) 没算出来——常见原因：样本数不够一个窗长，"
+                "或采样率低于预设声明的 min_fs 门槛）"
+            },
+            ensure_ascii=False,
+        )
+        return
+    f_axis = np.asarray(fv, dtype=float)
+    t_axis = np.asarray(tv, dtype=float)
+    Z = np.asarray(zv, dtype=float)
+    if Z.ndim != 2 or Z.shape[0] != f_axis.size or Z.shape[1] != t_axis.size:
+        __result = json.dumps(
+            {
+                "error": "热图矩阵形状和轴对不上（矩阵 %s，频率轴 %d 点、时间轴 %d 点），"
+                "检查 compute 里 stft(...) 的输出是否配对" % (Z.shape, f_axis.size, t_axis.size)
+            },
+            ensure_ascii=False,
+        )
+        return
+    z_rows = [[_clean(x) for x in row] for row in Z]
+    fs, fs_source = _spectrum_fs_meta(req.get("compute"), inferred_fs)
+    __result = json.dumps(
+        {
+            "f": [_clean(x) for x in f_axis],
+            "t": [_clean(x) for x in t_axis],
+            "z": z_rows,
+            "fullCount": int(t_axis.size),
             "fs": fs,
             "fsSource": fs_source,
             "warnings": take_notes() if take_notes else [],
@@ -5862,11 +6061,49 @@ def np_spectrum(request_json, max_bins=None):
     )
 
 
+def _resolve_spectrum_vlines(spec):
+    """把预设里的竖线声明解成 (Hz, label) 列表，附解析说明。
+
+    两种给法：\`value\` 字面量直接用；\`param\` 是参数名——滤波器截止频率各机架不同，
+    构建期只知道名字，这里查 initial_parameters 解。解不出来的线**消失**并留一句说明，
+    绝不画到猜的频率上（一条错位的标线比没有更误导）。
+    """
+    out = []
+    notes = []
+    if not spec:
+        return out, notes
+    params_fn = getattr(provider, "get_initial_parameters", None)
+    params = params_fn() if params_fn else {}
+    for item in spec:
+        if not isinstance(item, dict) or not item.get("label"):
+            continue
+        if item.get("param") is not None:
+            name = str(item["param"])
+            raw = (params or {}).get(name)
+            try:
+                f = float(raw) if raw is not None and str(raw).strip() != "" else None
+            except (TypeError, ValueError):
+                f = None
+            if f is None or f <= 0:
+                notes.append("参数 %s 没取到（或不是正数），标线「%s」没画" % (name, item["label"]))
+                continue
+            out.append({"f": f, "label": item["label"]})
+        else:
+            try:
+                f = float(item.get("value"))
+            except (TypeError, ValueError):
+                continue
+            if f > 0:
+                out.append({"f": f, "label": item["label"]})
+    return out, notes
+
+
 def _spectrum_stmt_fs(stmts):
-    """扫 compute 里的 \`spectrum(...)\` 调用 → \`{"explicit": [fs...], "inferred": [stmt...]}\`。
+    """扫 compute 里的 \`spectrum(...)\` / \`stft(...)\` 调用 → \`{"explicit": [fs...], "inferred": [...]}\`。
 
     \`explicit\`：语句里写了 \`sample_rate=<字面量>\`（构建期只允许字面量）。\`inferred\`：没写，
-    需要运行期补采样率——把那些语句原文留给 \`_inject_spectrum_fs\` 重算。
+    需要运行期补采样率——元素是 \`{"fn": 调用名, "stmt": 语句原文}\`，留给 \`_inject_spectrum_fs\`
+    重算（谱类算子都拿不到时间戳，fs 只能由引擎从命中话题的 timestamp 推）。
     """
     explicit = []
     inferred = []
@@ -5876,14 +6113,14 @@ def _spectrum_stmt_fs(stmts):
         except SyntaxError:
             continue
         for node in ast.walk(tree):
-            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "spectrum"):
+            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in ("spectrum", "stft")):
                 continue
             fs = None
             for kw in node.keywords:
                 if kw.arg == "sample_rate" and isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, (int, float)):
                     fs = float(kw.value.value)
             if fs is None:
-                inferred.append(stmt)
+                inferred.append({"fn": node.func.id, "stmt": stmt})
             else:
                 explicit.append(fs)
     return {"explicit": explicit, "inferred": inferred}
@@ -5905,8 +6142,8 @@ def _infer_topic_fs(bare, inst):
     return 1e6 / float(np.median(d))
 
 
-def _append_spectrum_kwarg(stmt, key, value):
-    """在 \`spectrum(...)\` 的实参表**末尾**追加一个关键字实参，返回改写后的语句（失败返 None）。
+def _append_spectrum_kwarg(stmt, key, value, fn="spectrum"):
+    """在 \`fn(...)\` 的实参表**末尾**追加一个关键字实参，返回改写后的语句（失败返 None）。
 
     \`spectrum(gx, norm="amplitude")\` → \`spectrum(gx, norm="amplitude", sample_rate=204.58?)\`。
     关键字实参必须排在所有位置实参之后，插到开头会得到 \`spectrum(sample_rate=…, gx, …)\`——
@@ -5914,7 +6151,7 @@ def _append_spectrum_kwarg(stmt, key, value):
     定位靠字符串扫描而不是 AST 重写：语句原文在构建期已被编译过一次，这里只做最小改动，
     重写回去还会引入 unparse 的格式化差异（引号、括号），反而更容易出问题。
     """
-    idx = stmt.find("spectrum(")
+    idx = stmt.find("%s(" % fn)
     if idx < 0:
         return None
     open_paren = idx + len("spectrum(")
@@ -5965,8 +6202,8 @@ def _inject_spectrum_fs(req, env, inst):
     if not fs or not np.isfinite(fs) or fs <= 0:
         return None
     ok = False
-    for stmt in info["inferred"]:
-        injected = _append_spectrum_kwarg(stmt, "sample_rate", float(fs))
+    for entry in info["inferred"]:
+        injected = _append_spectrum_kwarg(entry["stmt"], "sample_rate", float(fs), fn=entry["fn"])
         if injected is None:
             continue
         try:

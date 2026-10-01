@@ -1,0 +1,24 @@
+id: motor-rpm
+title: Motor RPM
+description: >
+  电调转速（esc_status.esc_rpm，每个电调一条线）。日志里没有 esc_status 话题时
+  这张图自动隐藏；缺哪个 ESC 下标就少哪条线。
+order: 24
+condition:
+  message: [esc_status]
+output:
+  - container: axes
+    title: Motor RPM
+    ylabel: rpm
+    children:
+      - mode: TimeSeries
+        ydata:
+          - esc_status.esc[0].esc_rpm
+          - esc_status.esc[1].esc_rpm
+          - esc_status.esc[2].esc_rpm
+          - esc_status.esc[3].esc_rpm
+          - esc_status.esc[4].esc_rpm
+          - esc_status.esc[5].esc_rpm
+          - esc_status.esc[6].esc_rpm
+          - esc_status.esc[7].esc_rpm
+        label: ["ESC 0", "ESC 1", "ESC 2", "ESC 3", "ESC 4", "ESC 5", "ESC 6", "ESC 7"]

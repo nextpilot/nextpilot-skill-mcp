@@ -31,6 +31,7 @@ import type {
     Severity,
     SeriesResponse,
     SpectrumResponse,
+    StftResponse,
     TopicManifest,
 } from "@/lib/types";
 import type { SeriesRequest } from "@/lib/chart-presets";
@@ -97,6 +98,7 @@ export function LogReport({
     info,
     requestSeries,
     requestSpectrum,
+    requestStft,
     loadTrack,
     onRestore,
     explaining,
@@ -115,6 +117,8 @@ export function LogReport({
     requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
     /** 取频谱图（与 requestSeries 平行的第二条通道，返回形状不同） */
     requestSpectrum: (req: SeriesRequest) => Promise<SpectrumResponse>;
+    /** 取时频热图（第三条通道：np_stft，[频率][时间] 的 dB 矩阵） */
+    requestStft: (req: SeriesRequest) => Promise<StftResponse>;
     /** 取 GPS 轨迹（存档优先，否则问 Worker） */
     loadTrack: () => Promise<TrackData>;
     /** 「重新选择该 .ulg 文件」：打开文件选择框，选完就地重解析，把缺的图表/轨迹补齐
@@ -264,6 +268,7 @@ export function LogReport({
                         phases={info.phases}
                         requestSeries={requestSeries}
                         requestSpectrum={requestSpectrum}
+                        requestStft={requestStft}
                         notes={report.instanceNotes ?? null}
                     />
                 )}

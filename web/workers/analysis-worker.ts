@@ -56,6 +56,13 @@ export type WorkerInMessage =
           /** 频谱取数声明：与 SeriesRequest 同形，额外带 freq（频率轴变量名）+ kind:"spectrum" */
           request: SeriesRequest;
           logId: string;
+      }
+    | {
+          type: "stft";
+          reqId: string;
+          /** 热图取数声明：与 SeriesRequest 同形，额外带 freq/times/z（stft 的三个输出变量名）+ kind:"stft" */
+          request: SeriesRequest;
+          logId: string;
       };
 
 export type WorkerOutMessage =
@@ -73,6 +80,7 @@ export type WorkerOutMessage =
       }
     | { type: "series"; reqId: string; data: unknown }
     | { type: "spectrum"; reqId: string; data: unknown }
+    | { type: "stft"; reqId: string; data: unknown }
     | { type: "track"; reqId: string; data: unknown }
     | { type: "error"; message: string };
 
@@ -407,6 +415,28 @@ async function handleMessage(msg: WorkerInMessage): Promise<void> {
             } catch (err) {
                 post({
                     type: "spectrum",
+                    reqId: msg.reqId,
+                    data: { error: err instanceof Error ? err.message : String(err) },
+                });
+            }
+            return;
+        }
+
+        if (msg.type === "stft") {
+            try {
+                // 与 series 同一道闸门：没装日志时直接跑只会抛 NameError，装的是别的日志会静默取错
+                const why = logNotLoadedReason(pyodide, msg.logId);
+                if (why) {
+                    post({ type: "stft", reqId: msg.reqId, data: { error: why } });
+                    return;
+                }
+                // 热图是第三条取数通道（x 时间、y 频率、值 dB），引擎侧走 np_stft
+                const code = `np_stft(${JSON.stringify(JSON.stringify(msg.request))})`;
+                const data = await runJson(pyodide, code);
+                post({ type: "stft", reqId: msg.reqId, data });
+            } catch (err) {
+                post({
+                    type: "stft",
                     reqId: msg.reqId,
                     data: { error: err instanceof Error ? err.message : String(err) },
                 });

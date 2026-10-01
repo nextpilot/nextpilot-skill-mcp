@@ -1,0 +1,23 @@
+id: spectrogram-angular-acceleration
+title: Angular acceleration Power Spectral Density
+description: >
+  角加速度三轴的时频热图（上游 DataPlotSpec 口径：hann 256/128、帧内去均值、三轴 PSD
+  求和、10*log10 dB、fs<100Hz 不画）。角加速度比角速度对高频更敏感，是看控制链路
+  噪声/陷波器效果最直接的量。
+order: 48
+condition:
+  message: [vehicle_angular_acceleration]
+compute:
+  - jx = vehicle_angular_acceleration.xyz[0]
+  - jy = vehicle_angular_acceleration.xyz[1]
+  - jz = vehicle_angular_acceleration.xyz[2]
+  - f, t, S = stft(jx, jy, jz, min_fs=100)
+output:
+  - container: spectrogram
+    title: Angular acceleration Power Spectral Density
+    ylabel: Hz
+    xlabel: s
+    children:
+      - mode: stft
+        z: S
+        label: ["roll accel", "pitch accel", "yaw accel"]

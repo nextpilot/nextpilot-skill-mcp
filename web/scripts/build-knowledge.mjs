@@ -879,7 +879,7 @@ function compileAxes(out, where, declaredVars, refs) {
     };
 }
 
-// `container: spectrogram` → 一张频谱图（x 轴 = 频率 Hz，y 轴 = 幅度）。
+// `container: spectrum` → 一张频谱图（x 轴 = 频率 Hz，y 轴 = 幅度）。
 // 与 `axes` 的取舍：频率轴由算子给（不是时间轴），所以 **不做时间轴联动、不画阶段底色**，
 // 也不收 hlines / flipx / flipy / range（频段选择改由 `fmax` 表达）。
 // 一条 child 的 ydata **必须全是 `compute` 算出来的变量**（`spectrum(...)` 的输出）：
@@ -908,20 +908,50 @@ function spectrumFreqMap(compute, where) {
     return map;
 }
 
-function compileSpectrogram(out, where, declaredVars, refs, freqMap) {
+function stftVarMap(compute, where) {
+    // 矩阵变量名 → {freq, times}。约定 `stft(...)` 的三个输出是 (频率轴, 时间轴, 矩阵)。
+    // 热图 yml 里只点名矩阵变量，freq/times 由这里从左值反查——单一事实来源，配错即编译失败。
+    const map = new Map();
+    for (const stmt of compute) {
+        let parsed;
+        try {
+            parsed = parseCompute(stmt);
+        } catch {
+            continue;
+        }
+        if (parsed.value?.k !== "call" || parsed.value.fn !== "stft") continue;
+        if (parsed.targets.length !== 3) {
+            throw new Error(
+                `${where}: stft(...) 要接三个变量（频率轴, 时间轴, 矩阵），如 \`f, t, S = stft(gx, gy, gz)\`——` +
+                    `实际接了 ${parsed.targets.length} 个`,
+            );
+        }
+        map.set(parsed.targets[2], { freq: parsed.targets[0], times: parsed.targets[1] });
+    }
+    return map;
+}
+
+function compileSpectrum(out, where, declaredVars, refs, freqMap) {
     const switches = containerSwitches(out, where);
-    if (switches.hlines) throw new Error(`${where}: spectrogram 不接受 hlines（频率图上没有水平门限线这回事）`);
-    if (switches.flipx || switches.flipy) throw new Error(`${where}: spectrogram 不接受 flipx / flipy`);
+    if (switches.hlines) throw new Error(`${where}: spectrum 不接受 hlines（频率图上没有水平门限线这回事）`);
+    if (switches.flipx || switches.flipy) throw new Error(`${where}: spectrum 不接受 flipx / flipy`);
     if (switches.range) {
-        throw new Error(`${where}: spectrogram 不接受 range（频段上限请用 fmax；两轴都按数据范围自动）`);
+        throw new Error(`${where}: spectrum 不接受 range（频段上限请用 fmax；两轴都按数据范围自动）`);
     }
     if (typeof out.ylabel !== "string" || !out.ylabel.trim()) {
-        throw new Error(`${where}: container: spectrogram 必须有 ylabel（幅度轴标签，如 幅度 / deg/s）`);
+        throw new Error(`${where}: container: spectrum 必须有 ylabel（幅度轴标签，如 幅度 / deg/s）`);
     }
     let fmax = null;
     if (out.fmax !== undefined) {
         fmax = Number(out.fmax);
         if (!Number.isFinite(fmax) || fmax <= 0) throw new Error(`${where}: fmax 要是一个正数（关注频段上限，Hz）`);
+    }
+    // y 轴上限（上游 Range1d(0, 0.01) 的等价物：把大幅低频段压掉，小信号才看得清）。只收上限，
+    // 下限恒为 0（幅度谱没有负值）；不写 = 按数据自动。
+    let ymax = null;
+    if (out.ymax !== undefined) {
+        ymax = Number(out.ymax);
+        if (!Number.isFinite(ymax) || ymax <= 0) throw new Error(`${where}: ymax 要是一个正数（幅度轴上限）`);
     }
     if (!Array.isArray(out.children) || out.children.length === 0) {
         throw new Error(`${where}: children 必须是非空数组（这张频谱图画哪几条谱线）`);
@@ -929,9 +959,7 @@ function compileSpectrogram(out, where, declaredVars, refs, freqMap) {
     const children = out.children.map((child, ci) => {
         const cwhere = `${where} 第 ${ci + 1} 条 child`;
         if (child.mode !== "spectrum") {
-            throw new Error(
-                `${cwhere}: spectrogram 的 child mode 只能是 spectrum（实际 ${JSON.stringify(child.mode)}）`,
-            );
+            throw new Error(`${cwhere}: spectrum 的 child mode 只能是 spectrum（实际 ${JSON.stringify(child.mode)}）`);
         }
         const ydata = compileFieldList(child.ydata, cwhere, "ydata", declaredVars, refs);
         const freqs = [];
@@ -968,15 +996,88 @@ function compileSpectrogram(out, where, declaredVars, refs, freqMap) {
             }) ?? [];
         return { mode: "spectrum", xdata: null, ydata, freqs, labels, styles, colors };
     });
+    // 竖线（滤波器截止频率等标注线）。值两种给法：字面量（Hz）或参数名——参数是每份日志
+    // 运行期才知道的（IMU_GYRO_CUTOFF 各机架不同），构建期只能记名字，np_spectrum 去
+    // initial_parameters 里解；解不出来该线消失并在 warnings 里说明，不能画在错误的频率上。
+    const vlines = (Array.isArray(out.vlines) ? out.vlines : []).map((v, i) => {
+        const vwhere = `${where} vlines[${i}]`;
+        if (!v || typeof v !== "object") throw new Error(`${vwhere}: 要是 {value|param, label}`);
+        const label = typeof v.label === "string" && v.label.trim() ? v.label.trim() : null;
+        if (!label) throw new Error(`${vwhere}: 必须有 label（图上看不出一条黑线是干嘛的）`);
+        if (v.param !== undefined) {
+            if (typeof v.param !== "string" || !/^[A-Z][A-Z0-9_]*$/.test(v.param)) {
+                throw new Error(`${vwhere}: param 要是参数名（大写下划线，如 IMU_GYRO_CUTOFF）`);
+            }
+            return { param: v.param, label };
+        }
+        const f = Number(v.value);
+        if (!Number.isFinite(f) || f <= 0) throw new Error(`${vwhere}: value 要是正数（Hz），或改用 param 引用参数`);
+        return { value: f, label };
+    });
     return {
-        container: "spectrogram",
+        container: "spectrum",
         title: switches.title,
         legend: switches.legend,
         grid: switches.grid,
         fmax,
+        ymax,
+        vlines,
         ylabel: out.ylabel.trim(),
         xlabel: typeof out.xlabel === "string" && out.xlabel.trim() ? out.xlabel.trim() : "Hz",
         children,
+    };
+}
+
+// `container: spectrogram` → 2D 时频热图（上游 DataPlotSpec："Power Spectral Density" 三张）。
+// 与 spectrum 线图是两回事：x 轴是时间（秒）、y 轴是频率（Hz）、颜色是 dB——一图一矩阵，
+// 三轴 PSD 求和的语义决定了 children 只能有一条。两轴都按数据范围自动（时间不联动、
+// 不画阶段底色；y 到 fs/2 全谱），dB 强弱交给颜色，所以没有 fmax/ymax/vlines 这些开关。
+function compileSpectrogram(out, where, declaredVars, refs, stftMaps) {
+    const switches = containerSwitches(out, where);
+    if (switches.hlines) throw new Error(`${where}: spectrogram 不接受 hlines（dB 热图上没有水平门限线这回事）`);
+    if (switches.flipx || switches.flipy) throw new Error(`${where}: spectrogram 不接受 flipx / flipy`);
+    if (switches.range) {
+        throw new Error(`${where}: spectrogram 不接受 range（两轴按数据范围自动：x 是时间、y 是频率）`);
+    }
+    if (out.fmax !== undefined || out.ymax !== undefined) {
+        throw new Error(`${where}: spectrogram 不接受 fmax / ymax（频率轴到 fs/2 全谱，强弱交给颜色）`);
+    }
+    if (out.vlines !== undefined) {
+        throw new Error(`${where}: spectrogram 不接受 vlines（上游 PSD 热图没有竖线标注；截止频率的落点看 FFT 线图）`);
+    }
+    if (typeof out.ylabel !== "string" || !out.ylabel.trim()) {
+        throw new Error(`${where}: container: spectrogram 必须有 ylabel（频率轴标签，一般就是 Hz）`);
+    }
+    if (!Array.isArray(out.children) || out.children.length !== 1) {
+        throw new Error(`${where}: spectrogram 的 children 只能有一条（三轴 PSD 求和的语义就是一图一矩阵）`);
+    }
+    const child = out.children[0];
+    const cwhere = `${where} 的 child`;
+    if (child.mode !== "stft") {
+        throw new Error(`${cwhere}: spectrogram 的 child mode 只能是 stft（实际 ${JSON.stringify(child.mode)}）`);
+    }
+    if (typeof child.z !== "string" || !child.z.trim()) {
+        throw new Error(`${cwhere}: 必须有 z（stft(...) 算出来的矩阵变量名）`);
+    }
+    if (!stftMaps) {
+        throw new Error(`${cwhere}: compute 里没有 stft(...) 调用，热图没有数据来源`);
+    }
+    const axes = stftMaps.get(child.z);
+    if (!axes) {
+        throw new Error(
+            `${cwhere}: z 引用的 ${JSON.stringify(child.z)} 不是 stft(...) 的矩阵输出——要引用 ` +
+                `\`f, t, S = stft(...)\` 里的那个矩阵变量`,
+        );
+    }
+    const labels = parallelList(child.label, 3, cwhere, "label") ?? [];
+    return {
+        container: "spectrogram",
+        title: switches.title,
+        legend: false, // 热图没有图例这回事（一张矩阵一个色标）
+        grid: switches.grid,
+        ylabel: out.ylabel.trim(),
+        xlabel: typeof out.xlabel === "string" && out.xlabel.trim() ? out.xlabel.trim() : "s",
+        children: [{ mode: "stft", freq: axes.freq, times: axes.times, z: child.z, labels }],
     };
 }
 
@@ -1075,19 +1176,21 @@ function compilePreset(spec, where, vehicles) {
     }
     let map = null;
     const refs = [];
-    // 频谱的频率轴变量名从 compute 的 spectrum(...) 左值里取（详见 compileSpectrogram）
-    const freqMap = spec.output.some((o) => o.container === "spectrogram") ? spectrumFreqMap(compute, where) : null;
+    // 频谱/热图的轴变量名从 compute 的 spectrum(...) / stft(...) 左值里取（详见 compileSpectrum / compileSpectrogram）
+    const freqMap = spec.output.some((o) => o.container === "spectrum") ? spectrumFreqMap(compute, where) : null;
+    const stftMaps = spec.output.some((o) => o.container === "spectrogram") ? stftVarMap(compute, where) : null;
     const outputs = spec.output.map((out, oi) => {
         const owhere = `${where} 第 ${oi + 1} 个 container`;
         if (out.container === "axes") return compileAxes(out, owhere, declaredVars, refs);
-        if (out.container === "spectrogram") return compileSpectrogram(out, owhere, declaredVars, refs, freqMap);
+        if (out.container === "spectrum") return compileSpectrum(out, owhere, declaredVars, refs, freqMap);
+        if (out.container === "spectrogram") return compileSpectrogram(out, owhere, declaredVars, refs, stftMaps);
         if (out.container === "map") {
             if (map) throw new Error(`${where}: 一份预设里最多一个 container: map`);
             map = compileMap(out, owhere, declaredVars, refs);
             return map;
         }
         throw new Error(
-            `${owhere}: container 只能是 axes / spectrogram / map（实际 ${JSON.stringify(out.container)}）`,
+            `${owhere}: container 只能是 axes / spectrum / spectrogram / map（实际 ${JSON.stringify(out.container)}）`,
         );
     });
     const plot = {

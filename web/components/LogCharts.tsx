@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, ChevronDown, Loader2, LineChart, Maximize2, RotateCcw, Share2, X } from "lucide-react";
-import type { FlightPhase, SeriesResponse, SpectrumResponse, TopicManifest } from "@/lib/types";
+import type { FlightPhase, SeriesResponse, SpectrumResponse, StftResponse, TopicManifest } from "@/lib/types";
 import {
     CHART_PRESETS,
     SERIES_COLORS_DARK,
@@ -51,6 +51,7 @@ export function LogCharts({
     phases,
     requestSeries,
     requestSpectrum,
+    requestStft,
     notes,
 }: {
     /** 实时分析：用 manifest 解析面板；打开历史：manifest 为空、改用下面两项 */
@@ -61,6 +62,8 @@ export function LogCharts({
     requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
     /** 取频谱图：与 requestSeries 平行的第二条通道（返回形状不同，不合并） */
     requestSpectrum: (req: SeriesRequest) => Promise<SpectrumResponse>;
+    /** 取时频热图：第三条通道（np_stft，返回 [频率][时间] 的 dB 矩阵） */
+    requestStft: (req: SeriesRequest) => Promise<StftResponse>;
     /** 报告级的取数提示（规则侧的实例越界等），与图上的提示一起进告警栏 */
     notes?: string[] | null;
 }) {
@@ -99,8 +102,10 @@ export function LogCharts({
     }, [notes, presets, runtimeWarnings]);
 
     // 没有飞行阶段：时间序列图依赖阶段底色，没它就整块不画（原来直接早退整页）。
-    // 但频谱图不看阶段（x 轴是频率），混在这种日志里不该被一起挡掉——只要有频谱面板就继续渲染。
-    const hasSpectrum = presets.some((x) => (x.panels ?? []).some((p) => p.spectrum === true));
+    // 但频谱/热图不看阶段（频谱 x 是频率、热图两轴自动），混在这种日志里不该被一起挡掉——只要有这类面板就继续渲染。
+    const hasSpectrum = presets.some((x) =>
+        (x.panels ?? []).some((p) => p.spectrum === true || p.spectrogram === true),
+    );
     if (phases.length === 0 && !hasSpectrum) {
         return (
             <p className="text-sm text-muted">该日志未记录飞行模式（vehicle_status.nav_state），无法绘制阶段背景。</p>
@@ -145,6 +150,7 @@ export function LogCharts({
                             phases={phases}
                             requestSeries={requestSeries}
                             requestSpectrum={requestSpectrum}
+                            requestStft={requestStft}
                             storedSeries={storedSeries ?? null}
                             onWarnings={pushWarnings}
                         />
@@ -163,6 +169,7 @@ function PresetCard({
     phases,
     requestSeries,
     requestSpectrum,
+    requestStft,
     storedSeries,
     onWarnings,
 }: {
@@ -173,6 +180,7 @@ function PresetCard({
     phases: FlightPhase[];
     requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
     requestSpectrum: (req: SeriesRequest) => Promise<SpectrumResponse>;
+    requestStft: (req: SeriesRequest) => Promise<StftResponse>;
     storedSeries: StoredPlotSeries | null;
     onWarnings: (ws: string[]) => void;
 }) {
@@ -203,21 +211,23 @@ function PresetCard({
             </button>
             {open && (
                 <div>
-                    {xRange && panels.length > 1 && panels.some((p) => p.spectrum !== true) && (
-                        <div className="mb-3 flex items-center gap-2">
-                            <span className="text-xs text-muted">
-                                X 轴已同步：{xRange[0].toFixed(1)}s – {xRange[1].toFixed(1)}s
-                            </span>
-                            <button
-                                type="button"
-                                onClick={handleResetXRange}
-                                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-primary hover:bg-primary/10"
-                            >
-                                <RotateCcw className="h-3 w-3" />
-                                恢复
-                            </button>
-                        </div>
-                    )}
+                    {xRange &&
+                        panels.length > 1 &&
+                        panels.some((p) => p.spectrum !== true && p.spectrogram !== true) && (
+                            <div className="mb-3 flex items-center gap-2">
+                                <span className="text-xs text-muted">
+                                    X 轴已同步：{xRange[0].toFixed(1)}s – {xRange[1].toFixed(1)}s
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={handleResetXRange}
+                                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-primary hover:bg-primary/10"
+                                >
+                                    <RotateCcw className="h-3 w-3" />
+                                    恢复
+                                </button>
+                            </div>
+                        )}
                     <div className="space-y-5 pb-5">
                         {panels.map((panel, i) => (
                             <PanelChart
@@ -226,6 +236,7 @@ function PresetCard({
                                 phases={phases}
                                 requestSeries={requestSeries}
                                 requestSpectrum={requestSpectrum}
+                                requestStft={requestStft}
                                 storedSeries={storedSeries}
                                 seriesKey={`${id}#${i}`}
                                 groupKey={id}
@@ -246,6 +257,7 @@ function PanelChart({
     phases,
     requestSeries,
     requestSpectrum,
+    requestStft,
     storedSeries,
     seriesKey,
     groupKey,
@@ -257,6 +269,7 @@ function PanelChart({
     phases: FlightPhase[];
     requestSeries: (req: SeriesRequest) => Promise<SeriesResponse>;
     requestSpectrum: (req: SeriesRequest) => Promise<SpectrumResponse>;
+    requestStft: (req: SeriesRequest) => Promise<StftResponse>;
     /** 存档里的曲线：命中就直接画，不打扰 Worker（打开历史时无 Worker 可问） */
     storedSeries: StoredPlotSeries | null;
     /** `${presetId}#${面板序号}`，与落盘时的键一致 */
@@ -366,8 +379,9 @@ function PanelChart({
     // Apply external xRange changes to the plot
     useEffect(() => {
         if (state !== "done" || !elRef.current) return;
-        // 频谱不参与时间轴联动：外部的 xRange（别的图拖出来的）不往频谱图上套
-        if (panel.spectrum === true) return;
+        // 频谱（x 是频率）与热图（x 虽是时间但按铁律不联动）不参与时间轴同步：
+        // 外部的 xRange（别的图拖出来的）不往这两类图上套
+        if (panel.spectrum === true || panel.spectrogram === true) return;
         const el = elRef.current;
         const applyRange = async () => {
             try {
@@ -392,7 +406,7 @@ function PanelChart({
             }
         };
         void applyRange();
-    }, [xRange, state, panel.spectrum]);
+    }, [xRange, state, panel.spectrum, panel.spectrogram]);
 
     useEffect(() => {
         let cancelled = false;
@@ -403,23 +417,29 @@ function PanelChart({
         (async () => {
             try {
                 // 存档可能是旧版格式（`ydata` 是取数声明改版后才有的）：那种情况说清楚，
-                // 别让 Plotly 拿着半截请求去画
-                const stale = panel.requests.find((r) => !Array.isArray(r.ydata) || r.ydata.length === 0 || !r.series);
+                // 别让 Plotly 拿着半截请求去画。热图请求（kind:"stft"）的 ydata/series 合法为空——
+                // 它的数据本体是 freq/times/z 三个变量，不在这两项里。
+                const stale = panel.requests.find(
+                    (r) => r.kind !== "stft" && (!Array.isArray(r.ydata) || r.ydata.length === 0 || !r.series),
+                );
                 if (stale) {
                     setError("这份存档的曲线是旧版格式，重新选择该日志文件解析一次即可恢复");
                     setState("error");
                     return;
                 }
                 const stored = storedSeries?.[seriesKey];
-                // 频谱与时间序列是两条取数通道（返回形状不同），按面板判别位各走各的
+                // 三条取数通道（返回形状不同），按面板判别位各走各的
                 const isSpectrum = panel.spectrum === true;
+                const isSpectrogram = panel.spectrogram === true;
                 const responses = await Promise.all(
                     panel.requests.map((r, i) =>
                         stored && stored[i]
                             ? Promise.resolve(stored[i])
-                            : isSpectrum
-                              ? requestSpectrum(r)
-                              : requestSeries(r),
+                            : isSpectrogram
+                              ? requestStft(r)
+                              : isSpectrum
+                                ? requestSpectrum(r)
+                                : requestSeries(r),
                     ),
                 );
                 if (cancelled) return;
@@ -430,7 +450,31 @@ function PanelChart({
                 const colors = isDark() ? SERIES_COLORS_DARK : SERIES_COLORS_LIGHT;
                 const traces: unknown[] = [];
                 let colorIdx = 0;
-                if (isSpectrum) {
+                if (isSpectrogram) {
+                    // 时频热图：z 是 [频率][时间] 的 dB 矩阵（行=频点、列=帧），x 时间、y 频率。
+                    // 上游 DataPlotSpec 用 Viridis256 色带 + 右侧 [dB] 色标；色标范围由数据定
+                    // （引擎已把 -inf 换成全图最小有限值，不会拉爆范围）。
+                    panel.requests.forEach((req, ri) => {
+                        const resp = responses[ri] as StftResponse | undefined;
+                        if (!resp || resp.error || !resp.f || !resp.t || !resp.z) return;
+                        traces.push({
+                            type: "heatmap",
+                            x: resp.t,
+                            y: resp.f,
+                            z: resp.z,
+                            colorscale: "Viridis",
+                            colorbar: {
+                                title: { text: "[dB]", side: "right" },
+                                thickness: 14,
+                                len: 0.9,
+                                tickfont: { size: 9, color: isDark() ? "#93a397" : "#5c665e" },
+                            },
+                            // plotly 的 hover 不认 label 数组，帧名带上三轴求和的口径说明
+                            hovertemplate: "t=%{x:.2f}s  f=%{y:.0f}Hz  %{z:.1f} dB<extra></extra>",
+                        });
+                        void req.series; // series 对热图无意义（构建期恒空），保持形状一致性
+                    });
+                } else if (isSpectrum) {
                     // 频谱：x 轴是频率（resp.f），y 轴是幅度（series[si].p）。与时间序列各写各的，
                     // 不复用 `const x = resp.x ?? resp.t`（那条是时间轴，频谱没有）
                     panel.requests.forEach((req, ri) => {
@@ -508,6 +552,39 @@ function PanelChart({
                         line: { color: h.color, width: 1, dash: "dash" },
                     }));
                 }
+                // 频谱的竖线标注（滤波器截止频率等）：xref 数据坐标（Hz），label 画在线旁。
+                // 与 hlines（水平门限，paper 坐标）不同轴不同向，各画各的。
+                if (isSpectrum && panel.vlines?.length) {
+                    const resolved = responses.flatMap((r) => (r as SpectrumResponse | undefined)?.vlines ?? []);
+                    if (resolved.length) {
+                        const baseShapes = Array.isArray(layout.shapes) ? layout.shapes : [];
+                        layout.shapes = [
+                            ...baseShapes,
+                            ...resolved.map((v) => ({
+                                type: "line",
+                                xref: "x",
+                                x0: v.f,
+                                x1: v.f,
+                                yref: "paper",
+                                y0: 0,
+                                y1: 1,
+                                line: { color: dark ? "#9ca3af" : "#374151", width: 1, dash: "dot" },
+                            })),
+                        ];
+                        layout.annotations = resolved.map((v) => ({
+                            xref: "x",
+                            x: v.f,
+                            yref: "paper",
+                            y: 1,
+                            text: v.label,
+                            showarrow: false,
+                            textangle: -90,
+                            yanchor: "top",
+                            xanchor: "left",
+                            font: { size: 9, color: dark ? "#9ca3af" : "#374151" },
+                        }));
+                    }
+                }
 
                 await Plotly.newPlot(el, traces, layout, {
                     responsive: true,
@@ -540,8 +617,8 @@ function PanelChart({
                 };
                 if (!cancelled)
                     gd.on?.("plotly_relayout", (eventData) => {
-                        // 频谱图的 x 轴是频率，绝不参与时间轴联动（用户明确纠正：只有时间序列图才 link 时间轴）
-                        if (isSpectrum) return;
+                        // 频谱的 x 轴是频率、热图虽是时间但按铁律不联动——只有时间序列图 link 时间轴
+                        if (isSpectrum || isSpectrogram) return;
                         if (ignoreNextRelayout.current) {
                             ignoreNextRelayout.current = false;
                             return;
@@ -573,7 +650,7 @@ function PanelChart({
                 .then((P) => P.purge(el))
                 .catch(() => {});
         };
-    }, [panel, phases, requestSeries, requestSpectrum, groupKey, onWarnings]);
+    }, [panel, phases, requestSeries, requestSpectrum, requestStft, groupKey, onWarnings]);
 
     return (
         <div className="w-full min-w-0">
@@ -681,8 +758,9 @@ function buildLayout(panel: PanelSpec, phases: FlightPhase[], dark: boolean): Re
     const plotBg = dark ? "#232e27" : "#eef1ee";
     const shapes: unknown[] = [];
     // 阶段背景带：用低透明度中性色，模式颜色由报告页顶部那条飞行阶段条承载。
-    // 频谱图的 x 轴是频率、不是时间，画阶段带就错位了——只给时间序列图加。
-    if (panel.spectrum !== true) {
+    // 只有时间序列图画：频谱的 x 轴是频率、热图是 xyplot 语义（用户明确纠正：
+    // 只有 timeserial 才 link/画阶段底色），往这两类图上画阶段带就错位了。
+    if (panel.spectrum !== true && panel.spectrogram !== true) {
         for (const p of phases) {
             shapes.push({
                 type: "rect",
@@ -730,6 +808,8 @@ function buildLayout(panel: PanelSpec, phases: FlightPhase[], dark: boolean): Re
     };
     if (panel.flipy) yaxis.autorange = "reversed";
     if (panel.range && panel.range.length === 4) yaxis.range = [panel.range[2], panel.range[3]];
+    // 频谱幅度轴上限（ymax）：压掉大幅低频段让小信号可见；下限恒 0（幅度谱无负值）
+    if (panel.spectrum === true && panel.ymax) yaxis.range = [0, panel.ymax];
     return {
         paper_bgcolor: "rgba(0,0,0,0)",
         plot_bgcolor: plotBg,

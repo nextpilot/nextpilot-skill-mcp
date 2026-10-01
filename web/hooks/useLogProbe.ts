@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { TopicManifest, SeriesResponse, SpectrumResponse } from "@/lib/types";
+import type { TopicManifest, SeriesResponse, SpectrumResponse, StftResponse } from "@/lib/types";
 import type { SeriesRequest } from "@/lib/chart-presets";
 import { hashLogBytes } from "@/lib/log-hash";
 import {
@@ -129,6 +129,29 @@ export function useLogProbe() {
         [logId],
     );
 
+    const requestStft = useCallback(
+        async (req: SeriesRequest): Promise<StftResponse> => {
+            const w = getSharedWorker();
+            if (!w) return { f: [], t: [], z: [], fullCount: 0, fs: 0, fsSource: "inferred", error: "Worker 不可用" };
+            if (!logId) return { f: [], t: [], z: [], fullCount: 0, fs: 0, fsSource: "inferred", error: "未解析日志" };
+
+            const reqId = String(++reqIdRef.current);
+            const promise = new Promise<unknown>((resolve) => {
+                pendingRef.current.set(reqId, resolve);
+            });
+
+            w.postMessage({ type: "stft", reqId, request: req, logId });
+
+            const raw = await promise;
+            const data = raw as StftResponse;
+            if (data.error) {
+                return { f: [], t: [], z: [], fullCount: 0, fs: 0, fsSource: "inferred", error: data.error };
+            }
+            return data;
+        },
+        [logId],
+    );
+
     const reset = useCallback(() => {
         setManifest(null);
         setLogId(null);
@@ -147,6 +170,7 @@ export function useLogProbe() {
         handleFile,
         requestSeries,
         requestSpectrum,
+        requestStft,
         reset,
     };
 }

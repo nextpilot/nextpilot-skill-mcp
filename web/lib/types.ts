@@ -229,6 +229,27 @@ export interface SpectrumResponse {
     fs: number;
     /** 采样率来源：explicit = YAML 写的；inferred = 由 timestamp 自推（界面要说明口径） */
     fsSource: "explicit" | "inferred";
+    /** 已解析的竖线标注（滤波器截止频率等）：param 引用由引擎解出实际 Hz；解不出的线直接不出现 */
+    vlines?: { f: number; label: string }[];
+    warnings?: string[];
+    error?: string;
+}
+
+/** np_stft() 的返回：时频热图的数据（x 时间、y 频率、值 dB）。
+ *  z 是 [频率][时间] 的二维矩阵（行 = 频点、列 = 帧），直接可喂 plotly heatmap。 */
+export interface StftResponse {
+    /** 频率轴，Hz，长度 = nperseg/2+1（0 到 fs/2） */
+    f: number[];
+    /** 帧中心时间轴，秒（相对首样本） */
+    t: number[];
+    /** dB 矩阵，z[频率][时间]；全静默帧的 -inf 已由引擎换成全图最小有限值 */
+    z: (number | null)[][];
+    /** 矩阵的帧数（抽稀后） */
+    fullCount: number;
+    /** 实际使用的采样率（Hz）：显式给的或从 timestamp 自推的 */
+    fs: number;
+    /** 采样率来源：explicit = YAML 写的；inferred = 由 timestamp 自推 */
+    fsSource: "explicit" | "inferred";
     warnings?: string[];
     error?: string;
 }

@@ -244,14 +244,15 @@ const REF_KEYS = new Set(["alias", "unit"]);
  * 两个下标位置不同、含义不同，别混。
  */
 const FIELD_REF =
-    /^[A-Za-z][A-Za-z0-9_]*(\[[-]?\d*(?::-?\d*)?\])?\.(?:[A-Za-z][A-Za-z0-9_]*\.)*[A-Za-z][A-Za-z0-9_]*(\[\d+(?:,\d+)?\])?$/;
+    /^[A-Za-z][A-Za-z0-9_]*(\[[-]?\d*(?::-?\d*)?\])?\.(?:[A-Za-z][A-Za-z0-9_]*(?:\[\d+(?:,\d+)?\])?\.)*[A-Za-z][A-Za-z0-9_]*(?:\[\d+(?:,\d+)?\])?$/;
 
 /** 拆开字段引用 → {topic, inst, field}（inst 是 int 或 slice；不写 = 第 0 个实例） */
 export function splitFieldRef(s) {
     // 大小写都收（与 TOPIC_NAME 同理）：`ATT.timestamp`（APM）与 `vehicle_attitude.timestamp`（PX4）同一件事
     const NAME = "[A-Za-z][A-Za-z0-9_]*";
+    const ELEM = "(?:\\[\\d+(?:,\\d+)?\\])?";
     const m = new RegExp(
-        `^(${NAME})(?:\\[([-]?\\d*(?::-?\\d*)?)\\])?\\.((?:${NAME}\\.)*${NAME})(?:\\[(\\d+(?:,\\d+)?)\\])?$`,
+        `^(${NAME})(?:\\[([-]?\\d*(?::-?\\d*)?)\\])?\\.((?:${NAME}${ELEM}\\.)*${NAME})(?:\\[(\\d+(?:,\\d+)?)\\])?$`,
     ).exec(String(s).trim());
     if (!m) return null;
     return {
@@ -530,12 +531,18 @@ function Parser(src, toks) {
             if (at("punct", ".")) {
                 eat("punct", ".");
                 const f = eat("name");
-                if (at("punct", ".")) fail("字段引用只能有一段点号（topic.field）", src, peek().pos);
                 if (at("punct", "(")) {
                     return call({ v: t.v + "." + f.v, pos: t.pos });
                 }
                 let node = { k: "attr", topic: t.v, field: f.v, pos: t.pos };
                 while (at("punct", "[")) node = subscript(node);
+                // 下标后可继续 .field（esc_status.esc[0].esc_rpm）：与下面 name[...] 分支同款循环
+                while (at("punct", ".")) {
+                    eat("punct", ".");
+                    const f2 = eat("name");
+                    node = { k: "attr", topic: node, field: f2.v, pos: node.pos };
+                    while (at("punct", "[")) node = subscript(node);
+                }
                 return node;
             }
             if (at("punct", "[")) {
@@ -693,7 +700,12 @@ function infer(node, ctx) {
             if (typeof node.topic === "string") {
                 const full = `${node.topic}.${node.field}`;
                 if (!FIELD_REF.test(full)) {
-                    fail(`字段引用 ${full} 的写法不对：必须是 topic.field 两段小写名字`, ctx.src, node.pos);
+                    fail(
+                        `字段引用 ${full} 的写法不对：topic 与每段字段都得是小写名字；` +
+                            `实例下标只跟在 topic 后（topic[N].field），字段段只许末尾带元素下标（field[i]）或嵌套段各带（esc[0].esc_rpm）`,
+                        ctx.src,
+                        node.pos,
+                    );
                 }
             } else {
                 // topic 是子表达式（如 estimator_status[:].field 中的 sub 节点）
@@ -1136,10 +1148,15 @@ export function checkFieldItem(src, opts = {}) {
     }
     const node = nodes[0];
     if (node.k === "attr") {
-        const topicName = typeof node.topic === "string" ? node.topic : collectTopicName(node.topic);
-        if (topicName) {
-            const instSuffix = node.topic.k === "sub" ? reconstructInstSuffix(node.topic.slice) : "";
-            return { kind: "field", fields: [`${topicName}${instSuffix}.${node.field}`] };
+        // topic 前缀是 name / sub(name)[inst] / 嵌套 attr（esc_status.esc[0].esc_rpm）的递归链：
+        // 中间段是数组字段（可带自己的元素下标），重建出完整引用串交给 FIELD_REF 校验
+        const prefix = collectRefPrefix(node.topic);
+        if (prefix) {
+            const full = `${prefix}.${node.field}`;
+            if (!FIELD_REF.test(full)) {
+                fail(`不是合法的字段引用：${full}（topic[实例].字段[下标]，中间段可带元素下标）`, text, node.pos);
+            }
+            return { kind: "field", fields: [full] };
         }
     }
     if (node.k === "call" && node.fn === "_ref") {
@@ -1171,14 +1188,16 @@ export function checkFieldItem(src, opts = {}) {
         }
         return { kind: "var", name: node.name };
     }
-    // 下标节点：topic[1].field[0] 这类带实例/索引的裸字段引用。
-    // v 是 attr 节点（sub 下标在 attr 外层：vehicle_torque_setpoint[1].xyz[0]
-    // → sub(v=attr(topic=sub(name="vehicle_torque_setpoint")[1], field="xyz"))[0]）
-    if (node.k === "sub") {
-        const attrNode = node.v?.k === "attr" ? node.v : null;
-        if (attrNode) {
-            const topicName = typeof attrNode.topic === "string" ? attrNode.topic : collectTopicName(attrNode.topic);
-            if (topicName) return { kind: "field", fields: [`${topicName}.${attrNode.field}`] };
+    // 下标节点：字段引用末尾再下元素下标（vehicle_torque_setpoint[1].xyz[0] 的 [0]、
+    // actuator_outputs[1].output[0]）。v 是 attr 节点，整条链完整重建——此前这里把
+    // 实例下标与元素下标全丢了（既有的静默取数错误，actuator-controls 的候选线踩过）。
+    if (node.k === "sub" && node.v?.k === "attr") {
+        const full = collectRefPrefix(node);
+        if (full) {
+            if (!FIELD_REF.test(full)) {
+                fail(`不是合法的字段引用：${full}（topic[实例].字段[下标]，中间段可带元素下标）`, text, node.pos);
+            }
+            return { kind: "field", fields: [full] };
         }
     }
     fail(
@@ -1189,11 +1208,25 @@ export function checkFieldItem(src, opts = {}) {
     );
 }
 
-/** 从 sub(name)[N] 链里提取 topic 名字（如 vehicle_torque_setpoint[1] → "vehicle_torque_setpoint"） */
-function collectTopicName(node) {
+/** 从 name / sub / attr 的嵌套链重建完整引用串：
+ *  `name("esc_status")` → "esc_status"；`sub(attr(...), [0])` → 前缀 + "[0]"；
+ *  `attr(topic=..., field="esc")` → 前缀 + ".esc"。链里出现其它表达式 → null。
+ *  （各级下标与中间字段段都保留，checkFieldItem 拿它拼取数串；重建后过 FIELD_REF 校验。） */
+function collectRefPrefix(node) {
     if (!node) return null;
+    // name.field 路径里 attr.topic 直接存的是字符串（{ k: "attr", topic: "esc_status", ... }）
+    if (typeof node === "string") return node;
     if (node.k === "name") return node.name;
-    if (node.k === "sub") return collectTopicName(node.v);
+    if (node.k === "sub") {
+        const base = collectRefPrefix(node.v);
+        if (base == null) return null;
+        return `${base}${reconstructInstSuffix(node.slice)}`;
+    }
+    if (node.k === "attr") {
+        const base = collectRefPrefix(node.topic);
+        if (base == null) return null;
+        return `${base}.${node.field}`;
+    }
     return null;
 }
 

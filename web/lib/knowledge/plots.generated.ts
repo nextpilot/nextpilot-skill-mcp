@@ -1544,7 +1544,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_torque_setpoint.xyz"
+                    "vehicle_torque_setpoint[1].xyz[0]"
                   ]
                 }
               ],
@@ -1561,7 +1561,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_torque_setpoint.xyz"
+                    "vehicle_torque_setpoint[1].xyz[1]"
                   ]
                 }
               ],
@@ -1578,7 +1578,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "vehicle_torque_setpoint.xyz"
+                    "vehicle_torque_setpoint[1].xyz[2]"
                   ]
                 }
               ],
@@ -1629,49 +1629,49 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_motors.control"
+                    "actuator_motors.control[0]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_motors.control"
+                    "actuator_motors.control[1]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_motors.control"
+                    "actuator_motors.control[2]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_motors.control"
+                    "actuator_motors.control[3]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_motors.control"
+                    "actuator_motors.control[4]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_motors.control"
+                    "actuator_motors.control[5]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_motors.control"
+                    "actuator_motors.control[6]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_motors.control"
+                    "actuator_motors.control[7]"
                   ]
                 }
               ],
@@ -1710,49 +1710,49 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_servos.control"
+                    "actuator_servos.control[0]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_servos.control"
+                    "actuator_servos.control[1]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_servos.control"
+                    "actuator_servos.control[2]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_servos.control"
+                    "actuator_servos.control[3]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_servos.control"
+                    "actuator_servos.control[4]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_servos.control"
+                    "actuator_servos.control[5]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_servos.control"
+                    "actuator_servos.control[6]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_servos.control"
+                    "actuator_servos.control[7]"
                   ]
                 }
               ],
@@ -1791,49 +1791,49 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs.output"
+                    "actuator_outputs.output[0]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs.output"
+                    "actuator_outputs.output[1]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs.output"
+                    "actuator_outputs.output[2]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs.output"
+                    "actuator_outputs.output[3]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs.output"
+                    "actuator_outputs.output[4]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs.output"
+                    "actuator_outputs.output[5]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs.output"
+                    "actuator_outputs.output[6]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs.output"
+                    "actuator_outputs.output[7]"
                   ]
                 }
               ],
@@ -1872,49 +1872,49 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs.output"
+                    "actuator_outputs[1].output[0]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs.output"
+                    "actuator_outputs[1].output[1]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs.output"
+                    "actuator_outputs[1].output[2]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs.output"
+                    "actuator_outputs[1].output[3]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs.output"
+                    "actuator_outputs[1].output[4]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs.output"
+                    "actuator_outputs[1].output[5]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs.output"
+                    "actuator_outputs[1].output[6]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "actuator_outputs.output"
+                    "actuator_outputs[1].output[7]"
                   ]
                 }
               ],
@@ -1927,6 +1927,104 @@ export const PLOT_PRESETS = {
                 "Output 5",
                 "Output 6",
                 "Output 7"
+              ],
+              "styles": [],
+              "colors": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "motor-rpm",
+      "title": "Motor RPM",
+      "description": "电调转速（esc_status.esc_rpm，每个电调一条线）。日志里没有 esc_status 话题时 这张图自动隐藏；缺哪个 ESC 下标就少哪条线。\n",
+      "condition": {
+        "firmware": "any",
+        "vehicle": "any",
+        "message": [
+          [
+            "esc_status"
+          ]
+        ]
+      },
+      "compute": [],
+      "outputs": [
+        {
+          "container": "axes",
+          "title": "Motor RPM",
+          "legend": true,
+          "grid": true,
+          "flipx": false,
+          "flipy": false,
+          "range": null,
+          "hlines": null,
+          "split_by_instance": false,
+          "ylabel": "rpm",
+          "xlabel": "秒（相对日志开始）",
+          "children": [
+            {
+              "mode": "TimeSeries",
+              "xdata": null,
+              "ydata": [
+                {
+                  "kind": "field",
+                  "fields": [
+                    "esc_status.esc[0].esc_rpm"
+                  ]
+                },
+                {
+                  "kind": "field",
+                  "fields": [
+                    "esc_status.esc[1].esc_rpm"
+                  ]
+                },
+                {
+                  "kind": "field",
+                  "fields": [
+                    "esc_status.esc[2].esc_rpm"
+                  ]
+                },
+                {
+                  "kind": "field",
+                  "fields": [
+                    "esc_status.esc[3].esc_rpm"
+                  ]
+                },
+                {
+                  "kind": "field",
+                  "fields": [
+                    "esc_status.esc[4].esc_rpm"
+                  ]
+                },
+                {
+                  "kind": "field",
+                  "fields": [
+                    "esc_status.esc[5].esc_rpm"
+                  ]
+                },
+                {
+                  "kind": "field",
+                  "fields": [
+                    "esc_status.esc[6].esc_rpm"
+                  ]
+                },
+                {
+                  "kind": "field",
+                  "fields": [
+                    "esc_status.esc[7].esc_rpm"
+                  ]
+                }
+              ],
+              "labels": [
+                "ESC 0",
+                "ESC 1",
+                "ESC 2",
+                "ESC 3",
+                "ESC 4",
+                "ESC 5",
+                "ESC 6",
+                "ESC 7"
               ],
               "styles": [],
               "colors": []
@@ -1970,19 +2068,19 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "sensor_combined.accelerometer_m_s2"
+                    "sensor_combined.accelerometer_m_s2[0]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "sensor_combined.accelerometer_m_s2"
+                    "sensor_combined.accelerometer_m_s2[1]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "sensor_combined.accelerometer_m_s2"
+                    "sensor_combined.accelerometer_m_s2[2]"
                   ]
                 }
               ],
@@ -2114,19 +2212,19 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "sensor_combined.gyro_rad"
+                    "sensor_combined.gyro_rad[0]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "sensor_combined.gyro_rad"
+                    "sensor_combined.gyro_rad[1]"
                   ]
                 },
                 {
                   "kind": "field",
                   "fields": [
-                    "sensor_combined.gyro_rad"
+                    "sensor_combined.gyro_rad[2]"
                   ]
                 }
               ],
@@ -2743,7 +2841,7 @@ export const PLOT_PRESETS = {
                 {
                   "kind": "field",
                   "fields": [
-                    "system_power.sensors3v3"
+                    "system_power.sensors3v3[0]"
                   ]
                 }
               ],
@@ -3242,7 +3340,7 @@ export const PLOT_PRESETS = {
     {
       "id": "sampling",
       "title": "Sampling Regularity",
-      "description": "sensor_combined 采样间隔与 estimator_status time_slip。",
+      "description": "sensor_combined 采样间隔（相邻 timestamp 差，diff 短一位由 pad_end 补齐）、 estimator_status time_slip。采样间隔抖动大或出现离群值说明日志记录不稳。\n",
       "condition": {
         "firmware": "any",
         "vehicle": "any",
@@ -3252,7 +3350,10 @@ export const PLOT_PRESETS = {
           ]
         ]
       },
-      "compute": [],
+      "compute": [
+        "dt = diff(sensor_combined.timestamp)",
+        "dt_full = pad_end(dt, count=1)"
+      ],
       "outputs": [
         {
           "container": "axes",
@@ -3272,6 +3373,10 @@ export const PLOT_PRESETS = {
               "xdata": null,
               "ydata": [
                 {
+                  "kind": "var",
+                  "name": "dt_full"
+                },
+                {
                   "kind": "field",
                   "fields": [
                     "estimator_status.time_slip"
@@ -3279,6 +3384,7 @@ export const PLOT_PRESETS = {
                 }
               ],
               "labels": [
+                "delta t (between 2 logged samples)",
                 "Estimator time slip (cumulative)"
               ],
               "styles": [],
@@ -3370,11 +3476,13 @@ export const PLOT_PRESETS = {
       ],
       "outputs": [
         {
-          "container": "spectrogram",
+          "container": "spectrum",
           "title": "Gyro X 幅度谱",
           "legend": true,
           "grid": true,
           "fmax": null,
+          "ymax": null,
+          "vlines": [],
           "ylabel": "幅度 [rad/s]",
           "xlabel": "Hz",
           "children": [
@@ -3395,6 +3503,367 @@ export const PLOT_PRESETS = {
               ],
               "styles": [],
               "colors": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "spectrum-actuator-controls",
+      "title": "Actuator Controls FFT",
+      "description": "作动器扭矩轴控制的幅度谱（上游 DataPlotFFT 口径：无窗、2/N 归一、fs<100Hz 不画）。 对照 MC_DTERM_CUTOFF / IMU_DGYRO_CUTOFF / IMU_GYRO_CUTOFF 参数线看输出噪声有没有被滤波器压住。\n",
+      "condition": {
+        "firmware": "any",
+        "vehicle": "any",
+        "message": [
+          [
+            "actuator_controls_0"
+          ]
+        ]
+      },
+      "compute": [
+        "roll = actuator_controls_0.control[0]",
+        "pitch = actuator_controls_0.control[1]",
+        "yaw = actuator_controls_0.control[2]",
+        "f, pr = spectrum(roll, norm=\"amplitude\", window=\"none\", min_fs=100)",
+        "f, pp = spectrum(pitch, norm=\"amplitude\", window=\"none\", min_fs=100)",
+        "f, py = spectrum(yaw, norm=\"amplitude\", window=\"none\", min_fs=100)"
+      ],
+      "outputs": [
+        {
+          "container": "spectrum",
+          "title": "Actuator Controls FFT",
+          "legend": true,
+          "grid": true,
+          "fmax": null,
+          "ymax": 0.01,
+          "vlines": [
+            {
+              "param": "MC_DTERM_CUTOFF",
+              "label": "MC_DTERM_CUTOFF"
+            },
+            {
+              "param": "IMU_DGYRO_CUTOFF",
+              "label": "IMU_DGYRO_CUTOFF"
+            },
+            {
+              "param": "IMU_GYRO_CUTOFF",
+              "label": "IMU_GYRO_CUTOFF"
+            }
+          ],
+          "ylabel": "Amplitude",
+          "xlabel": "Hz",
+          "children": [
+            {
+              "mode": "spectrum",
+              "xdata": null,
+              "ydata": [
+                {
+                  "kind": "var",
+                  "name": "pr"
+                },
+                {
+                  "kind": "var",
+                  "name": "pp"
+                },
+                {
+                  "kind": "var",
+                  "name": "py"
+                }
+              ],
+              "freqs": [
+                "f",
+                "f",
+                "f"
+              ],
+              "labels": [
+                "Roll",
+                "Pitch",
+                "Yaw"
+              ],
+              "styles": [],
+              "colors": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "spectrum-angular-velocity",
+      "title": "Angular Velocity FFT",
+      "description": "角速度三轴的幅度谱（上游 DataPlotFFT 口径：无窗、2/N 归一、fs<100Hz 不画）。 对照 IMU_GYRO_CUTOFF / IMU_GYRO_NF_FREQ 参数线看陀螺滤波器与陷波器实际落点。\n",
+      "condition": {
+        "firmware": "any",
+        "vehicle": "any",
+        "message": [
+          [
+            "vehicle_angular_velocity"
+          ]
+        ]
+      },
+      "compute": [
+        "wx = vehicle_angular_velocity.xyz[0]",
+        "wy = vehicle_angular_velocity.xyz[1]",
+        "wz = vehicle_angular_velocity.xyz[2]",
+        "f, px = spectrum(wx, norm=\"amplitude\", window=\"none\", min_fs=100)",
+        "f, py = spectrum(wy, norm=\"amplitude\", window=\"none\", min_fs=100)",
+        "f, pz = spectrum(wz, norm=\"amplitude\", window=\"none\", min_fs=100)"
+      ],
+      "outputs": [
+        {
+          "container": "spectrum",
+          "title": "Angular Velocity FFT",
+          "legend": true,
+          "grid": true,
+          "fmax": null,
+          "ymax": 0.01,
+          "vlines": [
+            {
+              "param": "IMU_GYRO_CUTOFF",
+              "label": "IMU_GYRO_CUTOFF"
+            },
+            {
+              "param": "IMU_GYRO_NF_FREQ",
+              "label": "IMU_GYRO_NF_FREQ"
+            }
+          ],
+          "ylabel": "Amplitude",
+          "xlabel": "Hz",
+          "children": [
+            {
+              "mode": "spectrum",
+              "xdata": null,
+              "ydata": [
+                {
+                  "kind": "var",
+                  "name": "px"
+                },
+                {
+                  "kind": "var",
+                  "name": "py"
+                },
+                {
+                  "kind": "var",
+                  "name": "pz"
+                }
+              ],
+              "freqs": [
+                "f",
+                "f",
+                "f"
+              ],
+              "labels": [
+                "Rollspeed",
+                "Pitchspeed",
+                "Yawspeed"
+              ],
+              "styles": [],
+              "colors": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "spectrum-angular-acceleration",
+      "title": "Angular Acceleration FFT",
+      "description": "角加速度三轴的幅度谱（上游 DataPlotFFT 口径：无窗、2/N 归一、fs<100Hz 不画，不设 y 上限）。 对照 IMU_DGYRO_CUTOFF / IMU_GYRO_NF_FREQ 参数线看微分链路的噪声与陷波效果。\n",
+      "condition": {
+        "firmware": "any",
+        "vehicle": "any",
+        "message": [
+          [
+            "vehicle_angular_acceleration"
+          ]
+        ]
+      },
+      "compute": [
+        "ax = vehicle_angular_acceleration.xyz[0]",
+        "ay = vehicle_angular_acceleration.xyz[1]",
+        "az = vehicle_angular_acceleration.xyz[2]",
+        "f, px = spectrum(ax, norm=\"amplitude\", window=\"none\", min_fs=100)",
+        "f, py = spectrum(ay, norm=\"amplitude\", window=\"none\", min_fs=100)",
+        "f, pz = spectrum(az, norm=\"amplitude\", window=\"none\", min_fs=100)"
+      ],
+      "outputs": [
+        {
+          "container": "spectrum",
+          "title": "Angular Acceleration FFT",
+          "legend": true,
+          "grid": true,
+          "fmax": null,
+          "ymax": null,
+          "vlines": [
+            {
+              "param": "IMU_DGYRO_CUTOFF",
+              "label": "IMU_DGYRO_CUTOFF"
+            },
+            {
+              "param": "IMU_GYRO_NF_FREQ",
+              "label": "IMU_GYRO_NF_FREQ"
+            }
+          ],
+          "ylabel": "Amplitude",
+          "xlabel": "Hz",
+          "children": [
+            {
+              "mode": "spectrum",
+              "xdata": null,
+              "ydata": [
+                {
+                  "kind": "var",
+                  "name": "px"
+                },
+                {
+                  "kind": "var",
+                  "name": "py"
+                },
+                {
+                  "kind": "var",
+                  "name": "pz"
+                }
+              ],
+              "freqs": [
+                "f",
+                "f",
+                "f"
+              ],
+              "labels": [
+                "Roll accel",
+                "Pitch accel",
+                "Yaw accel"
+              ],
+              "styles": [],
+              "colors": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "spectrogram-acceleration",
+      "title": "Acceleration Power Spectral Density",
+      "description": "加速度三轴的时频热图（上游 DataPlotSpec 口径：hann 256/128、帧内去均值、三轴 PSD 求和、10*log10 dB、fs<100Hz 不画）。上游叫它 \"Power Spectral Density\" 但不是折线图—— 颜色深浅是 dB 强弱，横轴时间、纵轴频率，看振动能量随时间/频率的分布（机架共振、桨叶不平衡）。\n",
+      "condition": {
+        "firmware": "any",
+        "vehicle": "any",
+        "message": [
+          [
+            "sensor_combined"
+          ]
+        ]
+      },
+      "compute": [
+        "ax = sensor_combined.accelerometer_m_s2[0]",
+        "ay = sensor_combined.accelerometer_m_s2[1]",
+        "az = sensor_combined.accelerometer_m_s2[2]",
+        "f, t, S = stft(ax, ay, az, min_fs=100)"
+      ],
+      "outputs": [
+        {
+          "container": "spectrogram",
+          "title": "Acceleration Power Spectral Density",
+          "legend": false,
+          "grid": true,
+          "ylabel": "Hz",
+          "xlabel": "s",
+          "children": [
+            {
+              "mode": "stft",
+              "freq": "f",
+              "times": "t",
+              "z": "S",
+              "labels": [
+                "X",
+                "Y",
+                "Z"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "spectrogram-angular-velocity",
+      "title": "Angular velocity Power Spectral Density",
+      "description": "角速度三轴的时频热图（上游 DataPlotSpec 口径：hann 256/128、帧内去均值、三轴 PSD 求和、10*log10 dB、fs<100Hz 不画）。看陀螺频段能量随时间的分布：滤波器截止频率 以上的残留噪声、机架共振峰在什么时刻被激起。\n",
+      "condition": {
+        "firmware": "any",
+        "vehicle": "any",
+        "message": [
+          [
+            "vehicle_angular_velocity"
+          ]
+        ]
+      },
+      "compute": [
+        "wx = vehicle_angular_velocity.xyz[0]",
+        "wy = vehicle_angular_velocity.xyz[1]",
+        "wz = vehicle_angular_velocity.xyz[2]",
+        "f, t, S = stft(wx, wy, wz, min_fs=100)"
+      ],
+      "outputs": [
+        {
+          "container": "spectrogram",
+          "title": "Angular velocity Power Spectral Density",
+          "legend": false,
+          "grid": true,
+          "ylabel": "Hz",
+          "xlabel": "s",
+          "children": [
+            {
+              "mode": "stft",
+              "freq": "f",
+              "times": "t",
+              "z": "S",
+              "labels": [
+                "rollspeed",
+                "pitchspeed",
+                "yawspeed"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "spectrogram-angular-acceleration",
+      "title": "Angular acceleration Power Spectral Density",
+      "description": "角加速度三轴的时频热图（上游 DataPlotSpec 口径：hann 256/128、帧内去均值、三轴 PSD 求和、10*log10 dB、fs<100Hz 不画）。角加速度比角速度对高频更敏感，是看控制链路 噪声/陷波器效果最直接的量。\n",
+      "condition": {
+        "firmware": "any",
+        "vehicle": "any",
+        "message": [
+          [
+            "vehicle_angular_acceleration"
+          ]
+        ]
+      },
+      "compute": [
+        "jx = vehicle_angular_acceleration.xyz[0]",
+        "jy = vehicle_angular_acceleration.xyz[1]",
+        "jz = vehicle_angular_acceleration.xyz[2]",
+        "f, t, S = stft(jx, jy, jz, min_fs=100)"
+      ],
+      "outputs": [
+        {
+          "container": "spectrogram",
+          "title": "Angular acceleration Power Spectral Density",
+          "legend": false,
+          "grid": true,
+          "ylabel": "Hz",
+          "xlabel": "s",
+          "children": [
+            {
+              "mode": "stft",
+              "freq": "f",
+              "times": "t",
+              "z": "S",
+              "labels": [
+                "roll accel",
+                "pitch accel",
+                "yaw accel"
+              ]
             }
           ]
         }

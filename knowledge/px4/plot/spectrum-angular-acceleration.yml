@@ -1,0 +1,29 @@
+id: spectrum-angular-acceleration
+title: Angular Acceleration FFT
+description: >
+  角加速度三轴的幅度谱（上游 DataPlotFFT 口径：无窗、2/N 归一、fs<100Hz 不画，不设 y 上限）。
+  对照 IMU_DGYRO_CUTOFF / IMU_GYRO_NF_FREQ 参数线看微分链路的噪声与陷波效果。
+order: 45
+condition:
+  message: [vehicle_angular_acceleration]
+compute:
+  - ax = vehicle_angular_acceleration.xyz[0]
+  - ay = vehicle_angular_acceleration.xyz[1]
+  - az = vehicle_angular_acceleration.xyz[2]
+  - f, px = spectrum(ax, norm="amplitude", window="none", min_fs=100)
+  - f, py = spectrum(ay, norm="amplitude", window="none", min_fs=100)
+  - f, pz = spectrum(az, norm="amplitude", window="none", min_fs=100)
+output:
+  - container: spectrum
+    title: Angular Acceleration FFT
+    ylabel: Amplitude
+    xlabel: Hz
+    vlines:
+      - param: IMU_DGYRO_CUTOFF
+        label: IMU_DGYRO_CUTOFF
+      - param: IMU_GYRO_NF_FREQ
+        label: IMU_GYRO_NF_FREQ
+    children:
+      - mode: spectrum
+        ydata: [px, py, pz]
+        label: ["Roll accel", "Pitch accel", "Yaw accel"]
