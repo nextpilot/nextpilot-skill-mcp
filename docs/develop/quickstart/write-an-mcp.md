@@ -1,9 +1,9 @@
 # 编写一个 MCP 条目
 
 **目标：在本地开发环境里做出一个可收录的 MCP 条目。**
-MCP 服务本身怎么开发（定义工具、参数校验、接入客户端）**真源在站内
-[`/guide/write-mcp`](https://nextpilot-skill-mcp.pages.dev/guide/write-mcp)**；
-本文讲**收录进平台**的闭环。
+MCP 服务本身怎么开发（定义工具、参数校验、接入客户端）真源在站内
+[`/guide/write-mcp`](https://nextpilot-skill-mcp.pages.dev/guide/write-mcp)；
+本文讲收录进平台的闭环。
 
 ---
 
@@ -33,7 +33,7 @@ pnpm web:check:mcp
 
 **要点**：
 
-- **传输方式的唯一真源是 `server.json` 的 `packages[0].transport.type`**；
+- 传输方式的唯一真源是 `server.json` 的 `packages[0].transport.type`；
   上游未确认的条目没有 `server.json`，退回 README frontmatter 过渡值（页面显示"待补"）。
   两份并存即双真源，`check-mcp-spec` 会判红。
 - 当前条目：`ardupilot-log`、`msfs-sim-flight`（后者 `upstream_status: pending`，

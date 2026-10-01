@@ -1,12 +1,12 @@
 # 六个阶段逐项：dev → commit → build → push → CI → deploy
 
-> 速查表、分档判据、复测命令见 [`README.md`](README.md)；本文逐阶段列**每一项检查**。
+速查表、分档判据、复测命令见 [`README.md`](README.md)；本文逐阶段列每一项检查。
 
 ---
 
 ## 一、阶段 0 · 写代码
 
-**你敲**：`pnpm web:dev` —— 一次起两段（`web/scripts/dev.mjs`）：先构建，再同时起知识热重建与 Next。
+你敲 `pnpm web:dev`，它一次起两段（`web/scripts/dev.mjs`）：先构建，再同时起知识热重建与 Next。
 
 | 文件                              | 是什么             | 干什么                                                                                                   |
 | --------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------- |
@@ -14,16 +14,15 @@
 | `web/scripts/build-knowledge.mjs` | 知识构建脚本       | 把引擎源码与人工经验拼成运行时产物。**全是 `throw`**：规则缺字段、算子没注册、表达式编译不过，这里就报错 |
 | `next dev`                        | Next.js 开发服务器 | 热更新的网站                                                                                             |
 
-**热更新分两段**：
+热更新分两段：
 
 | 你改了                                                                                     | 谁负责                                            |
 | ------------------------------------------------------------------------------------------ | ------------------------------------------------- |
 | `web/` 里的代码与站点内容（`.tsx` / `.css` / `content/**/*.mdx`）                          | Next 自己热更新（内容运行期读盘，刷新即见）       |
 | 知识真源（`knowledge/px4/rules/*.yaml`、`facts.yaml`、`knowledge/engine/operators.py` 等） | `build-knowledge --watch` 重建产物，Next 才看得到 |
 
-> **起不来往往不是 Next.js 的问题，是知识库写错了。** 报错直指哪个文件哪个字段。
-> dev 层**没有**类型与 lint 的实时反馈——建议另开 `tsc --noEmit --watch`（增量 2s 级），
-> 它不阻塞、不参与任何门禁。
+起不来往往不是 Next.js 的问题，是知识库写错了，报错直指哪个文件哪个字段。dev 层没有类型与
+lint 的实时反馈，建议另开 `tsc --noEmit --watch`（增量 2s 级），它不阻塞、不参与任何门禁。
 
 只开一半 / 单独开热重建：
 
@@ -36,14 +35,14 @@ pnpm web:kb:watch                  # 单独开着热重建（另开终端时用�
 
 ## 二、阶段 1 · 提交
 
-**你敲**：`git commit`。跑两个 hook（`.githooks/`，**只处理 staged 的文件**，耗时 2s）：
+你敲 `git commit`，它跑两个 hook（`.githooks/`，只处理 staged 的文件，耗时 2s）：
 
 | 文件                   | 干什么                                                                                                                                                                          |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `.githooks/pre-commit` | staged 的 `.py` 跑 `ruff format` + `ruff check`；`.ts/.tsx/.js/.mjs/.css` 跑 `prettier --write`；`.ts/.tsx` 跑 `eslint --fix`。**改过的文件自动重新 add**，提交的就是你刚看到的 |
 | `.githooks/commit-msg` | 标题必须是 `type(scope): 主题`、≤72 字符（完整规则见 [`../contribute/README.md`](../contribute/README.md)）                                                                     |
 
-**lint 的位置**（已定口径）：
+lint 的位置已定口径：
 
 | 动作                         | 位置       | 说明                                                               |
 | ---------------------------- | ---------- | ------------------------------------------------------------------ |
@@ -51,7 +50,7 @@ pnpm web:kb:watch                  # 单独开着热重建（另开终端时用�
 | `ruff check --fix`           | **不加**   | 项目明令禁止（`knowledge/engine/` 是拼接片段，`--fix` 会误删东西） |
 | `eslint` / `ruff check` 全套 | **push**   | 需人判断的问题留给 push，有整段时间处理                            |
 
-理由：自动修复（格式类、无争议）放 commit 是纯增量；需人判断的（未使用变量、hook 依赖数组）
+自动修复（格式类、无争议）放 commit 是纯增量；需人判断的（未使用变量、hook 依赖数组）
 不必在"正在提交、思路已断"的瞬间被拦下。若某条 `--fix` 规则造成困扰，按规则关掉它，
 不要放弃整个 `--fix`。
 
@@ -59,9 +58,9 @@ pnpm web:kb:watch                  # 单独开着热重建（另开终端时用�
 
 ## 三、阶段 2 · 构建
 
-**入口 `web/scripts/build-knowledge.mjs`：读源、生成产物。**
+入口 `web/scripts/build-knowledge.mjs`：读源、生成产物。
 
-**读这些（真源 —— 你要改的是它们）**：
+先读这些真源，你要改的就是它们：
 
 | 文件                            | 是什么                                                                                                   |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------- |
@@ -70,7 +69,7 @@ pnpm web:kb:watch                  # 单独开着热重建（另开终端时用�
 | `knowledge/px4/rules/*.yaml`    | **检查经验**：阈值与判定条件（最常改这里）                                                               |
 | `knowledge/px4/fault-kb.yaml`   | **故障知识库**                                                                                           |
 
-**生成产物（不要手改，下次构建就覆盖）**：
+生成产物不要手改，下次构建就覆盖：
 
 | 产物                                           | 是什么                               |
 | ---------------------------------------------- | ------------------------------------ |
@@ -78,18 +77,18 @@ pnpm web:kb:watch                  # 单独开着热重建（另开终端时用�
 | `web/workers/fault-kb.generated.json`          | 故障知识库的内联版                   |
 | `knowledge/rules-editor-schema.generated.json` | 规则编辑器的 JSON Schema             |
 
-**之后 `next build` 真编译生产产物，144s。** 本地按需跑（`pnpm web:build`），CI 每次跑
+之后 `next build` 真编译生产产物，144s。本地按需跑（`pnpm web:build`），CI 每次跑
 （`ci.yml` 的 `--build --ci`）。只跑 `next build` 不走 `pnpm web:build` 是安全的——产物已入库，
 `build:kb --check` 会抓产物与源的漂移，两个方向都有人守。
 
-清单 timeout 是 **300s**，对 144s 只有 2 倍余量。build 被推过 300s 时先查根因，
-**不要把 timeout 调大到失去意义**。
+清单 timeout 是 300s，对 144s 只有 2 倍余量。build 被推过 300s 时先查根因，
+不要把 timeout 调大到失去意义。
 
 ---
 
 ## 四、阶段 3 · 推送
 
-**你敲**：`git push`。跑 `check_all.py --push`，**24 项检查，30~40 秒**
+你敲 `git push`，它跑 `check_all.py --push`，24 项检查，30~40 秒
 （本机没有真实日志时 23 项——4 项日志回归 SKIP）。
 
 主要项一览（`check_all.py --list` 打印全貌）：
@@ -107,14 +106,14 @@ pnpm web:kb:watch                  # 单独开着热重建（另开终端时用�
 | 16–17 | `guard_apm_parser_version` / `guard_engine_names`  | 解析器升级纪律 / 拼接命名不撞车                                                            | 0.9s |
 | 18–19 | `check-guide-mdx` / `check-site-settings`          | 指南 MDX 可编译 / 站点设置机制还在                                                         | 2s   |
 
-**后果：`CI 全绿 ≠ 回归过了`** —— 第 12~15 项只在开发机跑。
+后果是 `CI 全绿 ≠ 回归过了`，因为第 12~15 项只在开发机跑。
 
 ---
 
 ## 五、阶段 4 · CI（推上去之后）
 
-**入口**：`.github/workflows/` 下**四个互相独立的 workflow**，各自一个 job、各自超时预算，
-**并行、互不阻塞**：谁慢谁独立，别让一条慢检查拖住其他。
+入口在 `.github/workflows/` 下四个互相独立的 workflow，各自一个 job、各自超时预算，
+并行、互不阻塞：谁慢谁独立，别让一条慢检查拖住其他。
 
 | workflow     | 触发                                        | 调什么                       | job                | 超时   |
 | ------------ | ------------------------------------------- | ---------------------------- | ------------------ | ------ |
@@ -123,8 +122,8 @@ pnpm web:kb:watch                  # 单独开着热重建（另开终端时用�
 | `mutate.yml` | `push`（master/main）、手动                 | `check_all.py --mutate`      | `guard-self-proof` | 40 min |
 | `audit.yml`  | **仅手动**（`workflow_dispatch`）           | `check_all.py --audit`       | `audit`            | 10 min |
 
-**四个文件都只做一件事**：装依赖（`./tools/setup/setup.sh`）→ 调 `check_all.py` 带对应开关。
-**检查项一个都不写在这里**——加检查改 `tools/ci/checklist.yml`，CI 自动跟上。
+四个文件都只做一件事：装依赖（`./tools/setup/setup.sh`）→ 调 `check_all.py` 带对应开关。
+检查项一个都不写在这里——加检查改 `tools/ci/checklist.yml`，CI 自动跟上。
 
 ### 5.1 `ci.yml` —— 质量门（默认关卡）
 
@@ -145,33 +144,35 @@ pnpm web:kb:watch                  # 单独开着热重建（另开终端时用�
 
 `playwright-smoke`（16 条路由，与 ci.yml 同一批）+ `playwright-analyze`
 （上传 `.ulg` → Pyodide 解析 → 显示，约 7min）。
-**为什么拆出去**：analyze 首跑要下 Pyodide WASM，7 分钟起步，留在质量门会拖慢每次 PR；
-它只验端侧链路，失败信号与静态检查是两类问题。只在 push 到 master/main 跑，**不阻塞 PR**。
+
+analyze 拆出去是因为它首跑要下 Pyodide WASM，7 分钟起步，留在质量门会拖慢每次 PR；
+它只验端侧链路，失败信号与静态检查是两类问题。只在 push 到 master/main 跑，不阻塞 PR。
 
 ### 5.3 `mutate.yml` —— 守卫自证
 
-74 条变异逐条注入源码，断言**恰好一条**守卫变红再还原，约 26min。
-**为什么独立**：74 条里 34 条打在 `test-issue-filer` 上（45s × 34），
-单独一份才拿得到独立超时预算。**为什么必须有地方跑**：它红了意味着某条守卫已退化成恒绿——
-这是本项目栽过最多次的一类问题（见 [`guards.md`](guards.md)）。
-只在 push 到 master/main 跑，不跑 PR。
+74 条变异逐条注入源码，断言恰好一条守卫变红再还原，约 26min。
+
+它独立成一份，是因为 74 条里 34 条打在 `test-issue-filer` 上（45s × 34），单独一份才拿得到
+独立超时预算。它必须有地方跑，是因为它红了意味着某条守卫已退化成恒绿——这是本项目栽过最多
+次的一类问题（见 [`guards.md`](guards.md)）。只在 push 到 master/main 跑，不跑 PR。
 
 ### 5.4 `audit.yml` —— 依赖审计
 
-`pip-audit`（41s）+ `pnpm-audit`（7.4s）。**仅手动**：依赖变更频率低，Actions 页面手动触发。
-**放 CI 不放 push**：要联网查外部漏洞库，网络抖动不该变成"提交失败"。
-**CI 不需要配 registry**：本机 `~/.npmrc` 指向 npmmirror（无 audit 端点）会红，
-CI 默认走官方源；命令里显式带 `--registry` 是为了让本机与 CI 行为一致。
+`pip-audit`（41s）+ `pnpm-audit`（7.4s）。仅手动：依赖变更频率低，Actions 页面手动触发。
 
-> ⚠️ **这四个 workflow 在 Gitee 上不会执行**：本仓主远端是 Gitee，GitHub 侧只作镜像。
-> 未迁移前云端门禁实际未生效，质量靠本机 `.githooks/pre-push` 拦——见
-> [`../operations/deploy.md`](../operations/deploy.md)。
+它放 CI 不放 push，是因为要联网查外部漏洞库，网络抖动不该变成"提交失败"。CI 不需要配
+registry：本机 `~/.npmrc` 指向 npmmirror（无 audit 端点）会红，CI 默认走官方源；命令里显式
+带 `--registry` 是为了让本机与 CI 行为一致。
+
+这四个 workflow 在 Gitee 上不会执行：本仓主远端是 Gitee，GitHub 侧只作镜像。未迁移前云端
+门禁实际未生效，质量靠本机 `.githooks/pre-push` 拦——见
+[`../operations/deploy.md`](../operations/deploy.md)。
 
 ---
 
 ## 六、阶段 5 · 部署
 
-**入口**：`.github/workflows/deploy.yml`。CI 成功才发布，失败就不发。
+入口 `.github/workflows/deploy.yml`，CI 成功才发布，失败就不发。
 
 | 步骤                            | 干什么                                                                                      |
 | ------------------------------- | ------------------------------------------------------------------------------------------- |

@@ -1,10 +1,10 @@
 # 编写一条新规则
 
 **目标：一条检查规则从改 YAML 到本地验证通过。**
-规则的写法语法（字段、算子、表达式子集）是另一门学问，**真源在站内
+规则的写法语法（字段、算子、表达式子集）是另一门学问，真源在站内
 [`/guide/write-rules`](https://nextpilot-skill-mcp.pages.dev/guide/write-rules) 与
-[`/guide/rule-schema`](https://nextpilot-skill-mcp.pages.dev/guide/rule-schema)**
-（构建期从 `knowledge/` 生成），本文只讲**开发闭环**。
+[`/guide/rule-schema`](https://nextpilot-skill-mcp.pages.dev/guide/rule-schema)
+（构建期从 `knowledge/` 生成），本文只讲开发闭环。
 
 ---
 
@@ -27,7 +27,7 @@ topic: vehicle_magnitude_estimator_status
 expr: "max(vibration_metric) > 0.05" # 安全子集的 Python 表达式
 ```
 
-语法与全部字段以站内 `/guide/rule-schema` 为准，**本文不复述**。
+语法与全部字段以站内 `/guide/rule-schema` 为准，本文不复述。
 
 ## 二、改完怎么验证（闭环）
 
@@ -51,7 +51,7 @@ pnpm eng:test
 
 ## 三、改了阈值必须打新基线
 
-引擎结论是「同输入 → 同结论」的回归锚点：**结论变化必须是显式动作**。
+引擎结论是「同输入 → 同结论」的回归锚点：结论变化必须是显式动作。
 改完阈值/逻辑，用真实日志重新打基线：
 
 ```bash
@@ -60,7 +60,7 @@ python tools/engine/dump_baseline.py    # 确认改动是有意的之后
 
 日志集怎么建、基线怎么入库，见 [`../knowledge/baselines.md`](../knowledge/baselines.md)
 与 [`../testing/log-regression.md`](../testing/log-regression.md)。
-**基线文件入库，日志文件不入库**——两者生命周期不同。
+基线文件入库，日志文件不入库——两者生命周期不同。
 
 ## 四、过门禁
 
@@ -72,7 +72,7 @@ git push    # pre-push hook 自动跑 check_all.py --push（含字段 lint、基
 
 ## 五、两个容易踩的
 
-1. **算子只能用注册过的**：`op:` 引用 `knowledge/engine/operators.py` 的 91 个算子，
+1. 算子只能用注册过的：`op:` 引用 `knowledge/engine/operators.py` 的 91 个算子，
    没有「内置隐式算子」——没注册构建期就红。
-2. **新规则要带反例**：规则清单页的「反例自检」要求每条规则都能被自己的反例打红，
+2. 新规则要带反例：规则清单页的「反例自检」要求每条规则都能被自己的反例打红，
    写规则时同步想清楚"什么日志不该命中"。

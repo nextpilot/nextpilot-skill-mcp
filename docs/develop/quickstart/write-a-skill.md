@@ -1,9 +1,9 @@
 # 编写一个 Skill
 
 **目标：在本地开发环境里做出一个可收录的 Skill。**
-Skill 的内容怎么写（场景、输入输出、示例、安全边界）**真源在站内
-[`/guide/write-skill`](https://nextpilot-skill-mcp.pages.dev/guide/write-skill)**，
-本文只讲**开发闭环**：文件放哪、怎么校验、怎么看效果。
+Skill 的内容怎么写（场景、输入输出、示例、安全边界）真源在站内
+[`/guide/write-skill`](https://nextpilot-skill-mcp.pages.dev/guide/write-skill)，
+本文只讲开发闭环：文件放哪、怎么校验、怎么看效果。
 
 ---
 
@@ -17,7 +17,7 @@ web/content/skills/<slug>/          # slug 用 kebab-case
 ```
 
 `SKILL.md` 的格式约束（frontmatter 字段、章节顺序）以站内教程与
-`web/scripts/check-skill-spec.mjs` 的判据为准——**校验脚本自带反例自检**，
+`web/scripts/check-skill-spec.mjs` 的判据为准——校验脚本自带反例自检，
 它认为合规的才合规。
 
 ## 二、开发闭环
@@ -38,8 +38,8 @@ pnpm web:check:skills
 
 ## 三、本仓自带的 Skill 脚本有个特殊约束
 
-`web/content/skills/*/scripts/*.py` 是**打包给用户下载**的内容——
-必须零依赖、可单独执行，**不许 import 本仓的 `tools/`**，打印用裸 `print` 是对的
+`web/content/skills/*/scripts/*.py` 是打包给用户下载的内容——
+必须零依赖、可单独执行，不许 import 本仓的 `tools/`，打印用裸 `print` 是对的
 （全仓唯一的例外，见 [`../contribute/code-style.md`](../contribute/code-style.md) §3）。
 
 ## 四、过门禁

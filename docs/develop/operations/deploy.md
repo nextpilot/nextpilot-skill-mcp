@@ -80,7 +80,7 @@ pnpm --filter ./web exec playwright test --config playwright.live.config.ts
 
 ---
 
-> ⚠️ **仓库托管方的现状**：当前 `origin` 是 Gitee（默认分支 `master`），
+> **仓库托管方的现状**：当前 `origin` 是 Gitee（默认分支 `master`），
 > 而 **Gitee 不执行 `.github/workflows/`**，它有自己的流水线配置目录。
 > 要让上面五个文件真正跑起来，需要把仓库镜像/迁移到 GitHub，或在 Gitee 侧另写一份
 > 等价配置（但那样就破了「校验命令只写一处」的约定，CI 与本地会分成两处维护）。

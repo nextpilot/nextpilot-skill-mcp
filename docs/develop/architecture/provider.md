@@ -1,6 +1,6 @@
 # provider 契约：日志格式适配层
 
-**一个 provider = 一种飞控日志格式的适配器。** 引擎的规则与图表只认这套接口，
+一个 provider = 一种飞控日志格式的适配器。引擎的规则与图表只认这套接口，
 不认 `pyulog` 或 `.bin` 解析细节。当前两个实现：
 
 | provider            | 格式             | 文件                                      |
@@ -9,24 +9,24 @@
 | `ArduPilotProvider` | ArduPilot `.bin` | `knowledge/engine/providers/ardupilot.py` |
 
 契约定义在 `knowledge/engine/providers/api.py`（`REQUIRED` / `OPTIONAL` / `BUILTIN_VARIABLES`）。
-**`api.py` 是唯一事实源**，本文解释它、不替代它。
+`api.py` 是唯一事实源，本文解释它、不替代它。
 
 ---
 
 ## 一、通用语义（两格式一致）
 
-- **取不到不抛异常**：返回 `None`（单个对象）/ `[]`（列表）/ `{}`（字典）。
-  "这份日志没有这个数据"是个**正常答案**，不是错误。
-- **时间戳两套单位**：查询 API 一律 µs（`*_us`）；面向展示/规则的条目字段用相对秒（`tSec`）。
-- **时基格式自定**：PX4 时间戳是开机起算，APM 是 `TimeUS`——`get_start_timestamp()`
+- 取不到不抛异常：返回 `None`（单个对象）/ `[]`（列表）/ `{}`（字典）。
+  "这份日志没有这个数据"是个正常答案。
+- 时间戳两套单位：查询 API 一律 µs（`*_us`）；面向展示/规则的条目字段用相对秒（`tSec`）。
+- 时基格式自定：PX4 时间戳是开机起算，APM 是 `TimeUS`——`get_start_timestamp()`
   给出各自原点，上层算相对时刻一律从它推导。
-- **单位诚实**：查不到单位/类型/位置就返回 `None`，**不许编一个空值糊弄**。
+- 单位诚实：查不到单位/类型/位置就返回 `None`，如实反映数据里没有。
 
-**两条结构性决策**：
+两条结构性决策：
 
-1. **不另起 facade 中间层**——API 直接长在 provider 契约上，文档里的名字就是
+1. 不另起 facade 中间层——API 直接长在 provider 契约上，文档里的名字就是
    `api.py` 里的名字。
-2. **不做双轨**：旧 API（`get_topic_data` / `get_logged_information` /
+2. 不做双轨：旧 API（`get_topic_data` / `get_logged_information` /
    `get_logged_messages` / `get_flight_phases`）已从契约与代码删除，全仓零定义、零调用。
 
 ---
@@ -55,7 +55,7 @@
 | event     | `get_armed_changed() -> list[dict]`                                                   | arming_state 切段                          | EV 10/11 → STAT.Armed 回退  | `[{t_start_us, t_end_us}]` 解锁/上锁区间（µs）；end 不会是 None（日志截止封口）                                                                      |
 | position  | `get_home_position() -> dict\|None`                                                   | `vehicle_global_position` 首个有效定位     | GPS 首个有效定位            | `{lat, lon, alt, ...}`。**Home 与 ref 是两个概念，分开取**                                                                                           |
 | position  | `get_ref_position() -> dict\|None`                                                    | `vehicle_local_position.ref_*`             | 无（返回 None）             | 局部 NED 参考原点 `{lat, lon, alt}`                                                                                                                  |
-| version   | `get_firmware_version() -> dict\|None`                                                | `ver_sw` 解析                              | MSG 横幅 / VER 消息         | `{major, minor, patch, git}`。⚠️ APM 的 `FORMAT_VERSION` 参数是 DataFlash 日志格式版本（120/13），**不是固件版本**，不可作回退                       |
+| version   | `get_firmware_version() -> dict\|None`                                                | `ver_sw` 解析                              | MSG 横幅 / VER 消息         | `{major, minor, patch, git}`。APM 的 `FORMAT_VERSION` 参数是 DataFlash 日志格式版本（120/13），**不是固件版本**，不可作回退                          |
 | version   | `get_version_info() -> tuple\|None`                                                   | 同上                                       | 同上                        | `(major, minor, patch, type)`                                                                                                                        |
 | version   | `get_version_info_str() -> str\|None`                                                 | 同上                                       | 同上                        | 展示串，如 `1.15.4` / `4.8.0-dev`                                                                                                                    |
 | identity  | `get_vehicle_identity() -> dict\|None`                                                | `AIRFRAME`/`ver_hw` 等                     | FRAME_CLASS 等              | `{frame_type, vehicle_type, uid, hardware, ...}`                                                                                                     |
@@ -85,7 +85,7 @@
 | `report_materials() -> dict`                         | ✓                              | ✓               | 报告页素材聚合                |
 
 **`get_default_parameters` 是 OPTIONAL 不是 REQUIRED**：缺数据源时对应能力隐藏，
-不该卡死整个 provider。
+不卡死整个 provider。
 
 ---
 
@@ -111,38 +111,38 @@
 | `HW_VER_SUBTYPE`                     | str         | 硬件子型号。没写空串                                     |
 | `FLIGHT_TIME_S`                      | float\|None | 载具**累计**飞行时长（参数计数器），不是本日志时长       |
 
-**命名约定**：键名一律英文；同类概念不造孪生名（如 `VEHICLE_TYPE` 与 `VEHICLE`
+命名约定：键名一律英文；同类概念不造孪生名（如 `VEHICLE_TYPE` 与 `VEHICLE`
 同义不同词表，故不落地，语义差异由 `AIRFRAME_ID` 这个数值键承担）。
 
 ---
 
 ## 五、实现要点
 
-**PX4 侧**：
+PX4 侧：
 
 - `get_start/last_timestamp`：`_read_data_list` 已算 t_min/t_max，补存 `t_max_us`
 - `get_dataset_description` / `get_field_sizeof` / `has_data_appended` /
   `has_file_corruption`：委托 pyulog 同名 property 与 `ULog.get_field_size`
-- `get_field_unit`：读构建期注入的字段单位表（**只含规则/图里写了 `unit=` 的字段**），
+- `get_field_unit`：读构建期注入的字段单位表（只含规则/图里写了 `unit=` 的字段），
   其余返回 None，如实标注，不冒充全量
 - home = `vehicle_global_position` 首个有效定位（armed 起点之后优先）；
-  ref = `vehicle_local_position.ref_lat/ref_lon/ref_alt` 首个非零三元组。**两概念分开**
+  ref = `vehicle_local_position.ref_lat/ref_lon/ref_alt` 首个非零三元组，两概念分开
 - `get_changed_parameters` 从 `report_materials` 内联逻辑提取为方法
 
-**ArduPilot 侧**：
+ArduPilot 侧：
 
-- `.bin` **格式自描述**：解析器按 FMT 表通解，不逐消息硬编码；消息一律按 FMT 名字查表，
+- `.bin` 格式自描述：解析器按 FMT 表通解，不逐消息硬编码；消息一律按 FMT 名字查表，
   不写死消息 ID
 - 长度约定自校准：用第一条 FMT 消息自己的 Length 字段判断含不含 3 字节头
 - 两遍扫描：先收 FMT 定义，再按格式解码；`TimeUS` 映射为 `timestamp` 列
 - 轨迹 = GPS（`Status>=3` 过滤）；阶段 = MODE 消息切段；armed = EV 事件 10/11，
   回退 STAT.Armed 状态沿，都没有就如实空
 
-**两条踩过的坑**：
+两条踩过的坑：
 
-- **`FORMAT_VERSION` 参数是 DataFlash 日志格式版本（120/13），不是固件版本**，
-  不可作回退。固件版本要从 MSG 横幅取（`ArduCopter V4.8.0-dev (hash)`）。
-- **`timestamp` 的要求是条件的**：FMT 声明了时间字段才要求 timestamp 列。
+- `FORMAT_VERSION` 参数是 DataFlash 日志格式版本（120/13），不是固件版本，
+  不能作回退。固件版本要从 MSG 横幅取（`ArduCopter V4.8.0-dev (hash)`）。
+- `timestamp` 的要求是条件的：FMT 声明了时间字段才要求 timestamp 列。
   AP_Logger 的 FILE 等内部传输消息没有 TimeUS，"所有 topic 都有 timestamp"
   在跨格式下不成立。
 
@@ -152,17 +152,17 @@
 
 契约不能靠自觉，靠四道守卫：
 
-1. **构建期 AST**：`build-knowledge.mjs` 自动要求每个 provider 定义新 REQUIRED 方法、
+1. 构建期 AST：`build-knowledge.mjs` 自动要求每个 provider 定义新 REQUIRED 方法、
    `builtin_variables()` 含新键。缺了构建就失败。
-2. **运行期**：`check_provider()` 补 `get_time_bounds` 形状断言。
-3. **契约测试** `tools/engine/guard_provider_contract.py`：
-   - 第 7 步查**真实方法名**（原写法查的 `phases` / `dropouts` 属性根本不存在，
+2. 运行期：`check_provider()` 补 `get_time_bounds` 形状断言。
+3. 契约测试 `tools/engine/guard_provider_contract.py`：
+   - 第 7 步查真实方法名（原写法查的 `phases` / `dropouts` 属性根本不存在，
      可选能力检查从来只跳过不检查，是恒绿）
    - 第 9 步断言时间边界自洽（duration 从 bounds 推导，与 start/end 同口径）、
      dtype/sizeof 与 meta 自洽、integrity 与 `DROPOUT_MS` 对表、
      armed_changed 与 `ARMED_INTERVALS` 对表
    - `--apm`：用 `tools/dev/apm_make_sample.py` 合成一份最小 `.bin` 跑同一套断言
-4. **runner 自动发现**：`tools/engine/run_engine.py` 从硬编码 `px4.py` 改为自动扫描
+4. runner 自动发现：`tools/engine/run_engine.py` 从硬编码 `px4.py` 改为自动扫描
    `providers/*.py`，与构建一致。
 
 > **未竟事项**（如实记）：守卫的变异自证未跑（破坏任一新方法应让对应断言失败，
