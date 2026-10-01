@@ -76,43 +76,53 @@ S11 参数变更（`changed_parameters`），上游也只是个按钮占位。
 
 ### 控制与作动器（8 项构造点，7 已建）
 
-| #   | 上游图                   | 干什么                         | 本仓文件                                                   | 状态 |
-| --- | ------------------------ | ------------------------------ | ---------------------------------------------------------- | ---- |
-| C1  | Airspeed                 | 空速 vs 地速                   | `plot/airspeed.yml`                                        | 已有 |
-| C2  | TECS                     | 总能量控制                     | `plot/tecs.yml`                                            | 已有 |
-| C3  | Manual Control Inputs    | 摇杆四通道 + 开关              | `plot/rc.yml`                                              | 已有 |
-| C4  | Raw Radio Control Inputs | 原始 RC 通道（老日志回退分支） | `plot/rc.yml`（同文件候选组）                              | 已有 |
-| C5  | Actuator Controls 0      | 姿态+推力控制输出              | `plot/actuator-controls-0.yml`                             | 已有 |
-| C6  | Actuator Controls 1      | VTOL 固定翼模式                | `plot/actuator-controls-1.yml`                             | 已有 |
-| C7  | Actuator Controls FFT    | 作动器输出频谱（y 限 0–0.01）  | 没有，缺频谱算子                                           | 没有 |
-| C8  | Actuator Outputs ×3      | 舵机 / 执行器输出              | `plot/actuator-outputs.yml`（Motor/Servo/Main/AUX 四容器） | 已有 |
+| #   | 上游图                   | 干什么                         | 本仓文件                                                                    | 状态           |
+| --- | ------------------------ | ------------------------------ | --------------------------------------------------------------------------- | -------------- |
+| C1  | Airspeed                 | 空速 vs 地速                   | `plot/airspeed.yml`                                                         | 已有           |
+| C2  | TECS                     | 总能量控制                     | `plot/tecs.yml`                                                             | 已有           |
+| C3  | Manual Control Inputs    | 摇杆四通道 + 开关              | `plot/rc.yml`                                                               | 已有           |
+| C4  | Raw Radio Control Inputs | 原始 RC 通道（老日志回退分支） | `plot/rc.yml`（同文件候选组）                                               | 已有           |
+| C5  | Actuator Controls 0      | 姿态+推力控制输出              | `plot/actuator-controls-0.yml`                                              | 已有           |
+| C6  | Actuator Controls 1      | VTOL 固定翼模式                | `plot/actuator-controls-1.yml`                                              | 已有           |
+| C7  | Actuator Controls FFT    | 作动器输出频谱（y 限 0–0.01）  | `plot/spectrum-actuator-controls.yml`（window="none"、ymax 0.01、参数标线） | **已有（W6）** |
+| C8  | Actuator Outputs ×3      | 舵机 / 执行器输出              | `plot/actuator-outputs.yml`（Motor/Servo/Main/AUX 四容器）                  | 已有           |
 
-### 振动与频谱（13 项构造点，6 已建 / 7 缺）
+### 振动与频谱（13 项构造点，11 已建 / 2 推迟）
 
-已建的六项：原始加速度（`raw-accel.yml`）、振动指标（`vibration.yml`，上游唯一
+已建十一项：原始加速度（`raw-accel.yml`）、振动指标（`vibration.yml`，上游唯一
 硬编码判定的三色带 4.905 / 9.81）、原始陀螺（`raw-gyro.yml`）、FIFO 三路加速度
 （`fifo-accel.yml`）、FIFO 三路陀螺（`fifo-gyro.yml`）、FIFO 采样规律性
-（`sampling.yml`，口径与上游不同算部分）。
+（`sampling.yml`，W6 补齐了 delta t 线，口径与上游对齐），
+以及 **W6 铺的谱图**（W5 样板 `spectrum-gyro.yml`，陀螺 X 单边幅度谱，沿用）：
 
-没建的七项全是谱分析：加速度 PSD（V5）、角速度 PSD（V6）、角加速度 PSD（V7）、
-FIFO 加速度 PSD（V9）、FIFO 陀螺 PSD（V12）、角加速度 FFT 标滤波器频率线（V13）、
-作动器 FFT（即上表 C7）。根因原本是同一个：上游的谱变换写在 `DataPlotSpec` 绘图类里，
-本仓把这一层抽到了引擎算子，而引擎里没有频域算子。
+| 上游构造点                                  | 本仓文件                                                                        | 口径                                                                                                                                 |
+| ------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 加速度 PSD（V5，2D 热图）                   | `plot/spectrogram-acceleration.yml`                                             | `container: spectrogram`：hann 256/128、帧内去均值、三轴 PSD 求和、10·log10 dB、fs≥100 门                                            |
+| 角速度 PSD（V6，2D 热图）                   | `plot/spectrogram-angular-velocity.yml`                                         | 同上                                                                                                                                 |
+| 角加速度 PSD（V7，2D 热图）                 | `plot/spectrogram-angular-acceleration.yml`                                     | 同上                                                                                                                                 |
+| 作动器 FFT（C7，线图）                      | `plot/spectrum-actuator-controls.yml`                                           | 上游 DataPlotFFT 口径：无窗、2/N 归一、ymax 0.01；IMU_DGYRO/GYRO/MC_DTERM_CUTOFF 参数标线                                            |
+| 角速度 FFT 标滤波器频率线（V13 的姊妹口径） | `plot/spectrum-angular-velocity.yml` / `plot/spectrum-angular-acceleration.yml` | 角速度/角加速度幅度谱 + IMU_GYRO_CUTOFF / IMU_DGYRO_CUTOFF / IMU_GYRO_NF_FREQ 参数标线（解不出的线消失并留说明，绝不画在猜的频率上） |
 
-**W4 已解锁这个根因**：新增字段无关的 `spectrum` 算子（去直流 + Hann 窗 + `np.fft.rfft`，
-`norm="amplitude"|"psd"` 两种口径，采样率可显式给、缺省时由引擎从话题 timestamp 自推），
-配套 `container: spectrogram` 与前端的频谱渲染分支（W5）。七张图从「缺算子」变成
-「缺各族的 plot 预设声明」——W6 铺图即可，不再有引擎侧阻塞。
+谱图从 W4/W5 的「有算子无图」变成 W6 的「有算子有图」：构建期 `compileSpectrogram`
+（2D 热图，`container: spectrogram`）与 `compileSpectrum`（线图，`container: spectrum`）
+是两条独立容器，引擎侧 `spectrum(...)`（单序列谱）与 `stft(...)`（三轴 PSD 求和时频谱，
+94 个算子里的两个）平行。
 
-已建的一张：`px4/plot/spectrum-gyro.yml`（`sensor_combined` 陀螺 X 轴单边幅度谱），
-作为 W6 的样板。剩余六张（PSD 口径、FIFO 系列、标滤波器频率线、作动器）待 W6。
+推迟的两项是 FIFO PSD（V9/V12，`spectrogram-*.yml` 的 FIFO 版本）：样例日志没有
+`sensor_accel_fifo`/`sensor_gyro_fifo`，铺了也无法满足 L0（真实浏览器渲染断言），
+登记到 W7 后有真实 FIFO 日志再铺。多实例（多 IMU）频谱拆分同理推迟（见
+`coverage.md` §4.5）。
+
+另一张超出上游的：Motor RPM（`plot/motor-rpm.yml`，`esc_status.esc[0..7].esc_rpm`
+嵌套字段引用）——上游没有这张图，本仓补上。它依赖 W6 顺带修好的**取数层嵌套数组
+支持**（构建期字段引用正则允许中间段带元素下标，运行期 provider 按字面 data key 命中）。
 
 ### 概览区与非图表子系统
 
 概览区六块：机型信息头（部分，有报告头无 3D/PID 链接）、信息表（部分，有 `facts`
 未成表）、硬故障横幅（没有）、日志损坏横幅（部分，APM 侧 `integrity.yaml` 有）、
-参数变更按钮（没有）、错误标签图例（没有）。Motor RPM 图没有，但 `motors` 规则
-已覆盖饱和与不平衡。
+参数变更按钮（没有）、错误标签图例（没有）。Motor RPM 图 **W6 已补**
+（`plot/motor-rpm.yml`，见上节），`motors` 规则继续覆盖饱和与不平衡。
 
 非图表子系统：3D View、PID Analysis、Overview 页没有（前两项在 plan 批 C/D）；
 统计表、配置表算部分；日志浏览与数据库明确不做（本仓纯客户端零上传）；VTOL 尾座机

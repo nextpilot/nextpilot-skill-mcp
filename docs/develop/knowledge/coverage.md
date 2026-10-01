@@ -11,10 +11,10 @@ PX4 那一堆 topic 里，我们检查了哪些、漏了哪些、先补哪些。
   `failure_detector_status`、`sensor_gyro_fft`、`estimator_gps_status`、`system_power`、
   `vehicle_land_detected`；批 2 新增 `input_rc`、`home_position`）。
 - 「该检查但完全没检查」的高价值 topic 从 14 个降到 8 个，剩余清单见第二节。
-- 批 2 的 `esc_status`/`esc_report`（电机级）**没做**：它们是结构体数组，字段嵌在
-  `esc[i]` 里（`esc_rpm`、`esc_current`……），而 v1 引擎的取数层对嵌套复合类型如实返回
-  `None`（`providers/px4.py` 的 `get_field_sizeof` 等处）。要做先给取数层补嵌套数组支持，
-  超出「写 YAML」的范围，故本轮记为待办而非落地。
+- 批 2 的 `esc_status`/`esc_report` **规则**没做，但堵点已消除：W6 顺带给取数层补了
+  嵌套数组支持（字段引用允许中间段带元素下标，`esc_status.esc[0].esc_rpm` 直接命中
+  provider 的字面 data key），`plot/motor-rpm.yml` 已用上；规则层的电机级检查
+  （转速/电流/温度）只差写 YAML，见第二节。
 - 9 份基线里，`power-sag` / `motor-unbalance` / `imu-bias-drift` 每份都跳过，
   `airspeed-invalid` / `ekf-innovation` / `wind-estimate` 多数跳过。
   跳过率高未必是 bug（多旋翼本来没空速、没风估），但要能一眼看出是"不适用"还是"取不到数"。
@@ -71,8 +71,9 @@ guard 用的日志元信息。
 | 13  | `tecs_status`                      | `altitude_sp`、`height_rate_*`、`airspeed` 相关                                           | TECS 高度/速度控制（固定翼核心）：跟踪误差                                                        | 中     |
 | 14  | `vehicle_global_position`          | `dead_reckoning`、`eph`、`epv`、`alt_valid`                                               | 全局位置可信度：`dead_reckoning` = 在纯推算（GPS 丢了）                                           | 低     |
 
-`esc_status`/`esc_report` 是这份清单里唯一卡在**引擎能力**而非规则工作量上的：它是结构体
-数组，取数层现在读不出嵌套字段（见"结论速览"）。其余各项都能按现有方言直接写。
+`esc_status`/`esc_report` 曾是这份清单里唯一卡在**引擎能力**而非规则工作量上的；
+W6 已给取数层补上嵌套数组支持（`plot/motor-rpm.yml` 已用上），规则层随时可写。
+其余各项都能按现有方言直接写。
 
 ---
 
@@ -94,34 +95,53 @@ guard 用的日志元信息。
 
 从 `configured_plots.py` 与 PX4 文档反推（不计已列的 topic 缺口）：
 
-| 检查                               | 上游表现                         | 我们的状态                               |
-| ---------------------------------- | -------------------------------- | ---------------------------------------- |
-| PID 跟踪性能（setpoint vs actual） | 每张图都有 estimated vs setpoint | 只有 `attitude-*` 看姿态，角速率跟踪无判 |
-| 执行器饱和                         | `Actuator Outputs` 图            | 无                                       |
-| 磁力计推力相关性                   | `Thrust and Magnetic Field` 图   | 无（磁干扰是常见坠机诱因）               |
-| 估计器看门狗                       | `Estimator Flags` 图             | `ekf-faults` 覆盖了一部分                |
-| 采样规律 / 时间滑移                | `Sampling Regularity` 图         | 只有 `guard-log-dropouts` 判丢包         |
-| 谱分析（PSD / FFT）                | 6 张 FFT/PSD 图 + 作动器 FFT     | **引擎已具备**（W4/W5），图待 W6 铺      |
+| 检查                               | 上游表现                         | 我们的状态                                                 |
+| ---------------------------------- | -------------------------------- | ---------------------------------------------------------- |
+| PID 跟踪性能（setpoint vs actual） | 每张图都有 estimated vs setpoint | 只有 `attitude-*` 看姿态，角速率跟踪无判                   |
+| 执行器饱和                         | `Actuator Outputs` 图            | 无                                                         |
+| 磁力计推力相关性                   | `Thrust and Magnetic Field` 图   | 无（磁干扰是常见坠机诱因）                                 |
+| 估计器看门狗                       | `Estimator Flags` 图             | `ekf-faults` 覆盖了一部分                                  |
+| 采样规律 / 时间滑移                | `Sampling Regularity` 图         | `sampling.yml` 有 delta t + time_slip（W6 补齐）+ 丢包守卫 |
+| 谱分析（PSD / FFT）                | 6 张 FFT/PSD 图 + 作动器 FFT     | **W6 已铺 8 张**（见第四点五节）；FIFO PSD 两张推迟        |
 
 ---
 
-## 四点五、频谱：能力已到、图还没铺
+## 四点五、频谱：W6 已铺图（2026-10）
 
-W4/W5 把「缺算子」这个根因解掉了，谱分析从「做不了」变成「写完 YAML 就有」。
-现状与待办分开记，免得下次又把"没图"当成"没能力"。
+W4/W5 解掉「缺算子」根因、W6 把图铺完。三种容器的分工与口径：
 
-| 项                       | 状态                                                                                    |
-| ------------------------ | --------------------------------------------------------------------------------------- |
-| 频谱算子 `spectrum`      | **已落地**。字段无关，`norm="amplitude"\|"psd"`，去直流 + Hann 窗 + `np.fft.rfft`       |
-| 采样率口径               | 显式给 `sample_rate=` 或由引擎从话题 `timestamp` 自推（自推值随响应回传，界面标口径）   |
-| `container: spectrogram` | **已落地**（构建期 `compileSpectrogram` + 前端判别位 + 渲染分支）                       |
-| Preset                   | `px4/plot/spectrum-gyro.yml` 一张（`sensor_combined` 陀螺 X，单边幅度谱）               |
-| 剩余六张图               | **待 W6**：加速度 PSD、角速度 PSD、角加速度 PSD、FIFO ×2、标滤波器频率线、作动器 FFT    |
-| 多实例（多 IMU）         | **待后续**：现在只出实例 0 的谱；多 IMU 会各自有采样率，需 `resolveSpectrum` 按实例拆分 |
+| 容器                     | 形状                         | 口径与用途                                                                                       |
+| ------------------------ | ---------------------------- | ------------------------------------------------------------------------------------------------ |
+| `container: spectrum`    | 线图（x 轴 Hz）              | `spectrum(...)` 单序列谱：去直流 + Hann（或 `window="none"` 复刻上游 2/N 归一）；`ymax` 压幅度轴 |
+| `container: spectrogram` | 2D 热图（x 时间/y Hz/色 dB） | `stft(...)` 三轴 PSD 求和：hann 256/128、帧内去均值、density、10·log10、-inf 换最小有限值        |
+| `vlines`（仅 spectrum）  | 参数标线                     | `param: IMU_GYRO_CUTOFF` 等由引擎查 initial_parameters 解；解不出线消失 + warning                |
 
-多实例这一项是**已知取舍不是遗漏**：`px4/plot/spectrum-gyro.yml` 只声明一条 `ydata`，
-命中哪个实例取哪个（默认 0）。上游会为每个 IMU 各画一张；本仓留到有真实多 IMU 日志驱动时再做，
-免得凭空设计。登记在此，W6 铺图时一并评估。
+**已铺的图（px4/plot/）**：
+
+| 图                                     | 容器        | 对应上游                         |
+| -------------------------------------- | ----------- | -------------------------------- |
+| `spectrum-gyro.yml`（W5 样板）         | spectrum    | Gyro FFT（幅度谱口径）           |
+| `spectrum-actuator-controls.yml`       | spectrum    | C7 作动器 FFT（无窗、ymax 0.01） |
+| `spectrum-angular-velocity.yml`        | spectrum    | 角速度 FFT + 滤波器标线          |
+| `spectrum-angular-acceleration.yml`    | spectrum    | 角加速度 FFT + 滤波器标线        |
+| `spectrogram-acceleration.yml`         | spectrogram | V5 加速度 PSD 热图               |
+| `spectrogram-angular-velocity.yml`     | spectrogram | V6 角速度 PSD 热图               |
+| `spectrogram-angular-acceleration.yml` | spectrogram | V7 角加速度 PSD 热图             |
+| `motor-rpm.yml`（超出上游）            | axes        | ESC 转速（嵌套取数已通）         |
+| `sampling.yml` 补 delta t 线           | axes        | Sampling Regularity 对齐         |
+
+**推迟与原因（登记不是遗漏）**：
+
+| 项                       | 原因                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------ |
+| FIFO PSD 两张（V9/V12）  | 样例日志没有 `sensor_accel_fifo`/`sensor_gyro_fifo`，铺了也无法过 L0（真实浏览器渲染断言）       |
+| 多实例（多 IMU）频谱拆分 | 同上需真实多 IMU 日志驱动；`spectrum-*` 现只出实例 0，`resolveSpectrum` 按实例拆分留待有数据再做 |
+| FIFO 原始数据图          | `fifo-accel/fifo-gyro.yml` 已有，但样例日志无 FIFO 话题，L0 一直靠有 FIFO 数据的日志             |
+
+端到端实测（sample.ulg，真实驱动 `np_spectrum`/`np_stft`）：四张频谱 fs 自推
+403.9–404.0 Hz（角速度族）/ 204.6 Hz（sensor_combined）；`IMU_DGYRO_CUTOFF=15`、
+`IMU_GYRO_CUTOFF=40` 从日志初始参数解出并画线，`MC_DTERM_CUTOFF`/`IMU_GYRO_NF_FREQ`
+缺失走 warning 路径；三张热图 0–fs/2 全谱、-inf 已替换、峰值落 6–24 Hz 低频段。
 
 ---
 
