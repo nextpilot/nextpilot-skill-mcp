@@ -77,6 +77,37 @@ test.describe("日志分析流程", () => {
         const body = await page.locator("body").textContent();
         expect(body).not.toMatch(/Application error/);
         expect(body).not.toContain("[next-mdx-remote] error");
+
+        // ── W8 L0：3D 视图 tab 真实渲染断言 ──
+        // WebGL 能力决定组件走哪条真实分支：可用 → canvas + 回放控件 + 时间轴联动全量断言
+        // （sample.ulg 有 GPS 与 vehicle_attitude，姿态标记可用、无降级提示）；不可用 →
+        // 错误分支必须给出明确指引。无 GPU 的沙箱/CI 走后者——那也是组件的真实渲染路径。
+        // 沙箱实测：SwiftShader 软渲染全灭（Vulkan 偶发成功不可依赖），故按能力分流。
+        await page.getByTestId("tab-3d").click();
+        await expect(page.getByRole("heading", { name: /3D 轨迹/ })).toBeVisible({ timeout: 60_000 });
+        const webglOk = await page.evaluate(() => {
+            const cv = document.createElement("canvas");
+            return !!(cv.getContext("webgl2") ?? cv.getContext("webgl"));
+        });
+        if (webglOk) {
+            const canvas3d = page.locator('[data-testid="track3d-container"] canvas');
+            await expect(canvas3d).toBeVisible({ timeout: 120_000 });
+            // 场景 ready 的标志：回放时间轴与时刻文字出现
+            await expect(page.getByTestId("track3d-scrub")).toBeVisible({ timeout: 30_000 });
+            const timeLabel = page.getByTestId("track3d-time");
+            await expect(timeLabel).toHaveText(/s$/, { timeout: 30_000 });
+            // 拖时间轴：applyFrac 直写 DOM，时刻文字要跟着变（0 → 中段）
+            await page.getByTestId("track3d-scrub").evaluate((el) => {
+                el.value = "500";
+                el.dispatchEvent(new Event("change", { bubbles: true }));
+            });
+            await expect(timeLabel).not.toHaveText(/^0\.0 s$/);
+            // 姿态可用时不出现降级提示
+            await expect(page.getByText(/取不到姿态四元数/)).toHaveCount(0);
+        } else {
+            // 无 WebGL：不能是含混的兜底话，要指路到地图
+            await expect(page.getByText(/不支持 WebGL/)).toBeVisible({ timeout: 60_000 });
+        }
     });
 
     test("历史记录可见", { timeout: 30_000 }, async ({ page }) => {

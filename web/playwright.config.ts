@@ -17,6 +17,12 @@ export default defineConfig({
         baseURL: BASE_URL,
         trace: "on-first-retry",
         video: "retain-on-failure",
+        // 无 GPU 环境尝试让 WebGL 走 SwiftShader 软渲染（ANGLE on Vulkan-SwiftShader）。
+        // 沙箱实测仍可能全部失败（GPU 进程起不来，e2e 已按 WebGL 能力分流断言），
+        // 但有 Vulkan loader 的 CI/机器上这段能让 3D 视图走全量断言；对其他测试无副作用。
+        launchOptions: {
+            args: ["--use-gl=angle", "--use-angle=vulkan", "--enable-features=Vulkan", "--enable-unsafe-swiftshader"],
+        },
     },
 
     projects: [

@@ -10,7 +10,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { ArrowLeft, Loader2, Sparkles } from "lucide-react";
 import { STAGE_TEXT, STAGE_PROGRESS } from "@/lib/stage-labels";
 
-type TabKey = "sysmsg" | "metrics" | "messages" | "params" | "charts" | "summary" | "ai";
+type TabKey = "sysmsg" | "metrics" | "messages" | "params" | "charts" | "3d" | "summary" | "ai";
 
 export function LogResultClient() {
     const params = useParams();

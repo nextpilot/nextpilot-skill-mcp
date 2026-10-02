@@ -23,6 +23,7 @@ import {
     CalendarClock,
     HardDrive,
     FileUp,
+    Move3d,
 } from "lucide-react";
 import type {
     LogReportData,
@@ -46,6 +47,7 @@ import { formatDateTime, formatFirmware } from "@/lib/format";
 import { vehicleTypeLabel } from "@/lib/vehicle-type";
 import { isDarkTheme, modeStyle } from "@/lib/phase-colors";
 import { LogFlightMap } from "./LogFlightMap";
+import { LogTrack3D } from "./LogTrack3D";
 
 const PHASE_LABELS: Record<string, string> = {
     takeoff: "起飞",
@@ -81,7 +83,7 @@ const TAG_LABELS: Record<string, string> = {
     failsafe: "触发失效保护",
 };
 
-type TabKey = "sysmsg" | "metrics" | "messages" | "params" | "charts" | "summary" | "ai";
+type TabKey = "sysmsg" | "metrics" | "messages" | "params" | "charts" | "3d" | "summary" | "ai";
 
 /**
  * 一份日志的分析报告正文（tab 壳）。六个子组件全在 `Log*` 家族里（见 ReportHistoryList.tsx
@@ -145,6 +147,9 @@ export function LogReport({
             icon: <LineChart className="h-4 w-4" />,
             disabled: !manifest && !storedPlots?.panels?.length,
         },
+        // 3D 与地图共用 loadTrack：没解析过日志（纯历史）时取不到，先禁用；
+        // 解析过但这份日志没有可用定位 → 点进去由 LogTrack3D 给逐条原因（引擎侧保证）
+        { key: "3d", label: "3D 视图", icon: <Move3d className="h-4 w-4" />, disabled: !info },
         { key: "summary", label: "检查结论", icon: <ClipboardCheck className="h-4 w-4" /> },
         { key: "ai", label: "AI 解读", icon: <Sparkles className="h-4 w-4" /> },
     ];
@@ -275,6 +280,9 @@ export function LogReport({
                 {effectiveTab === "messages" && info && <LogEventsMsg key="messages" info={info} />}
                 {effectiveTab === "sysmsg" && info && <LogSystemMsg key="sysmsg" info={info} />}
                 {effectiveTab === "params" && info && <LogParamsMsg key="params" info={info} />}
+                {effectiveTab === "3d" && info && (
+                    <LogTrack3D key="3d" loadTrack={loadTrack} requestSeries={requestSeries} onRestore={onRestore} />
+                )}
             </div>
         </div>
     );
