@@ -299,3 +299,40 @@ def test_spectrum_degenerate_inputs_return_none_pair():
     assert _op("spectrum")([1.0, 2.0, 3.0]) == (None, None)
     assert _op("spectrum")([float("nan")] * 100, sample_rate=100.0) == (None, None)
     assert _op("spectrum")([3.0] * 100, sample_rate=100.0) == (None, None)
+
+
+def test_rate_tracking_stats_basic_and_worst_axis():
+    # 两轴（Roll/Pitch）、sp 与 act 同频但 sp 时间戳略有偏移：插值对齐后误差应接近 0
+    n = 400
+    ts = (np.arange(n) * 20000).astype(np.int64)  # 50 Hz
+    sp_ts = ts + 3000  # 3 ms 偏移
+    act_roll = np.full(n, 1.0)  # rad/s
+    act_pitch = np.sin(np.arange(n) / 20.0)
+    sp_roll = np.full(n, 1.0)
+    sp_pitch = np.sin((np.arange(n) + 0.15) / 20.0)  # 与 act 同相：3ms 偏移 = 0.15 个样本
+    intervals = [(int(ts[10]), int(ts[-1]))]  # armed 段覆盖大部分
+    rms, p95, axis, seg_n = _op("rate_tracking_stats")(
+        [act_roll, act_pitch], ts, [sp_roll, sp_pitch], sp_ts, intervals, min_samples=50
+    )
+    assert seg_n >= n - 11
+    assert axis is not None
+    # 两轴误差都很小（插值对齐后近 0 偏差），RMS 应远小于 0.1 rad/s
+    assert rms is not None and rms < 0.1
+    assert p95 is not None and p95 < 0.1
+    # 人为把 Pitch 误差放大：最差轴应切到 1（列下标）
+    act_pitch_bad = act_pitch + 0.5
+    rms2, _, axis2, _ = _op("rate_tracking_stats")(
+        [act_roll, act_pitch_bad], ts, [sp_roll, sp_pitch], sp_ts, intervals, min_samples=50
+    )
+    assert axis2 == 1 and rms2 > rms
+
+
+def test_rate_tracking_stats_insufficient_and_missing():
+    # armed 样本不足 → 统计量 None 但 seg_n 照实返回；核心数据缺失 → None
+    n = 60
+    ts = (np.arange(n) * 20000).astype(np.int64)
+    ones = np.ones(n)
+    rms, p95, axis, seg_n = _op("rate_tracking_stats")([ones], ts, [ones], ts, [(int(ts[0]), int(ts[5]))], min_samples=50)
+    assert rms is None and p95 is None and axis is None and seg_n == 5  # 区间右开：ts[0]..ts[4] 5 个点
+    assert _op("rate_tracking_stats")([ones], None, [ones], ts, [(0, 100)]) is None
+    assert _op("rate_tracking_stats")([], ts, [], ts, [(0, 100)]) is None

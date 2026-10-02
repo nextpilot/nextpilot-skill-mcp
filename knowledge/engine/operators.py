@@ -1688,6 +1688,59 @@ def op_att_tracking_stats(
 
 
 @operator(
+    "rate_tracking_stats",
+    in_arity=6,
+    out_arity=4,
+    out_names=["rms_max", "p95_max", "worst_axis", "seg_n"],
+    doc="角速率跟踪误差统计：act/sp 的列按位置一一对应（第 k 列对第 k 列），sp 各列按时间戳"
+    "线性插值到 act 时间轴，armed 区间内逐轴算 RMS 与 P95(|err|)，输出三者里 RMS 最大的"
+    "那根轴（worst_axis 是列下标）与其 RMS、P95、参与统计的样本数。单位跟输入走（规则里"
+    "先换算再进算子，算子不做单位）。样本不足（armed 样本数 <= min_samples）时统计量为"
+    " None 但仍返回 seg_n，供调用方判断；核心数据缺失（无时间戳/无列）返回 None。",
+)
+def op_rate_tracking_stats(act_cols, act_ts, sp_cols, sp_ts, intervals, min_samples=50, **kw):
+    import numpy as np
+
+    a = _as_columns(act_cols)
+    s = _as_columns(sp_cols)
+    if act_ts is None or sp_ts is None or len(a) == 0 or len(s) == 0:
+        return None
+    n_col = min(len(a), len(s))
+    ts = np.asarray(act_ts, dtype=np.int64)
+    sp_ts = np.asarray(sp_ts, dtype=np.int64)
+    if len(ts) < 2 or len(sp_ts) < 1:
+        return None
+
+    # armed 掩码（与 att_tracking_stats 同一口径：区间下标折算到 act 轴）
+    amask = np.zeros(len(ts), dtype=bool)
+    for s_i, e_i in intervals or []:
+        lo = int(np.searchsorted(ts, int(s_i)))
+        hi = len(ts) if e_i is None else int(np.searchsorted(ts, int(e_i)))
+        amask[lo:hi] = True
+
+    rms_best = p95_best = axis_best = None
+    for k in range(n_col):
+        ac = np.asarray(a[k], dtype=float)
+        sc = np.asarray(s[k], dtype=float)
+        n = min(len(ac), len(ts))
+        if n < 2 or len(sc) < 1:
+            continue
+        sp_i = np.interp(ts[:n], sp_ts, sc)
+        err = ac[:n] - sp_i
+        seg = err[amask[:n]]
+        if seg.size <= int(min_samples):
+            continue
+        rms = float(np.sqrt(np.mean(seg**2)))
+        p95 = float(np.percentile(np.abs(seg), 95))
+        if rms_best is None or rms > rms_best:
+            rms_best, p95_best, axis_best = rms, p95, k
+    seg_n = int(np.count_nonzero(amask))
+    if rms_best is None:
+        return (None, None, None, seg_n)
+    return (rms_best, p95_best, int(axis_best), seg_n)
+
+
+@operator(
     "gyro_bias_series",
     in_arity=6,
     out_arity=5,

@@ -110,14 +110,14 @@ PX4 那一堆 topic 里，我们检查了哪些、漏了哪些、先补哪些。
 
 从 `configured_plots.py` 与 PX4 文档反推（不计已列的 topic 缺口）：
 
-| 检查                               | 上游表现                         | 我们的状态                                                 |
-| ---------------------------------- | -------------------------------- | ---------------------------------------------------------- |
-| PID 跟踪性能（setpoint vs actual） | 每张图都有 estimated vs setpoint | 只有 `attitude-*` 看姿态，角速率跟踪无判                   |
-| 执行器饱和                         | `Actuator Outputs` 图            | 无                                                         |
-| 磁力计推力相关性                   | `Thrust and Magnetic Field` 图   | 无（磁干扰是常见坠机诱因）                                 |
-| 估计器看门狗                       | `Estimator Flags` 图             | `ekf-faults` 覆盖了一部分                                  |
-| 采样规律 / 时间滑移                | `Sampling Regularity` 图         | `sampling.yml` 有 delta t + time_slip（W6 补齐）+ 丢包守卫 |
-| 谱分析（PSD / FFT）                | 6 张 FFT/PSD 图 + 作动器 FFT     | **W6 已铺 8 张**（见第四点五节）；FIFO PSD 两张推迟        |
+| 检查                               | 上游表现                         | 我们的状态                                                                                                             |
+| ---------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| PID 跟踪性能（setpoint vs actual） | 每张图都有 estimated vs setpoint | **角速率已判**（批 C：`rate-tracking` 两条规则 + `rate-error` 误差曲线图，降压版——不做反卷积/频域）；姿态 PID 分析仍无 |
+| 执行器饱和                         | `Actuator Outputs` 图            | 无                                                                                                                     |
+| 磁力计推力相关性                   | `Thrust and Magnetic Field` 图   | 无（磁干扰是常见坠机诱因）                                                                                             |
+| 估计器看门狗                       | `Estimator Flags` 图             | `ekf-faults` 覆盖了一部分                                                                                              |
+| 采样规律 / 时间滑移                | `Sampling Regularity` 图         | `sampling.yml` 有 delta t + time_slip（W6 补齐）+ 丢包守卫                                                             |
+| 谱分析（PSD / FFT）                | 6 张 FFT/PSD 图 + 作动器 FFT     | **W6 已铺 8 张**（见第四点五节）；FIFO PSD 两张推迟                                                                    |
 
 ---
 
@@ -176,8 +176,12 @@ W4/W5 解掉「缺算子」根因、W6 把图铺完。三种容器的分工与�
 - 批 3（补字段）：GPS 干扰（`noise_per_ms`/`jamming_indicator`）、陀螺振动、电池温度。
 - 批 3.5（谱图，2026-02）：借 W4/W5 落地的 `spectrum` 算子与 `spectrogram` 容器铺 6 张谱图，
   见第四点五节。这是唯一"算子已在、只差声明"的一批，成本最低。**已完成（W6）**。
-- 批 4（需新算子）：PID 跟踪误差（需要 setpoint-actual 对齐统计）、磁力计推力相关性、
-  执行器饱和。**未做**，是剩余规则缺口的主要部分。
+- 批 4（需新算子）：PID 跟踪误差、磁力计推力相关性、执行器饱和。
+  **PID 部分已落地（批 C，2026-10）**：新算子 `rate_tracking_stats`（95），
+  `rate_tracking` 组 2 条规则（RMS 30 / P95 60 deg/s [暂定]）+ `plot/rate-error.yml`
+  误差曲线（setpoint 插值到实测轴逐时刻作差）。sample.ulg 实测：P95 60.1 deg/s
+  （Pitch 轴）发射 warning，误差曲线三轴 1812 点与 finding 数值自洽。
+  磁力计推力相关性、执行器饱和**仍未做**。
 
 每批的验收标准：新规则在基线上跑通，产出的差异只允许新增 finding/skipped，
 不允许改动既有 finding，用 `tools/engine/compare_baseline.py` 卡。

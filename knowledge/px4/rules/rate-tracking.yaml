@@ -1,0 +1,118 @@
+# 角速率跟踪误差（PID 内环的"结果指标"）：rate setpoint 与实测角速率的偏差。
+# 与姿态组（attitude_tracking，外环）正交：姿态误差大不一定是内环的锅（可能是
+# setpoint 本身激进），角速率误差大才直接指向增益/执行器。两组合在一起对上
+# Flight Review PID 分析的"setpoint vs actual"口径（降压版：不做反卷积）。
+#
+# 对齐方式：sp 按时间戳线性插值到实测轴（rate_tracking_stats 内部做），armed 段
+# 内逐轴算 RMS 与 P95(|err|)，取最差轴。单位在规则里换算成 deg/s（算子不做单位）。
+#
+# 阈值 [暂定]：RMS 30 deg/s / P95 60 deg/s——调好的多旋翼角速率跟踪误差 RMS 通常
+# 在 10 deg/s 量级、yaw 轴偏保守会更大；30/60 取"明显失调"档，等真实日志校准。
+# 映射不到的机型（固定翼 rate setpoint 语义相同）同一口径，暂不分机架。
+
+---
+id: px4-rate-tracking-rms
+name: 角速率跟踪误差（RMS）
+group: rate_tracking
+order: 1
+tag: rate_tracking_error
+version: 1.0.0
+
+condition:
+  message:
+    - vehicle_angular_velocity
+    - vehicle_rates_setpoint
+
+compute:
+  # 三轴对齐进算子：xyz[i] 是嵌套数组字段，规则层必须显式 _ref（裸写三层链运行期会断，
+  # 见 esc-status.yaml 文件头注释）；rad/s → deg/s 在进算子前换算
+  - >-
+    act = stack_columns(
+    _ref("vehicle_angular_velocity.xyz[0]") * 57.29578,
+    _ref("vehicle_angular_velocity.xyz[1]") * 57.29578,
+    _ref("vehicle_angular_velocity.xyz[2]") * 57.29578)
+  - >-
+    sp = stack_columns(
+    vehicle_rates_setpoint.roll * 57.29578,
+    vehicle_rates_setpoint.pitch * 57.29578,
+    vehicle_rates_setpoint.yaw * 57.29578)
+  - >-
+    rms, p95, axis_i, seg_n = rate_tracking_stats(
+    act, vehicle_angular_velocity.timestamp, sp, vehicle_rates_setpoint.timestamp,
+    ARMED_INTERVALS, min_samples=50)
+  - seg_ok = seg_n > 50 if seg_n else False
+  - rms_stat = rms if seg_ok else None
+  - axis_name = ["Roll", "Pitch", "Yaw"][axis_i] if (seg_ok and axis_i is not None) else None
+
+output:
+  - name: rateErrRmsDeg
+    value: rms_stat
+    round: 1
+  - name: rateErrWorstAxis
+    value: axis_name
+
+ran_when: "seg_ok"
+
+trigger:
+  - when: "rms_stat >= 30.0"
+    label: rate_tracking_error
+    severity: warning
+    suggestion: "角速率跟踪误差偏大（RMS，最差轴 {axis_name}）。先排振动与执行器饱和（看对应图），再考虑降增益或做速率整定。"
+    description: "armed 段角速率跟踪误差 RMS {rms_stat:.1f} deg/s（最差轴 {axis_name}）"
+    evidence:
+      source: vehicle_angular_velocity.xyz vs vehicle_rates_setpoint(armed 段, deg/s)
+      value: rms_stat
+      threshold: 30.0
+
+---
+id: px4-rate-tracking-p95
+name: 角速率跟踪误差（P95 峰值）
+group: rate_tracking
+order: 2
+tag: rate_tracking_error
+version: 1.0.0
+
+condition:
+  message:
+    - vehicle_angular_velocity
+    - vehicle_rates_setpoint
+
+compute:
+  # 与 RMS 那条同源：同一份对齐与统计（多算一次成本低，换来两条独立触发与文案）
+  - >-
+    act = stack_columns(
+    _ref("vehicle_angular_velocity.xyz[0]") * 57.29578,
+    _ref("vehicle_angular_velocity.xyz[1]") * 57.29578,
+    _ref("vehicle_angular_velocity.xyz[2]") * 57.29578)
+  - >-
+    sp = stack_columns(
+    vehicle_rates_setpoint.roll * 57.29578,
+    vehicle_rates_setpoint.pitch * 57.29578,
+    vehicle_rates_setpoint.yaw * 57.29578)
+  - >-
+    rms, p95, axis_i, seg_n = rate_tracking_stats(
+    act, vehicle_angular_velocity.timestamp, sp, vehicle_rates_setpoint.timestamp,
+    ARMED_INTERVALS, min_samples=50)
+  - seg_ok = seg_n > 50 if seg_n else False
+  - p95_stat = p95 if seg_ok else None
+  - axis_name = ["Roll", "Pitch", "Yaw"][axis_i] if (seg_ok and axis_i is not None) else None
+
+output:
+  - name: rateErrP95Deg
+    value: p95_stat
+    round: 1
+  - name: rateErrWorstAxis
+    value: axis_name
+
+ran_when: "seg_ok"
+
+trigger:
+  - when: "p95_stat >= 60.0"
+    label: rate_tracking_error
+    severity: warning
+    suggestion: "角速率跟踪出现大的瞬时偏差（P95，最差轴 {axis_name}）。多由机动中的增益不足或执行器饱和引起；结合 Rate Tracking Error 曲线看偏差集中的时段。"
+    description: "armed 段角速率跟踪误差 P95 {p95_stat:.1f} deg/s（最差轴 {axis_name}）"
+    evidence:
+      source: vehicle_angular_velocity.xyz vs vehicle_rates_setpoint(armed 段, deg/s)
+      value: p95_stat
+      threshold: 60.0

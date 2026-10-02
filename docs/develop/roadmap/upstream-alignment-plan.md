@@ -1,9 +1,9 @@
 # 上游对齐实施 Plan：复刻 Flight Review → 借鉴 EKF/APM 生态 → 拉开差距
 
 状态：进行中。W1–W6 完成（频谱全链落地：算子 → 容器 → 8 张图）；规则侧批 1、批 2 与
-批 A（A1–A7 七个零覆盖 topic）完成，PX4 规则 26 → 61（另 APM 43，合计 104）；
-`esc_*` 嵌套取数支持已随 W6 落地并被批 A 全面用上。剩余：W7 批 C（PID 降压版）、
-W8 批 D（3D view）、W9 APM phases 修复、W10 收口。
+批 A（A1–A7 七个零覆盖 topic）完成，PX4 规则 26 → 63（另 APM 43，合计 106）；
+批 B（W9 APM phases 修复）与批 C（W7 PID 降压版）完成。剩余：W8 批 D（3D view）、
+W10 收口。
 
 用户需求（2026-09-30）：先把上游优点全盘覆盖（绘图、PID tune、3D view），再细化拉开差距；
 PX4 侧借鉴 `ecl_ekf_analysis` / `px4_log_analyzer` / `ai-drone-toolkit`；APM 侧对比
@@ -208,9 +208,9 @@ Pyodide 里 numpy 走 WASM，绝对数会比 CPython 慢若干倍，但 0.17 ms 
 | W4   | 批 B1a：读并确认 `zero_cross_hz`；实现字段无关频谱算子（候选 B：Worker 实时算）                                                         | 频谱实测 | **已完成**：`op_spectrum` + `_infer_fs` 落地，算子 92；单测 38 项全绿（含退化五连）；§5.1 已写实测数字                                                                                                                                                                                              |
 | W5   | 批 B2：`container` 加 `spectrogram`；前端加判别位与渲染分支                                                                             | W4       | **已完成**：构建期 `compileSpectrogram` + 前端九处打通；`typecheck`/eslint（0 error）/prettier 绿；真实日志端到端跑出 650 bin                                                                                                                                                                       |
 | W6   | 批 B3 + B4：铺 6 张频谱图 + Motor RPM + Sampling Regularity                                                                             | W5       | **已完成**：4 张 FFT 线图（`spectrum-*`，vlines 参数标线）+ 3 张 PSD 热图（`spectrogram-*`，`stft` 算子）+ `motor-rpm.yml` + sampling 补 delta t；算子 92→94；单测 43 项全绿；sample.ulg 端到端 fs 自推/vlines/热图形状全过；FIFO PSD ×2 与多实例拆分推迟（无样例数据，见 coverage.md「四点五」节） |
-| W7   | 批 C 降压版：PID 跟踪误差曲线 + 统计                                                                                                    | W3       | 页面可交互验证                                                                                                                                                                                                                                                                                      |
+| W7   | 批 C 降压版：PID 跟踪误差曲线 + 统计                                                                                                    | W3       | **已完成（批 C，2026-10）**：算子 `rate_tracking_stats`（95）+ `rate_tracking` 组 2 条规则 + `rate-error` 误差曲线图；sample.ulg 实测 P95 60.1 deg/s（Pitch）发射、曲线 1812 点自洽。反卷积/频域留第二阶段                                                                                          |
 | W8   | 批 D2：three.js 轨迹 + 姿态 tab                                                                                                         | W3       | 有数据时正常渲染；空数据隐藏 tab                                                                                                                                                                                                                                                                    |
-| W9   | APM `phases` 修复（从 `MODE` 切段推飞行阶段）                                                                                           | W1       | `check_apm_e2e.py` 通过；故障库命中率上升                                                                                                                                                                                                                                                           |
+| W9   | APM `phases` 修复（从 `MODE` 切段推飞行阶段）                                                                                           | W1       | **已完成（批 B，2026-10）**：`mode_phase_groups` + `_derive_phases`，check_apm_e2e 第 6 判据通过（STAB/AUTO → maneuver/cruise）；APM 3 份结果基线待有日志环境重冻（见 ardupilot/PENDING.md）                                                                                                        |
 | W10  | 文档与门禁收口：算子计数校准、覆盖率文档更新、`check_all.py --push` 全绿                                                                | W2–W9    | 34 项全绿                                                                                                                                                                                                                                                                                           |
 
 执行顺序：`W1 → W2 → W3 → W4 → W5 → W6 → W7 → W8 → W9 → W10`。

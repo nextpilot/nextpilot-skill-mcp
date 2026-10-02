@@ -1,0 +1,32 @@
+# 角速率跟踪误差曲线（PID 降压版批 C）：rate setpoint 插值到实测轴后逐时刻作差，
+# 三轴同图。与 rules/rate-tracking.yaml 的统计口径同源（同一条对齐方式），图看
+# "偏差集中在哪个时段/哪根轴"，规则管"超没超阈"。上游 Flight Review 的 PID 分析
+# 是独立子系统（反卷积/频域），这里只出误差曲线——对齐其可读性，不算复刻。
+#
+# 横轴：显式声明 vehicle_angular_velocity.timestamp（误差定义在实测轴上；不显式写
+# 会被 compute 里第一个裸字段反推成 setpoint 的时间轴，长度对不上直接报错）。
+id: rate-error
+title: Rate Tracking Error
+description: >
+  角速率跟踪误差（实测 − setpoint，deg/s）。roll/pitch/yaw 三轴同图，
+  setpoint 按时间戳线性插值到实测角速率的时间轴。持续偏离 = 增益不足或执行器
+  饱和；偏差尖峰多出现在大机动时段，与 Rate 图的 setpoint/实测对照看。
+order: 7
+condition:
+  message: [vehicle_angular_velocity, vehicle_rates_setpoint]
+compute:
+  - err_r = vehicle_angular_velocity.xyz[0] * 57.29578 - interp_to(vehicle_rates_setpoint.roll, vehicle_rates_setpoint.timestamp, vehicle_angular_velocity.timestamp) * 57.29578
+  - err_p = vehicle_angular_velocity.xyz[1] * 57.29578 - interp_to(vehicle_rates_setpoint.pitch, vehicle_rates_setpoint.timestamp, vehicle_angular_velocity.timestamp) * 57.29578
+  - err_y = vehicle_angular_velocity.xyz[2] * 57.29578 - interp_to(vehicle_rates_setpoint.yaw, vehicle_rates_setpoint.timestamp, vehicle_angular_velocity.timestamp) * 57.29578
+output:
+  - container: axes
+    title: Rate Tracking Error
+    ylabel: deg/s
+    children:
+      - mode: TimeSeries
+        xdata: vehicle_angular_velocity.timestamp
+        ydata:
+          - err_r
+          - err_p
+          - err_y
+        label: [Roll, Pitch, Yaw]

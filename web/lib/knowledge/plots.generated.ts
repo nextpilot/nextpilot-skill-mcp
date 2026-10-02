@@ -439,6 +439,75 @@ export const PLOT_PRESETS = {
       ]
     },
     {
+      "id": "rate-error",
+      "title": "Rate Tracking Error",
+      "description": "角速率跟踪误差（实测 − setpoint，deg/s）。roll/pitch/yaw 三轴同图， setpoint 按时间戳线性插值到实测角速率的时间轴。持续偏离 = 增益不足或执行器 饱和；偏差尖峰多出现在大机动时段，与 Rate 图的 setpoint/实测对照看。\n",
+      "condition": {
+        "firmware": "any",
+        "vehicle": "any",
+        "message": [
+          [
+            "vehicle_angular_velocity"
+          ],
+          [
+            "vehicle_rates_setpoint"
+          ]
+        ]
+      },
+      "compute": [
+        "err_r = vehicle_angular_velocity.xyz[0] * 57.29578 - interp_to(vehicle_rates_setpoint.roll, vehicle_rates_setpoint.timestamp, vehicle_angular_velocity.timestamp) * 57.29578",
+        "err_p = vehicle_angular_velocity.xyz[1] * 57.29578 - interp_to(vehicle_rates_setpoint.pitch, vehicle_rates_setpoint.timestamp, vehicle_angular_velocity.timestamp) * 57.29578",
+        "err_y = vehicle_angular_velocity.xyz[2] * 57.29578 - interp_to(vehicle_rates_setpoint.yaw, vehicle_rates_setpoint.timestamp, vehicle_angular_velocity.timestamp) * 57.29578"
+      ],
+      "outputs": [
+        {
+          "container": "axes",
+          "title": "Rate Tracking Error",
+          "legend": true,
+          "grid": true,
+          "flipx": false,
+          "flipy": false,
+          "range": null,
+          "hlines": null,
+          "split_by_instance": false,
+          "ylabel": "deg/s",
+          "xlabel": "秒（相对日志开始）",
+          "children": [
+            {
+              "mode": "TimeSeries",
+              "xdata": {
+                "kind": "field",
+                "fields": [
+                  "vehicle_angular_velocity.timestamp"
+                ]
+              },
+              "ydata": [
+                {
+                  "kind": "var",
+                  "name": "err_r"
+                },
+                {
+                  "kind": "var",
+                  "name": "err_p"
+                },
+                {
+                  "kind": "var",
+                  "name": "err_y"
+                }
+              ],
+              "labels": [
+                "Roll",
+                "Pitch",
+                "Yaw"
+              ],
+              "styles": [],
+              "colors": []
+            }
+          ]
+        }
+      ]
+    },
+    {
       "id": "yaw-angle",
       "title": "Yaw Angle",
       "description": "Yaw 欧拉角估计值与 setpoint、FF。",

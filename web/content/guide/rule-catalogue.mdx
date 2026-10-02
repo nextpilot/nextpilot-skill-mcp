@@ -7,7 +7,7 @@ group: 开发指南
 groupEn: For Developers
 order: 12
 ---
-引擎当前内置的 **104 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
+引擎当前内置的 **106 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
 每条给出：**适用**（固件 / 机架 / 依赖）、**取值**（读哪些字段、过哪个算子）、**判定**（自上而下
 命中第一条即发射）、**产出**（写进报告的 check 名、喂故障库匹配的标签、UI 用的统计）。
 
@@ -1212,6 +1212,39 @@ order: 12
 - 判定：
 - <strong>warning</strong> | `n_jump >= 10` | threshold 10 | description "armed 段测距跳变（>1 m）\{n_jump\} 次"
 - 产出：rangeJumpCount=n_jump, tag=range_distance_jump
+
+
+## rate_tracking（group: `rate_tracking`）
+
+### px4-rate-tracking-rms — 角速率跟踪误差（RMS）
+
+- 文件：`rules/rate-tracking.yaml` ｜ 位置：group `rate_tracking` #1
+- 适用：总是适用
+- 取值：
+- `act = stack_columns( _ref("vehicle_angular_velocity.xyz[0]") * 57.29578, _ref("vehicle_angular_velocity.xyz[1]") * 57.29578, _ref("vehicle_angular_velocity.xyz[2]") * 57.29578)`
+- `sp = stack_columns( vehicle_rates_setpoint.roll * 57.29578, vehicle_rates_setpoint.pitch * 57.29578, vehicle_rates_setpoint.yaw * 57.29578)`
+- `rms, p95, axis_i, seg_n = rate_tracking_stats( act, vehicle_angular_velocity.timestamp, sp, vehicle_rates_setpoint.timestamp, ARMED_INTERVALS, min_samples=50)`
+- `seg_ok = seg_n > 50 if seg_n else False`
+- `rms_stat = rms if seg_ok else None`
+- `axis_name = ["Roll", "Pitch", "Yaw"][axis_i] if (seg_ok and axis_i is not None) else None`
+- 判定：
+- <strong>warning</strong> | `rms_stat >= 30.0` | threshold 30 | description "armed 段角速率跟踪误差 RMS \{rms_stat:.1f\} deg/s（最差轴 \{axis_name\}）" | label=rate_tracking_error
+- 产出：rateErrRmsDeg=rms_stat, rateErrWorstAxis=axis_name, tag=rate_tracking_error
+
+### px4-rate-tracking-p95 — 角速率跟踪误差（P95 峰值）
+
+- 文件：`rules/rate-tracking.yaml` ｜ 位置：group `rate_tracking` #2
+- 适用：总是适用
+- 取值：
+- `act = stack_columns( _ref("vehicle_angular_velocity.xyz[0]") * 57.29578, _ref("vehicle_angular_velocity.xyz[1]") * 57.29578, _ref("vehicle_angular_velocity.xyz[2]") * 57.29578)`
+- `sp = stack_columns( vehicle_rates_setpoint.roll * 57.29578, vehicle_rates_setpoint.pitch * 57.29578, vehicle_rates_setpoint.yaw * 57.29578)`
+- `rms, p95, axis_i, seg_n = rate_tracking_stats( act, vehicle_angular_velocity.timestamp, sp, vehicle_rates_setpoint.timestamp, ARMED_INTERVALS, min_samples=50)`
+- `seg_ok = seg_n > 50 if seg_n else False`
+- `p95_stat = p95 if seg_ok else None`
+- `axis_name = ["Roll", "Pitch", "Yaw"][axis_i] if (seg_ok and axis_i is not None) else None`
+- 判定：
+- <strong>warning</strong> | `p95_stat >= 60.0` | threshold 60 | description "armed 段角速率跟踪误差 P95 \{p95_stat:.1f\} deg/s（最差轴 \{axis_name\}）" | label=rate_tracking_error
+- 产出：rateErrP95Deg=p95_stat, rateErrWorstAxis=axis_name, tag=rate_tracking_error
 
 
 ## rc_input（group: `rc_input`）

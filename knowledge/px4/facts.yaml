@@ -40,6 +40,7 @@ group_order:
         esc,
         imu_bias,
         attitude_tracking,
+        rate_tracking,
         airspeed,
         tecs,
         vtol_transition,
@@ -74,6 +75,7 @@ rule_meta:
         airspeed: { category: airspeed, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
         tecs: { category: airspeed, doc: "https://docs.px4.io/main/en/advanced_config/tuning_guide_fixedwing.html" }
         attitude_tracking: { category: attitude, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
+        rate_tracking: { category: attitude, doc: "https://docs.px4.io/main/en/config_mc/rate_tuning.html" }
         battery: { category: power, doc: "https://docs.px4.io/main/en/config/battery.html" }
         cpu: { category: system, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
         ekf_faults: { category: ekf, doc: "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html" }
