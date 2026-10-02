@@ -31,6 +31,7 @@
         "ekf_faults",
         "ekf_innovations",
         "ekf_variance",
+        "esc",
         "events",
         "failsafe",
         "fd_status",

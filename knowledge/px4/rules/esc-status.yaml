@@ -1,0 +1,229 @@
+# ESC 电机级规则：直接读电调回报的实测数据（转速 / 电流 / 温度 / 错误计数），
+# 与 motor-balance（读 actuator 输出指令）互为印证：输出指令平衡而实测转速失衡，
+# 问题在动力端（桨、电机、电调）；指令本身就不平衡，问题在混控或执行器分配。
+#
+# 取数注意：esc_status.esc[] 是嵌套结构数组，pyulog 展平成 `esc[0].esc_rpm` 这样的列。
+# 规则里**必须显式 _ref("esc_status.esc[0].esc_rpm")**——裸写嵌套链构建期校验放行，
+# 但运行期表达式重写只认 `topic[N].field` 两段形态，三层链会在最外层断掉（变成对
+# 取数结果取属性，异常 → 整条误报"数据不足"）。8 路全写：缺哪路取到 None，
+# stack_columns 自动跳过，活跃通道数由 active_column_means 的 min_mean 兜底。
+#
+# 阈值 [暂定]：转速/电流失衡是相对判据（比值），过温是绝对判据（电调 MOS 常见上限
+# 85 °C 预警、105 °C 危险）。 esc_state 值域随厂商（depend on Vendor）没有通用语义，
+# 不做独立规则；esc_report 独立话题只存在于更老的驱动，esc_status 各版本都在，本文件
+# 只对 esc_status 写（老日志缺列自然按"数据不足"跳过）。
+
+---
+id: px4-esc-rpm-unbalance
+name: ESC 转速不平衡
+group: esc
+order: 1
+tag: esc_rpm_unbalance
+version: 1.0.0
+
+condition:
+  message:
+    - esc_status
+  armed: true
+
+compute:
+  # 各电调实测转速（缺哪路取到 None，stack_columns 跳过）
+  - >-
+    rpm_m = stack_columns(
+    _ref("esc_status.esc[0].esc_rpm"), _ref("esc_status.esc[1].esc_rpm"),
+    _ref("esc_status.esc[2].esc_rpm"), _ref("esc_status.esc[3].esc_rpm"),
+    _ref("esc_status.esc[4].esc_rpm"), _ref("esc_status.esc[5].esc_rpm"),
+    _ref("esc_status.esc[6].esc_rpm"), _ref("esc_status.esc[7].esc_rpm"))
+  # 悬停/定点段比较（机动时四路指令本就不同，全程比会把正常机动算成失衡）
+  - >-
+    seg = active_window_mask(esc_status.timestamp, ARMED_INTERVALS, vehicle_status.nav_state, vehicle_status.timestamp, codes=[2, 4, 6, 14, 21], min_active=20)
+  # 平均转速 > 100 rpm 才算接入（排除未接/未用通道；反转桨均值为负同样排除）
+  - means = active_column_means(rpm_m, seg, min_mean=100.0)
+  - sp, hi_i, lo_i = items_spread(means)
+  - hi = means[hi_i]["mean"]
+  - lo = means[lo_i]["mean"]
+  - rel = (hi - lo) / hi
+
+output:
+  - name: escRpmSpreadRatio
+    value: rel
+    round: 3
+  - name: escRpmHigh
+    value: hi
+    round: 0
+    unit: rpm
+  - name: escRpmLow
+    value: lo
+    round: 0
+    unit: rpm
+  - name: escCountActive
+    value: len(means)
+
+trigger:
+  - when: "rel >= 0.30"
+    severity: critical
+    suggestion: "转速差超过 30%：桨叶松动/损伤、电机缺相或电调输出异常。结合 ESC 报错计数与电流分布定位是哪一路。"
+    description: "ESC {lo_i} 转速比 {hi_i} 低 {rel:.0%}（悬停段 {lo:.0f} vs {hi:.0f} rpm）"
+    evidence:
+      source: esc_status.esc[](悬停段均值极差)
+      value: f"{rel:.3f}"
+      threshold: 0.30
+  - when: "rel >= 0.15"
+    severity: warning
+    suggestion: "转速差偏大：先核对桨叶型号/紧固与机架形变，再看各电调电流是否同步偏斜（转速低的电流通常更高）。"
+    description: "ESC {lo_i} 转速比 {hi_i} 低 {rel:.0%}（悬停段 {lo:.0f} vs {hi:.0f} rpm）"
+    evidence:
+      source: esc_status.esc[](悬停段均值极差)
+      value: f"{rel:.3f}"
+      threshold: 0.15
+
+---
+id: px4-esc-current-skew
+name: ESC 电流偏斜
+group: esc
+order: 2
+tag: esc_current_skew
+version: 1.0.0
+
+condition:
+  message:
+    - esc_status
+  armed: true
+
+compute:
+  - >-
+    cur_m = stack_columns(
+    _ref("esc_status.esc[0].esc_current"), _ref("esc_status.esc[1].esc_current"),
+    _ref("esc_status.esc[2].esc_current"), _ref("esc_status.esc[3].esc_current"),
+    _ref("esc_status.esc[4].esc_current"), _ref("esc_status.esc[5].esc_current"),
+    _ref("esc_status.esc[6].esc_current"), _ref("esc_status.esc[7].esc_current"))
+  - >-
+    seg = active_window_mask(esc_status.timestamp, ARMED_INTERVALS, vehicle_status.nav_state, vehicle_status.timestamp, codes=[2, 4, 6, 14, 21], min_active=20)
+  # 平均电流 > 0.5 A 才算接入（未接通道 ≈ 0）
+  - means = active_column_means(cur_m, seg, min_mean=0.5)
+  - sp, hi_i, lo_i = items_spread(means)
+  - hi = means[hi_i]["mean"]
+  - lo = means[lo_i]["mean"]
+  - ratio = hi / lo if lo > 0 else 0
+
+output:
+  - name: escCurrentRatio
+    value: ratio
+    round: 2
+  - name: escCurrentHigh
+    value: hi
+    round: 2
+    unit: A
+  - name: escCurrentLow
+    value: lo
+    round: 2
+    unit: A
+
+# 阈值 [暂定]：均值比 >= 2.5 且高侧 >= 5 A 才报——低电流下比值噪声大
+
+trigger:
+  - when: "ratio >= 2.5 and hi >= 5.0"
+    severity: warning
+    suggestion: "某电调平均电流显著偏高：桨叶损伤/形变、电机轴承磨损、或该路电调输出特性异常。对照转速：电流高而转速低是负载重，电流高转速也高是分配偏。"
+    description: "ESC {hi_i} 平均电流是 {lo_i} 的 {ratio:.1f} 倍（{hi:.1f} vs {lo:.1f} A，悬停段）"
+    evidence:
+      source: esc_status.esc[](悬停段均值比)
+      value: f"{ratio:.2f}"
+      threshold: 2.5
+
+---
+id: px4-esc-overheat
+name: 电调过温
+group: esc
+order: 3
+tag: esc_overheat
+version: 1.0.0
+
+condition:
+  message:
+    - esc_status
+  armed: true
+
+compute:
+  - >-
+    temp_m = stack_columns(
+    _ref("esc_status.esc[0].esc_temperature"), _ref("esc_status.esc[1].esc_temperature"),
+    _ref("esc_status.esc[2].esc_temperature"), _ref("esc_status.esc[3].esc_temperature"),
+    _ref("esc_status.esc[4].esc_temperature"), _ref("esc_status.esc[5].esc_temperature"),
+    _ref("esc_status.esc[6].esc_temperature"), _ref("esc_status.esc[7].esc_temperature"))
+  # 每时刻各电调的最高温度；0 / 负值是"未上报"占位，gt=0 剔除
+  - tmax_t = rows_aggregate(temp_m, agg="max", gt=0.0)
+  - tmax = max(tmax_t) if tmax_t is not None else None
+  # armed 段温升（头段中位 vs 尾段中位）；不报温度的电调此处拿不到，容错掉
+  - rise, tail_med = _try(head_tail_median_drop(tmax_t, esc_status.timestamp, ARMED_INTERVALS, skip_first_s=5, min_seg=20))
+
+output:
+  - name: escTempMax
+    value: tmax
+    round: 1
+    unit: degC
+  - name: escTempRise
+    value: rise if rise is not None else None
+    round: 1
+    unit: degC
+
+# 阈值 [暂定]：85 °C 接近多数电调 MOS 的降额点，105 °C 已有损坏风险
+
+trigger:
+  - when: "tmax >= 105"
+    severity: critical
+    suggestion: "电调温度过高：检查散热与气流、降低悬停电流（桨叶效率）、或换更大电流余量的电调。持续高温会触发热失效保护。"
+    description: "ESC 最高温度 {tmax:.0f} °C（飞行中温升约 {rise:.0f} °C）"
+    evidence:
+      source: esc_status.esc[](温度最大值)
+      value: f"{tmax:.1f}"
+      threshold: 105
+      unit: degC
+  - when: "tmax >= 85"
+    severity: warning
+    suggestion: "电调温度偏高：多数电调在此开始降额。留意高温是否伴随大电流通道，必要时改善散热或减载。"
+    description: "ESC 最高温度 {tmax:.0f} °C"
+    evidence:
+      source: esc_status.esc[](温度最大值)
+      value: f"{tmax:.1f}"
+      threshold: 85
+      unit: degC
+
+---
+id: px4-esc-error-count
+name: 电调报错计数
+group: esc
+order: 4
+tag: esc_error_count
+version: 1.0.0
+
+condition:
+  message:
+    - esc_status
+
+compute:
+  - >-
+    err_m = stack_columns(
+    _ref("esc_status.esc[0].esc_errorcount"), _ref("esc_status.esc[1].esc_errorcount"),
+    _ref("esc_status.esc[2].esc_errorcount"), _ref("esc_status.esc[3].esc_errorcount"),
+    _ref("esc_status.esc[4].esc_errorcount"), _ref("esc_status.esc[5].esc_errorcount"),
+    _ref("esc_status.esc[6].esc_errorcount"), _ref("esc_status.esc[7].esc_errorcount"))
+  # 每时刻各电调错误计数的最大值；错误计数是累计值，看整段日志的增量
+  - err_t = rows_aggregate(err_m, agg="max")
+  - n_err = int(max(err_t) - err_t[0]) if err_t is not None else 0
+
+output:
+  - name: escErrorCount
+    value: n_err
+
+# 电调未上报错误时计数恒 0，增量 0 不触发；无固件判据，本仓不设阈值
+
+trigger:
+  - when: "n_err > 0"
+    severity: critical
+    suggestion: "电调在飞行中上报了错误：结合固件 failures 位（过流/过压/堵转/过温）与电机失效检测器交叉定位。报错后往往伴随该通道转速/电流异常。"
+    description: "电调错误计数增长 {n_err} 次"
+    evidence:
+      source: esc_status.esc[](esc_errorcount 增量)
+      value: n_err
+      threshold: 0

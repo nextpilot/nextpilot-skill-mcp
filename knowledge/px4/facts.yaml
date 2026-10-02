@@ -32,6 +32,7 @@ group_order:
         failsafe,
         mode_thrash,
         motor_balance,
+        esc,
         imu_bias,
         attitude_tracking,
         airspeed,
@@ -78,6 +79,7 @@ rule_meta:
         logged_messages: { category: messages, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
         mode_thrash: { category: mode, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
         motor_balance: { category: motor, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
+        esc: { category: motor, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
         vibration: { category: vibration, doc: "https://docs.px4.io/main/en/assembly/vibration_isolation.html" }
         vtol_transition: { category: vtol, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
         wind_estimate: { category: wind, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
