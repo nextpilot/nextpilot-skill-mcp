@@ -1,0 +1,110 @@
+# 避障/测距传感器（distance_sensor）：读数质量三查——信号质量、无效读数占比、
+# 相邻跳变。多实例传感器（前后上下多路）：signal_quality / variance 用 [:] 分组
+# 取最差实例；跳变与无效占比看实例 0（多路同时查跳变的边际价值小，先用实例 0）。
+#
+# 阈值 [暂定]：signal_quality 均值 < 60（0~100 口径，<60 表示回波质量差）；
+# 无效读数占比 30%；跳变 1 m / 10 次（悬停场景下测距不该有米级抖动）。
+
+---
+id: px4-range-signal-quality
+name: 测距信号质量差
+group: range_finder
+order: 1
+tag: range_signal_quality
+version: 1.0.0
+
+condition:
+  message:
+    - distance_sensor
+
+compute:
+  # signal_quality 0~100；不支持的传感器恒报 -1（均值 <0 被 min_mean 排除，
+  # 全部不支持时 worst_mean_stats 返回 None → 解包中止，记"数据不足"）
+  - q_mean, q_p95, q_max, q_idx = worst_mean_stats(_ref("distance_sensor[:].signal_quality"), min_mean=0)
+
+output:
+  - name: rangeSignalQualityMean
+    value: q_mean
+    round: 1
+  - name: rangeSignalQualityIdx
+    value: q_idx
+
+trigger:
+  - when: "q_mean < 60"
+    severity: warning
+    suggestion: "测距传感器回波质量差：检查透镜/超声波面是否脏污、安装角度与打气流失配、以及量程内是否有干扰源。质量差时避障读数不可靠。"
+    description: "测距传感器 {q_idx} 平均信号质量仅 {q_mean:.0f}/100"
+    evidence:
+      source: distance_sensor[].signal_quality(最差实例均值)
+      value: f"{q_mean:.1f}"
+      threshold: 60
+
+---
+id: px4-range-invalid
+name: 测距无效读数偏多
+group: range_finder
+order: 2
+tag: range_invalid_reads
+version: 1.0.0
+
+condition:
+  message:
+    - distance_sensor
+  armed: true
+
+compute:
+  # 无效读数（超量程/被挡）驱动报 0；统计 armed 段 0 的占比
+  - frac0 = ratio_equal(distance_sensor.current_distance, value=0.0)
+
+output:
+  - name: rangeInvalidFrac
+    value: frac0
+    round: 3
+
+# 阈值 [暂定]：30%。偶发超量程正常（抬头/滚转时打出去），持续三成读数无效
+# 说明量程配置与实际飞行不符或传感器选型不合适
+
+trigger:
+  - when: "frac0 >= 0.30"
+    severity: warning
+    suggestion: "armed 段近三成测距读数无效（0）：传感器朝向与飞行姿态不匹配（滚转/俯仰时打出量程）、量程参数配置过小、或安装位置被机体遮挡。"
+    description: "armed 段无效测距读数占比 {frac0:.0%}"
+    evidence:
+      source: distance_sensor.current_distance(==0 占比)
+      value: f"{frac0:.3f}"
+      threshold: 0.3
+
+---
+id: px4-range-jump
+name: 测距读数跳变
+group: range_finder
+order: 3
+tag: range_distance_jump
+version: 1.0.0
+
+condition:
+  message:
+    - distance_sensor
+  armed: true
+
+compute:
+  # 相邻采样差分；valid 读数间跳 1 m 以上（悬停不该有），数次数。
+  # 先剔除 0 占位再作差——0→valid 的恢复不算跳变
+  - d_valid = keep_gt(distance_sensor.current_distance, gt=0.0)
+  - n_jump = count_above(abs(diff(d_valid)), gt=1.0)
+
+output:
+  - name: rangeJumpCount
+    value: n_jump
+
+# 阈值 [暂定]：>1 m 的跳变 10 次以上。多旋翼悬停贴近地面时测距曲线应平滑
+
+trigger:
+  - when: "n_jump >= 10"
+    severity: warning
+    suggestion: "测距读数频繁米级跳变：多路径反射（水面/玻璃/栏杆）、阳光干扰（红外类）、或安装振动过大。跳变的读数会直接打进避障逻辑。"
+    description: "armed 段测距跳变（>1 m）{n_jump} 次"
+    evidence:
+      source: distance_sensor.current_distance(相邻差分)
+      value: n_jump
+      threshold: 10

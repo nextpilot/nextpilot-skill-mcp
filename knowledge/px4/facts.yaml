@@ -27,6 +27,7 @@ group_order:
         ekf_innovations,
         ekf_faults,
         baro,
+        range_finder,
         battery,
         cpu,
         gps_health,
@@ -72,6 +73,7 @@ rule_meta:
         cpu: { category: system, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
         ekf_faults: { category: ekf, doc: "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html" }
         baro: { category: sensor, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
+        range_finder: { category: sensor, doc: "https://docs.px4.io/main/en/computer_vision/object_avoidance.html" }
         ekf_innovations: { category: ekf, doc: "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html" }
         failsafe: { category: failsafe, doc: "https://docs.px4.io/main/en/config/safety.html" }
         gps_health: { category: gps, doc: "https://docs.px4.io/main/en/gps_compass/" }

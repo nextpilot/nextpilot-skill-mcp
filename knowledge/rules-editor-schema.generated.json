@@ -51,6 +51,7 @@
         "param_audit",
         "power_supply",
         "prearm_messages",
+        "range_finder",
         "rc_input",
         "rc_link",
         "sensor_health",
