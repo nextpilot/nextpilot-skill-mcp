@@ -7,7 +7,7 @@ group: 开发指南
 groupEn: For Developers
 order: 12
 ---
-引擎当前内置的 **106 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
+引擎当前内置的 **110 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
 每条给出：**适用**（固件 / 机架 / 依赖）、**取值**（读哪些字段、过哪个算子）、**判定**（自上而下
 命中第一条即发射）、**产出**（写进报告的 check 名、喂故障库匹配的标签、UI 用的统计）。
 
@@ -362,6 +362,33 @@ order: 12
 - 判定：
 - <strong>critical</strong> | `crit_bits` | threshold 0 | description "EKF 报告核心融合硬故障（filter_fault_flags=\{fault_union\}）"
 - <strong>info</strong> | `fault_union > 0 and not crit_bits` | threshold 0 | description "EKF 报告非核心辅助传感器融合拒绝（filter_fault_flags=\{fault_union\}，常见为未使用视觉/光流）"
+- 产出：tag=ekf_innovation_failure
+
+### px4-ekf-timeout — EKF 融合超时
+
+- 文件：`rules/ekf-timeout.yaml` ｜ 位置：group `ekf_faults` #2
+- 适用：总是适用
+- 取值：
+- `to = _try(bit_or_max(estimator_status[:].timeout_flags))`
+- `to = _try(coalesce(to, 0))`
+- 判定：
+- <strong>warning</strong> | `to > 0` | threshold 0 | description "EKF 某路观测融合超时（timeout_flags=\{to\}）" | label=ekf_innovation_failure
+- 产出：tag=ekf_innovation_failure
+
+### px4-ekf-gps-check-fails — EKF 拒收 GPS（解锁后）
+
+- 文件：`rules/ekf-gps-check-fails.yaml` ｜ 位置：group `ekf_faults` #3
+- 适用：总是适用
+- 取值：
+- `gf = estimator_status.gps_check_fail_flags`
+- `am = interval_mask(estimator_status.timestamp, ARMED_INTERVALS)`
+- `gf_armed = apply_mask(gf, am)`
+- `n_armed = count_true(am)`
+- `n_bad = count_above(gf_armed, gt=0)`
+- `ratio = _try(div(n_bad, n_armed))`
+- `gf_worst = max(gf_armed)`
+- 判定：
+- <strong>warning</strong> | `ratio is not None and ratio >= 0.5 and n_bad >= 100` | threshold 0.5 | description "EKF 在解锁后 \{ratio:.0%\} 的时间拒绝 GPS 融合（gps_check_fail_flags 最严 \{gf_worst\}）" | label=ekf_innovation_failure
 - 产出：tag=ekf_innovation_failure
 
 
@@ -1093,6 +1120,19 @@ order: 12
 - 产出：tag=apm_param_fence_empty
 
 
+## param_changes（group: `param_changes`）
+
+### px4-param-changed — 运行中参数修改
+
+- 文件：`rules/param-changed.yaml` ｜ 位置：group `param_changes` #1
+- 适用：总是适用
+- 取值：
+- `n_changed = _try(len(changed_parameters.timestamp_us))`
+- 判定：
+- <strong>info</strong> | `n_changed is not None and n_changed > 0` | threshold 0 | description "本次飞行中修改了 \{n_changed\} 个参数"
+- 产出：-
+
+
 ## position（group: `position`）
 
 ### px4-gpos-dead-reckoning — 位置惯性推算
@@ -1384,6 +1424,29 @@ order: 12
 - 判定：
 - <strong>warning</strong> | `long_loops > 0` | threshold 0 | unit 次 | description "调度记录到 \{long_loops:.0f\} 次长循环"
 - 产出：tag=apm_scheduler_long_loops
+
+
+## vehicle_profile（group: `vehicle_profile`）
+
+### apm-vehicle-profile-hover — 悬停油门 / 动力余量
+
+- 文件：`rules/vehicle-profile.yaml` ｜ 位置：group `vehicle_profile` #1
+- 适用：总是适用
+- 取值：
+- `hover_l = _cfg("MOT_THST_HOVER")`
+- `hover_l_ok = hover_l is not None and hover_l > 0.0 and hover_l <= 1.0`
+- `tho = _ref("CTUN.ThO")`
+- `fly = tho[(tho > 0.1) & (tho < 0.95)]`
+- `n_fly = len(fly)`
+- `hover_e = value_if(n_fly > 20, median(fly))`
+- `hover = coalesce(value_if(hover_l_ok, hover_l), hover_e)`
+- `margin = sub(100.0, scale(hover, factor=100.0))`
+- `t2w = div(1.0, hover)`
+- `hover_src = choose(hover_l_ok, "MOT_THST_HOVER", "CTUN.ThO 中位数估计")`
+- 判定：
+- <strong>warning</strong> | `hover is not None and hover >= 0.62` | threshold 0.62 | description "悬停油门 \{hover:.0%\}（\{hover_src\}）≥62%，动力余量仅 \{margin:.0f\}%，推重比 ≈\{t2w:.1f\}"
+- <strong>info</strong> | `hover is not None and hover <= 0.30` | threshold 0.3 | description "悬停油门 \{hover:.0%\}（\{hover_src\}）≤30%，推重比 ≈\{t2w:.1f\}，动力过剩"
+- 产出：hoverThrottle=hover, powerMarginPct=margin, thrustToWeight=t2w, tag=apm_vehicle_power_margin
 
 
 ## vibration（group: `vibration`）

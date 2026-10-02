@@ -42,6 +42,7 @@ group_order:
         sensor_health,
         prearm_messages,
         param_audit,
+        vehicle_profile,
         guards,
     ]
 
@@ -110,6 +111,9 @@ rule_meta:
         param_audit:
             category: config
             doc: "https://ardupilot.org/copter/docs/parameters.html"
+        vehicle_profile:
+            category: config
+            doc: "https://ardupilot.org/copter/docs/common-tuning.html"
         guards_early:
             category: guard
         guards:

@@ -51,6 +51,7 @@
         "mode_thrash",
         "motor_balance",
         "param_audit",
+        "param_changes",
         "position",
         "power_supply",
         "prearm_messages",
@@ -61,6 +62,7 @@
         "sensor_health",
         "tecs",
         "timing",
+        "vehicle_profile",
         "vibration",
         "vtol_transition",
         "wind_estimate"

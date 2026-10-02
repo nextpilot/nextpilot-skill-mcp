@@ -1,9 +1,11 @@
 # 上游对齐实施 Plan：复刻 Flight Review → 借鉴 EKF/APM 生态 → 拉开差距
 
 状态：已完成。W1–W6 完成（频谱全链落地：算子 → 容器 → 8 张图）；规则侧批 1、批 2 与
-批 A（A1–A7 七个零覆盖 topic）完成，PX4 规则 26 → 63（另 APM 43，合计 106）；
-批 B（W9 APM phases 修复）、批 C（W7 PID 降压版）与批 D（W8 three.js 3D 视图）完成。
-W10 收口随批 D 提交落地：算子 95、规则 106 条、门禁全绿；遗留项见 §8 已知限制。
+批 A（A1–A7 七个零覆盖 topic）完成；批 B（W9 APM phases 修复）、批 C（W7 PID 降压版）
+与批 D（W8 three.js 3D 视图）完成，W10 收口随批 D 落地。计划外延伸批 E（2026-10，
+"继续搬迁 rule 和 plot"收尾）：PX4 66 条（新增 ekf-gps-check-fails / ekf-timeout /
+param-changed），APM 44 条（新增 vehicle-profile，U5 16/16 收官），合计 110 条、
+算子 95；nan_flags 标不做（新固件已移除该信号）。门禁全绿；遗留项见 §8 已知限制。
 
 用户需求（2026-09-30）：先把上游优点全盘覆盖（绘图、PID tune、3D view），再细化拉开差距；
 PX4 侧借鉴 `ecl_ekf_analysis` / `px4_log_analyzer` / `ai-drone-toolkit`；APM 侧对比

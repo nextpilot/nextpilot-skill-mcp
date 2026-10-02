@@ -5,6 +5,9 @@ PX4 那一堆 topic 里，我们检查了哪些、漏了哪些、先补哪些。
 
 摸底时间 2026-09-30；批 1 落地后（2026-10）PX4 规则数由 26 涨到 31，批 2 再涨到 33；
 批 A（A1–A7，2026-10）把零覆盖 topic 清零后涨到 61（另有 ardupilot 43 条，两平台合计 104）。
+批 C 加 PID 跟踪误差 2 条（PX4 63）、批 B/W9 与批 C 陆续补 APM 侧；批 E（2026-10，
+上游搬迁收尾）PX4 加 `ekf-gps-check-fails`/`ekf-timeout`/`param-changed` 3 条
+（66），APM 加 `vehicle-profile` 1 条（44），两平台合计 **110 条**。
 
 ## 结论速览
 
@@ -182,6 +185,14 @@ W4/W5 解掉「缺算子」根因、W6 把图铺完。三种容器的分工与�
   误差曲线（setpoint 插值到实测轴逐时刻作差）。sample.ulg 实测：P95 60.1 deg/s
   （Pitch 轴）发射 warning，误差曲线三轴 1812 点与 finding 数值自洽。
   磁力计推力相关性、执行器饱和**仍未做**。
+- 批 E（上游搬迁收尾，2026-10）：PX4 侧补 3 条——`ekf-gps-check-fails`
+  （ecl U3 权威：`gps_check_fail_flags` 解锁后拒绝 GPS 融合占比 ≥50% 且坏样本 ≥100
+  → warning）、`ekf-timeout`（`timeout_flags` 跨实例位或非零 → warning）、
+  `param-changed`（飞行中改参计数 → info，日志没录 `changed_parameters` 自动 skip）。
+  APM 侧补 `vehicle-profile`（U5 16/16 收官，见 upstream.md §四）。sample.ulg 实跑：
+  gps-check-fails 发射 warning（armed 占比 81%、最严位 40=bit3+bit5）、timeout 不发射
+  （全 0）、param-changed 按"缺 topic"skip，全部符合预期。`nan_flags` 标不做
+  （新固件已移除，restart guard 覆盖）。
 
 每批的验收标准：新规则在基线上跑通，产出的差异只允许新增 finding/skipped，
 不允许改动既有 finding，用 `tools/engine/compare_baseline.py` 卡。

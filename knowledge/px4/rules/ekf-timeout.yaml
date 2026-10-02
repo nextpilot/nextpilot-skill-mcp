@@ -1,0 +1,29 @@
+# EKF 融合超时（robotto ekf_faults 检查的补全，ecl_ekf_analysis 同源）：timeout_flags
+# 是位掩码，某路观测（位置/速度/高度/磁……）长时间没进融合就会被置位——EKF 在
+# 盲飞。位或跨实例取并集：任一实例置过位就值得报（与 ekf-faults 同一处理）。
+
+id: px4-ekf-timeout
+name: EKF 融合超时
+group: ekf_faults
+order: 2 # ekf_faults group 内次序：faults=1, timeout=2, gps-check=3
+tag: ekf_innovation_failure
+
+condition:
+  message:
+    - estimator_status
+
+compute:
+  - to = _try(bit_or_max(estimator_status[:].timeout_flags))
+  - to = _try(coalesce(to, 0))
+
+trigger:
+  - when: "to > 0"
+    label: ekf_innovation_failure
+    severity: warning
+    suggestion: "检查对应传感器是否掉线/数据停滞（GNSS、磁力计、气压计、视觉），
+      以及 EKF2 的超时参数；盲飞状态下姿态可能发散，建议停飞排查。"
+    description: EKF 某路观测融合超时（timeout_flags={to}）
+    evidence:
+      source: estimator_status.timeout_flags
+      value: f"fault={to}"
+      threshold: 0

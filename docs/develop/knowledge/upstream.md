@@ -75,8 +75,9 @@ VIO 五项（P15–P19：位置/速度/姿态/角速率/延迟，数据源 `vehi
 传感器 11 项里 10 项已建：磁场（`plot/mag.yml`）、测距（`distance.yml`）、GPS 精度
 （`gps-uncertainty.yml`）、GPS 噪声（`gps-noise.yml`）、磁场对推力（`thrust-mag.yml`）、
 电源（`power.yml`）、温度（`temperature.yml`）、估计器标志（`estimator-flags.yml`）、
-失效保护标志（`failsafe-flags.yml`）、CPU 与内存（`cpu-ram.yml`）。唯一没建的是
-S11 参数变更（`changed_parameters`），上游也只是个按钮占位。
+失效保护标志（`failsafe-flags.yml`）、CPU 与内存（`cpu-ram.yml`）。S11 参数变更
+（`changed_parameters`）2026-10 补成检查 `px4-param-changed`（info 级，日志没录
+该 topic 自动 skip；上游也只是个按钮占位）。
 
 ### 控制与作动器（8 项构造点，7 已建）
 
@@ -141,16 +142,16 @@ PID 分析是一个子系统，能力清单留作参照：Wiener 反卷积求阶
 上游实码：`packages/robotto-drone-core/src/robotto_drone_core/ulog_tools.py`
 的 `diagnose_flight(path)`（第 523–800 行），阈值常量在第 70–78 行。
 
-| #   | 上游 check        | 上游判据与阈值                            | 本仓现状                                               |
-| --- | ----------------- | ----------------------------------------- | ------------------------------------------------------ |
-| 1   | `logged_errors`   | `ERR+` 聚合 critical                      | 已有，拆成 `log-errors` + `log-warnings`               |
-| 2   | `ekf_innovations` | 四路检验比峰值，warn 0.5 / crit 1.0       | 已有，口径改「拒绝占比」1%/5%，扩到 10 路              |
-| 3   | `ekf_faults`      | `filter_fault_flags` 或 `nan_flags` 非零  | 占位，位掩码逐位判，`nan_flags` 未查                   |
-| 4   | `vibration`       | `vibe[2]` 峰值，warn 30 / crit 60 m/s     | 占位，换数据源 `vehicle_imu_status`（4.905/9.81 m/s²） |
-| 5   | `cpu_load`        | `cpuload.load`，warn 0.90 / crit 0.95     | 部分，阈值相同                                         |
-| 6   | `battery`         | `remaining` 最小值，warn 0.20 / crit 0.10 | 已有，更细且修掉 -1 误报                               |
-| 7   | `failsafe`        | 5 布尔边沿 + `nav_state` 进降级状态       | 已有，完整复刻，armed 过滤更严                         |
-| 8   | `mode_thrash`     | `nav_state` 变化次数 >12                  | 部分，阈值相同                                         |
+| #   | 上游 check        | 上游判据与阈值                            | 本仓现状                                                                                             |
+| --- | ----------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| 1   | `logged_errors`   | `ERR+` 聚合 critical                      | 已有，拆成 `log-errors` + `log-warnings`                                                             |
+| 2   | `ekf_innovations` | 四路检验比峰值，warn 0.5 / crit 1.0       | 已有，口径改「拒绝占比」1%/5%，扩到 10 路                                                            |
+| 3   | `ekf_faults`      | `filter_fault_flags` 或 `nan_flags` 非零  | 已有，`bit_or_max` 跨实例逐位判；`nan_flags` 标不做（新固件已移除该信号，解锁重启 guard 覆盖同场景） |
+| 4   | `vibration`       | `vibe[2]` 峰值，warn 30 / crit 60 m/s     | 占位，换数据源 `vehicle_imu_status`（4.905/9.81 m/s²）                                               |
+| 5   | `cpu_load`        | `cpuload.load`，warn 0.90 / crit 0.95     | 部分，阈值相同                                                                                       |
+| 6   | `battery`         | `remaining` 最小值，warn 0.20 / crit 0.10 | 已有，更细且修掉 -1 误报                                                                             |
+| 7   | `failsafe`        | 5 布尔边沿 + `nav_state` 进降级状态       | 已有，完整复刻，armed 过滤更严                                                                       |
+| 8   | `mode_thrash`     | `nav_state` 变化次数 >12                  | 部分，阈值相同                                                                                       |
 
 几处实现差异值得记：上游四路创新比取瞬时峰值，本仓改成超阈样本占比加
 `channel_min=3` 去毛刺，还带多 EKF 实例定位；故障位上游逐实例取 max 会漏组合位，
@@ -185,8 +186,13 @@ PID 分析是一个子系统，能力清单留作参照：Wiener 反卷积求阶
 | 16  | `prearm`      | `prearm.yaml`（1 条）      | 已有；`count_items` 的 `contains=`，大小写不敏感                 |
 
 `_cfg()` 有个坑：只能在 `compute` 里用，`when` 里写非法。汇总：13 齐平 +
-2 主动降级（power / gps，理由在上表）+ `vehicle_profile` 未迁移（需要 hover 油门
-反推推重比，本仓无对应算子）；`recommend_tuning` 属建议层，等 PID 分析。
+2 主动降级（power / gps，理由在上表）+ `vehicle_profile`（**2026-10 补齐，U5 16/16
+收官**）。原记「需要 hover 油门反推推重比，本仓无对应算子」不成立：上游实码在
+`profile.py`（不在 checks/），悬停油门优先学习参数 `MOT_THST_HOVER`，否则
+`CTUN.ThO` 落在 (0.1, 0.95) 的样本 >20 个取中位数，`hover >= 0.62`（HOVER_UNDERPOWERED）
+发 warning、`hover <= 0.30`（HOVER_OVERPOWERED）发 info，现有算子链
+（`choose`/`coalesce`/`value_if`/`median`/布尔索引）即可完整表达，落 `vehicle-profile.yaml`。
+`recommend_tuning` 属建议层，等 PID 分析。
 
 从上游一并迁来的资产：码表 8 张（`_FRAME_CLASS_MAP`、`_MSGTYPE_*` 等）、
 阈值审计（上游 `docs/SOURCES.md` 的 198 条假设：confirmed 86 / heuristic 22 /
@@ -194,20 +200,20 @@ design choice 82 / corrected 8）、`estimate_cells` 电芯估算。
 
 ## 五、其余上游：旁证与可借鉴
 
-| 上游                  | 提供的能力                                             | 本仓 | 可借鉴                             |
-| --------------------- | ------------------------------------------------------ | ---- | ---------------------------------- |
-| U3 ecl_ekf_analysis   | EKF 创新比批处理、四步结构化分析                       | 部分 | 阈值对表；四步分析做报告骨架       |
-| U4 px4_log_analyzer   | 声明式事件 + 时间窗去抖、组合派生                      | 部分 | 时间窗去抖；约 80 参数的监控清单   |
-| U6 ArduPilot WebTools | `fft.js` + Pyodide；PIDReview；FilterTool Bode；MAGFit | 没有 | `fft.js` 是频谱零上传的现成答案    |
-| U7 FlightMD           | health score 0–100 + 权重；确切参数改动；50 份日志验证 | 没有 | 总评分、参数改动、回归集做法       |
-| U8 smarttune-cli      | 参数存在性校验门禁；6 层 JSON 知识库；置信度           | 没有 | 参数存在性校验门禁（最该抄的一条） |
-| PX4 官方四步分析      | 完整性 → 跟踪 → 传感器 → 电源                          | 部分 | 报告页叙事骨架                     |
-| px4-log-analysis      | Claude skill：`accel-vibration`（PSD 找陷波）等 4 个   | 没有 | PSD 做法对应频谱缺口               |
-| flight-tools          | RSSI vs 距离、功率图、日志浏览器                       | 没有 | RSSI 与距离关系图值得照搬          |
-| px4-ulog-mcp          | 5 个 MCP 工具（summary/query/failsafe/diagnose…）      | 部分 | 本仓 MCP 工具集的参照              |
-| PX4/pyulog            | `ulog_info`/`ulog2csv`/`ulog2kml`                      | 已有 | 本仓解析底层                       |
-| 桌面工具              | PlotJuggler / FlightPlot / MAVGCL …                    | 不做 | 那是工作台形态                     |
-| ML 分类器（U10）      | 训练权重                                               | 不做 | 与「确定性引擎是唯一真相源」冲突   |
+| 上游                  | 提供的能力                                             | 本仓 | 可借鉴                                                                                                                                                   |
+| --------------------- | ------------------------------------------------------ | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| U3 ecl_ekf_analysis   | EKF 创新比批处理、四步结构化分析                       | 部分 | 阈值对表；四步分析做报告骨架；GPS 检查失败位（`gps_check_fail_flags` armed 占比）与融合超时（`timeout_flags`）已搬成 `ekf-gps-check-fails`/`ekf-timeout` |
+| U4 px4_log_analyzer   | 声明式事件 + 时间窗去抖、组合派生                      | 部分 | 时间窗去抖；约 80 参数的监控清单                                                                                                                         |
+| U6 ArduPilot WebTools | `fft.js` + Pyodide；PIDReview；FilterTool Bode；MAGFit | 没有 | `fft.js` 是频谱零上传的现成答案                                                                                                                          |
+| U7 FlightMD           | health score 0–100 + 权重；确切参数改动；50 份日志验证 | 部分 | 总评分、回归集做法；参数改动已搬成 `px4-param-changed`（2026-10）                                                                                        |
+| U8 smarttune-cli      | 参数存在性校验门禁；6 层 JSON 知识库；置信度           | 没有 | 参数存在性校验门禁（最该抄的一条）                                                                                                                       |
+| PX4 官方四步分析      | 完整性 → 跟踪 → 传感器 → 电源                          | 部分 | 报告页叙事骨架                                                                                                                                           |
+| px4-log-analysis      | Claude skill：`accel-vibration`（PSD 找陷波）等 4 个   | 没有 | PSD 做法对应频谱缺口                                                                                                                                     |
+| flight-tools          | RSSI vs 距离、功率图、日志浏览器                       | 没有 | RSSI 与距离关系图值得照搬                                                                                                                                |
+| px4-ulog-mcp          | 5 个 MCP 工具（summary/query/failsafe/diagnose…）      | 部分 | 本仓 MCP 工具集的参照                                                                                                                                    |
+| PX4/pyulog            | `ulog_info`/`ulog2csv`/`ulog2kml`                      | 已有 | 本仓解析底层                                                                                                                                             |
+| 桌面工具              | PlotJuggler / FlightPlot / MAVGCL …                    | 不做 | 那是工作台形态                                                                                                                                           |
+| ML 分类器（U10）      | 训练权重                                               | 不做 | 与「确定性引擎是唯一真相源」冲突                                                                                                                         |
 
 频谱的出路，上游给了四条路线：
 

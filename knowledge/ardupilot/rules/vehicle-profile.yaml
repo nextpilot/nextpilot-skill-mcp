@@ -1,0 +1,70 @@
+# 车辆画像：上游 ardupilot-mcp 的 profile.py（build_profile）。U5 搬移收官——
+# upstream.md 原记「需要 hover 油门反推推重比，本仓无对应算子」，实测现有算子
+# （choose/coalesce/value_if/median/len/scale/sub/div + 布尔索引）即可完整表达。
+#
+# 核心是动力余量：悬停油门 hover（0..1 分数）→ power_margin=(1-hover)*100、
+# 推重比粗估 t2w≈1/hover。悬停油门取值（照上游 _hover_throttle，不做新编）：
+#   1. 优先学习参数 MOT_THST_HOVER（0 < h <= 1）；
+#   2. 否则 CTUN.ThO 落在 (0.1, 0.95) 开区间的样本 > 20 个 → 取中位数。上游注明
+#      这是 rough 估计，不过滤 armed/模式段——地面怠速 ThO 接近 0，天然落在区间外。
+# 判定（阈值照上游 HOVER_UNDERPOWERED / HOVER_OVERPOWERED，hover 语义只对旋翼机成立）：
+#   hover >= 0.62 → 动力余量不足（爬升/抗风/机动的操纵余量随时可能用尽）→ warning；
+#   hover <= 0.30 → 动力过剩（动力很富余但响应可能过灵敏、易过调）→ info；
+#   两者之间是 healthy，不发 finding，hover/margin/t2w 只进 metrics。
+#
+# [暂定]：0.62/0.30 是上游启发式（design choice），未过真实 .bin 校准，见 PENDING.md。
+
+---
+id: apm-vehicle-profile-hover
+name: 悬停油门 / 动力余量
+group: vehicle_profile
+order: 1
+tag: apm_vehicle_power_margin
+vehicle: [copter, heli]
+
+condition:
+  message:
+    - CTUN
+
+compute:
+  - hover_l = _cfg("MOT_THST_HOVER")
+  - hover_l_ok = hover_l is not None and hover_l > 0.0 and hover_l <= 1.0
+  - tho = _ref("CTUN.ThO")
+  - fly = tho[(tho > 0.1) & (tho < 0.95)]
+  - n_fly = len(fly)
+  - hover_e = value_if(n_fly > 20, median(fly))
+  - hover = coalesce(value_if(hover_l_ok, hover_l), hover_e)
+  - margin = sub(100.0, scale(hover, factor=100.0))
+  - t2w = div(1.0, hover)
+  - hover_src = choose(hover_l_ok, "MOT_THST_HOVER", "CTUN.ThO 中位数估计")
+
+trigger:
+  - when: "hover is not None and hover >= 0.62"
+    severity: warning
+    suggestion: "悬停就要 {margin:.0f}% 油门，动力余量不足：爬升、抗风、机动随时可能用尽操纵余量而掉高失稳。减轻起飞重量、换更大的桨或更强的动力套，并确认桨叶没有装反、桨距没有异常。"
+    description: "悬停油门 {hover:.0%}（{hover_src}）≥62%，动力余量仅 {margin:.0f}%，推重比 ≈{t2w:.1f}"
+    evidence:
+      source: MOT_THST_HOVER/CTUN.ThO
+      value: f"hover={hover:.2f}"
+      threshold: 0.62
+      unit: ""
+  - when: "hover is not None and hover <= 0.30"
+    severity: info
+    suggestion: "悬停只用 {hover:.0%} 油门，动力很富余：操纵余量大是好事，但注意响应可能过灵敏、易过调，调参时可适当降低姿态/角速率增益。"
+    description: "悬停油门 {hover:.0%}（{hover_src}）≤30%，推重比 ≈{t2w:.1f}，动力过剩"
+    evidence:
+      source: MOT_THST_HOVER/CTUN.ThO
+      value: f"hover={hover:.2f}"
+      threshold: 0.30
+      unit: ""
+
+output:
+  - name: hoverThrottle
+    value: hover
+    round: 3
+  - name: powerMarginPct
+    value: margin
+    round: 1
+  - name: thrustToWeight
+    value: t2w
+    round: 2

@@ -1,0 +1,38 @@
+# EKF 拒收 GPS 的原因位（ecl_ekf_analysis 的权威检查之一）：gps_check_fail_flags
+# 在地面常置位（eph 未收敛、静止位置差超限），不算问题；判据取 armed 段内非零样本
+# 占比——过半时间仍被 EKF 拒收才报。位含义（EKF2 gps_checks）：
+#   bit0 fix_type 不足 bit1 卫星数 bit2 GDoP bit3 水平精度 bit4 垂直精度
+#   bit5 速度差超限 bit6 水平位置差 bit7 垂直位置差
+# 阈值 [暂定]：占比 0.5、样本 100（约 10s@10Hz）。
+
+id: px4-ekf-gps-check-fails
+name: EKF 拒收 GPS（解锁后）
+group: ekf_faults
+order: 3 # ekf_faults group 内次序：faults=1, timeout=2, gps-check=3
+tag: ekf_innovation_failure
+
+condition:
+  message:
+    - estimator_status
+
+compute:
+  - gf = estimator_status.gps_check_fail_flags
+  - am = interval_mask(estimator_status.timestamp, ARMED_INTERVALS)
+  - gf_armed = apply_mask(gf, am)
+  - n_armed = count_true(am)
+  - n_bad = count_above(gf_armed, gt=0)
+  - ratio = _try(div(n_bad, n_armed))
+  - gf_worst = max(gf_armed)
+
+trigger:
+  - when: "ratio is not None and ratio >= 0.5 and n_bad >= 100"
+    label: ekf_innovation_failure
+    severity: warning
+    suggestion: "位含义：bit0 fix_type、bit1 卫星数、bit2 GDoP、bit3/4 水平/垂直精度、
+      bit5 速度差、bit6/7 水平/垂直位置差——解码后逐项排查（天线遮挡/干扰、
+      GPS 与飞控间距、EKF2_GPS_CHECK 参数是否过严）。"
+    description: EKF 在解锁后 {ratio:.0%} 的时间拒绝 GPS 融合（gps_check_fail_flags 最严 {gf_worst}）
+    evidence:
+      source: estimator_status.gps_check_fail_flags(armed 占比)
+      value: f"{ratio:.2f}"
+      threshold: 0.5

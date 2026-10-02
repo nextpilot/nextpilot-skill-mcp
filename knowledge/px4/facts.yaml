@@ -53,6 +53,7 @@ group_order:
         rc_link,
         home_position,
         logged_messages,
+        param_changes,
         guards,
     ]
 
@@ -90,6 +91,7 @@ rule_meta:
         guards_early: { category: guard }
         imu_bias: { category: imu, doc: "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html" }
         logged_messages: { category: messages, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
+        param_changes: { category: config, doc: "https://docs.px4.io/main/en/advanced_config/parameters.html" }
         mode_thrash: { category: mode, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
         mission: { category: mode, doc: "https://docs.px4.io/main/en/flight_modes_mission.html" }
         motor_balance: { category: motor, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }

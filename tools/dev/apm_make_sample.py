@@ -63,7 +63,7 @@ def _msg(mtype, fmt, values, scaled):
 
 
 # 消息类型 ID：解析器按名字查表，ID 本身随便给（这正是要自证的点之一）
-IDS = {"FMT": 128, "PARM": 132, "MSG": 133, "EV": 134, "MODE": 135, "GPS": 136}
+IDS = {"FMT": 128, "PARM": 132, "MSG": 133, "EV": 134, "MODE": 135, "GPS": 136, "CTUN": 137}
 
 # (名字, 格式串, 列名)。Length = 3 + 各字段字节数之和（含 3 字节头，与主流固件一致）；
 # 解析器有自校准，就算约定反了也该解对，这本身就是被测行为。
@@ -73,6 +73,8 @@ STRUCTS = {
     "EV": ("QB", "TimeUS,Id"),
     "MODE": ("Qn", "TimeUS,Mode"),
     "GPS": ("QBHLLf", "TimeUS,Status,NSats,Lat,Lng,Alt"),
+    # ThO 是油门输出（0..1 分数，真实固件即如此），给 vehicle-profile 的悬停油门估计用
+    "CTUN": ("Qff", "TimeUS,ThR,ThO"),
 }
 
 
@@ -129,6 +131,18 @@ def build_sample_bytes() -> bytes:
         )
     # 一个未定位样本（Status=0、坐标 0）：要被轨迹与 Home 剔掉
     out += _msg(IDS["GPS"], "QBHLLf", (7_500_000, 0, 0, 0, 0, 0.0), scaled=set())
+
+    # CTUN：给 vehicle-profile 的悬停油门估计（上游 profile.py 的 fallback 路径）。
+    # 参数表故意不设 MOT_THST_HOVER → 规则退回 ThO 中位数；22 个样本 ThO 从 0.65
+    # 线性到 0.75 → 中位数 0.70 ≥ 0.62（HOVER_UNDERPOWERED）→ warning 发射、
+    # hoverThrottle 指标 = 0.70。两个区间外样本（0.05 地面怠速、0.99）必须被
+    # (0.1, 0.95) 过滤掉——没滤掉中位数会漂到 0.65 附近，metrics 断言即失败。
+    for i in range(22):
+        t = 1_000_000 + i * 200_000
+        tho = 0.65 + i * (0.10 / 21)
+        out += _msg(IDS["CTUN"], "Qff", (t, tho, tho), scaled=set())
+    out += _msg(IDS["CTUN"], "Qff", (5_600_000, 0.05, 0.05), scaled=set())
+    out += _msg(IDS["CTUN"], "Qff", (5_800_000, 0.99, 0.99), scaled=set())
 
     return bytes(out)
 

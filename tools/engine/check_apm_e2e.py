@@ -25,6 +25,9 @@ APM 样本）把整条链路走一遍：认格式 → 取这一族的知识 → 
 6. 飞行阶段从 MODE 切段推出来（W9）：armed 段内的 STAB/AUTO 归到
    maneuver/cruise，解锁前的 STAB 与解锁后的末段不算——`facts.phases` 不再恒空，
    报告头与阶段相关的下游（阶段条、按阶段过滤）才有数可用
+7. vehicle-profile（U5 搬移收官）：不设 MOT_THST_HOVER 时按上游 fallback 用
+   CTUN.ThO 中位数估计悬停油门，(0.1, 0.95) 过滤生效，0.62 判据发射 warning，
+   output 段三项 metrics（hoverThrottle/powerMarginPct/thrustToWeight）数值正确
 
 用法：python tools/engine/check_apm_e2e.py
 
@@ -180,6 +183,32 @@ def main() -> int:
             "mode_phase_groups 与 provider 的 _derive_phases）"
         )
     )
+    log.print_check(step, total, rule_name, ok, detail, err)
+    results.append((rule_name, "ok" if ok else "fail"))
+
+    # ── Check 7: vehicle-profile：悬停油门估计 + underpowered 判据 + metrics ──
+    step += 1
+    total += 1
+    rule_name = "悬停油门画像：ThO 中位数估计 → underpowered warning，metrics 三值落位"
+    # 夹具不设 MOT_THST_HOVER → 走上游 fallback：ThO 落在 (0.1, 0.95) 的 22 个样本
+    # 取中位数 = 0.70 ≥ 0.62（HOVER_UNDERPOWERED）→ warning；区间外两点必须被滤掉，
+    # 否则中位数漂到 0.65 附近，metrics 断言会失败。output 段的三项 metrics：
+    # hoverThrottle=0.70、powerMarginPct=30.0、thrustToWeight=1.43。
+    vp = fired.get("apm-vehicle-profile-hover")
+    metric_vals = {m.get("key"): m.get("value") for m in report.get("metrics", [])}
+    h, mg, tw = metric_vals.get("hoverThrottle"), metric_vals.get("powerMarginPct"), metric_vals.get("thrustToWeight")
+    ok = (
+        vp is not None
+        and vp.get("severity") == "warning"
+        and h is not None
+        and abs(h - 0.70) < 0.005
+        and mg is not None
+        and abs(mg - 30.0) < 0.1
+        and tw is not None
+        and abs(tw - 1.43) < 0.01
+    )
+    detail = f"severity={vp.get('severity') if vp else '未发射'}，hoverThrottle={h}，powerMarginPct={mg}，thrustToWeight={tw}"
+    err = "" if ok else "悬停油门链路断了：估计值/过滤/判据/metrics 至少一处不符（查 CTUN 夹具与 vehicle-profile.yaml）"
     log.print_check(step, total, rule_name, ok, detail, err)
     results.append((rule_name, "ok" if ok else "fail"))
 
