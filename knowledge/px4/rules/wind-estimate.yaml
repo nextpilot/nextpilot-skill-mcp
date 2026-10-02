@@ -1,10 +1,13 @@
-# 风扰估计（F010）：北/东风分量合成风速取 p95。1.15 起 topic 改名 estimator_wind，
-# 旧固件为 wind_estimate —— 两者用 coalesce 取先有的那个（新 topic 在旧固件本就不存在）。
+# 风扰估计（F010）：北/东风分量合成风速取 p95。Wind.msg 官方声明**双 TOPICS**
+# （文件尾 `# TOPICS wind estimator_wind`，v1.12.3 与 main 一致）——日志里实际出现哪个名
+# 随固件与 EKF2 配置：实测 v1.6 日志是 wind_estimate，estimator_wind 名义上同源。
+# 两者用 coalesce 取先有的那个（谁在日志里用谁）。
 # 阈值 [暂定] px4-thresholds.toml [wind]：speed_warn=8.0 / speed_crit=12.0（m/s）。
 # 命中即打 guard 标签 wind_strong：解释姿态类异常时优先归因环境扰动。
 
 # 来源：本仓检查设计（对应 fault-kb F010 风扰关联标签）。
-# 与上游差异：上游无对应检查；1.15 topic 改名（wind_estimate → estimator_wind）用 coalesce 兼容为本仓处理，8/12 m/s [暂定]。
+# 与上游差异：上游无对应检查；Wind.msg 双 TOPICS 名（wind/estimator_wind）与老日志的
+# wind_estimate 用 coalesce 兼容为本仓处理，8/12 m/s [暂定]。
 id: px4-wind-estimate
 name: 风扰估计
 group: wind_estimate
@@ -16,10 +19,10 @@ condition:
     - estimator_wind || wind_estimate
 
 compute:
-  # 1.15 起这个量在日志里的 topic 叫 estimator_wind，之前叫 wind_estimate——**候选组**
-  # 按存在性取（实测两者从不同时出现，所以"有谁用谁"就是原来的版本分流）。
-  # 上游另有一个叫 wind 的 topic：字典按 .msg 文件名收录，与日志 topic 名不是一一对应，
-  # 别按名字猜。缺任一路（两个 topic 都没有）时 hypot 得 None、w_p95 也是 None → 不出结论。
+  # Wind.msg 双 TOPICS（wind / estimator_wind）加老日志的 wind_estimate——**候选组**
+  # 按存在性取（实测不会同时出现，"有谁用谁"就是原来的版本分流）。
+  # 字典按 .msg 文件名收录（键是 wind），校验侧经 topic-map.yaml 把 estimator_wind 映射过去；
+  # 缺任一路（所有候选都没有）时 hypot 得 None、w_p95 也是 None → 不出结论。
   # **只看第 0 个估计器实例**：不写下标也是第 0 个，这里写明是为了跟"跨实例取最差"区分开。
   - >-
     w_p95 = percentile(

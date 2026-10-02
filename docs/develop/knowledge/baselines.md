@@ -7,18 +7,17 @@
 
 ## 一、现在的状态（实测）
 
-| 项             | 现状                                                                                                    |
-| -------------- | ------------------------------------------------------------------------------------------------------- |
-| 日志来源       | `tools/testdata/logs/*.ulg`、`*.bin`、`*.BIN`，被 `.gitignore` 挡住，不入库                             |
-| 下载工具       | `tools/dev/download_px4_logs.py`（logs.px4.io）、`download_ardupilot_logs.py`（autotest.ardupilot.org） |
-| 下载落点       | `.cache/px4/logs/`、`.cache/ardupilot/logs/`，同样不入库                                                |
-| 冻结基线       | `tools/testdata/baseline/*.json`，9 份已入库                                                            |
-| 基线生成与比对 | `python tools/engine/dump_baseline.py`、`compare_baseline.py`                                           |
-| CI 门禁        | `checklist.yml` 的 `compare-baseline` / `check-provider`，`when: [logs]`                                |
-| 门禁触发条件   | `check_all.py` 第 231–244 行：`tools/testdata/logs/` 下有 `.ulg`/`.BIN` 才启用 `logs`                   |
-| CI 现状        | 日志不在仓库 → CI 输出 `no .ulg/.BIN under tools/testdata/logs (expected in CI)` → 两组检查整组跳过     |
-
-也就是说：9 份基线在仓库里躺着，但 CI 从来没跑过它们。本文要解决的就是这件事。
+| 项             | 现状                                                                                                                                      |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 日志来源       | `tools/testdata/logs/*.ulg`、`*.bin`、`*.BIN` 默认被 `.gitignore` 挡住；**白名单例外**（2026-10 起）：登记过 `index.jsonl` 的挑定日志入库 |
+| 已入库         | `sample_log_small.ulg`（921KB，v1.11.2 多旋翼，`index.jsonl` 有来源）——`has_logs=True`，logs 组门禁激活（24→28 项）                       |
+| 下载工具       | `tools/dev/download_px4_logs.py`（logs.px4.io）、`download_ardupilot_logs.py`（autotest.ardupilot.org）                                   |
+| 下载落点       | `.cache/px4/logs/`、`.cache/ardupilot/logs/`，同样不入库                                                                                  |
+| 冻结基线       | `tools/testdata/baseline/*.json`，9 份已入库                                                                                              |
+| 基线生成与比对 | `python tools/engine/dump_baseline.py`、`compare_baseline.py`（日志不在库的基线逐份 SKIP）                                                |
+| CI 门禁        | `checklist.yml` 的 `compare-baseline` / `check-provider`，`when: [logs]`                                                                  |
+| 门禁触发条件   | `check_all.py`：`tools/testdata/logs/` 下有 `.ulg`/`.BIN` 才启用 `logs` 组                                                                |
+| CI 现状        | 已入库 1 份 → CI 跑 28 项（compare-baseline 只比对在库日志）；继续按白名单补日志，覆盖面随之增长                                          |
 
 已入库的 9 份基线及其覆盖：
 
@@ -150,17 +149,26 @@ hint: "入库日志合计超预算或单份超 5MB。要么换更小的日志，
 
 ## 六、执行顺序（最小步）
 
-| 步   | 动作                                                         | 产出        | 依赖  |
-| ---- | ------------------------------------------------------------ | ----------- | ----- |
-| S1   | 从 logs.px4.io 挑 2 份 PX4 健康飞行（quad + fw，各 < 5 MB）  | 2 个 `.ulg` | 无    |
-| S2   | 从 autotest 挑 1 份带故障的 APM 日志（补 findings=0 的空白） | 1 个 `.BIN` | 无    |
-| S3   | 写 `index.jsonl`（slug / 来源 URL / 许可 / 为什么要它）      | 登记表      | 无    |
-| S4   | `.gitignore` 加白名单                                        | 可提交      | S1–S3 |
-| S5   | `dump_baseline.py` 冻结，产出 `baseline/*.json`              | 新基线      | S4    |
-| S6   | 本地 `check_all.py`（不带 `--skip-logs`）确认 `logs` 组全绿  | 验证        | S5    |
-| S7   | 加体积门禁 job + `check_log_budget.py`                       | CI 保护     | S1    |
-| S8   | 观察线上 CI 是否跑 `compare-baseline`                        | G1 达成     | S6    |
-| 后续 | `slice_log.py` 切片，换掉大日志                              | G3 强化     | 可选  |
+| 步  | 动作                                                         | 产出        | 依赖  |
+| --- | ------------------------------------------------------------ | ----------- | ----- |
+| S1  | 从 logs.px4.io 挑 2 份 PX4 健康飞行（quad + fw，各 < 5 MB）  | 2 个 `.ulg` | 无    |
+| S2  | 从 autotest 挑 1 份带故障的 APM 日志（补 findings=0 的空白） | 1 个 `.BIN` | 无    |
+| S3  | 写 `index.jsonl`（slug / 来源 URL / 许可 / 为什么要它）      | 登记表      | 无    |
+| S4  | `.gitignore` 加白名单                                        | 可提交      | S1–S3 |
+| S5  | `dump_baseline.py` 冻结，产出 `baseline/*.json`              | 新基线      | S4    |
+| S6  | 本地 `check_all.py`（不带 `--skip-logs`）确认 `logs` 组全绿  | 验证        | S5    |
+| S7  | 加体积门禁 job + `check_log_budget.py`                       | CI 保护     | S1    |
+| S8  | 观察线上 CI 是否跑 `compare-baseline`                        | G1 达成     | S6    |
+
+执行留痕（2026-10-02）：**首个闭环完成**——`sample_log_small.ulg`（921KB，v1.11.2，
+与 `web/e2e/fixtures/sample.ulg` 同源）走完 S3/S4/S5/S6：`index.jsonl` 登记、白名单
+放行、`sample_log_small.json` 基线重冻（含删除 param-changed 后的规则集）、logs 组
+4 项在 `check_all.py --push` 全绿（24→28 项）。`compare_baseline.py` 顺带补上
+「日志不在库 → SKIP」语义（此前日志缺失直接崩，log-regression.md 连带影响第 3 条
+本就要求 SKIP）。S1 的 fw（固定翼）与 S2 的 APM 故障日志待继续挑；S7 未做。
+另：`download_px4_logs.py` 的 `--max-size-mb` 判断有 bug（累计字节数当单次读入判，
+恒等值误报超限），本次用 curl 直下绕过，待修。
+| 后续 | `slice_log.py` 切片，换掉大日志 | G3 强化 | 可选 |
 
 S1–S4 是把日志加进仓库的最小闭环，S5–S6 让基线生效。
 

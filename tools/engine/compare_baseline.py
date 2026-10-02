@@ -40,9 +40,11 @@ BASELINE_DIR = TESTDATA / "baseline"
 IGNORED_TOP_KEYS: set[str] = {"parserVersion"}
 
 
-def find_log(name: str) -> Path:
+def find_log(name: str, quiet: bool = False) -> Path | None:
     p = LOG_DIR / name
     if not p.exists():
+        if quiet:
+            return None
         raise FileNotFoundError(name)
     return p
 
@@ -56,10 +58,16 @@ def normalize(value):
     return value
 
 
-def compare_one(baseline_path: Path) -> tuple[list[str], str, str]:
-    """返回 (差异列表, 基线解析器版本, 本次解析器版本)；后两者不参与判定，只供打印。"""
+def compare_one(baseline_path: Path) -> tuple[list[str], str, str] | None:
+    """返回 (差异列表, 基线解析器版本, 本次解析器版本)；后两者不参与判定，只供打印。
+
+    对应日志不在 LOG_DIR 时返回 None——由调用方按 SKIP 处理（基线入库、日志按
+    baselines.md 的白名单分批入库，两边生命周期不同步是常态，见 log-regression.md）。
+    """
     frozen = json.loads(baseline_path.read_text(encoding="utf-8"))
-    log_path = find_log(frozen["log"])
+    log_path = find_log(frozen["log"], quiet=True)
+    if log_path is None:
+        return None
     current = runner.run_one(log_path)
 
     diffs: list[str] = []
@@ -97,7 +105,14 @@ def main(argv: list[str]) -> int:
             log.print_check(i, len(paths), slug, False, detail=f"SKIP（基线不存在）: {p.name}")
             results.append((slug, "fail"))
             continue
-        diffs, frozen_pv, current_pv = compare_one(p)
+        result = compare_one(p)
+        if result is None:
+            log.print_check(
+                i, len(paths), slug, True, detail=f"SKIP {slug}: 日志不在 {LOG_DIR.name}/（按 baselines.md 白名单分批入库）"
+            )
+            results.append((slug, "skip"))
+            continue
+        diffs, frozen_pv, current_pv = result
         baseline_pvs.add(frozen_pv)
         current_pvs.add(current_pv)
         if diffs:

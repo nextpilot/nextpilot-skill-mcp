@@ -76,8 +76,10 @@ VIO 五项（P15–P19：位置/速度/姿态/角速率/延迟，数据源 `vehi
 （`gps-uncertainty.yml`）、GPS 噪声（`gps-noise.yml`）、磁场对推力（`thrust-mag.yml`）、
 电源（`power.yml`）、温度（`temperature.yml`）、估计器标志（`estimator-flags.yml`）、
 失效保护标志（`failsafe-flags.yml`）、CPU 与内存（`cpu-ram.yml`）。S11 参数变更
-（`changed_parameters`）2026-10 补成检查 `px4-param-changed`（info 级，日志没录
-该 topic 自动 skip；上游也只是个按钮占位）。
+（`changed_parameters`）2026-10 曾补成 `px4-param-changed`，同年 10 月复查后**删除**：
+ULog 里它不是 data topic，而是 PARAMETER 消息段（pyulog `MSG_TYPE_PARAMETER`，
+`ULog.changed_parameters` 属性），引擎 `topic.field` 取数路径结构上够不到——正确实现
+要 provider 把该段合成 topic，属独立基建，上游也只有按钮占位，不值得。
 
 ### 控制与作动器（8 项构造点，7 已建）
 
@@ -205,7 +207,7 @@ design choice 82 / corrected 8）、`estimate_cells` 电芯估算。
 | U3 ecl_ekf_analysis   | EKF 创新比批处理、四步结构化分析                       | 部分 | 阈值对表；四步分析做报告骨架；GPS 检查失败位（`gps_check_fail_flags` armed 占比）与融合超时（`timeout_flags`）已搬成 `ekf-gps-check-fails`/`ekf-timeout` |
 | U4 px4_log_analyzer   | 声明式事件 + 时间窗去抖、组合派生                      | 部分 | 时间窗去抖；约 80 参数的监控清单                                                                                                                         |
 | U6 ArduPilot WebTools | `fft.js` + Pyodide；PIDReview；FilterTool Bode；MAGFit | 没有 | `fft.js` 是频谱零上传的现成答案                                                                                                                          |
-| U7 FlightMD           | health score 0–100 + 权重；确切参数改动；50 份日志验证 | 部分 | 总评分、回归集做法；参数改动已搬成 `px4-param-changed`（2026-10）                                                                                        |
+| U7 FlightMD           | health score 0–100 + 权重；确切参数改动；50 份日志验证 | 部分 | 总评分、回归集做法；参数改动检查做过又删（`changed_parameters` 是 ULog PARAMETER 段不是 data topic，见 §二 S11）                                         |
 | U8 smarttune-cli      | 参数存在性校验门禁；6 层 JSON 知识库；置信度           | 没有 | 参数存在性校验门禁（最该抄的一条）                                                                                                                       |
 | PX4 官方四步分析      | 完整性 → 跟踪 → 传感器 → 电源                          | 部分 | 报告页叙事骨架                                                                                                                                           |
 | px4-log-analysis      | Claude skill：`accel-vibration`（PSD 找陷波）等 4 个   | 没有 | PSD 做法对应频谱缺口                                                                                                                                     |

@@ -1,15 +1,16 @@
-# 日志回归：只在本地跑
+# 日志回归：日志按白名单入库
 
-日志回归 4 项留在本地，`.ulg` 不提交仓库，CI 里这 4 项继续 SKIP。
+日志回归 4 项依赖 `tools/testdata/logs/` 下的真实日志。**入库策略见
+[`../knowledge/baselines.md`](../knowledge/baselines.md)**：默认 `*.ulg` 不入库
+（含 GPS 轨迹与作业信息的日志是产品隐私承诺），但挑过、在 `index.jsonl` 登记过来源的
+小样本按 `.gitignore` 白名单例外入库——CI 与新克隆环境直接能跑，不再 SKIP。
 
-这是纪律的直接结果：「原始日志不上传服务器」（原始日志含 GPS 轨迹与作业信息，是产品对用户的
-承诺）。日志不入库，云端 checkout 里就没有日志，这不是配置问题。
+2026-10 现状：`sample_log_small.ulg`（921KB，v1.11.2，公开日志）已入库，
+`check_all.py` 在 CI 跑到 28 项（`has_logs=True`）；其余 8 份基线的日志不在库，
+`compare_baseline.py` 对它们逐份 SKIP（基线在、日志不在是白名单分批入库的常态，
+不是故障）。继续补日志时按 baselines.md 的挑法与登记流程走。
 
-判据与事实也一致：`check_all.py` 的判据查日志目录下有没有 `.ulg` / `.bin`，云端 checkout
-里没有 → `has_logs=False` → 4 项 SKIP。这是有意的行为，不是故障。
-
-这 4 项在这台机器以外跑不了。新克隆的人需要自己备日志（`tools/testdata/logs/` 里两个
-`sample*` 是仓库自带的，其余需另下），否则这 4 项会安静地 SKIP。
+这 4 项在本地与 CI 行为一致；没有日志时 `--skip-logs` 跳过而不是报错。
 
 ## 连带影响（不改就会坏的四处）
 

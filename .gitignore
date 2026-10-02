@@ -53,10 +53,12 @@ test-results/
 .workbuddy/
 
 # ========== 校准用真实飞行日志 ==========
-# 含 GPS 轨迹，勿入库；用小样本/合成日志做 CI
+# 含 GPS 轨迹，勿入库；用小样本/合成日志做 CI。
+# 例外按 baselines.md 的白名单机制：挑过、登记过来源（index.jsonl）的基线日志放行。
 tools/testdata/logs/*.ulg
 tools/testdata/logs/*.bin
 tools/testdata/logs/*.BIN
+!tools/testdata/logs/sample_log_small.ulg
 
 # ========== IDE / 编辑器 ==========
 .vscode/

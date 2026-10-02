@@ -7,7 +7,7 @@ group: 开发指南
 groupEn: For Developers
 order: 12
 ---
-引擎当前内置的 **110 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
+引擎当前内置的 **109 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
 每条给出：**适用**（固件 / 机架 / 依赖）、**取值**（读哪些字段、过哪个算子）、**判定**（自上而下
 命中第一条即发射）、**产出**（写进报告的 check 名、喂故障库匹配的标签、UI 用的统计）。
 
@@ -1118,19 +1118,6 @@ order: 12
 - 判定：
 - <strong>warning</strong> | `fence_enable == 1 and fence_alt <= 0.0 and fence_radius <= 0.0` | threshold 非空边界 | description "围栏已启用但没有高度或半径边界"
 - 产出：tag=apm_param_fence_empty
-
-
-## param_changes（group: `param_changes`）
-
-### px4-param-changed — 运行中参数修改
-
-- 文件：`rules/param-changed.yaml` ｜ 位置：group `param_changes` #1
-- 适用：总是适用
-- 取值：
-- `n_changed = _try(len(changed_parameters.timestamp_us))`
-- 判定：
-- <strong>info</strong> | `n_changed is not None and n_changed > 0` | threshold 0 | description "本次飞行中修改了 \{n_changed\} 个参数"
-- 产出：-
 
 
 ## position（group: `position`）

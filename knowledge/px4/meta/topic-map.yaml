@@ -5,8 +5,9 @@
 # 要把 meta 接进"构建期字段校验"（查规则/plot 引用的字段在不在这个固件版本里），
 # 第一步就是先知道"这个日志 topic 该去哪一条字典里查"。
 #
-# 现状：**没有运行时消费者**——它只服务构建期校验（见下方"用在哪"）。
-# 本文件**不进浏览器产物**（与 meta/ 一样是构建期的东西），所以不必内联进
+# 现状：消费者是 `tools/engine/check_rules_fields.py`（2026-10 接上，之前一直没消费——
+# `estimator_wind` 条目登记了却没生效，被 lint 判成"可疑引用"）。本文件**不进浏览器产物**
+# （与 meta/ 一样是构建期的东西），所以不必内联进
 # web/workers/analysis-engine.generated.ts。
 #
 # 用在哪：`tools/engine/check_rules_fields.py` 与将来的构建期字段校验。判据是先按它把
@@ -26,6 +27,8 @@ topics:
 
     # 1.15+ 的估计器风。日志 topic 叫 estimator_wind，上游 msg 是 Wind.msg → 字典键 `wind`。
     # （日志里另有一个叫 `wind` 的 topic，与这条不是一回事，别按名字猜。）
+    # 2026-10 核实：Wind.msg 文件尾声明双 TOPICS（wind 与 estimator_wind，v1.12.3 与
+    # main 一致），docs.px4.io/main 的 Wind 页同样列出两个——此映射有官方依据。
     estimator_wind: wind
 
 # 字典里查不到的（本项目收录的 tag 里没有对应 msg，无法校验——不是"字段不存在"）：

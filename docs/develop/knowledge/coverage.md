@@ -7,7 +7,9 @@ PX4 那一堆 topic 里，我们检查了哪些、漏了哪些、先补哪些。
 批 A（A1–A7，2026-10）把零覆盖 topic 清零后涨到 61（另有 ardupilot 43 条，两平台合计 104）。
 批 C 加 PID 跟踪误差 2 条（PX4 63）、批 B/W9 与批 C 陆续补 APM 侧；批 E（2026-10，
 上游搬迁收尾）PX4 加 `ekf-gps-check-fails`/`ekf-timeout`/`param-changed` 3 条
-（66），APM 加 `vehicle-profile` 1 条（44），两平台合计 **110 条**。
+（66），APM 加 `vehicle-profile` 1 条（44），两平台合计 **110 条**；批 E 复查删除
+`param-changed`（`changed_parameters` 是 ULog PARAMETER 段非 data topic，取数够不到，
+见 upstream.md §二 S11），回落 **109 条**（px4 65 + apm 44）。
 
 ## 结论速览
 
@@ -188,11 +190,14 @@ W4/W5 解掉「缺算子」根因、W6 把图铺完。三种容器的分工与�
 - 批 E（上游搬迁收尾，2026-10）：PX4 侧补 3 条——`ekf-gps-check-fails`
   （ecl U3 权威：`gps_check_fail_flags` 解锁后拒绝 GPS 融合占比 ≥50% 且坏样本 ≥100
   → warning）、`ekf-timeout`（`timeout_flags` 跨实例位或非零 → warning）、
-  `param-changed`（飞行中改参计数 → info，日志没录 `changed_parameters` 自动 skip）。
-  APM 侧补 `vehicle-profile`（U5 16/16 收官，见 upstream.md §四）。sample.ulg 实跑：
-  gps-check-fails 发射 warning（armed 占比 81%、最严位 40=bit3+bit5）、timeout 不发射
-  （全 0）、param-changed 按"缺 topic"skip，全部符合预期。`nan_flags` 标不做
-  （新固件已移除，restart guard 覆盖）。
+  `param-changed`（飞行中改参计数 → info）。APM 侧补 `vehicle-profile`
+  （U5 16/16 收官，见 upstream.md §四）。sample.ulg 实跑：gps-check-fails 发射
+  warning（armed 占比 81%、最严位 40=bit3+bit5）、timeout 不发射（全 0）。
+  `nan_flags` 标不做（新固件已移除，restart guard 覆盖）。
+  **批 E 复查（同月）**：`param-changed` 删除——`changed_parameters` 在 ULog 里是
+  PARAMETER 消息段（pyulog `MSG_TYPE_PARAMETER`），不是 data topic，引擎 `topic.field`
+  取数路径结构上够不到（此前"自动 skip"只是碰巧不报错）。正确实现需 provider 把该段
+  合成 topic，登记为独立基建候选；上游 Flight Review 也只是按钮占位。
 
 每批的验收标准：新规则在基线上跑通，产出的差异只允许新增 finding/skipped，
 不允许改动既有 finding，用 `tools/engine/compare_baseline.py` 卡。

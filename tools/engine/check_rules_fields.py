@@ -28,6 +28,8 @@ import re
 import sys
 from pathlib import Path
 
+import yaml
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from _logging import get_logger  # noqa: E402
 from _logging import _c, YELLOW, RED  # noqa: E402
@@ -48,6 +50,7 @@ BASELINE_DIR = TESTDATA / "baseline"
 ARRAY_SUFFIX = re.compile(r"\[\d+\]$")
 INSTANCE_SUFFIX = re.compile(r"\[[^\]]*\]$")  # topic 后的实例写法：estimator_status[:].field
 MAIN_VERSION = (99, 0)  # main = 开发主干，当作最新
+TOPIC_ALIASES: dict[str, str] = {}  # 日志 topic 名 → 字典键（main() 里从 topic-map.yaml 装载）
 
 
 # ─────────────────────────── 版本 ───────────────────────────
@@ -135,6 +138,20 @@ def fields_by_version_from_meta() -> dict[tuple[int, int], dict[str, set[str]]]:
     return out
 
 
+def topic_aliases() -> dict[str, str]:
+    """日志 topic 名 → meta 字典键名（meta/topic-map.yaml 的 topics 段，首个消费方）。
+
+    字典按上游 .msg 文件名收录，与日志 topic 名不一一对应：一个 msg 可以声明多个
+    TOPICS 名（如 Wind.msg 同时声明 wind 与 estimator_wind），PX4 也整段改过名
+    （1.15 的 vehicle_gps_position → sensor_gps）。映射只登记确实对不上的；
+    表里没有的 topic 按同名直查。
+    """
+    p = META_DIR / "topic-map.yaml"
+    if not p.exists():
+        return {}
+    return (yaml.safe_load(p.read_text(encoding="utf-8")) or {}).get("topics") or {}
+
+
 def has_field(index, version, topic: str, fld: str) -> bool:
     """某版本里有没有这个字段。
 
@@ -193,9 +210,11 @@ def rule_refs() -> list[tuple[str, list[str], list]]:
 
 
 def main(argv: list[str]) -> int:
+    global TOPIC_ALIASES
     strict = "--strict" in argv
     logs = fields_by_version_from_logs()
     meta = fields_by_version_from_meta()
+    TOPIC_ALIASES = topic_aliases()
     versions = sorted(set(logs) | set(meta))
 
     log.print_header(
@@ -219,6 +238,8 @@ def main(argv: list[str]) -> int:
             topic, _, fld = n.partition(".")
             # 实例写法写在 topic 后（`estimator_status[:].vel_test_ratio`），查字段时去掉
             topic = INSTANCE_SUFFIX.sub("", topic)
+            # 日志 topic 名 → 字典键（topic-map.yaml；同名 topic 查表自身）
+            topic = TOPIC_ALIASES.get(topic, topic)
             if has_field(index, version, topic, fld):
                 return True
         return False

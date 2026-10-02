@@ -5,7 +5,10 @@
 与批 D（W8 three.js 3D 视图）完成，W10 收口随批 D 落地。计划外延伸批 E（2026-10，
 "继续搬迁 rule 和 plot"收尾）：PX4 66 条（新增 ekf-gps-check-fails / ekf-timeout /
 param-changed），APM 44 条（新增 vehicle-profile，U5 16/16 收官），合计 110 条、
-算子 95；nan_flags 标不做（新固件已移除该信号）。门禁全绿；遗留项见 §8 已知限制。
+算子 95；nan_flags 标不做（新固件已移除该信号）。批 E 复查删除 param-changed
+（changed_parameters 是 ULog PARAMETER 段非 data topic，取数够不到），合计 109 条。
+sample_log_small.ulg 已按 baselines.md 白名单入库（logs 组门禁 4 项激活，24→28 项）。
+门禁全绿；遗留项见 §8 已知限制。
 
 用户需求（2026-09-30）：先把上游优点全盘覆盖（绘图、PID tune、3D view），再细化拉开差距；
 PX4 侧借鉴 `ecl_ekf_analysis` / `px4_log_analyzer` / `ai-drone-toolkit`；APM 侧对比
