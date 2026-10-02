@@ -7,7 +7,7 @@ group: 开发指南
 groupEn: For Developers
 order: 12
 ---
-引擎当前内置的 **95 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
+引擎当前内置的 **98 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
 每条给出：**适用**（固件 / 机架 / 依赖）、**取值**（读哪些字段、过哪个算子）、**判定**（自上而下
 命中第一条即发射）、**产出**（写进报告的 check 名、喂故障库匹配的标签、UI 用的统计）。
 
@@ -923,6 +923,42 @@ order: 12
 - 判定：
 - <strong>warning</strong> | `n > 0` | threshold 0 | unit 条 | description "日志中出现 \{n\} 条 WARNING 消息"
 - 产出：-
+
+
+## mission（group: `mission`）
+
+### px4-mission-failure — 任务执行失败
+
+- 文件：`rules/mission-result.yaml` ｜ 位置：group `mission` #1
+- 适用：总是适用
+- 取值：
+- `n_fail = sum(mission_result.failure)`
+- 判定：
+- <strong>critical</strong> | `n_fail > 0` | threshold 0 | description "任务报告无法继续/完成（\{n_fail\} 帧）"
+- 产出：missionFailureFrames=n_fail, tag=mission_failure
+
+### px4-mission-incomplete — 任务未完成
+
+- 文件：`rules/mission-result.yaml` ｜ 位置：group `mission` #2
+- 适用：总是适用
+- 取值：
+- `seq_total_max = max(mission_result.seq_total)`
+- `n_fin = sum(mission_result.finished)`
+- `seq_reached_max = max(mission_result.seq_reached)`
+- 判定：
+- <strong>warning</strong> | `seq_total_max > 0 and n_fin == 0` | threshold 0 | description "任务 \{seq_total_max\} 项，最多到达第 \{seq_reached_max\} 项，未完成"
+- 产出：missionSeqTotal=seq_total_max, missionSeqReached=seq_reached_max, tag=mission_incomplete
+
+### px4-mission-invalid — 任务检查未通过
+
+- 文件：`rules/mission-result.yaml` ｜ 位置：group `mission` #3
+- 适用：总是适用
+- 取值：
+- `seq_total_max = max(mission_result.seq_total)`
+- `n_valid = sum(mission_result.valid)`
+- 判定：
+- <strong>warning</strong> | `seq_total_max > 0 and n_valid == 0` | threshold 0 | description "任务 \{seq_total_max\} 项但全程无有效状态"
+- 产出：missionValidFrames=n_valid, tag=mission_invalid
 
 
 ## mode_thrash（group: `mode_thrash`）

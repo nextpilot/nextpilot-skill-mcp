@@ -1,0 +1,104 @@
+# 任务执行结果（mission_result，navigator 运行时记录）：任务是否有效、
+# 中途失败、是否跑完。failure / finished / valid 都是 bool：
+#   failure  true = 任务无法继续或无法完成（导航失败、任务项超时…）
+#   finished true = 任务完整执行到最后一项
+#   valid    true = 当前任务通过检查（项数/单位/围栏等）
+#
+# 注意口径：seq_total > 0 只说明日志期间上传过任务；"上传了任务但全程手动飞"
+# 也会命中「未完成」——文案里写明，别让用户误判成导航故障。
+
+---
+id: px4-mission-failure
+name: 任务执行失败
+group: mission
+order: 1
+tag: mission_failure
+version: 1.0.0
+
+condition:
+  message:
+    - mission_result
+
+compute:
+  # failure 为 true 的帧数：任务报告过"无法继续/无法完成"
+  - n_fail = sum(mission_result.failure)
+
+output:
+  - name: missionFailureFrames
+    value: n_fail
+
+# 固件自报的判定，本仓不设阈值
+
+trigger:
+  - when: "n_fail > 0"
+    severity: critical
+    suggestion: "任务在执行中报告失败（导航异常、任务项不可达、任务项超时等）。结合任务轨迹图看中断位置：航点间距/高度设置、避障配置、以及失效保护事件是否同期发生。"
+    description: "任务报告无法继续/完成（{n_fail} 帧）"
+    evidence:
+      source: mission_result.failure(sum)
+      value: n_fail
+      threshold: 0
+
+---
+id: px4-mission-incomplete
+name: 任务未完成
+group: mission
+order: 2
+tag: mission_incomplete
+version: 1.0.0
+
+condition:
+  message:
+    - mission_result
+
+compute:
+  - seq_total_max = max(mission_result.seq_total)
+  - n_fin = sum(mission_result.finished)
+  # 到达过多少任务项（与 seq_total 对比看跑到了哪）
+  - seq_reached_max = max(mission_result.seq_reached)
+
+output:
+  - name: missionSeqTotal
+    value: seq_total_max
+  - name: missionSeqReached
+    value: seq_reached_max
+
+trigger:
+  - when: "seq_total_max > 0 and n_fin == 0"
+    severity: warning
+    suggestion: "日志期间上传过任务（{seq_total_max} 项）但从未完整执行：可能只手动飞了、中途切模式、或任务被中断。若本意是全自动任务，对照轨迹看在哪断的。"
+    description: "任务 {seq_total_max} 项，最多到达第 {seq_reached_max} 项，未完成"
+    evidence:
+      source: mission_result.finished(sum) 与 seq_total(max)
+      value: seq_reached_max
+      threshold: 0
+
+---
+id: px4-mission-invalid
+name: 任务检查未通过
+group: mission
+order: 3
+tag: mission_invalid
+version: 1.0.0
+
+condition:
+  message:
+    - mission_result
+
+compute:
+  - seq_total_max = max(mission_result.seq_total)
+  - n_valid = sum(mission_result.valid)
+
+output:
+  - name: missionValidFrames
+    value: n_valid
+
+trigger:
+  - when: "seq_total_max > 0 and n_valid == 0"
+    severity: warning
+    suggestion: "上传的任务从未通过检查（项数、任务项类型、围栏/起降点配置等）：QGC 上传时一般会有红色提示。修正任务后再飞，避免空中切换到无效任务。"
+    description: "任务 {seq_total_max} 项但全程无有效状态"
+    evidence:
+      source: mission_result.valid(sum) 与 seq_total(max)
+      value: n_valid
+      threshold: 0

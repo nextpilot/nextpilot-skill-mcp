@@ -47,6 +47,7 @@
         "integrity",
         "land_detection",
         "logged_messages",
+        "mission",
         "mode_thrash",
         "motor_balance",
         "param_audit",
