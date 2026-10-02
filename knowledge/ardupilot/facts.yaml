@@ -166,6 +166,21 @@ flight_modes:
     }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 飞行阶段：把 MODE 模式名归到阶段（providers/ardupilot.py 推 facts.phases 用），
+# 与 PX4 的 nav_state_groups 同构——映射是知识放这里，provider 只执行。
+# 口径：armed 段内出现过的模式才计（地面待命不算飞行阶段）；模式名 lower() 后
+# 精确匹配，名单同时收 mode.h 全名与部分日志/合成样本的缩写写法（stab/auto）。
+# 阶段词表与 PX4 对齐但没有 takeoff/fw_cruise 两个：APM 没有独立的起飞模式
+# （Auto 起飞是航点动作，MODE 消息看不见），多旋翼 AUTO 也判不出"固定翼巡航"。
+# [暂定]：LOITER 在 Plane 里是盘旋巡航、这里归 hover（多旋翼语义优先）；
+# GUIDED/AUTOTUNE/CIRCLE 这类混合语义的归组未过真实 .bin 校准，见 PENDING.md。
+mode_phase_groups:
+    - { phase: maneuver, modes: [stabilize, stab, acro, manual, training, sport, drift, flip] }
+    - { phase: hover, modes: [althold, alt_hold, loiter, poshold, pos_hold, position, brake, flowhold, flow_hold, throw, guided, guided_nogps, smart_rtl, smartrtl, follow, zigzag] }
+    - { phase: cruise, modes: [auto, auto_rtl, autotune, auto_tune, circle, systemid, avoid_adsb, autorotate, cruise, fbwa, fbwb, rtl] }
+    - { phase: landing, modes: [land, landing] }
+
+# ─────────────────────────────────────────────────────────────────────────────
 # ERR 子系统（AP_Logger.h 的 LogErrorSubsystem enum）。
 err_subsystems:
     {

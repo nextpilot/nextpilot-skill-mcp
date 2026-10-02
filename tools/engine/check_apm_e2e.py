@@ -22,6 +22,9 @@ APM 样本）把整条链路走一遍：认格式 → 取这一族的知识 → 
    以及"RNGFND1_TYPE>0 却没有测距仪消息"
 4. 反例：GPS_TYPE>0 且日志里真有 GPS 消息 → 不许报（否则就是误报）
 5. 报告头的 `platform` 问的是 provider，不是写死的 "PX4"
+6. 飞行阶段从 MODE 切段推出来（W9）：armed 段内的 STAB/AUTO 归到
+   maneuver/cruise，解锁前的 STAB 与解锁后的末段不算——`facts.phases` 不再恒空，
+   报告头与阶段相关的下游（阶段条、按阶段过滤）才有数可用
 
 用法：python tools/engine/check_apm_e2e.py
 
@@ -61,7 +64,7 @@ MUST_NOT_FIRE = "apm-sensor-gps"
 def main() -> int:
     log.print_header("APM 链路端到端冒烟（check_apm_e2e）", f"python {Path(__file__).name}")
 
-    total = 5
+    total = 6
     results: list[tuple[str, str]] = []
     skipped: list[str] = []
     step = 0
@@ -156,6 +159,27 @@ def main() -> int:
     ok = platform == "ArduPilot" and report.get("logType") == APM_LOG_TYPE
     detail = f"platform={platform!r}，logType={report.get('logType')!r}，parserVersion={report.get('parserVersion')!r}"
     err = "" if ok else "报告头还在写死固件族——ArduPilot 日志会顶着别人的名义出报告"
+    log.print_check(step, total, rule_name, ok, detail, err)
+    results.append((rule_name, "ok" if ok else "fail"))
+
+    # ── Check 6: 飞行阶段从 MODE 切段推出（W9 修复 phases 恒空）──────
+    step += 1
+    rule_name = "armed 段内的模式归到飞行阶段（STAB→maneuver，AUTO→cruise）"
+    # 合成日志：0.5s STAB（解锁前）→ 1s 解锁 → 2s AUTO → 6s 上锁 → 7s STAB。
+    # STAB 段 [0.5,2] 与 armed [1,6] 相交 → maneuver；AUTO 段 [2,7] 相交 → cruise；
+    # 末尾 STAB [7,7] 是零长封口段、与谁都不相交 → 不计。
+    got_phases = (report.get("facts") or {}).get("phases")
+    expected_phases = ["cruise", "maneuver"]
+    ok = got_phases == expected_phases
+    detail = f"facts.phases={got_phases!r}（期望 {expected_phases!r}）"
+    err = (
+        ""
+        if ok
+        else (
+            "phases 恒空或归组不对——MODE 切段推阶段的链路断了（查 facts.yaml 的 "
+            "mode_phase_groups 与 provider 的 _derive_phases）"
+        )
+    )
     log.print_check(step, total, rule_name, ok, detail, err)
     results.append((rule_name, "ok" if ok else "fail"))
 

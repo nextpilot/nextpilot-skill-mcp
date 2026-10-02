@@ -123,9 +123,10 @@ class ApmProvider:
     vehicle_categories = _VEHICLE_CATEGORIES
 
     def __init__(self, raw, facts_cfg):
-        # facts_cfg 是 PX4 的数据配置（构建期只有一份 facts.yaml），本适配器不读它，
-        # 码表都在本文件里（待迁 knowledge/ardupilot/）。参数保留只为与工厂签名一致。
-        # 迁移未完成的原因不是懒：动这里的任何一条常量都会让
+        # facts_cfg 本族的数据配置（构建期从 knowledge/ardupilot/facts.yaml 合流进产物）。
+        # 码表大头仍在本文件（待迁 knowledge/ardupilot/ 的见各常量表旁注释）；
+        # 这里只读 mode_phase_groups（模式名 → 飞行阶段，见 _derive_phases）。
+        # 动这里的任何一条常量都会让
         # tools/engine/guard_apm_parser_version.py 的 AST 指纹变红，得同步升
         # parser_version() 并重冻基线。等接线改动一起做，别单独动。
         self._cfg = facts_cfg or {}
@@ -254,6 +255,40 @@ class ApmProvider:
         self._read_vehicle_type()
         self._read_armed()
         self._read_home()
+        self._derive_phases()
+
+    def _derive_phases(self):
+        """飞行阶段集合：armed 段内出现过的 MODE 模式按 facts 的 mode_phase_groups 归类。
+
+        与 PX4 的 nav_state_groups 同构：映射表是知识（facts.yaml），引擎只执行。
+        "出现"按段与 armed 区间**相交**判，不按段起点——"解锁前切好模式、解锁后
+        原地起飞"的段起点在解锁前，按起点判会漏掉最常见的悬停起飞场景。
+        零长段（日志末尾的封口段）与谁都不相交，天然不计。
+        模式名映射不到（facts 没列的新模式/机型专属模式）就跳过：不编阶段。
+        """
+        self.phases_present = set()
+        groups = self._cfg.get("mode_phase_groups") or []
+        if not groups or not self.armed_intervals:
+            return
+        grouped = {}
+        for g in groups:
+            phase = g.get("phase")
+            if not phase:
+                continue
+            for m in g.get("modes", []):
+                grouped[str(m).lower()] = phase
+        for seg in self.get_mode_changed():
+            phase = grouped.get(str(seg.get("mode") or "").lower())
+            if phase is not None and self._overlaps_armed(seg.get("t_start_us"), seg.get("t_end_us")):
+                self.phases_present.add(phase)
+
+    def _overlaps_armed(self, s_us, e_us):
+        """段 [s, e] 是否与任一 armed 区间相交（零长段与谁都不相交）。"""
+        for s, e in self.armed_intervals:
+            e_eff = self.t_max_us if e is None else e
+            if s_us < e_eff and s < e_us:
+                return True
+        return False
 
     def _parse_fmt_row(self, payload):
         """FMT payload（86B）→ 声明 {id, len, name, format, fields}。格式字符解不了标记 unsupported。"""
@@ -462,7 +497,7 @@ class ApmProvider:
 
     def parser_version(self):
         """自研解析器（不依赖 pymavlink）：版本号在这里维护，进报告头的 parserVersion。"""
-        return "apm-bin-parser/1.5.0"  # 1.5.0：report_materials 填充 sysInfo；支持 ArduSub + sub vehicle_category；基线新增 APM .BIN 样本
+        return "apm-bin-parser/1.6.0"  # 1.6.0：MODE 切段推飞行阶段（facts.phases 非空，W9）；1.5.0：report_materials 填充 sysInfo；支持 ArduSub + sub vehicle_category；基线新增 APM .BIN 样本
 
     def get_topic_meta(self):
         out = []
@@ -611,7 +646,7 @@ class ApmProvider:
             "firmware": self.fw_label,
             "firmwareDisplay": self.fw_display,
             "armedDurationSec": self.armed_duration_s,
-            "phases": [],
+            "phases": sorted(self.phases_present),
             "dropoutTotalMs": 0,
         }
         if self.fw["git"]:

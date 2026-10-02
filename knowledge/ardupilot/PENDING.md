@@ -46,11 +46,14 @@
 - ⚠️ **metrics BAT/CURR 与 XKF4/NKF4 两条并列**：仍是现状（引擎没有跨 topic 兜底），
   概览区会同时显示两条。要不要给 metrics 加 fallback 链，等真机样本看了再定。
 - ✅ **补 `plot/` 目录**：改成容忍缺失，不必为了跑起来硬建。
-- ❌ **APM provider 不产飞行阶段，故障库仍然残废**（见第六节）：
-  `providers/ardupilot.py` 的 `get_report_facts()` 里 `"phases": []` 是硬编码空数组；
-  引擎 `run_all()` 拿它 `set(...)` 出空集，`match_fault_kb()` 于是对 `flight_phase`
-  不含 `"all"` 的条目**直接跳过**。要修就得从 `MODE` 消息切段推阶段
-  （`takeoff` / `hover` / `cruise` …），或者把匹配改成不依赖阶段。
+- ✅ **APM 飞行阶段已接线（2026-10，W9）**：`get_report_facts()["phases"]` 从 MODE
+  切段推出——armed 段内出现过的模式按 `facts.yaml` 新增的 `mode_phase_groups`
+  （模式名 lower() → maneuver/hover/cruise/landing，与 PX4 的 `nav_state_groups`
+  同构）归类，段与 armed 区间**相交**就算（按段起点判会漏"解锁前切好模式、
+  解锁后原地起飞"的常见场景）。映射不到的模式如实跳过，不编阶段；
+  `check_apm_e2e.py` 加了第 6 判据卡这条链路。
+  遗留一笔：3 份 APM 结果基线的 `facts.phases` 从 `[]` 变非空，**要在有真实
+  日志的环境重冻**（沙箱没有日志，compare_baseline 自动 SKIP，见第六节）。
 
 ## 二、占位总表：0 条（2026-09 C1 解除后清零）
 
@@ -160,7 +163,8 @@ when: "x == 0"
 - **校验脚本**：2026-09 已把端到端那条固化进 CI——`tools/engine/check_apm_e2e.py`
   挂在 `tools/ci/checklist.yml` 的 push 阶段（`check-apm-e2e`）。它验的是
   " `.bin` 被认成 `ardupilot-bin`、装载的是 APM 规则、`_cfg()` 取数与兜底、
-  4 条参数规则真发射、反例不报、`platform`/`logType` 来自 provider"。
+  4 条参数规则真发射、反例不报、`platform`/`logType` 来自 provider"，
+  2026-10 起再加一条"armed 段内模式归到飞行阶段（W9）"。
   为什么非要有它：接线这种事**最容易被改回去**，而"进不了产物"没有任何运行时信号，
   `_cfg()` 少挂一次的表现也只是一条规则静默不发射。
   **仍未入库的是静态规则校验脚本**（算子名写错、group 未登记、`when` 里调算子这类），
@@ -178,5 +182,12 @@ when: "x == 0"
   - **加前缀的直接后果**：`knowledge/px4/fault-kb.yaml` 那份**不能再被 APM 复用**
     ——它的 `trigger_tags` 是 PX4 裸标签，而 APM 现在产出的是 `apm_*`。
     这也是"别把 px4 那份挪到 `knowledge/` 根"的又一条理由：挪上去 APM 也命中不了。
-  - **先补 `phases` 再谈建库**（见第一节最后一条）：provider 的 `phases` 恒空时，
-    故障库 10 条里 7 条永不命中——这时候建 APM 的 fault-kb，建出来就是残的。
+  - **先补 `phases` 再谈建库**：已解除（2026-10，W9，见第一节）——`phases` 从
+    MODE 切段推出，不再恒空。剩下的前置是标签本身没在真机验证过（draft 状态的本义）。
+- **3 份 APM 结果基线待重冻（W9 的连带账）**：phases 修复后，ArduCopter-GSF /
+  ArduCopter-MinAltFence / ArduPlane-EK3HeightDatumResetFlushesBuffers 三份基线的
+  `result.facts.phases` 会从 `[]` 变非空（合法变更）。沙箱与 CI 都没有真实 `.bin`
+  （logs 不入库），compare_baseline 在无日志时 SKIP，所以这道 diff **在本地看不见**
+  ——谁的环境里有 `tools/testdata/logs/` 的那三份日志，跑一次
+  `python tools/engine/dump_baseline.py` 重冻，diff 里 phases 的变化是本意的。
+  解析器指纹基线（`apm_parser_baseline.json`）已随 1.6.0 重冻，不欠账。
