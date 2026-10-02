@@ -118,14 +118,164 @@
         "value": 9.2539888381958
       },
       {
+        "key": "imuGyroVibrationMean",
+        "label": "imuGyroVibrationMean",
+        "value": 0.21730679462940156
+      },
+      {
+        "key": "imuGyroVibrationP95",
+        "label": "imuGyroVibrationP95",
+        "value": 0.5419992029666899
+      },
+      {
+        "key": "imuGyroVibrationMax",
+        "label": "imuGyroVibrationMax",
+        "value": 1.9322658777236938
+      },
+      {
+        "key": "baroErrorCount",
+        "label": "baroErrorCount",
+        "value": 0
+      },
+      {
+        "key": "baroPressureRange",
+        "label": "baroPressureRange",
+        "value": 1150.0
+      },
+      {
+        "key": "baroTempMax",
+        "label": "baroTempMax",
+        "value": 42.27000045776367
+      },
+      {
         "key": "gpsEphP95M",
         "label": "gpsEphP95M",
         "value": 0.0003095500081777572
+      },
+      {
+        "key": "gpsJammingStateWorst",
+        "label": "gpsJammingStateWorst",
+        "value": 1.0
+      },
+      {
+        "key": "gpsJammingIndicatorMax",
+        "label": "gpsJammingIndicatorMax",
+        "value": 8.0
+      },
+      {
+        "key": "gpsNoisePerMsMax",
+        "label": "gpsNoisePerMsMax",
+        "value": 71.0
+      },
+      {
+        "key": "gpsHdopP95",
+        "label": "gpsHdopP95",
+        "value": 0.4599999785423279
+      },
+      {
+        "key": "missionFailureFrames",
+        "label": "missionFailureFrames",
+        "value": 0.0
+      },
+      {
+        "key": "missionSeqTotal",
+        "label": "missionSeqTotal",
+        "value": 10.0
+      },
+      {
+        "key": "missionSeqReached",
+        "label": "missionSeqReached",
+        "value": 8.0
+      },
+      {
+        "key": "missionValidFrames",
+        "label": "missionValidFrames",
+        "value": 5.0
+      },
+      {
+        "key": "rateErrRmsDeg",
+        "label": "rateErrRmsDeg",
+        "value": 56.46830636602833
+      },
+      {
+        "key": "rateErrWorstAxis",
+        "label": "rateErrWorstAxis",
+        "value": "Roll"
+      },
+      {
+        "key": "rateErrP95Deg",
+        "label": "rateErrP95Deg",
+        "value": 77.72848943704786
+      },
+      {
+        "key": "fdTriggeredFrames",
+        "label": "fdTriggeredFrames",
+        "value": 4.0
+      },
+      {
+        "key": "fdMotorFailureMask",
+        "label": "fdMotorFailureMask",
+        "value": 0.0
+      },
+      {
+        "key": "gpsCheckFailFrames",
+        "label": "gpsCheckFailFrames",
+        "value": 0.0
+      },
+      {
+        "key": "power5vOcFrames",
+        "label": "power5vOcFrames",
+        "value": 0.0
+      },
+      {
+        "key": "powerBrickInvalidFrames",
+        "label": "powerBrickInvalidFrames",
+        "value": 365.0
+      },
+      {
+        "key": "power5vMinV",
+        "label": "power5vMinV",
+        "value": 4.807397365570068
+      },
+      {
+        "key": "freefallFrames",
+        "label": "freefallFrames",
+        "value": 0.0
+      },
+      {
+        "key": "groundContactFrames",
+        "label": "groundContactFrames",
+        "value": 0.0
+      },
+      {
+        "key": "rcRssiMin",
+        "label": "rcRssiMin",
+        "value": 43.0
+      },
+      {
+        "key": "rcLostFrames",
+        "label": "rcLostFrames",
+        "value": 0.0
+      },
+      {
+        "key": "homeUpdateCount",
+        "label": "homeUpdateCount",
+        "value": 995.0
+      },
+      {
+        "key": "homeInvalidHposFrames",
+        "label": "homeInvalidHposFrames",
+        "value": 0.0
       }
     ],
     "tags": [
       "high_vibration",
-      "low_airspeed"
+      "gyro_vibration",
+      "mission_incomplete",
+      "rate_tracking_error",
+      "low_airspeed",
+      "fd_triggered",
+      "power_5v_fault"
     ],
     "guardTags": [
       "topic_missing:battery_status"
@@ -134,13 +284,19 @@
       "px4-guard-short-log",
       "px4-vibration",
       "px4-imu-clipping",
+      "px4-gyro-vibration",
       "px4-ekf-innovation",
       "px4-ekf-fault",
-      "px4-power-cell-voltage",
+      "px4-ekf-timeout",
+      "px4-ekf-gps-check-fails",
+      "px4-baro-error-count",
+      "px4-baro-frozen",
+      "px4-baro-overheat",
       "px4-cpu-load",
       "px4-gps-eph",
       "px4-gps-sats",
       "px4-gps-jump",
+      "px4-gps-interference",
       "px4-failsafe-failsafe",
       "px4-failsafe-rc_signal_lost",
       "px4-failsafe-data_link_lost",
@@ -148,11 +304,23 @@
       "px4-failsafe-mission_failure",
       "px4-failsafe-nav",
       "px4-mode-thrash",
+      "px4-mission-failure",
+      "px4-mission-incomplete",
+      "px4-mission-invalid",
+      "px4-actuator-saturation",
+      "px4-servo-saturation",
       "px4-attitude-overshoot",
       "px4-attitude-oscillation",
+      "px4-rate-tracking-rms",
+      "px4-rate-tracking-p95",
       "px4-airspeed-invalid",
-      "px4-vtol-transition-attitude",
       "px4-wind-estimate",
+      "px4-fd-status",
+      "px4-gps-detailed",
+      "px4-power-supply",
+      "px4-land-detection",
+      "px4-rc-link",
+      "px4-home-position",
       "px4-log-errors",
       "px4-log-warnings",
       "px4-guard-restart",
@@ -161,20 +329,104 @@
     ],
     "checksSkipped": [
       {
+        "ruleId": "px4-gpos-dead-reckoning",
+        "reason": "本条只在有解锁段时适用"
+      },
+      {
+        "ruleId": "px4-gpos-reset",
+        "reason": "本条只在有解锁段时适用"
+      },
+      {
+        "ruleId": "px4-gpos-never-valid",
+        "reason": "本条只在有解锁段时适用"
+      },
+      {
+        "ruleId": "px4-baro-gps-alt-drift",
+        "reason": "本条只在有解锁段时适用"
+      },
+      {
+        "ruleId": "px4-range-signal-quality",
+        "reason": "distance_sensor not in log"
+      },
+      {
+        "ruleId": "px4-range-invalid",
+        "reason": "distance_sensor not in log"
+      },
+      {
+        "ruleId": "px4-range-jump",
+        "reason": "distance_sensor not in log"
+      },
+      {
+        "ruleId": "px4-power-cell-voltage",
+        "reason": "battery_status not in log"
+      },
+      {
         "ruleId": "px4-power-sag",
-        "reason": "数据不足，本条没算出结论"
+        "reason": "battery_status not in log"
       },
       {
         "ruleId": "px4-power-remaining",
-        "reason": "数据不足，本条没算出结论"
+        "reason": "battery_status not in log"
+      },
+      {
+        "ruleId": "px4-battery-temperature",
+        "reason": "battery_status not in log"
+      },
+      {
+        "ruleId": "px4-health-errors",
+        "reason": "health_report not in log"
+      },
+      {
+        "ruleId": "px4-arming-check-errors",
+        "reason": "health_report not in log"
+      },
+      {
+        "ruleId": "px4-armability",
+        "reason": "health_report not in log"
       },
       {
         "ruleId": "px4-motor-unbalance",
         "reason": "数据不足，本条没算出结论"
       },
       {
+        "ruleId": "px4-esc-rpm-unbalance",
+        "reason": "esc_status not in log"
+      },
+      {
+        "ruleId": "px4-esc-current-skew",
+        "reason": "esc_status not in log"
+      },
+      {
+        "ruleId": "px4-esc-overheat",
+        "reason": "esc_status not in log"
+      },
+      {
+        "ruleId": "px4-esc-error-count",
+        "reason": "esc_status not in log"
+      },
+      {
         "ruleId": "px4-imu-bias-drift",
         "reason": "本条只在有解锁段时适用"
+      },
+      {
+        "ruleId": "px4-tecs-underspeed",
+        "reason": "本条只在有解锁段时适用"
+      },
+      {
+        "ruleId": "px4-tecs-height-rate-track",
+        "reason": "本条只在有解锁段时适用"
+      },
+      {
+        "ruleId": "px4-tecs-airspeed-track",
+        "reason": "本条只在有解锁段时适用"
+      },
+      {
+        "ruleId": "px4-vtol-transition-attitude",
+        "reason": "vtol_vehicle_status not in log"
+      },
+      {
+        "ruleId": "px4-gyro-fft",
+        "reason": "sensor_gyro_fft not in log"
       }
     ],
     "matchedFaults": [
@@ -221,7 +473,7 @@
     ],
     "findings": [
       {
-        "id": "F04",
+        "id": "F08",
         "severity": "critical",
         "ruleId": "px4-airspeed-invalid",
         "label": "low_airspeed",
@@ -233,6 +485,34 @@
         },
         "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html",
         "suggestion": "结合故障库 F009：空速失效极易引发失速，检查空速管堵塞/积水、管路漏气与校准。"
+      },
+      {
+        "id": "F10",
+        "severity": "critical",
+        "ruleId": "px4-fd-status",
+        "label": "fd_triggered",
+        "description": "飞行故障检测器触发 4.0 帧（roll=4.0 pitch=0.0 alt=0.0 batt=0.0 motor=0.0）",
+        "evidence": {
+          "source": "failure_detector_status.fd_*(sum)",
+          "value": 4.0,
+          "threshold": 0
+        },
+        "docUrl": "https://docs.px4.io/main/en/log/flight_log_analysis.html",
+        "suggestion": "固件故障检测器已触发（姿态/高度/电池/电机）。按触发的自由度定位：Roll/Pitch 查姿态控制，Alt 查高度估计，Battery 查电源。"
+      },
+      {
+        "id": "F11",
+        "severity": "critical",
+        "ruleId": "px4-power-supply",
+        "label": "power_5v_fault",
+        "description": "供电轨失效（brick=365.0 帧，servo=0.0 帧）",
+        "evidence": {
+          "source": "system_power.brick_valid/servo_valid(=0 计数)",
+          "value": 365.0,
+          "threshold": 0
+        },
+        "docUrl": "https://docs.px4.io/main/en/config/battery.html",
+        "suggestion": "电源砖或舵机供电轨失效（brick_valid/servo_valid 出现 0）。这类故障会使飞控或舵机失去供电，优先检查电源模块与接线。"
       },
       {
         "id": "F01",
@@ -265,7 +545,64 @@
         "suggestion": "削波表明振动峰值已超出传感器量程，建议排查机械振动源。"
       },
       {
+        "id": "F04",
+        "severity": "warning",
+        "ruleId": "px4-gyro-vibration",
+        "label": "gyro_vibration",
+        "description": "陀螺高频振动偏大（IMU #1）",
+        "evidence": {
+          "source": "vehicle_imu_status.gyro_vibration_metric(均值)",
+          "value": "0.217",
+          "threshold": 0.2,
+          "unit": "rad/s"
+        },
+        "docUrl": "https://docs.px4.io/main/en/assembly/vibration_isolation.html",
+        "suggestion": "陀螺高频振动偏大。结合 accel 侧振动规则交叉确认：先查桨叶动平衡与电机，再看机架减震。"
+      },
+      {
         "id": "F05",
+        "severity": "warning",
+        "ruleId": "px4-mission-incomplete",
+        "label": "mission_incomplete",
+        "description": "任务 10.0 项，最多到达第 8.0 项，未完成",
+        "evidence": {
+          "source": "mission_result.finished(sum) 与 seq_total(max)",
+          "value": 8.0,
+          "threshold": 0
+        },
+        "docUrl": "https://docs.px4.io/main/en/flight_modes_mission.html",
+        "suggestion": "日志期间上传过任务（10.0 项）但从未完整执行：可能只手动飞了、中途切模式、或任务被中断。若本意是全自动任务，对照轨迹看在哪断的。"
+      },
+      {
+        "id": "F06",
+        "severity": "warning",
+        "ruleId": "px4-rate-tracking-rms",
+        "label": "rate_tracking_error",
+        "description": "armed 段角速率跟踪误差 RMS 56.5 deg/s（最差轴 Roll）",
+        "evidence": {
+          "source": "vehicle_angular_velocity.xyz vs vehicle_rates_setpoint(armed 段, deg/s)",
+          "value": 56.46830636602833,
+          "threshold": 30
+        },
+        "docUrl": "https://docs.px4.io/main/en/config_mc/rate_tuning.html",
+        "suggestion": "角速率跟踪误差偏大（RMS，最差轴 Roll）。先排振动与执行器饱和（看对应图），再考虑降增益或做速率整定。"
+      },
+      {
+        "id": "F07",
+        "severity": "warning",
+        "ruleId": "px4-rate-tracking-p95",
+        "label": "rate_tracking_error",
+        "description": "armed 段角速率跟踪误差 P95 77.7 deg/s（最差轴 Roll）",
+        "evidence": {
+          "source": "vehicle_angular_velocity.xyz vs vehicle_rates_setpoint(armed 段, deg/s)",
+          "value": 77.72848943704786,
+          "threshold": 60
+        },
+        "docUrl": "https://docs.px4.io/main/en/config_mc/rate_tuning.html",
+        "suggestion": "角速率跟踪出现大的瞬时偏差（P95，最差轴 Roll）。多由机动中的增益不足或执行器饱和引起；结合 Rate Tracking Error 曲线看偏差集中的时段。"
+      },
+      {
+        "id": "F09",
         "severity": "warning",
         "ruleId": "px4-airspeed-invalid",
         "label": "low_airspeed",
@@ -294,7 +631,7 @@
         "suggestion": "少量削波可先观察；频次升高或伴随振动告警需排查机械问题。"
       },
       {
-        "id": "F06",
+        "id": "F12",
         "severity": "guard",
         "ruleId": "px4-guard-topic-missing",
         "label": "topic_missing:battery_status",

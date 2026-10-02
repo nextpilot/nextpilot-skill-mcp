@@ -53,12 +53,19 @@ test-results/
 .workbuddy/
 
 # ========== 校准用真实飞行日志 ==========
-# 含 GPS 轨迹，勿入库；用小样本/合成日志做 CI。
-# 例外按 baselines.md 的白名单机制：挑过、登记过来源（index.jsonl）的基线日志放行。
+# 含 GPS 轨迹，默认不入库；例外走 baselines.md 的白名单机制：
+# 挑过、登记过来源（tools/testdata/logs/index.jsonl）的基线日志才放行。
 tools/testdata/logs/*.ulg
 tools/testdata/logs/*.bin
 tools/testdata/logs/*.BIN
 !tools/testdata/logs/sample_log_small.ulg
+!tools/testdata/logs/39f26cce-337a-4f83-a967-45352f6e1e82.ulg
+!tools/testdata/logs/95b077d9-d719-45ea-bf91-5926170cbc52.ulg
+!tools/testdata/logs/ce302d3b-06bc-43ab-9c2a-027d29fcefd3.ulg
+!tools/testdata/logs/efd2ee9d-e0ff-44ac-ba83-5ac464adf470.ulg
+!tools/testdata/logs/ArduCopter-GSF-00000001.BIN
+!tools/testdata/logs/ArduCopter-MinAltFence-00000153.BIN
+!tools/testdata/logs/ArduPlane-EK3HeightDatumResetFlushesBuffers-00000477.BIN
 
 # ========== IDE / 编辑器 ==========
 .vscode/

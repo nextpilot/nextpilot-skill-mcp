@@ -1,34 +1,35 @@
 {
-  "log": "ArduPlane-EK3HeightDatumResetFlushesBuffers-00000001.BIN",
-  "slug": "ArduPlane-EK3HeightDatumResetFlushesBuffers-00000001",
+  "log": "ArduCopter-MinAltFence-00000153.BIN",
+  "slug": "ArduCopter-MinAltFence-00000153",
   "source": "ArduPilot SITL autotest 日志（本地 .cache/ardupilot/logs/）",
   "engine": "knowledge/engine/engine.py",
   "note": "冻结基线，重构规则格式时不得改动；如需改动须单独提交并说明理由",
   "result": {
     "platform": "ArduPilot",
     "logType": "ardupilot-bin",
-    "parserVersion": "apm-bin-parser/1.5.0",
+    "parserVersion": "apm-bin-parser/1.6.0",
     "facts": {
-      "durationSec": 29.6,
-      "vehicleType": "plane",
+      "durationSec": 3.7,
+      "vehicleType": "quad",
       "firmware": "4.8.0",
       "firmwareDisplay": "4.8.0",
-      "armedDurationSec": 1.4,
+      "armedDurationSec": 0.0,
       "phases": [],
       "dropoutTotalMs": 0,
-      "verSw": "9256cd77"
+      "verSw": "26c7363f",
+      "airframeId": 1
     },
     "metrics": [
       {
         "key": "vibrationMaxX",
         "label": "最大振动(X)",
-        "value": 1.35,
+        "value": 0.01,
         "unit": "m/s^2"
       },
       {
         "key": "vibrationMaxY",
         "label": "最大振动(Y)",
-        "value": 0.3,
+        "value": 0.01,
         "unit": "m/s^2"
       },
       {
@@ -40,25 +41,14 @@
       {
         "key": "batteryVoltageMin",
         "label": "最低电压(BAT)",
-        "value": 12.37,
+        "value": 12.6,
         "unit": "V"
       },
       {
         "key": "currentMax",
         "label": "最大电流",
-        "value": 9.27,
+        "value": 0.0,
         "unit": "A"
-      },
-      {
-        "key": "gpsSatellitesMin",
-        "label": "最少搜星",
-        "value": 3,
-        "unit": "颗"
-      },
-      {
-        "key": "gpsHdopMax",
-        "label": "最大 HDOP",
-        "value": 1.21
       },
       {
         "key": "ekfVarianceMax",
@@ -66,20 +56,22 @@
         "value": 0.0
       },
       {
-        "key": "ekfVarianceMaxLegacy",
-        "label": "EKF 最大检验比(NKF4)",
-        "value": 0.0
+        "key": "hoverThrottle",
+        "label": "hoverThrottle",
+        "value": 0.37312737107276917
       },
       {
-        "key": "longLoopCount",
-        "label": "长循环数",
-        "value": 0,
-        "unit": "次"
+        "key": "powerMarginPct",
+        "label": "powerMarginPct",
+        "value": 62.68726289272308
+      },
+      {
+        "key": "thrustToWeight",
+        "label": "thrustToWeight",
+        "value": 2.680049970938677
       }
     ],
-    "tags": [
-      "apm_param_rate_p_anomaly"
-    ],
+    "tags": [],
     "guardTags": [
       "log_incomplete"
     ],
@@ -103,7 +95,8 @@
       "apm-param-audit-batt-crt",
       "apm-param-audit-spin-arm",
       "apm-param-audit-pwm-inverted",
-      "apm-param-audit-fence-empty"
+      "apm-param-audit-fence-empty",
+      "apm-vehicle-profile-hover"
     ],
     "checksSkipped": [
       {
@@ -148,15 +141,15 @@
       },
       {
         "ruleId": "apm-gps-fix",
-        "reason": "数据不足，本条没算出结论"
+        "reason": "GPS not in log"
       },
       {
         "ruleId": "apm-gps-sats",
-        "reason": "本条只在有解锁段时适用"
+        "reason": "GPS not in log"
       },
       {
         "ruleId": "apm-gps-hdop",
-        "reason": "本条只在有解锁段时适用"
+        "reason": "GPS not in log"
       },
       {
         "ruleId": "apm-compass-interference",
@@ -188,7 +181,7 @@
       },
       {
         "ruleId": "apm-timing-long-loops",
-        "reason": "数据不足，本条没算出结论"
+        "reason": "PM not in log"
       },
       {
         "ruleId": "apm-sensor-compass-health",
@@ -201,21 +194,6 @@
     ],
     "matchedFaults": [],
     "findings": [
-      {
-        "id": "F02",
-        "severity": "critical",
-        "ruleId": "apm-param-audit-rate-p",
-        "label": "apm_param_rate_p_anomaly",
-        "description": "3 个轴的 Rate P 增益低于 0.04（R:0.000 P:0.000 Y:0.000），可能不可控",
-        "evidence": {
-          "source": "ATC_RAT_RLL_P/PIT_P/YAW_P",
-          "value": 3,
-          "threshold": 0,
-          "unit": "轴"
-        },
-        "docUrl": "https://ardupilot.org/copter/docs/parameters.html",
-        "suggestion": "ATC_RAT_RLL_P/PIT_P/YAW_P 过低（Copter 默认 ~0.135，<0.04 几乎不吃误差）。飞行会严重迟钝甚至不可控。在 AutoTune 或调参助手上调高到合理范围。"
-      },
       {
         "id": "F01",
         "severity": "guard",

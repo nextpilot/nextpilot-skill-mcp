@@ -10,32 +10,40 @@
 | 项             | 现状                                                                                                                                      |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | 日志来源       | `tools/testdata/logs/*.ulg`、`*.bin`、`*.BIN` 默认被 `.gitignore` 挡住；**白名单例外**（2026-10 起）：登记过 `index.jsonl` 的挑定日志入库 |
-| 已入库         | `sample_log_small.ulg`（921KB，v1.11.2 多旋翼，`index.jsonl` 有来源）——`has_logs=True`，logs 组门禁激活（24→28 项）                       |
+| 已入库         | 8 份（4 `.ulg` + 3 `.BIN` + 1 裁剪 `.ulg`，合计 33.8 MB，来源/许可见 `index.jsonl`）——`has_logs=True`，logs 组门禁激活（24→28 项）        |
 | 下载工具       | `tools/dev/download_px4_logs.py`（logs.px4.io）、`download_ardupilot_logs.py`（autotest.ardupilot.org）                                   |
-| 下载落点       | `.cache/px4/logs/`、`.cache/ardupilot/logs/`，同样不入库                                                                                  |
-| 冻结基线       | `tools/testdata/baseline/*.json`，9 份已入库                                                                                              |
+| 下载落点       | 基线日志直接落 `tools/testdata/logs/`（入库）；`.cache/` 仍作全量缓存（L3），不入库                                                       |
+| 冻结基线       | `tools/testdata/baseline/*.json`，9 份已入库（8 份 2026-10-02 按现规则集重冻，`sample` 为旧冻结）                                         |
 | 基线生成与比对 | `python tools/engine/dump_baseline.py`、`compare_baseline.py`（日志不在库的基线逐份 SKIP）                                                |
 | CI 门禁        | `checklist.yml` 的 `compare-baseline` / `check-provider`，`when: [logs]`                                                                  |
 | 门禁触发条件   | `check_all.py`：`tools/testdata/logs/` 下有 `.ulg`/`.BIN` 才启用 `logs` 组                                                                |
-| CI 现状        | 已入库 1 份 → CI 跑 28 项（compare-baseline 只比对在库日志）；继续按白名单补日志，覆盖面随之增长                                          |
+| CI 现状        | 28 项全绿，`compare-baseline` 覆盖 8 份在库日志（`sample` 日志不可复原，基线保持 SKIP）                                                   |
 
-已入库的 9 份基线及其覆盖：
+已入库的 9 份基线及其覆盖（时长为日志总时长，pyulog `start/last_timestamp` 或
+provider `get_time_bounds()` 实测；findings/跑跳为 2026-10-02 规则集（114 条）下的冻结值）：
 
-| slug                                                   | 平台      | 机型   | 时长    | findings | 跑/跳   |
-| ------------------------------------------------------ | --------- | ------ | ------- | -------- | ------- |
-| `sample_log_small`                                     | PX4       | 多旋翼 | 7.4 s   | 1        | 26 / 5  |
-| `sample`                                               | PX4       | 多旋翼 | 181.5 s | 1        | 19 / 10 |
-| `efd2ee9d`                                             | PX4       | 多旋翼 | 213.0 s | 3        | 25 / 6  |
-| `ce302d3b`                                             | PX4       | 固定翼 | 632.8 s | 11       | 28 / 3  |
-| `39f26cce`                                             | PX4       | 固定翼 | 203.4 s | 6        | 27 / 4  |
-| `95b077d9`                                             | PX4       | rover  | 73.2 s  | 2        | 22 / 7  |
-| `ArduCopter-GSF-00000001`                              | ArduPilot | quad   | 127.9 s | 0        | 21 / 22 |
-| `ArduCopter-MinAltFence-00000150`                      | ArduPilot | quad   | 611.8 s | 0        | 21 / 22 |
-| `ArduPlane-EK3HeightDatumResetFlushesBuffers-00000001` | ArduPilot | plane  | 29.6 s  | 2        | 20 / 23 |
+| slug                                                   | 平台      | 机型   | 时长                  | findings | 跑/跳 |
+| ------------------------------------------------------ | --------- | ------ | --------------------- | -------- | ----- |
+| `sample_log_small`                                     | PX4       | 多旋翼 | 1174.1 s（armed 5.6） | 4        | 38/32 |
+| `sample`                                               | PX4       | 多旋翼 | 181.5 s（旧记录）     | 1        | 19/10 |
+| `efd2ee9d`                                             | PX4       | 多旋翼 | 75.4 s                | 5        | 34/36 |
+| `ce302d3b`                                             | PX4       | 固定翼 | 309.6 s               | 13       | 48/22 |
+| `39f26cce`                                             | PX4       | 固定翼 | 182.7 s               | 12       | 45/25 |
+| `95b077d9`                                             | PX4       | rover  | 43.5 s                | 3        | 37/33 |
+| `ArduCopter-GSF-00000001`                              | ArduPilot | quad   | 6.0 s                 | 1        | 21/23 |
+| `ArduCopter-MinAltFence-00000153`                      | ArduPilot | quad   | 3.7 s                 | 1        | 21/23 |
+| `ArduPlane-EK3HeightDatumResetFlushesBuffers-00000477` | ArduPilot | plane  | 1.4 s                 | 2        | 21/23 |
 
-两个明显的问题：APM 侧 3 份里 2 份 findings 为 0——全是 SITL 仿真、无故障注入，
-规则的「正样本」几乎没有，规则写对了没有这些日志证明不了；PX4 侧 6 份全是 SITL
-或公开日志，且 APM 只有 quad/plane，没有 heli 和 VTOL。
+`sample` 一行要单独解释：对应日志 `sample.ulg`（4.0 MB）历史上从未入库，本地副本
+已丢、来源 uuid 无记录（logs.px4.io 上同 uuid 文件返回 403），**不可复原**；基线
+按 SKIP 语义保留，等哪天日志重新出现再补冻。旧表里 PX4 四份的时长与本次实测不同
+（如 `ce302d3b` 旧记 632.8 s、实测 309.6 s）——旧值来自上游页面展示口径，本表统一
+改为解析器实测口径，`index.jsonl` 同步。
+
+两个明显的问题依旧：APM 侧 3 份的 finding 是 `guard-integrity`（数据质量标签）与
+`param-audit`（参数审计）各一两 条——全是 SITL 仿真、无故障注入，规则的「正样本」
+几乎没有，规则写对了没有这些日志证明不了；PX4 侧全是公开日志或实机健康飞行，
+且 APM 只有 quad/plane，没有 heli 和 VTOL。
 
 ## 二、目标
 
@@ -165,10 +173,31 @@ hint: "入库日志合计超预算或单份超 5MB。要么换更小的日志，
 放行、`sample_log_small.json` 基线重冻（含删除 param-changed 后的规则集）、logs 组
 4 项在 `check_all.py --push` 全绿（24→28 项）。`compare_baseline.py` 顺带补上
 「日志不在库 → SKIP」语义（此前日志缺失直接崩，log-regression.md 连带影响第 3 条
-本就要求 SKIP）。S1 的 fw（固定翼）与 S2 的 APM 故障日志待继续挑；S7 未做。
-另：`download_px4_logs.py` 的 `--max-size-mb` 判断有 bug（累计字节数当单次读入判，
-恒等值误报超限），本次用 curl 直下绕过，待修。
-| 后续 | `slice_log.py` 切片，换掉大日志 | G3 强化 | 可选 |
+本就要求 SKIP）。
+
+执行留痕（同日第二批，9 份基线日志全量入库）：
+
+- **S1/S2 补齐**：4 份 PX4（`39f26cce` v1.16 固定翼、`ce302d3b` v1.17 固定翼、
+  `efd2ee9d` v1.15-dev 多旋翼、`95b077d9` v1.17 rover）从 `cdn.logs.px4.io` 直下
+  （`logs.px4.io/download` 302 过去，curl 加 `-L` 即可；`download_px4_logs.py` 的
+  `--max-size-mb` bug 依旧，绕过未修）；3 份 APM 走 autotest.ardupilot.org——
+  `GSF-00000001` 原名还在，`MinAltFence-00000150` 与 `EK3Height...-00000001` 已被
+  上游站点滚动清理（404），按「同组可互换」换 `00000153`/`00000477` 并重冻基线，
+  作废的 2 份旧基线 JSON 删除。
+- **S3/S4**：`index.jsonl` 补 7 条（含固件/机型/时长/许可/为什么），顺带修正
+  `sample_log_small` 的时长误记（旧记 7.4 s 实为 armed 时长，pyulog 实测全程
+  1174.1 s）；`.gitignore` 白名单扩到 8 份。
+- **S5**：9 份基线按现规则集（114 条）全量重冻（`sample` 除外，日志不可复原，
+  来源 uuid 无记录且同 uuid 在 logs.px4.io 返回 403——基线保留 SKIP）。
+- **S6**：`compare_baseline.py` 9 项全过（8 OK + 1 SKIP），logs 组随 `--push` 全绿。
+- **G3 未达标**：入库日志合计 33.8 MB（超 20 MB 预算），`ce302d3b`（15.6 MB）、
+  `efd2ee9d`（7.7 MB）、`39f26cce`（7.5 MB）三份超单份 5 MB——按用户决策全量
+  入库，切片工具（`tools/dev/slice_log.py`）落地后换切片版再收回预算。
+- **S7 未做**；APM 故障注入正样本（S2 的原目标——真故障而非 SITL 健康运行）
+  仍待从 discuss.ardupilot.org 挑。
+  另：`download_px4_logs.py` 的 `--max-size-mb` 判断有 bug（累计字节数当单次读入判，
+  恒等值误报超限），两批都用 curl 直下绕过，待修。
+  | 后续 | `slice_log.py` 切片，换掉大日志 | G3 强化 | 可选 |
 
 S1–S4 是把日志加进仓库的最小闭环，S5–S6 让基线生效。
 

@@ -35,6 +35,16 @@ def probe_one(path: Path) -> dict:
 
     errors: list[str] = []
 
+    # 日志时长：两平台 provider 都有 get_time_bounds()；拿不到就 None（phases 断言照旧）。
+    # loader.call 的约定是代码把结果写进 __result（json 字符串），不写就读到上一次调用的残值。
+    duration_s = None
+    try:
+        bounds = loader.call(ns, "import json; __result = json.dumps(provider.get_time_bounds() or {})")
+        if isinstance(bounds, dict):
+            duration_s = bounds.get("duration_s")
+    except Exception as exc:
+        errors.append(f"get_time_bounds 调用抛异常：{type(exc).__name__}: {exc}")
+
     sample = None
     for t in topics:
         if t["n"] > 2:
@@ -53,6 +63,7 @@ def probe_one(path: Path) -> dict:
             errors.append(f"np_series 调用抛异常：{type(exc).__name__}: {exc}")
 
     checks = {
+        "durationS": duration_s,
         "topics": len(topics),
         "messages": len(info["messages"]),
         "messagesEvent": sum(1 for m in info["messages"] if m.get("kind") == "event"),
@@ -93,7 +104,14 @@ def _probe_checks(path: Path) -> tuple[list[tuple[str, str]], dict]:
     checks.append(("topics > 0", "ok" if result["topics"] > 0 else "fail"))
     checks.append(("messages > 0", "ok" if result["messages"] > 0 else "fail"))
     checks.append(("params > 0", "ok" if result["params"] > 0 else "fail"))
-    checks.append(("phases >= 1", "ok" if result["phases"] >= 1 else "fail"))
+    # phases 断言只对足够长的日志有意义：几秒的 SITL 片段（如 ArduPilot 崩溃测试只
+    # 记录重启后的关键片段）推不出飞行阶段是正常行为，不是数据层坏了。阈值 30s，
+    # rover 等真实短程日志（43.5s）仍受检。
+    dur = result.get("durationS")
+    if dur is not None and dur < 30:
+        checks.append((f"phases 免检（日志 {dur:.1f}s < 30s，片段日志无阶段可言）", "ok"))
+    else:
+        checks.append(("phases >= 1", "ok" if result["phases"] >= 1 else "fail"))
     checks.append(("sysInfoKeys 非空", "ok" if result["sysInfoKeys"] else "fail"))
 
     has_series = "seriesField" in result

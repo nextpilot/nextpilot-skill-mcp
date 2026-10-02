@@ -29,8 +29,11 @@
 ## 两个同名但不同的 `sample.ulg`
 
 `web/e2e/fixtures/sample.ulg`（已入库，921KB，真实日志，`e2e.yml` 用）与
-`tools/testdata/logs/sample.ulg`（4.0MB，不入库，日志回归用）是两个不同的文件，改任一个前
-先确认自己在改哪个。
+`tools/testdata/logs/sample.ulg`（4.0MB，`baseline/sample.json` 对应）是两个不同的文件，
+改任一个前先确认自己在改哪个。
 
-因此「原始日志不入库」这条纪律现在只对 `tools/testdata/logs/*.ulg` 成立，不能作为通用红线
-引用。对 E2E fixture 已有例外（来源为公开的 logs.px4.io 且已在库，接受继续入库）。
+2026-10-02 更新：4.0MB 那份的本地副本已丢、来源 uuid 无记录（logs.px4.io 上同 uuid
+文件返回 403），**不可复原**——`sample.json` 基线按 SKIP 语义保留，日志回归实际
+覆盖见 baselines.md §一 的 9 份表。也因此「原始日志不入库」这条纪律对
+`tools/testdata/logs/` 整体不再成立：9 份基线日志已按白名单全量入库，其余下载缓存
+（`.cache/`）仍不入库。
