@@ -1,7 +1,9 @@
 # 上游对齐实施 Plan：复刻 Flight Review → 借鉴 EKF/APM 生态 → 拉开差距
 
-状态：进行中。批 1（W2 的 5 条规则）、批 2 的链路与返航点两条已完成，规则数 26 → 33；
-`esc_*` 待引擎补嵌套数组支持；频谱、PID、3D 三项未完成。
+状态：进行中。W1–W6 完成（频谱全链落地：算子 → 容器 → 8 张图）；规则侧批 1、批 2 与
+批 A（A1–A7 七个零覆盖 topic）完成，PX4 规则 26 → 61（另 APM 43，合计 104）；
+`esc_*` 嵌套取数支持已随 W6 落地并被批 A 全面用上。剩余：W7 批 C（PID 降压版）、
+W8 批 D（3D view）、W9 APM phases 修复、W10 收口。
 
 用户需求（2026-09-30）：先把上游优点全盘覆盖（绘图、PID tune、3D view），再细化拉开差距；
 PX4 侧借鉴 `ecl_ekf_analysis` / `px4_log_analyzer` / `ai-drone-toolkit`；APM 侧对比
@@ -32,7 +34,8 @@ PX4 侧借鉴 `ecl_ekf_analysis` / `px4_log_analyzer` / `ai-drone-toolkit`；APM
 成功标准（可判定）
 
 1. 规则 26 → 34~35（PX4），新 group 全部登记进 `facts.yaml` 的 `group_order` 与 `rule_meta.by_group`。
-   （批 1 完成：26 → 31；批 2 完成链路与返航点：31 → 33；`esc_*` 受限于引擎嵌套数组支持）
+   （批 1 完成：26 → 31；批 2 完成链路与返航点：31 → 33；批 A 完成 A1–A7：
+   38 → 61，7 个新组 23 条，group 已全部登记；合计含 APM 104 条）
 2. `compare_baseline.py` 跑 PX4 基线：只允许新增 finding / skipped，既有 finding 一字不改。
 3. 前端能渲染 `container: spectrogram` 的图；6 张频谱图在基线上不报错。
 4. PID 页能画出「setpoint vs 实测」跟踪误差曲线 + 统计值。
@@ -58,18 +61,17 @@ Out of scope
 
 ## 2. 现状盘点（已实测，非估算）
 
-| 资产       | 数量                       | 说明                                                                |
-| ---------- | -------------------------- | ------------------------------------------------------------------- |
-| PX4 规则   | 33                         | 覆盖 `meta` 的 227 个 topic 里的 19 个（批 1 +5、批 2 +2）          |
-| APM 规则   | 43                         | 全部 `status: draft`，无真实 `.bin` 验证                            |
-| PLOT 预设  | 40                         | 上游 Flight Review 45 张，缺 9 张                                   |
-| 引擎算子   | 92                         | 已有 `spectrum`（字段无关，amplitude/psd 双口径）与 `zero_cross_hz` |
-| 前端图表库 | `plotly.js-basic-dist-min` | `container` 是判别位，`spectrogram` 为其预留扩展点                  |
-| 基线       | 9 份（PX4 6 + APM 3）      | `tools/testdata/baseline/*.json`                                    |
+| 资产       | 数量                       | 说明                                                                     |
+| ---------- | -------------------------- | ------------------------------------------------------------------------ |
+| PX4 规则   | 61                         | 覆盖 `meta` 的 227 个 topic 里的 26 个（批 1 +5、批 2 +2、批 A +7）      |
+| APM 规则   | 43                         | 全部 `status: draft`，无真实 `.bin` 验证                                 |
+| PLOT 预设  | 48                         | 上游 Flight Review 45 张里已铺 39 + Motor RPM 等超出上游的               |
+| 引擎算子   | 94                         | 含 `spectrum`（amplitude/psd）、`stft`（三轴 PSD 求和）、`zero_cross_hz` |
+| 前端图表库 | `plotly.js-basic-dist-min` | `container` 是判别位，`spectrogram` 为其预留扩展点                       |
+| 基线       | 9 份（PX4 6 + APM 3）      | `tools/testdata/baseline/*.json`                                         |
 
-Flight Review 缺的 9 张图：Actuator Controls FFT、Angular Velocity FFT、Angular Acceleration FFT、
-Acceleration PSD、Angular Velocity PSD、Angular/Accel PSD（FIFO ×2）、Sampling Regularity（FIFO）、
-Motor RPM、Manual Control Inputs。其中 6 张卡在同一个前置能力：没有频谱/FFT。
+Flight Review 缺口在 W6 后只剩：FIFO PSD ×2（V9/V12，样例日志无 FIFO 话题，铺了无法过
+L0）、参数变更（上游也只是按钮占位）。频谱 7 张里 5 张已铺、Motor RPM 已补（超出上游）。
 
 ---
 
@@ -202,7 +204,7 @@ Pyodide 里 numpy 走 WASM，绝对数会比 CPython 慢若干倍，但 0.17 ms 
 | ---- | --------------------------------------------------------------------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | W1   | 基线冻结：跑 `compare_baseline.py` 存 6 份结果作为对照                                                                                  | —        | 6 份基线可复现                                                                                                                                                                                                                                                                                      |
 | W2   | 批 A1：`failure_detector_status` / `sensor_gyro_fft` / `estimator_gps_status` / `system_power` / `vehicle_land_detected`（+5，26 → 31） | W1       | **已完成**：`check_rules_fields.py --strict` + 基线只新增 finding                                                                                                                                                                                                                                   |
-| W3   | 批 A2：`esc_status`/`esc_report` / `input_rc`/`rc_channels` / `home_position`（+3~4，31 → 34~35）                                       | W2       | **部分完成**：`px4-rc-link`、`px4-home-position` 已做（31 → 33）；`esc_*` 卡引擎嵌套数组支持                                                                                                                                                                                                        |
+| W3   | 批 A2：`esc_status`/`esc_report` / `input_rc`/`rc_channels` / `home_position`（+3~4，31 → 34~35）                                       | W2       | **已完成（批 A，2026-10）**：`esc_*` 嵌套取数随 W6 落地；批 A1–A7 补齐 esc/baro/range_finder/health/mission/tecs/position 七个 topic，23 条新规则 38 → 61，基线只新增 finding                                                                                                                       |
 | W4   | 批 B1a：读并确认 `zero_cross_hz`；实现字段无关频谱算子（候选 B：Worker 实时算）                                                         | 频谱实测 | **已完成**：`op_spectrum` + `_infer_fs` 落地，算子 92；单测 38 项全绿（含退化五连）；§5.1 已写实测数字                                                                                                                                                                                              |
 | W5   | 批 B2：`container` 加 `spectrogram`；前端加判别位与渲染分支                                                                             | W4       | **已完成**：构建期 `compileSpectrogram` + 前端九处打通；`typecheck`/eslint（0 error）/prettier 绿；真实日志端到端跑出 650 bin                                                                                                                                                                       |
 | W6   | 批 B3 + B4：铺 6 张频谱图 + Motor RPM + Sampling Regularity                                                                             | W5       | **已完成**：4 张 FFT 线图（`spectrum-*`，vlines 参数标线）+ 3 张 PSD 热图（`spectrogram-*`，`stft` 算子）+ `motor-rpm.yml` + sampling 补 delta t；算子 92→94；单测 43 项全绿；sample.ulg 端到端 fs 自推/vlines/热图形状全过；FIFO PSD ×2 与多实例拆分推迟（无样例数据，见 coverage.md「四点五」节） |
@@ -238,13 +240,13 @@ A 风险最低、直接扩大产品面；B 是「复刻 Flight Review」的主�
 
 ## 8. 交付材料
 
-| 材料     | 内容                                                                                                                                     |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| 使用说明 | 规则注释阈值标注：`[暂定]` = 未对表上游；将来回填 `[来源]`，写法与 `vibration.yaml` 统一                                                 |
-| 部署说明 | 无新增服务器；改引擎后必须 `pnpm web:build:kb` 重新生成产物再部署                                                                        |
-| 回滚说明 | `git revert` + 重跑 `build:kb`；产物不一致是回滚最常见的坑                                                                               |
-| 运维说明 | 基线是回归基线不是性能基线；新增 finding 需人工确认是否本意                                                                              |
-| 已知限制 | ①新阈值全部 `[暂定]` ②APM 43 条仍未校准、缺真实 `.bin` ③频谱方案未最终拍板 ④PID 只做跟踪误差 ⑤3D 只到 `D2` ⑥无总评分与物理推理（见 §10） |
+| 材料     | 内容                                                                                                                                          |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 使用说明 | 规则注释阈值标注：`[暂定]` = 未对表上游；将来回填 `[来源]`，写法与 `vibration.yaml` 统一                                                      |
+| 部署说明 | 无新增服务器；改引擎后必须 `pnpm web:build:kb` 重新生成产物再部署                                                                             |
+| 回滚说明 | `git revert` + 重跑 `build:kb`；产物不一致是回滚最常见的坑                                                                                    |
+| 运维说明 | 基线是回归基线不是性能基线；新增 finding 需人工确认是否本意                                                                                   |
+| 已知限制 | ①新阈值全部 `[暂定]` ②APM 43 条仍未校准、缺真实 `.bin` ③频谱 FIFO ×2 等样例数据 ④PID 只做跟踪误差 ⑤3D 只到 `D2` ⑥无总评分与物理推理（见 §10） |
 
 ---
 

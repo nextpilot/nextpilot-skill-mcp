@@ -3,77 +3,92 @@
 PX4 那一堆 topic 里，我们检查了哪些、漏了哪些、先补哪些。本文只回答「覆盖没覆盖」，
 阈值准不准见 [`gap.md`](gap.md) §2.4，上游具体有哪些检查见 [`upstream.md`](upstream.md)。
 
-摸底时间 2026-09-30；批 1 落地后（2026-10）规则数由 26 涨到 31，批 2 再涨到 33。
+摸底时间 2026-09-30；批 1 落地后（2026-10）PX4 规则数由 26 涨到 31，批 2 再涨到 33；
+批 A（A1–A7，2026-10）把零覆盖 topic 清零后涨到 61（另有 ardupilot 43 条，两平台合计 104）。
 
 ## 结论速览
 
-- 现状 33 条规则，覆盖 `meta` 里的 19 个 topic（批 1 新增
+- 现状 61 条 PX4 规则，覆盖 `meta` 里的 26 个 topic（批 1 新增
   `failure_detector_status`、`sensor_gyro_fft`、`estimator_gps_status`、`system_power`、
-  `vehicle_land_detected`；批 2 新增 `input_rc`、`home_position`）。
-- 「该检查但完全没检查」的高价值 topic 从 14 个降到 8 个，剩余清单见第二节。
-- 批 2 的 `esc_status`/`esc_report` **规则**没做，但堵点已消除：W6 顺带给取数层补了
-  嵌套数组支持（字段引用允许中间段带元素下标，`esc_status.esc[0].esc_rpm` 直接命中
-  provider 的字面 data key），`plot/motor-rpm.yml` 已用上；规则层的电机级检查
-  （转速/电流/温度）只差写 YAML，见第二节。
+  `vehicle_land_detected`；批 2 新增 `input_rc`、`home_position`；批 A 新增
+  `esc_status`、`sensor_baro`、`distance_sensor`、`health_report`、`mission_result`、
+  `tecs_status`、`vehicle_global_position`）。
+- 「该检查但完全没检查」的高价值 topic **已清零**——第二节原清单 7 项全部于批 A
+  （A1–A7）落地，7 个新组 23 条规则。
+- 取数层的嵌套数组支持（W6 落地）在批 A 规则里全面用上。有个坑值得留给后续作者：
+  `esc_status.esc[0].esc_rpm` 这类三层链在规则层**必须显式写 `_ref("...")`**——
+  裸写在构建期放行、运行期会断链（engine 的引用改写只认两段式），见
+  `rules/esc-status.yaml` 文件头注释。
 - 9 份基线里，`power-sag` / `motor-unbalance` / `imu-bias-drift` 每份都跳过，
   `airspeed-invalid` / `ekf-innovation` / `wind-estimate` 多数跳过。
   跳过率高未必是 bug（多旋翼本来没空速、没风估），但要能一眼看出是"不适用"还是"取不到数"。
 
 ---
 
-## 一、现状：33 条规则按维度
+## 一、现状：61 条规则按维度
 
-| 维度         | group                          | 规则数 | 依赖 topic                    |
-| ------------ | ------------------------------ | ------ | ----------------------------- |
-| 数据质量守卫 | `guards_early`/`guards`        | 4      | 无（看日志元信息）            |
-| 振动         | `vibration`                    | 2      | `vehicle_imu_status`          |
-| EKF 融合     | `ekf_innovations`/`ekf_faults` | 2      | `estimator_status`            |
-| 电池         | `battery`                      | 3      | `battery_status`              |
-| CPU          | `cpu`                          | 1      | `cpuload`                     |
-| GPS          | `gps_health`                   | 3      | `vehicle_gps_position`        |
-| 失效保护     | `failsafe`                     | 6      | `vehicle_status`              |
-| 模式抖动     | `mode_thrash`                  | 1      | `vehicle_status`              |
-| 电机         | `motor_balance`                | 1      | `actuator_motors`             |
-| IMU 零偏     | `imu_bias`                     | 1      | `estimator_sensor_bias`       |
-| 姿态跟踪     | `attitude_tracking`            | 2      | `vehicle_attitude(_setpoint)` |
-| 空速         | `airspeed`                     | 1      | `airspeed_validated`          |
-| VTOL 转换    | `vtol_transition`              | 1      | `vtol_vehicle_status`         |
-| 风扰         | `wind_estimate`                | 1      | `estimator_wind`              |
-| 日志消息     | `logged_messages`              | 2      | 消息流                        |
-| 故障检测器   | `fd_status`                    | 1      | `failure_detector_status`     |
-| 陀螺频谱     | `gyro_fft`                     | 1      | `sensor_gyro_fft`             |
-| GPS 明细     | `gps_detailed`                 | 1      | `estimator_gps_status`        |
-| 供电健康     | `power_supply`                 | 1      | `system_power`                |
-| 落地检测     | `land_detection`               | 1      | `vehicle_land_detected`       |
-| 遥控链路     | `rc_link`                      | 1      | `input_rc`                    |
-| 返航点       | `home_position`                | 1      | `home_position`               |
+| 维度         | group                          | 规则数 | 依赖 topic                                                 |
+| ------------ | ------------------------------ | ------ | ---------------------------------------------------------- |
+| 数据质量守卫 | `guards_early`/`guards`        | 4      | 无（看日志元信息）                                         |
+| 振动         | `vibration`                    | 2      | `vehicle_imu_status`                                       |
+| EKF 融合     | `ekf_innovations`/`ekf_faults` | 2      | `estimator_status`                                         |
+| 位置可信度   | `position`                     | 3      | `vehicle_global_position`                                  |
+| 气压计       | `baro`                         | 4      | `sensor_baro`/`vehicle_air_data`/`vehicle_global_position` |
+| 测距         | `range_finder`                 | 3      | `distance_sensor`                                          |
+| 电池         | `battery`                      | 3      | `battery_status`                                           |
+| CPU          | `cpu`                          | 1      | `cpuload`                                                  |
+| GPS          | `gps_health`                   | 3      | `vehicle_gps_position`                                     |
+| 失效保护     | `failsafe`                     | 6      | `vehicle_status`                                           |
+| 健康汇总     | `health`                       | 3      | `health_report`                                            |
+| 模式抖动     | `mode_thrash`                  | 1      | `vehicle_status`                                           |
+| 任务         | `mission`                      | 3      | `mission_result`                                           |
+| 电机         | `motor_balance`                | 1      | `actuator_motors`                                          |
+| 电机级 ESC   | `esc`                          | 4      | `esc_status`                                               |
+| IMU 零偏     | `imu_bias`                     | 1      | `estimator_sensor_bias`                                    |
+| 姿态跟踪     | `attitude_tracking`            | 2      | `vehicle_attitude(_setpoint)`                              |
+| 空速         | `airspeed`                     | 1      | `airspeed_validated`                                       |
+| TECS         | `tecs`                         | 3      | `tecs_status`/`airspeed_validated`                         |
+| VTOL 转换    | `vtol_transition`              | 1      | `vtol_vehicle_status`                                      |
+| 风扰         | `wind_estimate`                | 1      | `estimator_wind`                                           |
+| 日志消息     | `logged_messages`              | 2      | 消息流                                                     |
+| 故障检测器   | `fd_status`                    | 1      | `failure_detector_status`                                  |
+| 陀螺频谱     | `gyro_fft`                     | 1      | `sensor_gyro_fft`                                          |
+| GPS 明细     | `gps_detailed`                 | 1      | `estimator_gps_status`                                     |
+| 供电健康     | `power_supply`                 | 1      | `system_power`                                             |
+| 落地检测     | `land_detection`               | 1      | `vehicle_land_detected`                                    |
+| 遥控链路     | `rc_link`                      | 1      | `input_rc`                                                 |
+| 返航点       | `home_position`                | 1      | `home_position`                                            |
 
-覆盖的 19 个 topic：`actuator_motors`、`airspeed_validated`、`battery_status`、`cpuload`、
-`estimator_gps_status`、`estimator_sensor_bias`、`estimator_states`、`estimator_status`、
-`failure_detector_status`、`home_position`、`input_rc`、`sensor_gyro_fft`、`system_power`、
-`vehicle_air_data`、`vehicle_imu_status`、`vehicle_land_detected`、`vehicle_status` +
-guard 用的日志元信息。
+覆盖的 26 个 topic = 上表 22 行里点名的：`actuator_motors`、`airspeed_validated`、
+`battery_status`、`cpuload`、`distance_sensor`、`esc_status`、`estimator_gps_status`、
+`estimator_sensor_bias`、`estimator_states`、`estimator_status`、`failure_detector_status`、
+`health_report`、`home_position`、`input_rc`、`mission_result`、`sensor_baro`、
+`sensor_gyro_fft`、`system_power`、`tecs_status`、`vehicle_air_data`、
+`vehicle_global_position`、`vehicle_imu_status`、`vehicle_land_detected`、
+`vehicle_status` + guard 用的日志元信息。
 
 ---
 
-## 二、缺口：高价值但完全没检查的 topic
+## 二、缺口：高价值但完全没检查的 topic（已于批 A 清零）
 
-按「检查了有没有用」排序，当前零覆盖的高价值项（表中第 2、3、5、6 项已于批 1 落地，
-第 4、9 项已于批 2 落地，这里留档的是**尚未覆盖**的）：
+按「检查了有没有用」排序的原清单（共 7 项，编号沿用了初版 14 项清单里批 1/批 2
+先落地的余号）。**批 A（A1–A7，2026-10）已全部落地**，此表留档：
 
-| #   | topic                              | 关键字段                                                                                  | 能判什么                                                                                          | 优先级 |
-| --- | ---------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------ |
-| 1   | `esc_status` / `esc_report`        | `esc_rpm`、`esc_current`、`esc_voltage`、`esc_temperature`、`esc_errorcount`、`esc_state` | 电机级故障：转速异常、电流失衡、过温、ESC 报错。比现在的 `actuator_motors` 输出推断精细一个数量级 | 高     |
-| 7   | `sensor_baro` / `vehicle_air_data` | `pressure`、`temperature`、`error_count`、`temperature_source`                            | 气压计故障：`error_count` 增长 = 传感器在报错；温度异常 = 影响高度估计                            | 中     |
-| 8   | `distance_sensor`                  | `current_distance`、`signal_quality`、`variance`                                          | 定高/避障传感器：信号质量、读数跳变                                                               | 中     |
-| 10  | `health_report`                    | `health_error_flags`、`arming_check_error_flags`、`can_arm_mode_flags`                    | 健康汇总与解锁拒绝原因（PX4 1.16 新 topic）                                                       | 中     |
-| 12  | `mission_result`                   | `failure`、`finished`、`seq_current`、`geofence_id`                                       | 任务执行：任务失败原因、地理围栏触发                                                              | 中     |
-| 13  | `tecs_status`                      | `altitude_sp`、`height_rate_*`、`airspeed` 相关                                           | TECS 高度/速度控制（固定翼核心）：跟踪误差                                                        | 中     |
-| 14  | `vehicle_global_position`          | `dead_reckoning`、`eph`、`epv`、`alt_valid`                                               | 全局位置可信度：`dead_reckoning` = 在纯推算（GPS 丢了）                                           | 低     |
+| #   | topic                              | 关键字段                                                                                  | 能判什么                                                                                          | 落地规则（条数）               |
+| --- | ---------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------ |
+| 1   | `esc_status` / `esc_report`        | `esc_rpm`、`esc_current`、`esc_voltage`、`esc_temperature`、`esc_errorcount`、`esc_state` | 电机级故障：转速异常、电流失衡、过温、ESC 报错。比现在的 `actuator_motors` 输出推断精细一个数量级 | A1 `esc-status.yaml`（4）      |
+| 7   | `sensor_baro` / `vehicle_air_data` | `pressure`、`temperature`、`error_count`、`temperature_source`                            | 气压计故障：`error_count` 增长 = 传感器在报错；温度异常 = 影响高度估计                            | A2 `baro.yaml`（4）            |
+| 8   | `distance_sensor`                  | `current_distance`、`signal_quality`、`variance`                                          | 定高/避障传感器：信号质量、读数跳变                                                               | A3 `distance-sensor.yaml`（3） |
+| 10  | `health_report`                    | `health_error_flags`、`arming_check_error_flags`、`can_arm_mode_flags`                    | 健康汇总与解锁拒绝原因（PX4 1.16 新 topic）                                                       | A4 `health-report.yaml`（3）   |
+| 12  | `mission_result`                   | `failure`、`finished`、`seq_current`、`geofence_id`                                       | 任务执行：任务失败原因、地理围栏触发                                                              | A5 `mission-result.yaml`（3）  |
+| 13  | `tecs_status`                      | `altitude_sp`、`height_rate_*`、`airspeed` 相关                                           | TECS 高度/速度控制（固定翼核心）：跟踪误差                                                        | A6 `tecs.yaml`（3）            |
+| 14  | `vehicle_global_position`          | `dead_reckoning`、`eph`、`epv`、`alt_valid`                                               | 全局位置可信度：`dead_reckoning` = 在纯推算（GPS 丢了）                                           | A7 `global-position.yaml`（3） |
 
-`esc_status`/`esc_report` 曾是这份清单里唯一卡在**引擎能力**而非规则工作量上的；
-W6 已给取数层补上嵌套数组支持（`plot/motor-rpm.yml` 已用上），规则层随时可写。
-其余各项都能按现有方言直接写。
+批 A 全程零新增算子——23 条规则全部用既有算子组合（`stack_columns`、
+`active_column_means`、`items_spread`、`rows_aggregate`、`interval_mask`+`apply_mask`、
+`interp_to`、`bit_or_max`、`worst_mean_stats`、`head_tail_median_drop` 等）拼出来。
+`esc_state` 是 vendor-specific 位域、不做规则；`health_report` 位名不写死
+（`health_component_t` 位序随版本扩），规则透传 mask 数值并指引地面站健康页按位定位。
 
 ---
 
@@ -155,16 +170,19 @@ W4/W5 解掉「缺算子」根因、W6 把图铺完。三种容器的分工与�
   `px4-gps-detailed`、`px4-power-supply`、`px4-land-detection`，规则数 26 → 31。
 - 批 2（新维度）：`esc_status`/`esc_report`（电机级）、`input_rc`/`rc_channels`（链路）、
   `home_position`（返航点）。**部分落地（2026-10）**：`px4-rc-link`、`px4-home-position`
-  两条已做，规则数 31 → 33；`esc_*` 卡在取数层的嵌套数组支持，见"结论速览"。
+  两条已做，规则数 31 → 33；`esc_*` 嵌套取数支持已随 W6 落地，规则在批 A 补齐。
+- 批 A（零覆盖 topic 清零，2026-10）：A1–A7 七批共 23 条规则、7 个新组，规则数 38 → 61，
+  见第二节留档表。验收同批 1：既有基线只新增 finding/skipped。
 - 批 3（补字段）：GPS 干扰（`noise_per_ms`/`jamming_indicator`）、陀螺振动、电池温度。
 - 批 3.5（谱图，2026-02）：借 W4/W5 落地的 `spectrum` 算子与 `spectrogram` 容器铺 6 张谱图，
-  见第四点五节。这是唯一"算子已在、只差声明"的一批，成本最低。
+  见第四点五节。这是唯一"算子已在、只差声明"的一批，成本最低。**已完成（W6）**。
 - 批 4（需新算子）：PID 跟踪误差（需要 setpoint-actual 对齐统计）、磁力计推力相关性、
-  执行器饱和。
+  执行器饱和。**未做**，是剩余规则缺口的主要部分。
 
 每批的验收标准：新规则在基线上跑通，产出的差异只允许新增 finding/skipped，
 不允许改动既有 finding，用 `tools/engine/compare_baseline.py` 卡。
 
-批 1+2 做完，覆盖数从 26 → 33，`[暂定]` 阈值从 15 条涨到 22 条。这是预期的——先有覆盖，
-再校准。`thresholds_source` 字段（设计里第 6 层，尚未落地）就是为此准备的，字段定义见网站
+批 1+2 做完，覆盖数从 26 → 33，`[暂定]` 阈值从 15 条涨到 22 条；批 A 再涨到 61 条规则、
+`[暂定]` 阈值约 45 条。这是预期的——先有覆盖，再校准。`thresholds_source` 字段
+（设计里第 6 层，尚未落地）就是为此准备的，字段定义见网站
 `/guide/rule-schema` 与 [`../../knowledge/px4/rules`](../../../knowledge/px4/rules)。
