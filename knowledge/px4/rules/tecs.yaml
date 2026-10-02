@@ -1,0 +1,130 @@
+# TECS（总能量控制系统，固定翼/VTOL 的空速-高度耦合控制器）跟踪质量：
+# 空速不足（underspeed_ratio 是固件自己的失速裕度判定）、高度速率跟踪、
+# 空速跟踪。字段 v1.15 与 v1.16 同名，候选组不需要。
+#
+# 口径说明：多旋翼日志不记 tecs_status（TECS 不跑）→ 自动跳过；VTOL 在
+# MC 段 TECS 不控姿态，armed 全段的统计会混进 MC 段——p95 鲁棒，文案里写明。
+# 阈值 [暂定]：underspeed 满额 1.0 即失速裕度耗尽（固件口径，不设阈值）；
+# 高度速率跟踪 p95=3 m/s；空速跟踪 p95=5 m/s（固定翼巡航场景的工程经验值）。
+
+---
+id: px4-tecs-underspeed
+name: 空速不足
+group: tecs
+order: 1
+tag: tecs_underspeed
+version: 1.0.0
+
+condition:
+  message:
+    - tecs_status
+  armed: true
+
+compute:
+  - us = tecs_status.underspeed_ratio
+  - us_max = max(us)
+  - us_p95 = np.percentile(us, 95)
+
+output:
+  - name: tecsUnderspeedMax
+    value: us_max
+    round: 2
+  - name: tecsUnderspeedP95
+    value: us_p95
+    round: 2
+
+# ratio 是固件自己的失速裕度判定（1 = 裕度耗尽），本仓不设阈值
+
+trigger:
+  - when: "us_max >= 1.0"
+    severity: critical
+    suggestion: "空速低于失速裕度（underspeed_ratio 满额）：迎风面不足或需求推力超出能力——查空速传感器是否低估、桨/电机推力是否达标、以及飞行是否顶了大风。失速风险，优先级最高。"
+    description: "armed 段 underspeed_ratio 达到 {us_max:.2f}（失速裕度耗尽）"
+    evidence:
+      source: tecs_status.underspeed_ratio(max)
+      value: us_max
+      threshold: 1.0
+  - when: "us_p95 >= 0.7"
+    severity: warning
+    suggestion: "空速裕度长期偏低（p95={us_p95:.2f}）：巡航速度设置偏小、桨效率不足、或风大顶飞。建议上调巡航空速或减载。"
+    description: "armed 段 underspeed_ratio p95={us_p95:.2f}"
+    evidence:
+      source: tecs_status.underspeed_ratio(p95)
+      value: us_p95
+      threshold: 0.7
+
+---
+id: px4-tecs-height-rate-track
+name: 高度速率跟踪差
+group: tecs
+order: 2
+tag: tecs_height_rate_error
+version: 1.0.0
+
+condition:
+  message:
+    - tecs_status
+  armed: true
+
+compute:
+  # 爬升/下降率指令 vs 实际；p95 取「大部分时间跟不住」的量级
+  - herr = abs(tecs_status.height_rate - tecs_status.height_rate_setpoint)
+  - herr_p95 = np.percentile(herr, 95)
+
+output:
+  - name: tecsHeightRateErrP95
+    value: herr_p95
+    round: 2
+    unit: m/s
+
+# 阈值 [暂定]：3 m/s。固定翼巡航时高度速率指令通常 ±2 m/s 内，p95 超 3 说明明显跟不住
+
+trigger:
+  - when: "herr_p95 >= 3.0"
+    severity: warning
+    suggestion: "高度速率长时间跟不上指令：推力不足（载重/桨效率/高海拔）、俯仰权限受限（失速保护压着）、或 TECS 参数（FFB 时间常数）不适配机体。对照油门曲线看是否长期满油门。"
+    description: "armed 段高度速率跟踪误差 p95={herr_p95:.1f} m/s（VTOL 的 MC 段也计入）"
+    evidence:
+      source: tecs_status.height_rate - height_rate_setpoint
+      value: f"{herr_p95:.2f}"
+      threshold: 3
+      unit: m/s
+
+---
+id: px4-tecs-airspeed-track
+name: 空速跟踪差
+group: tecs
+order: 3
+tag: tecs_airspeed_error
+version: 1.0.0
+
+condition:
+  message:
+    - tecs_status
+  armed: true
+
+compute:
+  # 只看 TECS 激活（有空速指令）的样本：sp==0 的段落误差没有意义
+  - asp = tecs_status.true_airspeed_sp
+  - aerr = abs(tecs_status.true_airspeed_filtered - asp)
+  - aerr_act = aerr[asp > 0.0]
+  - aerr_p95 = np.percentile(aerr_act, 95) if len(aerr_act) > 50 else 0
+
+output:
+  - name: tecsAirspeedErrP95
+    value: aerr_p95
+    round: 2
+    unit: m/s
+
+# 阈值 [暂定]：5 m/s。空速环的典型整定水平在 ±3 m/s 内，p95 超 5 说明能量分配有问题
+
+trigger:
+  - when: "aerr_p95 >= 5.0"
+    severity: warning
+    suggestion: "空速长时间跟不上指令：速度与高度能量分配失衡（TECS 参数）、或空速传感器读数漂移（被气流吹扰/安装位不佳）。对照 altitude_sp 看是不是高度优先抢了能量。"
+    description: "armed 段空速跟踪误差 p95={aerr_p95:.1f} m/s"
+    evidence:
+      source: tecs_status.true_airspeed_filtered - true_airspeed_sp
+      value: f"{aerr_p95:.2f}"
+      threshold: 5
+      unit: m/s

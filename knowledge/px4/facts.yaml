@@ -40,6 +40,7 @@ group_order:
         imu_bias,
         attitude_tracking,
         airspeed,
+        tecs,
         vtol_transition,
         wind_estimate,
         fd_status,
@@ -70,6 +71,7 @@ rule_meta:
         author: { name: NextPilot 内置 }
     by_group:
         airspeed: { category: airspeed, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
+        tecs: { category: airspeed, doc: "https://docs.px4.io/main/en/advanced_config/tuning_guide_fixedwing.html" }
         attitude_tracking: { category: attitude, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
         battery: { category: power, doc: "https://docs.px4.io/main/en/config/battery.html" }
         cpu: { category: system, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }

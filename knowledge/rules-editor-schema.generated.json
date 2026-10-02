@@ -57,6 +57,7 @@
         "rc_input",
         "rc_link",
         "sensor_health",
+        "tecs",
         "timing",
         "vibration",
         "vtol_transition",

@@ -7,7 +7,7 @@ group: 开发指南
 groupEn: For Developers
 order: 12
 ---
-引擎当前内置的 **98 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
+引擎当前内置的 **101 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
 每条给出：**适用**（固件 / 机架 / 依赖）、**取值**（读哪些字段、过哪个算子）、**判定**（自上而下
 命中第一条即发射）、**产出**（写进报告的 check 名、喂故障库匹配的标签、UI 用的统计）。
 
@@ -1248,6 +1248,46 @@ order: 12
 - 判定：
 - <strong>warning</strong> | `unhealthy_ratio > 0.20` | threshold 0.2 | description "罗盘不健康样本占比 \{unhealthy_ratio:.0%\}"
 - 产出：tag=apm_compass_unhealthy
+
+
+## tecs（group: `tecs`）
+
+### px4-tecs-underspeed — 空速不足
+
+- 文件：`rules/tecs.yaml` ｜ 位置：group `tecs` #1
+- 适用：总是适用
+- 取值：
+- `us = tecs_status.underspeed_ratio`
+- `us_max = max(us)`
+- `us_p95 = np.percentile(us, 95)`
+- 判定：
+- <strong>critical</strong> | `us_max >= 1.0` | threshold 1 | description "armed 段 underspeed_ratio 达到 \{us_max:.2f\}（失速裕度耗尽）"
+- <strong>warning</strong> | `us_p95 >= 0.7` | threshold 0.7 | description "armed 段 underspeed_ratio p95=\{us_p95:.2f\}"
+- 产出：tecsUnderspeedMax=us_max, tecsUnderspeedP95=us_p95, tag=tecs_underspeed
+
+### px4-tecs-height-rate-track — 高度速率跟踪差
+
+- 文件：`rules/tecs.yaml` ｜ 位置：group `tecs` #2
+- 适用：总是适用
+- 取值：
+- `herr = abs(tecs_status.height_rate - tecs_status.height_rate_setpoint)`
+- `herr_p95 = np.percentile(herr, 95)`
+- 判定：
+- <strong>warning</strong> | `herr_p95 >= 3.0` | threshold 3 | unit m/s | description "armed 段高度速率跟踪误差 p95=\{herr_p95:.1f\} m/s（VTOL 的 MC 段也计入）"
+- 产出：tecsHeightRateErrP95=herr_p95, tag=tecs_height_rate_error
+
+### px4-tecs-airspeed-track — 空速跟踪差
+
+- 文件：`rules/tecs.yaml` ｜ 位置：group `tecs` #3
+- 适用：总是适用
+- 取值：
+- `asp = tecs_status.true_airspeed_sp`
+- `aerr = abs(tecs_status.true_airspeed_filtered - asp)`
+- `aerr_act = aerr[asp > 0.0]`
+- `aerr_p95 = np.percentile(aerr_act, 95) if len(aerr_act) > 50 else 0`
+- 判定：
+- <strong>warning</strong> | `aerr_p95 >= 5.0` | threshold 5 | unit m/s | description "armed 段空速跟踪误差 p95=\{aerr_p95:.1f\} m/s"
+- 产出：tecsAirspeedErrP95=aerr_p95, tag=tecs_airspeed_error
 
 
 ## timing（group: `timing`）
