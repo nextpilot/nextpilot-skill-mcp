@@ -7,7 +7,7 @@ group: 开发指南
 groupEn: For Developers
 order: 12
 ---
-引擎当前内置的 **85 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
+引擎当前内置的 **89 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
 每条给出：**适用**（固件 / 机架 / 依赖）、**取值**（读哪些字段、过哪个算子）、**判定**（自上而下
 命中第一条即发射）、**产出**（写进报告的 check 名、喂故障库匹配的标签、UI 用的统计）。
 
@@ -130,6 +130,56 @@ order: 12
 - <strong>warning</strong> | `dur_s >= 1.0` | threshold 15 | unit deg | description "航向持续偏离指令 \{dur_s:.1f\} s，误差峰值 \{peak:.0f\}°（t=\{start_s:.1f\}s）"
 - <strong>warning</strong> | `peak_yaw > 30.0` | threshold 30 | unit deg | description "航向跟踪误差瞬时尖峰 \{peak_yaw:.0f\}°"
 - 产出：tag=apm_attitude_tracking_error
+
+
+## baro（group: `baro`）
+
+### px4-baro-error-count — 气压计错误计数
+
+- 文件：`rules/baro.yaml` ｜ 位置：group `baro` #1
+- 适用：总是适用
+- 取值：
+- `ec = sensor_baro.error_count`
+- `n_err = int(max(ec) - min(ec))`
+- 判定：
+- <strong>warning</strong> | `n_err > 0` | threshold 0 | description "气压计错误计数增长 \{n_err\} 次"
+- 产出：baroErrorCount=n_err, tag=baro_error_count
+
+### px4-baro-frozen — 气压计数据冻结
+
+- 文件：`rules/baro.yaml` ｜ 位置：group `baro` #2
+- 适用：总是适用
+- 取值：
+- `m = interval_mask(sensor_baro.timestamp, ARMED_INTERVALS)`
+- `prange = range_of(apply_mask(sensor_baro.pressure, m))`
+- 判定：
+- <strong>warning</strong> | `prange < 3.0` | threshold 3 | unit Pa | description "armed 段气压极差仅 \{prange:.1f\} Pa（数据疑似冻结）"
+- 产出：baroPressureRange=prange, tag=baro_frozen
+
+### px4-baro-overheat — 气压计过温
+
+- 文件：`rules/baro.yaml` ｜ 位置：group `baro` #3
+- 适用：总是适用
+- 取值：
+- `tmax = max(sensor_baro.temperature)`
+- 判定：
+- <strong>warning</strong> | `tmax >= 85` | threshold 85 | unit degC | description "气压计最高温度 \{tmax:.0f\} °C"
+- 产出：baroTempMax=tmax, tag=baro_overheat
+
+### px4-baro-gps-alt-drift — 气压高度相对 GPS 漂移
+
+- 文件：`rules/baro.yaml` ｜ 位置：group `baro` #4
+- 适用：总是适用
+- 取值：
+- `bts = vehicle_air_data.timestamp`
+- `galt = _ref("vehicle_global_position.alt")`
+- `galt_b = interp_to(galt, vehicle_global_position.timestamp, bts)`
+- `d = vehicle_air_data.baro_alt_meter - galt_b`
+- `drop, tail = head_tail_median_drop(d, bts, ARMED_INTERVALS, skip_first_s=5, min_seg=20)`
+- `drift = abs(drop)`
+- 判定：
+- <strong>warning</strong> | `drift >= 50.0` | threshold 50 | unit m | description "armed 段气压高度相对 GPS 漂移 \{drift:.0f\} m"
+- 产出：baroAltDrift=drift, tag=baro_alt_drift
 
 
 ## battery（group: `battery`）

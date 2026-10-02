@@ -1,0 +1,157 @@
+# 气压计健康：直接看 sensor_baro 的错误计数 / 数据活性 / 温度，再用
+# vehicle_air_data（融合气压高度）与 GPS 高度交叉查漂移。
+#
+# 多实例说明：多气压计日志取实例 0（裸写 topic.field = 第 0 实例）。错误多为
+# 总线级故障（I2C/SPI 卡死），通常多实例同报；逐实例展开的边际价值小。
+#
+# 阈值 [暂定]：冻结判据 armed 段气压极差 < 3 Pa（真实飞行哪怕悬停，气压变化
+# 也在几十 Pa 量级——温度漂移与风扰都算上）；温度上限 85 °C（多数 MEMS 气压计
+# 工作上限）；高度漂移 50 m（气压漂移导致的降高误判常见量级）。
+
+---
+id: px4-baro-error-count
+name: 气压计错误计数
+group: baro
+order: 1
+tag: baro_error_count
+version: 1.0.0
+
+condition:
+  message:
+    - sensor_baro
+
+compute:
+  # error_count 是传感器驱动累计错误数；看整段日志的增量（max-min 对重启归零也稳）
+  - ec = sensor_baro.error_count
+  - n_err = int(max(ec) - min(ec))
+
+output:
+  - name: baroErrorCount
+    value: n_err
+
+# 驱动不上报错误时计数恒 0；无固件判据，本仓不设阈值
+
+trigger:
+  - when: "n_err > 0"
+    severity: warning
+    suggestion: "气压计驱动上报了读取错误：检查接线/焊接与总线负载，确认气压计型号驱动匹配。错误期间高度估计退化为 GPS 或惯性推算。"
+    description: "气压计错误计数增长 {n_err} 次"
+    evidence:
+      source: sensor_baro.error_count(增量)
+      value: n_err
+      threshold: 0
+
+---
+id: px4-baro-frozen
+name: 气压计数据冻结
+group: baro
+order: 2
+tag: baro_frozen
+version: 1.0.0
+
+# 解锁总时长 > 60 s：地面短解锁电机不转，气压本来就不动，不设时长门槛会把
+# 正常的地面待飞判成冻结
+
+condition:
+  message:
+    - sensor_baro
+  armed: ">60"
+
+compute:
+  - m = interval_mask(sensor_baro.timestamp, ARMED_INTERVALS)
+  - prange = range_of(apply_mask(sensor_baro.pressure, m))
+
+output:
+  - name: baroPressureRange
+    value: prange
+    round: 1
+    unit: Pa
+
+trigger:
+  - when: "prange < 3.0"
+    severity: warning
+    suggestion: "解锁飞行期间气压读数几乎不变，疑似传感器冻值或驱动卡死：检查气压计 silicone 覆盖/气孔是否堵死、驱动是否报错。EKF 高度会退化为 GPS 单源。"
+    description: "armed 段气压极差仅 {prange:.1f} Pa（数据疑似冻结）"
+    evidence:
+      source: sensor_baro.pressure(armed 段极差)
+      value: f"{prange:.1f}"
+      threshold: 3
+      unit: Pa
+
+---
+id: px4-baro-overheat
+name: 气压计过温
+group: baro
+order: 3
+tag: baro_overheat
+version: 1.0.0
+
+condition:
+  message:
+    - sensor_baro
+
+compute:
+  - tmax = max(sensor_baro.temperature)
+
+output:
+  - name: baroTempMax
+    value: tmax
+    round: 1
+    unit: degC
+
+# 阈值 [暂定]：85 °C 是多数 MEMS 气压计（BMP388/DPS310 等）的工作上限
+
+trigger:
+  - when: "tmax >= 85"
+    severity: warning
+    suggestion: "气压计温度超出规格：多为靠近发热源（ESC/电源板）或机内散热差。高温会引入气压漂移（高度误判），必要时加隔热罩或挪位。"
+    description: "气压计最高温度 {tmax:.0f} °C"
+    evidence:
+      source: sensor_baro.temperature(max)
+      value: f"{tmax:.1f}"
+      threshold: 85
+      unit: degC
+
+---
+id: px4-baro-gps-alt-drift
+name: 气压高度相对 GPS 漂移
+group: baro
+order: 4
+tag: baro_alt_drift
+version: 1.0.0
+
+condition:
+  message:
+    - vehicle_air_data
+    - vehicle_global_position
+  armed: true
+
+compute:
+  # 把 GPS 高度插值对齐到气压数据的时间轴再作差；两个高度源同刻度（AMSL 米）
+  - bts = vehicle_air_data.timestamp
+  - galt = _ref("vehicle_global_position.alt")
+  - galt_b = interp_to(galt, vehicle_global_position.timestamp, bts)
+  - d = vehicle_air_data.baro_alt_meter - galt_b
+  # armed 段头段中位 vs 尾段中位的差值变化 = 漂移量（起飞冲击前 5s 跳过）
+  - drop, tail = head_tail_median_drop(d, bts, ARMED_INTERVALS, skip_first_s=5, min_seg=20)
+  - drift = abs(drop)
+
+output:
+  - name: baroAltDrift
+    value: drift
+    round: 1
+    unit: m
+
+# 阈值 [暂定]：50 m。GPS 竖直精度米级、气压漂移慢变，两者同飞应该互相贴住；
+# 张开到几十米说明气压计漂移（温度/气流/密封腔）或 GPS 竖直异常
+
+trigger:
+  - when: "drift >= 50.0"
+    severity: warning
+    suggestion: "气压高度与 GPS 高度在飞行中明显张口：气压计漂移（温升/气流扰动/密封不良）或 GPS 竖直精度差。气压漂移会让 EKF 降高误判，着陆前尤为危险。"
+    description: "armed 段气压高度相对 GPS 漂移 {drift:.0f} m"
+    evidence:
+      source: vehicle_air_data.baro_alt_meter - vehicle_global_position.alt
+      value: f"{drift:.1f}"
+      threshold: 50
+      unit: m

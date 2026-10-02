@@ -23,6 +23,7 @@
       "enum": [
         "airspeed",
         "attitude_tracking",
+        "baro",
         "battery",
         "calibration",
         "compass",
