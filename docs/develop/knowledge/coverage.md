@@ -9,7 +9,9 @@ PX4 那一堆 topic 里，我们检查了哪些、漏了哪些、先补哪些。
 上游搬迁收尾）PX4 加 `ekf-gps-check-fails`/`ekf-timeout`/`param-changed` 3 条
 （66），APM 加 `vehicle-profile` 1 条（44），两平台合计 **110 条**；批 E 复查删除
 `param-changed`（`changed_parameters` 是 ULog PARAMETER 段非 data topic，取数够不到，
-见 upstream.md §二 S11），回落 **109 条**（px4 65 + apm 44）。
+见 upstream.md §二 S11），回落 **109 条**（px4 65 + apm 44）；批 F（同月，
+coverage §三四类子维度搬迁）PX4 加执行器/舵机饱和、GPS 干扰、电池温度、陀螺振动
+5 条，现 **114 条**（px4 70 + apm 44）。
 
 ## 结论速览
 
@@ -101,13 +103,13 @@ PX4 那一堆 topic 里，我们检查了哪些、漏了哪些、先补哪些。
 
 不是没 topic，是同一个 topic 里还有没看的字段：
 
-| 现有规则              | 已有 topic             | 漏掉的字段                                                           | 能补什么                              |
-| --------------------- | ---------------------- | -------------------------------------------------------------------- | ------------------------------------- |
-| `motor-balance`       | `actuator_motors`      | `actuator_outputs.noutputs`、`actuator_servos`                       | 舵机通道、输出饱和                    |
-| `gps-*` 三条          | `vehicle_gps_position` | `noise_per_ms`、`jamming_indicator`、`hdop`/`vdop`、`s_variance_m_s` | GPS 干扰/压制（上游有专图）、精度因子 |
-| `power-*` 三条        | `battery_status`       | `temperature`、`cell_count`、`connected`                             | 电池温度、电芯数校验                  |
-| `vibration`           | `vehicle_imu_status`   | `gyro_vibration_metric`、`delta_angle_dt` 等                         | 陀螺振动（现在只看加速度计）          |
-| `log-errors/warnings` | 消息流                 | 未按来源模块分类                                                     | 区分"哪类模块在报错"                  |
+| 现有规则              | 已有 topic             | 漏掉的字段                                                           | 能补什么                                                                         |
+| --------------------- | ---------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `motor-balance`       | `actuator_motors`      | `actuator_outputs.noutputs`、`actuator_servos`                       | 舵机通道、输出饱和 **（批 F 已落地）**                                           |
+| `gps-*` 三条          | `vehicle_gps_position` | `noise_per_ms`、`jamming_indicator`、`hdop`/`vdop`、`s_variance_m_s` | GPS 干扰/压制（上游有专图）、精度因子 **（批 F 落地 jamming_state + HDOP p95）** |
+| `power-*` 三条        | `battery_status`       | `temperature`、`cell_count`、`connected`                             | 电池温度、电芯数校验 **（批 F 落地温度）**                                       |
+| `vibration`           | `vehicle_imu_status`   | `gyro_vibration_metric`、`delta_angle_dt` 等                         | 陀螺振动（现在只看加速度计）**（批 F 落地）**                                    |
+| `log-errors/warnings` | 消息流                 | 未按来源模块分类                                                     | 区分"哪类模块在报错"                                                             |
 
 ---
 
@@ -118,7 +120,7 @@ PX4 那一堆 topic 里，我们检查了哪些、漏了哪些、先补哪些。
 | 检查                               | 上游表现                         | 我们的状态                                                                                                             |
 | ---------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | PID 跟踪性能（setpoint vs actual） | 每张图都有 estimated vs setpoint | **角速率已判**（批 C：`rate-tracking` 两条规则 + `rate-error` 误差曲线图，降压版——不做反卷积/频域）；姿态 PID 分析仍无 |
-| 执行器饱和                         | `Actuator Outputs` 图            | 无                                                                                                                     |
+| 执行器饱和                         | `Actuator Outputs` 图            | **已判**（批 F：armed 段逐通道贴顶占比，motor + servo 两条，阈值 [暂定]）                                              |
 | 磁力计推力相关性                   | `Thrust and Magnetic Field` 图   | 无（磁干扰是常见坠机诱因）                                                                                             |
 | 估计器看门狗                       | `Estimator Flags` 图             | `ekf-faults` 覆盖了一部分                                                                                              |
 | 采样规律 / 时间滑移                | `Sampling Regularity` 图         | `sampling.yml` 有 delta t + time_slip（W6 补齐）+ 丢包守卫                                                             |
@@ -179,6 +181,11 @@ W4/W5 解掉「缺算子」根因、W6 把图铺完。三种容器的分工与�
 - 批 A（零覆盖 topic 清零，2026-10）：A1–A7 七批共 23 条规则、7 个新组，规则数 38 → 61，
   见第二节留档表。验收同批 1：既有基线只新增 finding/skipped。
 - 批 3（补字段）：GPS 干扰（`noise_per_ms`/`jamming_indicator`）、陀螺振动、电池温度。
+  **已落地（批 F，2026-10）**：GPS 干扰用接收机自判 `jamming_state`（枚举 0-3，比
+  indicator 启发式权威；老固件无此字段走 HDOP p95 > 2.0 兜底）+ `jamming_indicator`/
+  `noise_per_ms`/`hdop_p95` 进概览指标；陀螺振动 `gyro_vibration_metric`（rad/s，
+  worst 实例，0.2/0.5 [暂定]，与 accel 版同构）；电池温度 `max(temperature)`
+  （55/65 °C [暂定]，NaN 天然 skip）。
 - 批 3.5（谱图，2026-02）：借 W4/W5 落地的 `spectrum` 算子与 `spectrogram` 容器铺 6 张谱图，
   见第四点五节。这是唯一"算子已在、只差声明"的一批，成本最低。**已完成（W6）**。
 - 批 4（需新算子）：PID 跟踪误差、磁力计推力相关性、执行器饱和。
@@ -186,7 +193,7 @@ W4/W5 解掉「缺算子」根因、W6 把图铺完。三种容器的分工与�
   `rate_tracking` 组 2 条规则（RMS 30 / P95 60 deg/s [暂定]）+ `plot/rate-error.yml`
   误差曲线（setpoint 插值到实测轴逐时刻作差）。sample.ulg 实测：P95 60.1 deg/s
   （Pitch 轴）发射 warning，误差曲线三轴 1812 点与 finding 数值自洽。
-  磁力计推力相关性、执行器饱和**仍未做**。
+  磁力计推力相关性**仍未做**；执行器饱和已落地（见下条批 F）。
 - 批 E（上游搬迁收尾，2026-10）：PX4 侧补 3 条——`ekf-gps-check-fails`
   （ecl U3 权威：`gps_check_fail_flags` 解锁后拒绝 GPS 融合占比 ≥50% 且坏样本 ≥100
   → warning）、`ekf-timeout`（`timeout_flags` 跨实例位或非零 → warning）、
@@ -198,6 +205,14 @@ W4/W5 解掉「缺算子」根因、W6 把图铺完。三种容器的分工与�
   PARAMETER 消息段（pyulog `MSG_TYPE_PARAMETER`），不是 data topic，引擎 `topic.field`
   取数路径结构上够不到（此前"自动 skip"只是碰巧不报错）。正确实现需 provider 把该段
   合成 topic，登记为独立基建候选；上游 Flight Review 也只是按钮占位。
+- 批 F（coverage §三「已有规则的漏检子维度」搬迁，2026-10）：PX4 加 5 条——
+  `actuator-saturation` + `servo-saturation`（armed 段逐通道归一化推力贴顶占比，
+  `column_ratio_events` + foreach 展开，与 APM 侧 `apm-motor-saturation` 同构；
+  10%/30% [暂定]）、`gps-interference`（jamming_state 枚举判定 + HDOP p95 兜底）、
+  `battery-temperature`（55/65 °C [暂定]）、`gyro-vibration`（0.2/0.5 rad/s [暂定]）。
+  无需新算子；`topic-map.yaml` 的运行时消费者（`check_rules_fields.py`）同期接上。
+  基线实测（v1.11 老日志）：actuator/servo 双双 topic 缺失 skip、温度全 NaN 天然
+  skip、GPS 老固件无 jamming_state 走兜底不触发、陀螺振动 metrics ~3e-5 rad/s 不触发。
 
 每批的验收标准：新规则在基线上跑通，产出的差异只允许新增 finding/skipped，
 不允许改动既有 finding，用 `tools/engine/compare_baseline.py` 卡。

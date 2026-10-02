@@ -128,6 +128,21 @@
         "value": 0.0007368898077402264
       },
       {
+        "key": "imuGyroVibrationMean",
+        "label": "imuGyroVibrationMean",
+        "value": 2.7010810299543664e-05
+      },
+      {
+        "key": "imuGyroVibrationP95",
+        "label": "imuGyroVibrationP95",
+        "value": 3.112227932433598e-05
+      },
+      {
+        "key": "imuGyroVibrationMax",
+        "label": "imuGyroVibrationMax",
+        "value": 3.2228803320322186e-05
+      },
+      {
         "key": "baroErrorCount",
         "label": "baroErrorCount",
         "value": 0
@@ -141,6 +156,21 @@
         "key": "gpsEphP95M",
         "label": "gpsEphP95M",
         "value": 0.0032078500747680667
+      },
+      {
+        "key": "gpsJammingIndicatorMax",
+        "label": "gpsJammingIndicatorMax",
+        "value": 57.0
+      },
+      {
+        "key": "gpsNoisePerMsMax",
+        "label": "gpsNoisePerMsMax",
+        "value": 99.0
+      },
+      {
+        "key": "gpsHdopP95",
+        "label": "gpsHdopP95",
+        "value": 0.75
       },
       {
         "key": "rateErrRmsDeg",
@@ -205,6 +235,7 @@
       "px4-guard-short-log",
       "px4-vibration",
       "px4-imu-clipping",
+      "px4-gyro-vibration",
       "px4-ekf-fault",
       "px4-ekf-timeout",
       "px4-ekf-gps-check-fails",
@@ -212,10 +243,12 @@
       "px4-baro-overheat",
       "px4-power-cell-voltage",
       "px4-power-remaining",
+      "px4-battery-temperature",
       "px4-cpu-load",
       "px4-gps-eph",
       "px4-gps-sats",
       "px4-gps-jump",
+      "px4-gps-interference",
       "px4-failsafe-failsafe",
       "px4-failsafe-rc_signal_lost",
       "px4-failsafe-data_link_lost",
@@ -306,6 +339,14 @@
       {
         "ruleId": "px4-motor-unbalance",
         "reason": "actuator_motors not in log"
+      },
+      {
+        "ruleId": "px4-actuator-saturation",
+        "reason": "actuator_motors not in log"
+      },
+      {
+        "ruleId": "px4-servo-saturation",
+        "reason": "actuator_servos not in log"
       },
       {
         "ruleId": "px4-esc-rpm-unbalance",

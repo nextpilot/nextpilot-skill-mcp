@@ -7,7 +7,7 @@ group: 开发指南
 groupEn: For Developers
 order: 12
 ---
-引擎当前内置的 **109 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
+引擎当前内置的 **114 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
 每条给出：**适用**（固件 / 机架 / 依赖）、**取值**（读哪些字段、过哪个算子）、**判定**（自上而下
 命中第一条即发射）、**产出**（写进报告的 check 名、喂故障库匹配的标签、UI 用的统计）。
 
@@ -265,6 +265,17 @@ order: 12
 - <strong>critical</strong> | `rem <= 0.10` | threshold 0.1 | description "电池剩余电量极低（\{rem_pct:.0f\}%）"
 - <strong>warning</strong> | `rem <= 0.20` | threshold 0.2 | description "电池剩余电量偏低（\{rem_pct:.0f\}%）"
 - 产出：batteryRemainingMin=rem, tag=battery_voltage_drop
+
+### px4-battery-temperature — 电池温度
+
+- 文件：`rules/battery-temperature.yaml` ｜ 位置：group `battery` #4
+- 适用：总是适用
+- 取值：
+- `t_max = _try(max(battery_status.temperature))`
+- 判定：
+- <strong>critical</strong> | `t_max >= 65` | threshold 65 | unit degC | description "电池最高温 \{t_max:.1f\}°C"
+- <strong>warning</strong> | `t_max >= 55` | threshold 55 | unit degC | description "电池最高温 \{t_max:.1f\}°C"
+- 产出：batteryTempMax=t_max, tag=battery_overheat
 
 
 ## calibration（group: `calibration`）
@@ -756,6 +767,22 @@ order: 12
 - <strong>warning</strong> | `njump >= 3` | threshold 3 | unit 次 | description "GPS 位置出现 \{njump\} 次异常跳变（>50 m/s）" | label=gps_jump
 - 产出：gpsJumpCount=njump, tag=gps_jump
 
+### px4-gps-interference — GPS 干扰
+
+- 文件：`rules/gps-interference.yaml` ｜ 位置：group `gps_health` #4
+- 适用：总是适用
+- 取值：
+- `jam_max = _try(max(vehicle_gps_position.jamming_state))`
+- `jam_ind = _try(max(vehicle_gps_position.jamming_indicator))`
+- `noise = _try(max(vehicle_gps_position.noise_per_ms))`
+- `hdop_p95 = _try(percentile(vehicle_gps_position.hdop, p=95))`
+- `have_jam = is_not_none(jam_max)`
+- 判定：
+- <strong>critical</strong> | `have_jam and jam_max >= 3` | threshold 3 | unit 枚举 | description "GPS 接收机自报严重干扰"
+- <strong>warning</strong> | `have_jam and jam_max >= 2` | threshold 2 | unit 枚举 | description "GPS 接收机自报疑似干扰"
+- <strong>warning</strong> | `not have_jam and hdop_p95 > 2.0` | threshold 2 | description "HDOP p95 = \{hdop_p95:.2f\}，定位精度恶化"
+- 产出：gpsJammingStateWorst=jam_max, gpsJammingIndicatorMax=jam_ind, gpsNoisePerMsMax=noise, gpsHdopP95=hdop_p95, tag=gps_interference
+
 
 ## 数据质量 guard（group: `guards`）
 
@@ -1042,6 +1069,32 @@ order: 12
 - <strong>critical</strong> | `frac > 0.50` | threshold 0.5 | unit % | description "电机 \{channel\} 号通道长时间满舵（均值 \{mean:.0f\} us）"
 - <strong>warning</strong> | `True` | threshold 0.2 | unit % | description "电机 \{channel\} 号通道接近满舵（均值 \{mean:.0f\} us）"
 - 产出：tag=apm_motor_output_saturated
+
+### px4-actuator-saturation — 电机输出饱和
+
+- 文件：`rules/actuator-saturation.yaml` ｜ 位置：group `motor_balance` #2
+- 适用：总是适用
+- 取值：
+- `mts = actuator_motors.timestamp`
+- `seg = interval_mask(mts, ARMED_INTERVALS)`
+- `sats = column_ratio_events(actuator_motors.control, 0.98, mask=seg, min_frac=0.10, min_mean=0.01)`
+- 判定：
+- <strong>critical</strong> | `frac > 0.30` | threshold 0.3 | unit % | description "电机 \{channel\} 号通道长时间满推力（均值 \{mean:.2f\}）"
+- <strong>warning</strong> | `True` | threshold 0.1 | unit % | description "电机 \{channel\} 号通道推力经常贴顶（均值 \{mean:.2f\}）"
+- 产出：tag=motor_output_saturated
+
+### px4-servo-saturation — 舵机输出饱和
+
+- 文件：`rules/actuator-saturation.yaml` ｜ 位置：group `motor_balance` #3
+- 适用：总是适用
+- 取值：
+- `sts = actuator_servos.timestamp`
+- `seg = interval_mask(sts, ARMED_INTERVALS)`
+- `sats = column_ratio_events(actuator_servos.control, 0.98, mask=seg, min_frac=0.10, min_mean=0.01)`
+- 判定：
+- <strong>critical</strong> | `frac > 0.30` | threshold 0.3 | unit % | description "舵机 \{channel\} 号通道长时间贴顶（均值 \{mean:.2f\}）"
+- <strong>warning</strong> | `True` | threshold 0.1 | unit % | description "舵机 \{channel\} 号通道输出经常贴顶（均值 \{mean:.2f\}）"
+- 产出：tag=servo_output_saturated
 
 
 ## param_audit（group: `param_audit`）
@@ -1519,6 +1572,18 @@ order: 12
 - <strong>critical</strong> | `clip0_total >= 100.0` | threshold 100 | unit 次 | description "IMU0 削波 \{clip0_total:.0f\} 次"
 - <strong>warning</strong> | `clip0_total > 0.0` | threshold 0 | unit 次 | description "IMU0 削波 \{clip0_total:.0f\} 次"
 - 产出：tag=apm_accel_clipping
+
+### px4-gyro-vibration — 陀螺高频振动
+
+- 文件：`rules/gyro-vibration.yaml` ｜ 位置：group `vibration` #4
+- 适用：总是适用
+- 取值：
+- `gyro_vib_mean, gyro_vib_p95, gyro_vib_max, gyro_idx = _try(worst_mean_stats(
+  _ref("vehicle_imu_status[:].gyro_vibration_metric"), min_mean=0))`
+- 判定：
+- <strong>critical</strong> | `gyro_vib_mean >= 0.5` | threshold 0.5 | unit rad/s | description "陀螺高频振动严重超标（IMU #\{gyro_idx\}）"
+- <strong>warning</strong> | `gyro_vib_mean >= 0.2` | threshold 0.2 | unit rad/s | description "陀螺高频振动偏大（IMU #\{gyro_idx\}）"
+- 产出：imuGyroVibrationMean=gyro_vib_mean, imuGyroVibrationP95=gyro_vib_p95, imuGyroVibrationMax=gyro_vib_max, tag=gyro_vibration
 
 ### apm-clip-1 — 加速度计削波（IMU1）
 

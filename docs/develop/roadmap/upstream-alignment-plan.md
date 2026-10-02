@@ -8,7 +8,9 @@ param-changed），APM 44 条（新增 vehicle-profile，U5 16/16 收官），�
 算子 95；nan_flags 标不做（新固件已移除该信号）。批 E 复查删除 param-changed
 （changed_parameters 是 ULog PARAMETER 段非 data topic，取数够不到），合计 109 条。
 sample_log_small.ulg 已按 baselines.md 白名单入库（logs 组门禁 4 项激活，24→28 项）。
-门禁全绿；遗留项见 §8 已知限制。
+批 F（coverage §三子维度搬迁，2026-10）：PX4 加执行器/舵机饱和、GPS 干扰、电池温度、
+陀螺振动 5 条，合计 114 条。9 份基线日志全量入库（33.8 MB，见 baselines.md 留痕），
+基线按现规则集重冻，compare 9 项（8 OK + sample SKIP）。门禁全绿；遗留项见 §8 已知限制。
 
 用户需求（2026-09-30）：先把上游优点全盘覆盖（绘图、PID tune、3D view），再细化拉开差距；
 PX4 侧借鉴 `ecl_ekf_analysis` / `px4_log_analyzer` / `ai-drone-toolkit`；APM 侧对比

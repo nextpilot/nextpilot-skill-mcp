@@ -1,0 +1,59 @@
+# 陀螺高频振动：跨 IMU 实例取 gyro_vibration_metric 均值最大的实例，与 vibration.yaml
+# （accel_vibration_metric 版）同构。该指标是 IMU 陀螺计自身统计的高频角速率抖动水平，
+# 单位 rad/s（meta main：vehicle_imu_status 注释），量纲与 accel 振动的 m/s² 不同，
+# Flight Review 振动色带只给 accel 侧，本规则没有官方色带可对表。
+# 阈值 [暂定]：warning 0.2 / critical 0.5 rad/s——按「 accel 色带 (0.5g/1g) 对应同一
+# 物理振动的角速率量级」的经验换算起步，待更多样本与 accel 规则联动校准。
+# 老固件无 gyro_vibration_metric 字段（v1.11 实测）：_try 兜 None，规则静默跳过。
+
+# 来源：本仓检查设计（coverage.md §四「陀螺振动」缺口，vibration.yaml 的陀螺侧姊妹版）。
+# 与上游差异：上游 Flight Review 只展示 accel 振动色带；「worst 实例 + rad/s 阈值」为本仓设计。
+id: px4-gyro-vibration
+name: 陀螺高频振动
+group: vibration
+order: 4 # vibration group 内次序：vibration=1, stddev=2, clipping=3, gyro-vibration=4
+tag: gyro_vibration
+
+condition:
+  message:
+    - vehicle_imu_status
+
+compute:
+  # 每个 IMU 实例一条 gyro_vibration_metric 序列；取均值最大的实例，
+  # 同时得到该实例的 p95 与最大值（与 vibration.yaml 同一算子同一口径）。
+  # min_mean=0：全零视为无有效数据；字段整体缺失时 _try 兜 None（规则静默跳过）
+  - >-
+    gyro_vib_mean, gyro_vib_p95, gyro_vib_max, gyro_idx = _try(worst_mean_stats(
+      _ref("vehicle_imu_status[:].gyro_vibration_metric"), min_mean=0))
+
+output:
+  - name: imuGyroVibrationMean
+    value: gyro_vib_mean
+    round: 3
+  - name: imuGyroVibrationP95
+    value: gyro_vib_p95
+    round: 3
+  - name: imuGyroVibrationMax
+    value: gyro_vib_max
+    round: 3
+
+trigger:
+  # gyro_vib_mean 为 None（无字段/无有效数据）时比较抛 TypeError，引擎按不命中处理——天然 skip
+  - when: "gyro_vib_mean >= 0.5"
+    severity: critical
+    suggestion: "陀螺高频振动严重超标（>0.5 rad/s）。结合 accel 侧振动规则与故障库条目排查：桨叶动平衡、电机轴承、机架共振、IMU 减震。"
+    description: "陀螺高频振动严重超标（IMU #{gyro_idx}）"
+    evidence:
+      source: vehicle_imu_status.gyro_vibration_metric(均值)
+      value: f"{gyro_vib_mean:.3f}"
+      threshold: 0.5
+      unit: rad/s
+  - when: "gyro_vib_mean >= 0.2"
+    severity: warning
+    suggestion: "陀螺高频振动偏大。结合 accel 侧振动规则交叉确认：先查桨叶动平衡与电机，再看机架减震。"
+    description: "陀螺高频振动偏大（IMU #{gyro_idx}）"
+    evidence:
+      source: vehicle_imu_status.gyro_vibration_metric(均值)
+      value: f"{gyro_vib_mean:.3f}"
+      threshold: 0.2
+      unit: rad/s

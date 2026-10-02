@@ -1,0 +1,71 @@
+# GPS 干扰/压制（接收机自判）：jamming_state 是 GNSS 接收机自己给出的干扰评估枚举
+# （VehicleGpsPosition.msg：0 UNKNOWN / 1 OK / 2 WARNING / 3 CRITICAL），比任何
+# 外部启发式都权威，直接对表。老固件（v1.11 实测）没有这个字段——_try 兜成 None，
+# 此时退回后果侧旁证：HDOP 全程 p95（精度因子恶化是干扰/多径最常见的可观测后果）。
+# jamming_indicator / noise_per_ms 只进概览指标，不参与判定（不同接收机标定差异大，
+# 没有跨机型的统一阈值，硬编码反而误报）。
+# 阈值 [暂定]：jamming_state >=2 warning / >=3 critical（枚举即判定，无需调参）；
+# HDOP p95 > 2.0 warning（良好接收 <1.0，>2.0 已明显恶化；待更多样本校准）。
+
+# 来源：本仓检查设计（coverage.md §四「GPS 干扰/压制」缺口）。
+# 与上游差异：上游 Flight Review 无干扰判定；「接收机自判枚举 + HDOP p95 兜底」为本仓设计。
+id: px4-gps-interference
+name: GPS 干扰
+group: gps_health
+order: 4 # gps_health group 内次序：eph=1, sats=2, jump=3, interference=4
+tag: gps_interference
+
+condition:
+  message:
+    - vehicle_gps_position
+
+compute:
+  # v1.11 老固件无 jamming_state/jamming_indicator/noise_per_ms：字段缺失 _ref 抛异常 → _try 兜 None
+  - jam_max = _try(max(vehicle_gps_position.jamming_state))
+  - jam_ind = _try(max(vehicle_gps_position.jamming_indicator))
+  - noise = _try(max(vehicle_gps_position.noise_per_ms))
+  - hdop_p95 = _try(percentile(vehicle_gps_position.hdop, p=95))
+  # 接收机是否给了自判（老固件 False → 走 HDOP 兜底，避免每条 when 都写 None 判断）
+  - have_jam = is_not_none(jam_max)
+
+output:
+  - name: gpsJammingStateWorst
+    value: jam_max
+  - name: gpsJammingIndicatorMax
+    value: jam_ind
+  - name: gpsNoisePerMsMax
+    value: noise
+  - name: gpsHdopP95
+    value: hdop_p95
+    round: 2
+
+trigger:
+  # jam_max/hdop_p95 为 None 时比较抛 TypeError，引擎按不命中处理——缺失字段天然跳过
+  - when: "have_jam and jam_max >= 3"
+    severity: critical
+    suggestion: "接收机自报受到严重干扰/压制（jamming_state=CRITICAL）。检查飞场附近是否有干扰源（高压线、雷达、敌对压制设备），必要时更换频点或加装抗干扰天线。"
+    description: GPS 接收机自报严重干扰
+    evidence:
+      source: vehicle_gps_position.jamming_state(max)
+      value: jam_max
+      threshold: 3
+      unit: 枚举
+  - when: "have_jam and jam_max >= 2"
+    severity: warning
+    suggestion: "接收机自报疑似干扰（jamming_state=WARNING）。观察同机位其他飞行是否复现；排查飞场干扰源与天线遮挡/布线。"
+    description: GPS 接收机自报疑似干扰
+    evidence:
+      source: vehicle_gps_position.jamming_state(max)
+      value: jam_max
+      threshold: 2
+      unit: 枚举
+  # HDOP 兜底只在接收机没给自判（老固件/字段缺失）时生效，避免与上面两条重复报
+  - when: "not have_jam and hdop_p95 > 2.0"
+    severity: warning
+    suggestion: "水平精度因子（HDOP）全程 p95 超过 2.0，卫星几何或信号质量差——干扰、多径或遮挡的常见表现。排查飞场环境与天线安装。"
+    description: HDOP p95 = {hdop_p95:.2f}，定位精度恶化
+    evidence:
+      source: vehicle_gps_position.hdop(p95)
+      value: f"{hdop_p95:.2f}"
+      threshold: 2.0
+      unit: ""

@@ -1,0 +1,47 @@
+# 电池温度：battery_status.temperature 单位 degC、无效值填 NaN（BatteryStatus.msg
+# [@invalid NaN]），max 算子天然忽略 NaN——全 NaN（老固件没实测温度，v1.11 实测如此）
+# 返回 None，所有 trigger 不触发，即「没有数据就不下结论」的天然 skip。
+# 阈值 [暂定]：锂电池放电工作上限一般 60 degC，取 55 warning 留裕度、65 critical
+# （此时已超上限且接近热失控风险区，少数电芯化学体系标称上限更低）。
+
+# 来源：本仓检查设计（coverage.md §四「电池温度」缺口）。
+# 与上游差异：上游 Flight Review 只画 Battery Status 曲线无温度判定；阈值为本仓设计 [暂定]。
+id: px4-battery-temperature
+name: 电池温度
+group: battery
+order: 4 # battery group 内次序：cell-voltage=1, sag=2, remaining=3, temperature=4
+tag: battery_overheat
+
+condition:
+  message:
+    - battery_status
+
+compute:
+  # temperature 是 @invalid NaN 字段：max 忽略 NaN，全 NaN / 无字段 → None
+  - t_max = _try(max(battery_status.temperature))
+
+output:
+  - name: batteryTempMax
+    value: t_max
+    round: 1
+
+trigger:
+  # t_max 为 None（无有效温度）时比较抛 TypeError，引擎按不命中处理——天然 skip
+  - when: "t_max >= 65"
+    severity: critical
+    suggestion: "电池最高温超过 65°C，已超锂电池放电上限并接近热失控风险区。立即停飞检查：放电倍率是否不足、是否长时间大电流输出、电池是否鼓包老化。"
+    description: 电池最高温 {t_max:.1f}°C
+    evidence:
+      source: battery_status.temperature(max)
+      value: f"{t_max:.1f}"
+      threshold: 65
+      unit: degC
+  - when: "t_max >= 55"
+    severity: warning
+    suggestion: "电池最高温超过 55°C，接近锂电池放电上限（60°C）。检查放电倍率匹配与飞行强度，高温会加速容量衰减并触发电芯保护。"
+    description: 电池最高温 {t_max:.1f}°C
+    evidence:
+      source: battery_status.temperature(max)
+      value: f"{t_max:.1f}"
+      threshold: 55
+      unit: degC

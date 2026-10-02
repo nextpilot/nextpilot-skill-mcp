@@ -1,0 +1,90 @@
+# 电机输出饱和：armed 段内单通道归一化推力贴顶（|control| ≥ 0.98）的样本占比。
+# control[] 是 [@range -1, 1] 的归一化推力（meta main：ActuatorMotors.msg），
+# 长时间贴顶 = 动力余量耗尽（超重/动力偏弱/桨不匹配），与 APM 侧
+# apm-motor-saturation（RCOU >=1950us 占比）同一问题域的 PX4 口径。
+# 未用通道（均值≈0 或全 NaN，如 6 电机机架的 control[6..11]）由 min_mean 排除。
+# 阈值 [暂定]：贴顶占比 ≥10% 报 warning / ≥30% 升 critical（armed 全程口径，
+# 无上游判定可对表，参照 APM 侧 20%/50% 的 us 口径按归一化量纲收紧）。
+
+# 来源：本仓检查设计（coverage.md §四「执行器饱和」缺口，上游只有 Actuator Outputs 图无判定）。
+# 与上游差异：上游 Flight Review 只画图不判定；「armed 段 + 逐通道贴顶占比 + foreach 展开」
+# 为本仓设计（算子与展开方式与 APM 侧 apm-motor-saturation 同构），阈值 [暂定]。
+id: px4-actuator-saturation
+name: 电机输出饱和
+group: motor_balance
+order: 2
+tag: motor_output_saturated
+
+condition:
+  message:
+    - actuator_motors
+
+compute:
+  - mts = actuator_motors.timestamp
+  - seg = interval_mask(mts, ARMED_INTERVALS)
+  # 逐通道统计 armed 段内贴顶（>=0.98）样本占比，按占比降序；未用通道被 min_mean 排除
+  - sats = column_ratio_events(actuator_motors.control, 0.98, mask=seg, min_frac=0.10, min_mean=0.01)
+
+# 每个超标通道各出一条 finding（占比最高的排在前），与 APM 侧口径一致
+
+foreach: { var: sats, keys: [ channel, frac, mean ] }
+
+trigger:
+  - when: "frac > 0.30"
+    severity: critical
+    suggestion: "近三分之一时间贴着满推力，动力余量已严重不足（超重或动力偏弱），突风或机动中可能失去姿态控制权。减轻起飞重量或换更大推力的电机/桨。"
+    description: 电机 {channel} 号通道长时间满推力（均值 {mean:.2f}）
+    evidence:
+      source: actuator_motors.control[](armed 段贴顶占比)
+      value: f"{frac*100:.0f}"
+      threshold: 0.3
+      unit: "%"
+  - when: "True"
+    severity: warning
+    suggestion: "长时间接近满推力说明动力余量不足（超重或动力偏弱）。先查桨叶与电机是否匹配、起飞重量是否超规格，再考虑调整悬停油门（MOT_THST_HOVER）。"
+    description: 电机 {channel} 号通道推力经常贴顶（均值 {mean:.2f}）
+    evidence:
+      source: actuator_motors.control[](armed 段贴顶占比)
+      value: f"{frac*100:.0f}"
+      threshold: 0.1
+      unit: "%"
+
+---
+id: px4-servo-saturation
+name: 舵机输出饱和
+group: motor_balance
+order: 3
+tag: servo_output_saturated
+
+condition:
+  message:
+    - actuator_servos
+
+compute:
+  - sts = actuator_servos.timestamp
+  - seg = interval_mask(sts, ARMED_INTERVALS)
+  # 舵面通道（固定翼/VTOL）：control[] 同为 [@range -1, 1]；舵面贴顶 = 舵面量不足或
+  # 机械卡滞/铰链力矩超限，与电机饱和同口径（min_mean 排除未用通道）
+  - sats = column_ratio_events(actuator_servos.control, 0.98, mask=seg, min_frac=0.10, min_mean=0.01)
+
+foreach: { var: sats, keys: [ channel, frac, mean ] }
+
+trigger:
+  - when: "frac > 0.30"
+    severity: critical
+    suggestion: "舵面长时间贴顶，舵量已不足以维持姿态（速度过高、舵面太小或机械卡滞）。检查舵机扭矩与连杆比，必要时限制飞行速度。"
+    description: 舵机 {channel} 号通道长时间贴顶（均值 {mean:.2f}）
+    evidence:
+      source: actuator_servos.control[](armed 段贴顶占比)
+      value: f"{frac*100:.0f}"
+      threshold: 0.3
+      unit: "%"
+  - when: "True"
+    severity: warning
+    suggestion: "舵面经常接近满舵：查舵机扭矩、连杆比与机械卡滞；高速飞行时适当压低速度。"
+    description: 舵机 {channel} 号通道输出经常贴顶（均值 {mean:.2f}）
+    evidence:
+      source: actuator_servos.control[](armed 段贴顶占比)
+      value: f"{frac*100:.0f}"
+      threshold: 0.1
+      unit: "%"
