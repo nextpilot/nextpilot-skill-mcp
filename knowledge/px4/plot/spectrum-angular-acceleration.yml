@@ -1,3 +1,7 @@
+# 角加速度幅度谱（FFT 线图）。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的 V13 姊妹口径（频谱分析族）；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：本仓 spectrum 实现：无窗、2/N 归一；IMU_DGYRO_CUTOFF 参数标线（解不出则消失）。
+
 id: spectrum-angular-acceleration
 title: Angular Acceleration FFT
 description: >

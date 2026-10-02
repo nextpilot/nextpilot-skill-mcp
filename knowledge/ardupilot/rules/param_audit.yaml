@@ -10,6 +10,7 @@
 #
 # 每条都是一等字段的精确等于判断，没有采样窗口、没有机型分支（与上游一致）。
 
+# 来源：ardupilot-mcp（U5，PyPI 0.1.2）的 checks/param_audit.py；官方文档链接见 facts.yaml 组级 doc（finding 的 docUrl 由它派生）。
 ---
 id: apm-param-audit-rate-p
 name: Rate P 增益异常

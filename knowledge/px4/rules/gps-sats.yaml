@@ -1,6 +1,8 @@
 # GPS 卫星数（F002 相关）：全程最小值。阈值 [暂定] px4-thresholds.toml [gps]：sats_crit=6。
 # 注意：证据里的 threshold 用 sats_warn（8）——这是迁移前就有的写法，为保持等价按原样保留。
 
+# 来源：本仓检查设计（对应 fault-kb F002 GPS 定位异常关联标签）。
+# 与上游差异：上游无对应检查；sats_crit=6 为本仓设计 [暂定]。
 id: px4-gps-sats
 name: GPS 卫星数
 group: gps_health

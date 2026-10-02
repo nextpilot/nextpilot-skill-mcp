@@ -1,5 +1,7 @@
 # 电池剩余电量（robotto）：armed 全程最低值，-1 表示未知需过滤
 
+# 来源：robotto ai-drone-toolkit（U2）的 battery 检查。
+# 与上游差异：阈值一致（0.20 / 0.10）；armed 全程最低值、过滤 -1 未知值的口径与迁移前一致。
 id: px4-power-remaining
 name: 电池剩余电量
 group: battery

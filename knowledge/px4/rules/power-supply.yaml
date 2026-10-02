@@ -3,6 +3,8 @@
 # periph_5v_oc / hipower_5v_oc 是过流标志，非零即事件；*_valid 是各供电轨是否有效。
 # 阈值 [暂定]：过流/失效按固件标志位透传，不额外设阈值。
 
+# 来源：本仓检查设计（批 1「读现成结论」型，system_power）。
+# 与上游差异：上游无对应检查；过流/失效按固件标志位透传，不设阈值。
 id: px4-power-supply
 name: 供电健康
 group: power_supply

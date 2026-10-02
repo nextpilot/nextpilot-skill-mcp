@@ -1,3 +1,7 @@
+# 电调实测转速（esc_status.esc[0..7].esc_rpm），与输出指令对照定位动力端问题。
+# 来源：本仓补充的图，上游没有这张（依赖本仓 W6 落地的嵌套数组取数）。
+# 与上游差异：超出上游：上游无 ESC 转速图。
+
 id: motor-rpm
 title: Motor RPM
 description: >

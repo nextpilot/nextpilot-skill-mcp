@@ -1,3 +1,7 @@
+# 磁场强度对推力的相关性曲线，磁力计被电机/电调干扰时推力增大磁场读数随之变化。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的传感器项「Thrust and Magnetic Field」构造点；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：字段与口径照抄上游。
+
 id: thrust-mag
 title: Thrust and Magnetic Field
 description: 推力与磁场强度范数对比。

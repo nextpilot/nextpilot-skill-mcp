@@ -1,3 +1,7 @@
+# IMU 原始加速度 FIFO 高频数据（未降采样），看高频振动与削波。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的「Raw Acceleration (FIFO)」构造点（写在其 for 循环内）；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：上游按 IMU 实例循环展开成多张图，本仓用 split_by_instance 合并进一个文件。
+
 id: fifo-accel
 title: Raw Acceleration (FIFO)
 description: FIFO 加速度计原始数据（每 IMU 一张），仅当 sensor_accel_fifo 存在时显示。

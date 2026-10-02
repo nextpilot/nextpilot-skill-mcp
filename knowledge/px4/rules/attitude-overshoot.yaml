@@ -5,6 +5,8 @@
 # 对齐/掩码/统计全在 att_tracking_stats 一个复合算子里（原先是 30 个节点串起来）。
 # 边界：姿态或指令字段缺失时本经验静默不适用（原实现会留一条 skip；该路径未被基线覆盖）。
 
+# 来源：本仓检查设计（对应 fault-kb 的姿态跟踪异常关联标签）。
+# 与上游差异：上游只把姿态画成图、不判定；原实现一次两条 finding，本仓按「一条规则一条 finding」拆成两条。
 id: px4-attitude-overshoot
 name: 姿态跟踪超调
 group: attitude_tracking

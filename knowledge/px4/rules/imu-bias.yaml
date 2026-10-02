@@ -4,6 +4,8 @@
 # 取源、掩码、逐轴归约都收在复合算子里。
 # 阈值 [暂定]：abs/drift warn=0.02、crit=0.05、温度跨度 guard=15。
 
+# 来源：本仓检查设计（fault-kb F005 IMU 数据异常关联标签）。
+# 与上游差异：上游无对应检查；跨固件版本取源（1.15+ 直读 estimator_sensor_bias / 旧固件 states[10..12]）为本仓处理，阈值 [暂定]。
 id: px4-imu-bias-drift
 name: 陀螺零偏漂移
 group: imu_bias

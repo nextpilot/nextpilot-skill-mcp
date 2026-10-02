@@ -2,6 +2,8 @@
 # landed/ground_contact 可用于切分起降段。这里重点是抓 freefall——正常飞行中不该出现。
 # 阈值 [暂定]：freefall 只要出现即告警；ground_contact 仅作输出供切段参考，不单独触发。
 
+# 来源：本仓检查设计（批 1「读现成结论」型，vehicle_land_detected）。
+# 与上游差异：上游无对应检查；freefall 出现即告警为本仓口径 [暂定]。
 id: px4-land-detection
 name: 落地与自由落体
 group: land_detection

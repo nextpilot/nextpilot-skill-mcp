@@ -7,6 +7,8 @@
 # 那是"从未校准过"的标志。但 Copter 预解锁里已经把"未校准加速度计"挡死了，
 # 加一条规则没有增量信息，本轮不迁。
 
+# 与上游差异：np.hypot 求三轴硬铁偏移模长；阈值照上游。
+# 来源：ardupilot-mcp（U5，PyPI 0.1.2）的 checks/calibration.py；官方文档链接见 facts.yaml 组级 doc（finding 的 docUrl 由它派生）。
 id: apm-calibration-compass-offset
 name: 罗盘校准偏移
 group: calibration

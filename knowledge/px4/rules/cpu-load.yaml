@@ -1,3 +1,8 @@
+# CPU 负载过高（robotto）：cpuload.load 的 armed 段峰值，负载持续过高会掉
+# 控制频率甚至掉日志，与 timing 组的间隔抖动互为印证。阈值 [暂定]：0.90 warn / 0.95 crit。
+# 来源：robotto ai-drone-toolkit（U2）的 cpu_load 检查；字段语义按 PX4 uORB cpuload。
+# 与上游差异：阈值一致（0.90 / 0.95）；实现迁移为声明式规则。
+
 # 一条经验 = 一个自包含单元：身份 / 适用范围 / 计算 / 触发 / 输出
 # 结构说明见 ../rule-schema-design.md；改动后跑 tools/calibrate/compare-baseline.py 验等价
 

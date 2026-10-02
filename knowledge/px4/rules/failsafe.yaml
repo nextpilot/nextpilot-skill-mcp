@@ -3,6 +3,8 @@
 # 合并在这里；每条仍是自包含经验，id 即 finding.ruleId（与原实现一致）。
 # 事件列表由 rising_edge_events / step_into_events 产出，框架按 foreach 展开。
 
+# 来源：robotto ai-drone-toolkit（U2）的 failsafe 检查（对应 fault-kb F007 失控关联标签）。
+# 与上游差异：上游只对 rc/link 两个字段做 armed 过滤；本仓用声明式边沿事件把六条布尔字段全覆盖，armed 过滤更严。
 id: px4-failsafe-failsafe
 name: 失效保护触发
 group: failsafe

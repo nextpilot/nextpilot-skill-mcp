@@ -8,6 +8,8 @@
 # 所以这里改成**按严重度分档的汇总**：先数出安全关键错误有几条、错误总共几条，
 # 再由 triggers 分档。代价是看不出每次发生的时间与具体子系统——记在 PENDING.md。
 
+# 来源：ardupilot-mcp（U5，PyPI 0.1.2）的 checks/events.py；官方文档链接见 facts.yaml 组级 doc（finding 的 docUrl 由它派生）。
+# 与上游差异：判据照上游；MODE 时间线用文本列（原卡构建期 C1，2026-09 解除）。
 id: apm-err-subsystem
 name: 子系统错误（ERR）
 group: events

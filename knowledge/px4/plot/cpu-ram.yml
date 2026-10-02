@@ -1,3 +1,7 @@
+# CPU 负载与内存余量时序，负载持续过高会掉日志、掉控制频率。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的传感器项「CPU & RAM」构造点；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：字段与口径照抄上游。
+
 id: cpu-ram
 title: CPU & RAM
 description: CPU 负载与 RAM 使用率。

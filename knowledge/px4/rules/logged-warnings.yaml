@@ -2,6 +2,8 @@
 # 级别判定用 level_name，理由见 logged-errors.yaml 的说明（迁移前 == 4 永不命中）。
 # 阈值 px4-thresholds.toml [messages]：max_examples=5 / clip=200。
 
+# 来源：robotto ai-drone-toolkit（U2）logged_errors 检查的 WARNING 半边。
+# 与上游差异：上游 ERROR/WARNING 同一个 check 名出两条 finding；本仓拆成独立规则，聚合上限一致。
 id: px4-log-warnings
 name: 日志警告消息
 group: logged_messages

@@ -2,6 +2,8 @@
 # （当年写在算子链上的 `per_instance: worst` 修饰，现在是算子 worst_mean_stats 吃 `[:]` 的分组输入）。
 # 阈值 [来源] Flight Review 振动色带 0.5g / 1g（与 px4-thresholds.toml [vibration] 一致）。
 
+# 来源：robotto ai-drone-toolkit（U2）的 vibration 检查；阈值另对 Flight Review 振动色带。
+# 与上游差异：数据源从 estimator_status.vibe[2] 改为 vehicle_imu_status（4.905 / 9.81 m/s² 口径）；跨实例取「均值最大的实例」。
 id: px4-vibration
 name: 高频振动
 group: vibration

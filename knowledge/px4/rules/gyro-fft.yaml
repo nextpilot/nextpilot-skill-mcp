@@ -3,6 +3,8 @@
 # peak_snr_* 高 = 该频点能量显著（通常是桨叶通过频率或结构共振）。
 # 阈值 [暂定]：SNR 20 为「显著峰值」的经验线，待真实日志标定。
 
+# 来源：本仓检查设计（批 1「读现成结论」型；与 Flight Review 的 FFT 分析路径互证）。
+# 与上游差异：不做 FFT——直读固件写进日志的 sensor_gyro_fft 峰值与信噪比；SNR 20 的「显著峰」经验线 [暂定]。
 id: px4-gyro-fft
 name: 陀螺频谱峰值
 group: gyro_fft

@@ -1,3 +1,7 @@
+# 视觉里程计（VIO）姿态四元数对照。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的 P17「Visual Odometry Attitude」（VIO 五项之一）；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：字段与口径照抄上游。
+
 id: visual-odom-att
 title: Visual Odometry Attitude
 description: 视觉里程计姿态角（仅当 topic 存在时显示）。

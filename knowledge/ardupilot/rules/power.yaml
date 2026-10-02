@@ -10,6 +10,8 @@
 # BAT / CURR 两个 topic 名是固件代际差异（Copter 4.x 用 BAT，3.x 用 CURR，字段同名），
 # 一律用 `BAT || CURR` + ref 候选组成对处理。
 
+# 来源：ardupilot-mcp（U5，PyPI 0.1.2）的 checks/power.py；官方文档链接见 facts.yaml 组级 doc（finding 的 docUrl 由它派生）。
+# 与上游差异：仍走 estimate_cells 电芯估算，阈值未过真实日志验证（[暂定]）。
 id: apm-battery-low
 name: 电池最低电压
 group: battery

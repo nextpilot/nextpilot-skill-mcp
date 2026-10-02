@@ -1,3 +1,7 @@
+# GPS 精度指标（eph/epv/卫星数/PDOP），看定位质量随时间的变化。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的传感器项「GPS Uncertainty」构造点；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：字段与口径照抄上游。
+
 id: gps-uncertainty
 title: GPS Uncertainty
 description: GPS 不确定度：eph / epv / hdop / vdop / s_variance_m_s / satellites_used / fix_type。

@@ -1,3 +1,7 @@
+# 空速与地速对照（含合成风速参考），差值大提示风大或空速管故障。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的 C1「Airspeed」构造点；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：字段与口径照抄上游。
+
 id: airspeed
 title: Airspeed
 description: 地速 / 真空速 / 指示空速与 GPS 地速、空速 setpoint。

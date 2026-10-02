@@ -1,6 +1,8 @@
 # 数据质量 guard：关键 topic 缺失（vehicle_status / battery_status / estimator_status）。
 # 只打 guard 标签，不产 finding；顺序与原实现一致（数组顺序参与比对）。
 
+# 来源：本仓 guard 层设计。
+# 与上游差异：上游无对应机制；关键 topic 缺失只打标签。
 id: px4-guard-topic-missing
 name: 数据质量-关键 topic 缺失
 group: guards

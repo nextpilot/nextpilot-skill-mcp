@@ -4,6 +4,8 @@
 # 取数差异。缺 topic（老固件没记）时整条自动 skip。
 # 注：AUTOTUNE/参数保存工具的批量写也在这里出现，所以只给 info 不给更高严重级。
 
+# 来源：U7 FlightMD 的「确切参数改动」做法；Flight Review 侧只有按钮占位。
+# 与上游差异：上游两家都只列清单/占位；本仓落成 info 级计数检查，缺 topic 自动 skip。
 id: px4-param-changed
 name: 运行中参数修改
 group: param_changes

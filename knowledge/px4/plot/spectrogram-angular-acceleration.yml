@@ -1,3 +1,7 @@
+# 角加速度功率谱密度时频热图，看执行器/结构高频响应。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的 V7「Angular acceleration PSD」构造点；参考做法同 acceleration PSD。
+# 与上游差异：本仓 stft 实现，参数同 spectrogram-acceleration。
+
 id: spectrogram-angular-acceleration
 title: Angular acceleration Power Spectral Density
 description: >

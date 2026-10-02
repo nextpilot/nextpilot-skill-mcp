@@ -1,3 +1,7 @@
+# VTOL 固定翼模式的控制指令曲线（多旋翼与固定翼通道并存时分开看）。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的 C6「Actuator Controls 1（VTOL in Fixed-Wing mode）」；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：仅 VTOL 固定翼段有数据，与上游一致。
+
 id: actuator-controls-1
 title: Actuator Controls 1 (VTOL in Fixed-Wing mode)
 description: 第二组 Actuator Controls（仅 VTOL/固定翼配置时存在）。

@@ -1,3 +1,7 @@
+# XY 轨迹地图（叠加设定点与轨迹线），整段飞行的空间概览。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的 P1「Position plot（DataPlot2D）」；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：字段与口径照抄上游（真值并入候选组）。
+
 id: position
 title: Position
 description: 2D 位置轨迹（vehicle_local_position y vs x），及 setpoint、GPS setpoint。

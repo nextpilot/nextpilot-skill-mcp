@@ -2,6 +2,8 @@
 # 只在「armed 且 nav_state ∈ 固定翼巡航{3 Mission, 8 AltitudeCruise}」时才判，否则中止。
 # 阈值 [暂定] px4-thresholds.toml [airspeed]：invalid_ratio_warn=0.10 / crit=0.50。
 
+# 来源：本仓检查设计（robotto ai-drone-toolkit 的 8 项对表之外，对应本仓 fault-kb 的 F009 空速健康关联标签）；字段语义按 PX4 uORB vehicle_air_speed。
+# 与上游差异：上游无对应检查；「armed 且固定翼巡航段」的窗口过滤为本仓加严，阈值 [暂定]。
 id: px4-airspeed-invalid
 name: 空速健康
 group: airspeed

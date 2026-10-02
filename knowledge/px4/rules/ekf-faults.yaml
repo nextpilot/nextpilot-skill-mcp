@@ -2,6 +2,8 @@
 # bit 0-5 为核心融合故障（速度/水平位置/垂直位置/磁罗盘 XYZ）→ critical；
 # bit 10（视觉速度融合拒绝）在未用 VIO 的飞机上属正常 → 只报 info，避免误报。
 
+# 来源：robotto ai-drone-toolkit（U2）的 ekf_faults 检查。
+# 与上游差异：上游「任一非零即报」；本仓按位分级——bit0-5 核心融合故障 critical、bit10（未用视觉）只 info，比上游细。
 id: px4-ekf-fault
 name: EKF 融合硬故障
 group: ekf_faults

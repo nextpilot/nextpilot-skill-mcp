@@ -7,6 +7,8 @@
 # 组（直报数据），这里是融合后的结果侧。epeh/epv 的直报判据已有（px4-gps-eph），
 # 不在融合侧重复。
 
+# 来源：本仓检查设计（批 A，position 组）。
+# 与上游差异：上游无对应检查；dead_reckoning 状态与 reset_counter 计数口径为本仓设计，阈值 [暂定]。
 ---
 id: px4-gpos-dead-reckoning
 name: 位置惯性推算

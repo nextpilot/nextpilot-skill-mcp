@@ -7,6 +7,8 @@
 # 判据实现：四个主通道同时 < 1000 us（-x > -1000 等价于 x < 1000），
 # 再用 excursion_events 判持续时长（>=2s 或到日志末尾 → critical，否则 warning）。
 
+# 与上游差异：补 excursion_events 后对齐上游「持续 ≥2s」判据。
+# 来源：ardupilot-mcp（U5，PyPI 0.1.2）的 checks/rcin.py；官方文档链接见 facts.yaml 组级 doc（finding 的 docUrl 由它派生）。
 id: apm-rcin-link-loss
 name: 遥控输入链路
 group: rc_input

@@ -14,6 +14,8 @@
 # 上游还有一条 RCOU 饱和的附加说明（只在 critical 时追加），需要在文案里引用另一条
 # 规则的中间量，引擎做不到跨规则取值，故不迁（饱和本身由 apm-motor-saturation 单独报）。
 
+# 来源：ardupilot-mcp（U5，PyPI 0.1.2）的 checks/attitude.py；官方文档链接见 facts.yaml 组级 doc（finding 的 docUrl 由它派生）。
+# 与上游差异：判据对齐上游「持续 1s」，2026-09 补 excursion_events 后恢复为声明式事件。
 id: apm-attitude-roll
 name: 横滚跟踪误差
 group: attitude_tracking

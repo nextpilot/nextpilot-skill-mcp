@@ -16,6 +16,8 @@
 # 各按自己的 topic 现算的，规则用候选组取数**分不清值来自哪个 topic**，所以这里不写
 # outputs.stats——写了就会把 XKF4 的值填进标着 NKF4 的那一项，反而误导。
 
+# 来源：ardupilot-mcp（U5，PyPI 0.1.2）的 checks/ekf.py；官方文档链接见 facts.yaml 组级 doc（finding 的 docUrl 由它派生）。
+# 与上游差异：阈值照上游（CRIT 1.0 / WARN 0.8）；候选组成对写、不写 outputs.stats。
 id: apm-ekf-velocity
 name: EKF 速度检验比
 group: ekf_variance

@@ -1,3 +1,7 @@
+# 局部位置 X 轴（北向）估计值 vs 设定值。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的 P10「Local Position X」；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：SITL 仿真真值并入 _ref 候选组（上游 P14 单独一张图）。
+
 id: local-x
 title: Local Position X
 description: 局部位置 X 轴估计值与 setpoint。

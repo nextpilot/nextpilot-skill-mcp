@@ -1,3 +1,7 @@
+# 加速度功率谱密度时频热图（三轴求和），定位振动频点随时间的变化。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的 V5「Acceleration PSD」构造点；PSD 参考做法另见 ArduPilot WebTools fft.js 与 px4-log-analysis。
+# 与上游差异：本仓 stft 实现：hann 256/128、帧内去均值、三轴 PSD 求和、10·log10（dB）、fs≥100 门。
+
 id: spectrogram-acceleration
 title: Acceleration Power Spectral Density
 description: >

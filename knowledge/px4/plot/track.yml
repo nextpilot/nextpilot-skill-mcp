@@ -1,3 +1,7 @@
+# 地理轨迹地图（按飞行模式着色），整段飞行的地理概览。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的 P2「Leaflet Map」；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：本仓用 map 容器复刻；瓦片源与配色是本仓实现。
+
 id: track
 title: 轨迹
 description: 地图上的飞行轨迹（原始 GNSS），多条轨道叠画、可点选隐藏。

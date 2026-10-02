@@ -1,3 +1,7 @@
+# 陀螺 X 轴单边幅度谱（W5 频谱样板图）。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py） 频谱分析口径；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：上游无单一对应图，本仓按其 FFT 口径实现（W5 样板，后续谱图沿用）。
+
 id: spectrum-gyro
 title: Gyro Spectrum (X)
 description: sensor_combined 陀螺 X 轴的单边幅度谱（字段无关频谱算子；采样率由该话题 timestamp 自推）。

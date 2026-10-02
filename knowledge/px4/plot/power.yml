@@ -1,3 +1,7 @@
+# 电池电压/电流/剩余电量时序，配合电池类规则定位压降与容量问题。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的传感器项「Power」构造点；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：字段与口径照抄上游。
+
 id: power
 title: Power
 description: 电池电压 / 电流 / 放电量 / 剩余电量 / OCV / 内阻 / 5V / 3.3V。

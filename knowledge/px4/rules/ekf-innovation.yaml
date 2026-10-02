@@ -4,6 +4,8 @@
 # 迁移前语义：某实例有主信号就只用主信号（不足 primary_min 个样本则该实例不产出候选）。
 # 阈值 [暂定] px4-thresholds.toml [ekf]：reject_ratio_warn=0.01 / crit=0.05，证据里换算成 %。
 
+# 来源：robotto ai-drone-toolkit（U2）的 ekf_innovations 检查。
+# 与上游差异：上游取瞬时峰值（warn 0.5 / crit 1.0）；本仓改为超阈样本「拒绝占比」1%/5%，扩到 10 路，并加 channel_min=3 去毛刺、带多 EKF 实例定位。
 id: px4-ekf-innovation
 name: EKF 创新检验
 group: ekf_innovations

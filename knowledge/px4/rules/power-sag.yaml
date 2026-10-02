@@ -2,6 +2,8 @@
 # 时序切窗是通用能力：rows_aggregate 把数组字段归约成时间序列，head_tail_median_drop
 # 对任意 (序列, 时间戳, 区间) 计算头/尾中位数落差。
 
+# 来源：本仓检查设计（robotto battery 检查的压降扩展）。
+# 与上游差异：上游无对应检查；「剔除起飞冲击前 5s + 头尾中位落差」口径为本仓设计（head_tail_median_drop 复合算子）。
 id: px4-power-sag
 name: 飞行中持续压降
 group: battery

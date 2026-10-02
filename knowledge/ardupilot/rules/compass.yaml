@@ -12,6 +12,8 @@
 # 另：上游还检查 COMPASS_OFS_* 硬铁偏移，那个依赖参数。当初因为读不到参数（C2）没迁，
 # 2026-09 C2 解除后已迁至 `calibration.yaml`（`np.hypot` 求三轴偏移模长：300/600 mGauss）。
 
+# 与上游差异：CV 判据（0.30 / 0.60）与上游一致；实现改用 std/cv 算子。
+# 来源：ardupilot-mcp（U5，PyPI 0.1.2）的 checks/compass.py；官方文档链接见 facts.yaml 组级 doc（finding 的 docUrl 由它派生）。
 id: apm-compass-interference
 name: 罗盘场强稳定性
 group: compass

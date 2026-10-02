@@ -1,3 +1,7 @@
+# IMU 振动指标（0-1 归一）与削波计数，多 IMU 实例并列。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的振动项「Vibration Metrics」构造点；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：照抄上游唯一硬编码判定的三色背景带 4.905 / 9.81 m/s²。
+
 id: vibration
 title: Vibration Metrics
 description: 每个 IMU 的高频振动指标 IMU0-3 合在一张图上，参考线 4.905 / 9.81。

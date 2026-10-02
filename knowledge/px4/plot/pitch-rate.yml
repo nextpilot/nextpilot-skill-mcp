@@ -1,3 +1,7 @@
+# 俯仰角速率：实测 vs 设定值与积分项。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的 P8「Pitch Angular Rate」；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：字段与口径照抄上游。
+
 id: pitch-rate
 title: Pitch Angular Rate
 description: Pitch 角速度估计值与 setpoint、积分。

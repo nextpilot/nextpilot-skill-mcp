@@ -2,6 +2,8 @@
 # 转换段标志从 vtol_vehicle_status 时间轴向前保持到姿态时间轴；样本过少（<=5）不出结论。
 # 阈值 [暂定] px4-thresholds.toml [vtol]：transition_tilt_deg=8.0。
 
+# 来源：本仓检查设计（对应 fault-kb F003 VTOL 转换异常关联标签）。
+# 与上游差异：上游无对应检查；转换段标志保持到姿态时间轴 + 样本 ≥5 的口径为本仓设计，8° [暂定]。
 id: px4-vtol-transition-attitude
 name: VTOL 转换姿态越限
 group: vtol_transition

@@ -11,6 +11,8 @@
 # `conditions.topics: [PARM]` 是有意的：日志没录参数表时，这三条要在报告里显示成
 # **skipped（缺 PARM）**，而不是"跑了、没发现问题"——后者会让读者以为检查过了。
 
+# 与上游差异：判据照上游；原实现 100% 卡在读不到参数，加 PARAMS 变量 + _cfg() 后转真。
+# 来源：ardupilot-mcp（U5，PyPI 0.1.2）的 checks/config.py；官方文档链接见 facts.yaml 组级 doc（finding 的 docUrl 由它派生）。
 id: apm-config-arming-check
 name: 预解锁检查被禁用
 group: config_safety

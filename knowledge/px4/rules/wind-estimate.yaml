@@ -3,6 +3,8 @@
 # 阈值 [暂定] px4-thresholds.toml [wind]：speed_warn=8.0 / speed_crit=12.0（m/s）。
 # 命中即打 guard 标签 wind_strong：解释姿态类异常时优先归因环境扰动。
 
+# 来源：本仓检查设计（对应 fault-kb F010 风扰关联标签）。
+# 与上游差异：上游无对应检查；1.15 topic 改名（wind_estimate → estimator_wind）用 coalesce 兼容为本仓处理，8/12 m/s [暂定]。
 id: px4-wind-estimate
 name: 风扰估计
 group: wind_estimate

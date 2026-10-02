@@ -6,6 +6,8 @@
 # 直接记一条「not in log」的 skipped，根本不会跑到这里。
 # 阈值 [暂定]：update_count 为 0 = 全程没更新过返航点。
 
+# 来源：本仓检查设计（批 2 补字段）。
+# 与上游差异：上游无对应检查；与 gps-* 的定位质量判定正交，阈值 [暂定]。
 id: px4-home-position
 name: 返航点有效性
 group: home_position

@@ -1,3 +1,7 @@
+# 角速度功率谱密度时频热图，看旋转类振动（桨叶不平衡等）。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的 V6「Angular velocity PSD」构造点；参考做法同 acceleration PSD。
+# 与上游差异：本仓 stft 实现，参数同 spectrogram-acceleration。
+
 id: spectrogram-angular-velocity
 title: Angular velocity Power Spectral Density
 description: >

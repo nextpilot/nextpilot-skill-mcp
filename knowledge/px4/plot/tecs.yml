@@ -1,3 +1,7 @@
+# TECS 总能量控制系统的状态与跟踪量（空速/高度耦合控制）。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的 C2「TECS」构造点；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：字段与口径照抄上游。
+
 id: tecs
 title: TECS
 description: TECS 高度变化率与 setpoint（固定翼/VTOL）。

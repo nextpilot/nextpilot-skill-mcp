@@ -2,6 +2,8 @@
 # 两者都没有但有总压时给 info。取数与回退链收在 cell_voltage_min 一个算子里；
 # 字段名、阈值与文案仍由本文件给出。
 
+# 来源：本仓检查设计（robotto battery 检查的电芯级扩展）。
+# 与上游差异：上游只看 remaining；实测电芯电压优先、两级回退链（总压/电芯数）为本仓设计。
 id: px4-power-cell-voltage
 name: 单电芯电压
 group: battery

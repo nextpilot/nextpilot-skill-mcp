@@ -1,6 +1,8 @@
 # 数据质量 guard：中途重启（同一 topic 时间戳回退）。
 # 只打 guard 标签，不产 finding。
 
+# 来源：本仓 guard 层设计。
+# 与上游差异：上游无对应机制；只打 guard 标签、不产 finding。
 id: px4-guard-restart
 name: 数据质量-中途重启
 group: guards

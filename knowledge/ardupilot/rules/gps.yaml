@@ -12,6 +12,8 @@
 # 代价：不写 ARMED/DISARMED 事件也没有 STAT 的日志（autotest 日志常见）会跳过这两条。
 # 时间戳字段写 `timestamp`：APM 的 TimeUS 由 provider 统一改名（见 providers/ardupilot.py 文件头）。
 
+# 来源：ardupilot-mcp（U5，PyPI 0.1.2）的 checks/gps.py；官方文档链接见 facts.yaml 组级 doc（finding 的 docUrl 由它派生）。
+# 与上游差异：有意偏离——拿不到 armed 窗口时直接 skip，上游退回全程判；阈值 [暂定] 未过真实日志验证。
 id: apm-gps-fix
 name: GPS 定位状态
 group: gps_health

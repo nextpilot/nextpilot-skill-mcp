@@ -7,6 +7,8 @@
 # 间隙那条原先是占位，2026-09 补上 `gap_events` 算子后落地：中位数与阈值比较都封在
 # 算子内（阈值 = max(0.5 s, 10 × 名义间隔)），经验文件里只写"超过阈值的才算间隙"。
 
+# 与上游差异：补 diff/median/sum 后恢复；gap_events 复刻上游取整间隔逻辑。
+# 来源：ardupilot-mcp（U5，PyPI 0.1.2）的 checks/timing.py；官方文档链接见 facts.yaml 组级 doc（finding 的 docUrl 由它派生）。
 id: apm-timing-gaps
 name: 日志间隙
 group: timing

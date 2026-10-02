@@ -15,6 +15,7 @@
 # 引擎 _match_vehicle 支持类别简写，写 vehicle: [copter] 可匹配多旋翼所有精确机型，
 # 但 heli 也在 copter 类别下——将来接线时如要区分，须在 provider 里把 heli 移出 copter。
 
+# 来源：ardupilot-mcp（U5，PyPI 0.1.2）的 checks/motors.py；官方文档链接见 facts.yaml 组级 doc（finding 的 docUrl 由它派生）。
 id: apm-motor-imbalance
 name: 电机输出不平衡
 group: motor_balance

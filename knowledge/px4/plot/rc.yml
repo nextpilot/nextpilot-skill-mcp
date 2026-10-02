@@ -1,3 +1,7 @@
+# 摇杆四通道与开关状态，对照失控/误操作时刻的输入。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的 C3「Manual Control Inputs」+ C4「Raw Radio Control Inputs」；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：上游两张图（新/老固件回退分支）合并为本仓一个文件的候选组。
+
 id: rc
 title: Manual Control Inputs
 description: 手动控制输入（遥控器/手柄）：Roll/Pitch/Yaw/Throttle + Aux + Flight Mode + Kill Switch。

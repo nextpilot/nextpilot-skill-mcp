@@ -11,6 +11,8 @@
 # 第三条只看 MAG.Health 这个数值字段。
 # 上游这一组刻意保守（只报"配置与数据明显矛盾"的），本轮沿用。
 
+# 来源：ardupilot-mcp（U5，PyPI 0.1.2）的 checks/sensors.py；官方文档链接见 facts.yaml 组级 doc（finding 的 docUrl 由它派生）。
+# 与上游差异：判据照上游；「配置但无数据」实现为 _cfg 有值但消息缺失。
 id: apm-sensor-rangefinder
 name: 测距仪配置但无数据
 group: sensor_health

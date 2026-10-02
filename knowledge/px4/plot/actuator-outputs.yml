@@ -1,3 +1,7 @@
+# 执行器最终输出（电机/舵机的 PWM 或单位化值），验证混控与配平是否正常。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的 C8「Actuator Outputs」构造点；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：上游按 Motor/Servo/Main/AUX 展开多张图，本仓合并为一个文件的四容器。
+
 id: actuator-outputs
 title: Actuator Outputs
 description: 执行机构输出（Motor/Servo 或 Main/AUX/EXTRA），取决于 dynamic_control_alloc。

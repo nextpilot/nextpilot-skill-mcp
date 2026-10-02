@@ -1,3 +1,7 @@
+# 测距传感器读数与质量，配合避障与精准降落排查。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的传感器项「Distance Sensor」构造点；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：字段与口径照抄上游。
+
 id: distance
 title: Distance Sensor
 description: 距离传感器读数（current_distance / variance / dist_bottom）。

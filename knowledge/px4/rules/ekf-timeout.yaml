@@ -2,6 +2,8 @@
 # 是位掩码，某路观测（位置/速度/高度/磁……）长时间没进融合就会被置位——EKF 在
 # 盲飞。位或跨实例取并集：任一实例置过位就值得报（与 ekf-faults 同一处理）。
 
+# 来源：ecl_ekf_analysis（U3）的 timeout 语义，robotto（U2）ekf_faults 检查的补全项。
+# 与上游差异：robotto 8 项里没有此项，本仓按 ecl 的 timeout_flags 位语义补全；阈值 [暂定]。
 id: px4-ekf-timeout
 name: EKF 融合超时
 group: ekf_faults

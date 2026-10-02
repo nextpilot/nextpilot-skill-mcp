@@ -14,6 +14,7 @@
 #
 # [暂定]：0.62/0.30 是上游启发式（design choice），未过真实 .bin 校准，见 PENDING.md。
 
+# 来源：ardupilot-mcp（U5，PyPI 0.1.2）的 profile.py（build_profile）；官方文档链接见 facts.yaml 组级 doc（finding 的 docUrl 由它派生）。
 ---
 id: apm-vehicle-profile-hover
 name: 悬停油门 / 动力余量

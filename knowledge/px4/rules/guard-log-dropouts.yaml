@@ -1,6 +1,8 @@
 # 数据质量 guard：日志丢包累计超过阈值（阈值 [暂定] px4-thresholds.toml [guard] dropout_ms=1000）。
 # 只打 guard 标签，不产 finding。
 
+# 来源：本仓 guard 层设计（上游 8 项对表与 Flight Review 均无 guard 概念）。
+# 与上游差异：上游无对应机制；只打 guard 标签、不产 finding。
 id: px4-guard-log-dropouts
 name: 数据质量-日志丢包
 group: guards

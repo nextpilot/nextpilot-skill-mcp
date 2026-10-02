@@ -7,6 +7,8 @@
 #   has_file_corruption → True = 解析过程中遇到坏帧
 # 与 PX4 guard 的做法一致：只打 guard 标签，不产 finding。
 
+# 与上游差异：判据照上游；provider 补 is_log_ok() 后规则补齐。
+# 来源：ardupilot-mcp（U5，PyPI 0.1.2）的 checks/integrity.py；官方文档链接见 facts.yaml 组级 doc（finding 的 docUrl 由它派生）。
 id: apm-guard-integrity
 name: 数据质量-日志完整性
 group: guards_early

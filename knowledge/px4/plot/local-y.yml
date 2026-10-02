@@ -1,3 +1,7 @@
+# 局部位置 Y 轴（东向）估计值 vs 设定值。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的 P10「Local Position Y」；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：同 local-x：真值并入候选组。
+
 id: local-y
 title: Local Position Y
 description: 局部位置 Y 轴估计值与 setpoint。

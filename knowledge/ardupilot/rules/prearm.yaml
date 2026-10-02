@@ -8,6 +8,8 @@
 # not calibrated / unhealthy / inconsistent），最多出 6 条样本引用
 # （上游 MAX_FINDINGS=6），其余截断。
 
+# 与上游差异：判据照上游；用 count_items 的 contains= 做大小写不敏感匹配。
+# 来源：ardupilot-mcp（U5，PyPI 0.1.2）的 checks/prearm.py；官方文档链接见 facts.yaml 组级 doc（finding 的 docUrl 由它派生）。
 id: apm-prearm-warnings
 name: 预解锁/启动消息扫描
 group: prearm_messages

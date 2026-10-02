@@ -1,6 +1,8 @@
 # 模式抖动（robotto）：nav_state 变化次数 > 12 视为抖动。
 # 阈值 [来源] px4-thresholds.toml [mode] thrash_changes=12。
 
+# 来源：robotto ai-drone-toolkit（U2）的 mode_thrash 检查。
+# 与上游差异：阈值一致（nav_state 变化 > 12 次）。
 id: px4-mode-thrash
 name: 飞行模式抖动
 group: mode_thrash

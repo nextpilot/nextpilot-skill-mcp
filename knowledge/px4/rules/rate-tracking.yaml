@@ -10,6 +10,8 @@
 # 在 10 deg/s 量级、yaw 轴偏保守会更大；30/60 取"明显失调"档，等真实日志校准。
 # 映射不到的机型（固定翼 rate setpoint 语义相同）同一口径，暂不分机架。
 
+# 来源：本仓检查设计（批 C；口径对 Flight Review PID 分析的 setpoint vs actual，降压版）。
+# 与上游差异：上游是完整 PID 分析子系统（Wiener 反卷积、分层统计、频域叠窗）；本仓只出 RMS/P95 与最差轴，sp 线性插值对齐。
 ---
 id: px4-rate-tracking-rms
 name: 角速率跟踪误差（RMS）

@@ -1,3 +1,7 @@
+# 三轴原始磁场强度时序，看磁力计饱和/干扰/硬铁偏移突变。
+# 来源：Flight Review（PX4/flight_review，plot/configured_plots.py）的传感器项「Raw Magnetic Field Strength」构造点；字段语义按 PX4 uORB 消息定义（github.com/PX4/PX4-Autopilot/tree/main/msg）。
+# 与上游差异：字段与口径照抄上游。
+
 id: mag
 title: Raw Magnetic Field Strength
 description: 传感器原始磁场强度（magnetometer_ga），兼容 vehicle_magnetometer / sensor_combined。

@@ -1,6 +1,8 @@
 # 加速度计削波（robotto）：accel_clipping[3] 是单调累计计数，取「末值 − 首值」为全日志
 # 累计削波次数；跨 IMU 实例与轴向取最大者。阈值 [暂定] 100 / 1000 次，1~99 次报 info。
 
+# 来源：本仓检查设计；字段语义按 PX4 uORB vehicle_imu_status 的 accel_clipping[3]（单调累计计数）。原头注 (robotto) 标注有误：robotto 的 diagnose_flight 8 项里没有削波检查，2026-10 修正。
+# 与上游差异：上游无对应检查；跨实例/轴向取最大与 100/1000 次分档 [暂定] 为本仓设计。
 id: px4-imu-clipping
 name: 加速度计削波
 group: vibration

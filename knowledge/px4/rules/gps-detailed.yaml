@@ -3,6 +3,8 @@
 # check_fail_* 非零 = 该项检查未通过；checks_passed = 0 表示该帧整体判不通过。
 # 阈值 [暂定]：以固件判定为准，本仓只统计不通过帧数。
 
+# 来源：本仓检查设计（批 1「读现成结论」型，estimator_gps_status）。
+# 与上游差异：上游无对应检查；读固件逐项判定结论位，不重推，阈值 [暂定]。
 id: px4-gps-detailed
 name: GPS 检查明细
 group: gps_detailed

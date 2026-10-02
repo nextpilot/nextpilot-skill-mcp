@@ -5,6 +5,8 @@
 #   bit5 速度差超限 bit6 水平位置差 bit7 垂直位置差
 # 阈值 [暂定]：占比 0.5、样本 100（约 10s@10Hz）。
 
+# 来源：Auterion ecl_ekf_analysis（U3，EKF 阈值权威）的 GPS 检查失败分析；文档见 PX4 tuning_the_ecl_ekf。
+# 与上游差异：上游为批处理报告口径；本仓改为 armed 段拒绝占比 ≥0.5 且坏样本 ≥100 的判定，阈值 [暂定]。
 id: px4-ekf-gps-check-fails
 name: EKF 拒收 GPS（解锁后）
 group: ekf_faults

@@ -12,6 +12,8 @@
 # 为什么不写 outputs.stats：三轴峰值与三个削波数都由 facts.yaml 的 metrics 就地现算
 # （同一口径、同一处维护），规则再产一份只会让"同一个数字两处算"将来分叉。
 
+# 来源：ardupilot-mcp（U5，PyPI 0.1.2）的 checks/vibration.py；官方文档链接见 facts.yaml 组级 doc（finding 的 docUrl 由它派生）。
+# 与上游差异：阈值照上游（WARN 30 / CRIT 60 m/s²）；上游一条 check 出多条 finding，本仓按「一条规则一条 finding」拆 6 条。
 id: apm-vibration-x
 name: X 轴振动
 group: vibration

@@ -5,6 +5,8 @@
 #
 # 横轴：显式声明 vehicle_angular_velocity.timestamp（误差定义在实测轴上；不显式写
 # 会被 compute 里第一个裸字段反推成 setpoint 的时间轴，长度对不上直接报错）。
+# 来源：本仓原创（批 C，角速率跟踪误差规则 px4-rate-tracking 的配套曲线）；口径对 Flight Review PID 分析的 setpoint vs actual。
+# 与上游差异：上游 PID 分析是完整子系统（反卷积求阶跃响应），本仓是降压版——sp 线性插值到实测轴逐时刻作差。
 id: rate-error
 title: Rate Tracking Error
 description: >
