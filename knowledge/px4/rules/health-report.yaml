@@ -1,0 +1,126 @@
+# 健康与解锁检查汇总（health_report，PX4 1.16+）：固件把「哪个子系统不健康、
+# 哪项解锁检查不过」算成了位图，本仓只读位透传，不从原始数据重推。
+# 三张位图口径：
+#   health_error_flags       health_component_t 位图：某子系统 required 但 error
+#   arming_check_error_flags 解锁检查错误位图：置位 = 该项检查不过，解锁会被拒
+#   can_arm_mode_flags       每个飞行模式一位：能否在该模式下解锁（NAVIGATION_STATE_*）
+#
+# 位名不写死：health_component_t 的位序随版本扩（1.16 起是 64 位），mask 数值
+# 配合地面站健康页/解锁检查报告定位。多实例不存在（单例 topic），直读即可。
+
+---
+id: px4-health-errors
+name: 子系统健康错误
+group: health
+order: 1
+tag: health_error_flags_set
+version: 1.0.0
+
+condition:
+  message:
+    - health_report
+
+compute:
+  # 任意时刻健康错误位的并集（日志里全程出现过哪些错误子系统）
+  - err_mask = bit_or_max(health_report.health_error_flags)
+  - warn_mask = bit_or_max(health_report.health_warning_flags)
+
+output:
+  - name: healthErrorMask
+    value: err_mask
+  - name: healthWarningMask
+    value: warn_mask
+
+# 固件自报的判定，本仓不设阈值：非零即报
+
+trigger:
+  - when: "err_mask > 0"
+    severity: critical
+    suggestion: "健康检查报告子系统处于错误状态（对照 QGC 健康页按位定位：陀螺/加速度计/磁罗盘/气压计/GPS…）。required 的子系统出错会直接拒绝解锁或触发失效保护。"
+    description: "子系统健康错误位图 err_mask={err_mask}"
+    evidence:
+      source: health_report.health_error_flags(位并集)
+      value: err_mask
+      threshold: 0
+  - when: "warn_mask > 0"
+    severity: warning
+    suggestion: "健康检查报告子系统处于警告状态（能飞但余量不足）：常见为磁罗盘干扰强、GPS 精度差、传感器一致性偏差。结合飞行表现决定是否排查。"
+    description: "子系统健康警告位图 warn_mask={warn_mask}"
+    evidence:
+      source: health_report.health_warning_flags(位并集)
+      value: warn_mask
+      threshold: 0
+
+---
+id: px4-arming-check-errors
+name: 解锁检查报错
+group: health
+order: 2
+tag: arming_check_error
+version: 1.0.0
+
+condition:
+  message:
+    - health_report
+
+compute:
+  - arm_err = bit_or_max(health_report.arming_check_error_flags)
+  - arm_warn = bit_or_max(health_report.arming_check_warning_flags)
+
+output:
+  - name: armingCheckErrorMask
+    value: arm_err
+  - name: armingCheckWarningMask
+    value: arm_warn
+
+# 固件自报的判定，本仓不设阈值
+
+trigger:
+  - when: "arm_err > 0"
+    severity: critical
+    suggestion: "解锁检查有错误项（对应 QGC 解锁按钮旁的红字报告）：按报告项处理——校准、传感器一致性、失效保护配置等。带错误解锁会被固件直接拒绝。"
+    description: "解锁检查错误位图 arm_err={arm_err}"
+    evidence:
+      source: health_report.arming_check_error_flags(位并集)
+      value: arm_err
+      threshold: 0
+  - when: "arm_warn > 0"
+    severity: warning
+    suggestion: "解锁检查有警告项（不阻止解锁但值得关注）：多为电池电量、GPS 精度、home 未设置这类可在起飞前消除的问题。"
+    description: "解锁检查警告位图 arm_warn={arm_warn}"
+    evidence:
+      source: health_report.arming_check_warning_flags(位并集)
+      value: arm_warn
+      threshold: 0
+
+---
+id: px4-armability
+name: 全模式不可解锁
+group: health
+order: 3
+tag: cannot_arm_any_mode
+version: 1.0.0
+
+condition:
+  message:
+    - health_report
+
+compute:
+  # can_arm_mode_flags 每模式一位；全程从未有任何一位可解锁 = 系统性不可用
+  - armable = max(health_report.can_arm_mode_flags)
+
+output:
+  - name: armableModeMaskMax
+    value: armable
+
+# 全程从未能解锁：不设阈值，判"是否存在过"
+
+trigger:
+  - when: "armable == 0"
+    severity: critical
+    suggestion: "整段日志里没有任何飞行模式允许解锁：硬件故障或关键配置缺失（校准/失效保护/电池设置）。先看解锁检查报告的具体错误项，别先怀疑个别飞行模式。"
+    description: "全程无可解锁模式（can_arm_mode_flags 恒 0）"
+    evidence:
+      source: health_report.can_arm_mode_flags(max)
+      value: armable
+      threshold: 0

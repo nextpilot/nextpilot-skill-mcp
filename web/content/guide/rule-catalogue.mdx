@@ -7,7 +7,7 @@ group: 开发指南
 groupEn: For Developers
 order: 12
 ---
-引擎当前内置的 **92 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
+引擎当前内置的 **95 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
 每条给出：**适用**（固件 / 机架 / 依赖）、**取值**（读哪些字段、过哪个算子）、**判定**（自上而下
 命中第一条即发射）、**产出**（写进报告的 check 名、喂故障库匹配的标签、UI 用的统计）。
 
@@ -808,6 +808,43 @@ order: 12
 - <strong>warning</strong> | `snr_max >= 20.0` | threshold 20 | description "陀螺频谱峰值显著（三轴最大 SNR=\{snr_max:.1f\}，Z 轴峰频 \{freq_z:.0f\} Hz）"
 - <strong>info</strong> | `snr_max >= 12.0` | threshold 12 | description "陀螺频谱存在峰值（SNR=\{snr_max:.1f\}，X/Y/Z 峰频 \{freq_x:.0f\}/\{freq_y:.0f\}/\{freq_z:.0f\} Hz）"
 - 产出：gyroFftSnrMax=snr_max, gyroFftPeakFreqHz=freq_z, tag=gyro_fft_peak
+
+
+## health（group: `health`）
+
+### px4-health-errors — 子系统健康错误
+
+- 文件：`rules/health-report.yaml` ｜ 位置：group `health` #1
+- 适用：总是适用
+- 取值：
+- `err_mask = bit_or_max(health_report.health_error_flags)`
+- `warn_mask = bit_or_max(health_report.health_warning_flags)`
+- 判定：
+- <strong>critical</strong> | `err_mask > 0` | threshold 0 | description "子系统健康错误位图 err_mask=\{err_mask\}"
+- <strong>warning</strong> | `warn_mask > 0` | threshold 0 | description "子系统健康警告位图 warn_mask=\{warn_mask\}"
+- 产出：healthErrorMask=err_mask, healthWarningMask=warn_mask, tag=health_error_flags_set
+
+### px4-arming-check-errors — 解锁检查报错
+
+- 文件：`rules/health-report.yaml` ｜ 位置：group `health` #2
+- 适用：总是适用
+- 取值：
+- `arm_err = bit_or_max(health_report.arming_check_error_flags)`
+- `arm_warn = bit_or_max(health_report.arming_check_warning_flags)`
+- 判定：
+- <strong>critical</strong> | `arm_err > 0` | threshold 0 | description "解锁检查错误位图 arm_err=\{arm_err\}"
+- <strong>warning</strong> | `arm_warn > 0` | threshold 0 | description "解锁检查警告位图 arm_warn=\{arm_warn\}"
+- 产出：armingCheckErrorMask=arm_err, armingCheckWarningMask=arm_warn, tag=arming_check_error
+
+### px4-armability — 全模式不可解锁
+
+- 文件：`rules/health-report.yaml` ｜ 位置：group `health` #3
+- 适用：总是适用
+- 取值：
+- `armable = max(health_report.can_arm_mode_flags)`
+- 判定：
+- <strong>critical</strong> | `armable == 0` | threshold 0 | description "全程无可解锁模式（can_arm_mode_flags 恒 0）"
+- 产出：armableModeMaskMax=armable, tag=cannot_arm_any_mode
 
 
 ## home_position（group: `home_position`）

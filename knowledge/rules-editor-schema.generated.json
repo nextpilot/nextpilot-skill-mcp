@@ -41,6 +41,7 @@
         "guards",
         "guards_early",
         "gyro_fft",
+        "health",
         "home_position",
         "imu_bias",
         "integrity",
