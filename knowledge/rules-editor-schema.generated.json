@@ -51,6 +51,7 @@
         "mode_thrash",
         "motor_balance",
         "param_audit",
+        "position",
         "power_supply",
         "prearm_messages",
         "range_finder",

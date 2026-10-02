@@ -7,7 +7,7 @@ group: 开发指南
 groupEn: For Developers
 order: 12
 ---
-引擎当前内置的 **101 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
+引擎当前内置的 **104 条检查经验**，按执行位置（slot，即下面每一节的标题）分组。
 每条给出：**适用**（固件 / 机架 / 依赖）、**取值**（读哪些字段、过哪个算子）、**判定**（自上而下
 命中第一条即发射）、**产出**（写进报告的 check 名、喂故障库匹配的标签、UI 用的统计）。
 
@@ -1091,6 +1091,45 @@ order: 12
 - 判定：
 - <strong>warning</strong> | `fence_enable == 1 and fence_alt <= 0.0 and fence_radius <= 0.0` | threshold 非空边界 | description "围栏已启用但没有高度或半径边界"
 - 产出：tag=apm_param_fence_empty
+
+
+## position（group: `position`）
+
+### px4-gpos-dead-reckoning — 位置惯性推算
+
+- 文件：`rules/global-position.yaml` ｜ 位置：group `position` #1
+- 适用：总是适用
+- 取值：
+- `m = interval_mask(vehicle_global_position.timestamp, ARMED_INTERVALS)`
+- `dr_armed = apply_mask(vehicle_global_position.dead_reckoning, m)`
+- `dr_frac = count_above(dr_armed, gt=0.0) / len(dr_armed) if len(dr_armed) > 0 else 0`
+- 判定：
+- <strong>warning</strong> | `dr_frac >= 0.05` | threshold 0.05 | description "armed 段 \{dr_frac:.0%\} 时间处于惯性推算"
+- 产出：deadReckoningFrac=dr_frac, tag=dead_reckoning_used
+
+### px4-gpos-reset — EKF 位置重置
+
+- 文件：`rules/global-position.yaml` ｜ 位置：group `position` #2
+- 适用：总是适用
+- 取值：
+- `n_h = int(max(vehicle_global_position.lat_lon_reset_counter) - min(vehicle_global_position.lat_lon_reset_counter))`
+- `n_v = int(max(vehicle_global_position.alt_reset_counter) - min(vehicle_global_position.alt_reset_counter))`
+- `n_reset = n_h + n_v`
+- 判定：
+- <strong>warning</strong> | `n_reset > 0` | threshold 0 | description "EKF 位置/高度重置 \{n_reset\} 次（水平 \{n_h\} / 高度 \{n_v\}）"
+- 产出：posResetCount=n_reset, posResetHorizontal=n_h, posResetVertical=n_v, tag=ekf_position_reset
+
+### px4-gpos-never-valid — 位置估计从未有效
+
+- 文件：`rules/global-position.yaml` ｜ 位置：group `position` #3
+- 适用：总是适用
+- 取值：
+- `latlon_ok = max(vehicle_global_position.lat_lon_valid)`
+- `alt_ok = max(vehicle_global_position.alt_valid)`
+- 判定：
+- <strong>critical</strong> | `latlon_ok == 0` | threshold 0 | description "armed 段水平位置估计从未有效"
+- <strong>critical</strong> | `alt_ok == 0` | threshold 0 | description "armed 段高度估计从未有效"
+- 产出：latLonEverValid=latlon_ok, altEverValid=alt_ok, tag=position_never_valid
 
 
 ## power_supply（group: `power_supply`）

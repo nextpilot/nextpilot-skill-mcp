@@ -1,0 +1,124 @@
+# 位置估计可信度（vehicle_global_position，EKF 融合输出）：
+#   dead_reckoning   惯性推算状态（0 = 有绝对参考；非 0 = 一段时间没有绝对参考）
+#   *_reset_counter  EKF 位置/高度重置次数（单调递增，每次重置 = 估计位置跳一次）
+#   lat_lon_valid / alt_valid  该时刻位置/高度估计是否有效
+#
+# 这组规则看的是「位置估计还能不能信」——GPS 硬件质量在 gps_health / gps_detailed
+# 组（直报数据），这里是融合后的结果侧。epeh/epv 的直报判据已有（px4-gps-eph），
+# 不在融合侧重复。
+
+---
+id: px4-gpos-dead-reckoning
+name: 位置惯性推算
+group: position
+order: 1
+tag: dead_reckoning_used
+version: 1.0.0
+
+condition:
+  message:
+    - vehicle_global_position
+  armed: true
+
+compute:
+  # armed 段处于推算状态（无绝对位置参考）的帧占比
+  - m = interval_mask(vehicle_global_position.timestamp, ARMED_INTERVALS)
+  - dr_armed = apply_mask(vehicle_global_position.dead_reckoning, m)
+  - dr_frac = count_above(dr_armed, gt=0.0) / len(dr_armed) if len(dr_armed) > 0 else 0
+
+output:
+  - name: deadReckoningFrac
+    value: dr_frac
+    round: 3
+
+trigger:
+  - when: "dr_frac >= 0.05"
+    severity: warning
+    suggestion: "飞行中有 5% 以上的时间 EKF 没有绝对位置参考（GPS/视觉丢失或精度骤降，靠惯性推算飞行）：查 GPS 收星环境（遮挡/干扰）与视觉/运动捕捉系统是否掉线。推算期间位置会持续漂移，返航与任务航点都会偏。"
+    description: "armed 段 {dr_frac:.0%} 时间处于惯性推算"
+    evidence:
+      source: vehicle_global_position.dead_reckoning(armed 段占比)
+      value: f"{dr_frac:.3f}"
+      threshold: 0.05
+
+---
+id: px4-gpos-reset
+name: EKF 位置重置
+group: position
+order: 2
+tag: ekf_position_reset
+version: 1.0.0
+
+condition:
+  message:
+    - vehicle_global_position
+  armed: true
+
+compute:
+  # 重置计数单调递增；增量 = 日志期间的重置次数（水平与高度分开计）
+  - n_h = int(max(vehicle_global_position.lat_lon_reset_counter) - min(vehicle_global_position.lat_lon_reset_counter))
+  - n_v = int(max(vehicle_global_position.alt_reset_counter) - min(vehicle_global_position.alt_reset_counter))
+  - n_reset = n_h + n_v
+
+output:
+  - name: posResetCount
+    value: n_reset
+  - name: posResetHorizontal
+    value: n_h
+  - name: posResetVertical
+    value: n_v
+
+# 每次重置都是一次位置跳变，一次也不该有；无固件判据，本仓不设阈值
+
+trigger:
+  - when: "n_reset > 0"
+    severity: warning
+    suggestion: "EKF 在飞行中重置了位置估计（水平 {n_h} 次 / 高度 {n_v} 次）：每次重置都会让位置或高度瞬间跳一下，任务飞行会表现为航点突然偏移。常见诱因是 GPS 信号突变、气压计漂移被纠正、磁航向修正。结合 innovations 组与 GPS 质量排查。"
+    description: "EKF 位置/高度重置 {n_reset} 次（水平 {n_h} / 高度 {n_v}）"
+    evidence:
+      source: vehicle_global_position.*_reset_counter(增量)
+      value: n_reset
+      threshold: 0
+
+---
+id: px4-gpos-never-valid
+name: 位置估计从未有效
+group: position
+order: 3
+tag: position_never_valid
+version: 1.0.0
+
+condition:
+  message:
+    - vehicle_global_position
+  armed: true
+
+compute:
+  - latlon_ok = max(vehicle_global_position.lat_lon_valid)
+  - alt_ok = max(vehicle_global_position.alt_valid)
+
+output:
+  - name: latLonEverValid
+    value: latlon_ok
+  - name: altEverValid
+    value: alt_ok
+
+# armed 段从未有效：不设阈值，判"是否存在过"
+
+trigger:
+  - when: "latlon_ok == 0"
+    severity: critical
+    suggestion: "解锁后位置估计从未有效（GPS 完全不可用或 EKF 拒绝融合）：纯推算起飞，位置回传与返航都不可信。立即检查 GPS 硬件、安装位置与 EKF 门限参数。"
+    description: "armed 段水平位置估计从未有效"
+    evidence:
+      source: vehicle_global_position.lat_lon_valid(max)
+      value: latlon_ok
+      threshold: 0
+  - when: "alt_ok == 0"
+    severity: critical
+    suggestion: "解锁后高度估计从未有效：气压计数据被 EKF 拒绝（冲突/漂移/未接）。高度环实际在用 GPS 或推算高度，着陆判断不可靠。"
+    description: "armed 段高度估计从未有效"
+    evidence:
+      source: vehicle_global_position.alt_valid(max)
+      value: alt_ok
+      threshold: 0

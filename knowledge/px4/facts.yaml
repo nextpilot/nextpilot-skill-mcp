@@ -26,6 +26,7 @@ group_order:
         vibration,
         ekf_innovations,
         ekf_faults,
+        position,
         baro,
         range_finder,
         battery,
@@ -76,6 +77,7 @@ rule_meta:
         battery: { category: power, doc: "https://docs.px4.io/main/en/config/battery.html" }
         cpu: { category: system, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
         ekf_faults: { category: ekf, doc: "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html" }
+        position: { category: ekf, doc: "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html" }
         baro: { category: sensor, doc: "https://docs.px4.io/main/en/log/flight_log_analysis.html" }
         range_finder: { category: sensor, doc: "https://docs.px4.io/main/en/computer_vision/object_avoidance.html" }
         ekf_innovations: { category: ekf, doc: "https://docs.px4.io/main/en/advanced_config/tuning_the_ecl_ekf.html" }
